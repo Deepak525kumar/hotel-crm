@@ -37,16 +37,20 @@ model User {
   verifications         QualityVerification[]
   ratings_received      Rating[]          @relation("ratings_received")
   ratings_given         Rating[]          @relation("ratings_given")
+  overall_rating        WorkerOverallRating?
   contracts             Contract[]        @relation("worker_contract")
   created_contracts     Contract[]        @relation("created_contract")
+  documents             WorkerDocument[]
   uploaded_documents    WorkerDocument[]  @relation("uploaded_by")
+  data_retention_logs   DataRetentionLog[]
   payroll_records       Payroll[]
   work_assignments      WorkerAssignment[]
+  assigned_worker_assignments WorkerAssignment[] @relation("assigned_by")
   created_work_requests WorkRequest[]
-  assigned_work_requests WorkRequest[]    @relation("assigned_by")
   created_operations    DailyOperation[]  @relation("created_by")
   notifications         Notification[]
   audit_logs            AuditLog[]
+  consent_logs          ConsentLog[]
 
   @@index([role])
   @@index([is_active])
@@ -93,7 +97,9 @@ model Hotel {
   daily_operations    DailyOperation[]
   work_requests       WorkRequest[]
   contracts           Contract[]
+  contract_templates  ContractTemplate[]
   documents           WorkerDocument[]
+  required_documents  RequiredDocument[]
   payroll_records     Payroll[]
   verifications       QualityVerification[]
   ratings             Rating[]
@@ -440,7 +446,7 @@ model WorkerAssignment {
   // Relations
   daily_operations      DailyOperation[]
 
-  @@unique([ worker_id, status], where: { status: { in: ["ASSIGNED", "IN_PROGRESS"] } })
+  @@unique([worker_id, status])
   @@index([worker_id])
   @@index([work_request_id])
   @@index([status])
