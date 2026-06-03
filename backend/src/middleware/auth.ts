@@ -4,7 +4,7 @@ import { UnauthorizedError } from '../lib/errors.js';
 
 export async function authMiddleware(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
@@ -40,7 +40,7 @@ export async function authMiddleware(
 
 export function optionalAuthMiddleware(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void {
   try {

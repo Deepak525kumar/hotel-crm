@@ -7,31 +7,31 @@ import { BaseService } from '../../lib/base-service.js';
  * This is a skeleton for the modular monolith structure
  */
 export class CrmService extends BaseService {
-  async createHotel(data: Record<string, unknown>) {
+  async createHotel(_data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async getHotel(hotelId: string) {
+  async getHotel(_hotelId: string) {
     throw new Error('Not implemented');
   }
 
-  async listHotels(filters?: Record<string, unknown>) {
+  async listHotels(_filters?: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async createRoom(hotelId: string, data: Record<string, unknown>) {
+  async createRoom(_hotelId: string, _data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async createTask(hotelId: string, data: Record<string, unknown>) {
+  async createTask(_hotelId: string, _data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async completeTask(taskId: string, userId: string) {
+  async completeTask(_taskId: string, _userId: string) {
     throw new Error('Not implemented');
   }
 
-  async uploadTaskPhoto(taskId: string, file: Buffer, metadata?: Record<string, unknown>) {
+  async uploadTaskPhoto(_taskId: string, _file: Buffer, _metadata?: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 }

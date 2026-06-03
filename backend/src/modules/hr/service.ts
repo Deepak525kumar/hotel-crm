@@ -1,23 +1,23 @@
 import { BaseService } from '../../lib/base-service.js';
 
 export class HrService extends BaseService {
-  async createContract(data: Record<string, unknown>) {
+  async createContract(_data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async listContracts(filters?: Record<string, unknown>) {
+  async listContracts(_filters?: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async createPayroll(data: Record<string, unknown>) {
+  async createPayroll(_data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async listPayroll(filters?: Record<string, unknown>) {
+  async listPayroll(_filters?: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async uploadDocument(workerId: string, file: Buffer, metadata?: Record<string, unknown>) {
+  async uploadDocument(_workerId: string, _file: Buffer, _metadata?: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 }

@@ -1,23 +1,23 @@
 import { BaseService } from '../../lib/base-service.js';
 
 export class StaffingService extends BaseService {
-  async createWorkRequest(data: Record<string, unknown>) {
+  async createWorkRequest(_data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async assignWorkers(workRequestId: string, data: Record<string, unknown>) {
+  async assignWorkers(_workRequestId: string, _data: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async getAvailableWorkers(hotelId: string, date: string) {
+  async getAvailableWorkers(_hotelId: string, _date: string) {
     throw new Error('Not implemented');
   }
 
-  async startAssignment(assignmentId: string) {
+  async startAssignment(_assignmentId: string) {
     throw new Error('Not implemented');
   }
 
-  async completeAssignment(assignmentId: string) {
+  async completeAssignment(_assignmentId: string) {
     throw new Error('Not implemented');
   }
 }

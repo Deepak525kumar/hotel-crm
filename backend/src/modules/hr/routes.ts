@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { requirePermission, checkHotelAccess } from '../../middleware/permissions.js';
+import { requirePermission } from '../../middleware/permissions.js';
 import { hrController } from './controller.js';
 
 const router = Router();

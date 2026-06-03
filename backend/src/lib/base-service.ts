@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { getPrisma } from './db.js';
 
 export class BaseService {
@@ -19,7 +20,7 @@ export class BaseService {
         action,
         resource_type,
         resource_id,
-        details: details || null,
+        details: details ? (details as Prisma.InputJsonValue) : Prisma.JsonNull,
         ip_address: ip_address || null,
         timestamp: new Date(),
       },

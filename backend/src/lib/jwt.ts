@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { getEnv } from '../config/env.js';
 import { logger } from './logger.js';
 
@@ -27,18 +27,20 @@ export interface JwtTokens {
 
 export function signAccessToken(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): string {
   const env = getEnv();
-  return jwt.sign(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRY,
+  const options: SignOptions = {
+    expiresIn: env.JWT_ACCESS_EXPIRY as SignOptions['expiresIn'],
     algorithm: 'HS256',
-  });
+  };
+  return jwt.sign(payload, env.JWT_SECRET, options);
 }
 
 export function signRefreshToken(userId: string): string {
   const env = getEnv();
-  return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRY,
+  const options: SignOptions = {
+    expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
     algorithm: 'HS256',
-  });
+  };
+  return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_SECRET, options);
 }
 
 export function signTokens(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): JwtTokens {

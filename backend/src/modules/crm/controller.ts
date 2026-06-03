@@ -77,7 +77,7 @@ export class CrmController {
     }
   }
 
-  async uploadPhoto(req: Request, res: Response, next: NextFunction) {
+  async uploadPhoto(_req: Request, _res: Response, next: NextFunction) {
     try {
       // TODO: Handle file upload
       throw new Error('Not implemented');

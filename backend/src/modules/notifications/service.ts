@@ -1,23 +1,23 @@
 import { BaseService } from '../../lib/base-service.js';
 
 export class NotificationService extends BaseService {
-  async sendNotification(userId: string, payload: Record<string, unknown>) {
+  async sendNotification(_userId: string, _payload: Record<string, unknown>) {
     throw new Error('Not implemented');
   }
 
-  async getNotifications(userId: string) {
+  async getNotifications(_userId: string) {
     throw new Error('Not implemented');
   }
 
-  async markAsRead(notificationId: string) {
+  async markAsRead(_notificationId: string) {
     throw new Error('Not implemented');
   }
 
-  async sendEmail(email: string, subject: string, body: string) {
+  async sendEmail(_email: string, _subject: string, _body: string) {
     throw new Error('Not implemented');
   }
 
-  async sendPushNotification(userId: string, title: string, body: string) {
+  async sendPushNotification(_userId: string, _title: string, _body: string) {
     throw new Error('Not implemented');
   }
 }

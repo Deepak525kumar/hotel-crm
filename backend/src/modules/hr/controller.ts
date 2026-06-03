@@ -54,7 +54,7 @@ export class HrController {
     }
   }
 
-  async uploadDocument(req: Request, res: Response, next: NextFunction) {
+  async uploadDocument(_req: Request, _res: Response, next: NextFunction) {
     try {
       throw new Error('Not implemented');
     } catch (error) {

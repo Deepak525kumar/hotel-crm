@@ -3,7 +3,7 @@ import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 
 export function requirePermission(permissions: string | string[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.auth) {
       next(new UnauthorizedError('Authentication required'));
       return;
@@ -61,7 +61,7 @@ export function requirePermission(permissions: string | string[]) {
 }
 
 export function requireRole(roles: string | string[]) {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.auth) {
       next(new UnauthorizedError('Authentication required'));
       return;
@@ -92,7 +92,7 @@ export function requireRole(roles: string | string[]) {
 }
 
 export function checkHotelAccess() {
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.auth) {
       next(new UnauthorizedError('Authentication required'));
       return;
