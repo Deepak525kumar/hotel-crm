@@ -18,7 +18,9 @@ apt-get install -y -qq \
   curl wget git unzip \
   nginx \
   docker.io docker-compose-plugin \
-  ufw fail2ban
+  ufw fail2ban \
+  postgresql-client \
+  awscli
 
 echo "==> [3/9] Create deploy user"
 if ! id -u "$DEPLOY_USER" &>/dev/null; then
