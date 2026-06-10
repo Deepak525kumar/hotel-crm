@@ -22,15 +22,25 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
 
-      - name: Install deps
+      - name: Install backend deps
         run: npm ci --omit=dev
         working-directory: backend
 
-      - name: Build
+      - name: Build backend
         run: npm run build
         working-directory: backend
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
 
       - name: Run migrations (staging)
         run: npx prisma migrate deploy
@@ -52,7 +62,13 @@ jobs:
             cd backend
             npm ci --omit=dev
             npm run build
+            cd ../frontend
+            npm ci
+            npm run build
+            cd ..
             pm2 restart hotel-crm-api --update-env
+            pm2 restart hotel-crm-web --update-env
             sleep 5
-            curl -sf http://localhost:3001/api/v1/health || { echo "Health check failed"; exit 1; }
+            curl -sf http://localhost:3001/api/v1/health || { echo "Backend health check failed"; exit 1; }
+            curl -sf http://localhost:3000/ >/dev/null || { echo "Frontend health check failed"; exit 1; }
             echo "Staging deploy successful: $(date -u)"
