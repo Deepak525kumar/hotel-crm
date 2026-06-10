@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: ci
     environment: production   # requires manual approval configured in GitHub Environments
+    permissions:
+      contents: write   # required to push the release tag back to the repo
 
     steps:
       - uses: actions/checkout@v4
@@ -47,14 +49,32 @@ jobs:
           script: |
             set -e
             cd /opt/hotel-crm
+            # Capture the currently-deployed commit BEFORE updating, so we can
+            # restore the last known good release if the new one fails health checks.
+            PREV_SHA="$(git rev-parse HEAD)"
+            echo "Previous (last known good) release: $PREV_SHA"
             git fetch origin main
             git checkout origin/main
+            NEW_SHA="$(git rev-parse HEAD)"
+            echo "New release candidate: $NEW_SHA"
+
+            rollback() {
+              echo "Health check failed — rolling back to $PREV_SHA"
+              cd /opt/hotel-crm
+              git checkout "$PREV_SHA"
+              cd backend
+              npm ci --omit=dev
+              npm run build
+              pm2 reload hotel-crm-api --update-env || pm2 restart hotel-crm-api --update-env
+              exit 1
+            }
+
             cd backend
             npm ci --omit=dev
             npm run build
             pm2 reload hotel-crm-api --update-env
             sleep 10
-            curl -sf http://localhost:3001/api/v1/health || { echo "Health check failed — rolling back"; pm2 restart hotel-crm-api; exit 1; }
+            curl -sf http://localhost:3001/api/v1/health || rollback
             echo "Production deploy successful: $(date -u)"
 
       - name: Tag release
