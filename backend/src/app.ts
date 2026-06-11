@@ -1,7 +1,6 @@
 import express, { Express } from 'express';
 import { getEnv } from './config/env.js';
 import { requestLoggerMiddleware } from './middleware/requestLogger.js';
-// import { authMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { logger } from './lib/logger.js';
 import v1Router from './routes/v1/index.js';
