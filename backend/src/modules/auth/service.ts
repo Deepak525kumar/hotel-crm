@@ -8,10 +8,11 @@ import {
   ForbiddenError,
 } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
-import { SignupRequest, LoginRequest, RefreshTokenRequest, AuthResponse, UpdateProfileRequest } from './validation.js';
+import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest } from './validation.js';
+import { AuthTokens } from './types.js';
 
 export class AuthService extends BaseService {
-  async signup(data: SignupRequest, ip?: string): Promise<AuthResponse> {
+  async signup(data: SignupRequest, ip?: string): Promise<AuthTokens> {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
       throw new ConflictError('Email already registered');
@@ -38,6 +39,7 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
+      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 
@@ -57,11 +59,12 @@ export class AuthService extends BaseService {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        phone: user.phone,
-        profile_photo_url: user.profile_photo_url,
         role: user.role.toLowerCase(),
+        hotel_ids: user.hotel_ids,
         permissions: user.permissions,
         is_active: user.is_active,
+        phone: user.phone ?? undefined,
+        profile_photo_url: user.profile_photo_url ?? undefined,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
       },
@@ -71,7 +74,7 @@ export class AuthService extends BaseService {
     };
   }
 
-  async login(data: LoginRequest, ip?: string): Promise<AuthResponse> {
+  async login(data: LoginRequest, ip?: string): Promise<AuthTokens> {
     const user = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (!user || user.deleted_at) {
       throw new UnauthorizedError('Invalid credentials');
@@ -89,6 +92,7 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
+      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 
@@ -108,11 +112,12 @@ export class AuthService extends BaseService {
         email: user.email,
         first_name: user.first_name,
         last_name: user.last_name,
-        phone: user.phone,
-        profile_photo_url: user.profile_photo_url,
         role: user.role.toLowerCase(),
+        hotel_ids: user.hotel_ids,
         permissions: user.permissions,
         is_active: user.is_active,
+        phone: user.phone ?? undefined,
+        profile_photo_url: user.profile_photo_url ?? undefined,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
       },
@@ -122,7 +127,7 @@ export class AuthService extends BaseService {
     };
   }
 
-  async refreshToken(data: RefreshTokenRequest): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token' | 'expires_in'>> {
+  async refreshToken(data: RefreshTokenRequest): Promise<Pick<AuthTokens, 'access_token' | 'refresh_token' | 'expires_in'>> {
     const payload = verifyRefreshToken(data.refresh_token);
     if (!payload) {
       throw new UnauthorizedError('Invalid or expired refresh token');
@@ -144,6 +149,7 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
+      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 
@@ -184,6 +190,7 @@ export class AuthService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
+        hotel_ids: true,
         permissions: true,
         is_active: true,
         created_at: true,
@@ -214,6 +221,7 @@ export class AuthService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
+        hotel_ids: true,
         permissions: true,
         is_active: true,
         updated_at: true,
