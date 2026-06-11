@@ -80,6 +80,7 @@ export const PAGINATION = {
   MAX_LIMIT: 100,
 } as const;
 
+
 // RBAC: permissions granted to each role
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [
