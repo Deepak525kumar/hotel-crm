@@ -6,6 +6,8 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   role: string;
+  // hotel_ids retained in JWT transitionally; removed in Phase 5 (S-4)
+  hotel_ids: string[];
   permissions: string[];
   iat: number;
   exp: number;
@@ -24,30 +26,27 @@ export interface JwtTokens {
   expires_in: number;
 }
 
+const ACCESS_TOKEN_OPTIONS: SignOptions = { expiresIn: undefined, algorithm: 'HS256' };
+
 export function signAccessToken(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): string {
   const env = getEnv();
-  return jwt.sign(payload, env.JWT_SECRET, {
-    expiresIn: env.JWT_ACCESS_EXPIRY as SignOptions['expiresIn'],
-    algorithm: 'HS256',
-  });
+  const options: SignOptions = { ...ACCESS_TOKEN_OPTIONS, expiresIn: env.JWT_ACCESS_EXPIRY as SignOptions['expiresIn'] };
+  return jwt.sign(payload, env.JWT_SECRET, options);
 }
 
 export function signRefreshToken(userId: string): string {
   const env = getEnv();
+  // Use JWT_REFRESH_SECRET when available so access and refresh secrets can be rotated independently
   const secret = env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
-  return jwt.sign({ sub: userId, type: 'refresh' }, secret, {
-    expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
-    algorithm: 'HS256',
-  });
+  const options: SignOptions = { expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'], algorithm: 'HS256' };
+  return jwt.sign({ sub: userId, type: 'refresh' }, secret, options);
 }
 
 export function signTokens(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): JwtTokens {
-  const env = getEnv();
   const access_token = signAccessToken(payload);
   const refresh_token = signRefreshToken(payload.sub);
-  const expirySeconds = parseExpiryToSeconds(env.JWT_ACCESS_EXPIRY);
-
-  return { access_token, refresh_token, expires_in: expirySeconds };
+  const expires_in = parseExpiryToSeconds(getEnv().JWT_ACCESS_EXPIRY);
+  return { access_token, refresh_token, expires_in };
 }
 
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
@@ -97,7 +96,7 @@ export function extractTokenFromHeader(authHeader: string | undefined): string |
   return parts[1];
 }
 
-export export function parseExpiryToSeconds(expiryStr: string): number {
+export function parseExpiryToSeconds(expiryStr: string): number {
   const match = expiryStr.match(/^(\d+)([smhd])$/);
   if (!match) return 3600;
   const value = parseInt(match[1], 10);
