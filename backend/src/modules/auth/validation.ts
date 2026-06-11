@@ -10,6 +10,8 @@ export const SignupSchema = z.object({
   last_name: z.string().min(2).max(50),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
   role: z.enum(['worker', 'checker', 'manager', 'admin']).optional(),
+  // hotel_ids retained transitionally; removed in Phase 5 (S-4)
+  hotel_ids: z.array(z.string()).optional(),
 });
 
 export const LoginSchema = z.object({
