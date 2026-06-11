@@ -79,3 +79,41 @@ export const PAGINATION = {
   DEFAULT_LIMIT: 20,
   MAX_LIMIT: 100,
 } as const;
+
+export const BCRYPT_ROUNDS = 12;
+
+// RBAC: permissions granted to each role
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
+  ADMIN: [
+    'admin:*',
+    'users:read', 'users:write', 'users:delete',
+    'hotels:read', 'hotels:write', 'hotels:delete',
+    'hotel_workers:read', 'hotel_workers:write',
+    'quality:read', 'quality:write',
+    'hr:read', 'hr:write',
+    'staffing:read', 'staffing:write',
+    'notifications:read', 'notifications:write',
+    'analytics:read',
+    'audit:read',
+  ],
+  MANAGER: [
+    'hotels:read',
+    'hotel_workers:read', 'hotel_workers:write',
+    'quality:read',
+    'hr:read', 'hr:write',
+    'staffing:read', 'staffing:write',
+    'notifications:read',
+    'analytics:read',
+    'users:read',
+  ],
+  CHECKER: [
+    'hotels:read',
+    'hotel_workers:read',
+    'quality:read', 'quality:write',
+    'notifications:read',
+  ],
+  WORKER: [
+    'hotels:read',
+    'notifications:read',
+  ],
+};
