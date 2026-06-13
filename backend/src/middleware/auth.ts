@@ -24,7 +24,6 @@ export async function authMiddleware(
       userId: payload.sub,
       email: payload.email,
       role: payload.role,
-      hotel_ids: payload.hotel_ids || [],
       permissions: payload.permissions || [],
     };
 
@@ -54,7 +53,6 @@ export function optionalAuthMiddleware(
           userId: payload.sub,
           email: payload.email,
           role: payload.role,
-          hotel_ids: payload.hotel_ids || [],
           permissions: payload.permissions || [],
         };
       }

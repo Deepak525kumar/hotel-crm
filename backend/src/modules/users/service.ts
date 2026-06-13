@@ -13,7 +13,7 @@ export class UserService extends BaseService {
 
     if (role) where['role'] = role.toUpperCase();
     if (is_active !== undefined) where['is_active'] = is_active === 'true';
-    if (hotel_id) where['hotel_ids'] = { has: hotel_id };
+    if (hotel_id) where['hotel_workers'] = { some: { hotel_id, status: 'ACTIVE' } };
     if (search) {
       where['OR'] = [
         { first_name: { contains: search, mode: 'insensitive' } },
@@ -35,7 +35,6 @@ export class UserService extends BaseService {
           phone: true,
           profile_photo_url: true,
           role: true,
-          hotel_ids: true,
           permissions: true,
           is_active: true,
           created_at: true,
@@ -47,7 +46,7 @@ export class UserService extends BaseService {
     ]);
 
     return {
-      users: users.map((u: { id: string; email: string; first_name: string; last_name: string; phone: string | null; profile_photo_url: string | null; role: string; hotel_ids: string[]; permissions: string[]; is_active: boolean; created_at: Date; updated_at: Date }) => ({ ...u, role: u.role.toLowerCase() })),
+      users: users.map((u: { id: string; email: string; first_name: string; last_name: string; phone: string | null; profile_photo_url: string | null; role: string; permissions: string[]; is_active: boolean; created_at: Date; updated_at: Date }) => ({ ...u, role: u.role.toLowerCase() })),
       pagination: {
         page,
         per_page: limit,
@@ -70,7 +69,6 @@ export class UserService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
-        hotel_ids: true,
         permissions: true,
         is_active: true,
         created_at: true,
@@ -100,7 +98,6 @@ export class UserService extends BaseService {
         last_name: data.last_name,
         phone: data.phone,
         role,
-        hotel_ids: data.hotel_ids ?? [],
         permissions: permissions ?? [],
       },
       select: {
@@ -110,7 +107,6 @@ export class UserService extends BaseService {
         last_name: true,
         phone: true,
         role: true,
-        hotel_ids: true,
         permissions: true,
         is_active: true,
         created_at: true,
@@ -140,7 +136,6 @@ export class UserService extends BaseService {
         last_name: data.last_name ?? user.last_name,
         phone: data.phone ?? user.phone,
         role: newRole,
-        hotel_ids: data.hotel_ids ?? user.hotel_ids,
         permissions: permissions ?? user.permissions,
         is_active: data.is_active ?? user.is_active,
       },
@@ -151,7 +146,6 @@ export class UserService extends BaseService {
         last_name: true,
         phone: true,
         role: true,
-        hotel_ids: true,
         permissions: true,
         is_active: true,
         updated_at: true,

@@ -7,7 +7,6 @@ export const CreateUserSchema = z.object({
   last_name: z.string().min(1).max(100),
   phone: z.string().optional(),
   role: z.enum(['worker', 'checker', 'manager', 'admin']).default('worker'),
-  hotel_ids: z.array(z.string()).optional().default([]),
 });
 
 export const UpdateUserSchema = z.object({
@@ -15,7 +14,6 @@ export const UpdateUserSchema = z.object({
   last_name: z.string().min(1).max(100).optional(),
   phone: z.string().optional(),
   role: z.enum(['worker', 'checker', 'manager', 'admin']).optional(),
-  hotel_ids: z.array(z.string()).optional(),
   is_active: z.boolean().optional(),
 });
 

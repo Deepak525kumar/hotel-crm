@@ -30,7 +30,6 @@ export class AuthService extends BaseService {
         last_name: data.last_name,
         phone: data.phone,
         role,
-        hotel_ids: [],
         permissions: permissions ?? [],
       },
     });
@@ -39,7 +38,6 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 
@@ -91,7 +89,6 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 
@@ -147,7 +144,6 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      hotel_ids: user.hotel_ids,
       permissions: user.permissions,
     });
 

@@ -2,7 +2,6 @@ export interface AuthContext {
   userId: string;
   email: string;
   role: string;
-  hotel_ids: string[];
   permissions: string[];
 }
 

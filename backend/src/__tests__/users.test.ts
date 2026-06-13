@@ -35,7 +35,7 @@ describe('UserService', () => {
   describe('listUsers', () => {
     it('returns paginated users', async () => {
       mockPrisma.user.findMany.mockResolvedValue([
-        { id: 'u1', email: 'a@b.com', first_name: 'A', last_name: 'B', phone: null, profile_photo_url: null, role: 'WORKER', hotel_ids: [], permissions: [], is_active: true, created_at: new Date(), updated_at: new Date() },
+        { id: 'u1', email: 'a@b.com', first_name: 'A', last_name: 'B', phone: null, profile_photo_url: null, role: 'WORKER', permissions: [], is_active: true, created_at: new Date(), updated_at: new Date() },
       ]);
       mockPrisma.user.count.mockResolvedValue(1);
 
@@ -62,7 +62,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u1', email: 'a@b.com', first_name: 'A', last_name: 'B',
         phone: null, profile_photo_url: null, role: 'WORKER',
-        hotel_ids: [], permissions: [], is_active: true,
+        permissions: [], is_active: true,
         created_at: new Date(), updated_at: new Date(), deleted_at: null,
       });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -88,7 +88,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', hotel_ids: [] }, 'actor', 'admin')
+        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker' }, 'actor', 'admin')
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
   });

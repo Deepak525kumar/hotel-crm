@@ -6,7 +6,6 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   role: string;
-  hotel_ids: string[];
   permissions: string[];
   iat: number;
   exp: number;

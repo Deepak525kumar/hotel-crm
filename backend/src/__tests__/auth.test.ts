@@ -60,7 +60,6 @@ describe('AuthService', () => {
         first_name: 'John',
         last_name: 'Doe',
         role: 'WORKER',
-        hotel_ids: [],
         permissions: ['hotels:read'],
         is_active: true,
         created_at: new Date(),
@@ -91,7 +90,6 @@ describe('AuthService', () => {
         first_name: 'Admin',
         last_name: 'User',
         role: 'ADMIN',
-        hotel_ids: [],
         permissions: ['admin:*'],
         is_active: true,
         created_at: new Date(),
@@ -130,7 +128,6 @@ describe('AuthService', () => {
         is_active: false,
         deleted_at: null,
         role: 'WORKER',
-        hotel_ids: [],
         permissions: [],
       });
 
@@ -148,7 +145,6 @@ describe('AuthService', () => {
         is_active: true,
         deleted_at: null,
         role: 'WORKER',
-        hotel_ids: [],
         permissions: [],
       });
 
@@ -192,7 +188,6 @@ describe('AuthService', () => {
         phone: null,
         profile_photo_url: null,
         role: 'WORKER',
-        hotel_ids: [],
         permissions: [],
         is_active: true,
         created_at: new Date(),
