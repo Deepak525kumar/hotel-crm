@@ -1,4 +1,5 @@
 import { getPrisma } from './db.js';
+import { Prisma } from '@prisma/client';
 
 export class BaseService {
   protected prisma = getPrisma();
@@ -15,11 +16,11 @@ export class BaseService {
     await this.prisma.auditLog.create({
       data: {
         actor_id,
-        actor_role,
+        actor_role: actor_role as any,
         action,
         resource_type,
         resource_id,
-        details: details || null,
+        details: (details ?? Prisma.JsonNull) as Prisma.InputJsonValue,
         ip_address: ip_address || null,
         timestamp: new Date(),
       },
