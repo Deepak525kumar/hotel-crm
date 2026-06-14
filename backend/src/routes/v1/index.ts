@@ -9,7 +9,9 @@ import workRequestRoutes from '../../modules/work-requests/routes.js';
 import workApplicationRoutes from '../../modules/work-applications/routes.js';
 import assignmentRoutes from '../../modules/assignments/routes.js';
 import attendanceRoutes from '../../modules/attendance/routes.js';
-import qualityRoutes from '../../modules/quality/routes.js';
+import qualityVerificationRoutes from '../../modules/quality-verifications/routes.js';
+import ratingRoutes from '../../modules/ratings/routes.js';
+import leaderboardRoutes from '../../modules/leaderboard/routes.js';
 import hrRoutes from '../../modules/hr/routes.js';
 import notificationRoutes from '../../modules/notifications/routes.js';
 import analyticsRoutes from '../../modules/analytics/routes.js';
@@ -27,7 +29,9 @@ router.use('/work-requests', workRequestRoutes);
 router.use('/work-requests/:id/applications', workApplicationRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/attendance', attendanceRoutes);
-router.use('/quality', qualityRoutes);
+router.use('/quality-verifications', qualityVerificationRoutes);
+router.use('/ratings', ratingRoutes);
+router.use('/leaderboard', leaderboardRoutes);
 router.use('/hr', hrRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
@@ -39,7 +43,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'hotel-workers', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality'],
+      modules: ['auth', 'users', 'crm', 'hotel-workers', 'work-requests', 'work-applications', 'assignments', 'attendance', 'quality-verifications', 'ratings', 'leaderboard', 'hr', 'calendar', 'notifications', 'analytics'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {
