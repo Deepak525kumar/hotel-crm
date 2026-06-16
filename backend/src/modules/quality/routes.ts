@@ -12,8 +12,10 @@ router.post('/verifications', requirePermission('quality:write'), (req, res, nex
 router.post('/ratings', requirePermission('quality:write'), (req, res, next) =>
   qualityController.createRating(req, res, next)
 );
-router.get('/leaderboard', (req, res, next) => qualityController.getLeaderboard(req, res, next));
-router.get('/leaderboard/by-hotel/:hotel_id', checkHotelAccess(), (req, res, next) =>
+router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.getLeaderboard(req, res, next)
+);
+router.get('/leaderboard/by-hotel/:hotel_id', requirePermission('quality:read'), checkHotelAccess(), (req, res, next) =>
   qualityController.getLeaderboard(req, res, next)
 );
 

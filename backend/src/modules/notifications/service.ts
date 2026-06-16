@@ -1,6 +1,6 @@
 import { NotificationType, Prisma } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { NotFoundError, NotImplementedError } from '../../lib/errors.js';
+import { ForbiddenError, NotFoundError, NotImplementedError } from '../../lib/errors.js';
 import { NotificationPayload } from './types.js';
 
 export class NotificationService extends BaseService {
@@ -24,11 +24,12 @@ export class NotificationService extends BaseService {
     });
   }
 
-  async markAsRead(notificationId: string) {
+  async markAsRead(notificationId: string, userId: string) {
     const notification = await this.prisma.notification.findUnique({
       where: { id: notificationId },
     });
     if (!notification) throw new NotFoundError('Notification not found');
+    if (notification.user_id !== userId) throw new ForbiddenError('Cannot mark this notification as read');
 
     return this.prisma.notification.update({
       where: { id: notificationId },

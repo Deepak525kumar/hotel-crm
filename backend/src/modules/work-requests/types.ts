@@ -88,4 +88,5 @@ export interface WorkRequestDto {
   cancellation_reason: string | null;
   created_at: string;
   updated_at: string;
+  my_application?: { id: string; status: string; created_at: string } | null;
 }

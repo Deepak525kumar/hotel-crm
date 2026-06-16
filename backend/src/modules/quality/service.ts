@@ -2,7 +2,7 @@ import { AssignmentStatus, AttendanceStatus, HotelWorkerStatus, Prisma } from '@
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
-import type { CreateRatingRequest } from './types.js';
+import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
 
 interface Actor {
   userId: string;
@@ -11,20 +11,10 @@ interface Actor {
 
 export class QualityService extends BaseService {
   async createVerification(
-    data: Record<string, unknown>,
+    data: CreateQualityVerificationRequest,
     actor: Actor
   ) {
-    const { assignment_id, score, notes, status } = data as {
-      assignment_id: string;
-      score: number;
-      notes?: string;
-      status?: string;
-    };
-
-    if (!assignment_id) throw new ValidationError('assignment_id is required');
-    if (!Number.isInteger(Number(score)) || Number(score) < 0 || Number(score) > 100) {
-      throw new ValidationError('score must be an integer between 0 and 100');
-    }
+    const { assignment_id, score, notes } = data;
 
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
@@ -36,9 +26,8 @@ export class QualityService extends BaseService {
     });
     if (existing) throw new ConflictError('Verification already exists for this assignment');
 
-    const numScore = Number(score);
-    const derivedStatus =
-      status ?? (numScore >= 70 ? 'PASSED' : numScore >= 40 ? 'NEEDS_REWORK' : 'FAILED');
+    const numScore = score;
+    const derivedStatus = numScore >= 70 ? 'PASSED' : numScore >= 40 ? 'NEEDS_REWORK' : 'FAILED';
 
     const verification = await this.prisma.qualityVerification.create({
       data: {

@@ -142,7 +142,20 @@ export class WorkRequestService extends BaseService {
       if (!membership) throw new ForbiddenError('Cannot access this work request');
     }
 
-    return this.toDto(wr);
+    const dto = this.toDto(wr);
+
+    if (actor.role === 'worker' || actor.role === 'checker') {
+      const app = await this.prisma.workApplication.findFirst({
+        where: { work_request_id: id, worker_id: actor.userId },
+        select: { id: true, status: true, created_at: true },
+        orderBy: { created_at: 'desc' },
+      });
+      dto.my_application = app
+        ? { id: app.id, status: app.status, created_at: app.created_at.toISOString() }
+        : null;
+    }
+
+    return dto;
   }
 
   async update(

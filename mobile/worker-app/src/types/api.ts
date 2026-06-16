@@ -41,6 +41,7 @@ export interface WorkRequest {
   hourly_rate?: number;
   status: WorkRequestStatus;
   created_at: string;
+  my_application?: WorkApplication | null;
 }
 
 export interface WorkApplication {

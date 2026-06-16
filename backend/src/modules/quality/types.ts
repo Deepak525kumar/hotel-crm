@@ -1,3 +1,11 @@
+import { z } from 'zod';
+
+export const CreateQualityVerificationSchema = z.object({
+  assignment_id: z.string().min(1),
+  score: z.number().int().min(0).max(100),
+  notes: z.string().optional(),
+});
+
 export interface CreateQualityVerificationRequest {
   assignment_id: string;
   score: number; // 0-100
