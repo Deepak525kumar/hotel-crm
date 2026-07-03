@@ -70,7 +70,7 @@ Existence does not imply authority. Generated files, archives, examples, caches,
 
 ## 7. Module Ownership and Architecture
 
-- Every module, state domain, public contract, and published event has exactly one accountable owner recorded in `knowledge/MODULE_REGISTRY.yaml`.
+- Every module, state domain, public contract, and published event has exactly one accountable owner recorded in `../knowledge/MODULE_REGISTRY.yaml`.
 - Modules expose explicit interfaces; consumers do not reach into private internals.
 - State has one authoritative writer. Replicas and caches are never promoted to source of truth.
 - Cross-module behavior uses declared contracts and dependency direction.
@@ -79,7 +79,7 @@ Existence does not imply authority. Generated files, archives, examples, caches,
 
 ## 8. Dependency Principles
 
-- Every upstream/downstream relation, shared contract, state owner, published event, and consumed event is recorded in `knowledge/DEPENDENCY_GRAPH.yaml`.
+- Every upstream/downstream relation, shared contract, state owner, published event, and consumed event is recorded in `../knowledge/DEPENDENCY_GRAPH.yaml`.
 - A contract change is classified as compatible, conditionally compatible, or breaking.
 - Producer and consumer synchronization is planned before a breaking change is implemented.
 - Dependency versions are pinned or constrained intentionally and validated through the applicable package manager.
@@ -115,7 +115,7 @@ Existence does not imply authority. Generated files, archives, examples, caches,
 ## 12. Review Gates and Merge Policy
 
 - Authoring and reviewing are separate responsibilities.
-- Architecture, dependency, and consistency reviews run independently when their inputs are frozen.
+- Architecture, dependency, consistency, and — where applicable — security and performance reviews run independently when their inputs are frozen.
 - Findings are merged by identifier and severity, then returned to the responsible author.
 - The author cannot approve their own blocking finding.
 - Merge requires all applicable gates in [REVIEW_GATES.md](REVIEW_GATES.md), traceable evidence, synchronized docs/knowledge, and explicit approval.
@@ -135,7 +135,7 @@ Existence does not imply authority. Generated files, archives, examples, caches,
 - Use requirement, decision, module, contract, event, owner, finding, risk, and gate identifiers consistently.
 - Normative words are: **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY**.
 - Avoid ambiguous completion claims such as “looks good.” State what passed, what did not run, and why.
-- Canonical project terms live in `knowledge/TERMINOLOGY.md`; aliases and deprecated terms are explicit.
+- Canonical project terms live in `../knowledge/TERMINOLOGY.md`; aliases and deprecated terms are explicit.
 
 ## 15. Naming Conventions
 

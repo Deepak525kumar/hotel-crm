@@ -37,7 +37,7 @@ flowchart TD
     G2 -->|fail/block| D
     G3 -->|fail/block| IP
     G5 -->|fail/block| IM
-    G6 -->|fail/block| MF
+    G6 -->|fail/block| IM
     G7 -->|drift| SH
     G8 -->|no-go| REL
 ```

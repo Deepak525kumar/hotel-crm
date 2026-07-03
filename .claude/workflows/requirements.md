@@ -21,7 +21,7 @@ Requirements Analyst (owner); Business Rule Validator; Lead Architect; human pro
 1. Baseline current behavior and authoritative intent.
 2. Define actors, outcomes, constraints, inclusions, exclusions, and priority.
 3. Decompose into `REQ-*` and measurable acceptance criteria.
-4. Extract `RULE-*`; independently validate source, owner, cases, and contradictions.
+4. Extract `RULE-*`; independently validate source, owner, cases, and contradictions against the business-rules checklist (`BR-01..BR-10`).
 5. Build source and requirement traceability.
 6. Resolve or explicitly exclude unknowns and conflicts.
 7. Validate requirements completeness and record G1.
