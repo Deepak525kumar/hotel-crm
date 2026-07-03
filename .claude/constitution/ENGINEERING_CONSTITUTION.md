@@ -1,7 +1,9 @@
 # Engineering Constitution
 
-**Status:** Permanent governing policy  
-**Change class:** Constitutional; human approval required  
+**Status:** Permanent governing policy
+
+**Change class:** Constitutional; human approval required
+
 **Applies to:** Every agent, workflow, artifact, implementation, and release
 
 ## 1. Mission

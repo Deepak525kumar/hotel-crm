@@ -60,3 +60,13 @@ Do not load unrelated project context.
 
 The Lead Architect maintains global awareness.
 Specialist agents receive only the minimum required context.
+
+## Knowledge Separation
+
+The AI Engineering Platform is reusable.
+
+Repository-specific knowledge belongs exclusively in `knowledge/`.
+
+Framework behaviour belongs exclusively in `.claude/`.
+
+Do not mix reusable engineering policy with project-specific information.

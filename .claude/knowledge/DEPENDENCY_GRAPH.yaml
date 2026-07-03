@@ -1,0 +1,82 @@
+schema_version: 1
+project: hotel-crm
+observed_revision: 9eea00b9d28cdc443f7e3dd1041d18d0d2b6419e
+status: provisional
+
+node_schema:
+  required: [id, kind, owner, source]
+  kinds: [module, client, infrastructure, contract, event, state-domain, external-service]
+
+edge_schema:
+  required: [id, source, target, kind, evidence, status]
+  kinds: [calls, imports, consumes-api, publishes-event, consumes-event, reads-state, writes-state, shared-contract, deploys-to, package]
+  compatibility: [compatible, conditional, breaking, unknown, not-applicable]
+
+nodes:
+  - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
+  - { id: backend-work-applications, kind: module, owner: unassigned, source: backend/src/modules/work-applications }
+  - { id: backend-attendance, kind: module, owner: unassigned, source: backend/src/modules/attendance }
+  - { id: backend-quality, kind: module, owner: unassigned, source: backend/src/modules/quality }
+  - { id: backend-notifications, kind: module, owner: unassigned, source: backend/src/modules/notifications }
+  - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
+
+edges:
+  - id: edge-work-requests-notifications
+    source: backend-work-requests
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: backend/src/modules/work-requests/service.ts
+  - id: edge-work-applications-notifications
+    source: backend-work-applications
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: backend/src/modules/work-applications/service.ts
+  - id: edge-attendance-notifications
+    source: backend-attendance
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: backend/src/modules/attendance/service.ts
+  - id: edge-quality-notifications
+    source: backend-quality
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: backend/src/modules/quality/service.ts
+
+contracts:
+  - id: notification-service
+    version: unversioned
+    owner_module: backend-notifications
+    source: backend/src/modules/notifications/service.ts
+    consumers:
+      - backend-work-requests
+      - backend-work-applications
+      - backend-attendance
+      - backend-quality
+  - id: prisma-schema
+    version: unversioned
+    owner_module: unassigned
+    source: backend/prisma/schema.prisma
+    consumers: [verification-required]
+
+events: []
+state_domains: []
+
+pending_verification:
+  - Map every registered backend module and shared library dependency.
+  - Map Prisma model write ownership and cross-module reads.
+  - Map frontend and mobile API contract consumption.
+  - Determine whether NotificationType values are events, notification categories, or both.
+  - Establish event publisher/consumer records and delivery semantics.
+  - Assign owners and contract versions.

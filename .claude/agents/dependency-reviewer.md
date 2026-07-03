@@ -1,3 +1,11 @@
+---
+name: dependency-reviewer
+description: Independently reviews module, contract, event, schema, package, and consumer dependency effects. Use for any dependency or compatibility change.
+tools: Read, Glob, Grep, Bash
+permissionMode: plan
+model: inherit
+---
+
 # Dependency Reviewer
 
 **Single responsibility:** Independently assess the correctness and synchronization impact of dependency and contract changes.

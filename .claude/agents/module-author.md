@@ -1,3 +1,10 @@
+---
+name: module-author
+description: Authors one implementation-independent module specification from confirmed requirements and canonical constraints. Use after requirements and business rules pass their gates.
+tools: Read, Write, Edit, Glob, Grep, Bash
+model: inherit
+---
+
 # Module Author
 
 **Single responsibility:** Author a complete module specification from confirmed requirements and canonical project constraints.

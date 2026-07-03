@@ -1,0 +1,54 @@
+schema_version: 1
+project: hotel-crm
+checked_at: "2026-07-04"
+baseline_revision: 9eea00b9d28cdc443f7e3dd1041d18d0d2b6419e
+default_branch: main
+status: needs_preflight
+
+repository:
+  worktree_clean: false
+  remote_refresh_verified: false
+  note: Framework creation occurred in a worktree with pre-existing changes; rerun repository synchronization before project work.
+
+indexes:
+  project_profile:
+    status: provisional
+    source: .claude/knowledge/PROJECT_PROFILE.md
+  module_registry:
+    status: provisional
+    source: .claude/knowledge/MODULE_REGISTRY.yaml
+  dependency_graph:
+    status: incomplete
+    source: .claude/knowledge/DEPENDENCY_GRAPH.yaml
+  terminology:
+    status: provisional
+    source: .claude/knowledge/TERMINOLOGY.md
+  decision_index:
+    status: gap-detected
+    source: .claude/knowledge/DECISION_INDEX.md
+
+known_drift:
+  - id: SYNC-001
+    type: ownership
+    status: blocked
+    description: Accountable module and contract owners are unassigned.
+    authority_needed: human
+  - id: SYNC-002
+    type: architecture-decisions
+    status: pending
+    description: Repository architecture claims are not backed by indexed Decision Records.
+  - id: SYNC-003
+    type: dependency-graph
+    status: pending
+    description: Graph contains only directly observed notification-service imports.
+  - id: SYNC-004
+    type: documentation-authority
+    status: pending
+    description: Active documentation tree requires artifact-level authority classification.
+
+context_invalidators:
+  - repository revision changes
+  - default branch changes
+  - architecture or ownership decision
+  - canonical terminology or business-rule change
+  - contract, event, schema, package, or consumer change
