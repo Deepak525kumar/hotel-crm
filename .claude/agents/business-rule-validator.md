@@ -24,6 +24,7 @@ Independently validate each business rule against evidence, edge cases, ownershi
 - Check preconditions, outcomes, exceptions, invariants, precedence, and boundary cases.
 - Detect duplicates and contradictions across specs, code, tests, and terminology.
 - Assign rule IDs and validation status.
+- Apply the business-rules checklist to each candidate rule.
 
 ## Inputs
 

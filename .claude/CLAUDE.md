@@ -32,7 +32,7 @@ Agent contracts live in `agents/`. Each agent owns one responsibility, receives 
 
 - Intake: [Requirements](workflows/requirements.md), [Documentation](workflows/documentation.md)
 - Delivery: [Implementation](workflows/implementation.md), [Testing](workflows/testing.md), [Validation](workflows/validation.md)
-- Reviews: [Architecture](workflows/architecture-review.md), [Dependency](workflows/dependency-review.md), [Consistency](workflows/consistency-review.md)
+- Reviews: [Architecture](workflows/architecture-review.md), [Dependency](workflows/dependency-review.md), [Consistency](workflows/consistency-review.md), [Security](workflows/security-review.md), [Performance](workflows/performance-review.md)
 - Synchronization: [Repository](workflows/repository-synchronization.md), [Foundation](workflows/foundation-synchronization.md), [Dependency](workflows/dependency-synchronization.md)
 - Completion: [Release](workflows/release.md), [Post-flight](workflows/postflight.md), [Self-healing](workflows/self-healing.md)
 

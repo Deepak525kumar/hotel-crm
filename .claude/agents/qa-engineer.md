@@ -24,6 +24,7 @@ Create risk-based test coverage, execute reproducible checks, and report defects
 - Cover positive, negative, boundary, authorization, integration, and regression behavior as applicable.
 - Define environment/data prerequisites and isolate flaky infrastructure.
 - Record reproducible defects and exact execution evidence.
+- Apply the testing checklist to the candidate revision.
 
 ## Inputs
 

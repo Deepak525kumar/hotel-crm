@@ -24,7 +24,8 @@ QA Engineer (owner); implementation engineers for defect fixes; Security and Per
 4. Run security/performance checks where applicable.
 5. Record defects with reproducible evidence.
 6. Implementers fix; run targeted tests then required regression.
-7. Finalize coverage and residual limitations.
+7. Execute the testing checklist (`TS-01..TS-10`) and record evidence.
+8. Finalize coverage and residual limitations.
 
 ## Parallel Activities
 
