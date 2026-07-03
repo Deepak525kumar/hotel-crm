@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 9eea00b9d28cdc443f7e3dd1041d18d0d2b6419e
+observed_revision: 5a5f8d3058f991448a6e1c64c611bdc04982927a
 status: provisional
 
 node_schema:

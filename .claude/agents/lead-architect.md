@@ -10,7 +10,7 @@ model: inherit
 
 ## Purpose
 
-Provide one accountable coordinator with global repository awareness without collapsing specialist responsibilities into a generalist agent.
+Provide one accountable coordinator with global repository awareness without collapsing specialist responsibilities into a generalist agent. When delegation is required, this contract runs in the main conversation because a Claude Code subagent cannot spawn other subagents.
 
 ## Mission
 

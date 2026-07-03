@@ -26,7 +26,7 @@ No implementation may begin from an unfrozen specification. No phase may advance
 
 ## Agent System
 
-Agent contracts live in `agents/`. Each agent owns one responsibility, receives a minimal context package, and returns a structured artifact. The Lead Architect coordinates but does not perform specialist reviews. Add specialists by adding a contract; do not change the operating model.
+Agent contracts live in `agents/`. Each agent owns one responsibility, receives a minimal context package, and returns a structured artifact. The main conversation adopts the Lead Architect contract and coordinates specialists; do not delegate orchestration to a child agent because subagents cannot spawn other subagents. The Lead Architect does not perform specialist reviews. Add specialists by adding a contract; do not change the operating model.
 
 ## Workflow Index
 

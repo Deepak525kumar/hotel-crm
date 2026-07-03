@@ -2,7 +2,7 @@
 
 **Profile status:** Provisional repository-derived baseline; ownership and architecture decisions require formal confirmation
 
-**Observed repository revision:** `9eea00b9d28cdc443f7e3dd1041d18d0d2b6419e`
+**Observed repository revision:** `5a5f8d3058f991448a6e1c64c611bdc04982927a`
 
 **Observed default branch:** `main` via `refs/remotes/origin/HEAD`
 
