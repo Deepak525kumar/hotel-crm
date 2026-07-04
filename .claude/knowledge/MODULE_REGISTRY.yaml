@@ -1,31 +1,35 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 5a5f8d3058f991448a6e1c64c611bdc04982927a
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
 status: provisional
 
-# owner remains unassigned until an authoritative human or repository source assigns it.
+# Owners are UNKNOWN: no CODEOWNERS/OWNERS file, no package.json author, and no
+# authoritative documentation assigns an accountable module owner. Owners require
+# authoritative human assignment; UNKNOWN is never to be replaced by inference.
 modules:
-  - { id: backend-auth, type: backend-module, path: backend/src/modules/auth, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-users, type: backend-module, path: backend/src/modules/users, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-crm, type: backend-module, path: backend/src/modules/crm, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-hotel-workers, type: backend-module, path: backend/src/modules/hotel-workers, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-work-requests, type: backend-module, path: backend/src/modules/work-requests, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-work-applications, type: backend-module, path: backend/src/modules/work-applications, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-assignments, type: backend-module, path: backend/src/modules/assignments, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-attendance, type: backend-module, path: backend/src/modules/attendance, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-quality, type: backend-module, path: backend/src/modules/quality, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-hr, type: backend-module, path: backend/src/modules/hr, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-notifications, type: backend-module, path: backend/src/modules/notifications, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-analytics, type: backend-module, path: backend/src/modules/analytics, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-calendar, type: backend-module, path: backend/src/modules/calendar, owner: unassigned, lifecycle: active, evidence: backend/src/routes/v1/index.ts }
-  - { id: backend-chatbot, type: backend-module, path: backend/src/modules/chatbot, owner: unassigned, lifecycle: unverified, evidence: backend/src/modules/chatbot }
-  - { id: backend-geo, type: backend-module, path: backend/src/modules/geo, owner: unassigned, lifecycle: unverified, evidence: backend/src/modules/geo }
-  - { id: frontend-web, type: web-client, path: frontend, owner: unassigned, lifecycle: active, evidence: frontend/package.json }
-  - { id: mobile-worker, type: mobile-client, path: mobile/worker-app, owner: unassigned, lifecycle: active, evidence: mobile/worker-app/package.json }
-  - { id: mobile-checker, type: mobile-client, path: mobile/checker-app, owner: unassigned, lifecycle: active, evidence: mobile/checker-app/package.json }
-  - { id: operations, type: infrastructure, path: ".", owner: unassigned, lifecycle: active, evidence: docker-compose.prod.yml }
+  - { id: backend-auth, type: backend-module, path: backend/src/modules/auth, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:4" }
+  - { id: backend-users, type: backend-module, path: backend/src/modules/users, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:5" }
+  - { id: backend-crm, type: backend-module, path: backend/src/modules/crm, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:6" }
+  - { id: backend-hotel-workers, type: backend-module, path: backend/src/modules/hotel-workers, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:7" }
+  - { id: backend-work-requests, type: backend-module, path: backend/src/modules/work-requests, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:8" }
+  - { id: backend-work-applications, type: backend-module, path: backend/src/modules/work-applications, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:9" }
+  - { id: backend-assignments, type: backend-module, path: backend/src/modules/assignments, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:10" }
+  - { id: backend-attendance, type: backend-module, path: backend/src/modules/attendance, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:11" }
+  - { id: backend-quality, type: backend-module, path: backend/src/modules/quality, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:12" }
+  - { id: backend-hr, type: backend-module, path: backend/src/modules/hr, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:13" }
+  - { id: backend-notifications, type: backend-module, path: backend/src/modules/notifications, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:14" }
+  - { id: backend-analytics, type: backend-module, path: backend/src/modules/analytics, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:15" }
+  - { id: backend-calendar, type: backend-module, path: backend/src/modules/calendar, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:16" }
+  # chatbot and geo directories contain only a .placeholder file; they are not
+  # imported or mounted anywhere (no import in backend/src/routes/v1/index.ts).
+  - { id: backend-chatbot, type: backend-module, path: backend/src/modules/chatbot, owner: UNKNOWN, lifecycle: placeholder-unregistered, evidence: "backend/src/modules/chatbot/.placeholder" }
+  - { id: backend-geo, type: backend-module, path: backend/src/modules/geo, owner: UNKNOWN, lifecycle: placeholder-unregistered, evidence: "backend/src/modules/geo/.placeholder" }
+  - { id: frontend-web, type: web-client, path: frontend, owner: UNKNOWN, lifecycle: active, evidence: "frontend/package.json; ecosystem.config.js:24; nginx/hotelcrm.conf:91" }
+  - { id: mobile-worker, type: mobile-client, path: mobile/worker-app, owner: UNKNOWN, lifecycle: active, evidence: "mobile/worker-app/package.json; package.json:9" }
+  - { id: mobile-checker, type: mobile-client, path: mobile/checker-app, owner: UNKNOWN, lifecycle: active, evidence: "mobile/checker-app/package.json; package.json:9" }
+  - { id: operations, type: infrastructure, path: ".", owner: UNKNOWN, lifecycle: active, evidence: "docker-compose.yml; docker-compose.prod.yml; ecosystem.config.js; nginx/hotelcrm.conf; deploy/aws-edge-checklist.md; scripts/deploy.sh" }
 
 ownership_conflicts: []
 unresolved:
-  - All accountable owners require authoritative assignment.
-  - backend-chatbot and backend-geo runtime registration/status require verification.
+  - All accountable owners are UNKNOWN and require authoritative human assignment.
+  - backend-chatbot and backend-geo are unregistered placeholders; retirement or activation requires a human decision.
