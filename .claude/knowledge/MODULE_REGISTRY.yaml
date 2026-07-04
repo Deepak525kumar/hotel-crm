@@ -1,35 +1,257 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
-status: provisional
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2  # 5b16be4
+status: verified-inventory
 
-# Owners are UNKNOWN: no CODEOWNERS/OWNERS file, no package.json author, and no
-# authoritative documentation assigns an accountable module owner. Owners require
-# authoritative human assignment; UNKNOWN is never to be replaced by inference.
+# Inventory is verified against the worktree at the observed revision.
+# Ownership remains BLOCKED: no CODEOWNERS file exists and backend/package.json
+# "author" is empty; owner assignment is reserved human authority (SYNC-001).
+# Every `owner` is `unassigned` by evidence, never invented.
+# No event bus exists in the codebase: all `published_events`/`consumed_events`
+# are `none-observed`. The per-module `dependencies` field lists only direct
+# synchronous module->module service-call edges (into backend-notifications).
+# Broader relationships -- cross-module Prisma reads-state/writes-state, client
+# consumes-api, and operations deploys-to edges -- are recorded authoritatively in
+# DEPENDENCY_GRAPH.yaml, not duplicated here. All modules share Prisma/PostgreSQL
+# via a shared BaseService (shared infrastructure, not a module contract).
+# No frozen module specification exists for any registered module: the only
+# MODULE_SPEC.md files (docs/03-modules/employee-management, .../onboarding) are
+# non-frozen business-spec rewrites with [OPEN] items and do not map to a
+# registered module id, so `specification` is UNKNOWN for every module.
+
 modules:
-  - { id: backend-auth, type: backend-module, path: backend/src/modules/auth, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:4" }
-  - { id: backend-users, type: backend-module, path: backend/src/modules/users, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:5" }
-  - { id: backend-crm, type: backend-module, path: backend/src/modules/crm, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:6" }
-  - { id: backend-hotel-workers, type: backend-module, path: backend/src/modules/hotel-workers, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:7" }
-  - { id: backend-work-requests, type: backend-module, path: backend/src/modules/work-requests, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:8" }
-  - { id: backend-work-applications, type: backend-module, path: backend/src/modules/work-applications, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:9" }
-  - { id: backend-assignments, type: backend-module, path: backend/src/modules/assignments, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:10" }
-  - { id: backend-attendance, type: backend-module, path: backend/src/modules/attendance, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:11" }
-  - { id: backend-quality, type: backend-module, path: backend/src/modules/quality, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:12" }
-  - { id: backend-hr, type: backend-module, path: backend/src/modules/hr, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:13" }
-  - { id: backend-notifications, type: backend-module, path: backend/src/modules/notifications, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:14" }
-  - { id: backend-analytics, type: backend-module, path: backend/src/modules/analytics, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:15" }
-  - { id: backend-calendar, type: backend-module, path: backend/src/modules/calendar, owner: UNKNOWN, lifecycle: active, evidence: "backend/src/routes/v1/index.ts:16" }
-  # chatbot and geo directories contain only a .placeholder file; they are not
-  # imported or mounted anywhere (no import in backend/src/routes/v1/index.ts).
-  - { id: backend-chatbot, type: backend-module, path: backend/src/modules/chatbot, owner: UNKNOWN, lifecycle: placeholder-unregistered, evidence: "backend/src/modules/chatbot/.placeholder" }
-  - { id: backend-geo, type: backend-module, path: backend/src/modules/geo, owner: UNKNOWN, lifecycle: placeholder-unregistered, evidence: "backend/src/modules/geo/.placeholder" }
-  - { id: frontend-web, type: web-client, path: frontend, owner: UNKNOWN, lifecycle: active, evidence: "frontend/package.json; ecosystem.config.js:24; nginx/hotelcrm.conf:91" }
-  - { id: mobile-worker, type: mobile-client, path: mobile/worker-app, owner: UNKNOWN, lifecycle: active, evidence: "mobile/worker-app/package.json; package.json:9" }
-  - { id: mobile-checker, type: mobile-client, path: mobile/checker-app, owner: UNKNOWN, lifecycle: active, evidence: "mobile/checker-app/package.json; package.json:9" }
-  - { id: operations, type: infrastructure, path: ".", owner: UNKNOWN, lifecycle: active, evidence: "docker-compose.yml; docker-compose.prod.yml; ecosystem.config.js; nginx/hotelcrm.conf; deploy/aws-edge-checklist.md; scripts/deploy.sh" }
+  - id: backend-auth
+    type: backend-module
+    path: backend/src/modules/auth
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:22
+
+  - id: backend-users
+    type: backend-module
+    path: backend/src/modules/users
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:23
+
+  - id: backend-crm
+    type: backend-module
+    path: backend/src/modules/crm
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:24
+
+  - id: backend-hotel-workers
+    type: backend-module
+    path: backend/src/modules/hotel-workers
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:25
+
+  - id: backend-work-requests
+    type: backend-module
+    path: backend/src/modules/work-requests
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: [backend-notifications]
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:26; backend/src/modules/work-requests/service.ts:4
+
+  - id: backend-work-applications
+    type: backend-module
+    path: backend/src/modules/work-applications
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: [backend-notifications]
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
+
+  - id: backend-assignments
+    type: backend-module
+    path: backend/src/modules/assignments
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:28
+
+  - id: backend-attendance
+    type: backend-module
+    path: backend/src/modules/attendance
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: [backend-notifications]
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:29; backend/src/modules/attendance/service.ts:4
+
+  - id: backend-quality
+    type: backend-module
+    path: backend/src/modules/quality
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: [backend-notifications]
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:30; backend/src/modules/quality/service.ts:4
+
+  - id: backend-hr
+    type: backend-module
+    path: backend/src/modules/hr
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active-no-tests  # registered and implemented; no dedicated test file in backend/src/__tests__/
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:31
+
+  - id: backend-notifications
+    type: backend-module
+    path: backend/src/modules/notifications
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:32
+
+  - id: backend-analytics
+    type: backend-module
+    path: backend/src/modules/analytics
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:33
+
+  - id: backend-calendar
+    type: backend-module
+    path: backend/src/modules/calendar
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active-no-tests  # registered and implemented; no dedicated test file in backend/src/__tests__/
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/routes/v1/index.ts:34
+
+  - id: backend-chatbot
+    type: backend-module
+    path: backend/src/modules/chatbot
+    owner: unassigned
+    lifecycle: declared
+    implementation_status: unimplemented-stub  # directory holds only .placeholder; not route-registered
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/modules/chatbot/.placeholder
+
+  - id: backend-geo
+    type: backend-module
+    path: backend/src/modules/geo
+    owner: unassigned
+    lifecycle: declared
+    implementation_status: unimplemented-stub  # directory holds only .placeholder; not route-registered
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: backend/src/modules/geo/.placeholder
+
+  - id: frontend-web
+    type: web-client
+    path: frontend
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: frontend/package.json; ecosystem.config.js:25 (hotel-crm-web); nginx/hotelcrm.conf:92 (proxy_pass to :3000)
+
+  - id: mobile-worker
+    type: mobile-client
+    path: mobile/worker-app
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: mobile/worker-app/package.json; package.json:9 (mobile/* workspace)
+
+  - id: mobile-checker
+    type: mobile-client
+    path: mobile/checker-app
+    owner: unassigned
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: mobile/checker-app/package.json; package.json:9 (mobile/* workspace)
+
+  - id: operations
+    type: infrastructure
+    path: "."
+    owner: unassigned
+    lifecycle: active
+    implementation_status: not-applicable  # infrastructure surface, not a backend service module
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: UNKNOWN
+    evidence: docker-compose.yml; docker-compose.prod.yml; ecosystem.config.js; nginx/hotelcrm.conf; deploy/aws-edge-checklist.md; scripts/deploy.sh
 
 ownership_conflicts: []
+
 unresolved:
-  - All accountable owners are UNKNOWN and require authoritative human assignment.
-  - backend-chatbot and backend-geo are unregistered placeholders; retirement or activation requires a human decision.
+  - All accountable owners require authoritative human assignment (SYNC-001, blocked); no CODEOWNERS exists and backend/package.json "author" is empty.
+  - backend-chatbot and backend-geo are declared-but-unimplemented stubs (directories contain only .placeholder; not route-registered).
+  - backend-hr and backend-calendar are active but lack a dedicated test file in backend/src/__tests__/.
+  - No frozen module specification exists yet for any registered module; the only MODULE_SPEC.md files (docs/03-modules/employee-management, docs/03-modules/onboarding) are non-frozen business-spec rewrites with [OPEN] items and do not map to a registered module id, so specification is UNKNOWN throughout.

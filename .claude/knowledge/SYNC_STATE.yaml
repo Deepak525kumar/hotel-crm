@@ -1,50 +1,60 @@
 schema_version: 1
 project: hotel-crm
 checked_at: "2026-07-04"
-baseline_revision: 5a5f8d3058f991448a6e1c64c611bdc04982927a
+baseline_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
 default_branch: main
-status: needs_preflight
+status: governance-artifacts-generated
 
 repository:
-  worktree_clean: false
+  worktree_clean: true
   remote_refresh_verified: false
-  note: Framework creation occurred in a worktree with pre-existing changes; rerun repository synchronization before project work.
+  note: v1.1.0 governance artifacts (ADR-001..008, MODULE_REGISTRY, DEPENDENCY_GRAPH) generated and independently reviewed at baseline_revision. Ownership assignment (SYNC-001) remains blocked pending human authority.
 
 indexes:
   project_profile:
-    status: provisional
+    status: current
     source: .claude/knowledge/PROJECT_PROFILE.md
   module_registry:
-    status: provisional
+    status: verified-inventory
     source: .claude/knowledge/MODULE_REGISTRY.yaml
   dependency_graph:
-    status: incomplete
+    status: verified-edges
     source: .claude/knowledge/DEPENDENCY_GRAPH.yaml
   terminology:
-    status: provisional
+    status: current
     source: .claude/knowledge/TERMINOLOGY.md
   decision_index:
-    status: gap-detected
+    status: populated
     source: .claude/knowledge/DECISION_INDEX.md
 
 known_drift:
   - id: SYNC-001
     type: ownership
     status: blocked
-    description: Accountable module and contract owners are unassigned.
+    description: Accountable module and contract owners are unassigned. No CODEOWNERS exists; backend/package.json author is empty.
     authority_needed: human
   - id: SYNC-002
     type: architecture-decisions
-    status: pending
-    description: Repository architecture claims are not backed by indexed Decision Records.
+    status: resolved-proposed
+    description: ADR-001..008 authored in docs/09-decisions/architecture-decisions/ and indexed in DECISION_INDEX.md. Records exist in Proposed status; formal ratification (Proposed -> Accepted) remains reserved human authority.
+    authority_needed: human
   - id: SYNC-003
     type: dependency-graph
-    status: pending
-    description: Graph contains only directly observed notification-service imports.
+    status: resolved
+    description: DEPENDENCY_GRAPH.yaml provides complete repository-backed relationship discovery (reconciled with main PR #103). Records notification-service calls edges, cross-module reads-state/writes-state Prisma access, frontend/mobile consumes-api edges, operations deploys-to edges, and 13 state-domains with owning module; no event bus exists (events verified absent). Owner tokens conformed to `unassigned`.
   - id: SYNC-004
     type: documentation-authority
     status: pending
     description: Active documentation tree requires artifact-level authority classification.
+  - id: SYNC-005
+    type: state-ownership
+    status: blocked
+    description: State domains are mapped to an owning module, but the single authoritative writer for shared-write models (state-user - auth+users; state-audit-log - shared via BaseService) is UNKNOWN and requires a human ownership decision (see DEPENDENCY_GRAPH.yaml pending_verification).
+    authority_needed: human
+  - id: SYNC-006
+    type: documentation-authority
+    status: pending
+    description: Bootloader (.claude/CLAUDE.md) refers to the knowledge layer as "knowledge/" while the actual location is ".claude/knowledge/"; canonical knowledge-path wording to be reconciled (framework doc, human/framework authority).
 
 context_invalidators:
   - repository revision changes
