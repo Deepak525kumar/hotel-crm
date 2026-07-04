@@ -1,13 +1,15 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: bc2ef8d7042726333c5404a6473594dc88845d05
-status: provisional
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2  # 5b16be4
+status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
-# MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Status
-# remains provisional because module owners and contract versions are UNKNOWN and
-# require authoritative human assignment (see MODULE_REGISTRY.yaml). Discovery is
-# derived from repository evidence only; the MODULE_REGISTRY.yaml inventory is
-# authoritative and is never rediscovered here.
+# MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
+# remain `unassigned` (equivalent to UNKNOWN): module owners and contract versions
+# require authoritative human assignment (SYNC-001, blocked; see MODULE_REGISTRY.yaml).
+# Discovery is derived from repository evidence only; the MODULE_REGISTRY.yaml
+# inventory is authoritative and is never rediscovered here. Note: reads-state /
+# writes-state edges record observed Prisma model access; designating a single
+# authoritative writer per state domain remains reserved human authority.
 
 node_schema:
   required: [id, kind, owner, source]
@@ -20,45 +22,45 @@ edge_schema:
 
 nodes:
   # Backend modules (active, mounted in backend/src/routes/v1/index.ts)
-  - { id: backend-auth, kind: module, owner: UNKNOWN, source: backend/src/modules/auth }
-  - { id: backend-users, kind: module, owner: UNKNOWN, source: backend/src/modules/users }
-  - { id: backend-crm, kind: module, owner: UNKNOWN, source: backend/src/modules/crm }
-  - { id: backend-hotel-workers, kind: module, owner: UNKNOWN, source: backend/src/modules/hotel-workers }
-  - { id: backend-work-requests, kind: module, owner: UNKNOWN, source: backend/src/modules/work-requests }
-  - { id: backend-work-applications, kind: module, owner: UNKNOWN, source: backend/src/modules/work-applications }
-  - { id: backend-assignments, kind: module, owner: UNKNOWN, source: backend/src/modules/assignments }
-  - { id: backend-attendance, kind: module, owner: UNKNOWN, source: backend/src/modules/attendance }
-  - { id: backend-quality, kind: module, owner: UNKNOWN, source: backend/src/modules/quality }
+  - { id: backend-auth, kind: module, owner: unassigned, source: backend/src/modules/auth }
+  - { id: backend-users, kind: module, owner: unassigned, source: backend/src/modules/users }
+  - { id: backend-crm, kind: module, owner: unassigned, source: backend/src/modules/crm }
+  - { id: backend-hotel-workers, kind: module, owner: unassigned, source: backend/src/modules/hotel-workers }
+  - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
+  - { id: backend-work-applications, kind: module, owner: unassigned, source: backend/src/modules/work-applications }
+  - { id: backend-assignments, kind: module, owner: unassigned, source: backend/src/modules/assignments }
+  - { id: backend-attendance, kind: module, owner: unassigned, source: backend/src/modules/attendance }
+  - { id: backend-quality, kind: module, owner: unassigned, source: backend/src/modules/quality }
   # backend-hr and backend-calendar are mounted at runtime but every service method
   # throws NotImplementedError; they hold no business state (stub modules).
-  - { id: backend-hr, kind: module, owner: UNKNOWN, source: backend/src/modules/hr, lifecycle: stub }
-  - { id: backend-notifications, kind: module, owner: UNKNOWN, source: backend/src/modules/notifications }
-  - { id: backend-analytics, kind: module, owner: UNKNOWN, source: backend/src/modules/analytics }
-  - { id: backend-calendar, kind: module, owner: UNKNOWN, source: backend/src/modules/calendar, lifecycle: stub }
+  - { id: backend-hr, kind: module, owner: unassigned, source: backend/src/modules/hr, lifecycle: stub }
+  - { id: backend-notifications, kind: module, owner: unassigned, source: backend/src/modules/notifications }
+  - { id: backend-analytics, kind: module, owner: unassigned, source: backend/src/modules/analytics }
+  - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: stub }
   # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
   # file); not imported or mounted anywhere. No relationships exist.
-  - { id: backend-chatbot, kind: module, owner: UNKNOWN, source: backend/src/modules/chatbot, lifecycle: placeholder-unregistered }
-  - { id: backend-geo, kind: module, owner: UNKNOWN, source: backend/src/modules/geo, lifecycle: placeholder-unregistered }
+  - { id: backend-chatbot, kind: module, owner: unassigned, source: backend/src/modules/chatbot, lifecycle: placeholder-unregistered }
+  - { id: backend-geo, kind: module, owner: unassigned, source: backend/src/modules/geo, lifecycle: placeholder-unregistered }
 
   # Clients
-  - { id: frontend-web, kind: client, owner: UNKNOWN, source: frontend }
-  - { id: mobile-worker, kind: client, owner: UNKNOWN, source: mobile/worker-app }
-  - { id: mobile-checker, kind: client, owner: UNKNOWN, source: mobile/checker-app }
+  - { id: frontend-web, kind: client, owner: unassigned, source: frontend }
+  - { id: mobile-worker, kind: client, owner: unassigned, source: mobile/worker-app }
+  - { id: mobile-checker, kind: client, owner: unassigned, source: mobile/checker-app }
 
   # Infrastructure
-  - { id: operations, kind: infrastructure, owner: UNKNOWN, source: "." }
+  - { id: operations, kind: infrastructure, owner: unassigned, source: "." }
 
   # Shared contracts (repository-derived; consumed cross-module)
-  - { id: prisma-schema, kind: contract, owner: UNKNOWN, source: backend/prisma/schema.prisma }
+  - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
   - { id: notification-service, kind: contract, owner: backend-notifications, source: backend/src/modules/notifications/service.ts }
-  - { id: base-service, kind: contract, owner: UNKNOWN, source: backend/src/lib/base-service.ts }
+  - { id: base-service, kind: contract, owner: unassigned, source: backend/src/lib/base-service.ts }
   - { id: auth-middleware, kind: contract, owner: backend-auth, source: backend/src/middleware/auth.ts }
-  - { id: permissions-middleware, kind: contract, owner: UNKNOWN, source: backend/src/middleware/permissions.ts }
-  - { id: validation-middleware, kind: contract, owner: UNKNOWN, source: backend/src/middleware/validation.ts }
+  - { id: permissions-middleware, kind: contract, owner: unassigned, source: backend/src/middleware/permissions.ts }
+  - { id: validation-middleware, kind: contract, owner: unassigned, source: backend/src/middleware/validation.ts }
 
   # State domains (Prisma models). authoritative_writer is the module that
   # creates/updates the model; UNKNOWN where more than one module writes it.
-  - { id: state-user, kind: state-domain, owner: UNKNOWN, source: "backend/prisma/schema.prisma:117 (model User)" }
+  - { id: state-user, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:117 (model User)" }
   - { id: state-session, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma:157 (model Session)" }
   - { id: state-hotel, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:175 (model Hotel)" }
   - { id: state-hotel-worker, kind: state-domain, owner: backend-hotel-workers, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }
@@ -70,7 +72,7 @@ nodes:
   - { id: state-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:419 (model Rating)" }
   - { id: state-worker-overall-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:445 (model WorkerOverallRating)" }
   - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
-  - { id: state-audit-log, kind: state-domain, owner: UNKNOWN, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
+  - { id: state-audit-log, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -324,7 +326,7 @@ contracts:
       - backend-quality
   - id: prisma-schema
     version: unversioned
-    owner_module: UNKNOWN
+    owner_module: unassigned
     source: backend/prisma/schema.prisma
     note: "Central shared data contract. Consumed by every active backend module through @prisma/client types and the shared PrismaClient (BaseService)."
     consumers:
@@ -341,7 +343,7 @@ contracts:
       - backend-analytics
   - id: base-service
     version: unversioned
-    owner_module: UNKNOWN
+    owner_module: unassigned
     source: backend/src/lib/base-service.ts
     note: "Shared abstract base every service extends; provides PrismaClient access and logAudit (writes state-audit-log)."
     consumers:
@@ -379,7 +381,7 @@ contracts:
       - backend-auth
   - id: permissions-middleware
     version: unversioned
-    owner_module: UNKNOWN
+    owner_module: unassigned
     source: backend/src/middleware/permissions.ts
     note: "requireRole / requirePermission / checkHotelAccess authorization guards."
     consumers:
@@ -396,7 +398,7 @@ contracts:
       - backend-calendar
   - id: validation-middleware
     version: unversioned
-    owner_module: UNKNOWN
+    owner_module: unassigned
     source: backend/src/middleware/validation.ts
     note: "validateBody / validateQuery zod-schema request validation."
     consumers:
