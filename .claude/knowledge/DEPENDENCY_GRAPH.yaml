@@ -1,7 +1,13 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 5a5f8d3058f991448a6e1c64c611bdc04982927a
+observed_revision: bc2ef8d7042726333c5404a6473594dc88845d05
 status: provisional
+# Relationship discovery is complete for the observed revision: every module in
+# MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Status
+# remains provisional because module owners and contract versions are UNKNOWN and
+# require authoritative human assignment (see MODULE_REGISTRY.yaml). Discovery is
+# derived from repository evidence only; the MODULE_REGISTRY.yaml inventory is
+# authoritative and is never rediscovered here.
 
 node_schema:
   required: [id, kind, owner, source]
@@ -13,14 +19,63 @@ edge_schema:
   compatibility: [compatible, conditional, breaking, unknown, not-applicable]
 
 nodes:
-  - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
-  - { id: backend-work-applications, kind: module, owner: unassigned, source: backend/src/modules/work-applications }
-  - { id: backend-attendance, kind: module, owner: unassigned, source: backend/src/modules/attendance }
-  - { id: backend-quality, kind: module, owner: unassigned, source: backend/src/modules/quality }
-  - { id: backend-notifications, kind: module, owner: unassigned, source: backend/src/modules/notifications }
-  - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
+  # Backend modules (active, mounted in backend/src/routes/v1/index.ts)
+  - { id: backend-auth, kind: module, owner: UNKNOWN, source: backend/src/modules/auth }
+  - { id: backend-users, kind: module, owner: UNKNOWN, source: backend/src/modules/users }
+  - { id: backend-crm, kind: module, owner: UNKNOWN, source: backend/src/modules/crm }
+  - { id: backend-hotel-workers, kind: module, owner: UNKNOWN, source: backend/src/modules/hotel-workers }
+  - { id: backend-work-requests, kind: module, owner: UNKNOWN, source: backend/src/modules/work-requests }
+  - { id: backend-work-applications, kind: module, owner: UNKNOWN, source: backend/src/modules/work-applications }
+  - { id: backend-assignments, kind: module, owner: UNKNOWN, source: backend/src/modules/assignments }
+  - { id: backend-attendance, kind: module, owner: UNKNOWN, source: backend/src/modules/attendance }
+  - { id: backend-quality, kind: module, owner: UNKNOWN, source: backend/src/modules/quality }
+  # backend-hr and backend-calendar are mounted at runtime but every service method
+  # throws NotImplementedError; they hold no business state (stub modules).
+  - { id: backend-hr, kind: module, owner: UNKNOWN, source: backend/src/modules/hr, lifecycle: stub }
+  - { id: backend-notifications, kind: module, owner: UNKNOWN, source: backend/src/modules/notifications }
+  - { id: backend-analytics, kind: module, owner: UNKNOWN, source: backend/src/modules/analytics }
+  - { id: backend-calendar, kind: module, owner: UNKNOWN, source: backend/src/modules/calendar, lifecycle: stub }
+  # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
+  # file); not imported or mounted anywhere. No relationships exist.
+  - { id: backend-chatbot, kind: module, owner: UNKNOWN, source: backend/src/modules/chatbot, lifecycle: placeholder-unregistered }
+  - { id: backend-geo, kind: module, owner: UNKNOWN, source: backend/src/modules/geo, lifecycle: placeholder-unregistered }
+
+  # Clients
+  - { id: frontend-web, kind: client, owner: UNKNOWN, source: frontend }
+  - { id: mobile-worker, kind: client, owner: UNKNOWN, source: mobile/worker-app }
+  - { id: mobile-checker, kind: client, owner: UNKNOWN, source: mobile/checker-app }
+
+  # Infrastructure
+  - { id: operations, kind: infrastructure, owner: UNKNOWN, source: "." }
+
+  # Shared contracts (repository-derived; consumed cross-module)
+  - { id: prisma-schema, kind: contract, owner: UNKNOWN, source: backend/prisma/schema.prisma }
+  - { id: notification-service, kind: contract, owner: backend-notifications, source: backend/src/modules/notifications/service.ts }
+  - { id: base-service, kind: contract, owner: UNKNOWN, source: backend/src/lib/base-service.ts }
+  - { id: auth-middleware, kind: contract, owner: backend-auth, source: backend/src/middleware/auth.ts }
+  - { id: permissions-middleware, kind: contract, owner: UNKNOWN, source: backend/src/middleware/permissions.ts }
+  - { id: validation-middleware, kind: contract, owner: UNKNOWN, source: backend/src/middleware/validation.ts }
+
+  # State domains (Prisma models). authoritative_writer is the module that
+  # creates/updates the model; UNKNOWN where more than one module writes it.
+  - { id: state-user, kind: state-domain, owner: UNKNOWN, source: "backend/prisma/schema.prisma:117 (model User)" }
+  - { id: state-session, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma:157 (model Session)" }
+  - { id: state-hotel, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:175 (model Hotel)" }
+  - { id: state-hotel-worker, kind: state-domain, owner: backend-hotel-workers, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }
+  - { id: state-work-request, kind: state-domain, owner: backend-work-requests, source: "backend/prisma/schema.prisma:236 (model WorkRequest)" }
+  - { id: state-work-application, kind: state-domain, owner: backend-work-applications, source: "backend/prisma/schema.prisma:279 (model WorkApplication)" }
+  - { id: state-worker-assignment, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma:314 (model WorkerAssignment)" }
+  - { id: state-attendance, kind: state-domain, owner: backend-attendance, source: "backend/prisma/schema.prisma:359 (model Attendance)" }
+  - { id: state-quality-verification, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:395 (model QualityVerification)" }
+  - { id: state-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:419 (model Rating)" }
+  - { id: state-worker-overall-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:445 (model WorkerOverallRating)" }
+  - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
+  - { id: state-audit-log, kind: state-domain, owner: UNKNOWN, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
 
 edges:
+  # --- Backend cross-module service calls (notification fan-out) ---
+  # Each caller imports the shared `notificationService` singleton and invokes
+  # sendNotification (fire-and-forget; a delivery failure never rolls back).
   - id: edge-work-requests-notifications
     source: backend-work-requests
     target: backend-notifications
@@ -28,7 +83,7 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: backend/src/modules/work-requests/service.ts
+    evidence: "backend/src/modules/work-requests/service.ts:4,240-242"
   - id: edge-work-applications-notifications
     source: backend-work-applications
     target: backend-notifications
@@ -36,7 +91,7 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: backend/src/modules/work-applications/service.ts
+    evidence: "backend/src/modules/work-applications/service.ts:12,103,194,299,306"
   - id: edge-attendance-notifications
     source: backend-attendance
     target: backend-notifications
@@ -44,7 +99,7 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: backend/src/modules/attendance/service.ts
+    evidence: "backend/src/modules/attendance/service.ts:4,187,200"
   - id: edge-quality-notifications
     source: backend-quality
     target: backend-notifications
@@ -52,13 +107,216 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: backend/src/modules/quality/service.ts
+    evidence: "backend/src/modules/quality/service.ts:4,75,191"
+
+  # --- Cross-module state writes (work-applications accept-application transaction) ---
+  # The accept flow provisions records in state domains owned by other modules.
+  - id: edge-work-applications-writes-work-request
+    source: backend-work-applications
+    target: state-work-request
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:219,278,283 (tx.workRequest.updateMany/update)"
+  - id: edge-work-applications-writes-worker-assignment
+    source: backend-work-applications
+    target: state-worker-assignment
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:243 (tx.workerAssignment.create)"
+  - id: edge-work-applications-writes-attendance
+    source: backend-work-applications
+    target: state-attendance
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:256 (tx.attendance.create)"
+
+  # --- Cross-module state reads (a module reads a state domain it does not own) ---
+  - id: edge-work-requests-reads-hotel
+    source: backend-work-requests
+    target: state-hotel
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-requests/service.ts:53 (this.prisma.hotel.findUnique)"
+  - id: edge-work-requests-reads-hotel-worker
+    source: backend-work-requests
+    target: state-hotel-worker
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-requests/service.ts:101,135,233 (this.prisma.hotelWorker)"
+  - id: edge-work-requests-reads-work-application
+    source: backend-work-requests
+    target: state-work-application
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-requests/service.ts:149 (this.prisma.workApplication.findFirst)"
+  - id: edge-work-applications-reads-work-request
+    source: backend-work-applications
+    target: state-work-request
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:43,118,211,276 (this.prisma.workRequest)"
+  - id: edge-work-applications-reads-hotel-worker
+    source: backend-work-applications
+    target: state-hotel-worker
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:50 (this.prisma.hotelWorker.findFirst)"
+  - id: edge-work-applications-reads-worker-overall-rating
+    source: backend-work-applications
+    target: state-worker-overall-rating
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts:64 (this.prisma.workerOverallRating.findUnique)"
+  - id: edge-assignments-reads-hotel-worker
+    source: backend-assignments
+    target: state-hotel-worker
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/assignments/service.ts:69 (this.prisma.hotelWorker.findFirst)"
+  - id: edge-attendance-reads-worker-assignment
+    source: backend-attendance
+    target: state-worker-assignment
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/attendance/service.ts:35,195 (this.prisma.workerAssignment.findUnique)"
+  - id: edge-quality-reads-worker-assignment
+    source: backend-quality
+    target: state-worker-assignment
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/quality/service.ts:19,100,150 (workerAssignment.findUnique/findFirst)"
+  - id: edge-hotel-workers-reads-hotel
+    source: backend-hotel-workers
+    target: state-hotel
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/hotel-workers/service.ts:37,87 (this.prisma.hotel.findUnique)"
+  - id: edge-hotel-workers-reads-user
+    source: backend-hotel-workers
+    target: state-user
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/hotel-workers/service.ts:40 (this.prisma.user.findUnique)"
+  # analytics is a read-only aggregator across many owned state domains.
+  - id: edge-analytics-reads-work-request
+    source: backend-analytics
+    target: state-work-request
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:75,76,189 (this.prisma.workRequest)"
+  - id: edge-analytics-reads-worker-assignment
+    source: backend-analytics
+    target: state-worker-assignment
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:81,82,197 (this.prisma.workerAssignment)"
+  - id: edge-analytics-reads-attendance
+    source: backend-analytics
+    target: state-attendance
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:87,88,200 (this.prisma.attendance)"
+  - id: edge-analytics-reads-quality-verification
+    source: backend-analytics
+    target: state-quality-verification
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:93,97,100,208,212,215 (this.prisma.qualityVerification)"
+  - id: edge-analytics-reads-rating
+    source: backend-analytics
+    target: state-rating
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:101,105 (this.prisma.rating)"
+  - id: edge-analytics-reads-worker-overall-rating
+    source: backend-analytics
+    target: state-worker-overall-rating
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:37 (this.prisma.workerOverallRating.findMany)"
+
+  # --- Client -> backend API consumption (consumes-api) ---
+  # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
+  - { id: edge-frontend-auth, source: frontend-web, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:171,177,180 (/auth/login,/auth/me,/auth/logout)" }
+  - { id: edge-frontend-work-requests, source: frontend-web, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:202,204,207 (/work-requests)" }
+  - { id: edge-frontend-work-applications, source: frontend-web, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/work-requests/${id}/applications)" }
+  - { id: edge-frontend-attendance, source: frontend-web, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/attendance)" }
+  - { id: edge-frontend-assignments, source: frontend-web, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/assignments)" }
+  - { id: edge-frontend-notifications, source: frontend-web, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/notifications)" }
+  - { id: edge-frontend-crm, source: frontend-web, target: backend-crm, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/crm)" }
+  # mobile-worker (Expo) via mobile/worker-app/src/lib/api.ts
+  - { id: edge-mobile-worker-auth, source: mobile-worker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:61 (/auth); mobile/worker-app/src (/auth)" }
+  - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)" }
+  - { id: edge-mobile-worker-assignments, source: mobile-worker, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/assignments)" }
+  - { id: edge-mobile-worker-attendance, source: mobile-worker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/attendance)" }
+  - { id: edge-mobile-worker-analytics, source: mobile-worker, target: backend-analytics, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/analytics)" }
+  - { id: edge-mobile-worker-hr, source: mobile-worker, target: backend-hr, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/hr)" }
+  - { id: edge-mobile-worker-notifications, source: mobile-worker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/notifications)" }
+  # mobile-checker (Expo) via mobile/checker-app/src/lib/api.ts
+  - { id: edge-mobile-checker-auth, source: mobile-checker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src/lib/api.ts:59 (/auth); mobile/checker-app/src (/auth)" }
+  - { id: edge-mobile-checker-attendance, source: mobile-checker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/attendance)" }
+  - { id: edge-mobile-checker-quality, source: mobile-checker, target: backend-quality, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/quality)" }
+  - { id: edge-mobile-checker-notifications, source: mobile-checker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/notifications)" }
+
+  # --- Deployment (operations packages and deploys the runtime units) ---
+  - { id: edge-operations-deploys-backend, source: operations, target: backend-auth, kind: deploys-to, compatibility: not-applicable, status: observed, evidence: "ecosystem.config.js; docker-compose.yml; docker-compose.prod.yml (backend service = all backend modules)" }
+  - { id: edge-operations-deploys-frontend, source: operations, target: frontend-web, kind: deploys-to, compatibility: not-applicable, status: observed, evidence: "ecosystem.config.js:24; nginx/hotelcrm.conf:91; docker-compose.yml" }
+
+runtime:
+  # Repository-derived runtime bootstrap and route registration (Agent 2 scope).
+  bootstrap:
+    - "backend/src/server.ts starts the process and creates the app via createApp()."
+    - "backend/src/app.ts mounts v1 router at /api/${API_VERSION}: app.use(`/api/${env.API_VERSION}`, v1Router) (app.ts:51)."
+    - "backend/src/routes/v1/index.ts registers every active backend module router (index.ts:22-34)."
+    - "All services obtain the shared PrismaClient through BaseService (backend/src/lib/base-service.ts:5 -> lib/db.ts getPrisma), a single runtime persistence dependency."
+  route_registration:
+    - { module: backend-auth, mount: "/api/v1/auth", evidence: "backend/src/routes/v1/index.ts:22" }
+    - { module: backend-users, mount: "/api/v1/users", evidence: "backend/src/routes/v1/index.ts:23" }
+    - { module: backend-crm, mount: "/api/v1/crm", evidence: "backend/src/routes/v1/index.ts:24" }
+    - { module: backend-hotel-workers, mount: "/api/v1/crm/hotels/:hotel_id/workers", nested_under: backend-crm, evidence: "backend/src/routes/v1/index.ts:25" }
+    - { module: backend-work-requests, mount: "/api/v1/work-requests", evidence: "backend/src/routes/v1/index.ts:26" }
+    - { module: backend-work-applications, mount: "/api/v1/work-requests/:id/applications", nested_under: backend-work-requests, evidence: "backend/src/routes/v1/index.ts:27" }
+    - { module: backend-assignments, mount: "/api/v1/assignments", evidence: "backend/src/routes/v1/index.ts:28" }
+    - { module: backend-attendance, mount: "/api/v1/attendance", evidence: "backend/src/routes/v1/index.ts:29" }
+    - { module: backend-quality, mount: "/api/v1/quality", evidence: "backend/src/routes/v1/index.ts:30" }
+    - { module: backend-hr, mount: "/api/v1/hr", evidence: "backend/src/routes/v1/index.ts:31" }
+    - { module: backend-notifications, mount: "/api/v1/notifications", evidence: "backend/src/routes/v1/index.ts:32" }
+    - { module: backend-analytics, mount: "/api/v1/analytics", evidence: "backend/src/routes/v1/index.ts:33" }
+    - { module: backend-calendar, mount: "/api/v1/calendar", evidence: "backend/src/routes/v1/index.ts:34" }
+  middleware_registration:
+    - "optionalAuthMiddleware applied to the whole v1 router (routes/v1/index.ts:20)."
+    - "authMiddleware / requireRole / requirePermission / checkHotelAccess applied per-module in each module's routes.ts (backend/src/middleware/auth.ts, backend/src/middleware/permissions.ts)."
+    - "requestLoggerMiddleware, CORS, errorHandler, notFoundHandler registered globally in app.ts:18,21,54,57."
+  unregistered:
+    - "backend-chatbot and backend-geo are NOT imported or mounted (only a .placeholder file exists). No runtime relationship."
 
 contracts:
   - id: notification-service
     version: unversioned
     owner_module: backend-notifications
     source: backend/src/modules/notifications/service.ts
+    interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead"
+    payload_contract: "backend/src/modules/notifications/types.ts (NotificationPayload)"
     consumers:
       - backend-work-requests
       - backend-work-applications
@@ -66,17 +324,201 @@ contracts:
       - backend-quality
   - id: prisma-schema
     version: unversioned
-    owner_module: unassigned
+    owner_module: UNKNOWN
     source: backend/prisma/schema.prisma
-    consumers: [verification-required]
+    note: "Central shared data contract. Consumed by every active backend module through @prisma/client types and the shared PrismaClient (BaseService)."
+    consumers:
+      - backend-auth
+      - backend-users
+      - backend-crm
+      - backend-hotel-workers
+      - backend-work-requests
+      - backend-work-applications
+      - backend-assignments
+      - backend-attendance
+      - backend-quality
+      - backend-notifications
+      - backend-analytics
+  - id: base-service
+    version: unversioned
+    owner_module: UNKNOWN
+    source: backend/src/lib/base-service.ts
+    note: "Shared abstract base every service extends; provides PrismaClient access and logAudit (writes state-audit-log)."
+    consumers:
+      - backend-auth
+      - backend-users
+      - backend-crm
+      - backend-hotel-workers
+      - backend-work-requests
+      - backend-work-applications
+      - backend-assignments
+      - backend-attendance
+      - backend-quality
+      - backend-notifications
+      - backend-analytics
+      - backend-hr
+      - backend-calendar
+  - id: auth-middleware
+    version: unversioned
+    owner_module: backend-auth
+    source: backend/src/middleware/auth.ts
+    note: "authMiddleware / optionalAuthMiddleware. Applied globally to v1 router and per-module in routes.ts."
+    consumers:
+      - backend-users
+      - backend-crm
+      - backend-hotel-workers
+      - backend-work-requests
+      - backend-work-applications
+      - backend-assignments
+      - backend-attendance
+      - backend-quality
+      - backend-hr
+      - backend-notifications
+      - backend-analytics
+      - backend-calendar
+      - backend-auth
+  - id: permissions-middleware
+    version: unversioned
+    owner_module: UNKNOWN
+    source: backend/src/middleware/permissions.ts
+    note: "requireRole / requirePermission / checkHotelAccess authorization guards."
+    consumers:
+      - backend-users
+      - backend-crm
+      - backend-hotel-workers
+      - backend-work-requests
+      - backend-work-applications
+      - backend-assignments
+      - backend-attendance
+      - backend-quality
+      - backend-hr
+      - backend-analytics
+      - backend-calendar
+  - id: validation-middleware
+    version: unversioned
+    owner_module: UNKNOWN
+    source: backend/src/middleware/validation.ts
+    note: "validateBody / validateQuery zod-schema request validation."
+    consumers:
+      - backend-users
+      - backend-crm
+      - backend-auth
 
 events: []
-state_domains: []
+# No event bus, message broker, or publish/subscribe mechanism exists in the
+# repository. grep for EventEmitter/emit/on/amqp/kafka/redis/bull/pubsub/subscribe
+# across backend/src returned only Node process signals (server.ts) and an OPTIONAL
+# unused REDIS_URL env var (config/env.ts:15). Cross-module notification delivery is
+# a synchronous, fire-and-forget in-process service call (see the four `calls` edges
+# to notification-service), NOT asynchronous eventing. The Prisma `NotificationType`
+# enum (schema.prisma:89) is a set of notification CATEGORIES, not domain events.
+# Therefore publishes/consumes relationships are: NONE (not UNKNOWN — verified absent).
 
-pending_verification:
-  - Map every registered backend module and shared library dependency.
-  - Map Prisma model write ownership and cross-module reads.
-  - Map frontend and mobile API contract consumption.
-  - Determine whether NotificationType values are events, notification categories, or both.
-  - Establish event publisher/consumer records and delivery semantics.
-  - Assign owners and contract versions.
+state_domains:
+  - id: state-user
+    model: User
+    authoritative_writer: UNKNOWN
+    writers: [backend-auth, backend-users]
+    readers: [backend-hotel-workers]
+    evidence: "auth writes: backend/src/modules/auth/service.ts:25,205,218; users writes: backend/src/modules/users/service.ts:93,132,164; hotel-workers reads: backend/src/modules/hotel-workers/service.ts:40"
+    note: "Two modules write User (auth on register/password reset; users on CRUD). Single authoritative writer is a human ownership decision."
+  - id: state-session
+    model: Session
+    authoritative_writer: backend-auth
+    writers: [backend-auth]
+    readers: [backend-auth]
+    evidence: "backend/src/modules/auth/service.ts:44,95,131,150,167,171,210"
+  - id: state-hotel
+    model: Hotel
+    authoritative_writer: backend-crm
+    writers: [backend-crm]
+    readers: [backend-work-requests, backend-hotel-workers]
+    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/work-requests/service.ts:53, backend/src/modules/hotel-workers/service.ts:37,87"
+  - id: state-hotel-worker
+    model: HotelWorker
+    authoritative_writer: backend-hotel-workers
+    writers: [backend-hotel-workers]
+    readers: [backend-work-requests, backend-work-applications, backend-assignments]
+    evidence: "hotel-workers writes: backend/src/modules/hotel-workers/service.ts:51,133,163; reads: backend/src/modules/work-requests/service.ts:101,135,233, backend/src/modules/work-applications/service.ts:50, backend/src/modules/assignments/service.ts:69"
+  - id: state-work-request
+    model: WorkRequest
+    authoritative_writer: backend-work-requests
+    writers: [backend-work-requests, backend-work-applications]
+    readers: [backend-work-applications, backend-analytics]
+    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; work-applications writes (accept tx): backend/src/modules/work-applications/service.ts:219,278,283; analytics reads: backend/src/modules/analytics/service.ts:75,76,189"
+    note: "work-applications mutates WorkRequest status during the accept-application transaction (cross-module write)."
+  - id: state-work-application
+    model: WorkApplication
+    authoritative_writer: backend-work-applications
+    writers: [backend-work-applications]
+    readers: [backend-work-requests]
+    evidence: "work-applications writes: backend/src/modules/work-applications/service.ts:86,72,186,233; work-requests reads: backend/src/modules/work-requests/service.ts:149"
+  - id: state-worker-assignment
+    model: WorkerAssignment
+    authoritative_writer: backend-assignments
+    writers: [backend-assignments, backend-work-applications]
+    readers: [backend-quality, backend-attendance, backend-analytics]
+    evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; work-applications creates (accept tx): backend/src/modules/work-applications/service.ts:243; reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
+    note: "The assignment RECORD is created by work-applications during accept but subsequently owned/updated by assignments (cross-module write)."
+  - id: state-attendance
+    model: Attendance
+    authoritative_writer: backend-attendance
+    writers: [backend-attendance, backend-work-applications]
+    readers: [backend-analytics]
+    evidence: "attendance writes: backend/src/modules/attendance/service.ts:57,179; work-applications creates placeholder (accept tx): backend/src/modules/work-applications/service.ts:256; analytics reads: backend/src/modules/analytics/service.ts:87,88,200"
+    note: "work-applications seeds the initial Attendance row during accept (cross-module write)."
+  - id: state-quality-verification
+    model: QualityVerification
+    authoritative_writer: backend-quality
+    writers: [backend-quality]
+    readers: [backend-analytics]
+    evidence: "quality writes: backend/src/modules/quality/service.ts:39; analytics reads: backend/src/modules/analytics/service.ts:93,97,100,208,212,215"
+  - id: state-rating
+    model: Rating
+    authoritative_writer: backend-quality
+    writers: [backend-quality]
+    readers: [backend-analytics]
+    evidence: "quality writes: backend/src/modules/quality/service.ts:113; analytics reads: backend/src/modules/analytics/service.ts:101,105"
+  - id: state-worker-overall-rating
+    model: WorkerOverallRating
+    authoritative_writer: backend-quality
+    writers: [backend-quality]
+    readers: [backend-work-applications, backend-analytics]
+    evidence: "quality writes: backend/src/modules/quality/service.ts:174; reads: backend/src/modules/work-applications/service.ts:64, backend/src/modules/analytics/service.ts:37"
+  - id: state-notification
+    model: Notification
+    authoritative_writer: backend-notifications
+    writers: [backend-notifications]
+    readers: [backend-notifications]
+    evidence: "backend/src/modules/notifications/service.ts:8,20,28,34"
+    note: "Only notifications writes/reads directly; other modules produce notifications through the notification-service `calls` contract, not by touching this state."
+  - id: state-audit-log
+    model: AuditLog
+    authoritative_writer: UNKNOWN
+    writers: [shared-via-base-service]
+    readers: []
+    evidence: "backend/src/lib/base-service.ts:19 (logAudit -> this.prisma.auditLog.create); inherited by every service"
+    note: "Written through the shared BaseService.logAudit by any module; no single module owns it."
+
+analysis:
+  circular_dependencies:
+    code_imports: none
+    note: "No backend module imports another module except the notification-service singleton (notifications imports no other module), so the static import graph is acyclic. A DATA-level bidirectional coupling exists between backend-work-requests and backend-work-applications (work-requests reads WorkApplication; work-applications reads and writes WorkRequest) via shared Prisma models, but this is not a code-import cycle."
+  orphan_modules:
+    - { id: backend-chatbot, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
+    - { id: backend-geo, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
+    - { id: backend-calendar, reason: "mounted at runtime (routes/v1/index.ts:34) but stub (all methods throw NotImplementedError); no discovered client consumer and no cross-module edge." }
+  stub_but_registered:
+    - { id: backend-hr, note: "stub service (NotImplementedError) but consumed by mobile-worker (/hr) and mounted at runtime." }
+    - { id: backend-calendar, note: "stub service (NotImplementedError); mounted but no consumer discovered." }
+  unknown_relationships:
+    - "All module owners (node owner) and contract versions are UNKNOWN — human assignment required (per MODULE_REGISTRY.yaml)."
+    - "state-user authoritative_writer UNKNOWN (auth and users both write)."
+    - "state-audit-log authoritative_writer UNKNOWN (shared via BaseService)."
+
+remaining_human_decisions:
+  - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
+  - "Designate the authoritative writer for state-user (backend-auth vs backend-users both write the User model)."
+  - "Confirm the intentional cross-module write coupling in the accept-application transaction: backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules (backend/src/modules/work-applications/service.ts:219-283). Decide whether this is approved architectural coupling or should be delegated to the owning modules' services."
+  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub modules backend-hr and backend-calendar."
+  - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
