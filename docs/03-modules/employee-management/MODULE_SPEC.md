@@ -1,465 +1,330 @@
-# Employee Management Module — Business Specification
+# Module Specification: `employee-management`
 
-**Platform:** Workforce Operations Platform
-**Client:** FHM Hotelservice GmbH (Frankfurt am Main, Germany) · **Vendor:** Zirove · **Market:** Germany only
-**Document type:** Business specification (no implementation, no schema, no API, no code)
-**Status:** Source-of-truth-aligned rewrite — supersedes the prior marketplace-era engineering specification at this path.
+## Document Control
 
----
+| Field | Value |
+|---|---|
+| Spec ID / version | `SPEC-EMP-001 / 0.1.0` |
+| Status | `REVIEW` (freeze candidate; G2 Specification-Freeze pending — see Review and Change Log) |
+| Owner | `unassigned` — reserved human authority (SYNC-001); no `CODEOWNERS` exists and `backend/package.json` author is empty |
+| Authors / reviewers | Author: Module Author (documentation workflow). Independent reviewers (architecture, dependency, consistency): **pending** (G4) |
+| Repository revision | `1796c370ec2639ea801f8f057a15918b8cbd41fc` (`1796c37`) |
+| Approved by / at | — (G2 freeze requires the named human approver; not yet approved) |
+| Supersedes | Prior non-canonical *Employee Management Module — Business Specification* at this path, revision `7c71498` (retained as historical evidence in git history) |
 
-## Source of Truth & Provenance
+> **Authoring note (not a normative section change).** This document is the canonical-template instance for the Employee Management module, authored per the [Documentation Workflow](../../../.claude/workflows/documentation.md) freeze sequence. It replaces the prior free-form business specification at this path with the fixed shape of [`MODULE_SPEC_TEMPLATE.md`](../../../.claude/templates/MODULE_SPEC_TEMPLATE.md); the template file itself is unmodified. Behaviour is derived **exclusively** from the two authoritative documents — `docs/00-foundations/CONFIRMED_REQUIREMENTS_REGISTER.md` (**CRR §n**) and `docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md` (**PDD §n**) — plus the current worktree for repository facts. No behaviour is drawn from marketplace-era or `docs/legacy/**` sources.
 
-This specification is derived **exclusively** from the two authoritative documents:
+## Purpose and Scope
 
-- `CONFIRMED_REQUIREMENTS_REGISTER.md` (referenced below as **CRR §n**)
-- `PIVOT_DESIGN_DOCUMENT.md` (referenced below as **PDD §n**)
+**Outcome:** A single authoritative, legally compliant record of each **employee** (the Staff/Worker role) — identity linkage, core employment fields, lifecycle status, skills, and hotel blocklisting — exposed consistently to the rest of the Workforce Operations Platform, together with the unified profile-and-history view that serves as the platform's performance-review surface (CRR §4, §5; PDD §9.1).
 
-No behaviour in this document is derived from any other source. Marketplace-era documentation, previous PRDs, previous architecture, previous audits, and `docs/legacy/**` were not used.
+**In scope:**
 
-> **[OPEN] Source-path discrepancy (flagged, not resolved here):** The governing instruction cites the authoritative files under `docs/01-product/requirements/`, but in the repository they exist only under `docs/00-foundations/` (the cited directory contains only a placeholder). The two documents were read from their actual location. This is a documentation-location inconsistency for the docs-tree owner to reconcile; it does not affect any behaviour specified here.
+- Employee identity linkage to the platform account (account owned by Authentication/User Management; this module owns the employment-domain record and references the account) (CRR §1, §2; PDD §5.3).
+- Core employment profile fields: Employee ID, Job Title, Start Date (CRR §4).
+- Employee lifecycle status and its transitions: Inactive → Under Review → Active/Rejected → Deactivated, plus the manual "marked suitable" probation milestone (CRR §6–§10; PDD §9.1).
+- Skill tags carried on the record — the fixed confirmed set and each tag's assessment basis — as the authoritative input other modules read (CRR §4, §13).
+- Unified profile-and-history view: aggregation and presentation of work history, task scores, and rating history, with date and management filters (CRR §5).
+- Personalfragebogen-sourced personal data carried on the employee record (collected by Onboarding; stored here as the employee's personal data) (CRR §6).
+- Hotel blocklist: a hotel blocking specific staff from assignment there, with a logged reason (CRR §4).
+- Bulk CSV import of staff, routed through the same hire-approval workflow as manual creation (CRR §4).
+- Employee-data governance owned at the record: special-category field visibility, retention-tier classification of employee fields, subject-rights data provision, and immutable audit of employee-record actions (CRR §25–§30; PDD §5.4, §5.7).
+- Provisional representation of the today-only red/green availability indicator; **final owning module is an open decision** (CRR §20 — see OD-EMP-07).
 
-> **Refactor / conflict note (Rule 6):** This file **replaces** a previously merged engineering-style specification that was written against the *marketplace* architecture. That prior document derived behaviour from non-authoritative sources, reintroduced removed marketplace concepts (worker applications, marketplace matching, `WorkRequest → WorkApplication → WorkerAssignment`), omitted the confirmed **Regional Manager** role, declared **skills** non-existent (the Register confirms a fixed skill set), and contained database schema and API endpoints. Those conflicts are resolved here by adhering strictly to the authoritative documents. See **§27 Refactoring Summary**.
+**Out of scope:** (owned elsewhere and referenced, never redefined — Constitution §6)
 
----
+- Authentication, login, MFA, sessions, password reset, failed-login manager notification (Authentication module; CRR §2; PDD §5.3).
+- The platform account/role/scope object and the RBAC framework itself (User Management / Authorization; CRR §1; PDD §5.4).
+- Onboarding orchestration: the Personalfragebogen self-service form, the document-collection chatbot, and the pool/claim hire-approval mechanism (Onboarding module; CRR §6, §8, §10).
+- Document storage, expiry tracking, and the non-EU work-permit requirement (Documents module; CRR §4, §7).
+- Contract generation, storage, and the manager-confirmed hand-signed contract lifecycle (Contracts module; CRR §9).
+- Weekly calendar, direct scheduling, and sick/vacation marking (Calendar/Scheduling module; CRR §13, §22).
+- Broadcast job requests, direct assignment, skill-based eligibility computation, and daily assignment exclusivity enforcement (Job Dispatch module; CRR §13).
+- Quality scoring, rating computation, rating tiers, recency weighting, warnings, and the rework flow (Quality module; CRR §14–§16).
+- Geofenced clock-in/out and coordinate capture/retention (Attendance/Geo module; CRR §17).
+- Push notification delivery (Notifications module; CRR §18), payslip request flow (Payslips module; CRR §23), the daily GDPR consent gate (Consent module; CRR §24), the three-tier automatic deletion jobs (Retention module; CRR §25), policy governance and subject-rights automation (Compliance module; CRR §26, §27, §33), hotel/Hotel-Group records and the pause-jobs toggle (Hotels module; CRR §11), and basic analytics (Analytics module; CRR §21).
 
-## 1. Module Overview
+**Non-goals:** (confirmed out of the platform entirely — CRR §3, §4, §13, §22, §23, Explicit Non-Goals)
 
-The Employee Management Module is the system of record for the **employee** as a business entity on the Workforce Operations Platform. Every person who performs work for the client — internally the **Staff (Worker)** role — is a permanent employee whose identity, employment record, skills, lifecycle status, profile-and-history view, and hotel blocklisting are owned here (CRR §1, §4, §5; PDD §9.1). A day-level availability indicator (CRR §20) exists on the platform; **its owning module is `[OPEN]`** — see §26 OPQ-10.
-
-The platform operates a **workforce operations model**, not a marketplace. Workers do not browse, apply for, or compete for work. Managers assign work directly (via the weekly calendar) or broadcast gap-fill requests to eligible workers. The Employee Management Module supplies the authoritative employee data (identity, skills, status, blocklist) that those operational modules consume; it does not itself perform assignment, scheduling, rating, or attendance (CRR §13; PDD §5.5).
-
-All staff are permanent employees who simply do not earn when they are not assigned to work — this is why the worker-facing application is named the **Employee App** (CRR §4, §31).
-
-## 2. Purpose
-
-To maintain a single, authoritative, legally compliant record of each employee and to expose that record consistently to the rest of the platform, so that:
-
-- Each employee has one durable employment record with a well-defined lifecycle status (CRR §4, §6–§10).
-- A unified profile-and-history view serves as the performance-review surface for the worker and every role above them (CRR §5).
-- Skills carried on the employee record drive operational eligibility decisions made by other modules (CRR §4, §13).
-- A day-level availability indicator is represented for operational visibility; which module owns it is `[OPEN]` (CRR §20; see §26 OPQ-10).
-- Hotel-level blocklisting constrains where an employee may be assigned (CRR §4).
-- Employee personal data is handled under German/EU data-protection law, including special-category restrictions, tiered retention classification, and full auditability (CRR §25–§30; PDD §5.4, §5.7).
-
-## 3. Scope
-
-In scope for this module:
-
-- **Employee identity linkage** to the platform account (the account itself is owned by Authentication/User Management; this module owns the employment-domain record and references the account) (CRR §1, §2; PDD §5.3).
-- **Core employment profile fields:** Employee ID, Job Title, Start Date (CRR §4).
-- **Employee lifecycle and status** from account creation through activation, the probationary milestone, and deactivation (CRR §6–§10; PDD §9.1).
-- **Skills** carried on the employee record: the confirmed tag set and each tag's assessment basis (CRR §4).
-- **Unified profile-and-history view:** aggregation and presentation of the employee's work history, task scores, and rating history, with date and management filters (CRR §5).
-- **Day-level availability indicator** (red/green, today only) (CRR §20) — **included here provisionally; final module ownership is `[OPEN]`** (see §26 OPQ-10).
-- **Blocklist:** a hotel blocking specific staff from assignment there, with a logged reason (CRR §4).
-- **Bulk import** of staff via CSV, routed through the same hire-approval workflow as manual creation (CRR §4).
-- **Employee-data governance:** special-category field visibility rules, retention-tier classification of employee fields, subject-rights data provision, and audit of employee-record actions (CRR §25–§30; PDD §5.4, §5.7).
-
-## 4. Out of Scope
-
-**Module boundary (Employee Management / Onboarding / Compliance):**
-
-- **Employee Management** owns **employee records and employee state** (identity linkage, core profile fields, lifecycle status, skills, blocklist entries) — this document's subject matter.
-- **Onboarding** owns **onboarding workflows and the hire-approval process** (Personalfragebogen collection, document-collection chatbot, pool/claim review, approve/reject decisioning).
-- **Compliance** owns **policy governance**: retention policy, consent governance, and compliance automation (subject-rights fulfilment, special-category policy).
-
-These three modules do not share ownership of any single rule. Employee Management holds only the *resulting employee state* that Onboarding's and Compliance's processes produce; it does not define, execute, or duplicate those processes.
-
-Owned by other modules and **referenced, never redefined** here (Rule 5):
-
-- **Authentication, login, MFA, sessions, password reset** — Authentication module (CRR §2; PDD §5.3).
-- **The platform account/role/scope object itself and the RBAC framework** — User Management / Authorization (CRR §1; PDD §5.4).
-- **Onboarding orchestration:** the Personalfragebogen self-service form, the document-collection chatbot, and the pool/claim hire-approval mechanism — Onboarding module (CRR §6, §8, §10).
-- **Document storage, expiry tracking, and the non-EU work-permit requirement** — Documents module (CRR §4, §7).
-- **Contract storage and the manager-confirmed hand-signed contract** — Contracts module (CRR §9).
-- **Weekly calendar, direct scheduling, and sick/vacation marking** — Calendar/Scheduling module (CRR §13, §22).
-- **Broadcast job requests, direct assignment, skill-based eligibility computation, and daily assignment exclusivity enforcement** — Job Dispatch module (CRR §13).
-- **Quality scoring, rating computation, rating tiers, recency weighting, warnings, and the rework flow** — Quality module (CRR §14, §15, §16).
-- **Geofenced clock-in/out and coordinate capture/retention** — Attendance/Geo module (CRR §17).
-- **Push notification delivery** — Notifications module (CRR §18).
-- **Payslip request flow** — Payslips module (CRR §23).
-- **Daily GDPR consent gate** — Consent module (CRR §24).
-- **Three-tier automatic deletion jobs** — Retention module (CRR §25).
-- **Policy governance** (retention policy, consent governance, compliance automation, subject-rights fulfilment) — Compliance module (CRR §26, §27, §33).
-- **Hotel and Hotel Group records and the per-hotel "pause new jobs" toggle** — Hotels module (CRR §11).
-- **Basic analytics** — Analytics module (CRR §21).
-
-Explicitly excluded from the platform entirely and therefore **never** part of this module (CRR §3, §4, §13, §22, §23, Explicit Non-Goals):
-
-- Worker-initiated job applications; auto-matching/ranking; best-match suggestions; worker browsing or selection workflows; marketplace analytics; all marketplace terminology.
+- Worker-initiated job applications, auto-matching/ranking, best-match suggestions, worker browsing/selection, marketplace analytics, and all marketplace terminology.
 - Background checks; account lockout; login rate-limiting; CAPTCHA; MFA for regular staff.
 - Department field; certifications and certification reminders; preferred-staff list; internal-transfer tracking; an employment-type *distinguishing* field; promotion history; training records; reward history.
 - In-system payroll math; leave-balance tracking; leave-approval workflow; shift swaps; coverage planning; recurring jobs.
 - Rooms/floors/buildings/zones; offline mode; SMS/email notification channels; multi-country support.
 
-## 5. Responsibilities
+## Evidence and Traceability
 
-The module is responsible for:
+| Claim/requirement | Source path, line, revision, or decision | Authority | Status |
+|---|---|---|---|
+| `REQ-EMP-001` One employment record per employee; core fields Employee ID, Job Title, Start Date | `docs/00-foundations/CONFIRMED_REQUIREMENTS_REGISTER.md` §4 (CRR §4) | Authoritative | Confirmed |
+| `REQ-EMP-002` Employee lifecycle status is owned here | CRR §6–§10; `PIVOT_DESIGN_DOCUMENT.md` §9.1 (PDD §9.1) | Authoritative | Confirmed |
+| `REQ-EMP-003` Fixed skill-tag set with per-tag assessment basis | CRR §4 | Authoritative | Confirmed |
+| `REQ-EMP-004` Unified profile-and-history view is the performance-review surface | CRR §5 | Authoritative | Confirmed |
+| `REQ-EMP-005` Hotel blocklist with logged reason | CRR §4 | Authoritative | Confirmed |
+| `REQ-EMP-006` Bulk CSV import routed through hire-approval | CRR §4 | Authoritative | Confirmed |
+| `REQ-EMP-007` Special-category field visibility restriction + per-access audit | CRR §27, §30; PDD §5.4 | Authoritative | Confirmed |
+| `REQ-EMP-008` Retention-tier classification of employee fields | CRR §25; PDD §9.4 | Authoritative | Confirmed |
+| `REQ-EMP-009` Provide employee data for subject-rights access/export | CRR §26 | Authoritative | Confirmed |
+| `REQ-EMP-010` Immutable audit of employee-record actions; 5-year retention; no admin log viewer | CRR §30 | Authoritative | Confirmed |
+| `REQ-EMP-011` Personalfragebogen-sourced personal data carried on the record | CRR §6 | Authoritative | Confirmed |
+| `REQ-EMP-012` Permanent-employee model; not hotel-tied; assignable only within Hotel Group | CRR §4, §11, §12, §31 | Authoritative | Confirmed |
+| `REQ-EMP-013` Regional Manager + Admin visibility across a group, incl. org chart | CRR §1 | Authoritative | Confirmed |
+| `REQ-EMP-014` Today-only red/green availability indicator exists (inputs: same-day assignment + sick/vacation) | CRR §20 | Authoritative | Confirmed; **owning module open** (OD-EMP-07) |
+| Confirmed five-role model; no Supervisor role | CRR §1; PDD §5.4 | Authoritative | Confirmed |
+| Probation shape: 1-year fixed-term, 6-month probation, hand-signed; permanent after 2 years | CRR §9 (Open Items resolved) | Authoritative | Confirmed |
+| Backend code module for HR/employee domain is `backend-hr` (currently a stub — every service method throws `NotImplementedError`) | `.claude/knowledge/DEPENDENCY_GRAPH.yaml:36`; `.claude/knowledge/MODULE_REGISTRY.yaml:131` | Generated (repo-derived) | Confirmed current-state |
+| No frozen module specification currently maps to a registered module id | `.claude/knowledge/MODULE_REGISTRY.yaml:20,257` | Generated | Confirmed |
+| Authoritative documents live under `docs/00-foundations/`, not `docs/01-product/requirements/` | worktree at `1796c37` | Current repository | Confirmed (location discrepancy — OD-EMP-11) |
 
-1. Creating and maintaining one employment record per employee, including identity linkage and core profile fields (CRR §4).
-2. Owning the **employee lifecycle status** and enforcing valid transitions (CRR §6–§10).
-3. Holding the employee's **skill tags** and their assessment basis, as the authoritative source other modules read (CRR §4, §13).
-4. Composing and serving the **unified profile-and-history view** by aggregating data owned elsewhere (ratings, scores, attendance history) (CRR §5).
-5. Provisionally representing **today-only availability** for each employee, pending confirmation of final module ownership (CRR §20; see §26 OPQ-10).
-6. Maintaining **hotel blocklist** entries with logged reasons (CRR §4).
-7. Supporting **bulk CSV import**, with each imported employee routed into the standard hire-approval path (CRR §4).
-8. Enforcing **special-category field visibility** and emitting a distinct audit entry on every such access (CRR §27, §30).
-9. Classifying employee fields by **retention tier** so the Retention module can delete them automatically at the correct horizon (CRR §25).
-10. Providing the employee's data for **subject-rights access/export** requests (CRR §26).
-11. Ensuring **every important employee-record action is audit-logged** immutably via the existing audit framework (CRR §30).
+## Actors and Terminology
 
-## 6. Core Concepts
+| Term/actor | Canonical definition | Source |
+|---|---|---|
+| Employee (Staff/Worker) | A permanent employee who performs jobs and earns only when assigned; the sole worker role (no Supervisor) | CRR §1, §4, §13, §31 |
+| Checker | Distinct role that inspects work and assigns rework; not a renamed Supervisor | CRR §1 |
+| Hotel Manager | Manager scoped to one hotel | CRR §1; PDD §5.4 |
+| Regional Manager | New role; sees all Hotel-Manager data across the Hotel Group they manage | CRR §1; PDD §5.4 |
+| Admin | System-wide access; hotel creation and account deletion | CRR §1, §11; PDD §5.4 |
+| Employment record | The durable per-employee record owned by this module (repurposed retained roster record) | PDD §9.1 |
+| Account | Authentication identity (email/username, role, scope) owned by Authentication/User Management and linked to the employment record | CRR §1, §2; PDD §5.3 |
+| Skill tag | One of the fixed confirmed set: Cleaner, Public Service, Kitchen Dishwasher, Waiter | CRR §4 |
+| Assessment basis | Cleaner → rooms cleaned; Public Service / Kitchen Dishwasher / Waiter → hours worked | CRR §4 |
+| Profile-and-history view | Single unified view of work history, task scores, and rating history — this view *is* the performance review | CRR §5 |
+| Availability indicator | Today-only red/green signal of whether the employee is available today | CRR §20 |
+| Blocklist entry | Hotel-scoped block preventing a specific employee from assignment at that hotel, with a logged reason | CRR §4 |
+| Personalfragebogen | German new-hire data form completed self-service at signup; source of the personal data carried on the record | CRR §6; PDD Appendix |
+| Special-category data | Konfession (religion, for church tax), disability status, health data (sick notes) — restricted visibility | CRR §27 |
+| Hotel Group | Set of hotels under one Regional Manager, within which a worker may be assigned | CRR §11, §12 |
+| Hire-approval (pool/claim) | Onboarding-owned manager review that turns a completed application into an active employee | CRR §10 |
 
-- **Employee (Staff/Worker):** A permanent employee who performs jobs; earns only when assigned. The only worker role; there is no Supervisor role (CRR §1, §4, §13).
-- **Employment record:** The durable per-employee record owned by this module, repurposed from the retained roster record and now serving as the permanent-employment record (PDD §9.1).
-- **Account:** The authentication identity (email/username, role, scope) owned by Authentication/User Management and linked to the employment record (CRR §1, §2; PDD §5.3).
-- **Hotel Group context:** Workers are not tied to any single hotel; a worker may be assigned only within the group of hotels they are working in (CRR §11, §12). *(Association mechanism — see [OPEN] in §26.)*
-- **Skill tag:** One of a fixed, confirmed set; determines which broadcast slots an employee is eligible for and how the employee is assessed (CRR §4, §13).
-- **Profile-and-history view:** A single unified view of full work history, task scores, and rating history — this view *is* the performance review; there is no separate review process (CRR §5).
-- **Availability indicator:** A today-only red/green signal of whether the employee is available for work today (CRR §20). **Owning module `[OPEN]`** — see §26 OPQ-10.
-- **Blocklist entry:** A hotel-scoped block preventing a specific employee from being assigned at that hotel, with a logged reason (CRR §4).
-- **Special-category data:** Konfession (religion, for church tax), disability status, and health data (sick notes) — handled under restricted visibility (CRR §27).
-- **Hire-approval (pool/claim):** The onboarding-owned review by which a completed application becomes an active employee; this module owns the resulting status, not the mechanism (CRR §10).
+## Requirements and Acceptance Criteria
 
-## 7. Employee Lifecycle
+| Requirement | Statement | Priority | Acceptance criteria | Rule IDs |
+|---|---|---|---|---|
+| `REQ-EMP-001` | Maintain exactly one employment record per employee, linked to one platform account, holding core fields Employee ID, Job Title, Start Date. | MUST | A created employee has exactly one record and one account link; Employee ID, Job Title, Start Date are present and readable; no Department or employment-type distinguishing field exists. | `RULE-EMP-01` |
+| `REQ-EMP-002` | Own the employee lifecycle status and permit only the confirmed transitions. | MUST | Status is one of {Inactive, Under Review, Active, Rejected, Deactivated}; every transition matches State and Lifecycle; no Suspended state and no rating/warning-driven automatic transition exist. | `RULE-EMP-02`, `RULE-EMP-03`, `RULE-EMP-12` |
+| `REQ-EMP-003` | Hold each employee's skill tags, drawn only from the fixed set, with each tag's assessment basis available to consumers. | MUST | Skill tags accepted only from {Cleaner, Public Service, Kitchen Dishwasher, Waiter}; Cleaner carries rooms-cleaned basis, the others hours-worked; no certifications or expiry. | `RULE-EMP-04` |
+| `REQ-EMP-004` | Compose and serve a single profile-and-history view (work history, task scores, rating history) with date and management filters, as the performance-review surface. | MUST | View aggregates referenced data owned elsewhere; date/management filters apply; no separate performance-review process exists; special-category fields never appear. | `RULE-EMP-08`, `RULE-EMP-09` |
+| `REQ-EMP-005` | Maintain hotel blocklist entries, each requiring a logged reason. | MUST | A blocklist entry cannot be created without a reason; the entry and its reason are audit-logged; assignment consumers can read the block for a (hotel, employee). | `RULE-EMP-07` |
+| `REQ-EMP-006` | Support bulk CSV import of staff, routing each created employee through the same hire-approval path as manual creation. | MUST | Imported employees start Inactive and enter the standard hire-approval flow; manual and bulk paths reach Active identically. | `RULE-EMP-10` |
+| `REQ-EMP-007` | Restrict special-category field visibility to the confirmed audiences and emit a distinct audit entry on each access. | MUST | Konfession is visible only to the payslip-request processor and Admin; disability status only to Admin; each view/edit yields its own audit entry; general profile never exposes these fields. | `RULE-EMP-09` |
+| `REQ-EMP-008` | Classify each employee field into its retention tier so the Retention module can delete it automatically at the correct horizon. | MUST | Shift coordinates → 6 months (Tier 1, attendance-linked); general personal/profile data → 5 years (Tier 2); payroll/tax-adjacent fields (IBAN, Tax ID, payslip-request records, wage records) → 6 years (Tier 3). | `RULE-EMP-11` |
+| `REQ-EMP-009` | Provide the employee's data for subject-rights access/export requests fulfilled by Compliance. | SHOULD | On a Compliance-initiated request, this module returns the employee's owned fields; each collected field retains its stated legal basis. | `RULE-EMP-09` |
+| `REQ-EMP-010` | Audit-log every important employee-record action immutably, retained 5 years, with no admin-facing log viewer. | MUST | Create, update, lifecycle transitions, blocklist, and special-category access are logged immutably via the existing audit framework; logs retained 5 years; no admin log-viewer screen is introduced. | `RULE-EMP-11`, `RULE-EMP-09` |
+| `REQ-EMP-011` | Carry the Personalfragebogen-sourced personal data on the employee record (collected/validated by Onboarding). | MUST | The confirmed personal fields are stored; Teilzeit/Minijob is stored as information only with no system logic; formats are validated at capture by Onboarding, not redefined here. | `RULE-EMP-01`, `RULE-EMP-06` |
+| `REQ-EMP-012` | Reflect the permanent-employee model: no worker is hotel-tied; a worker is assignable only within their Hotel Group. | MUST | Records carry no permanent hotel tie; the group association bounds assignability; daily assignment exclusivity outcomes (owned by Job Dispatch) are reflected, not enforced, here. | `RULE-EMP-05`, `RULE-EMP-06` |
+| `REQ-EMP-013` | Expose group-wide employee visibility, including the org chart, to Regional Manager and Admin. | MUST | Regional Manager sees employee data across their group; org chart ("who reports to whom") is visible only to Regional Manager and Admin. | `RULE-EMP-08` |
+| `REQ-EMP-014` | Represent a today-only red/green availability indicator whose inputs are same-day assignment and sick/vacation state. | MUST | The indicator reflects today only and does not change with the calendar date being viewed; it derives solely from confirmed inputs. **Which module owns/derives it is an open decision (OD-EMP-07).** | `RULE-EMP-05`, `RULE-EMP-06` |
 
-The employee lifecycle is the employee-level view of the journey from account creation to active employment and eventual deactivation. The **mechanics** of onboarding (form, chatbot, contract, approval) are owned by the Onboarding, Documents, and Contracts modules; this module owns the **status** that results from each stage.
+## Business Rules
 
-1. **Record created / Inactive.** An account and employment record come into existence at signup or via bulk CSV import. The record is inactive until onboarding completion criteria owned by the **Onboarding module** are satisfied (CRR §4, §6, §8).
-2. **Onboarding in progress.** The onboarding workflow (Personalfragebogen, document collection, chatbot, contract) is owned and executed by the **Onboarding module** (see Onboarding module specification). This module's only concern is that the record remains **Inactive** for the duration of that workflow (CRR §6, §7, §8, §9).
-3. **Under review.** Once the Onboarding module signals that its workflow is complete, the record moves to **Under Review**, pending a hire-approval decision. The pool/claim review mechanism itself is owned by the **Onboarding module** (see Onboarding module specification) (CRR §10).
-4. **Active (approved) / Rejected.** The Onboarding module's review decision (approve/reject) drives this module's transition to **Active** or **Rejected** (CRR §10).
-5. **Probationary period.** Active employees serve a probationary period; a manual "suitable" marking is recorded against the employee record (no system timer, no rating-threshold automation). The confirmed employment/contract shape is a **fixed-term one-year contract with a six-month probation clause, signed by hand** (contract mechanics owned by the Contracts module; resolved — see §26 OPQ-1) (CRR §6, §9, §10).
-6. **Deactivated.** The platform retains soft-deletion of the account/record, so an employee record can be deactivated without destroying operational history. The **triggering offboarding/termination workflow is not defined** in the authoritative documents (see [OPEN] in §26) (PDD §9.1; CRR §30).
+| Rule | Preconditions | Outcome/invariant | Exceptions/precedence | Owner/source |
+|---|---|---|---|---|
+| `RULE-EMP-01` | Employee record exists | Exactly one employment record per employee, linked to one account; core fields present | No Department field; no employment-type distinguishing field | This module (CRR §4) |
+| `RULE-EMP-02` | Onboarding completion criteria not yet satisfied | Record stays **Inactive**; cannot work | Completion criteria differ by nationality (owned by Onboarding/Documents) | This module observes; Onboarding owns criteria (CRR §4, §7, §8) |
+| `RULE-EMP-03` | Onboarding signals completion → hire-approval decision | Status transitions Inactive → Under Review → Active or Rejected | Hire-approval mechanism (pool/claim) owned by Onboarding | This module owns resulting status (CRR §8, §10) |
+| `RULE-EMP-04` | Skill tag assigned | Tag ∈ {Cleaner, Public Service, Kitchen Dishwasher, Waiter}; carries its assessment basis | No certifications, no expiring qualifications | This module (CRR §4) |
+| `RULE-EMP-05` | Worker assigned anything for a day (calendar or broadcast) | Reflected as unavailable for further same-day assignment | Exclusivity **enforced** by Job Dispatch; this module reflects it | Job Dispatch owns; this module reflects (CRR §12, §13, §20) |
+| `RULE-EMP-06` | Worker marks a day sick/vacation | Same-day assignment auto-cancelled (by Calendar); availability reflects it | Vacation is a label only — no balance tracking | Calendar owns; this module reflects (CRR §22, §20) |
+| `RULE-EMP-07` | Hotel blocks a specific worker | Blocklist entry created **with a logged reason**; assignment at that hotel not permitted | Enforcement at assignment time by Job Dispatch | This module owns entry; Job Dispatch enforces (CRR §4) |
+| `RULE-EMP-08` | Viewer requests a profile-and-history view | Visible to the worker (self) and every role above them (Checker, Hotel Manager, Regional Manager, Admin) within scope; this view *is* the performance review | Org chart visible only to Regional Manager + Admin | This module (CRR §5, §1) |
+| `RULE-EMP-09` | Access to a special-category field | Allowed only for the restricted audience; each access individually audit-logged; never on the general profile | Konfession → payslip-request processor + Admin; disability → Admin only | This module enforces; Compliance owns policy (CRR §27, §30) |
+| `RULE-EMP-10` | Bulk CSV import row is valid | Created staff enter the **same hire-approval** path as manual creation | Invalid-row/duplicate handling unresolved (OD-EMP-08) | This module (CRR §4) |
+| `RULE-EMP-11` | Any important employee-record action; any field at rest | Action audit-logged immutably (5-year retention); each field classified into its retention tier for automatic deletion | Deletion executed by Retention module | This module classifies/logs; Retention deletes (CRR §25, §30) |
+| `RULE-EMP-12` | Rating crosses a warning threshold (<70, then <50) | **No** status change in this module; worker notified, then manager notified; manual handling | No auto-suspension, no automated consequence | Quality owns warnings; this module's status model unaffected (CRR §16) |
 
-## 8. Employee Status Model
+## Ownership and Boundaries
 
-The confirmed employee-level statuses, each grounded in the authoritative documents:
+**Module owner:** `unassigned` — accountable owner assignment is reserved human authority (SYNC-001, blocked: no `CODEOWNERS`, empty `backend/package.json` author). Code-level home is the `backend-hr` module (`backend/src/modules/hr`), currently a stub whose service methods throw `NotImplementedError` (`.claude/knowledge/DEPENDENCY_GRAPH.yaml:36`). The docs↔code module-id mapping is proposed, not asserted — see Proposed Knowledge Deltas and OD-EMP-10.
 
-- **Inactive** — record exists; onboarding not yet complete; cannot work (CRR §4, §8).
-- **Under Review** — onboarding complete; application in the manager pool, possibly claimed by a specific manager (CRR §10).
-- **Active** — approved by a manager; the employee may be scheduled and may accept broadcasts (CRR §10).
+**Owned state:**
+
+- The employment record and its core fields (Employee ID, Job Title, Start Date).
+- Employee lifecycle status and the manual "marked suitable" milestone flag.
+- Skill tags and their assessment basis on the record.
+- Personalfragebogen-sourced personal data carried on the record, including the restricted special-category fields (Konfession, disability status).
+- Hotel blocklist entries and their reasons.
+- Per-field retention-tier classification metadata for employee fields.
+
+**Consumed state (owned elsewhere, referenced never redefined):** platform account/role/scope (Authentication/User Management); documents and expiry incl. non-EU work permit (Documents); contract and its signing status (Contracts); ratings, scores, tiers, warnings (Quality); attendance/work history and shift coordinates (Attendance/Geo); calendar assignments and sick/vacation state (Calendar); broadcast assignments and daily-exclusivity outcome (Job Dispatch); hotel and Hotel-Group records (Hotels).
+
+**Permitted writes:** only to this module's owned state above, and only through its own interfaces. Lifecycle-status writes occur solely in response to signals from Onboarding (completion, approve/reject) and an Admin-driven deactivation; this module never writes account, document, contract, quality, attendance, calendar, or dispatch state.
+
+**Boundary/non-responsibilities:** this module does **not** execute onboarding, hire-approval, document/contract handling, scheduling, dispatch/eligibility computation, quality/rating/warning logic, attendance/geofencing, notification delivery, consent gating, retention deletion, or subject-rights automation. It holds only the *resulting employee state* those processes produce and the read surface other modules consume. Availability-indicator ownership is explicitly **not** claimed here pending OD-EMP-07.
+
+## Interfaces and Contracts
+
+For each API, command, query, event, job, or UI contract:
+
+> The authoritative documents describe a modular monolith with synchronous service calls and a notification/audit flow but **do not enumerate a formal interface schema**. The contracts below are the business-level interfaces implied by owned state and confirmed behaviour; concrete transport/versioned signatures are an open decision (OD-EMP-09). Direction is relative to this module.
+
+| Contract ID/version | Direction | Input | Output | Errors | Auth | Compatibility |
+|---|---|---|---|---|---|---|
+| `IF-EMP-CreateEmployee / v0` | Inbound (command) | Account link + core fields (manual or bulk-import row) | Employee record in **Inactive** status | Validation failure; duplicate identity `[OPEN]` (OD-EMP-08) | Admin; other importing roles `[OPEN]` (OD-EMP-08) | New |
+| `IF-EMP-GetProfileHistory / v0` | Inbound (query) | Employee id, optional date/management filters | Unified profile-and-history view (owned + referenced data), special-category fields excluded | Not found; scope denied | Self + roles above within scope (CRR §5) | New |
+| `IF-EMP-GetSkills / v0` | Inbound (query) | Employee id (or skill filter) | Skill tags + assessment basis | Not found | Dispatch/manager scope | New |
+| `IF-EMP-GetBlocklist / v0` | Inbound (query) | Hotel id and/or employee id | Blocklist entries with reasons | Scope denied | Manager scope / Job Dispatch | New |
+| `IF-EMP-SetBlocklist / v0` | Inbound (command) | Hotel id, employee id, **reason (required)** | Blocklist entry (audit-logged) | Missing reason → rejected; scope denied | Hotel/Regional Manager, Admin | New |
+| `IF-EMP-GetSpecialCategory / v0` | Inbound (query) | Employee id, field | Field value (each access audit-logged) | Denied + logged if lacking restricted permission | Restricted tier: Konfession → payslip processor + Admin; disability → Admin | New |
+| `IF-EMP-ExportEmployeeData / v0` | Inbound (query, Compliance-initiated) | Employee id | Owned fields for subject-rights fulfilment | Not found | Compliance/Admin | New |
+| `IF-EMP-Deactivate / v0` | Inbound (command) | Employee id | Record soft-deleted; history retained | Scope denied | Admin | New |
+| `IF-EMP-LifecycleSignal / v0` | Inbound (event-driven) | Onboarding completion / approve / reject signal | Status transition (Under Review / Active / Rejected) | Out-of-order signal `[OPEN]` (OD-EMP-09) | Internal (Onboarding) | New |
+
+## Events
+
+> No formal event schema exists in the authoritative documents or codebase (no event bus is present — `.claude/knowledge/MODULE_REGISTRY.yaml` records `published_events: none-observed` for every module). The following are business-level domain events implied by owned state changes; the concrete event contract/transport is an open decision (OD-EMP-09).
+
+| Event ID/version | Publisher | Trigger | Payload source | Consumers | Delivery/idempotency |
+|---|---|---|---|---|---|
+| `EVT-EMP-Created / v0` | employee-management | Record created (signup or bulk import; Inactive) | Core fields + account link | Onboarding, Notifications, Audit | `[OPEN]` (OD-EMP-09) |
+| `EVT-EMP-SubmittedForReview / v0` | employee-management | Onboarding signals completion | Employee id | Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-Activated / v0` | employee-management | Hire-approval approved | Employee id | Job Dispatch, Calendar, Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-Rejected / v0` | employee-management | Hire-approval rejected | Employee id | Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-MarkedSuitable / v0` | employee-management | Manager confirms probation suitability | Employee id, manager | Audit | `[OPEN]` |
+| `EVT-EMP-ProfileUpdated / v0` | employee-management | Core/personal field change | Changed fields | Audit | `[OPEN]` |
+| `EVT-EMP-SkillsChanged / v0` | employee-management | Skill tags changed | Employee id, tags | Job Dispatch, Audit | `[OPEN]` |
+| `EVT-EMP-Blocklisted / v0` | employee-management | Blocklist added/removed | Hotel, employee, reason | Job Dispatch, Audit | `[OPEN]` |
+| `EVT-EMP-Deactivated / v0` | employee-management | Record soft-deleted | Employee id | Notifications, Audit | `[OPEN]` |
+
+**Consumed events** (to keep profile/availability/history current; contract `[OPEN]`): Onboarding/Documents/Contracts — completion, contract signed, approve/reject → lifecycle transitions (CRR §8–§10); Job Dispatch — worker assigned for a day → history + availability input (CRR §12, §13, §20); Calendar — sick/vacation for a day → availability input (CRR §20, §22); Quality — new rating/score, warning thresholds crossed → profile view, display only (CRR §5, §15, §16); Attendance — clock-in/out recorded → work history (CRR §5, §17). An "availability changed" event is deliberately **not** claimed as published here (OD-EMP-07).
+
+## Dependencies
+
+| Dependency/edge | Reason | Contract | Compatibility | Failure behavior |
+|---|---|---|---|---|
+| Authentication / User Management | Account, role, scope, MFA, sessions link the employee | `auth-middleware`, RBAC/scope (reused) | compatible (reuse) | No auth → employee functions unavailable (access precondition) |
+| Onboarding | Signals workflow completion and approve/reject; owns Personalfragebogen/chatbot/pool-claim | `IF-EMP-LifecycleSignal` (candidate) | conditional (schema `[OPEN]`) | No signal → record stays Inactive |
+| Documents | Documents + expiry + non-EU work permit gate activation | referenced (Documents-owned) | conditional | Missing required docs → cannot reach Active |
+| Contracts | Manager-confirmed hand-signed contract activates the account | referenced (Contracts-owned) | conditional | No signed contract → cannot activate (CRR §9) |
+| Calendar/Scheduling | Sick/vacation → availability input | consumed event (candidate) | conditional | Degraded availability freshness |
+| Job Dispatch | Reads skills + blocklist; daily exclusivity → availability input | `IF-EMP-GetSkills`, `IF-EMP-GetBlocklist` | conditional | Eligibility/exclusivity affected downstream |
+| Quality | Scores/ratings/tiers/warnings surfaced in profile view | consumed event (candidate) | conditional | Stale ratings in view; no status impact |
+| Attendance/Geo | Clock-in/out + coordinates → work history; coordinate 6-month tier | consumed event (candidate) | conditional | Stale history in view |
+| Notifications | Push delivery of employee-related events | `notification-service` (reused) | compatible | Events undelivered; state unaffected |
+| Payslips | Payslip-request processor context for Konfession visibility | referenced | conditional | Konfession visibility audience incomplete |
+| Consent | Daily consent gate is an access precondition | referenced (Consent-owned) | compatible | Declined consent → access blocked + manager notified |
+| Retention | Executes automatic tiered deletion of classified fields | classification metadata (this module) | conditional | Fields not deleted on schedule (compliance risk) |
+| Compliance | Special-category policy + subject-rights automation | `IF-EMP-ExportEmployeeData` | conditional | Subject-rights fulfilment incomplete |
+| Hotels | Hotel and Hotel-Group records; group context | referenced (Hotels-owned) | conditional (association mechanism `[OPEN]`, OD-EMP-05) | Group association undefined |
+| Platform/infrastructure | PostgreSQL system of record, Express/TS monolith, immutable audit log, Winston, AWS, EU object storage | shared infrastructure (`base-service`, `prisma-schema`) | compatible (reuse) | Standard platform failure modes |
+
+## State and Lifecycle
+
+**States (employee-level, owned here):**
+
+- **Inactive** — record exists (signup or bulk import); onboarding not complete; cannot work (CRR §4, §8).
+- **Under Review** — onboarding complete; application in the manager pool, possibly claimed (CRR §10).
+- **Active** — approved by a manager; may be scheduled and may accept broadcasts (CRR §10).
 - **Rejected** — the manager rejected the application (CRR §10).
-- **Deactivated (soft-deleted)** — record retained for history/audit but no longer an operating employee (PDD §9.1).
+- **Deactivated (soft-deleted)** — retained for history/audit; no longer an operating employee (PDD §9.1).
 
-Additional notes:
+**Transitions (each audit-logged; each arises from a confirmed event):**
 
-- **Probation is a milestone, not an automated status.** "Suitable" is a manual manager marking; there is no system timer or automatic transition (CRR §10). The now-resolved probation legal shape — a fixed-term one-year contract with a six-month probation clause, signed by hand — does **not** introduce a distinct probation status; suitability remains a manual manager marking (resolved — see §26 OPQ-1) (CRR §9, §10).
-- **Rating tiers (Elite / High / Standard / Low / Probation) are NOT employee statuses.** They are display labels owned by the Quality module, layered on the 0–100 rating, and must not be conflated with lifecycle status (CRR §15).
-- **No suspension status exists.** Warnings explicitly trigger no auto-suspension and no automated consequence beyond manager notification (CRR §16).
-- **No account lockout** exists as a status either (CRR §2).
+- `(none) → Inactive` — record created at signup or via bulk import.
+- `Inactive → Under Review` — Onboarding signals workflow completion.
+- `Under Review → Active` — Onboarding approval decision.
+- `Under Review → Rejected` — Onboarding rejection decision.
+- `Active → Active (marked suitable)` — manager manually confirms probation suitability; **not** a distinct status and **not** automated. The resolved probation shape (1-year fixed-term contract, 6-month probation clause, hand-signed; permanent after 2 years) adds no separate status.
+- `Active → Deactivated` — Admin-driven soft-deletion. **Triggering offboarding/termination and any re-engagement workflow are undefined in the authoritative documents (OD-EMP-04).**
 
-## 9. Employee Profile
+**Invariants:** no Suspended state; no rating/warning-driven automatic transition out of Active (CRR §16); rating tiers (Elite/High/Standard/Low/Probation) are Quality-owned display labels, never lifecycle statuses (CRR §15); no account-lockout status (CRR §2).
 
-The employee profile is composed from data this module owns directly and data it references from other modules. It must never expose special-category fields on the general profile/history view (CRR §27).
+**Concurrency:** hire-approval claim/lock concurrency is resolved entirely inside Onboarding; this module receives only the resulting decision. Same-day assignment vs. sick/vacation atomicity is owned by Calendar/Job Dispatch (a single transaction there prevents an employee appearing both assigned and on-leave; PDD §7.2).
 
-**Owned core fields (CRR §4):**
+**Retention/migration:** soft deletion preserves operational/audit history within retention horizons; field-level retention tiers (6 months / 5 years / 6 years) drive automatic deletion by the Retention module. The employment record is repurposed from the retained roster/`HotelWorker` record with no destructive migration (pre-launch, no production employee data; PDD §9.1, §10).
 
-- Employee ID
-- Job Title *(value domain — see [OPEN] in §26)*
-- Start Date
+## Failure, Security, Privacy, and Performance
 
-**Personal data captured at onboarding and carried on the record (collected by Onboarding; stored as the employee's personal data) (CRR §6):**
+**Failure modes/recovery:**
 
-- First name, Last name
-- Date of birth
-- Nationality, Place of birth, Country of birth
-- Street & house number, Postal code & city
-- Bank account holder, IBAN
-- Tax ID (Steuer-ID)
-- Health insurance provider (Krankenkasse)
-- Social security number (Sozialversicherungsnummer)
-- Employment type: Teilzeit / Minijob — **stored as information only**, with no system logic or warning attached (CRR §4, §6)
-- Work start date
-- Signed declaration (place/date)
+- Activation attempted before Onboarding signals completion → blocked; record stays Inactive.
+- Onboarding completion criteria unmet for a nationality (non-EU work permit missing) → cannot reach Active.
+- Assignment attempted for a blocklisted worker at that hotel → not permitted (enforced by Job Dispatch using this module's blocklist).
+- Special-category access without the restricted permission → denied and audit-logged.
+- Bulk import with invalid rows → valid staff created and routed to approval; invalid-row/duplicate handling is unresolved (OD-EMP-08).
+- Out-of-order or lost lifecycle signal from Onboarding → handling unresolved (OD-EMP-09).
 
-**Special-category fields — restricted, never on the general profile (CRR §27):**
+**Trust boundaries/authorization:** reuse existing authentication (email/username + password; 7-day inactivity logout; forgot-password via email; MFA for Hotel Manager and above; not for Staff/Checker) — this module implements none of it. Deny-by-default authorization on role × hotel/group scope; cross-hotel access requires the actor's scope to include the target hotel. Special-category fields sit behind a **restricted permission tier** smaller than general staff-data access. No background checks, no account lockout, no rate-limiting, no CAPTCHA are introduced (CRR §2, §3; PDD §5.3, §5.4).
 
-- Konfession (religion) — voluntary; visible only to the payslip-request processor and Admin; tied solely to its church-tax legal basis.
-- Disability status — voluntary; visible to Admin only.
-
-**Referenced (owned elsewhere, surfaced in the unified view):**
-
-- Documents and their expiry, including the non-EU work-permit document (Documents module) (CRR §4, §7).
-- Contract and its signing status (Contracts module) (CRR §9).
-- Skills (held on the employee record — see §10).
-- Rating history, task scores, rating tier, and recency-weighted overall rating (Quality module) (CRR §5, §15).
-- Attendance/work history (Attendance module) (CRR §5, §17).
-- Availability indicator — owning module `[OPEN]` (see §26 OPQ-10).
-
-There is **no Department field** and **no employment-type distinguishing field** (CRR §4).
-
-## 10. Skills
-
-- The confirmed skill tag set is exactly: **Cleaner, Public Service, Kitchen Dishwasher, Waiter** (CRR §4).
-- **Assessment basis** (a property of the skill, used by the Quality/operations modules, owned as data here):
-  - **Cleaner** → assessed by **rooms cleaned**.
-  - **Public Service, Kitchen Dishwasher, Waiter** → assessed by **hours worked** (CRR §4).
-- An employee may carry one or more skill tags. Skills carried on the employee record are the authoritative input to **broadcast eligibility**: for a given broadcast slot, only workers holding the matching skill are notified (eligibility computation is owned by Job Dispatch; the skill data is owned here) (CRR §13).
-- There are **no certifications, no formal expiring qualifications, and no certification reminders** — skill tags are not certifications (CRR §4).
-
-> **[OPEN] Skill-set governance:** The authoritative documents fix the *set* of skill tags and each tag's assessment basis, but do not state whether the tag set is a closed system list versus administratively editable. Treated as the fixed confirmed set above; governance of changes is unresolved (§26).
-
-## 11. Employment Rules
-
-- **All staff are permanent employees** who do not earn when not assigned (CRR §4, §31).
-- **No worker is tied to a specific hotel**; only the manager is dedicated/permanent to a hotel (CRR §11, §12).
-- A worker may be assigned tasks **only within the Hotel Group they are working in**, and only at the hotel a manager selects (CRR §12).
-- **Daily assignment exclusivity:** once a worker is assigned anything for a day (via calendar or broadcast), they are blocked from any further assignment for that entire day — this blocks all further requests for the day, not merely a time slot. *Enforcement is owned by Job Dispatch;* this module reflects the resulting availability (CRR §12, §13).
-- **No internal-transfer tracking** and **no cross-hotel dual-manager approval step** exist (CRR §4, §12).
-- **Teilzeit/Minijob is informational only** and carries no system logic (CRR §6).
-- **Bulk-imported staff are still permanent employees** and still pass through hire-approval (CRR §4).
-
-## 12. Relationships
-
-Each relationship below names the owning module to avoid duplication (Rule 5):
-
-- **Employee ↔ Account** — one employment record links to one platform account (account owned by Authentication/User Management) (CRR §1, §2; PDD §5.3).
-- **Employee ↔ Personal data** — the Personalfragebogen-sourced personal data carried on the record (collected by Onboarding) (CRR §6).
-- **Employee ↔ Documents** — uploaded documents with expiry, including the non-EU work-permit document (Documents module) (CRR §4, §7).
-- **Employee ↔ Contract** — one contract used at signup and post-probation (Contracts module) (CRR §9).
-- **Employee ↔ Hotel Group** — the group within which the employee may be assigned (Hotels module; association mechanism [OPEN], §26) (CRR §11, §12).
-- **Employee ↔ Hotel (assignment context)** — non-permanent, established per assignment (Calendar/Job Dispatch) (CRR §12, §13).
-- **Employee ↔ Skills** — the skill tags carried on the record (owned here) (CRR §4).
-- **Employee ↔ Quality history** — ratings, scores, tiers, warnings (Quality module) (CRR §5, §14–§16).
-- **Employee ↔ Attendance history** — clock-in/out and work history (Attendance module) (CRR §5, §17).
-- **Employee ↔ Blocklist** — hotel-scoped blocks with reasons (owned here) (CRR §4).
-- **Employee ↔ Manager** — the manager who claims/approves and who manages the employee's hotel context (Onboarding/Hotels) (CRR §10, §11).
-- **Employee ↔ Org chart / reporting** — "who reports to whom," visible only to Regional Manager and Admin; the reporting-relationship structure itself is not defined ([OPEN], §26) (CRR §1).
-
-## 13. Business Rules
-
-1. An employee record **cannot become Active** until the **Onboarding module** signals that its completion criteria are satisfied (see Onboarding module specification) (CRR §4, §8).
-2. Onboarding completion criteria differ by nationality (non-EU/EEA/Swiss vs. EU/EEA/Swiss); this rule is owned and enforced by the **Onboarding/Documents modules** (see those module specifications) — this module only observes the resulting Active/not-Active state (CRR §7).
-3. Hire-approval is owned and executed by the **Onboarding module** (see Onboarding module specification); this module only reflects the resulting status (Under Review / Active / Rejected) (CRR §10).
-4. **Probation suitability is a manual manager judgment** — no system timer, no rating-threshold automation (CRR §10).
-5. A worker's day-level availability reflects assignment-exclusivity outcomes owned by the **Job Dispatch module** and sick/vacation outcomes owned by the **Calendar module**; this module does not define either rule (CRR §12, §20, §22).
-6. The **availability indicator is today-only** and does not change based on which date is being viewed on the calendar (CRR §20).
-7. A hotel may **blocklist** specific staff from assignment there; the block requires a **logged reason** (CRR §4).
-8. The **unified profile-and-history view** is the performance-review surface — there is no separate performance-review process (CRR §5).
-9. **Special-category fields never appear on the general profile/history view** and are visible only to the restricted audiences in §15 (CRR §27).
-10. **Bulk CSV import** creates staff that flow through the **same hire-approval workflow** as manual creation (CRR §4).
-11. **Removing (deactivating) a worker does not destroy operational history** (history retained per audit/retention tiers) (CRR §30; PDD §9.1).
-12. **Warnings produce no status change** in this module: a worker is notified at rating < 70 and again at < 50, after which the manager is notified and handles it manually — no auto-suspension, no automated consequence (warning logic owned by Quality; this module's status model is unaffected) (CRR §16).
-
-## 14. State Transitions
-
-Employee-status transitions owned by this module. Each transition is audit-logged (§20) and arises from a confirmed event.
-
-- **(none) → Inactive** — record created at signup or via bulk import (CRR §4, §6).
-- **Inactive → Under Review** — triggered by the Onboarding module signalling workflow completion (see Onboarding module specification) (CRR §8, §10).
-- **Under Review → Active** — triggered by the Onboarding module's approval decision (see Onboarding module specification) (CRR §10).
-- **Under Review → Rejected** — triggered by the Onboarding module's rejection decision (see Onboarding module specification) (CRR §10).
-- **Active → Active (marked suitable)** — manager manually confirms probation suitability; not an automated transition (CRR §10). This is **not** a distinct status: the resolved probation shape (fixed-term one-year contract, six-month probation clause, hand-signed) adds no separate status (resolved — see §26 OPQ-1).
-- **Active → Deactivated** — soft-deletion of the record; **triggering workflow is [OPEN]** (PDD §9.1; §26).
-
-Constraints:
-
-- There is **no Suspended state** and **no automated transition out of Active** driven by ratings/warnings (CRR §16).
-- Re-engagement of a deactivated worker is **not defined** in the authoritative documents ([OPEN], §26).
-
-## 15. Permissions
-
-Permissions are expressed against the existing RBAC framework (reused, not redefined — Rule 3) using the confirmed five-role model and role × hotel/group scope; the model is deny-by-default (CRR §1; PDD §5.4).
-
-**Roles:** Staff (Worker), Checker, Hotel Manager, Regional Manager, Admin. There is no Supervisor role (CRR §1).
-
-**Profile-and-history view** is visible to the worker themselves plus every role above them — Checker, Hotel Manager, Regional Manager, Admin (CRR §5).
+Permission matrix (against the reused five-role RBAC model; deny-by-default):
 
 | Capability | Staff | Checker | Hotel Manager | Regional Manager | Admin |
 |---|---|---|---|---|---|
 | View own profile & history | ✅ (self) | — | — | — | — |
 | View a worker's profile & history | — | ✅ (assigned hotel) | ✅ (their hotel) | ✅ (their group) | ✅ (all) |
 | Blocklist a worker at a hotel (with reason) | — | — | ✅ (their hotel) | ✅ (their group) | ✅ |
-| Bulk-import staff | — | — | [OPEN] (§26) | [OPEN] (§26) | ✅ |
+| Bulk-import staff | — | — | `[OPEN]` (OD-EMP-08) | `[OPEN]` (OD-EMP-08) | ✅ |
 | View active workers today | — | — | ✅ | ✅ | ✅ |
-| View org chart ("who reports to whom") | — | — | — | ✅ | ✅ |
+| View org chart | — | — | — | ✅ | ✅ |
 | View Konfession (special-category) | — | — | — | — | ✅ + payslip-request processor |
 | View disability status (special-category) | — | — | — | — | ✅ |
 | Account deletion (deactivation) | — | — | — | — | ✅ |
 
-Scope rules (PDD §5.4):
+**Data classification/retention:** Germany-only; all documents/photos in EU/EEA object storage; no employee data leaves the EU/EEA. Three retention tiers classified here, deleted automatically by Retention: Tier 1 shift coordinates 6 months; Tier 2 general personal/profile data 5 years; Tier 3 payroll/tax-adjacent fields (IBAN, Steuer-ID, payslip-request records, wage records) 6 years. Special-category data is voluntary where applicable, tied to a named legal basis, never on the general profile, and audit-logged per access. Sick leave requires no doctor's note (Calendar owns; this record never holds sick-note health data). Daily GDPR consent gate is an access precondition (Consent-owned). Data-minimization is not actively pruned, but every collected field keeps a stated legal basis (CRR §24–§27, §30, §33; PDD §5.4, §5.7).
 
-- Hotel Manager is scoped to **one hotel**; Regional Manager to **all hotels in their group**; Admin is **system-wide**.
-- Special-category fields sit behind a **separate restricted permission tier**, smaller than general staff-data access; every view/edit is individually audit-logged (CRR §27).
-- Hire-approval permissions are owned by the **Onboarding module** (see Onboarding module specification); this module reflects only the resulting employee status (CRR §10).
+**Performance budgets/workload:** no explicit SLO is defined in the authoritative documents. Design intent: profile-and-history composition and skill/blocklist reads scale as hotels grow (search/filter by hotel; CRR §11, §21). Concrete budgets are deferred to implementation and are not asserted here (labelled unknown, Constitution §6).
 
-> **[OPEN] Self-edit of profile by Staff after onboarding:** Only self-entry of the Personalfragebogen at signup is confirmed (CRR §6). Whether Staff may edit profile fields after activation is unresolved (§26).
-> **[OPEN] Bulk-import permission holder:** Bulk import is confirmed (CRR §4) but the authoritative documents do not state which managerial role(s), beyond Admin, may perform it (§26).
+**Observability/audit:** every important employee-record action logged immutably via the existing audit framework; blocklist actions logged with reason; lifecycle transitions logged; each special-category access logged individually; audit retained 5 years; **no admin-facing log-viewer screen** (CRR §30).
 
-## 16. Events Produced
+## Rollout and Compatibility
 
-> The authoritative documents describe a modular monolith with an event/job flow and confirmed manager notifications, but **do not enumerate a formal event schema**. The events below are the business-level domain events implied by confirmed state changes this module owns. The concrete event contract/transport is **[OPEN]** (§26).
+This module is part of the marketplace → Workforce Operations Platform forward refactor (pre-launch; no production employee data, so no dual-run migration; PDD §10). Sequence: foundation realignment (Regional Manager role + scope, response-envelope centralization, removal of `WorkApplication`, repurposing the retained record as the employment record) precedes the compliance/onboarding work that produces the employee lifecycle signals (PDD §10 Phases 1 and 3; roadmap M1 and M4).
 
-This module announces (for other modules and Notifications/Audit to consume):
+**Feature flags:** each new capability sits behind the existing `FEATURE_*` env-flag convention so partial deploys are safe (PDD §10).
 
-- **Employee record created** (signup or bulk import; status Inactive) (CRR §4, §6).
-- **Employee submitted for review** (Onboarding module signals completion; see Onboarding module specification) (CRR §8, §10).
-- **Employee approved / activated** (CRR §10).
-- **Employee rejected** (CRR §10).
-- **Employee marked suitable** (probation milestone confirmed by manager) (CRR §10).
-- **Employee profile updated** (core/personal fields changed) (CRR §4, §6).
-- **Employee skills changed** (CRR §4).
-- **Employee blocklisted / unblocklisted at a hotel** (with reason) (CRR §4).
-- **Employee deactivated** (soft-deleted) (PDD §9.1).
+**Backward compatibility:** the only breaking change in the wider pivot is removing `WorkApplication`, done in Phase 1 before any client depends on it; the employment record repurposing is non-destructive. Removing (deactivating) a worker never destroys operational history (soft delete; CRR §30; PDD §9.1).
 
-> An "availability changed" event is not listed above: since ownership of the availability indicator is `[OPEN]` (§26 OPQ-10), this module does not assert that it is the producer of that event.
+**Rollback:** because phases are additive and pre-launch, rollback is disabling the feature flag and redeploying the prior build (PDD §10).
 
-## 17. Events Consumed
+**Removal criteria:** not applicable — this is a foundational, permanently-owned domain module.
 
-This module reacts to events owned elsewhere in order to keep the profile, availability, and history aggregation current (formal contract **[OPEN]**, §26):
+## Validation Plan
 
-- From **Onboarding/Documents/Contracts:** documents complete; contract filled/signed; hire-approval claimed/approved/rejected → drives lifecycle transitions (CRR §8, §9, §10).
-- From **Job Dispatch:** worker assigned for a day (direct or broadcast) → contributes to history; also relevant to the availability indicator, whose owning module is `[OPEN]` (§26 OPQ-10) (CRR §12, §13, §20).
-- From **Calendar/Scheduling:** worker marked sick or vacation for a day (which auto-cancels any same-day assignment) → relevant to the availability indicator, whose owning module is `[OPEN]` (§26 OPQ-10) (CRR §20, §22).
-- From **Quality:** new rating/score recorded; warning thresholds crossed (< 70, < 50) → reflected in the profile-and-history view (display only; no status change) (CRR §5, §15, §16).
-- From **Attendance:** clock-in/clock-out recorded → contributes to work history surfaced in the profile view (CRR §5, §17).
+| Criterion | Test level/check | Environment/data | Evidence required |
+|---|---|---|---|
+| One record per employee; core fields present; no Department/employment-type field (`REQ-EMP-001`) | Unit + schema check | Seed employees | Record/link assertions; field-absence check |
+| Only confirmed lifecycle transitions occur; no Suspended/auto-transition (`REQ-EMP-002`) | Unit (state machine) | Seed lifecycle fixtures | Transition table coverage incl. negative cases |
+| Skill tags constrained to the fixed set with correct assessment basis (`REQ-EMP-003`) | Unit + boundary | Valid + invalid tags | Accept/reject evidence |
+| Profile-and-history view aggregates correctly, excludes special-category, honors filters and role/scope visibility (`REQ-EMP-004`, `REQ-EMP-013`) | Integration + authorization | Multi-role, multi-hotel data | View contents + access-matrix results |
+| Blocklist requires a reason; is audit-logged; readable by assignment (`REQ-EMP-005`) | Unit + integration | Hotel/worker pairs | Missing-reason rejection; audit entry; read result |
+| Bulk import routes through hire-approval identically to manual (`REQ-EMP-006`) | Integration | CSV fixtures (valid rows) | Both paths reach Active; imported start Inactive |
+| Special-category visibility restricted; each access audit-logged (`REQ-EMP-007`) | Authorization + audit | Restricted vs. general roles | Deny-and-log for unauthorized; per-access entries |
+| Retention-tier classification correct for each field (`REQ-EMP-008`) | Unit (classification) | Field catalog | Tier mapping table verified |
+| Subject-rights export returns owned fields with legal basis (`REQ-EMP-009`) | Integration | Employee with full data | Export contents + legal-basis presence |
+| Audit immutability, 5-year retention config, no admin viewer (`REQ-EMP-010`) | Integration + config check | Audit fixtures | Immutability + retention config; absence of viewer route |
+| Personalfragebogen data stored; Teilzeit/Minijob inert (`REQ-EMP-011`) | Unit | Onboarding-sourced record | Stored values; no logic on employment type |
+| Availability reflects today only from confirmed inputs (`REQ-EMP-014`) | Unit (once owner resolved) | Assigned + sick/vacation cases | Today-only behaviour; **blocked on OD-EMP-07** |
 
-## 18. Security Considerations
+## Risks, Assumptions, and Open Decisions
 
-- **Reuse existing authentication** (email/username + password; auto-logout after 7 days; forgot-password via email; MFA required for Hotel Manager and above; MFA not required for Staff/Checker). This module does not implement authentication (CRR §2; PDD §5.3) (Rule 3).
-- **Deny-by-default authorization** with role × hotel/group scope; cross-hotel access requires the actor's scope to include the target hotel (PDD §5.4).
-- **Restricted permission tier** gates special-category fields, smaller than general staff-data access (CRR §27).
-- **No background checks** are performed anywhere — this module must not introduce any (CRR §3).
-- **No account lockout, no login rate-limiting, no CAPTCHA**; repeated failed logins instead **notify the manager** (owned by Authentication; noted for consistency) (CRR §2).
-- Employee data exposure is bounded by scope: a Hotel Manager sees only their hotel's workers; a Regional Manager their group; Admin all (PDD §5.4).
-- The platform operates **Germany only**, with documents/photos stored in the EU/EEA; no employee data leaves the EU/EEA (CRR §33; PDD §5.7).
+| ID | Type | Description | Evidence/impact | Owner | Resolution/status |
+|---|---|---|---|---|---|
+| `OD-EMP-01` | Resolved | Probation legal shape | 1-year fixed-term, 6-month probation, hand-signed; probation stays a manual manager marking | Client | **Resolved** (CRR §9) — recorded, not blocking |
+| `OD-EMP-02` | Resolved | Contract expiry length | 1yr initial, +1yr extension, permanent after 2yr | Client | **Resolved** (CRR §9) |
+| `OD-EMP-03` | Resolved | Hotel-creation permission | Admin/HQ only | Client | **Resolved** (CRR §11) |
+| `OD-EMP-04` | Open decision | Offboarding/termination + re-engagement workflow undefined | Soft-delete retained but no triggering workflow (PDD §9.1; CRR §30) | Product/Human | Open — blocks Deactivated-transition acceptance |
+| `OD-EMP-05` | Open decision | Hotel-Group association mechanism | Assignability bounded by group, but how a worker joins a group is unspecified (CRR §12) | Architecture/Human | Open — affects `REQ-EMP-012` acceptance |
+| `OD-EMP-06` | Open decision | Staff self-edit after onboarding | Only signup-time self-entry confirmed (CRR §6) | Product/Human | Open — affects permission matrix |
+| `OD-EMP-07` | Open decision | Availability-indicator ownership/derivation | Indicator confirmed; no owning module named; Employee/Calendar/Job Dispatch all plausible (CRR §20) | Architecture/Human | Open — resolve once Calendar + Job Dispatch specs freeze; `REQ-EMP-014` validation blocked until then |
+| `OD-EMP-08` | Open decision | Bulk-import row handling + permission holder | Invalid-row/duplicate handling and importing roles beyond Admin unspecified (CRR §4) | Product/Human | Open — affects `REQ-EMP-006`, permission matrix |
+| `OD-EMP-09` | Open decision | Formal domain-event / interface contract | No event schema/transport enumerated; interfaces are candidate-level (PDD §5.5) | Architecture/Human | Open — affects Interfaces and Contracts, Events |
+| `OD-EMP-10` | Open decision | Docs↔code module-id mapping | Registry records no spec maps to a registered id; `backend-hr` is the plausible code home but is a stub | Human (SYNC-001) | Open — proposed delta below, not asserted |
+| `OD-EMP-11` | Assumption/Note | Authoritative-doc location discrepancy | Governing instruction cites `docs/01-product/requirements/`; files exist under `docs/00-foundations/` | Docs owner | Note — read from actual location; no behavioural impact |
+| `OD-EMP-12` | Open decision | Org-chart / reporting-relationship model | Visibility (RM+Admin) confirmed; underlying reporting model undefined (CRR §1) | Product/Human | Open — affects `REQ-EMP-013` structure |
+| `OD-EMP-13` | Open decision | Job Title value domain | Field confirmed; free-text vs. controlled list unspecified (CRR §4) | Product/Human | Open — affects `REQ-EMP-001` |
+| `OD-EMP-14` | Open decision | Skill-set governance | Tag set and bases fixed; whether administratively editable unspecified (CRR §4) | Product/Human | Open — affects `REQ-EMP-003` |
+| `OD-EMP-15` | Assumption | Owner unassigned | No `CODEOWNERS`; empty package author (SYNC-001) | Human | Open — freeze requires a named owner/approver |
 
-## 19. GDPR Considerations
+## Proposed Knowledge Deltas
 
-- **Daily consent gate:** access to the system (and therefore to employee functions) is contingent on the worker accepting the German data-protection notice once per calendar day; declining blocks access and notifies the manager. The gate is owned by the Consent module; this module's availability of employee functions depends on it (CRR §24).
-- **Three-tier automatic retention** — this module classifies each employee field into the correct tier; deletion is executed automatically by the Retention module (CRR §25):
-  - **Tier 1 — shift clock-in/out coordinates:** 6 months (attendance-linked) (CRR §17, §25).
-  - **Tier 2 — general personal/profile data:** 5 years (CRR §25).
-  - **Tier 3 — payroll/tax-adjacent fields** (IBAN, Tax ID, payslip-request records, wage records): 6 years (CRR §25).
-- **Special-category data** (Konfession, disability, health/sick data) is voluntary where applicable, restricted in visibility, tied to a named legal basis, never shown on the general profile, and individually audit-logged on each access. This module enforces the restriction as the holder of these fields; the underlying legal-basis policy is owned by the **Compliance module** (CRR §27).
-- **Sick leave requires no doctor's note** — a plain "sick" calendar flag avoids storing sensitive health data (owned by Calendar; noted because it shapes what health data the employee record never holds) (CRR §27).
-- **Subject-rights requests** (data access/export) are handled automatically, via a button or the chatbot; this automation is owned by the **Compliance module**, and this module only supplies the employee's data for fulfilment (CRR §26).
-- **Legal-basis-per-field:** data minimization is not actively pruned, but each collected field remains tied to a stated legal basis (CRR §26).
-- **Soft deletion** of the employee record is retained, preserving the ability to delete identity while honouring retention of operational/audit history (PDD §9.1; CRR §30).
+- **`MODULE_REGISTRY.yaml`:** on freeze, set `specification` for the employee-management domain module to `SPEC-EMP-001`. Record the **proposed** docs↔code mapping employee-management ↔ `backend-hr` as an open item (OD-EMP-10); do **not** flip `backend-hr` away from its verified `stub`/`UNKNOWN` state without human confirmation (SYNC-001).
+- **`DEPENDENCY_GRAPH.yaml`:** on freeze, add the candidate consumer edges declared here — Job Dispatch → employee-management (`reads-state`: skills, blocklist), Onboarding → employee-management (`writes-state`/signal: lifecycle), Compliance → employee-management (subject-rights read) — marked `compatibility: conditional` until interface schemas resolve (OD-EMP-09).
+- **`TERMINOLOGY.md`:** promote, on human confirmation, canonical terms **Employee (permanent Staff/Worker)**, **Employment record**, **Skill tag / Assessment basis**, **Profile-and-history view**, **Availability indicator**, **Blocklist entry**, **Personalfragebogen**, **Konfession (special-category)**, **Hotel Group**; note that documentation module name *employee-management* must not be silently normalized to code module `backend-hr`.
+- **`DECISION_INDEX.md`:** register the open architecture decisions OD-EMP-04, OD-EMP-05, OD-EMP-07, OD-EMP-09, OD-EMP-10, OD-EMP-12 as pending decision records.
+- **`SYNC_STATE.yaml`:** record this spec as `REVIEW` pending G4 independent reviews and G2 human approval; owner assignment remains blocked (SYNC-001).
 
-## 20. Audit Requirements
+## Review and Change Log
 
-- **Every important employee-record action is logged immutably** (who did what, when), using the existing immutable audit-log framework (reused, not rebuilt — Rule 3) (CRR §30).
-- **Audit logs are retained for 5 years**, consistent with the general-data tier (CRR §30).
-- **Each view or edit of a special-category field produces its own distinct audit entry** (CRR §27).
-- **Blocklist actions are logged with their reason** (CRR §4).
-- **Lifecycle transitions** (submit-for-review, approve, reject, mark-suitable, deactivate) are audit-logged (CRR §10, §30).
-- There is **no admin-facing log-viewer/search screen** — the audit trail is written and retained but not surfaced in an admin UI (CRR §30).
-
-## 21. Validation Rules
-
-- An employee may transition to **Active** only when onboarding completeness holds: all required documents uploaded **and** contract filled (CRR §4, §8).
-- **Work-permit documents** are required to complete onboarding for non-EU/EEA/Swiss nationals and not required for EU/EEA/Swiss citizens (rule owned by Documents/Onboarding; this module honours it as an activation precondition) (CRR §7).
-- **Skill tags** must be drawn from the confirmed set: Cleaner, Public Service, Kitchen Dishwasher, Waiter (CRR §4).
-- **Core fields** Employee ID, Job Title, and Start Date are part of the employee record (CRR §4).
-- **Sick/vacation marking rules** are owned by the **Calendar module** (see Calendar module specification); this module only consumes the resulting day-level state as an availability input (CRR §22).
-- **Blocklist** entries require a reason (CRR §4).
-- **Bulk CSV import** validates each row and routes successfully created staff through hire-approval; **invalid-row and duplicate handling is [OPEN]** (§26) (CRR §4).
-- **Personalfragebogen field formats** (e.g., IBAN, Tax ID, social-security number) are validated at the point of capture by the Onboarding module; this module stores validated values and does not re-define their formats (CRR §6).
-
-## 22. Error Scenarios
-
-- **Activation attempted before Onboarding signals completion** → blocked; the record remains Inactive (mechanism owned by the Onboarding module; see its specification) (CRR §4, §8).
-- **Onboarding completion criteria unmet for a given nationality** → the record cannot reach Active (rule owned by the Onboarding/Documents modules; see their specifications) (CRR §7, §8).
-- **Concurrent hire-approval review conflicts** → resolved entirely within the Onboarding module (see its specification); this module only receives the resulting Active/Rejected decision (CRR §10).
-- **Assignment attempted for a blocklisted worker at that hotel** → not permitted (enforced at assignment time by Job Dispatch using this module's blocklist) (CRR §4).
-- **Access to a special-category field without the restricted permission** → denied, and the attempt is audit-logged (CRR §27, §30).
-- **Bulk import contains invalid rows** → valid staff are created and routed to approval; handling of the invalid rows is **[OPEN]** (§26) (CRR §4).
-
-## 23. Edge Cases
-
-- **EU/EEA/Swiss vs non-EU determination** hinges on nationality; **dual nationality or a change of nationality** is not addressed by the authoritative documents → **[OPEN]** (§26) (CRR §7).
-- **Worker marks sick/vacation after being assigned that day** → the existing same-day assignment is auto-cancelled (cancellation owned by Calendar); the effect on the availability indicator is subject to the ownership open question (§26 OPQ-10) (CRR §22, §20).
-- **Worker with no skill tags** → eligible for no broadcast slots (eligibility owned by Job Dispatch) (CRR §13).
-- **Fewer than 10 completed jobs** → the recency-weighted overall rating still computes from available history (owned by Quality; surfaced here) (CRR §15).
-- **Deactivated worker** → operational history and audit entries remain intact and retrievable within retention horizons (CRR §30; PDD §9.1).
-- **Availability viewed against a future/past calendar date** → the confirmed rule is that the indicator does not change and reflects *today* only; which module implements this is subject to the ownership open question (§26 OPQ-10) (CRR §20).
-- **Worker's Hotel-Group association** governs the set of hotels they can be assigned within; the **mechanism establishing that association is [OPEN]** (§26) (CRR §12).
-
-## 24. Dependencies
-
-> No sibling module specification is merged yet; the integration **contracts** with the modules below are therefore **[OPEN]** beyond what the authoritative documents state. Dependencies are listed by ownership (Rule 4/5).
-
-**Platform / infrastructure (reused — Rule 3; PDD §2, §5):** PostgreSQL system of record; Express + TypeScript modular monolith; existing RBAC framework; existing immutable audit log; Winston logging; AWS (EC2 + RDS), Nginx, PM2, GitHub Actions CI/CD; EU-region object storage for documents/photos.
-
-**Sibling modules:**
-
-- **Authentication / User Management** — account, role, scope, MFA, sessions (CRR §1, §2; PDD §5.3).
-- **Onboarding** — Personalfragebogen, document-collection chatbot, pool/claim hire-approval (CRR §6, §8, §10).
-- **Documents** — document storage, expiry, non-EU work-permit (CRR §4, §7).
-- **Contracts** — contract storage and the manager-confirmed hand-signed contract (CRR §9).
-- **Calendar/Scheduling** — weekly plan, sick/vacation (availability inputs) (CRR §13, §22).
-- **Job Dispatch** — broadcast, direct assignment, skill eligibility, daily exclusivity (availability inputs) (CRR §13).
-- **Quality** — scores, ratings, tiers, warnings, rework (profile inputs) (CRR §14–§16).
-- **Attendance/Geo** — clock-in/out, coordinates (history inputs) (CRR §17).
-- **Notifications** — push delivery of employee-related events (CRR §18).
-- **Payslips** — payslip-request processor context (special-category visibility) (CRR §23, §27).
-- **Consent** — daily consent gate (access precondition) (CRR §24).
-- **Retention** — automatic tiered deletion of classified employee fields (CRR §25).
-- **Compliance** — special-category governance and subject-rights, to be **extended** later per fuller client requirements (CRR §26, §27, §33).
-- **Hotels** — hotel and Hotel Group records, group context (CRR §11).
-
-## 25. Future Extensibility
-
-- **Scaling hotels and groups:** the design anticipates new hotels added over time; employee-to-group association and search/filter by hotel must scale accordingly (CRR §11, §21).
-- **Compliance extension:** the compliance surface is to be **extended** (not rebuilt) when the client's fuller compliance requirements arrive (CRR §33).
-- **Post-probation contract divergence:** today one contract document serves both signup and post-probation; if it must differ later, that is a future change (CRR §9).
-- **Contract expiry/renewal:** the confirmed contract lifecycle is **one year initial, extendable by one additional year, and permanent (open-ended) after two years**; expiry handling attaches to the employee/contract relationship accordingly (resolved — see §26 OPQ-2) (CRR §9).
-- **Per-hotel configurable geofence radius** is anticipated later (attendance-owned; noted for platform consistency) (CRR §17).
-- The retained employment record is intended to accommodate future scheduling expansion **without restructuring** (PDD §9.5).
-
-## 26. Open Questions
-
-Items 1–3 are the three product questions previously recorded as open in the authoritative register; they are now **RESOLVED** in the CRR (Open Items) and their confirmed answers are recorded below (identifiers and positions retained to preserve cross-references). Items 4+ are genuine gaps this module surfaces (Rule 7 — not resolved here).
-
-- **[RESOLVED] OPQ-1 — Probation legal shape.** Confirmed: the initial contract is a **fixed-term one-year contract with a six-month probation clause, signed by handwritten signature** (contracts are signed by hand; there is no e-signature). Probation remains a **manual manager marking** and is not a distinct automated employee status (CRR §9, Open Items).
-- **[RESOLVED] OPQ-2 — Contract expiry length.** Confirmed: **one year initial, extendable by one additional year, and permanent (open-ended) after two years** of successful employment (CRR §9, Open Items).
-- **[RESOLVED] OPQ-3 — Hotel-creation permission.** Confirmed: new hotels may be created by **Admin/HQ only**; Regional/Property Managers may not create hotels or modify hotel groups (CRR §11, Open Items).
-- **[OPEN] OPQ-4 — Offboarding/termination workflow.** Soft-deletion is retained, but no triggering termination/deactivation or re-engagement workflow is defined (PDD §9.1; CRR §30).
-- **[OPEN] OPQ-5 — Hotel-Group association mechanism.** Workers may be assigned only within the group they are working in, but how a worker becomes associated with a group is not specified (CRR §12).
-- **[OPEN] OPQ-6 — Staff self-edit after onboarding.** Only signup-time self-entry of the Personalfragebogen is confirmed; post-activation self-edit rights are unspecified (CRR §6).
-- **[OPEN] OPQ-7 — Org-chart / reporting structure.** Visibility (Regional Manager + Admin) is confirmed, but the underlying reporting-relationship model is undefined (CRR §1).
-- **[OPEN] OPQ-8 — Formal domain-event contract.** The authoritative documents describe an event/job flow but enumerate no event schema/transport for §16–§17 (PDD §5.5).
-- **[OPEN] OPQ-9 — Bulk-import row handling & permission holder.** Invalid-row and duplicate handling, and which managerial roles (beyond Admin) may import, are unspecified (CRR §4).
-- **[OPEN] OPQ-10 — Availability-indicator ownership and derivation.** CRR §20 confirms that a today-only red/green availability indicator exists and confirms its inputs are limited to same-day assignment and sick/vacation state, but does not name an owning module, and PDD does not assign it either. Employee Management, Calendar, and Job Dispatch are all plausible owners since each holds part of the relevant state. **Ownership will be finalized once the remaining scheduling-related modules (Calendar, Job Dispatch) are frozen**; until then, this document describes the indicator's existence and confirmed behaviour only, and does not claim ownership on behalf of Employee Management.
-- **[OPEN] OPQ-11 — Job Title value domain.** A Job Title field is confirmed, but whether it is free text or a controlled list is not specified (CRR §4).
-- **[OPEN] OPQ-12 — Skill-set governance.** The skill tag set and assessment bases are fixed; whether the set is administratively editable is unspecified (CRR §4).
-
-## 27. Refactoring Summary
-
-This module is a **refactor** within the marketplace → Workforce Operations Platform rewrite. Changes below are scoped to Employee Management and derived from the authoritative documents (CRR §13, §34, Explicit Non-Goals; PDD §9.1, §9.2).
-
-**Reused components (kept; not redesigned — Rule 3):**
-
-- Authentication, MFA, sessions, password reset (Authentication).
-- RBAC framework and role × scope authorization (User Management/Authorization).
-- The retained roster/employment record, repurposed (see "Redesigned").
-- Hotel and Hotel Group records (Hotels).
-- Notifications framework, immutable audit logging, AWS infrastructure, and deployment architecture.
-
-**Removed components (marketplace-era, explicitly out of scope — must not appear):**
-
-- Worker-initiated job applications and the application-to-assignment linkage.
-- Auto-matching / auto-ranking engine and best-match suggestions.
-- Worker browsing and worker-selection workflows; all "marketplace" framing and terminology.
-- The employment-type *distinguishing* field; certifications and reminders; preferred-staff list; internal-transfer tracking; promotion history; training records; reward history.
-
-**Redesigned components:**
-
-- The retained roster record becomes the **permanent-employment record**, reflecting that all staff are permanent employees who earn only when assigned (PDD §9.1; CRR §4, §31).
-- The employee's relationship to work changes from *applying/competing* to **being directly assigned or broadcast-eligible**; assignment no longer depends on a prior application (PDD §9.1; CRR §13).
-- The profile-and-history view becomes the **single performance-review surface** (no separate review process) (CRR §5).
-- The lifecycle status set is reduced to confirmed states (Inactive, Under Review, Active, Rejected, Deactivated), with rating "tiers" explicitly separated out as Quality-owned display labels (CRR §10, §15, §16).
-
-**New components:**
-
-- Personalfragebogen-sourced personal data carried on the employee record (CRR §6).
-- Non-EU work-permit data linkage (CRR §7).
-- The fixed skill-tag set with per-tag assessment basis as the eligibility input (CRR §4, §13).
-- Special-category restricted fields (Konfession, disability) with per-access auditing (CRR §27).
-- Three-tier retention classification of employee fields (CRR §25).
-- Hotel blocklist with logged reasons (CRR §4).
-- Bulk CSV import routed through hire-approval (CRR §4).
-- Regional Manager visibility (including org-chart visibility) over employee data across a group (CRR §1).
-- Dependence on the daily GDPR consent gate as an access precondition (CRR §24).
+| Version | Date | Change | Findings resolved | Approver |
+|---|---|---|---|---|
+| 0.1.0 | 2026-07-05 | Initial canonical-template authoring from CRR/PDD; supersedes the prior free-form business specification at this path (rev `7c71498`). Freeze candidate submitted for G4 independent review (architecture, dependency, consistency) and G2 human approval. Author cannot self-approve blocking findings (Constitution §12); **FROZEN status is withheld pending human approval and disposition of open decisions OD-EMP-04..15.** | — (none dispositioned yet) | — (pending) |
