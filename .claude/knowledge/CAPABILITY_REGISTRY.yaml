@@ -1,0 +1,244 @@
+schema_version: 1
+purpose: >-
+  Authoritative index of platform capabilities. A capability is a unit of engineering
+  ability, not an agent; one agent may hold several capabilities, and a capability names
+  its single responsible agent. This registry lets workflows and gates be composed by
+  capability rather than by agent identity.
+scope: framework  # indexes reusable framework capabilities; travels with .claude/
+version_source: .claude/VERSION.yaml
+
+# Each capability records: responsible_agent, required_inputs, produced_outputs,
+# applicable_workflows, applicable_gates, dependencies (other capability ids),
+# authority (what it MAY decide / MUST NOT decide).
+
+capabilities:
+  - id: orchestration-and-context-assembly
+    responsible_agent: lead-architect
+    required_inputs: [human objective, repository state, applicable rules]
+    produced_outputs: [context manifests, workflow/gate plan, transition records]
+    applicable_workflows: [preflight, all]
+    applicable_gates: [G0, G7, G9]
+    dependencies: [repository-truth-resolution]
+    authority:
+      may: [select workflow, assemble minimal context, record gate transitions, route specialists]
+      must_not: [perform specialist reviews, approve own blocking finding, resolve product/architecture conflict alone]
+
+  - id: repository-truth-resolution
+    responsible_agent: lead-architect
+    required_inputs: [repository worktree, default branch, docs, specs, PRs, knowledge indexes]
+    produced_outputs: [evidence ledger, source classifications, conflict reports]
+    applicable_workflows: [repository-synchronization, preflight]
+    applicable_gates: [G0]
+    dependencies: []
+    authority:
+      may: [classify sources, bind claims to revisions]
+      must_not: [treat inferred as confirmed, resolve same-rank conflict without escalation]
+
+  - id: requirements-analysis
+    responsible_agent: requirements-analyst
+    required_inputs: [objective, current-state evidence, product authority]
+    produced_outputs: [Requirements Register, acceptance criteria, scope statement]
+    applicable_workflows: [requirements]
+    applicable_gates: [G1]
+    dependencies: [repository-truth-resolution]
+    authority:
+      may: [scope and decompose requirements]
+      must_not: [choose implementation, invent product policy]
+
+  - id: business-rule-validation
+    responsible_agent: business-rule-validator
+    required_inputs: [candidate rules, rule sources]
+    produced_outputs: [Business Rule Validation report]
+    applicable_workflows: [requirements]
+    applicable_gates: [G1]
+    dependencies: [requirements-analysis]
+    authority:
+      may: [classify rule authority/consistency/testability]
+      must_not: [author requirements, decide product intent]
+
+  - id: module-specification-authoring
+    responsible_agent: module-author
+    required_inputs: [frozen requirements, canonical constraints]
+    produced_outputs: [Module Specification]
+    applicable_workflows: [documentation]
+    applicable_gates: [G2]
+    dependencies: [requirements-analysis, business-rule-validation]
+    authority:
+      may: [author one module spec]
+      must_not: [self-approve, expand scope, review own spec]
+
+  - id: implementation-planning
+    responsible_agent: implementation-planner
+    required_inputs: [frozen specification, review dispositions, dependencies]
+    produced_outputs: [Implementation Plan, execution DAG, rollback plan]
+    applicable_workflows: [implementation]
+    applicable_gates: [G3]
+    dependencies: [module-specification-authoring]
+    authority:
+      may: [order and sequence work items]
+      must_not: [change spec, expand scope]
+
+  - id: backend-implementation
+    responsible_agent: backend-engineer
+    required_inputs: [approved plan item, frozen spec, conventions]
+    produced_outputs: [server/API/persistence changes, tests, implementation report]
+    applicable_workflows: [implementation]
+    applicable_gates: [G5]
+    dependencies: [implementation-planning]
+    authority:
+      may: [implement scoped backend work]
+      must_not: [expand scope, patch spec through code]
+
+  - id: frontend-implementation
+    responsible_agent: frontend-engineer
+    required_inputs: [approved plan item, frozen spec, conventions]
+    produced_outputs: [web-client changes, tests, implementation report]
+    applicable_workflows: [implementation]
+    applicable_gates: [G5]
+    dependencies: [implementation-planning]
+    authority:
+      may: [implement scoped frontend work]
+      must_not: [expand scope, patch spec through code]
+
+  - id: mobile-implementation
+    responsible_agent: mobile-engineer
+    required_inputs: [approved plan item, frozen spec, conventions]
+    produced_outputs: [mobile screen/navigation/storage changes, tests, implementation report]
+    applicable_workflows: [implementation]
+    applicable_gates: [G5]
+    dependencies: [implementation-planning]
+    authority:
+      may: [implement scoped mobile work]
+      must_not: [expand scope, patch spec through code]
+
+  - id: infrastructure-implementation
+    responsible_agent: infrastructure-engineer
+    required_inputs: [approved plan item, infra topology, conventions]
+    produced_outputs: [IaC/deploy/CI/observability changes, runbooks]
+    applicable_workflows: [implementation, release]
+    applicable_gates: [G5, G8]
+    dependencies: [implementation-planning]
+    authority:
+      may: [implement scoped infrastructure work]
+      must_not: [authorize production release, expand scope]
+
+  - id: architecture-review
+    responsible_agent: architecture-reviewer
+    required_inputs: [frozen design version, ADRs, module registry, dependency graph]
+    produced_outputs: [Architecture Review report]
+    applicable_workflows: [architecture-review]
+    applicable_gates: [G4]
+    dependencies: [module-specification-authoring]
+    authority:
+      may: [classify conformance and findings]
+      must_not: [author/fix design, validate implementation, approve product scope]
+
+  - id: dependency-review
+    responsible_agent: dependency-reviewer
+    required_inputs: [frozen artifact/diff, dependency graph, manifests]
+    produced_outputs: [Dependency Review report, graph delta]
+    applicable_workflows: [dependency-review]
+    applicable_gates: [G4]
+    dependencies: []
+    authority:
+      may: [classify edges and compatibility]
+      must_not: [author/fix code, approve breaking change without authority]
+
+  - id: consistency-review
+    responsible_agent: consistency-reviewer
+    required_inputs: [frozen candidate, terminology, active docs, indexes]
+    produced_outputs: [Consistency Review report, terminology/cross-reference deltas]
+    applicable_workflows: [consistency-review]
+    applicable_gates: [G4]
+    dependencies: []
+    authority:
+      may: [detect contradictions and duplication]
+      must_not: [choose a canonical winner without authority]
+
+  - id: security-review
+    responsible_agent: security-reviewer
+    required_inputs: [frozen candidate, data flows, dependency report, security policy]
+    produced_outputs: [Security Review report, residual-risk statement]
+    applicable_workflows: [security-review]
+    applicable_gates: [G4]
+    dependencies: [dependency-review]
+    authority:
+      may: [classify security/privacy risk and required controls]
+      must_not: [accept residual risk, downgrade findings for schedule]
+
+  - id: performance-review
+    responsible_agent: performance-reviewer
+    required_inputs: [frozen candidate, workload/SLO evidence, baselines, budgets]
+    produced_outputs: [Performance Review report, measurements, capacity notes]
+    applicable_workflows: [performance-review]
+    applicable_gates: [G4]
+    dependencies: []
+    authority:
+      may: [classify performance/capacity effects]
+      must_not: [author/fix code, approve budget waivers]
+
+  - id: documentation-validation
+    responsible_agent: documentation-validator
+    required_inputs: [frozen document, evidence, approvals, template]
+    produced_outputs: [Validation Report (documentation dimensions)]
+    applicable_workflows: [validation, documentation]
+    applicable_gates: [G6]
+    dependencies: [module-specification-authoring]
+    authority:
+      may: [confirm completeness/traceability/template compliance]
+      must_not: [author content, approve target state]
+
+  - id: architecture-validation
+    responsible_agent: architecture-validator
+    required_inputs: [implementation candidate, approved architecture, resolved findings]
+    produced_outputs: [Validation Report (architecture conformance)]
+    applicable_workflows: [validation]
+    applicable_gates: [G6]
+    dependencies: [architecture-review]
+    authority:
+      may: [confirm implementation conforms to approved architecture]
+      must_not: [author design, waive unresolved findings]
+
+  - id: quality-assurance-testing
+    responsible_agent: qa-engineer
+    required_inputs: [implementation candidate, frozen acceptance criteria, environment]
+    produced_outputs: [Test Plan, execution evidence, defect reports, QA recommendation]
+    applicable_workflows: [testing, validation]
+    applicable_gates: [G6]
+    dependencies: [backend-implementation, frontend-implementation, mobile-implementation]
+    authority:
+      may: [design/execute behavior tests, report defects]
+      must_not: [fix defects, prove acceptance from flaky checks]
+
+  - id: release-preparation
+    responsible_agent: release-manager
+    required_inputs: [merge-ready revision, gate evidence, prior release, target environment]
+    produced_outputs: [Release Report, deployment/rollback plan, go/no-go recommendation]
+    applicable_workflows: [release]
+    applicable_gates: [G8]
+    dependencies: [quality-assurance-testing, infrastructure-implementation]
+    authority:
+      may: [assemble and verify release candidate, recommend go/no-go]
+      must_not: [authorize release without human approval, improvise production changes]
+
+  - id: drift-repair
+    responsible_agent: lead-architect
+    required_inputs: [drift report, authoritative current/target state]
+    produced_outputs: [repair plan/diff, regression evidence, synchronization update]
+    applicable_workflows: [self-healing, foundation-synchronization, dependency-synchronization]
+    applicable_gates: [original-change-gates]
+    dependencies: [repository-truth-resolution]
+    authority:
+      may: [restore consistency with approved truth via normal specialist workflow]
+      must_not: [invent product intent, loop repairs without a changed hypothesis]
+
+  - id: continuous-learning
+    responsible_agent: lead-architect
+    required_inputs: [terminal gate reports, findings, escalations, synchronization records]
+    produced_outputs: [IMP-* improvement records, escalation proposals]
+    applicable_workflows: [learning]
+    applicable_gates: []
+    dependencies: [orchestration-and-context-assembly]
+    authority:
+      may: [record deterministic improvement proposals]
+      must_not: [mutate policy/gates, convert a single occurrence into a requirement]

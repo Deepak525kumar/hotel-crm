@@ -11,6 +11,50 @@ This changelog follows the principles of:
 
 Changes to the Engineering Constitution, workflows, agents, templates, governance model, or platform architecture are recorded here.
 
+The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); this changelog narrates each version but does not redefine the current version.
+
+---
+
+# Version 1.1.0
+
+**Release Date:** 2026-07-05
+
+**Status:** Stable
+
+## Overview
+
+Version 1.1.0 implements the approved platform-audit improvements. It is fully backward compatible: it extends existing architecture and never replaces it. No workflow, agent, gate, or constitutional guarantee was weakened.
+
+## Added
+
+- **Loop Control policy** (`constitution/LOOP_CONTROL.md`): canonical definition of the seven loop types, required loop metadata fields, bounded-correction retry policy, termination guarantee, and the three-level confidence scale.
+- **Standardized reviewer findings** (`constitution/REVIEWER_FINDINGS.md`): single canonical finding schema — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome.
+- **Loop Registry** (`knowledge/LOOP_REGISTRY.yaml`): every workflow registered with loop type, owner, objective, metric, boundary, retry/escalation policy, confidence threshold, artifacts, gates, and restart conditions.
+- **Capability Registry** (`knowledge/CAPABILITY_REGISTRY.yaml`): platform capabilities mapped to responsible agent, inputs, outputs, applicable workflows/gates, dependencies, and authority.
+- **Learning workflow** (`workflows/learning.md`) and **Improvement Log** (`knowledge/IMPROVEMENT_LOG.yaml`): deterministic, human-reviewable improvement records from repeated engineering signals; proposes only, never mutates policy.
+- **Canonical version source** (`VERSION.yaml`): single source of truth for the framework version.
+- Constitution Articles 21 (Loop Control and Termination) and 22 (Continuous Learning).
+
+## Improved
+
+- Every workflow now declares explicit Loop Metadata (objective, metric, boundary, retry, escalation, termination, success/failure conditions, confidence threshold, loop type).
+- Reviewer and validator agent contracts and review templates now emit the canonical finding schema, including confidence, unknowns, and limitations.
+- Review Gates now separate gate ownership from evidence production and authorization ("Gate Ownership").
+- Post-flight now invokes the learning loop on terminal states.
+
+## Fixed
+
+- Reconciled platform version truth across `CHANGELOG.md`, `FRAMEWORK_RELEASE_NOTES.md`, and `SYNC_STATE.yaml` against the new canonical `VERSION.yaml` (see `IMPROVEMENT_LOG.yaml` IMP-001).
+- Removed heterogeneity in reviewer finding structure (IMP-002).
+
+## Breaking Changes
+
+None. All additions are backward compatible.
+
+## Migration Notes
+
+No action required. New registries and canonical policy documents are additive; existing workflows, agents, templates, and checklists continue to apply and now reference the canonical loop and finding policy.
+
 ---
 
 # Version 1.0.0
@@ -248,17 +292,21 @@ AI Contributors
 
 ## Next Planned Release
 
-### Version 1.1.0
+### Version 1.2.0
 
-Planned objectives:
+Planned objectives (carried forward; not delivered in 1.1.0):
 
 - Runtime enforcement
-- Ownership registry completion
-- ADR ratification
-- Dependency graph completion
+- Ownership registry completion (SYNC-001)
+- ADR ratification (SYNC-002)
+- State-ownership resolution (SYNC-005)
 - Pilot validation on a live project module
 - Framework refinements based on production usage
 
 ---
 
 End of Version 1.0.0
+
+---
+
+End of Version 1.1.0

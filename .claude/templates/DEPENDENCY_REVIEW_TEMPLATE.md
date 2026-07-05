@@ -24,8 +24,10 @@ Producer/consumer order, compatibility layer, contract tests, graph/manifests/do
 
 ## Findings
 
-| ID | Severity | Evidence | Affected edges | Impact | Required outcome | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Affected edges | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Proposed Graph Delta
 

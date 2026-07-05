@@ -32,6 +32,8 @@ flowchart TD
     REL --> G8{G8 Human release authorization}
     G8 --> PF[Post-flight]
     PF --> G9{G9 Consistency restored}
+    G9 --> LN[Learning: record repeated signals]
+    LN -.proposals.-> H
 
     G1 -->|fail/block| R
     G2 -->|fail/block| D
@@ -42,4 +44,4 @@ flowchart TD
     G8 -->|no-go| REL
 ```
 
-Reviews fan out only after one immutable candidate exists. Validation is independent from both authoring and review.
+Reviews fan out only after one immutable candidate exists. Validation is independent from both authoring and review. Every gate is a bounded loop with a defined retry policy and termination condition (see [../constitution/LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md)); the learning loop runs after G9 and proposes improvements without mutating policy.

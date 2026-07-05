@@ -1,5 +1,18 @@
 # Foundation Synchronization Workflow
 
+## Loop Metadata
+
+- **Loop type:** Synchronization ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Repair drift caused by changes to architecture, terminology, business rules, shared templates, constitution, or ownership.
+- **Metric:** Canonical foundation source and every affected active dependent agree; synchronization state is current.
+- **Boundary:** One canonical delta; at most one repair attempt per unchanged hypothesis (§3); resume at the first failed dependent.
+- **Retry policy:** Self-healing bound per [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3; restart impact analysis only if the canonical decision changes.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** Source and dependents agree; all semantic changes have required approval; paused workflows can restart.
+- **Failure condition:** No canonical source, ownership conflict, or scope beyond authority → escalate; affected workflows stay paused.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Repair drift caused by changes to architecture, terminology, business rules, shared templates, constitution, or ownership.

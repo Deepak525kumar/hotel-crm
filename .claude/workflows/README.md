@@ -17,6 +17,10 @@ Any state may enter `PAUSED_DRIFT`, `BLOCKED`, or `FAILED`. Only the Lead Archit
 - Restart from the last passed gate after refreshing all affected context packages.
 - Artifacts use stable IDs and record repository revision or document version.
 
+## Loop Metadata
+
+Every workflow is a bounded loop. Each workflow file declares a `## Loop Metadata` block (objective, metric, boundary, retry policy, escalation policy, termination, success/failure conditions, confidence threshold, and loop type). Shared iteration, termination, and confidence semantics are defined once in [../constitution/LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md); the machine-readable cross-index is [../knowledge/LOOP_REGISTRY.yaml](../knowledge/LOOP_REGISTRY.yaml). No workflow may remain unclassified or unbounded.
+
 ## Workflow Selection
 
 Use the smallest workflow covering the objective. Compose workflows by declared entry/exit conditions; never skip a gate because another workflow already produced a similarly named artifact.

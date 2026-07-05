@@ -10,7 +10,17 @@ Every gate returns exactly one status:
 - `BLOCKED` — required evidence, authority, environment, or decision is unavailable.
 - `NOT_APPLICABLE` — applicability rule is demonstrably false.
 
-Unknown is never equivalent to pass. Gate reports identify reviewer, input revision/version, checks, evidence, findings, and status.
+Unknown is never equivalent to pass. Gate reports identify reviewer, input revision/version, checks, evidence, findings, and status. Findings use the canonical shape in [REVIEWER_FINDINGS.md](REVIEWER_FINDINGS.md); iteration and termination follow [LOOP_CONTROL.md](LOOP_CONTROL.md).
+
+## Gate Ownership
+
+Each gate separates three distinct roles so accountability is never ambiguous:
+
+- **Evidence producer** — the agent whose work generates the gate's mandatory evidence (e.g., a reviewer, engineer, or validator). May not decide the gate on their own authored artifact.
+- **Gate owner** — the single role in the table below accountable for evaluating the evidence and recording the gate status. The owner does not author the evidence they judge for blocking findings.
+- **Authorizer** — the human (or, for G2/G8, the named human approver) who ratifies decisions reserved to human authority.
+
+The Owner column names the gate owner. Where the owner and evidence producer would otherwise coincide (e.g., an engineer's own implementation verification at G5), the independent check at the next gate (G6) is the authoritative confirmation. No role approves its own blocking finding (Constitution §12).
 
 ## Lifecycle Gates
 

@@ -1,10 +1,35 @@
 # AI Engineering Platform Release Notes
 
+The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml).
+
+## Version 1.1.0
+
+**Release Date:** 2026-07-05
+
+**Status:** Stable (current)
+
+---
+
+Version 1.1.0 delivers the approved platform-audit improvements as a backward-compatible extension of the 1.0.0 architecture. It strengthens the platform's iteration discipline without changing its operating model.
+
+Highlights:
+
+- **Bounded loops with explicit metadata.** Every workflow now declares its loop type, objective, metric, boundary, retry policy, escalation policy, termination condition, success/failure conditions, and confidence threshold. Shared iteration and termination semantics are defined canonically in `constitution/LOOP_CONTROL.md`.
+- **Loop Registry and Capability Registry.** `knowledge/LOOP_REGISTRY.yaml` classifies and registers every workflow; `knowledge/CAPABILITY_REGISTRY.yaml` maps platform capabilities to responsible agents, inputs, outputs, workflows, gates, dependencies, and authority.
+- **Standardized reviewer findings.** `constitution/REVIEWER_FINDINGS.md` defines a single finding schema — including mandatory confidence, unknowns, and limitations — referenced by every reviewer agent and review template.
+- **Gate ownership clarified.** Review Gates now separate gate owner, evidence producer, and authorizer.
+- **Learning loop.** `workflows/learning.md` and `knowledge/IMPROVEMENT_LOG.yaml` capture recurring engineering signals as deterministic, human-reviewable improvement records; the loop proposes and never mutates policy.
+- **Version truth reconciled.** A single canonical `VERSION.yaml` now governs the framework version; all version-bearing artifacts reference it.
+
+Compatibility: no breaking changes; no migration required.
+
+---
+
 ## Version 1.0.0
 
 **Release Date:** 2026-07-04
 
-**Status:** Stable
+**Status:** Superseded by 1.1.0 (baseline)
 
 ---
 
@@ -271,7 +296,7 @@ Breaking changes will be explicitly documented within the changelog and accompan
 
 # Future Roadmap
 
-Planned objectives for Version 1.1.0 include:
+Version 1.1.0 delivered the platform-audit improvements (bounded loops, registries, standardized findings, learning loop, version-truth reconciliation). Planned objectives for Version 1.2.0 include:
 
 - Runtime enforcement mechanisms
 - Ownership registry completion

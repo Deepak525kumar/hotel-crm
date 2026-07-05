@@ -1,0 +1,248 @@
+schema_version: 1
+purpose: >-
+  Authoritative index of every platform workflow as a bounded loop. Each workflow
+  file declares the same loop metadata inline; this registry is the machine-readable
+  cross-index. Shared iteration/termination/confidence semantics are defined once in
+  constitution/LOOP_CONTROL.md and referenced here, never duplicated.
+scope: framework  # indexes reusable framework workflows; travels with .claude/
+canonical_policy: .claude/constitution/LOOP_CONTROL.md
+version_source: .claude/VERSION.yaml
+
+# loop_type ∈ { Pipeline, Validation, Critic, Refinement, Synchronization, Discovery, Learning }
+# Every workflow is classified with exactly one type; none may remain unclassified.
+
+loops:
+  - id: repository-synchronization
+    loop_type: Discovery
+    owner: Lead Architect
+    objective: Produce a non-destructive, revision-bound view of current repository truth.
+    metric: Branch/HEAD/default/remote/worktree/sources recorded and classified.
+    boundary: Read-only inspection at one revision; no correction sub-loop.
+    retry_policy: Re-run whole workflow on state change; no in-place fact retry (LOOP_CONTROL §3).
+    escalation_policy: Unknown dirty-change ownership or ambiguous baseline → human (Constitution §18).
+    confidence_threshold: High
+    produced_artifacts: [Repository State Record, source manifest, divergence report, protected-change list]
+    required_gates: [G0-repository-check]
+    restart_conditions: Branch, HEAD, worktree, remote metadata, or PR baseline change.
+
+  - id: preflight
+    loop_type: Pipeline
+    owner: Lead Architect
+    objective: Establish a safe, current, correctly scoped baseline before any work.
+    metric: G0 passes all five checks.
+    boundary: One objective at one revision; drift pauses to synchronization.
+    retry_policy: Re-run full pre-flight on any input change (LOOP_CONTROL §3).
+    escalation_policy: Any check FAIL/BLOCKED, missing authority, or destructive action → human.
+    confidence_threshold: High
+    produced_artifacts: [Pre-flight Record, evidence ledger, scope statement, affected-module list, drift reports, context manifests, workflow/gate plan]
+    required_gates: [G0]
+    restart_conditions: Repository revision, objective, frozen input, architecture, ownership, or dependency change.
+
+  - id: requirements
+    loop_type: Pipeline
+    owner: Requirements Analyst
+    objective: Confirmed, atomic, traceable, testable requirements without implementation choice.
+    metric: G1 passes.
+    boundary: Objective scope; ≤3 clarification iterations per unresolved item (LOOP_CONTROL §3).
+    retry_policy: Bounded correction; re-derive only on changed intent/evidence.
+    escalation_policy: Missing product authority, conflicting intent, or scope expansion → human.
+    confidence_threshold: High
+    produced_artifacts: [Requirements Register, rule matrix, acceptance-criteria matrix, scope statement, evidence ledger, decision/open-question log]
+    required_gates: [G1]
+    restart_conditions: Human intent, canonical rule, repository baseline, or scope change.
+
+  - id: documentation
+    loop_type: Pipeline
+    owner: Module Author / document owner
+    objective: Author, review, validate, and freeze an authoritative document.
+    metric: G2, G4, and documentation portion of G6 pass; FROZEN/CURRENT.
+    boundary: One candidate; semantic edit increments version; ≤3 review→fix cycles.
+    retry_policy: Semantic edit → new version → impact-based re-review (LOOP_CONTROL §3).
+    escalation_policy: New requirement, authority conflict, or unresolved high finding → human/gate.
+    confidence_threshold: High
+    produced_artifacts: [Versioned document, evidence manifest, independent review reports, finding/disposition log, Validation Report, approval record]
+    required_gates: [G2, G4, G6-doc]
+    restart_conditions: Scope/requirement change (author), semantic edit (review), corrective metadata (validation).
+
+  - id: implementation
+    loop_type: Pipeline
+    owner: Implementation Planner
+    objective: Implement a frozen spec with bounded scope, traceability, and verification.
+    metric: G3 then G5 pass.
+    boundary: Frozen-spec scope only; failed check restarts affected item, ≤3 per item.
+    retry_policy: Bounded correction; spec/contract change reruns pre-flight and re-plans (LOOP_CONTROL §3).
+    escalation_policy: Spec ambiguity, unplanned contract/architecture change, or destructive migration → gate/human.
+    confidence_threshold: High
+    produced_artifacts: [Implementation Plan, context manifests, code/config/test changes, migration/rollback evidence, implementation reports, deviation log]
+    required_gates: [G3, G5]
+    restart_conditions: Failed checks (item), spec/contract/foundation change (full re-plan).
+
+  - id: testing
+    loop_type: Validation
+    owner: QA Engineer
+    objective: Risk-based functional/nonfunctional checks against a known candidate.
+    metric: Every criterion maps to passing evidence or a blocking status; contributes to G6.
+    boundary: One candidate revision; fixes re-enter implementation; flaky checks quarantined with task.
+    retry_policy: Targeted + impact-based regression after each fix (LOOP_CONTROL §3).
+    escalation_policy: Untestable criterion, nondeterminism, or critical/high defect → return/escalate.
+    confidence_threshold: High
+    produced_artifacts: [Test plan, cases, coverage matrix, execution logs, defect reports, specialist test reports, QA recommendation]
+    required_gates: [G6-test]
+    restart_conditions: Acceptance criteria, environment, or candidate architecture change.
+
+  - id: validation
+    loop_type: Validation
+    owner: Documentation/Architecture Validator (consolidated by Lead Architect)
+    objective: Independently prove requirements and system laws are satisfied.
+    metric: G6 passes across all mandatory dimensions.
+    boundary: One immutable candidate; candidate change invalidates affected dimensions.
+    retry_policy: Re-validate failed dimensions after fixes (LOOP_CONTROL §3).
+    escalation_policy: Conflicting validator results or constitutional failure → human.
+    confidence_threshold: High
+    produced_artifacts: [Validation Report, criterion matrix, reproduced-command evidence, residual limitation list, G6 result]
+    required_gates: [G6]
+    restart_conditions: Revision identity, frozen requirements, architecture, or core evidence change.
+
+  - id: architecture-review
+    loop_type: Critic
+    owner: Architecture Reviewer
+    objective: Independently assess a frozen design for architecture conformity and boundary integrity.
+    metric: All applicable architecture-checklist criteria evaluated; architecture component of G4.
+    boundary: One immutable version; reviewer does not edit; ≤3 re-review cycles.
+    retry_policy: Semantic fix → new version → re-review changed/affected criteria (LOOP_CONTROL §3).
+    escalation_policy: Conflicting ADRs, ownership ambiguity, or disputed high severity → human.
+    confidence_threshold: High
+    produced_artifacts: [Architecture Review, checklist record, finding/disposition log, Decision Record request]
+    required_gates: [G4-architecture]
+    restart_conditions: Scope/boundary/decision change (full), else affected checklist sections.
+
+  - id: dependency-review
+    loop_type: Critic
+    owner: Dependency Reviewer
+    objective: Independently identify dependency, contract, package, and synchronization consequences.
+    metric: Every affected edge and package classified; dependency component of G4.
+    boundary: One frozen artifact/diff; reviewer does not edit; ≤3 re-review cycles.
+    retry_policy: Re-run package evidence on version/lockfile change; re-review corrections (LOOP_CONTROL §3).
+    escalation_policy: Breaking change without authority, unknown owner/consumer, or cycle → human/dep-sync.
+    confidence_threshold: High
+    produced_artifacts: [Dependency Review, edge/compatibility matrix, package assessment, graph delta, synchronization plan]
+    required_gates: [G4-dependency]
+    restart_conditions: Contract/package/ownership change (edge analysis), version/lockfile change (package evidence).
+
+  - id: consistency-review
+    loop_type: Critic
+    owner: Consistency Reviewer
+    objective: Independently detect contradictions, duplicate authorities, terminology drift, stale references.
+    metric: Artifacts agree or discrepancies recorded as blocking findings/sync tasks; consistency component of G4.
+    boundary: One frozen candidate vs canonical sources; no winner chosen without authority; ≤3 re-check cycles.
+    retry_policy: Restart affected comparisons after edits (LOOP_CONTROL §3).
+    escalation_policy: Equal-authority conflict, no canonical term, or historical-as-current → source owner/human.
+    confidence_threshold: High
+    produced_artifacts: [Consistency Review, terminology delta, cross-reference report, synchronization inventory]
+    required_gates: [G4-consistency]
+    restart_conditions: Canonical source, terminology, or scope change (full), else affected comparisons.
+
+  - id: security-review
+    loop_type: Critic
+    owner: Security Reviewer
+    objective: Independently assess security and privacy risk of a frozen candidate.
+    metric: All applicable security-checklist criteria evaluated; security component of G4 and residual risk.
+    boundary: One immutable version; reviewer does not edit and never records secrets; ≤3 re-review cycles.
+    retry_policy: Restart affected checklist sections after fixes (LOOP_CONTROL §3).
+    escalation_policy: Critical/high issue, active exposure, secret leakage, or missing authority → human.
+    confidence_threshold: High
+    produced_artifacts: [Security Review, checklist record, threat/abuse-case summary, finding/disposition log, residual-risk statement, Risk Assessment request]
+    required_gates: [G4-security]
+    restart_conditions: Attack-surface/trust-boundary/data-classification change (full), else affected sections.
+
+  - id: performance-review
+    loop_type: Critic
+    owner: Performance Reviewer
+    objective: Independently assess whether a frozen candidate meets performance/scalability constraints.
+    metric: All applicable performance-checklist criteria evaluated; performance component of G4, measurements, capacity assumptions.
+    boundary: One immutable version; reviewer does not edit; ≤3 re-review cycles.
+    retry_policy: Restart affected checklist sections after fixes (LOOP_CONTROL §3).
+    escalation_policy: No approved budget, material capacity cost, or unresolved regression → human.
+    confidence_threshold: High
+    produced_artifacts: [Performance Review, checklist record, measurement plan/results, bottleneck findings, capacity notes, gate recommendation]
+    required_gates: [G4-performance]
+    restart_conditions: Workload/topology/budget change (full), else affected sections.
+
+  - id: foundation-synchronization
+    loop_type: Synchronization
+    owner: Lead Architect
+    objective: Repair drift in architecture, terminology, business rules, shared templates, constitution, or ownership.
+    metric: Canonical source and every active dependent agree; sync state current.
+    boundary: One canonical delta; ≤1 repair per unchanged hypothesis; resume at first failed dependent.
+    retry_policy: Self-healing bound (LOOP_CONTROL §3); restart impact analysis only on canonical decision change.
+    escalation_policy: No canonical source, ownership conflict, or scope beyond authority → human; workflows stay paused.
+    confidence_threshold: High
+    produced_artifacts: [Foundation Drift Report, impact inventory, Decision Record, synchronized artifacts, Validation Report, sync-state update]
+    required_gates: [synchronization-pass]
+    restart_conditions: Canonical decision change (impact analysis), else first failed dependent.
+
+  - id: dependency-synchronization
+    loop_type: Synchronization
+    owner: Lead Architect
+    objective: Repair drift among producers, consumers, contracts, events, ownership edges, packages, records.
+    metric: Implementations, contracts, tests, manifests/locks, graph, and docs agree at a known revision.
+    boundary: Authoritative contract/package/ownership state; breaking migrations staged; resume at failed stage.
+    retry_policy: Re-trace on contract/owner/package change; else resume and rerun regression (LOOP_CONTROL §3).
+    escalation_policy: Unknown consumer/owner, breaking change without migration, cycle, or destructive schema → human.
+    confidence_threshold: High
+    produced_artifacts: [Dependency Drift Report, compatibility matrix, rollout/migration plan, updated contracts/tests/graph, Validation Report]
+    required_gates: [synchronization-pass]
+    restart_conditions: Contract/owner/package change (tracing), else failed migration stage.
+
+  - id: postflight
+    loop_type: Synchronization
+    owner: Lead Architect
+    objective: Restore repository-wide consistency after terminal work.
+    metric: G9 passes; all affected artifacts current or owned follow-up.
+    boundary: One final change inventory; re-run from inventory on any final-state change.
+    retry_policy: Reopen responsible sync/documentation step on failure (LOOP_CONTROL §3).
+    escalation_policy: Undocumented scope, ownership conflict, or breaking dependent → escalate; parent stays open.
+    confidence_threshold: High
+    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list]
+    required_gates: [G9]
+    restart_conditions: Any final-state change or finding correction.
+    invokes: [learning]
+
+  - id: self-healing
+    loop_type: Refinement
+    owner: Lead Architect
+    objective: Detect and repair drift without inventing intent.
+    metric: Drift repaired and validated, or isolated and escalated.
+    boundary: ≤1 repair attempt per unchanged hypothesis (LOOP_CONTROL §3).
+    retry_policy: Never loop repairs without a changed hypothesis.
+    escalation_policy: Unresolved truth, policy-changing repair, or recurrence → human; path stays blocked.
+    confidence_threshold: High
+    produced_artifacts: [Drift Report, root-cause analysis, repair plan/diff, regression evidence, synchronization update, restart record]
+    required_gates: [original-change-gates]
+    restart_conditions: New evidence/hypothesis or human decision required before retry.
+
+  - id: release
+    loop_type: Pipeline
+    owner: Release Manager
+    objective: Prepare a validated revision for human-authorized release and post-release verification.
+    metric: G8 passes with explicit human authorization; post-release health observed.
+    boundary: One frozen candidate revision; any candidate change restarts from artifact freeze.
+    retry_policy: Restart from artifact freeze on candidate change; never improvise production repair (LOOP_CONTROL §3).
+    escalation_policy: Failed gate, changed artifact, rollback uncertainty, or absent authority → no-go.
+    confidence_threshold: High
+    produced_artifacts: [Release Report, notes, artifact manifest, deployment/rollback plan, verification record, approval/no-go decision]
+    required_gates: [G8]
+    restart_conditions: Candidate change (artifact freeze), environment-only failure (rehearsal/check).
+
+  - id: learning
+    loop_type: Learning
+    owner: Lead Architect
+    objective: Evaluate terminal workflows for repeated signals and record reusable improvements.
+    metric: Every terminal workflow evaluated against six signal classes; qualifying signals produce IMP-* records.
+    boundary: Read-only evaluation; proposes only, never mutates policy/code/gates.
+    retry_policy: Re-evaluate on new terminal evidence; no correction sub-loop (LOOP_CONTROL §3).
+    escalation_policy: Signal above recurrence threshold → framework/constitutional change proposal (Constitution §20/§22).
+    confidence_threshold: Medium (open record); High recurrence (escalate proposal)
+    produced_artifacts: [IMP-* improvement records in IMPROVEMENT_LOG.yaml, escalation proposals]
+    required_gates: []  # advisory only; gates nothing
+    restart_conditions: New terminal state or new occurrence evidence.

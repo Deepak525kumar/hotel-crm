@@ -1,5 +1,18 @@
 # Pre-flight Workflow
 
+## Loop Metadata
+
+- **Loop type:** Pipeline ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Establish a safe, current, correctly scoped execution baseline before any work.
+- **Metric:** Gate G0 passes all five checks (repository sync, foundation drift, dependency drift, scope, context packaging).
+- **Boundary:** One objective at one revision; discovered drift pauses to the applicable synchronization workflow rather than looping here.
+- **Retry policy:** Re-run full pre-flight on any input change (§3); drift routes to self-healing.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** G0 `PASS` with revision-bound, minimal context manifests.
+- **Failure condition:** Any check `FAIL`/`BLOCKED` → do not begin task work.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Establish a safe, current, correctly scoped execution baseline before any engineering work.

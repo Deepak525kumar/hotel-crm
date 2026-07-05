@@ -1,5 +1,18 @@
 # Release Workflow
 
+## Loop Metadata
+
+- **Loop type:** Pipeline ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Prepare a known, validated revision for safe human-authorized release and post-release verification.
+- **Metric:** Gate G8 passes with explicit human authorization; post-release health criteria observed.
+- **Boundary:** One frozen candidate revision; any candidate change restarts from artifact freeze; environment-only failure restarts from the affected rehearsal/check.
+- **Retry policy:** Restart from artifact freeze on candidate change ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3); never improvise production repair.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure (no-go), or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** Release authorized and verified, or a documented no-go/rollback state is reached; G8 and post-flight complete.
+- **Failure condition:** Failed gate, changed artifact, rollback uncertainty, or absent production authority → no-go and return to owner.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Prepare a known, validated revision for safe human-authorized release and post-release verification.

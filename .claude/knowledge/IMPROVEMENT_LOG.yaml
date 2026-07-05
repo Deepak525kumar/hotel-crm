@@ -1,0 +1,65 @@
+schema_version: 1
+purpose: >-
+  Deterministic, human-reviewable improvement records produced by the learning
+  workflow (.claude/workflows/learning.md). Records capture repeated engineering
+  signals. This log proposes; it never mutates policy. Escalations are dispositioned
+  by humans under Engineering Constitution §20/§22.
+project: hotel-crm
+
+# Signal classes (see workflows/learning.md):
+#   repeated-failure | repeated-escalation | repeated-finding |
+#   architectural-violation | synchronization-failure | documentation-drift
+#
+# Record fields:
+#   id                stable IMP-<zero-padded-number>
+#   signal_class      one of the classes above
+#   summary           one-line statement of the recurring signal
+#   evidence          paths/revisions/gate reports proving each occurrence
+#   occurrences       integer count of observed occurrences
+#   recurrence_threshold  occurrences at which the signal escalates
+#   status            open | escalated | dismissed | resolved
+#   proposed_improvement  reusable change proposed for human disposition
+#   confidence        High | Medium | Low (LOOP_CONTROL.md §5)
+#   opened_at / updated_at  ISO-8601 date or revision
+
+records:
+  - id: IMP-001
+    signal_class: documentation-drift
+    summary: >-
+      Platform version truth diverged across artifacts (SYNC_STATE referenced
+      "v1.1.0 governance artifacts" while CHANGELOG/RELEASE_NOTES declared only
+      1.0.0 released and 1.1.0 as planned), with no single canonical version source.
+    evidence:
+      - ".claude/CHANGELOG.md (Version 1.0.0 as released; 1.1.0 as planned)"
+      - ".claude/knowledge/SYNC_STATE.yaml:11 (note: v1.1.0 governance artifacts generated)"
+      - "No canonical version file existed prior to .claude/VERSION.yaml"
+    occurrences: 1
+    recurrence_threshold: 2
+    status: resolved
+    proposed_improvement: >-
+      Establish a single canonical version source (.claude/VERSION.yaml) and require
+      all version-bearing artifacts to reference it rather than restate a literal.
+      Implemented in the platform-audit-improvements change.
+    confidence: High
+    opened_at: "2026-07-05"
+    updated_at: "2026-07-05"
+
+  - id: IMP-002
+    signal_class: architectural-violation
+    summary: >-
+      Reviewer finding structure varied across agents and templates (confidence,
+      unknowns, and limitations were inconsistently required), weakening independent
+      finding merge.
+    evidence:
+      - ".claude/agents/*.md Communication Protocol sections (heterogeneous field lists)"
+      - ".claude/templates/*_REVIEW_TEMPLATE.md Findings tables (missing confidence/unknowns/limitations columns)"
+    occurrences: 1
+    recurrence_threshold: 2
+    status: resolved
+    proposed_improvement: >-
+      Define one canonical finding schema (constitution/REVIEWER_FINDINGS.md) and have
+      every reviewer/validator and review template reference it. Implemented in the
+      platform-audit-improvements change.
+    confidence: High
+    opened_at: "2026-07-05"
+    updated_at: "2026-07-05"

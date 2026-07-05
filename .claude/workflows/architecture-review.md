@@ -1,5 +1,18 @@
 # Architecture Review Workflow
 
+## Loop Metadata
+
+- **Loop type:** Critic ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Independently assess a frozen design for architecture conformity and boundary integrity before implementation.
+- **Metric:** All applicable architecture-checklist criteria evaluated; architecture component of G4 recorded.
+- **Boundary:** One immutable candidate version; the reviewer does not edit; a semantic fix creates a new version and impact-based re-review, at most three cycles (§3).
+- **Retry policy:** Re-review changed/affected criteria only per [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** No unresolved critical/high finding and no undocumented required decision; recommendation bound to the reviewed version.
+- **Failure condition:** Conflicting ADRs, ownership ambiguity, or disputed high severity → escalate.
+- **Confidence threshold:** `High` for any blocking finding.
+
 ## Purpose
 
 Independently assess a frozen design before implementation for architecture conformity and boundary integrity.

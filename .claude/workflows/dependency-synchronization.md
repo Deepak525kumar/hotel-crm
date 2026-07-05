@@ -1,5 +1,18 @@
 # Dependency Synchronization Workflow
 
+## Loop Metadata
+
+- **Loop type:** Synchronization ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Repair drift among producers, consumers, contracts, events, ownership edges, packages, and dependency records.
+- **Metric:** Producer/consumer implementations, contracts, tests, manifests/locks, graph, and docs agree at a known revision.
+- **Boundary:** One authoritative contract/package/ownership state; breaking migrations follow approved staged order; resume at the failed migration stage.
+- **Retry policy:** Re-trace after any contract/owner/package change; otherwise resume and rerun affected regression ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** Zero unknown consumers, complete contract tests, consistent manifests/locks, graph/repository agreement.
+- **Failure condition:** Unknown consumer/owner, breaking change without migration, cycle, or destructive schema change → escalate; keep a compatibility layer until consumers migrate.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Repair drift among producers, consumers, contracts, events, ownership edges, packages, and dependency records.

@@ -22,8 +22,10 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`; justify every `N/A`. No secret or sensi
 
 ## Findings
 
-| ID | Severity | Criterion | Evidence | Impact | Required control | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale. Never include secrets or sensitive payloads in evidence.
+
+| Finding ID | Severity | Criterion | Evidence | Impact | Recommendation / required control | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Residual Risk
 

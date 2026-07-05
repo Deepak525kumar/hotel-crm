@@ -53,6 +53,8 @@ Receives completed artifact from Lead Architect; sends failures to the responsib
 
 Report criterion-by-criterion `PASS`, `FAIL`, `BLOCKED`, or `N/A`, with exact evidence. Aggregate status follows gate rules.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 Every mandatory criterion is objectively evaluated and the result is reproducible at the same artifact version.

@@ -1,5 +1,18 @@
 # Self-healing Workflow
 
+## Loop Metadata
+
+- **Loop type:** Refinement ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Detect and repair repository, documentation, foundation, or dependency drift without inventing intent.
+- **Metric:** Drift is repaired and validated, or isolated and escalated with no false completion claim.
+- **Boundary:** At most one repair attempt per unchanged hypothesis (§3); a failed attempt requires new evidence or a human decision before retry.
+- **Retry policy:** Never loop repairs without a changed hypothesis ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** Repair passes every gate the original change would require and restarts from the last stable gate.
+- **Failure condition:** Truth cannot be resolved, repair changes product/architecture/constitution, or recurrence repeats → keep path blocked and escalate.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Detect and repair repository, documentation, foundation, or dependency drift without inventing intent.

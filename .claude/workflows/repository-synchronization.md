@@ -1,5 +1,18 @@
 # Repository Synchronization Workflow
 
+## Loop Metadata
+
+- **Loop type:** Discovery ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Produce a non-destructive, revision-bound view of current repository truth.
+- **Metric:** Branch, `HEAD`, default branch, remote/fetch status, worktree changes, and source classifications are all recorded.
+- **Boundary:** Read-only inspection at one revision; no correction sub-loop — facts are captured or marked `unknown`.
+- **Retry policy:** Re-run whole workflow on state change (§3); no in-place retry of a recorded fact.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Blocked, or restart on state change ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** All required facts captured or explicitly `unknown`; unrelated changes protected.
+- **Failure condition:** Baseline or dirty-change ownership unknowable in a way that blocks dependent decisions → `BLOCKED`.
+- **Confidence threshold:** `High` for recorded facts; unknowns explicit.
+
 ## Purpose
 
 Create a non-destructive, revision-bound view of current worktree, default branch, merged baseline, and proposed changes.
