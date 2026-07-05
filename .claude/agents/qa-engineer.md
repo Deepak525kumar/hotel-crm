@@ -54,6 +54,8 @@ Receives candidate from implementers; sends defects to responsible engineer; pro
 
 Each result includes test ID, requirement/rule ID, environment/revision, steps or command, expected, actual, artifacts, and status.
 
+Every reported defect conforms to the canonical finding schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 All applicable criteria have deterministic evidence, defects reproduce, and untested areas/limitations are explicit.

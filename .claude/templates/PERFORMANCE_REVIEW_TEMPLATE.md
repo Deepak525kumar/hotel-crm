@@ -24,8 +24,10 @@ Record measured results only; mark projections and unknown capacity as such and 
 
 ## Findings
 
-| ID | Severity | Criterion | Evidence | Impact | Required outcome | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Criterion | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Capacity Notes and Limitations
 

@@ -1,5 +1,18 @@
 # Requirements Workflow
 
+## Loop Metadata
+
+- **Loop type:** Pipeline ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Transform an objective into confirmed, atomic, traceable, testable requirements without choosing implementation.
+- **Metric:** Gate G1 passes (zero unsupported normative statements, zero unresolved blocking questions, complete acceptance criteria, approved scope).
+- **Boundary:** Scope of the objective; at most three clarification iterations per unresolved item before escalation (§3).
+- **Retry policy:** Default bounded correction per [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3; re-derive only on changed intent or evidence.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** G1 `PASS`.
+- **Failure condition:** Items remain `UNKNOWN`/`CONFLICTING` after the retry bound → escalate to product/architecture authority.
+- **Confidence threshold:** `High` for every normative statement.
+
 ## Purpose
 
 Transform an objective into confirmed, atomic, traceable, testable requirements without choosing implementation.

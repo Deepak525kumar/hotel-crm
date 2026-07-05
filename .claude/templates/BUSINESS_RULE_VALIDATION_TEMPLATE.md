@@ -13,8 +13,10 @@ Use `VALID`, `INVALID`, or `BLOCKED`; cite evidence for every status.
 
 ## Duplication and Contradiction Findings
 
-| ID | Severity | Conflicting locations | Evidence | Impact | Required outcome | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Conflicting locations | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Missing-case Questions
 

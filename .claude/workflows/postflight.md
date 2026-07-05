@@ -1,5 +1,19 @@
 # Post-flight Workflow
 
+## Loop Metadata
+
+- **Loop type:** Synchronization ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Restore repository-wide consistency after completed, failed, or intentionally stopped work.
+- **Metric:** Gate G9 passes; all affected artifacts are current or carry an owned, due follow-up.
+- **Boundary:** One final change inventory; re-run from the inventory on any final-state change or finding correction.
+- **Retry policy:** Reopen the responsible synchronization/documentation step on failure ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3); do not mark the parent complete meanwhile.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** G9 `PASS` with no temporary bypass, unresolved blocking finding, or orphaned artifact.
+- **Failure condition:** Undocumented scope, ownership conflict, breaking dependent, or unresolved foundation drift → reopen sync and escalate.
+- **Confidence threshold:** `High`.
+- **Learning hook:** On terminal state, invoke the [learning workflow](learning.md) to record repeated signals in `../knowledge/IMPROVEMENT_LOG.yaml`.
+
 ## Purpose
 
 Restore repository-wide consistency after completed, failed, or intentionally stopped work.

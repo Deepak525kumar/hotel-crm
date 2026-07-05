@@ -1,5 +1,18 @@
 # Performance Review Workflow
 
+## Loop Metadata
+
+- **Loop type:** Critic ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Independently assess whether a frozen candidate meets defined performance and scalability constraints before approval.
+- **Metric:** All applicable performance-checklist criteria evaluated; performance component of G4, measurements, and capacity assumptions recorded.
+- **Boundary:** One immutable candidate version; the reviewer does not edit; semantic fix creates a new version and impact-based re-review, at most three cycles (§3).
+- **Retry policy:** Restart affected checklist sections after fixes; full restart on workload/topology/budget change ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** No unresolved critical/high finding and no unbounded behavior or capacity assumption left invisible.
+- **Failure condition:** No approved budget, material capacity cost, correctness tradeoff, or unresolved regression → escalate.
+- **Confidence threshold:** `High` for any blocking finding; measurements distinguished from projections.
+
 ## Purpose
 
 Independently assess whether a frozen candidate meets defined performance and scalability constraints before it is approved.

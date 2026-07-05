@@ -1,5 +1,18 @@
 # Implementation Workflow
 
+## Loop Metadata
+
+- **Loop type:** Pipeline ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Plan and implement a frozen specification with bounded scope, traceability, and independent verification.
+- **Metric:** Gate G3 then G5 pass (plan mapped and reviewed; diff mapped, clean checks, no unapproved deviation, migration/rollback evidence).
+- **Boundary:** Frozen-spec scope only; a failed check restarts the affected work item, at most three iterations per item before escalation (§3).
+- **Retry policy:** Default bounded correction per [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3; spec/contract change reruns pre-flight and re-plans invalidated items.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** G5 `PASS` with complete plan mapping and no unapproved deviation.
+- **Failure condition:** Spec ambiguity or unplanned contract/architecture/dependency change → return to the originating gate; never patch the spec through code.
+- **Confidence threshold:** `High`.
+
 ## Purpose
 
 Plan and implement a frozen specification with bounded scope, traceability, safe sequencing, and independent verification.

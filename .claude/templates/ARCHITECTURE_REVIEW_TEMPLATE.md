@@ -17,8 +17,10 @@ Use `PASS`, `FAIL`, `BLOCKED`, or `N/A`; justify every `N/A`.
 
 ## Findings
 
-| ID | Severity | Criterion | Evidence | Impact | Required outcome | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Criterion | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Decision Record Requirements
 

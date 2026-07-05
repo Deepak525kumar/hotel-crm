@@ -1,5 +1,18 @@
 # Documentation Workflow
 
+## Loop Metadata
+
+- **Loop type:** Pipeline with an embedded Refinement sub-loop (author → review → correct) ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Author, independently review, validate, and freeze an authoritative specification or engineering document.
+- **Metric:** G2, G4, and the documentation portion of G6 pass; artifact marked `FROZEN`/`CURRENT`.
+- **Boundary:** One candidate; every semantic correction increments the candidate version; at most three review→fix cycles before escalation (§3).
+- **Retry policy:** Semantic edit → new version → impact-based re-review of affected sections only ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** Approved, versioned, traceable, review-complete document.
+- **Failure condition:** Unresolved high finding or authority conflict after the retry bound → escalate.
+- **Confidence threshold:** `High` for target-state and decision content.
+
 ## Purpose
 
 Author, independently review, validate, and freeze an authoritative specification or engineering document.

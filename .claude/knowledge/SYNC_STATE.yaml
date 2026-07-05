@@ -8,7 +8,7 @@ status: governance-artifacts-generated
 repository:
   worktree_clean: true
   remote_refresh_verified: false
-  note: v1.1.0 governance artifacts (ADR-001..008, MODULE_REGISTRY, DEPENDENCY_GRAPH) generated and independently reviewed at baseline_revision. Ownership assignment (SYNC-001) remains blocked pending human authority.
+  note: Governance artifacts (ADR-001..008, MODULE_REGISTRY, DEPENDENCY_GRAPH) generated and independently reviewed at baseline_revision. Ownership assignment (SYNC-001) remains blocked pending human authority. Canonical framework version is declared in ../VERSION.yaml (currently 1.1.0).
 
 indexes:
   project_profile:
@@ -26,6 +26,18 @@ indexes:
   decision_index:
     status: populated
     source: .claude/knowledge/DECISION_INDEX.md
+  loop_registry:
+    status: current
+    source: .claude/knowledge/LOOP_REGISTRY.yaml
+  capability_registry:
+    status: current
+    source: .claude/knowledge/CAPABILITY_REGISTRY.yaml
+  improvement_log:
+    status: current
+    source: .claude/knowledge/IMPROVEMENT_LOG.yaml
+  platform_version:
+    status: current
+    source: .claude/VERSION.yaml
 
 known_drift:
   - id: SYNC-001
@@ -55,6 +67,18 @@ known_drift:
     type: documentation-authority
     status: pending
     description: Bootloader (.claude/CLAUDE.md) refers to the knowledge layer as "knowledge/" while the actual location is ".claude/knowledge/"; canonical knowledge-path wording to be reconciled (framework doc, human/framework authority).
+  - id: SYNC-007
+    type: framework-change
+    status: resolved
+    description: >-
+      Platform-audit improvements implemented as backward-compatible extensions (framework v1.1.0):
+      Loop Control and Reviewer Findings canonical policies (constitution/), Constitution Articles 21-22,
+      explicit per-workflow Loop Metadata, LOOP_REGISTRY.yaml, CAPABILITY_REGISTRY.yaml, learning workflow,
+      IMPROVEMENT_LOG.yaml, standardized reviewer/validator findings, gate-ownership clarification, and
+      version-truth reconciliation via VERSION.yaml. Constitutional additions trace to the approved
+      platform audit and preserve all prior guarantees; formal human ratification of Articles 21-22 remains
+      reserved human authority per Engineering Constitution §20.
+    authority_needed: human
 
 context_invalidators:
   - repository revision changes

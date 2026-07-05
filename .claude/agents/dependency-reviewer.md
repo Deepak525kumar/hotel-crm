@@ -54,6 +54,8 @@ Receives input from Lead Architect; coordinates evidence with Infrastructure/Sec
 
 Report each edge as `UNCHANGED`, `ADDED`, `REMOVED`, or `CHANGED` and compatibility as `COMPATIBLE`, `CONDITIONAL`, `BREAKING`, or `UNKNOWN`.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 All affected producers, consumers, packages, contracts, rollout steps, and graph updates are identified with evidence.

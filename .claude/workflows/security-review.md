@@ -1,5 +1,18 @@
 # Security Review Workflow
 
+## Loop Metadata
+
+- **Loop type:** Critic ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Independently assess security and privacy risk introduced or affected by a frozen candidate before approval.
+- **Metric:** All applicable security-checklist criteria evaluated; security component of G4 and residual risk recorded.
+- **Boundary:** One immutable candidate version; the reviewer does not edit and never records secrets; semantic fix creates a new version and impact-based re-review, at most three cycles (§3).
+- **Retry policy:** Restart affected checklist sections after fixes; full restart on attack-surface/trust-boundary/data-classification change ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** No unresolved critical/high finding and no undocumented accepted residual risk.
+- **Failure condition:** Critical/high issue, active exposure, secret leakage, or missing security authority → escalate; findings never downgraded for schedule.
+- **Confidence threshold:** `High` for any blocking finding.
+
 ## Purpose
 
 Independently assess security and privacy risk introduced or affected by a frozen candidate before it is approved.

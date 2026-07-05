@@ -18,8 +18,10 @@ Check terminology, actors, states, rules, ownership, interfaces, examples, statu
 
 ## Findings
 
-| ID | Severity | Conflicting locations | Evidence | Impact | Required outcome | Owner/status |
-|---|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Conflicting locations | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Terminology and Cross-reference Delta
 

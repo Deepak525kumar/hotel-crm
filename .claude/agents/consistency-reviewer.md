@@ -53,6 +53,8 @@ Works independently; routes terminology decisions to human/Lead Architect, rule 
 
 Each finding identifies both conflicting locations, authority classification, canonical candidate if known, and required synchronization set.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 No unchecked relevant artifact remains; one canonical term/rule/source is identifiable; references and statuses agree.

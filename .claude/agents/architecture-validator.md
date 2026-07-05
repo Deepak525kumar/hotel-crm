@@ -53,6 +53,8 @@ Receives candidate after implementation verification; returns failures to implem
 
 Map each architectural constraint/finding to implementation evidence and `PASS`, `FAIL`, `BLOCKED`, or `N/A`.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 Every applicable architecture constraint is traced to actual implementation and no unapproved structural drift remains.

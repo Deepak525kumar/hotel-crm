@@ -53,6 +53,8 @@ Receives inputs independently; coordinates facts with Dependency/Infrastructure 
 
 Report affected asset, threat, precondition, evidence, impact, likelihood, severity, required control, and safe redaction.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale. Never include secrets or sensitive payloads in evidence.
+
 ## Success Criteria
 
 Relevant trust boundaries and abuse cases are evaluated; findings are actionable; no secret or sensitive payload enters reports.

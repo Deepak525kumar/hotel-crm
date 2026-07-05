@@ -1,5 +1,18 @@
 # Dependency Review Workflow
 
+## Loop Metadata
+
+- **Loop type:** Critic ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Independently identify dependency, contract, package, and synchronization consequences before approval.
+- **Metric:** Every affected edge and package classified; dependency component of G4 recorded.
+- **Boundary:** One frozen artifact/diff; the reviewer does not edit; contract/package/ownership change restarts edge analysis, at most three cycles (§3).
+- **Retry policy:** Re-run package evidence on version/lockfile change; re-review corrections per [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** No unknown consumer, no unplanned breaking edge, complete synchronization actions.
+- **Failure condition:** Breaking change without authority, unknown owner/consumer, cycle, or unavailable migration path → escalate or invoke dependency synchronization.
+- **Confidence threshold:** `High` for any blocking finding.
+
 ## Purpose
 
 Independently identify dependency, contract, package, and synchronization consequences before approval.

@@ -116,6 +116,7 @@ Existence does not imply authority. Generated files, archives, examples, caches,
 
 - Authoring and reviewing are separate responsibilities.
 - Architecture, dependency, consistency, and — where applicable — security and performance reviews run independently when their inputs are frozen.
+- Every reviewer and validator emits the single canonical finding shape defined in [REVIEWER_FINDINGS.md](REVIEWER_FINDINGS.md), including confidence, unknowns, and limitations.
 - Findings are merged by identifier and severity, then returned to the responsible author.
 - The author cannot approve their own blocking finding.
 - Merge requires all applicable gates in [REVIEW_GATES.md](REVIEW_GATES.md), traceable evidence, synchronized docs/knowledge, and explicit approval.
@@ -192,3 +193,16 @@ Changing this document requires:
 5. Validation that no rule became contradictory or unenforceable.
 
 Editorial clarification that does not change meaning may use the normal documentation workflow.
+
+## 21. Loop Control and Termination
+
+- Every workflow is a bounded loop with an explicit type, retry policy, confidence threshold, and termination condition defined canonically in [LOOP_CONTROL.md](LOOP_CONTROL.md) and registered in `../knowledge/LOOP_REGISTRY.yaml`.
+- Correction never repeats against an unchanged hypothesis; boundary exhaustion escalates and is never a silent pass.
+- `Unknown` is never a terminal success; a loop MUST NOT advance a dependent from any non-success terminal state.
+- Confidence is reported on the canonical scale; a criterion is met only when its supporting evidence reaches the workflow's declared confidence threshold.
+
+## 22. Continuous Learning
+
+- Completed and stopped workflows are evaluated by the [learning workflow](../workflows/learning.md) for repeated failures, escalations, findings, architectural violations, synchronization failures, and documentation drift.
+- Learning produces deterministic, human-reviewable improvement records in `../knowledge/IMPROVEMENT_LOG.yaml`; it never mutates policy autonomously.
+- Improvements that generalize to the platform are escalated as constitutional or framework changes under §20; the learning loop only proposes.

@@ -10,6 +10,11 @@ This directory is the only project-specific layer of the reusable platform. It c
 - `TERMINOLOGY.md` — approved project terms, aliases, and deprecations.
 - `DECISION_INDEX.md` — index of decisions; decision records remain in the project documentation tree.
 - `SYNC_STATE.yaml` — last verified revisions and known drift.
+- `LOOP_REGISTRY.yaml` — framework-scoped index classifying every workflow as a bounded loop (see `../constitution/LOOP_CONTROL.md`).
+- `CAPABILITY_REGISTRY.yaml` — framework-scoped index of platform capabilities mapped to responsible agents, inputs, outputs, workflows, gates, and authority.
+- `IMPROVEMENT_LOG.yaml` — deterministic improvement records produced by the learning workflow (`../workflows/learning.md`).
+
+`LOOP_REGISTRY.yaml` and `CAPABILITY_REGISTRY.yaml` index reusable framework workflows and capabilities; they are co-located here for discoverability and travel with the framework rather than with project-specific entries.
 
 ## Rules
 

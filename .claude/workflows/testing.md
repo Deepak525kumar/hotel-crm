@@ -1,5 +1,18 @@
 # Testing Workflow
 
+## Loop Metadata
+
+- **Loop type:** Validation ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §1).
+- **Objective:** Design and execute risk-based functional and nonfunctional checks against a known implementation candidate.
+- **Metric:** Every frozen acceptance criterion maps to passing evidence or a blocking status; contributes to G6.
+- **Boundary:** One candidate revision; defect fixes re-enter implementation; flaky checks are quarantined only with an owner and root-cause task.
+- **Retry policy:** Targeted plus impact-based regression after each fix (§3); rebuild the plan on criteria/environment/architecture change.
+- **Escalation policy:** See Escalation Conditions; Constitution §18.
+- **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
+- **Success condition:** All applicable tests execute with traceable results; defects resolved or accepted under policy.
+- **Failure condition:** Untestable criterion, nondeterminism, or unresolved critical/high defect → return to implementer or escalate.
+- **Confidence threshold:** `High`; only deterministic checks prove acceptance.
+
 ## Purpose
 
 Design and execute risk-based functional and nonfunctional checks against a known implementation candidate.

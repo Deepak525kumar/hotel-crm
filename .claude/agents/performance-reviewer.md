@@ -53,6 +53,8 @@ Requests workload facts from Lead Architect/human; sends bottlenecks to implemen
 
 For each claim state metric, workload, environment, baseline, candidate result, variance, sample method, and confidence.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 All applicable budgets are tested or explicitly blocked; results reproduce; unbounded behavior and capacity assumptions are visible.

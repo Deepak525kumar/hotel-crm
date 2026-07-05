@@ -54,6 +54,8 @@ Receives candidates from Requirements Analyst or Module Author; returns findings
 
 For each `RULE-*`, report source, owner, invariant, cases checked, contradictions, and `VALID`, `INVALID`, or `BLOCKED`.
 
+Every actionable finding conforms to the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md) — Finding ID, Severity, Evidence, Impact, Recommendation, Confidence, Unknowns, Limitations, Required Outcome — with confidence on the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
 ## Success Criteria
 
 Every normative rule has one canonical definition, authority, deterministic interpretation, complete cases, and testable outcomes.

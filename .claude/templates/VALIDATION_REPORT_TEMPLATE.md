@@ -31,8 +31,10 @@ Validator(s); date; candidate revision/version; environment; frozen spec; applic
 
 ## Findings and Dispositions
 
-| ID | Severity | Criterion | Evidence | Required correction | Owner/status |
-|---|---|---|---|---|---|
+Findings use the canonical schema in [../constitution/REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md); confidence uses the [LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §5 scale.
+
+| Finding ID | Severity | Criterion | Evidence | Impact | Recommendation | Confidence | Unknowns | Limitations | Required outcome | Owner/status |
+|---|---|---|---|---|---|---|---|---|---|---|
 
 ## Commands and Results
 
