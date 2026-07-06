@@ -1,0 +1,298 @@
+# Module Specification: `crm`
+
+## Document Control
+
+| Field | Value |
+|---|---|
+| Spec ID / version | `SPEC-CRM-001 / 0.1.0` |
+| Status | `REVIEW` (freeze candidate; G2 Specification-Freeze pending — see Review and Change Log) |
+| Owner | `unassigned` — reserved human authority (SYNC-001); no `CODEOWNERS` exists and `backend/package.json` author is empty |
+| Authors / reviewers | Author: Lead Architect (specification-freeze workflow). Independent reviewers (architecture, dependency, consistency, security): **pending** (G4) |
+| Repository revision | `5651915f614b1da900eb541a9d66838e85ddeac9` (`5651915`, worktree). CRM sources (`backend/src/modules/crm/**`) and `backend/prisma/schema.prisma` are byte-identical to the knowledge-artifact observed revision `5b16be40ef0aa9ac3f186e7323b960886a6153c2` (`5b16be4`) — verified with `git diff --stat 5b16be4 5651915 -- backend/src/modules/crm backend/prisma/schema.prisma` (empty). |
+| Approved by / at | — (G2 freeze requires the named human approver; not yet approved) |
+| Supersedes | None. No prior specification maps to `backend-crm`; `MODULE_REGISTRY.yaml:56` records `specification: UNKNOWN`. `docs/03-modules/hotels/` exists but is empty. |
+
+> **Authoring note (not a normative section change).** This is the canonical-template instance for the CRM (Hotel & Organization Management) module, authored per the [Documentation Workflow](../../../.claude/workflows/documentation.md) freeze sequence and the fixed shape of [`MODULE_SPEC_TEMPLATE.md`](../../../.claude/templates/MODULE_SPEC_TEMPLATE.md); the template file itself is unmodified. **Current Repository Behaviour** is derived exclusively from the current worktree (Prisma schema, module source, routing, middleware, tests). **Target Behaviour** is derived exclusively from the two authoritative business documents — `docs/00-foundations/CONFIRMED_REQUIREMENTS_REGISTER.md` (**CRR §n**) and `docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md` (**PDD §n**). The three planes — Current, Target, Migration Gap — are kept explicitly separate throughout. No behaviour is drawn from marketplace-era or `docs/legacy/**` sources. Per the task constraint and the repository truth (`MODULE_REGISTRY.yaml:47`, `DEPENDENCY_GRAPH.yaml:65`), Hotel and Organization Management belong to the **`crm` code module**; a separate "Hotels" module is **not** created here (see OD-CRM-06).
+
+## Purpose and Scope
+
+**Outcome:** A single authoritative record and management surface for the **operating properties (hotels)** of FHM Hotelservice GmbH and the **organizational grouping** (Hotel Group) under which those properties are administered, exposed consistently to the rest of the Workforce Operations Platform as the canonical hotel reference every scheduling, roster, dispatch, attendance, and quality flow depends on (CRR §11; PDD §4.3, §5.4, §9.1).
+
+**In scope:**
+
+- **Current:** The Hotel entity and its lifecycle CRUD — create, read (single + paginated list with search/country/active filters), update, and soft-delete — owned by the `crm` module (`backend/src/modules/crm/**`; `state-hotel` authoritative writer `backend-crm`, `DEPENDENCY_GRAPH.yaml:433`).
+- **Current:** The hotel reference record other modules read to scope work requests, rosters, assignments, attendance, verifications, ratings, and notifications (Hotel relations, `schema.prisma:189-196`).
+- **Current:** Audit logging of hotel view/create/update/delete actions through the shared audit framework (`service.ts:62,77,97,107`).
+- **Target:** The **Hotel Group** organizational unit that aggregates hotels under one Regional Manager with shared billing, and the assignment of a created hotel to its responsible Regional/Property Manager (CRR §11; PDD §4.3). **The data-model home for the group is an open decision (OD-CRM-01).**
+- **Target:** A per-hotel **"pause new jobs"** toggle (CRR §11; PDD §4.3).
+- **Target:** Enforcement that hotel creation is **Admin/HQ only**, and that Regional/Property Managers may manage their assigned hotels but may not create hotels or modify hotel groups (CRR §11 §177–§180; PDD §4.3).
+
+**Out of scope:** (owned elsewhere and referenced, never redefined — Constitution §6)
+
+- The **HotelWorker roster** (which workers are affiliated with a hotel, at what rate, and their INVITED→ACTIVE→SUSPENDED→REMOVED lifecycle). Owned by the **`hotel-workers`** module (`state-hotel-worker` authoritative writer `backend-hotel-workers`, `DEPENDENCY_GRAPH.yaml:439`), even though its routes are **nested** under `/crm/hotels/:hotel_id/workers` (`routes/v1/index.ts:25`). Route nesting is not ownership (see Ownership and Boundaries).
+- Authentication, JWT issuance, role/scope claims, MFA, sessions (Authentication/User Management; `backend/src/modules/auth`, `backend/src/middleware/auth.ts`; PDD §5.3).
+- The RBAC/scope framework and the role-permission map itself (`backend/src/middleware/permissions.ts`, `backend/src/config/constants.ts`; PDD §5.4).
+- Work requests / broadcast job requests, assignments, attendance/geofencing, quality/ratings, notifications, analytics, HR/employee records, calendar — each its own module; each merely **reads** the Hotel reference.
+- Shared **billing** computation for a Hotel Group (CRR §11 names shared billing; no billing module or model exists — OD-CRM-10).
+
+**Non-goals:** (confirmed out of the platform entirely — CRR §11 explicit non-goals)
+
+- **Rooms, floors, buildings, and zones** systems (CRR §11: "No rooms system / No floors system / No buildings system / No zones system"). The marketplace-era `Room`/`Task` concepts are already removed from the schema (`schema.prisma:4`).
+- Multi-country operation and localization beyond the German default (`country` default `"Germany"`, `timezone` default `"Europe/Berlin"`; `types.ts:6-8`); the platform is Germany-only (PDD §5.7).
+- Any marketplace-era hotel behaviour (hotel-posts-work-request-for-workers-to-browse). The pivot removes marketplace mechanics (PDD §1, §2.4).
+
+## Evidence and Traceability
+
+Each requirement maps: **Repository Evidence → Business Rule → Acceptance Criteria → Open Decision (if any) → Knowledge Delta**. The last column names the traceability plane the row governs.
+
+| Claim/requirement | Source path, line, revision, or decision | Authority | Status |
+|---|---|---|---|
+| `REQ-CRM-001` Hotel is a first-class entity with fields name, city, country, address, timezone, contact_email?, contact_phone?, is_active, deleted_at?, timestamps | `backend/prisma/schema.prisma:175-201` | Current repository | Confirmed current-state |
+| `REQ-CRM-002` `crm` module exposes Hotel CRUD (list/get/create/update/soft-delete) under `/api/v1/crm/hotels` | `backend/src/modules/crm/routes.ts:11-15`; `backend/src/routes/v1/index.ts:24` | Current repository | Confirmed current-state |
+| `REQ-CRM-003` Hotel state is owned (authoritatively written) only by `backend-crm`; read by `backend-work-requests` and `backend-hotel-workers` | `.claude/knowledge/DEPENDENCY_GRAPH.yaml:433-438` | Generated (repo-derived) | Confirmed current-state |
+| `REQ-CRM-004` Hotel view/create/update/delete actions are audit-logged via the shared audit framework | `backend/src/modules/crm/service.ts:62,77,97,107`; `backend/src/lib/base-service.ts:7-31` | Current repository | Confirmed current-state |
+| `REQ-CRM-005` Delete is a soft-delete (`is_active=false`, `deleted_at=now`), not a physical delete | `backend/src/modules/crm/service.ts:101-108` | Current repository | Confirmed current-state |
+| `REQ-CRM-006` Each hotel has a dedicated manager; hotels scale over time | CRR §11 (§167, §176); PDD §4.3 | Authoritative (business) | Confirmed target |
+| `REQ-CRM-007` Hotel Groups aggregate multiple hotels under one Regional Manager with shared billing | CRR §11 (§169); PDD §4.3 (§99–§101) | Authoritative (business) | Confirmed target; **data model open (OD-CRM-01)** |
+| `REQ-CRM-008` Per-hotel "pause new jobs" toggle | CRR §11 (§170); PDD §4.3 (§102) | Authoritative (business) | Confirmed target; **not implemented (OD-CRM-04)** |
+| `REQ-CRM-009` Hotel creation is Admin/HQ only; created hotel is assigned to its responsible Regional/Property Manager | CRR §11 (§177–§178); PDD §4.3 (§103) | Authoritative (business) | Confirmed target |
+| `REQ-CRM-010` Regional/Property Managers get scoped permissions for assigned hotels; may manage them but may not create hotels or modify hotel groups | CRR §11 (§179–§180); PDD §4.3, §5.4 | Authoritative (business) | Confirmed target |
+| `REQ-CRM-011` Authorization is two-dimensional: role × scope (hotel or hotel-group), scope carried in token | PDD §5.3 (§170), §5.4 (§172, §180) | Authoritative (business) | Confirmed target; **not implemented (OD-CRM-05)** |
+| Regional Manager is a new fifth role; the confirmed role set is Staff/Worker, Checker, Hotel Manager, Regional Manager, Admin | CRR §1 (§15); PDD §4.1 (§85) | Authoritative (business) | Confirmed target; enum has only WORKER/CHECKER/MANAGER/ADMIN (`schema.prisma:22-27`) — gap |
+| No rooms/floors/buildings/zones | CRR §11 (§172–§175) | Authoritative (business) | Confirmed non-goal; already absent from schema |
+| Backend code module for the hotel/organization domain is `backend-crm` (active); no frozen spec currently maps to it | `.claude/knowledge/MODULE_REGISTRY.yaml:47-57`; `.claude/knowledge/DEPENDENCY_GRAPH.yaml:27,65` | Generated (repo-derived) | Confirmed current-state |
+| Documentation elsewhere refers to a "Hotels module" distinct from CRM | `docs/03-modules/employee-management/MODULE_SPEC.md:45`; empty `docs/03-modules/hotels/` | Documentation | Naming conflict — OD-CRM-06 |
+| No Organization/HotelGroup/Regional/pause reference exists anywhere in backend source or schema | `grep -rniE "organization|hotel_group|regional|pause" backend/src backend/prisma` → 0 matches at `5651915` | Current repository | Confirmed current-state |
+| Authoritative business documents live under `docs/00-foundations/` | worktree at `5651915` | Current repository | Confirmed (same location discrepancy noted in SPEC-EMP-001 OD-EMP-11) |
+
+## Actors and Terminology
+
+| Term/actor | Canonical definition | Source |
+|---|---|---|
+| Hotel (Property) | An operating property of FHM Hotelservice GmbH; the durable reference record owned by this module and read by scheduling/roster/dispatch/attendance/quality | `schema.prisma:175`; CRR §11 |
+| Hotel Group (Organization) | A set of hotels administered together under one Regional Manager, with shared billing; the "Organization" of "Hotel & Organization Management" | CRR §11 (§169); PDD §4.3 |
+| Staff (Worker) | Permanent employee who performs jobs; role token `WORKER` | CRR §1; `schema.prisma:23` |
+| Checker | Quality-inspection role operating across hotels; role token `CHECKER` | CRR §1; `schema.prisma:24` |
+| Hotel Manager | Manager scoped to one hotel; the hotel's dedicated manager; role token `MANAGER` | CRR §1, §11; PDD §5.4 |
+| Regional Manager | **New** role overseeing all hotels in a Hotel Group; **no enum token exists yet** | CRR §1 (§20); PDD §4.1 (§85); gap vs `schema.prisma:22-27` |
+| Admin | System-wide access; the only creator of hotels (Admin/HQ); role token `ADMIN` | CRR §11 (§177); `schema.prisma:26` |
+| Scope | The hotel or hotel-group a user may act within; second RBAC dimension, carried in the token claims (target) | PDD §5.3, §5.4 |
+| Pause new jobs | Per-hotel toggle that suspends new job creation for that hotel without deactivating it (target) | CRR §11 (§170); PDD §4.3 |
+| Soft-delete | Deactivation that sets `is_active=false` and records `deleted_at`, preserving the row and its history | `service.ts:101-108` |
+| `checkHotelAccess` | Middleware that permits admin/manager/checker unconditionally and otherwise requires an ACTIVE `HotelWorker` roster membership for the target hotel | `middleware/permissions.ts:96-156` |
+| Response envelope | `{ status, data, pagination?, meta:{ timestamp, request_id } }` — the platform response shape returned by CRM endpoints | `controller.ts:17-22,33-37,49-53` |
+
+## Requirements and Acceptance Criteria
+
+Requirements `REQ-CRM-001..005` describe **Current Repository Behaviour** (what the module does today). `REQ-CRM-006..011` describe **Target Behaviour** (what the frozen business documents require). Migration gaps between them are enumerated in State and Lifecycle → Migration Gaps and in Open Decisions.
+
+| Requirement | Statement | Priority | Acceptance criteria | Rule IDs |
+|---|---|---|---|---|
+| `REQ-CRM-001` (Current) | Maintain the Hotel entity with its confirmed fields and German defaults. | MUST | A Hotel row carries name, city, country (default "Germany"), address, timezone (default "Europe/Berlin"), optional contact_email/contact_phone, is_active (default true), deleted_at?, created_at, updated_at; no room/floor/building/zone field exists. | `RULE-CRM-01` |
+| `REQ-CRM-002` (Current) | Expose Hotel CRUD under `/api/v1/crm/hotels`: paginated list, single get, create, update, soft-delete. | MUST | The five routes at `routes.ts:11-15` respond with the standard envelope; list supports `page`,`limit`,`search`,`is_active`,`country`; validation rejects malformed bodies/queries via zod. | `RULE-CRM-02`, `RULE-CRM-06` |
+| `REQ-CRM-003` (Current) | Be the sole authoritative writer of Hotel state; serve it as a read reference to other modules. | MUST | Only `backend-crm` creates/updates/deletes Hotel; `work-requests` and `hotel-workers` read it and never write it (`DEPENDENCY_GRAPH.yaml:433-438`). | `RULE-CRM-03` |
+| `REQ-CRM-004` (Current) | Audit-log every hotel view/create/update/delete action. | MUST | Get → `VIEW`, create → `MODIFY` (`action:create`), update → `MODIFY` (changed field keys), delete → `DELETE`; each written to `AuditLog` via `BaseService.logAudit`. | `RULE-CRM-04` |
+| `REQ-CRM-005` (Current) | Delete a hotel by soft-delete only. | MUST | Delete sets `is_active=false` and `deleted_at=now()`; the row persists; the list default excludes it via `is_active`; no physical delete path exists. | `RULE-CRM-05` |
+| `REQ-CRM-006` (Target) | Each hotel has a dedicated manager and the hotel inventory scales over time. | MUST | A hotel can be associated with a dedicated Hotel Manager; new hotels can be added without limit. **Manager-association mechanism is open (OD-CRM-01).** | `RULE-CRM-07` |
+| `REQ-CRM-007` (Target) | Represent Hotel Groups: multiple hotels under one Regional Manager, with shared billing. | MUST | A Hotel Group groups ≥1 hotel; each hotel belongs to at most one group; the group has one Regional Manager. **Data model open (OD-CRM-01); billing ownership open (OD-CRM-10).** | `RULE-CRM-08` |
+| `REQ-CRM-008` (Target) | Provide a per-hotel "pause new jobs" toggle. | SHOULD | A manager can pause/resume new job creation for a hotel; pausing does not deactivate the hotel and is distinct from `is_active`. **Field not implemented (OD-CRM-04).** | `RULE-CRM-09` |
+| `REQ-CRM-009` (Target) | Restrict hotel creation to Admin/HQ; assign a created hotel to its responsible manager. | MUST | Only Admin may create a hotel; a non-Admin creation attempt is denied; on creation the hotel is assigned to a Regional/Property Manager. **Current route also gates creation on role `manager` (contradiction — OD-CRM-02).** | `RULE-CRM-10` |
+| `REQ-CRM-010` (Target) | Let Regional/Property Managers manage their assigned hotels but not create hotels or modify hotel groups. | MUST | A scoped manager may update a hotel within scope; may not create a hotel; may not alter hotel-group composition. **Requires scope model (OD-CRM-05) and a manager `hotels:write` grant currently absent (OD-CRM-02).** | `RULE-CRM-10`, `RULE-CRM-11` |
+| `REQ-CRM-011` (Target) | Authorize on role × scope; carry scope (hotel or group) in the token. | MUST | Every hotel action checks both role and whether the actor's scope includes the target hotel/group; scope is a token claim. **Not implemented; no scope claim, no Regional Manager role (OD-CRM-05).** | `RULE-CRM-11` |
+
+## Business Rules
+
+| Rule | Preconditions | Outcome/invariant | Exceptions/precedence | Owner/source |
+|---|---|---|---|---|
+| `RULE-CRM-01` | Hotel row exists | Exactly the confirmed field set; German defaults applied on create; no room/floor/building/zone fields | `contact_email`/`contact_phone` exist in schema but are **not** read/written by the service (OD-CRM-03) | This module (Current: `schema.prisma:175-201`, `types.ts`) |
+| `RULE-CRM-02` | Authenticated request to a CRM hotel route | Request passes zod validation and the route's role/permission/scope guards before the service runs | Guard specifics per route (see Interfaces and Contracts) | This module (Current: `routes.ts`, `controller.ts`) |
+| `RULE-CRM-03` | Any Hotel state mutation | Performed only by `backend-crm`; other modules read Hotel, never write it | No cross-module writer of Hotel is observed | This module owns; `hotel-workers`/`work-requests` read (Current: `DEPENDENCY_GRAPH.yaml:433-438`) |
+| `RULE-CRM-04` | Hotel view/create/update/delete | An immutable `AuditLog` row is written (actor, role, action, `HOTEL`, hotel id, details, ip) | Audit uses shared `BaseService.logAudit`; `resource_type` string is `"HOTEL"` | This module writes; audit framework shared (Current: `service.ts`, `base-service.ts`) |
+| `RULE-CRM-05` | Delete requested | Soft-delete: `is_active=false`, `deleted_at=now()`; row retained | No hard delete; reactivation path via update `is_active=true` (no explicit un-delete of `deleted_at`) | This module (Current: `service.ts:101-108`) |
+| `RULE-CRM-06` | List requested | Filters by `search` (name/city, case-insensitive), `country` (case-insensitive), `is_active`; ordered by name asc; paginated | Service also forces `is_active=true` for non-admin/manager actors, but the route restricts listing to admin/manager, making that branch unreachable via HTTP (OD-CRM-07) | This module (Current: `service.ts:11-54`) |
+| `RULE-CRM-07` | Hotel created (target) | The hotel is associated with a dedicated Hotel Manager | Association mechanism undefined in repo (OD-CRM-01) | Target (CRR §11; PDD §4.3) |
+| `RULE-CRM-08` | Hotel Group defined (target) | ≥1 hotel per group; ≤1 group per hotel; one Regional Manager per group; shared billing | No group entity exists; billing owner undefined (OD-CRM-01, OD-CRM-10) | Target (CRR §11; PDD §4.3) |
+| `RULE-CRM-09` | Manager toggles pause (target) | New job creation for that hotel is suspended; `is_active` unchanged | Toggle field not implemented (OD-CRM-04); enforcement is in the job/work-request module, not here | Target (CRR §11); enforcement elsewhere |
+| `RULE-CRM-10` | Hotel creation attempted (target) | Allowed only for Admin/HQ; scoped managers denied creation and hotel-group modification | Current route allows role `manager` to create by role but the permission map denies managers `hotels:write` (OD-CRM-02) | Target (CRR §11 §177–§180) |
+| `RULE-CRM-11` | Any scoped hotel action (target) | Permitted only if actor role allows the action **and** actor scope includes the target hotel/group | Requires scope claim + Regional Manager role, both absent (OD-CRM-05) | Target (PDD §5.4) |
+
+## Ownership and Boundaries
+
+**Module owner:** `unassigned` — accountable owner assignment is reserved human authority (SYNC-001; no `CODEOWNERS`, empty `backend/package.json` author). Code home is the `crm` module (`backend/src/modules/crm`), registered id `backend-crm`, `lifecycle: active`, `implementation_status: active` (`MODULE_REGISTRY.yaml:47-57`). The documentation↔code mapping **crm (docs) ↔ `backend-crm` (code)** is asserted from repository evidence; the divergent "Hotels module" naming used elsewhere is flagged, not adopted (OD-CRM-06).
+
+**Owned state:**
+
+- **Current:** `Hotel` (`schema.prisma:175`; `state-hotel`, authoritative writer `backend-crm`, `DEPENDENCY_GRAPH.yaml:65,433`). All columns: id, name, city, country, address, timezone, contact_email?, contact_phone?, is_active, deleted_at?, created_at, updated_at.
+- **Target (proposed, unowned until OD-CRM-01 resolves):** a Hotel Group / Organization entity and hotel→group and hotel→dedicated-manager associations, plus a per-hotel pause-jobs flag.
+
+**Consumed state (owned elsewhere, referenced never redefined):** none at present — `backend-crm` has `dependencies: []` (`MODULE_REGISTRY.yaml:53`) and reads no other module's state. The Hotel record **references** Users only transitively through the roster/relations owned by other modules; CRM itself queries only `hotel` and (via `BaseService`) `auditLog`. Target scope/role data is owned by Authentication/User Management, not here.
+
+**Permitted writes:** only `Hotel` (create/update/soft-delete) and `AuditLog` (append-only, via shared `BaseService.logAudit`). This module never writes User, HotelWorker, WorkRequest, WorkerAssignment, Attendance, Quality, Rating, or Notification state.
+
+**Readers of owned state:** `backend-work-requests` (`service.ts:53`) and `backend-hotel-workers` (`service.ts:37,87`) read `Hotel`; `frontend-web` consumes the list endpoint (`frontend/lib/api.ts:332-333`, `/crm/hotels?per_page=100`).
+
+**Boundary/non-responsibilities:**
+
+- The **HotelWorker roster is not owned here.** Its routes are nested under `/crm/hotels/:hotel_id/workers` (`routes/v1/index.ts:25`) purely for URL hierarchy; the owning module is `backend-hotel-workers` and the owning state is `state-hotel-worker` (`DEPENDENCY_GRAPH.yaml:439-444`). Nesting ≠ ownership.
+- CRM does **not** implement authentication, the RBAC/scope framework, the role-permission map, job/work-request pausing enforcement, billing, or any employee/roster logic. It holds only the hotel reference record (and, on target, its organizational grouping) and the audit of hotel actions.
+- **Ownership challenge (Boundary Loop):** for every state below, owner/readers/writers/consumers are proven or escalated.
+  - `Hotel` — Owner: `backend-crm`. Writers: `backend-crm` only. Readers: `backend-work-requests`, `backend-hotel-workers`. Consumers: `frontend-web`. **Proven** (`DEPENDENCY_GRAPH.yaml:433-438`).
+  - `AuditLog` (hotel rows) — Owner: **UNKNOWN** (shared writer via `BaseService`; `DEPENDENCY_GRAPH.yaml:497-503`). CRM is one of many writers; single ownership is a human decision (OD-CRM-11 references SYNC-001).
+  - Hotel Group / Organization (target) — Owner: **unproven**; PDD §9.1 adds *scope* to User/Session but names **no group entity** in §9.3. Ownership cannot be proven → **OD-CRM-01**.
+
+## Interfaces and Contracts
+
+All contracts are **Current Repository Behaviour** unless marked *(target)*. Direction is relative to this module. Transport is REST/JSON over the platform response envelope; the API is unversioned in code beyond the `/api/v1` mount (`DEPENDENCY_GRAPH.yaml:297`). Authorization tokens are lowercased role strings (`auth/service.ts:40` — `user.role.toLowerCase()`), so route guards compare against lowercase `admin`/`manager`/etc.
+
+| Contract ID/version | Direction | Input | Output | Errors | Auth | Compatibility |
+|---|---|---|---|---|---|---|
+| `IF-CRM-ListHotels / v1` | Inbound (query) `GET /api/v1/crm/hotels` | `page`(≥1, def 1), `limit`(1–100, def 20), `search?`, `is_active?`('true'\|'false'), `country?` | `{status, data:Hotel[], pagination:{page,per_page,total,total_pages,has_next,has_prev}, meta}` | 401 unauthenticated; 403 wrong role/permission; 400 invalid query | `authMiddleware` + `requireRole(['admin','manager'])` + `requirePermission('hotels:read')` | Current (`routes.ts:11`, `controller.ts:11-27`, `service.ts:11-54`) |
+| `IF-CRM-GetHotel / v1` | Inbound (query) `GET /api/v1/crm/hotels/:hotel_id` | path `hotel_id` | `{status, data:Hotel, meta}`; writes a `VIEW` audit row | 401; 403 (fails `checkHotelAccess`); 404 not found | `authMiddleware` + `checkHotelAccess()` + `requirePermission('hotels:read')` | Current (`routes.ts:13`, `controller.ts:29-41`, `service.ts:56-64`) |
+| `IF-CRM-CreateHotel / v1` | Inbound (command) `POST /api/v1/crm/hotels` | body `{name, city, country?='Germany', address, timezone?='Europe/Berlin'}` | `201 {status, data:Hotel, meta}`; writes a `MODIFY`(create) audit row | 401; 403; 400 invalid body | `authMiddleware` + `requireRole(['admin','manager'])` + `requirePermission('hotels:write')` — **net effect Admin-only** because MANAGER lacks `hotels:write` (OD-CRM-02) | Current (`routes.ts:12`, `controller.ts:43-58`, `service.ts:66-79`) |
+| `IF-CRM-UpdateHotel / v1` | Inbound (command) `PATCH /api/v1/crm/hotels/:hotel_id` | path `hotel_id`; body any of `{name?, city?, country?, address?, timezone?, is_active?}` | `{status, data:Hotel, meta}`; writes a `MODIFY`(field keys) audit row | 401; 403; 404 not found; 400 invalid body | `authMiddleware` + `checkHotelAccess()` + `requireRole(['admin','manager'])` + `requirePermission('hotels:write')` — **net effect Admin-only** (OD-CRM-02) | Current (`routes.ts:14`, `controller.ts:60-75`, `service.ts:81-99`) |
+| `IF-CRM-DeleteHotel / v1` | Inbound (command) `DELETE /api/v1/crm/hotels/:hotel_id` | path `hotel_id` | `204 No Content`; soft-delete; writes a `DELETE` audit row | 401; 403 (non-admin); 404 not found | `authMiddleware` + `requireRole('admin')` (**no** `requirePermission` guard) | Current (`routes.ts:15`, `controller.ts:77-85`, `service.ts:101-108`) |
+| `IF-CRM-PauseJobs / v0` *(target)* | Inbound (command) | path `hotel_id`, `paused:boolean` | Hotel pause flag updated | scoped-manager / admin | **Not implemented** (OD-CRM-04); field absent | Target (CRR §11) |
+| `IF-CRM-Hotel Group CRUD / v0` *(target)* | Inbound (command/query) | group + member hotels + Regional Manager | Group record | Admin (create/modify group) | **Not implemented** (OD-CRM-01); no entity | Target (CRR §11; PDD §4.3) |
+
+**Observed contract drift (Reconciliation):**
+
+- **Manager write authority (OD-CRM-02):** `POST`/`PATCH` gate on `requireRole(['admin','manager'])` **and** `requirePermission('hotels:write')`, but `ROLE_PERMISSIONS.MANAGER` (`config/constants.ts:103-114`) grants only `hotels:read`, not `hotels:write`. A manager therefore passes the role gate and **fails** the permission gate, so today only Admin can create/update hotels. This *aligns* with CRR §11's "Admin/HQ only" **for creation**, but *contradicts* the target's "Regional/Property Managers may manage their assigned hotels" **for update** (REQ-CRM-010). The route's inclusion of `manager` in the role list is misleading dead intent.
+- **List permission vs. role gate (OD-CRM-07):** WORKER/CHECKER/MANAGER all hold `hotels:read` (`constants.ts:104,116,124`) and the service has a defensive "non-admin/manager sees only active" branch (`service.ts:26-28`), yet `GET /crm/hotels` is gated `requireRole(['admin','manager'])`, so Worker/Checker cannot list hotels over HTTP and that branch is unreachable. Intended audience for listing is unresolved.
+- **Query param drift (OD-CRM-08):** the frontend requests `/crm/hotels?per_page=100` (`frontend/lib/api.ts:333`) but the query schema names the field `limit` (`types.ts:21`); `per_page` is ignored and the list silently caps at the default 20. The response pagination echoes `per_page` (`service.ts:47`) while the request expects `limit` — asymmetric naming.
+- **Inactive-hotel read (OD-CRM-09):** `getHotel` does not filter `is_active`/`deleted_at` (`service.ts:56-64`), so a roster-ACTIVE worker passing `checkHotelAccess` could read a soft-deleted hotel.
+
+## Events
+
+| Event ID/version | Publisher | Trigger | Payload source | Consumers | Delivery/idempotency |
+|---|---|---|---|---|---|
+| — (none) | — | — | — | — | — |
+
+**No domain events are published or consumed by this module.** There is no event bus, broker, or pub/sub anywhere in the repository (`DEPENDENCY_GRAPH.yaml:409-417`: "publishes/consumes relationships are: NONE — verified absent"). The only externally-visible side effect of a hotel mutation is an append to `AuditLog` (`RULE-CRM-04`), which is a state write, not an event. Should the platform later introduce eventing (e.g. `HotelCreated`, `HotelDeactivated`, `HotelGroupChanged`), the contract/transport is an open decision (OD-CRM-12); none may be asserted now.
+
+## Dependencies
+
+Classification per edge — **Owns / Reads / Writes / Consumes / Produces / Compatibility / Failure**.
+
+| Dependency/edge | Reason | Contract | Compatibility | Failure behavior |
+|---|---|---|---|---|
+| `prisma-schema` (Hotel model) | **Owns/Writes** Hotel; **Reads** it back | `prisma-schema` (unversioned shared contract; `DEPENDENCY_GRAPH.yaml:327-343`) | compatible (reuse) | DB unavailable → all hotel operations fail (500); no degraded mode |
+| `base-service` | **Produces** audit rows via `logAudit`; obtains shared PrismaClient | `base-service` (unversioned; `DEPENDENCY_GRAPH.yaml:344-362`) | compatible (reuse) | Audit write failure propagates; a create/update whose audit throws would surface an error after the mutation (no compensating rollback observed) |
+| `auth-middleware` | **Consumes** authenticated identity (`req.auth`) on every route | `auth-middleware` (`DEPENDENCY_GRAPH.yaml:363-382`) | compatible (reuse) | No/invalid token → 401 before service runs |
+| `permissions-middleware` | **Consumes** `requireRole`, `requirePermission`, `checkHotelAccess` guards | `permissions-middleware` (`DEPENDENCY_GRAPH.yaml:382-398`) | compatible (reuse); **conditional** where the map/role gate disagree (OD-CRM-02, OD-CRM-07) | Guard denial → 403 before service runs |
+| `validation-middleware` | **Consumes** `validateBody`/`validateQuery` (zod) on list/create/update | `validation-middleware` (`DEPENDENCY_GRAPH.yaml:399-407`) | compatible (reuse) | Invalid input → 400 before service runs |
+| `backend-work-requests` → Hotel | Downstream **Reads** Hotel to scope work requests | reads-state (`DEPENDENCY_GRAPH.yaml:139-145,437`) | not-applicable (read-only) | Missing/renamed Hotel fields would break the consumer (backward-compat constraint on any target schema change) |
+| `backend-hotel-workers` → Hotel | Downstream **Reads** Hotel; roster routes nested under `/crm` | reads-state (`DEPENDENCY_GRAPH.yaml:202-208,437`) | not-applicable (read-only) | Same backward-compat constraint |
+| `frontend-web` → `/crm` | **Consumes** the hotel list for the work-request create form | consumes-api (`DEPENDENCY_GRAPH.yaml:268`; `frontend/lib/api.ts:331-333`) | unknown | `per_page` drift (OD-CRM-08); tolerant of pagination shape |
+| Authentication / User Management (scope+role) *(target)* | Target authorization needs scope claim + Regional Manager role | reused RBAC/scope (target) | conditional (scope model absent — OD-CRM-05) | Without scope, target REQ-CRM-011 cannot be enforced |
+
+**Dependency-loop conclusion:** CRM has **no outbound cross-module service calls** (no notification fan-out; `DEPENDENCY_GRAPH.yaml` lists none for `backend-crm`) and **no inbound state writes from other modules**. Its only couplings are (a) the shared platform contracts it consumes and (b) two downstream read-only consumers of the Hotel record. The static import graph is acyclic for this module.
+
+## State and Lifecycle
+
+### Hotel record lifecycle (Current)
+
+- **States:** `active` (`is_active=true`, `deleted_at=null`) and `inactive/soft-deleted` (`is_active=false`, `deleted_at` set).
+- **Transitions:**
+  - `(none) → active` — `createHotel` (Admin/HQ effective; `service.ts:66-79`).
+  - `active → active` — `updateHotel` field edits, including toggling `is_active` (`service.ts:81-99`).
+  - `active → inactive` — `deleteHotel` soft-delete (`service.ts:101-108`).
+  - `inactive → active` — possible only via `updateHotel` setting `is_active=true`; `deleted_at` is **not** cleared by any path (residual timestamp; note for reactivation semantics).
+- **Invariants:** rows are never physically removed; `deleted_at` is monotonic once set (no un-set path); German field defaults apply at create; no room/floor/building/zone attributes exist.
+- **Concurrency:** no optimistic-locking column on Hotel (unlike `WorkRequest.version`, `schema.prisma:235`); concurrent updates are last-write-wins. `updateHotel` reads-then-writes without a transaction, so a lost-update race is possible under simultaneous edits (repository fact; not a business rule).
+- **Retention:** soft-deleted hotels persist indefinitely in-repo; no retention tier is defined for Hotel (the PDD retention tiers, §5.6, target employee/shift/payroll data, not the hotel reference).
+
+### Target additions
+
+- **Hotel Group / Organization:** a new entity grouping hotels under a Regional Manager with shared billing; hotel↔group association and lifecycle undefined in the repo (**OD-CRM-01**).
+- **Pause-jobs flag:** a per-hotel boolean orthogonal to `is_active` (**OD-CRM-04**).
+- **Scope + Regional Manager role:** token scope claim and a fifth enum role (**OD-CRM-05**).
+
+### Migration Gaps (Current → Target)
+
+| Gap | Current | Target | Evidence |
+|---|---|---|---|
+| G-CRM-1 | No Hotel Group/Organization entity | Hotel Groups with one Regional Manager + shared billing | CRR §11; PDD §4.3 vs `schema.prisma` (no such model) |
+| G-CRM-2 | `MANAGER` lacks `hotels:write`; route lets `manager` in by role | Admin-only creation; scoped-manager update | `constants.ts:103-114`; `routes.ts:12,14` vs CRR §11 §177–§180 |
+| G-CRM-3 | No pause-new-jobs field | Per-hotel pause toggle | `schema.prisma:175-201` vs CRR §11 §170 |
+| G-CRM-4 | Enum roles = WORKER/CHECKER/MANAGER/ADMIN; no scope claim | Five roles incl. Regional Manager; role×scope in token | `schema.prisma:22-27` vs CRR §1, PDD §5.3–§5.4 |
+| G-CRM-5 | `contact_email`/`contact_phone` exist but unused by service | Wired or removed | `schema.prisma:182-183` vs `service.ts` (never referenced) |
+| G-CRM-6 | Dedicated-manager association absent | Each hotel has a dedicated manager | CRR §11 §167 vs `schema.prisma` (no hotel→manager FK) |
+| G-CRM-7 | Shared billing absent | Group-level shared billing | CRR §11 §169 (owner undefined — OD-CRM-10) |
+
+These are **pre-launch, additive** changes (PDD §10: no production data, no dual-run migration). None is a destructive rewrite of existing Hotel rows; the Hotel record is retained and extended (PDD §9.1 "Hotel … Keep").
+
+## Failure, Security, Privacy, and Performance
+
+**Failure modes/recovery:**
+
+- DB unavailable → hotel operations return 500; no degraded/cached mode (single Prisma dependency, `DEPENDENCY_GRAPH.yaml:293`).
+- Update/delete on a missing hotel → `NotFoundError` → 404 (`service.ts:60,83,103`).
+- Concurrent hotel updates → last-write-wins; possible lost update (no version column; see Concurrency).
+- Audit-write failure during a mutation → error surfaces after the state change with no compensating rollback (observed control flow; `service.ts:77,97,107`).
+
+**Trust boundaries/authorization:** every route sits behind `authMiddleware`; per-route `requireRole`/`requirePermission`/`checkHotelAccess` enforce deny-by-default (`routes.ts:8-15`). Tokens carry a lowercased role and a flat `permissions[]` list; `admin:*`/wildcards short-circuit permission checks (`permissions.ts:18,30-40`). **Current authorization gaps:** the manager write contradiction (OD-CRM-02); the list role/permission mismatch (OD-CRM-07); a dead `super_admin` branch (`permissions.ts:18`) referencing a role absent from the enum; and `DELETE` guarded by role only, with no `requirePermission('hotels:delete')` although the permission exists for ADMIN (`constants.ts:92`). **Target:** two-dimensional role×scope with scope in the token (PDD §5.4) — unimplemented (OD-CRM-05).
+
+**Data classification/retention:** Hotel data is **operational reference data**, not personal/special-category data — no GDPR special-category fields live on the Hotel record (contrast the employee record). `contact_email`/`contact_phone` are business-contact fields (currently unused). Germany-only operation; no hotel data leaves the EU/EEA (PDD §5.7). No retention tier applies to the hotel reference; soft-deleted rows are retained for audit continuity.
+
+**Observability/audit:** hotel view/create/update/delete are individually audit-logged with actor, role, action, resource id, and details via the shared immutable `AuditLog` (`RULE-CRM-04`); there is no admin-facing log viewer (consistent with CRR §30 platform stance). Request logging and request-id propagation are provided globally (`app.ts`; `meta.request_id` in every envelope).
+
+**Performance budgets/workload:** no explicit SLO is defined in the authoritative documents. Hotel reads are indexed on `country`, `is_active`, and `(city, country)` (`schema.prisma:198-200`); list is paginated (max `limit` 100) and ordered by name. The workload is small and low-churn (a bounded, slowly growing set of properties; CRR §11 "scale over time"). Concrete budgets are deferred to implementation and not asserted here (Constitution §6).
+
+## Rollout and Compatibility
+
+This module is part of the marketplace → Workforce Operations Platform forward refactor (pre-launch; no production data, so no dual-run migration; PDD §10). The current Hotel CRUD is already live and stable; target work is **additive**: introduce the Hotel Group/Organization entity and scope model (Phase 1 foundation realignment — Regional Manager role + scope; PDD §10), add the pause-jobs flag, and reconcile the manager write-authority contradiction.
+
+**Feature flags:** new capabilities sit behind the existing `FEATURE_*` env-flag convention for safe partial deploys (PDD §10).
+
+**Backward compatibility:** any change to the Hotel field set is constrained by two downstream readers (`work-requests`, `hotel-workers`) and the frontend list consumer; additive columns (pause flag, group FK) are safe; renames/removals of read fields are breaking and must be sequenced. Removing a hotel remains a non-destructive soft-delete (`RULE-CRM-05`).
+
+**Rollback:** because target changes are additive and pre-launch, rollback is disabling the feature flag and redeploying the prior build (PDD §10).
+
+**Removal criteria:** not applicable — the hotel reference and its organizational grouping are foundational, permanently-owned domain state.
+
+## Validation Plan
+
+| Criterion | Test level/check | Environment/data | Evidence required |
+|---|---|---|---|
+| Hotel field set + German defaults; no room/floor/zone field (`REQ-CRM-001`) | Unit + schema check | Seed hotels | Field presence/absence + default assertions (extends `__tests__/hotel.test.ts`) |
+| Five CRUD routes behave per envelope; list filters/pagination correct (`REQ-CRM-002`) | Unit + integration | Multi-hotel seed | Route responses; filter/pagination coverage |
+| Only `backend-crm` writes Hotel; consumers read-only (`REQ-CRM-003`) | Static/dependency check | Repo graph | No cross-module Hotel write; `DEPENDENCY_GRAPH.yaml` conformance |
+| View/create/update/delete each emit the correct audit action (`REQ-CRM-004`) | Unit | Mock Prisma (as in existing test) | Audit-call assertions per action |
+| Delete is soft (is_active=false, deleted_at set); row retained (`REQ-CRM-005`) | Unit | Seed hotel | Update-args assertion (existing test covers is_active; extend for deleted_at) |
+| Creation restricted to Admin/HQ; non-Admin denied (`REQ-CRM-009`) | Authorization | Admin vs manager tokens | Deny evidence for manager create; **blocked on OD-CRM-02** |
+| Scoped manager may update within scope, not create/modify group (`REQ-CRM-010`) | Authorization | Scoped-manager fixtures | Access-matrix results; **blocked on OD-CRM-05, OD-CRM-02** |
+| Pause-jobs toggle suspends new jobs without deactivating (`REQ-CRM-008`) | Integration | Hotel + job flow | Toggle behavior; **blocked on OD-CRM-04** |
+| Hotel Group grouping + one Regional Manager + shared billing (`REQ-CRM-007`) | Integration | Group fixtures | Grouping/authority evidence; **blocked on OD-CRM-01, OD-CRM-10** |
+| Role×scope authorization enforced; scope in token (`REQ-CRM-011`) | Authorization | Multi-scope tokens | Scope-inclusion checks; **blocked on OD-CRM-05** |
+
+## Risks, Assumptions, and Open Decisions
+
+| ID | Type | Description | Evidence/impact | Owner | Resolution/status |
+|---|---|---|---|---|---|
+| `OD-CRM-01` | Open decision | **Hotel Group / Organization data model.** CRR §11 requires Hotel Groups; PDD §9.1 adds *scope* to User/Session but names **no** group entity in §9.3. Whether the "Organization" is a first-class model owned by CRM, or purely a scope attribute on accounts, is unproven. | Blocks REQ-CRM-006/007, RULE-CRM-07/08; defines whether CRM owns a second entity | Architecture/Human | **Open — blocks target ownership** |
+| `OD-CRM-02` | Repository contradiction | **Manager hotel-write authority.** Routes gate create/update on `requireRole(['admin','manager'])` **and** `requirePermission('hotels:write')`, but `MANAGER` lacks `hotels:write`; net effect is Admin-only. Contradicts REQ-CRM-010 (managers manage assigned hotels). | `routes.ts:12,14` vs `constants.ts:103-114`; changes who can create/update hotels | Human authority | **Open — repository contradiction requiring decision** |
+| `OD-CRM-03` | Open decision | **Unused contact fields.** `contact_email`/`contact_phone` exist on Hotel but are never read/written by the service. Wire into CRUD or remove. | `schema.prisma:182-183` vs `service.ts` | Product/Human | Open — affects REQ-CRM-001 field set |
+| `OD-CRM-04` | Open decision / gap | **Pause-new-jobs toggle** confirmed by CRR §11 §170 but not implemented (no field, no route). | `schema.prisma` (absent) | Product/Human | Open — blocks REQ-CRM-008 |
+| `OD-CRM-05` | Open decision / gap | **Scope + Regional Manager role** absent: enum has four roles, tokens carry no scope. Target role×scope authorization cannot be enforced. | `schema.prisma:22-27`; PDD §5.3–§5.4 | Architecture/Human | Open — blocks REQ-CRM-011, part of REQ-CRM-010 |
+| `OD-CRM-06` | Documentation conflict | **Module naming.** SPEC-EMP-001 and an empty `docs/03-modules/hotels/` refer to a "Hotels module"; repository truth is code module `backend-crm`. This spec adopts **crm ↔ `backend-crm`** and treats "Hotels module" as an alias to reconcile. | `employee-management/MODULE_SPEC.md:45`; `MODULE_REGISTRY.yaml:47` | Docs owner/Human | Open — terminology reconciliation (see Knowledge Deltas) |
+| `OD-CRM-07` | Repository contradiction | **Who may list hotels.** Worker/Checker hold `hotels:read` and the service has a defensive active-only branch, but `GET /crm/hotels` is role-gated to admin/manager, making that branch unreachable and denying read-holders. | `constants.ts:104,116,124`; `routes.ts:11`; `service.ts:26-28` | Human authority | Open — intended list audience unresolved |
+| `OD-CRM-08` | Drift | **Query param mismatch.** Frontend sends `per_page`; schema expects `limit`; `per_page` ignored (silent cap at 20). Response echoes `per_page`. | `frontend/lib/api.ts:333`; `types.ts:21`; `service.ts:47` | Human/Frontend | Open — API contract alignment |
+| `OD-CRM-09` | Risk | **Inactive-hotel read.** `getHotel` does not filter `is_active`/`deleted_at`; a roster-ACTIVE worker could read a soft-deleted hotel. | `service.ts:56-64`; `permissions.ts:96-156` | Human/Security | Open — low impact; confirm intent |
+| `OD-CRM-10` | Open decision | **Shared-billing ownership.** CRR §11 §169 names shared billing for a Hotel Group; no billing module/model exists. Whether CRM owns billing metadata or a separate module does is undefined. | CRR §11; `schema.prisma` (absent) | Product/Architecture/Human | Open — affects REQ-CRM-007 boundary |
+| `OD-CRM-11` | Assumption | **Owner unassigned.** No `CODEOWNERS`; empty package author (SYNC-001). AuditLog authoritative writer also UNKNOWN. | `DEPENDENCY_GRAPH.yaml:497-503` | Human | Open — freeze requires a named owner/approver |
+| `OD-CRM-12` | Open decision | **Formal interface/event contract versions** are unversioned; no event schema. Concrete versioned signatures and any future hotel events are deferred. | `DEPENDENCY_GRAPH.yaml:327-407,409-417` | Architecture/Human | Open — affects Interfaces, Events |
+| `OD-CRM-13` | Note | **Concurrency.** Hotel has no optimistic-lock column (unlike `WorkRequest.version`); updates are last-write-wins. | `schema.prisma:175-201,235` | Human | Note — confirm acceptable for low-churn hotel data |
+
+## Proposed Knowledge Deltas
+
+- **`MODULE_REGISTRY.yaml`:** on freeze, set `specification` for `backend-crm` (`:56`) to `SPEC-CRM-001`. Record the docs↔code mapping **crm ↔ `backend-crm`** as asserted (not open). Do not alter its verified `active`/`active` lifecycle/status without human confirmation (SYNC-001).
+- **`DEPENDENCY_GRAPH.yaml`:** no new *code* edges are asserted (CRM has none beyond the observed shared-contract consumers and the two Hotel readers, already recorded). On resolution of OD-CRM-01, add the Hotel Group entity as a new `state-domain` owned by `backend-crm` (or by the module the human decision names) — **not before**.
+- **`TERMINOLOGY.md`:** promote, on human confirmation, canonical terms **Hotel (Property)**, **Hotel Group (Organization)**, **Regional Manager**, **Scope (role×scope)**, **Pause new jobs**, **Soft-delete**; record the alias **"Hotels module" → `crm`** so the divergent documentation name is not silently normalized to a nonexistent separate module (OD-CRM-06). Resolve the currently "unresolved" role tokens (`Worker`/`Checker`/`Manager`/`Admin`, `TERMINOLOGY.md:25-28`) against the confirmed five-role model — flag that **Regional Manager** is a target role absent from the enum.
+- **`DECISION_INDEX.md`:** register the open architecture/contradiction decisions OD-CRM-01, OD-CRM-02, OD-CRM-05, OD-CRM-07, OD-CRM-10, OD-CRM-12 as pending decision records.
+- **`SYNC_STATE.yaml`:** record this spec as `REVIEW` pending G4 independent reviews (architecture, dependency, consistency, security) and G2 human approval; owner assignment remains blocked (SYNC-001).
+
+## Review and Change Log
+
+| Version | Date | Change | Findings resolved | Approver |
+|---|---|---|---|---|
+| 0.1.0 | 2026-07-06 | Initial canonical-template authoring of SPEC-CRM-001 from the current worktree (Current Repository Behaviour) and CRR/PDD (Target Behaviour), per the specification-freeze workflow. Documents Hotel CRUD as implemented; separates Current / Target / Migration Gap planes; records the Hotel-vs-CRM naming reconciliation and the manager-write contradiction. Freeze candidate submitted for G4 independent review and G2 human approval. Author cannot self-approve blocking findings (Constitution §12); **FROZEN status is withheld pending human approval and disposition of OD-CRM-01, OD-CRM-02, OD-CRM-05, OD-CRM-10, OD-CRM-11.** | — (none dispositioned yet) | — (pending) |
