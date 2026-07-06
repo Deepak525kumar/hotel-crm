@@ -40,6 +40,23 @@ Evaluate each terminal workflow for:
 5. Repeated synchronization failures.
 6. Repeated documentation drift.
 
+## Execution Graph
+
+```
+Lead Architect (invoked by postflight on terminal state)
+  ↓ terminal workflow gate reports + findings + escalations + sync records + prior IMPROVEMENT_LOG entries
+Lead Architect — collect evidence for the terminal workflow
+  ↓ ART-IMP-000 (evidence bundle, revision-bound; read-only)
+  ├─ (parallel across signal classes 1..6) classify each observed signal with evidence
+  │      (independent evaluation per class; source owners consulted for signal accuracy where needed)
+       ↓ SYNC-learn-1 (all six signal-class evaluations complete)
+Lead Architect — match against existing IMP-* records; increment occurrence counts (serialized to keep counts deterministic)
+  ↓ ART-IMP-001 (updated or newly opened IMP-* records) or "no signals" record
+Lead Architect — mark records crossing recurrence threshold as `escalated` with proposed change
+  ↓ ART-IMP-002 (escalation proposals, if any)
+Lead Architect — hand escalations to human under Constitution §20/§22; leave policy/workflows/gates unchanged
+```
+
 ## Execution Order
 
 1. Collect gate reports, findings, escalations, and sync records for the terminal workflow.
@@ -49,6 +66,66 @@ Evaluate each terminal workflow for:
 5. Mark records crossing their recurrence threshold as `escalated` with a proposed change.
 6. Leave policy, workflows, and gates unchanged; hand escalations to the human.
 
+## Agent I/O Contracts
+
+### Lead Architect
+
+- **Inputs:** Terminal workflow's gate reports; findings register; escalation records; synchronization records; `../knowledge/IMPROVEMENT_LOG.yaml`; canonical policy pointers (no policy mutation).
+- **Outputs:** `ART-IMP-000` evidence bundle; `ART-IMP-001` opened/updated `IMP-*` records in `IMPROVEMENT_LOG.yaml`; `ART-IMP-002` escalation proposals for records crossing recurrence threshold.
+- **Next Consumer:** Human (for accepting any framework/constitutional change under Constitution §20/§22); postflight (terminal state).
+
+### Source owners (consulted only for signal accuracy)
+
+- **Inputs:** The specific signal question and its evidence.
+- **Outputs:** Confirmation or correction of signal accuracy (not policy).
+- **Next Consumer:** Lead Architect.
+
+### Human (accepting a proposal)
+
+- **Inputs:** `ART-IMP-002` escalation proposal + supporting evidence.
+- **Outputs:** Accept / defer / reject decision under Constitution §20 / §22.
+- **Next Consumer:** Documentation workflow (for any accepted constitutional/framework change).
+
+## Artifact Handoffs
+
+| Artifact ID | Producer | Consumes | Produces | Next Consumer |
+|---|---|---|---|---|
+| `ART-IMP-000` | Lead Architect | terminal workflow evidence (read-only) | revision-bound evidence bundle | Signal-class classifiers (Lead Architect, one per class) |
+| `ART-IMP-001` | Lead Architect | classified signals + existing `IMP-*` records | opened/updated `IMP-*` records in `IMPROVEMENT_LOG.yaml` | Recurrence-threshold check |
+| `ART-IMP-002` | Lead Architect | `IMP-*` records crossing threshold | escalation proposals under Constitution §20/§22 | Human (accept/defer/reject) |
+
+## Synchronization Points
+
+- **SYNC-learn-1:** Lead Architect waits until all six signal-class evaluations return before matching against existing `IMP-*` records. Record reconciliation is serialized to keep occurrence counts deterministic (parallel writes to `IMPROVEMENT_LOG.yaml` are forbidden).
+
+## Context Packages
+
+### Lead Architect receives
+
+- The terminal workflow's identifiers and evidence citations only (gate reports, findings, escalations, sync records).
+- Current `../knowledge/IMPROVEMENT_LOG.yaml`.
+- Canonical policy pointers (Constitution §20/§22); no policy content for mutation.
+
+### Source owners receive (consulted step)
+
+- Single signal question + its evidence; nothing else.
+
+### Human receives (accepting a proposal)
+
+- `ART-IMP-002` proposal + supporting evidence; explicit reference to Constitution §20/§22.
+
+## Status Report
+
+Emit the canonical `STATUS` shape from [README.md](README.md#canonical-status-shape) with:
+
+- `Workflow: learning`
+- `Current Gate: none` (this workflow gates nothing).
+- `Current Agent: Lead Architect`.
+- `Completed`: closed `ART-IMP-*` IDs.
+- `Waiting On`: SYNC-learn-1; consulted source-owner confirmation; human decision on an escalated proposal.
+- `Blockers`: missing terminal-workflow evidence (`BLOCKED`; record the gap rather than invent a signal).
+- `Next Action`: signal reconciliation, threshold check, or escalation to human.
+
 ## Parallel Activities
 
 Signal collection across independent terminal workflows MAY run in parallel; record reconciliation is serialized to keep occurrence counts deterministic.
@@ -56,6 +133,11 @@ Signal collection across independent terminal workflows MAY run in parallel; rec
 ## Validation Gates
 
 This workflow gates nothing and grants no approval. It contributes only advisory records; a recorded improvement never blocks or bypasses G0–G9.
+
+### Required Inputs → Produced Outputs
+
+- **Advisory only** inputs: `ART-IMP-000` evidence bundle bound to the terminal workflow revision.
+- **Advisory only** outputs: `ART-IMP-001` improvement records; `ART-IMP-002` escalation proposals when a threshold is crossed. Neither output authorizes a workflow transition.
 
 ## Escalation Conditions
 

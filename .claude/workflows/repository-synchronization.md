@@ -29,6 +29,22 @@ Branch, `HEAD`, default branch, remote/fetch status, worktree changes, relevant 
 
 Lead Architect (owner); human when remote access or change ownership requires authorization.
 
+## Execution Graph
+
+```
+Lead Architect
+  ├─ (parallel) local inspection ─┐
+  └─ (parallel) active-document inventory ─┤
+                                           ↓ SYNC-repo-1
+                                Lead Architect (remote comparison, network-permitting)
+                                           ↓ ART-REPO-001 (Repository State Record)
+                                Lead Architect (classify uncommitted files)
+                                           ↓ ART-REPO-002 (protected-change list)
+                                Lead Architect (locate active docs, specs, PRs, historical)
+                                           ↓ ART-REPO-003 (source manifest + divergence report)
+                                pre-flight scope validation (consumer)
+```
+
 ## Execution Order
 
 1. Verify repository root and version-control system.
@@ -39,6 +55,47 @@ Lead Architect (owner); human when remote access or change ownership requires au
 6. Locate active documentation, frozen specs, open proposals, and historical paths.
 7. Produce source/evidence manifest and synchronization status.
 
+## Agent I/O Contracts
+
+### Lead Architect
+
+- **Inputs:** Repository root; local git state; remote metadata (when permitted); active-doc paths; open-PR list; `../knowledge/PROJECT_PROFILE.md`.
+- **Outputs:** `ART-REPO-001` Repository State Record; `ART-REPO-002` protected-change list; `ART-REPO-003` source manifest and divergence report.
+- **Next Consumer:** Pre-flight workflow (scope validation and context packaging steps).
+
+## Artifact Handoffs
+
+| Artifact ID | Producer | Consumes | Produces | Next Consumer |
+|---|---|---|---|---|
+| `ART-REPO-001` | Lead Architect | git worktree, remotes, HEAD | Repository State Record (branch, HEAD, default, fetch status) | Pre-flight (`ART-PREFLIGHT-*`) |
+| `ART-REPO-002` | Lead Architect | worktree diff, ownership signals | Protected-change list (task-owned / user-owned / generated / unknown) | Pre-flight; self-healing on `unknown` |
+| `ART-REPO-003` | Lead Architect | active docs, frozen specs, open PRs, historical paths | Source manifest + divergence report | Pre-flight; Consistency Reviewer for stale references |
+
+## Synchronization Points
+
+- **SYNC-repo-1:** Lead Architect waits until (a) local repository inspection and (b) active-document inventory both complete before starting remote comparison. Only Lead Architect evaluates the join.
+
+## Context Packages
+
+### Lead Architect receives
+
+- Repository root path.
+- Any prior `../knowledge/SYNC_STATE.yaml` entry for this repository.
+- Network availability signal (permit / deny) for remote refresh.
+- Explicit exclusion of unrelated worktree hunks (preserved verbatim).
+
+## Status Report
+
+Emit the canonical `STATUS` shape from [README.md](README.md#canonical-status-shape) with:
+
+- `Workflow: repository-synchronization`
+- `Current Gate: G0-repository-check`
+- `Current Agent: Lead Architect`
+- `Completed`: closed `ART-REPO-*` IDs.
+- `Waiting On`: remote fetch, `unknown` change classification, or SYNC-repo-1.
+- `Blockers`: unknown dirty-change ownership; ambiguous baseline; unavailable required network.
+- `Next Action`: next `ART-REPO-*` handoff or pre-flight resumption.
+
 ## Parallel Activities
 
 Local repository inspection and active-document inventory MAY run in parallel. Remote comparison waits only when network metadata is required.
@@ -46,6 +103,11 @@ Local repository inspection and active-document inventory MAY run in parallel. R
 ## Validation Gates
 
 Pre-flight repository check passes when decisions are bound to a known revision and unrelated/unknown changes are protected.
+
+### Required Inputs → Produced Outputs
+
+- **G0-repository-check** inputs: `ART-REPO-001`, `ART-REPO-002`, `ART-REPO-003`.
+- **G0-repository-check** outputs: gate status recorded on the pre-flight record; drift entries opened in `../knowledge/SYNC_STATE.yaml` when a divergence is detected.
 
 ## Escalation Conditions
 
