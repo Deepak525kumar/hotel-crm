@@ -14,10 +14,16 @@ status: verified-inventory
 # consumes-api, and operations deploys-to edges -- are recorded authoritatively in
 # DEPENDENCY_GRAPH.yaml, not duplicated here. All modules share Prisma/PostgreSQL
 # via a shared BaseService (shared infrastructure, not a module contract).
-# No frozen module specification exists for any registered module: the only
-# MODULE_SPEC.md files (docs/03-modules/employee-management, .../onboarding) are
-# non-frozen business-spec rewrites with [OPEN] items and do not map to a
-# registered module id, so `specification` is UNKNOWN for every module.
+# No frozen module specification exists for any registered module (G2 freeze is
+# reserved human authority). REVIEW-status specifications now exist and are
+# reflected below for backend-work-requests/work-applications/assignments
+# (SPEC-JOB-DISPATCH-001@0.2.0) and backend-notifications (SPEC-NOTIF-001@0.1.1).
+# Known drift (non-blocking, out of scope for the notifications spec-freeze
+# session that added this note): docs/03-modules/attendance/MODULE_SPEC.md and
+# docs/03-modules/quality/MODULE_SPEC.md were authored and merged but this
+# registry's `specification` field for backend-attendance/backend-quality was
+# never updated to reflect them — still reads UNKNOWN below. A future
+# synchronization pass should close this gap for those two modules.
 
 modules:
   - id: backend-auth
@@ -149,7 +155,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-NOTIF-001@0.1.1 (REVIEW)  # docs/03-modules/notifications/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); G6-doc PASS_WITH_ACTIONS; NOT frozen (G2 human)
     evidence: backend/src/routes/v1/index.ts:32
 
   - id: backend-analytics
@@ -254,4 +260,5 @@ unresolved:
   - All accountable owners require authoritative human assignment (SYNC-001, blocked); no CODEOWNERS exists and backend/package.json "author" is empty.
   - backend-chatbot and backend-geo are declared-but-unimplemented stubs (directories contain only .placeholder; not route-registered).
   - backend-hr and backend-calendar are active but lack a dedicated test file in backend/src/__tests__/.
-  - No frozen module specification exists yet for any registered module; the only MODULE_SPEC.md files (docs/03-modules/employee-management, docs/03-modules/onboarding) are non-frozen business-spec rewrites with [OPEN] items and do not map to a registered module id, so specification is UNKNOWN throughout.
+  - No frozen module specification exists yet for any registered module (G2 freeze is reserved human authority); REVIEW-status specifications exist for job-dispatch (backend-work-requests/work-applications/assignments, SPEC-JOB-DISPATCH-001@0.2.0) and backend-notifications (SPEC-NOTIF-001@0.1.1).
+  - docs/03-modules/attendance/MODULE_SPEC.md (SPEC-ATT-001) and docs/03-modules/quality/MODULE_SPEC.md (SPEC-QUAL-001, v0.1.1) exist and were merged (PRs #109, #110, #111) but this registry's `specification` field for backend-attendance/backend-quality was never synchronized to reflect them — still UNKNOWN below; a future synchronization pass should close this gap.
