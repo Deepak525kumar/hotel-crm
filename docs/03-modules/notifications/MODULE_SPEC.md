@@ -17,10 +17,10 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-NOTIF-001 / 0.1.0` |
+| Spec ID / version | `SPEC-NOTIF-001 / 0.1.1` |
 | Status | `REVIEW` |
 | Owner | `unassigned (SYNC-001, human authority required)` |
-| Authors / reviewers | Author: Module Author agent. Reviewers: pending (G4 not yet run). |
+| Authors / reviewers | Author: Module Author agent. Reviewers: G4 complete — architecture, dependency, consistency, security, and performance reviewers all returned `PASS_WITH_ACTIONS`, zero Critical/High findings. Author-fixable corrections applied in `0.1.1`; see Review and Change Log. |
 | Repository revision | `efde2a9f0393cccc2168cd1d2d89ea9cbc21033a` (current HEAD, branch `claude/notifications-spec-freeze-bpxz57`) |
 | Approved by / at | Not approved. G2 freeze is reserved human authority; do NOT mark FROZEN. |
 | Supersedes | None — first specification for `backend-notifications` (registry `specification: UNKNOWN` prior; `MODULE_REGISTRY.yaml:152`). |
@@ -125,7 +125,7 @@ review, or resolving any open decision below.
 | `TREQ-005` declining the daily GDPR consent gate blocks access AND notifies the manager | CONFIRMED §18, §24; PIVOT §4.8, §7.6 | Confirmed authority | Target; unbuilt (MIG-GAP-05) |
 | `TREQ-006` marking a day sick or vacation notifies the manager (informational, no approval) | CONFIRMED §22; PIVOT §4.5, §7.2 | Confirmed authority | Target; unbuilt (MIG-GAP-06) |
 | `TREQ-007` scheduled job reminds the responsible manager before the 1-year contract end and again before the 2-year end; none once permanent | CONFIRMED §9; PIVOT §5.6, §9.1 | Confirmed authority | Target; unbuilt (MIG-GAP-07) |
-| `TREQ-008` broadcast job request notifies ONLY workers with matching skill who are free that day ("job available") | CONFIRMED §13; PIVOT §4.4, §5.5, §7.3, Section 6 diagram | Confirmed authority | Target; unbuilt (MIG-GAP-08); cross-ref `docs/03-modules/job-dispatch/MODULE_SPEC.md` TREQ-003 |
+| `TREQ-008` broadcast job request notifies ONLY workers with matching skill who are free that day ("job available") | CONFIRMED §13; PIVOT §4.4, §5.5, §7.3 | Confirmed authority | Target; unbuilt (MIG-GAP-08); cross-ref `docs/03-modules/job-dispatch/MODULE_SPEC.md` TREQ-003 |
 | `TREQ-009` when a broadcast skill's slots fill, later responders get an explicit "requirement fulfilled" notification (not silence, not an error) | CONFIRMED §13; PIVOT §4.4, §7.3, Section 8.2 sequence diagram | Confirmed authority | Target; unbuilt (MIG-GAP-09); cross-ref job-dispatch TREQ-005 |
 | `TREQ-010` unfilled broadcast job request auto-closes after 6h (or manual close) and notifies the manager | CONFIRMED §13; PIVOT §4.4, §5.6, Section 6 diagram (`AC --> PG`) | Confirmed authority | Target; unbuilt (MIG-GAP-10); cross-ref job-dispatch TREQ-006 |
 | `TREQ-011` delivery channel is push-only, system-wide; no SMS; no self-service notification-settings screen | CONFIRMED §18; PIVOT §4.8, §5.2, §11 | Confirmed authority | Target; unbuilt (MIG-GAP-11) |
@@ -192,7 +192,7 @@ as evidence, not silently accepted — see Risks/Open Decisions `OQ-NOTIF-03`.
 | TREQ-009 | Post-fill broadcast responders receive an explicit "requirement fulfilled" message. | Must | A response after a skill's slots are full → sender gets a distinct, named notification, not silence and not an HTTP error. | TRULE-003 |
 | TREQ-010 | Broadcast auto-close notifies the manager. | Must | 6h after creation (or manual close), an unfilled job request closes and the manager is notified. | TRULE-001 |
 | TREQ-011 | All new and existing notification delivery is push-only. | Must | No notification is delivered via email or SMS; APNs/FCM is the sole external delivery mechanism; no self-service settings screen is built. | TRULE-005 |
-| TREQ-012 | `NotificationChannel` usage narrows to `{IN_APP, PUSH}` in practice for this capability. | Should | New code paths never set `channel=EMAIL` or `channel=SMS` on a `Notification` row (author's reconciliation of TREQ-002/011; `OQ-NOTIF-01`). | TRULE-002, TRULE-005 |
+| TREQ-012 | `NotificationChannel` usage narrows to `{IN_APP, PUSH}` in practice for this capability. `[interpretation OPEN, see OQ-NOTIF-01]` | Should | New code paths never set `channel=EMAIL` or `channel=SMS` on a `Notification` row (author's reconciliation of TREQ-002/011; `OQ-NOTIF-01`). | TRULE-002, TRULE-005 |
 
 ## Business Rules
 
@@ -346,6 +346,13 @@ spec beyond the terminology/graph promotions in Proposed Knowledge Deltas):
 | `edge-mobile-worker-notifications` | Employee App lists/marks-read | `GET /notifications`, `POST /:id/read` | baseline/UNKNOWN | Client-side error surfacing only |
 | `edge-mobile-checker-notifications` | Checker App lists/marks-read | `GET /notifications`, `POST /:id/read` | baseline/UNKNOWN | Client-side error surfacing only |
 
+**Graph revision note:** `DEPENDENCY_GRAPH.yaml`'s header records `observed_revision:
+5b16be40ef0aa9ac3f186e7323b960886a6153c2` (`DEPENDENCY_GRAPH.yaml:3`), an earlier revision than
+this spec's Document Control repository revision `efde2a9f0393cccc2168cd1d2d89ea9cbc21033a`. All
+edges cited above were independently re-verified as still accurate at review time — this is a
+traceability note flagging the revision gap so a reader does not have to independently diff the
+two revisions to establish graph currency, not a correction of substance.
+
 `[CURRENT]` client consumers (verified):
 - `frontend-web` — `notificationsApi.list`/`markAsRead` (`frontend/lib/api.ts:321-329`).
 - `mobile-worker` — `api.notifications.list`/`markRead` (`mobile/worker-app/src/lib/api.ts:218-221`).
@@ -368,14 +375,25 @@ spec beyond the terminology/graph promotions in Proposed Knowledge Deltas):
 
 `[TARGET]` new dependencies (unbuilt):
 - **APNs/FCM client libraries** — to replace the `sendPushNotification` stub (PIVOT §5.2, §11).
-- **Scheduled-job runtime** (node-cron / BullMQ on Redis) — for the rework 20-minute timer and
-  contract-expiry-reminder job that both notify through this module (PIVOT §5.6). Neither job
-  exists in the repository today.
+- **Scheduled-job runtime** (node-cron / BullMQ on Redis) — for the rework 20-minute timer
+  (TREQ-003) and contract-expiry-reminder job (TREQ-007) that both notify through this module
+  (PIVOT §5.6). Neither job exists in the repository today. **Which module hosts/owns the timer
+  that decides WHEN to fire is UNSTATED by either PIVOT or CONFIRMED and is carried as an
+  explicit open decision, `OQ-NOTIF-08`.** Listing this runtime as a dependency of
+  `backend-notifications` does not mean this module hosts the scheduler: this module's own
+  "Ownership and Boundaries" section states it is a pure sink that "does not decide WHEN ... to
+  notify" — if `backend-notifications` itself hosted the timer, that would contradict its own
+  declared boundary. No owner is invented here; see `OQ-NOTIF-08`.
 - **New producer call sites** in modules that do not currently import `notificationService`:
-  `auth` (failed-login), `calendar` (sick/vacation — module currently a stub per
-  `MODULE_REGISTRY.yaml:39`, `lifecycle: stub`), a consent-gate module (does not exist yet),
-  `hr` (contract-expiry — module currently `active-no-tests`, no contract model exists yet),
-  and job-dispatch's broadcast flow (`work-requests`/successor, per job-dispatch spec TREQ-002/003).
+  `auth` (failed-login), `calendar` (sick/vacation — `MODULE_REGISTRY.yaml:167-177` records
+  `lifecycle: active, implementation_status: active-no-tests` for this module, but every
+  `calendar/service.ts` method throws `NotImplementedError` in practice, and
+  `DEPENDENCY_GRAPH.yaml:39` independently tags it `lifecycle: stub`; both sources are cited
+  here because `MODULE_REGISTRY.yaml` line 39 itself belongs to an unrelated entry,
+  `backend-users`, not calendar — corrected citation, see Review and Change Log 0.1.1), a
+  consent-gate module (does not exist yet), `hr` (contract-expiry — module currently
+  `active-no-tests`, no contract model exists yet), and job-dispatch's broadcast flow
+  (`work-requests`/successor, per job-dispatch spec TREQ-002/003).
 
 ## State and Lifecycle
 
@@ -415,11 +433,19 @@ because removing in-app persistence system-wide would break the already-shipped
 authorizing that removal. **It is carried as an explicit open decision (`OQ-NOTIF-01`) and is
 NOT resolved by this document** — an equally defensible reading is that §14's carve-out exists
 *because* the general rule is push-only-with-no-persistence, and rework is the sole exception
-requiring inbox persistence.
+requiring inbox persistence. **Because this determines the shape of the `notification-service`
+contract and the `NotificationChannel` enum consumed by 4 current + 5 future producer modules, a
+Decision Record resolving `OQ-NOTIF-01` is REQUIRED — not merely optionally requestable — before
+any target-state implementation planning begins for TREQ-002/TRULE-002 (dual-channel rework) or
+TREQ-012/TRULE-005 (channel narrowing to `{IN_APP, PUSH}`).**
 
 **Concurrency:** No optimistic locking, no version field, and no concurrent-write scenario is
 observed on `Notification` — each row is written once and updated at most once (`markAsRead`).
-No concurrency risk is identified in current or target behavior.
+**Scope correction:** this analysis covers only single-row write races in current-state behavior;
+it does not claim target-state concurrency risk has been assessed. Target-state batch-insert
+volume from future scheduled jobs (the rework 20-minute escalation timer, the contract-expiry
+job, and broadcast auto-close, once built) is a distinct, unanalyzed question — deferred to
+M2-M4 implementation planning, not asserted as risk-free here.
 
 **Retention/migration:** `[CURRENT]` rows persist indefinitely; no soft-delete, no TTL. `[TARGET]`
 CONFIRMED §25 defines exactly three GDPR retention tiers (shift coordinates 6 months, general
@@ -452,7 +478,13 @@ this module (authorization for "may producer X notify user Y" is implicitly dele
 producer's own authz, e.g. work-requests only notifies its own roster). `[TARGET]` no new
 authorization model is specified by either authority for this module beyond the general
 role×scope model (job-dispatch spec TREQ-008); whether producer-to-notification authorization
-needs an explicit check is UNSTATED (`OQ-NOTIF-05`).
+needs an explicit check is UNSTATED (`OQ-NOTIF-05`). **Forward-looking note:** any future
+hotel-scoped notification feature must (a) actually populate `hotel_id` at write time (it is
+currently always null in practice, REQ-010) and (b) apply role×scope checks consistent with
+job-dispatch's TREQ-008, not just the current user-ownership scoping (RULE-001,
+`WHERE user_id=caller`) — otherwise it risks either breaking (if `hotel_id` remains null while
+scoping logic assumes it is populated) or over-broad cross-hotel exposure (if `hotel_id` is
+populated but no scope check is added).
 
 **Data classification/retention:** Notification `message`/`title`/`data` fields can carry
 worker-facing operational detail (rejection reasons, scores, rating warnings) but no
@@ -467,10 +499,35 @@ notification delivery latency (consistent with job-dispatch spec's finding of no
 in this codebase). The one identified latency-relevant behavior: `work-requests`' roster
 fan-out is awaited on the publish request path (`Promise.all`, REQ-011) — cost is O(roster size)
 per publish, same finding as job-dispatch spec's FIND-PERF-001, cited here because it is this
-module's `sendNotification` being called in that loop. `getNotifications`'s hardcoded `take:50`
-bounds list-query cost regardless of a user's total notification count; there is no index
-citation needed beyond the existing `@@index([user_id, is_read])` "hot path: unread notification
-badge count" (`schema.prisma:487`), which is well-suited to the current query pattern.
+module's `sendNotification` being called in that loop. **Index-claim correction (v0.1.1,
+resolves PERF FIND-PERF-001):** the prior version of this section stated the
+`@@index([user_id, is_read])` index (`schema.prisma:487`) "is well-suited to the current query
+pattern." This was verified WRONG: `getNotifications` (`notifications/service.ts:19-25`) never
+filters on `is_read` — it only does `where: {user_id}`, `orderBy: {created_at: 'desc'}`,
+`take: 50`. The composite index's `is_read` column therefore provides no benefit over the plain
+`@@index([user_id])` (`schema.prisma:483`) that already exists separately; the index's own schema
+comment ("hot path: unread notification badge count") describes a query that does not exist
+anywhere in the codebase — repo-wide grep for `is_read` usage confirms no server-side
+unread-count endpoint exists. Additionally, `getNotifications`'s hardcoded `take: 50` bounds
+per-call result size but does not bound scan/sort cost: neither `@@index([user_id])` alone nor
+`@@index([user_id, is_read])` is a composite covering both the `WHERE user_id=?` filter and the
+`ORDER BY created_at DESC` sort together — the schema's separate standalone
+`@@index([created_at])` (`schema.prisma:486`) does not help this filter-then-sort pattern either,
+since it is not composed with `user_id`. The `ORDER BY created_at DESC LIMIT 50` query therefore
+still requires a post-filter sort with unbounded cost growth as a user's row count increases, with
+no retention/TTL on `Notification` to cap that growth (per `OQ-NOTIF-02`).
+
+**Target-state performance risk (unbudgeted, resolves PERF FIND-PERF-002):** the above discusses
+only current-state workloads. Four target-state workloads are entirely unbudgeted/unmeasured
+today, with no budget, baseline, or even a flagged "TBD before implementation" marker prior to
+this correction — consistent with how rigorously this document treats other unknowns elsewhere:
+(a) TREQ-008 broadcast fan-out volume to eligibility-filtered worker sets; (b) push-delivery
+network-call cost/timeout/retry/rate-limit behavior once MIG-GAP-11 lands; (c) the rework
+20-minute-escalation scheduled job's (TREQ-003) batch behavior; (d) the contract-expiry daily
+job's (TREQ-007) iteration volume. Each is flagged TBD before implementation begins for the
+corresponding milestone (M2 for (a); M1 for (b); M3 for (c); M4 for (d), per the MIGRATION GAP
+table). See also `OQ-NOTIF-09` for a related, more specific latency-composition risk on the
+existing `work-requests` roster fan-out once (b) lands.
 
 **Observability/audit:** No `AuditLog` entry for any notification lifecycle event (REQ-007,
 RULE-005) — this is the module's most significant observability gap: neither notification
@@ -518,12 +575,12 @@ data):
 | MIG-GAP-03 | No scheduled-job runtime exists (no node-cron/BullMQ found; Redis declared-unused, `env.ts:15`) | 20-minute rework-incomplete escalation to Manager+Checker (CONFIRMED §14; PIVOT §5.6) — TREQ-003 | M3 |
 | MIG-GAP-04 | No `WARNING`-family `NotificationType`; no rating-threshold notification logic anywhere (also independently flagged by `docs/03-modules/quality/MODULE_SPEC.md:457` MIG-GAP-04) | Rating <70 (worker) and <50 (worker + manager) warnings (CONFIRMED §16) — TREQ-004 | M3 |
 | MIG-GAP-05 | No consent-gate module/model exists (task-scoped as out-of-scope mechanics; trigger point only) | Consent decline notifies manager (CONFIRMED §18, §24) — TREQ-005 | M4 |
-| MIG-GAP-06 | `calendar` module is a registered stub (`MODULE_REGISTRY.yaml:39`, `lifecycle: stub`); no sick/vacation flag or notification exists | Sick/vacation marking notifies manager (CONFIRMED §22) — TREQ-006 | M2 |
+| MIG-GAP-06 | `calendar` module is functionally a stub: `DEPENDENCY_GRAPH.yaml:39` tags it `lifecycle: stub`, and its service methods all throw `NotImplementedError` (`calendar/service.ts`), even though `MODULE_REGISTRY.yaml:167-177` records `lifecycle: active, implementation_status: active-no-tests` for the same module — no sick/vacation flag or notification exists either way | Sick/vacation marking notifies manager (CONFIRMED §22) — TREQ-006 | M2 |
 | MIG-GAP-07 | No `Contract` model exists (verified: zero schema matches for `Contract`/`ContractStatus`); no contract-expiry job | Scheduled reminder before 1yr/2yr contract end (CONFIRMED §9) — TREQ-007 | M4 |
 | MIG-GAP-08 | `WORK_REQUEST_PUBLISHED` fans out to the ENTIRE ACTIVE roster (REQ-011), not an eligibility-filtered subset | Broadcast notifies only matching-skill ∧ free-that-day workers (CONFIRMED §13) — TREQ-008; cross-ref job-dispatch TREQ-003 | M2 |
 | MIG-GAP-09 | No "requirement fulfilled" notification concept exists anywhere in code | Post-fill late responders get an explicit message (CONFIRMED §13) — TREQ-009; cross-ref job-dispatch TREQ-005 | M2 |
 | MIG-GAP-10 | `WorkRequest.EXPIRED` is set by an external job absent from the repo (job-dispatch spec REQ-013); no manager-notify-on-close behavior exists | 6h auto-close notifies manager (CONFIRMED §13; PIVOT §5.6) — TREQ-010; cross-ref job-dispatch TREQ-006 | M2 |
-| MIG-GAP-11 | `sendPushNotification` unconditionally throws `NotImplementedError`; APNs/FCM credentials declared-unwired (`env.ts:24,47-50`, independently verified zero consumers) | Push-only delivery is the sole confirmed channel (CONFIRMED §18) — TREQ-011 | M1 (per PIVOT §12, notification-adjacent envelope work is M1-scoped; push implementation itself is not explicitly milestone-pinned by either authority — flagged as `OQ-NOTIF-06`) |
+| MIG-GAP-11 | `sendPushNotification` unconditionally throws `NotImplementedError`; APNs/FCM credentials declared-unwired (`env.ts:24,47-50`, independently verified zero consumers). **Implementation note:** whoever implements this gap MUST attach an explicit secret-storage/rotation/least-privilege requirement to `APNS_PRIVATE_KEY_BASE64` and the related APNs/FCM config fields (`env.ts:24,47-50`) — this is not left implicit for the implementer to decide unprompted. | Push-only delivery is the sole confirmed channel (CONFIRMED §18) — TREQ-011 | M1 (per PIVOT §12, notification-adjacent envelope work is M1-scoped; push implementation itself is not explicitly milestone-pinned by either authority — flagged as `OQ-NOTIF-06`) |
 | MIG-GAP-12 | `sendEmail` unconditionally throws `NotImplementedError`; zero call sites | CONFIRMED §18 explicitly excludes email/SMS as notification channels — `sendEmail`'s intended role (if any) is UNSTATED by either authority; may be permanently dead code or repurposed for a non-notification use (e.g. is distinct from HR's separate SMTP payslip mechanism, PIVOT §7.7) | Unscheduled — open decision `OQ-NOTIF-07` |
 
 ## Validation Plan
@@ -556,13 +613,15 @@ Genuine remaining human-authority items (status OPEN).
 
 | ID | Type | Description | Evidence/impact | Owner | Resolution/status |
 |---|---|---|---|---|---|
-| OQ-NOTIF-01 | decision | Reconciliation of "push notifications only" (CONFIRMED §18) vs. rework's explicit "in-app inbox AND push, BOTH channels" (CONFIRMED §14) is the author's inference (State and Lifecycle), not a settled authority statement. Two readings are equally defensible: (a) every notification keeps its IN_APP row and gains push, with §14 merely emphasizing this for a safety-critical flow; or (b) push-only is the general rule and §14 is a sole, narrow exception requiring IN_APP persistence ONLY for rework. This determines whether `NotificationChannel.EMAIL`/`SMS` are simply unused or should be removed from the schema, and whether every new target trigger (TREQ-001,004,005,006,007,008,009,010) gets an inbox row or push-only delivery. | `schema.prisma:80-85`; CONFIRMED §14, §18; PIVOT §4.8, §9.1 | human/unassigned | **OPEN** |
-| OQ-NOTIF-02 | decision | `Notification` rows are not named under any of CONFIRMED §25's three GDPR retention tiers (6mo shift-coords / 5yr general / 6yr payroll-tax). Whether notifications default to the 5-year general tier, need a bespoke shorter retention (they are ephemeral/operational, unlike a profile record), or are exempt entirely is unstated. | CONFIRMED §25 (silent on this model); `schema.prisma:466-488` (no `deleted_at`/TTL field) | human/unassigned | **OPEN** |
+| OQ-NOTIF-01 | decision | Reconciliation of "push notifications only" (CONFIRMED §18) vs. rework's explicit "in-app inbox AND push, BOTH channels" (CONFIRMED §14) is the author's inference (State and Lifecycle), not a settled authority statement. Two readings are equally defensible: (a) every notification keeps its IN_APP row and gains push, with §14 merely emphasizing this for a safety-critical flow; or (b) push-only is the general rule and §14 is a sole, narrow exception requiring IN_APP persistence ONLY for rework. This determines whether `NotificationChannel.EMAIL`/`SMS` are simply unused or should be removed from the schema, and whether every new target trigger (TREQ-001,004,005,006,007,008,009,010) gets an inbox row or push-only delivery. **A Decision Record is REQUIRED (not merely MAY-be-requested) before any target-state implementation planning begins for TREQ-002/TRULE-002 or TREQ-012/TRULE-005**, since it shapes the `notification-service` contract and the `NotificationChannel` enum consumed by 4 current + 5 future producer modules. | `schema.prisma:80-85`; CONFIRMED §14, §18; PIVOT §4.8, §9.1 | human/unassigned | **OPEN — Decision Record REQUIRED before TREQ-002/TREQ-012 implementation planning (elevated per ARCH FIND-001)** |
+| OQ-NOTIF-02 | decision | `Notification` rows are not named under any of CONFIRMED §25's three GDPR retention tiers (6mo shift-coords / 5yr general / 6yr payroll-tax). Whether notifications default to the 5-year general tier, need a bespoke shorter retention (they are ephemeral/operational, unlike a profile record), or are exempt entirely is unstated. **Required-before-G8-Release-Readiness disposition:** `Notification` must be assigned to an existing tier (most plausibly Tier 2 / 5-year general, given its operational/personal character) or given a bespoke shorter retention, via human/compliance decision, before this module reaches release — this is Medium-now (system is pre-launch today) and would become High-or-Critical post-launch once real personal data accumulates unretained. | CONFIRMED §25 (silent on this model); `schema.prisma:466-488` (no `deleted_at`/TTL field) | human/unassigned | **OPEN — required disposition before G8 Release Readiness (elevated per SEC FIND-SEC-004)** |
 | OQ-NOTIF-03 | decision | PIVOT §10 states each new module is gated by "the existing `FEATURE_*` env convention... already exists in the codebase." Repo-wide grep found zero matches anywhere in actual source/config (only in other module specs' prose repeating the same claim). This module's target push-delivery rollout has no existing flag mechanism to attach to per PIVOT's own stated strategy. | PIVOT §10:431; repo-wide grep, no matches | human/unassigned | **OPEN — factual mismatch, not silently accepted** |
-| OQ-NOTIF-04 | decision | The current fire-and-forget `.catch(() => {})` pattern silently swallows ALL notification-send failures (including, currently, an unhandled Prisma FK-constraint error if a producer passes an invalid `userId` — see Ownership and Boundaries). Whether this swallow-everything pattern is acceptable once a real push-delivery mechanism exists (where delivery failures become more frequent and more consequential — e.g. a manager never learning about a failed-login alert) is a human product/reliability decision, not resolved here. | `notifications/service.ts:7-17` (no try/catch); all 4 producer call sites (`.catch(() => {})`) | human/unassigned | **OPEN** |
+| OQ-NOTIF-04 | decision | The current fire-and-forget `.catch(() => {})` pattern silently swallows ALL notification-send failures (including, currently, an unhandled Prisma FK-constraint error if a producer passes an invalid `userId` — see Ownership and Boundaries). Whether this swallow-everything pattern is acceptable once a real push-delivery mechanism exists (where delivery failures become more frequent and more consequential — e.g. a manager never learning about a failed-login alert) is a human product/reliability decision, not resolved here. **Required minimum control:** any future security-relevant `NotificationType` emission (TREQ-001 failed-login, TREQ-004 rating-warning, TREQ-005 consent-decline) MUST at minimum log the failure (and ideally write an `AuditLog` row) rather than silently swallowing it — the swallow-everything pattern used by the 4 current producers must NOT be reused unchanged for these specific future triggers without that minimum control. This is a required precondition attached to the M1 (TREQ-001) and M4 (TREQ-005; TREQ-004 is M3) milestones that introduce them. | `notifications/service.ts:7-17` (no try/catch); all 4 producer call sites (`.catch(() => {})`) | human/unassigned | **OPEN — minimum log/audit control required before M1/M3/M4 security-relevant triggers ship (elevated per SEC FIND-SEC-002)** |
 | OQ-NOTIF-05 | decision | The in-process `sendNotification` contract performs no authorization check on "may producer X address a notification to user Y" — this is currently implicitly delegated to each producer's own authz logic. Whether an explicit cross-module authorization boundary is warranted (especially once more producers, e.g. auth/failed-login, gain the ability to notify arbitrary users) is unresolved by either authority. | `notifications/service.ts:7-17` (no check); job-dispatch spec's own role×scope model (TREQ-008) does not name this module | human/unassigned | **OPEN** |
 | OQ-NOTIF-06 | decision | Neither PIVOT nor CONFIRMED explicitly milestone-pins the push-delivery IMPLEMENTATION itself (as opposed to the individual trigger features that depend on it); PIVOT §12's M1 covers RBAC/scope/envelope/WorkApplication-removal only, with push-adjacent trigger work spread across M2-M4. It is unclear whether a working APNs/FCM integration is expected to land once (early, so all subsequent triggers can use it) or incrementally per-trigger. | PIVOT §12 (milestone table, no explicit push-implementation row); PIVOT §5.2 (APNs/FCM listed as an external dependency with no phase assignment) | human/unassigned | **OPEN** |
 | OQ-NOTIF-07 | decision | `sendEmail`'s intended target role, if any, is unstated. CONFIRMED §18 excludes email as a *notification* channel, but HR's separate payslip-email flow (PIVOT §7.7) uses SMTP for a non-notification purpose. Whether `sendEmail` on `NotificationService` is dead code to be deleted, or is intended to be repurposed/relocated for the payslip flow, is undecided. | `notifications/service.ts:40-42` (zero call sites); PIVOT §7.7 (separate SMTP payslip mechanism, not attributed to this module) | human/unassigned | **OPEN** |
+| OQ-NOTIF-08 | decision | Neither PIVOT nor CONFIRMED states which module hosts/owns the scheduled-job runtime that decides WHEN to fire the rework 20-minute escalation (TREQ-003) or the contract-expiry reminder (TREQ-007). Listing "scheduled-job runtime" as a Dependencies-section dependency of `backend-notifications` does not resolve this — this module's own "Ownership and Boundaries" section declares it a pure sink that "does not decide WHEN ... to notify," so `backend-notifications` itself hosting the timer would contradict its own declared boundary. No owner is invented here. | PIVOT §5.6 (job existence, no host module named); this spec's own Ownership and Boundaries section (boundary claim) | human/unassigned | **OPEN** (elevated per ARCH FIND-004) |
+| OQ-NOTIF-09 | decision | IF a future push-delivery implementation (MIG-GAP-11/TREQ-011) is wired directly into `sendNotification` without changing callers, the already-awaited roster-fan-out loop in `work-requests` (REQ-011, RULE-003; cross-ref job-dispatch FIND-PERF-001) would change from O(roster) cheap DB writes to O(roster) synchronous external network round-trips (APNs/FCM) on the hotel-manager-facing publish request path — a concrete latency-regression mechanism not called out anywhere else in this document. Recommend resolving during M1/M2 implementation planning: either make push-send unawaited/best-effort (matching the other 3 producers' existing fire-and-forget pattern) or decouple the roster fan-out from the synchronous publish path. | `work-requests/service.ts:238-249` (awaited `Promise.all` fan-out); MIG-GAP-11 (unbuilt push implementation) | human/unassigned | **OPEN** (added per PERF FIND-PERF-003) |
 | SYNC-001 | decision | Module owner is `unassigned` (no CODEOWNERS; empty package author) — blocks accountable ownership and SLO-setting, consistent with every other spec in this repository. | `MODULE_REGISTRY.yaml:146` | human | **OPEN** (cross-repository, not unique to this module) |
 
 Assumptions:
@@ -577,18 +636,26 @@ Assumptions:
 Proposed only — NOT applied. Application requires the appropriate synchronization gate.
 
 - **MODULE_REGISTRY.yaml:** set `specification` for `backend-notifications`
-  (`MODULE_REGISTRY.yaml:152`) from `UNKNOWN` → `SPEC-NOTIF-001@0.1.0 (REVIEW)`. Do not alter
+  (`MODULE_REGISTRY.yaml:152`) from `UNKNOWN` → `SPEC-NOTIF-001@0.1.1 (REVIEW)`. Do not alter
   `owner` (remains `unassigned`, SYNC-001).
 - **DEPENDENCY_GRAPH.yaml (proposed):**
   - PROMOTE the bare Prisma enums `NotificationType` (`schema.prisma:89-111`) and
-    `NotificationChannel` (`schema.prisma:80-85`) into the graph's `contracts` or a new
-    lightweight `enum` kind, tagged `owner: backend-notifications`, since both are referenced
+    `NotificationChannel` (`schema.prisma:80-85`) into the graph's existing `contract` kind or a
+    new lightweight `enum` kind, tagged `owner: backend-notifications`, since both are referenced
     exclusively by `state-notification` and are the primary target-vs-current gap surface
     identified by this spec (16 declared values, 8+ confirmed target categories entirely
-    unrepresented).
+    unrepresented). **Caveat:** `DEPENDENCY_GRAPH.yaml`'s own `node_schema.kinds` is a closed
+    enumeration (currently `[module, client, infrastructure, contract, event, state-domain,
+    external-service]`, `DEPENDENCY_GRAPH.yaml:16`); introducing a new `enum` kind would extend
+    that foundation-level schema itself, not add a routine node, and per Constitution §7/§19
+    requires explicit architecture sign-off before application — it is not covered by the
+    routine synchronization gate alone, regardless of which of the two options is ultimately
+    chosen.
   - NOTE (future, do not add yet): once M1-M4 land per the roadmap, new `calls` edges into
     `backend-notifications` will be needed from `backend-auth` (failed-login), `backend-calendar`
-    (sick/vacation, once it exits `lifecycle: stub`), a not-yet-registered consent-gate module,
+    (sick/vacation, once it exits `lifecycle: stub` per `DEPENDENCY_GRAPH.yaml:39` — see the
+    corrected MIG-GAP-06/Dependencies citations above; `MODULE_REGISTRY.yaml:167-177` separately
+    records `lifecycle: active`), a not-yet-registered consent-gate module,
     `backend-hr` (contract-expiry), and the job-dispatch capability's broadcast producer
     (TREQ-006 of `SPEC-JOB-DISPATCH-001`). Not added now because none of these producer call
     sites exist in code yet (MIGRATION GAP table).
@@ -598,10 +665,12 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
   §4.8/§5.2/§9.1.
 - **DECISION_INDEX.md:** reference ADR-003 (modular monolith, PIVOT §5.1/§11) and ADR-004
   (Prisma ORM, PIVOT §2.1/§11) as existing anchors (consistent with job-dispatch spec's own
-  citation of the same two ADRs). A NEW Decision Record MAY be requested by architecture/human
-  for `OQ-NOTIF-01` (the push-only vs. dual-channel reconciliation), since it materially affects
-  the schema (`NotificationChannel` enum shape) and every future producer's contract — proposed,
-  not created here.
+  citation of the same two ADRs). A NEW Decision Record is REQUIRED (not merely MAY-be-requested,
+  per architecture review elevation, ARCH FIND-001) for `OQ-NOTIF-01` (the push-only vs.
+  dual-channel reconciliation) before target-state implementation planning begins for
+  TREQ-002/TRULE-002 or TREQ-012/TRULE-005, since it materially affects the schema
+  (`NotificationChannel` enum shape) and every future producer's contract — proposed, not
+  created here.
 - **SYNC_STATE.yaml:** none proposed by the author; the synchronization owner records spec
   issuance if/when this candidate advances.
 
@@ -610,3 +679,4 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 | Version | Date | Change | Findings resolved | Approver |
 |---|---|---|---|---|
 | 0.1.0 | 2026-07-07 | Initial current-state reverse specification at `efde2a9f`, paired with target-state requirements drawn from CONFIRMED §2/§9/§13/§14/§16/§18/§22 and PIVOT §4.8/§5.2/§5.6/§6/§7.3/§7.5/§9.1. REQ-001..015, RULE-001..007 (current); TREQ-001..012, TRULE-001..005 (target). MIGRATION GAP enumeration MIG-GAP-01..12. Identified and independently verified: zero APNs/FCM/REDIS_URL consumers outside `env.ts`; zero `sendEmail`/`sendPushNotification` call sites repository-wide; zero `FEATURE_*` matches repository-wide (factual mismatch vs. PIVOT §10's claim); zero failed-login-tracking code; zero `Contract`/`ConsentLog` schema presence. Carried 7 genuine open decisions (`OQ-NOTIF-01..07`) plus `SYNC-001`; explicitly did not resolve the push-only vs. dual-channel tension, instead offering a labeled, non-authoritative reconciliation. | None — first version, no prior findings to resolve. | None — status REVIEW, G2 freeze reserved to human. |
+| 0.1.1 | 2026-07-07 | G4 review-response pass: all five reviewers (architecture, dependency, consistency, security, performance) returned `PASS_WITH_ACTIONS`, zero Critical/High findings. Applied all 15 author-fixable corrections: (1) corrected three erroneous `calendar` citations misattributing `lifecycle: stub` to `MODULE_REGISTRY.yaml:39` (that line is `backend-users`, not calendar) — replaced with accurate `DEPENDENCY_GRAPH.yaml:39` (`lifecycle: stub`) and/or `MODULE_REGISTRY.yaml:167-177` (`lifecycle: active, implementation_status: active-no-tests`) plus the code-level `NotImplementedError` fact, in Dependencies, MIG-GAP-06, and Proposed Knowledge Deltas (**FIND-CONS-01/ARCH FIND-002**); (2) elevated `OQ-NOTIF-01` to state a Decision Record is REQUIRED, not merely MAY-be-requested, before TREQ-002/TRULE-002 or TREQ-012/TRULE-005 implementation planning, in both the State-and-Lifecycle reconciliation paragraph and the Risks table row, and fixed matching "MAY be requested" wording in Proposed Knowledge Deltas (**ARCH FIND-001**); (3) added a caveat to the enum-kind graph-promotion proposal flagging that a new `enum` kind extends `DEPENDENCY_GRAPH.yaml`'s closed `node_schema.kinds` enumeration and requires explicit architecture sign-off, not just the routine sync gate (**ARCH FIND-003 / DEP FIND-DEP-N01**); (4) added `OQ-NOTIF-08` and a Dependencies-section note naming scheduled-job-runtime ownership (rework escalation, contract-expiry) as unresolved, consistent with this module's own "pure sink" boundary claim (**ARCH FIND-004**); (5) added a graph-revision-gap traceability note (`DEPENDENCY_GRAPH.yaml` `observed_revision: 5b16be4...` vs. this spec's `efde2a9f...`) to the Dependencies section (**DEP FIND-DEP-N02**); (6) added `[interpretation OPEN, see OQ-NOTIF-01]` to the TREQ-012 row in the Requirements and Acceptance Criteria table to match the existing Evidence-table flag (**CONS FIND-CONS-03**); (7) dropped the generic "Section 6 diagram" sub-citation from TREQ-008's Evidence-table row (**CONS FIND-CONS-04**, Note/optional, applied); (8) made `OQ-NOTIF-04` prescriptive: future security-relevant `NotificationType` emissions (TREQ-001, TREQ-004, TREQ-005) MUST at minimum log failures (ideally an `AuditLog` row), attached as a required precondition to the M1/M3/M4 milestones introducing them (**SEC FIND-SEC-002**); (9) added a forward-looking `hotel_id` population-and-scoping note to the Trust-boundaries paragraph (**SEC FIND-SEC-003**); (10) escalated `OQ-NOTIF-02` with a required-before-G8-Release-Readiness disposition and explicit Medium-now/would-be-High-or-Critical-post-launch framing (**SEC FIND-SEC-004**); (11) attached an explicit secret-storage/rotation/least-privilege requirement to MIG-GAP-11's `APNS_PRIVATE_KEY_BASE64`/related config fields (**SEC FIND-SEC-005**); (12) rewrote the Performance section's index-claim paragraph to correct the factually wrong "`@@index([user_id, is_read])` is well-suited" statement — verified `getNotifications` never filters on `is_read`, no server-side unread-count endpoint exists, and no index composes `user_id`+`created_at` for the actual `WHERE user_id ORDER BY created_at DESC LIMIT 50` query pattern (**PERF FIND-PERF-001**, MUST FIX); (13) added explicit disclosure that four target-state workloads (TREQ-008 broadcast fan-out, push-delivery network cost, rework-escalation job batch behavior, contract-expiry job iteration volume) are unbudgeted/unmeasured (**PERF FIND-PERF-002**); (14) added `OQ-NOTIF-09` flagging the REQ-011 roster-fan-out latency-composition risk once push delivery (MIG-GAP-11/TREQ-011) is wired synchronously into `sendNotification` (**PERF FIND-PERF-003**); (15) narrowed the Concurrency paragraph's wording to state it covers only single-row write races in current-state behavior, not target-state batch-insert volume, which is deferred to M2-M4 planning (**PERF FIND-PERF-004**). Out of scope by design: CONS FIND-CONS-02 (a `job-dispatch` spec defect, not this spec's); all positive-evidence/Note findings requiring no action (ARCH boundary confirmations, SEC FIND-SEC-001/FIND-SEC-006). Status remains `REVIEW`; NOT marked `FROZEN` (G2 freeze is reserved human authority). | FIND-CONS-01/ARCH FIND-002; ARCH FIND-001; ARCH FIND-003/DEP FIND-DEP-N01; ARCH FIND-004; DEP FIND-DEP-N02; CONS FIND-CONS-03; CONS FIND-CONS-04; SEC FIND-SEC-002; SEC FIND-SEC-003; SEC FIND-SEC-004; SEC FIND-SEC-005; PERF FIND-PERF-001; PERF FIND-PERF-002; PERF FIND-PERF-003; PERF FIND-PERF-004 | None — status REVIEW, G2 freeze reserved to human; corrections applied by Module Author agent per Lead Architect's merged findings register. |
