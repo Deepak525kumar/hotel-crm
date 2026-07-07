@@ -95,6 +95,30 @@ known_drift:
       are human-authority items. Registry specification pointers updated to @0.2.0 (REVIEW). MODULE_SPEC NOT frozen.
     authority_needed: human  # G2 freeze; OQ-01 CRITICAL remediation decision; SYNC-001 ownership; FIND-ARCH-003 coupling DR
 
+  - id: SYNC-009
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-NOTIF-001 (Notifications) authored at v0.1.1, status REVIEW
+      (docs/03-modules/notifications/MODULE_SPEC.md). One bounded capability over backend-notifications
+      (Notification model, NotificationType/NotificationChannel enums, notification-service contract
+      consumed by backend-work-requests/work-applications/attendance/quality and by frontend-web/
+      mobile-worker/mobile-checker). Current-state persist-only/IN_APP-default behavior reverse-specified
+      (15 requirements, 7 rules) and cross-checked against target authorities (PIVOT_DESIGN_DOCUMENT.md,
+      CONFIRMED_REQUIREMENTS_REGISTER.md); 12 migration gaps recorded (push-only delivery is entirely
+      unbuilt despite declared-but-unwired APNs/FCM config; zero NotificationType values exist for 8+
+      confirmed target trigger categories). G4 reviews complete: architecture/dependency/consistency/
+      security/performance all PASS_WITH_ACTIONS, zero Critical/High findings. All 15 author-fixable
+      findings applied in v0.1.1 (one was a factual error in the performance section's index-usage claim,
+      corrected). G6 documentation-validation PASS_WITH_ACTIONS. 9 open decisions carried (OQ-NOTIF-01..09),
+      two elevated to required-before-milestone-work disposition (OQ-NOTIF-01 Decision Record before
+      TREQ-002/012 planning; OQ-NOTIF-02 GDPR retention-tier mapping before G8 Release Readiness).
+      Registry specification pointer updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
+      Discovered incidental drift (not remediated by this session, noted in MODULE_REGISTRY.yaml header/
+      unresolved instead): backend-attendance/backend-quality specification fields were never synchronized
+      after SPEC-ATT-001/SPEC-QUAL-001 merged (PRs #109-#111).
+    authority_needed: human  # G2 freeze; OQ-NOTIF-01 Decision Record; OQ-NOTIF-02 retention-tier decision; SYNC-001 ownership
+
 context_invalidators:
   - repository revision changes
   - default branch changes
