@@ -16,10 +16,10 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-QUAL-001 / 0.1.0` |
+| Spec ID / version | `SPEC-QUAL-001 / 0.1.1` |
 | Status | `REVIEW` |
-| Owner | `unassigned (SYNC-001, human authority required)`. No CODEOWNERS entry; MODULE_REGISTRY `owner: unassigned` (`.claude/knowledge/MODULE_REGISTRY.yaml:119-129`). Owner assignment is NOT invented here. |
-| Authors / reviewers | Author: Module Author agent. Reviewers: none yet (candidate not yet submitted to Architecture / Dependency / Consistency / Security / Performance reviewers). |
+| Owner | `unassigned (OQ-06 / SYNC-001, human authority required)`. No CODEOWNERS entry; MODULE_REGISTRY `owner: unassigned` (`.claude/knowledge/MODULE_REGISTRY.yaml:119-129`). Owner assignment is NOT invented here. |
+| Authors / reviewers | Author: Module Author agent. Reviewers: Architecture, Dependency, Consistency, and Security reviews completed — all returned `PASS_WITH_ACTIONS`; dispositions applied at v0.1.1 (see Review and Change Log). Performance review not yet run. |
 | Repository revision | Code base described: `6e404ab9d52daf04f144673030de731bbe1af5d6` (`6e404ab`). |
 | Approved by / at | Not approved — G2 freeze reserved to human. Do NOT mark FROZEN. |
 | Supersedes | None. First specification for `backend-quality` (registry `specification: UNKNOWN` prior, `MODULE_REGISTRY.yaml:119-129`). |
@@ -180,16 +180,16 @@ set granted those permissions in `config/constants.ts:88-129`.
 
 | Rule | Preconditions | Outcome/invariant | Exceptions/precedence | Owner/source |
 |---|---|---|---|---|
-| RULE-001 | Any quality request | All routes require `authMiddleware`; writes require `quality:write`, reads require `quality:read`; `by-hotel` adds `checkHotelAccess()`. Responses use the shared envelope; NO pagination. | Missing permission → 403. Envelope is unversioned (baseline/UNKNOWN). | `unassigned (SYNC-001)`; `quality/routes.ts:7-18`; `config/constants.ts:88-129` |
-| RULE-002 | createVerification | Requires an existing assignment; a verification is 1:1 with an assignment (`assignment_id @unique`). | Missing assignment → NotFoundError; existing verification → ConflictError. | `unassigned (SYNC-001)`; `quality/service.ts:19-27`; `schema.prisma:397` |
-| RULE-003 | Any unique-constraint create (verification, rating) | A Prisma P2002 is caught and re-surfaced as ConflictError (409), never a 500. | Applies to both verification create (`service.ts:49-61`) and rating create (`service.ts:126-133`). | `unassigned (SYNC-001)`; `quality/service.ts:49-61,126-133` |
-| RULE-004 | Verification create | `VerificationStatus` is DERIVED from the 0–100 score: `>=70`→PASSED, `>=40`→NEEDS_REWORK, else FAILED. Enum default is PASSED (`schema.prisma:404`). | Thresholds are hard-coded; UNTESTED. `[TARGET]` interplay with warnings (<70/<50) is a separate scale (OQ-08). | `unassigned (SYNC-001)`; `quality/service.ts:30-35` |
-| RULE-005 | Verification/rating write | `hotel_id` is COPIED from the assignment (denormalized), never client-supplied; verifier/rater is the actor (`verified_by_id`/`rated_by_id=actor.userId`). | — | `unassigned (SYNC-001)`; `quality/service.ts:39-48,113-125` |
-| RULE-006 | createRating | Requires assignment; `assignment.worker_id` MUST equal the supplied `worker_id`; `score` int 1..5 (service guard + Zod). Rating is 1:1 with an assignment. | Missing assignment → NotFound; worker mismatch → Forbidden; duplicate → Conflict. `[TARGET]` 1–5 scale contradicted by 0–100 (OQ-01). | `unassigned (SYNC-001)`; `quality/service.ts:92-133`; `types.ts:15-21` |
-| RULE-007 | Rating committed | `WorkerOverallRating.average_score` is a PLAIN rolling average of 1–5 `Rating.score` (`_avg.score ?? 0`), upserted by `worker_id` inside the rating transaction. | `[TARGET]` must become recency-weighted last-10 0–100 (TRULE-004, OQ-02). | `unassigned (SYNC-001)`; `quality/service.ts:136-178`; `schema.prisma:449` |
-| RULE-008 | Overall-rating recompute / leaderboard | `completion_rate = completedAssignments / totalAssignments`; `on_time_rate = onTimeAttendanceCount / totalAssignments` (PRESENT-attendance count divided by ASSIGNMENTS, not attendance rows — observed formula). Leaderboard orders by `average_score desc`, `take 50`. | `on_time_rate` denominator is assignments (observed). Leaderboard orders by the 1–5 average, not the 0–100 quality score (OQ-02). Schema comment claims a DB trigger maintains the aggregate, but code upserts it in-app (OQ-04). | `unassigned (SYNC-001)`; `quality/service.ts:136-178,203-224`; `schema.prisma:443` |
-| RULE-009 | Any notification emission | Best-effort synchronous fire-and-forget; never participates in or rolls back the write; `.catch(()=>{})`-swallowed. Types: `QUALITY_VERIFICATION_SUBMITTED`, `REWORK_REQUIRED`, `RATING_RECEIVED`. | FAILED verification REUSES `QUALITY_VERIFICATION_SUBMITTED` (no FAILED-specific type). Channel is not enforced push-only in code. `[TARGET]` push-only (TRULE-007). | `unassigned (SYNC-001)`; `quality/service.ts:75-84,191-198`; `schema.prisma:108-110` |
-| RULE-010 | Any mutation (verification / rating) | Writes an immutable AuditLog row via `BaseService.logAudit` (`CREATE_VERIFICATION` / `CREATE_RATING`). | Audit writes are UNTESTED. | `unassigned (SYNC-001)`; `quality/service.ts:63-70,183-187` |
+| RULE-001 | Any quality request | All routes require `authMiddleware`; writes require `quality:write`, reads require `quality:read`; `by-hotel` adds `checkHotelAccess()`. Responses use the shared envelope; NO pagination. | Missing permission → 403. Envelope is unversioned (baseline/UNKNOWN). | `unassigned (OQ-06/SYNC-001)`; `quality/routes.ts:7-18`; `config/constants.ts:88-129` |
+| RULE-002 | createVerification | Requires an existing assignment; a verification is 1:1 with an assignment (`assignment_id @unique`). | Missing assignment → NotFoundError; existing verification → ConflictError. | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:19-27`; `schema.prisma:397` |
+| RULE-003 | Any unique-constraint create (verification, rating) | A Prisma P2002 is caught and re-surfaced as ConflictError (409), never a 500. | Applies to both verification create (`service.ts:49-61`) and rating create (`service.ts:126-133`). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:49-61,126-133` |
+| RULE-004 | Verification create | `VerificationStatus` is DERIVED from the 0–100 score: `>=70`→PASSED, `>=40`→NEEDS_REWORK, else FAILED. Enum default is PASSED (`schema.prisma:404`). | Thresholds are hard-coded; UNTESTED. `[TARGET]` interplay with warnings (<70/<50) is a separate scale (OQ-08). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:30-35` |
+| RULE-005 | Verification/rating write | `hotel_id` is COPIED from the assignment (denormalized), never client-supplied; verifier/rater is the actor (`verified_by_id`/`rated_by_id=actor.userId`). | — | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:39-48,113-125` |
+| RULE-006 | createRating | Requires assignment; `assignment.worker_id` MUST equal the supplied `worker_id`; `score` int 1..5 (service guard + Zod). Rating is 1:1 with an assignment. | Missing assignment → NotFound; worker mismatch → Forbidden; duplicate → Conflict. `[TARGET]` 1–5 scale contradicted by 0–100 (OQ-01). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:92-133`; `types.ts:15-21` |
+| RULE-007 | Rating committed | `WorkerOverallRating.average_score` is a PLAIN rolling average of 1–5 `Rating.score` (`_avg.score ?? 0`), upserted by `worker_id` inside the rating transaction. | `[TARGET]` must become recency-weighted last-10 0–100 (TRULE-004, OQ-02). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:136-178`; `schema.prisma:449` |
+| RULE-008 | Overall-rating recompute / leaderboard | `completion_rate = completedAssignments / totalAssignments`; `on_time_rate = onTimeAttendanceCount / totalAssignments` (PRESENT-attendance count divided by ASSIGNMENTS, not attendance rows — observed formula). Leaderboard orders by `average_score desc`, `take 50`. | `on_time_rate` denominator is assignments (observed). Leaderboard orders by the 1–5 average, not the 0–100 quality score (OQ-02). An INSTALLED DB trigger `Rating_refresh_overall_rating` (`migration.sql:588-631`) ALSO writes the aggregate (`average_score`/`total_ratings`/`last_worked_at` only), converging with the app upsert on createRating but diverging on any direct Rating UPDATE/DELETE — dual-writer hazard (OQ-04). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:136-178,203-224`; `schema.prisma:443`; `migration.sql:588-631` |
+| RULE-009 | Any notification emission | Best-effort synchronous fire-and-forget; never participates in or rolls back the write; `.catch(()=>{})`-swallowed. Types: `QUALITY_VERIFICATION_SUBMITTED`, `REWORK_REQUIRED`, `RATING_RECEIVED`. | FAILED verification REUSES `QUALITY_VERIFICATION_SUBMITTED` (no FAILED-specific type). Channel is not enforced push-only in code. `[TARGET]` push-only (TRULE-007). | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:75-84,191-198`; `schema.prisma:108-110` |
+| RULE-010 | Any mutation (verification / rating) | Writes an immutable AuditLog row via `BaseService.logAudit` (`CREATE_VERIFICATION` / `CREATE_RATING`). | Audit writes are UNTESTED. | `unassigned (OQ-06/SYNC-001)`; `quality/service.ts:63-70,183-187` |
 
 `[TARGET STATE]` rules (TRULE-001..007) — confirmed authority:
 
@@ -205,19 +205,34 @@ set granted those permissions in `config/constants.ts:88-129`.
 
 ## Ownership and Boundaries
 
-**Module owner:** `unassigned (SYNC-001, human authority required)`. MODULE_REGISTRY records
-`owner: unassigned` (`MODULE_REGISTRY.yaml:119-129`); no CODEOWNERS entry exists. Owner assignment
-is reserved human authority and is NOT invented here.
+**Module owner:** `unassigned (OQ-06 / SYNC-001, human authority required)`. MODULE_REGISTRY records
+`owner: unassigned` (`MODULE_REGISTRY.yaml:119-129`); no CODEOWNERS entry exists. `SYNC-001` is the
+canonical cross-artifact owner token (`TERMINOLOGY.md:44`); in this artifact it is DEFINED by the
+`OQ-06 / SYNC-001` row in the Open Decisions table below, to which every inline `SYNC-001` reference
+resolves. Owner assignment is reserved human authority and is NOT invented here.
 
 **Owned state (per DEPENDENCY_GRAPH state-domains):**
 - `state-quality-verification` (`schema.prisma:395-417`, `DEPENDENCY_GRAPH.yaml:71`) — model
   `QualityVerification`; `authoritative_writer: backend-quality`, `writers: [backend-quality]`.
 - `state-rating` (`schema.prisma:419-441`, `DEPENDENCY_GRAPH.yaml:72`) — model `Rating`; writer
   `[backend-quality]`.
-- `state-worker-overall-rating` (`schema.prisma:443-459`, `DEPENDENCY_GRAPH.yaml:73,445`) — model
-  `WorkerOverallRating`; writer `[backend-quality]`. NOTE: the schema comment (`schema.prisma:443`)
-  claims a DB trigger maintains this aggregate, but `service.ts:174` upserts it in application code
-  inside the rating transaction — a dual-writer / source-of-truth ambiguity (OQ-04).
+- `state-worker-overall-rating` (`schema.prisma:443-459`, `DEPENDENCY_GRAPH.yaml:73,485-490`) — model
+  `WorkerOverallRating`; writer `[backend-quality]`. NOTE (FIND-ARCH-001): this owned domain has TWO
+  write mechanisms, both belonging to `backend-quality`'s data layer (a SAME-OWNER second write
+  mechanism, NOT a cross-owner writer):
+  1. A CONFIRMED, INSTALLED PostgreSQL trigger `Rating_refresh_overall_rating` — `CREATE TRIGGER ...
+     AFTER INSERT OR UPDATE OR DELETE ON "Rating"` running `refresh_worker_overall_rating()`
+     (`backend/prisma/migrations/20260613120000_v2_marketplace_init/migration.sql:588-631`). It
+     writes ONLY `average_score`, `total_ratings`, `last_worked_at`.
+  2. The application upsert (`service.ts:174`) inside the rating `$transaction`, which writes the
+     FULL row (`average_score`, `total_ratings`, `total_assignments`, `completion_rate`,
+     `on_time_rate`, `last_worked_at`).
+  On the createRating path the two currently CONVERGE (the app upsert runs after `Rating.create` in
+  the same transaction). But any direct `Rating` UPDATE/DELETE, or any non-createRating writer, lets
+  the trigger REWRITE `average_score`/`total_ratings`/`last_worked_at` WITHOUT the app-only fields
+  (`total_assignments`/`completion_rate`/`on_time_rate`) — a genuine dual-writer / source-of-truth
+  hazard, since the aggregate is read downstream by work-applications (`work-applications/service.ts:64`)
+  and the leaderboard. Which mechanism is authoritative stays `[OPEN DECISION]` OQ-04.
 
 **Consumed state (read):**
 - `state-worker-assignment` (owner `backend-assignments`) — read for verification/rating ownership
@@ -231,6 +246,10 @@ is reserved human authority and is NOT invented here.
 **Permitted writes:** This module writes ONLY its three owned domains
 (`state-quality-verification`, `state-rating`, `state-worker-overall-rating`) and `state-audit-log`
 (cross-cutting). No cross-owner INBOUND writers are observed on these domains (contrast attendance).
+NOTE (FIND-ARCH-001): `state-worker-overall-rating` nonetheless has TWO SAME-OWNER write mechanisms —
+the application upsert (`service.ts:174`) and the installed DB trigger `Rating_refresh_overall_rating`
+(`migration.sql:588-631`); both are `backend-quality`'s data layer, so the single-authoritative-writer
+(`backend-quality`) statement holds, but source-of-truth between the two mechanisms is OQ-04.
 
 **Consumers of this module's state (downstream — NOT owned here):**
 - `backend-work-applications` reads `state-worker-overall-rating` at apply time
@@ -249,10 +268,11 @@ is reserved human authority and is NOT invented here.
 (`backend-assignments`); attendance capture (`backend-attendance` — read-only here for `on_time_rate`);
 notification delivery mechanics (`backend-notifications` — this module only calls `sendNotification`);
 analytics aggregation (`backend-analytics` — a downstream consumer); the work-applications rating
-snapshot. `[TARGET]` it will own the 0–100 scoring, rating-tier derivation, recency-weighted
-aggregation, warning emission, and the rework loop + 20-minute escalation timer (in concert with a
-scheduled-job runtime and object storage); it does NOT own the notification channel or the timer
-infrastructure itself.
+snapshot. `[TARGET]` it is the CANDIDATE owner (pending OQ-08) of the 0–100 scoring, rating-tier
+derivation, recency-weighted aggregation, warning emission, and the rework loop + 20-minute escalation
+timer (in concert with a scheduled-job runtime and object storage) — whether these live in the quality
+service or a new job/module is left OPEN by OQ-08. It does NOT own the notification channel or the
+timer infrastructure itself.
 
 ## Interfaces and Contracts
 
@@ -375,24 +395,39 @@ or rating can persist while its notification is silently lost.
 CHECKER); reads require `quality:read` (ADMIN, MANAGER, CHECKER); WORKER has no quality permission
 (`config/constants.ts:88-129`). Current-state authorization observation (finding candidate, NOT
 resolved here):
-- `[OPEN DECISION]` OQ-03 — the `by-hotel` leaderboard's hotel scope is a NO-OP for every
+- `[OPEN DECISION]` OQ-03 (READ-side) — the `by-hotel` leaderboard's hotel scope is a NO-OP for every
   quality-permitted role: `checkHotelAccess()` BYPASSES the hotel-membership check for
   admin/manager/checker (`permissions.ts:103-108`, "Checkers operate across hotels"), and only
   workers (who lack quality permissions entirely) are ever scoped. So any quality-permitted actor
   reads ANY hotel's leaderboard regardless of the `:hotel_id` path segment. Intended cross-hotel
   visibility or a scoping defect — human decision (cross-tenant exposure class).
+- `[OPEN DECISION]` OQ-09 (WRITE-side, FIND-SEC-002) — the write routes bind the actor to the
+  ASSIGNMENT only, NOT to the assignment's hotel: `createVerification` (`service.ts:13-87`) and
+  `createRating` (`service.ts:89-201`) copy `hotel_id` from the assignment (RULE-005) but perform no
+  hotel-membership check, and `checkHotelAccess()` is applied ONLY to the by-hotel READ route
+  (`routes.ts:18`), never to the write routes (`routes.ts:9,12`). So any actor with `quality:write`
+  (ADMIN/CHECKER) can verify/rate ANY assignment at ANY hotel, mutating that worker's
+  `WorkerOverallRating` / leaderboard / (target) warning state. `hotel_id`-from-assignment is NOT by
+  itself an authorization control. Bounded by single-tenant-per-client deployment (PIVOT §5.1) and
+  trusted staff. Intended or a defect — human decision; no control invented here.
 
 **Data classification/retention:** `[CURRENT]` quality data carries worker performance data (scores,
-ratings, notes/comments) and rater identity; audit rows persist actor id/role. No photo/location data
-is captured today (`photo_urls` dormant). `[TARGET]` inspection/rework photos are worker-performance
-media stored in object storage (S3 EU, PIVOT ~line 164); their retention policy is not settled by the
-authorities and must be decided (recorded under OQ-08 scope). Warnings are worker-sensitive
+ratings, notes/comments) and rater identity; audit rows persist actor id/role. Both leaderboard reads
+(`GET /leaderboard`, `GET /leaderboard/by-hotel/:hotel_id`) return worker **email**
+(`service.ts:216-219`) — contact PII / GDPR personal data disclosed to ALL `quality:read` holders
+(ADMIN/MANAGER/CHECKER), and cross-hotel via the OQ-03 scope no-op (FIND-SEC-003). No photo/location
+data is captured today (`photo_urls` dormant). `[TARGET]` inspection/rework photos are
+worker-performance media stored in object storage (S3 EU, PIVOT ~line 164); their retention policy is
+not settled by the authorities and must be decided (recorded under OQ-08 scope). Additionally, a
+target photo-RETRIEVAL authorization obligation must be settled (FIND-SEC-004): who may VIEW personal
+performance media and at what hotel scope, so the OQ-03/OQ-09 no-scope pattern is NOT silently
+inherited by the M3 photo-serving path (recorded under OQ-08 scope). Warnings are worker-sensitive
 notifications.
 
 **Performance budgets/workload:** No explicit budgets or SLOs are defined in code or authority docs
 (`[OPEN DECISION]` OQ-07; blocked on ownership SYNC-001). Observations: the leaderboard is an
 UNPAGINATED `take 50` with `orderBy average_score desc` (`service.ts:214-223`); `average_score` is
-indexed (`schema.prisma:458`). The overall-rating recompute issues several aggregate/count queries in
+indexed (`@@index([average_score])`, `schema.prisma:457`). The overall-rating recompute issues several aggregate/count queries in
 a `Promise.all` per rating (`service.ts:136-159`). `[TARGET]` recency-weighting, tier derivation,
 warning checks, and a periodic rework-timer sweep add new workload; the timer runtime is
 node-cron/BullMQ on Redis (PIVOT ~line 165,190). Single-tenant-per-client deployment (PIVOT §5.1)
@@ -416,7 +451,7 @@ constraint. `[MIGRATION GAP]` enumeration:
 
 | Gap ID | Current state (evidence) | Target requirement (evidence) | Phase |
 |---|---|---|---|
-| MIG-GAP-01 | `Rating.score` is 1..5 stars (`schema.prisma:429`; `types.ts:18`); leaderboard orders by that 1–5 average (`service.ts:214-223`) | Score is **0–100, NO 5-star system** (CONFIRMED §15; PIVOT §4.6) — TREQ-001. HEADLINE contradiction (OQ-01) | M3 |
+| MIG-GAP-01 | `Rating.score` is 1..5 stars (`schema.prisma:429`; `types.ts:18`); leaderboard orders by that 1–5 average (`service.ts:214-223`) | Score is **0–100, NO 5-star system** (CONFIRMED §15; PIVOT §4.6) — TREQ-001. HEADLINE contradiction (OQ-01); classified **BREAKING** vs the unversioned baseline (FIND-DEP-002) | M3 |
 | MIG-GAP-02 | `WorkerOverallRating.average_score` = plain rolling average of 1–5 (`service.ts:161`; `schema.prisma:449`) | **Recency-weighted, last-10-weighted** 0–100 average (CONFIRMED §15; PIVOT §4.6, §7.5) — TREQ-004 | M3 |
 | MIG-GAP-03 | No rating tiers anywhere in code | **Elite/High/Standard/Low/Probation** label on top of the 0–100 score (CONFIRMED §15) — TREQ-003 | M3 |
 | MIG-GAP-04 | No warning logic and no WARNING notification type (`schema.prisma:108-110`) | Warnings <70 (first), <50 (second → also manager, manual) (CONFIRMED §16; PIVOT §7.5) — TREQ-006/007 | M3 |
@@ -427,10 +462,19 @@ constraint. `[MIGRATION GAP]` enumeration:
 
 **Backward compatibility:** current `/quality` endpoints are consumed by mobile-checker
 (`DEPENDENCY_GRAPH.yaml:281`) and the overall-rating aggregate is read by work-applications and
-analytics (`:174,238,245,252`); rescaling/replacing the 1–5 `Rating` (OQ-01) and redefining
-`average_score` (OQ-02) are cross-consumer breaking changes that MUST be assessed against those
-consumers. Because contracts are unversioned (baseline/UNKNOWN), any change must be assessed against a
-future versioned baseline. **Rollback:** feature-flag the target scoring/rework paths per the existing
+analytics (`:174,238,245,252`). The target 1–5→0–100 `Rating` change (OQ-01 / MIG-GAP-01) and the
+`average_score` redefinition (OQ-02) are classified **BREAKING** against the current unversioned
+baseline (FIND-DEP-002), gated on OQ-01/OQ-02 (no change made now). Two additional exposures the
+current consumer list understated:
+- `average_score` is re-exposed TRANSITIVELY to **mobile-worker** via `backend-analytics`
+  (`/analytics/leaderboard`, `analytics/service.ts:20-56`) → `mobile/worker-app/src/app/ratings.tsx:19`
+  → `api.ts:225`; edge `edge-mobile-worker-analytics` (`DEPENDENCY_GRAPH.yaml:275`) — a consumer NOT
+  in the module's direct list. Redefining `average_score`'s scale is worker-visible.
+- `backend-work-applications` PERSISTS a `worker_rating_snapshot` at apply time
+  (`work-applications/service.ts:64,77-78,92-93`), so historical 1–5 snapshots would COEXIST with new
+  0–100 values unless migrated — a data-coexistence hazard, not just a live-read change.
+Because contracts are unversioned (baseline/UNKNOWN), any change must be assessed against a future
+versioned baseline. **Rollback:** feature-flag the target scoring/rework paths per the existing
 `FEATURE_*` convention. **Removal criteria:** none — quality is a core capability.
 
 ## Validation Plan
@@ -468,13 +512,14 @@ Genuine remaining human-authority items (status OPEN). These are NOT resolved he
 | ID | Type | Description | Evidence/impact | Owner | Resolution/status |
 |---|---|---|---|---|---|
 | OQ-01 | decision | Does the shipped 1–5 `Rating` model get **rescaled, replaced, or retired** under the confirmed 0–100 no-5-star model? Headline product/architecture decision. | `schema.prisma:419-441`; `types.ts:18` vs CONFIRMED §15 | human/architecture | **OPEN — headline** |
-| OQ-02 | decision | `WorkerOverallRating.average_score` currently aggregates 1–5 `Rating.score` but is read as the worker's headline rating by work-applications (`service.ts:64`), analytics, and the leaderboard order. Under the 0–100 target, what scale/definition/recency-weighting does it carry? Cross-consumer contract. | `service.ts:161,214-223`; `work-applications/service.ts:64`; CONFIRMED §15 | human/architecture | **OPEN — cross-consumer** |
-| OQ-03 | decision | `getLeaderboard/by-hotel/:hotel_id` scope is a NO-OP for all quality roles (`checkHotelAccess` bypasses admin/manager/checker) and the global leaderboard orders by the 1–5 average. Intended cross-hotel visibility or a scoping defect? | `service.ts:204-223`; `permissions.ts:103-108` | human | **OPEN — cross-tenant** |
-| OQ-04 | decision | The `WorkerOverallRating` schema comment claims a DB trigger maintains it, but code upserts it in-app (`service.ts:174`). Dual-writer / source-of-truth ambiguity to resolve. | `schema.prisma:443`; `service.ts:174` | human/architecture | **OPEN** |
+| OQ-02 | decision | `WorkerOverallRating.average_score` currently aggregates 1–5 `Rating.score` but is read as the worker's headline rating by work-applications (`service.ts:64`), analytics, the leaderboard order, AND transitively by mobile-worker via `/analytics/leaderboard` (`analytics/service.ts:20-56`; `mobile/worker-app/src/app/ratings.tsx:19`→`api.ts:225`; `edge-mobile-worker-analytics` `DEPENDENCY_GRAPH.yaml:275`). Under the 0–100 target, what scale/definition/recency-weighting does it carry? Redefinition is BREAKING (FIND-DEP-002); work-applications also persists a `worker_rating_snapshot` (`work-applications/service.ts:64,77-78,92-93`) so historical 1–5 snapshots coexist unless migrated. Cross-consumer contract. | `service.ts:161,214-223`; `work-applications/service.ts:64,77-78,92-93`; `analytics/service.ts:20-56`; CONFIRMED §15 | human/architecture | **OPEN — cross-consumer, BREAKING** |
+| OQ-03 | decision | READ-side: `getLeaderboard/by-hotel/:hotel_id` scope is a NO-OP for all quality roles (`checkHotelAccess` bypasses admin/manager/checker) and the global leaderboard orders by the 1–5 average. Intended cross-hotel visibility or a scoping defect? **Severity Medium** (FIND-SEC-001): cross-hotel read of worker-performance ranking + worker email PII, bounded to cross-hotel WITHIN one client tenant (single-tenant-per-client, PIVOT §5.1), NOT cross-client. Routed WITH OQ-09 to a Risk Assessment for human acceptance (owner unassigned, OQ-06/SYNC-001). | `service.ts:204-223`; `permissions.ts:103-108` | human | **OPEN — cross-tenant (Medium)** |
+| OQ-09 | decision | WRITE-side cross-hotel authorization exposure (FIND-SEC-002): `createVerification`/`createRating` bind the actor to the assignment only, not its hotel; `checkHotelAccess()` is applied to no write route (`routes.ts:9,12`). Any `quality:write` holder can verify/rate ANY assignment at ANY hotel, mutating that worker's overall-rating / leaderboard / (target) warning state. Intended or defect? **Severity Medium**, bounded by single-tenant-per-client (PIVOT §5.1) + trusted staff; routed WITH OQ-03 to a Risk Assessment for human acceptance (owner unassigned, OQ-06/SYNC-001). No control invented here. | `service.ts:13-87,89-201`; `routes.ts:9,12,18` | human | **OPEN — cross-tenant (Medium)** |
+| OQ-04 | decision | `state-worker-overall-rating` has TWO SAME-OWNER write mechanisms: an INSTALLED DB trigger `Rating_refresh_overall_rating` (writes `average_score`/`total_ratings`/`last_worked_at` only, `migration.sql:588-631`) AND the app upsert (writes the full row, `service.ts:174`). They converge on the createRating path but any direct Rating UPDATE/DELETE lets the trigger rewrite the aggregate without the app-only fields (`total_assignments`/`completion_rate`/`on_time_rate`) — dual-writer / source-of-truth hazard read downstream by work-applications + leaderboard. Which mechanism is authoritative? | `backend/prisma/migrations/20260613120000_v2_marketplace_init/migration.sql:588-631`; `service.ts:174`; `schema.prisma:443` | human/architecture | **OPEN** |
 | OQ-05 | decision | `verified_by`/`rated_by` are `onDelete: Restrict` while worker/hotel are Cascade — deletion-behavior asymmetry to settle. | `schema.prisma:402,428` | human/architecture | **OPEN** |
-| OQ-06 | decision | Owner is `unassigned` (SYNC-001) — blocks accountable ownership and SLO-setting. | `MODULE_REGISTRY.yaml:119-129` | human | **OPEN** |
+| OQ-06 / SYNC-001 | decision | Owner is `unassigned` — blocks accountable ownership and SLO-setting. This row DEFINES the `SYNC-001` owner token for this artifact (canonical token: `TERMINOLOGY.md:44`); all inline `SYNC-001`/`OQ-06/SYNC-001` references resolve here. Cross-spec alignment with the attendance precedent (`attendance/MODULE_SPEC.md:461`) is routed to post-flight synchronization — the attendance spec is NOT edited here. | `MODULE_REGISTRY.yaml:119-129`; `TERMINOLOGY.md:44` | human | **OPEN** |
 | OQ-07 | decision | No performance budget/SLO for verification/rating/leaderboard latency; the leaderboard is an unpaginated `take 50`. | Code/authorities define none | human/unassigned | **OPEN** |
-| OQ-08 | decision | Where recency-weighting, tier derivation, and warnings LIVE (quality service vs a new job), whether they mutate `WorkerOverallRating` or a new structure, the tier thresholds, and the photo-retention policy — architecture decisions for M3. | CONFIRMED §14/§15/§16; PIVOT §7.5, §9.1 | human/architecture | **OPEN** |
+| OQ-08 | decision | Where recency-weighting, tier derivation, and warnings LIVE (quality service vs a new job), whether they mutate `WorkerOverallRating` or a new structure, the tier thresholds, the photo-RETENTION policy, and the target photo-RETRIEVAL authorization (who may view personal performance media + its hotel scope, FIND-SEC-004 — so the OQ-03/OQ-09 no-scope pattern is not inherited by the M3 photo-serving path) — architecture decisions for M3. | CONFIRMED §14/§15/§16; PIVOT §7.5, §9.1 | human/architecture | **OPEN** |
 
 Assumptions:
 
@@ -488,15 +533,21 @@ Assumptions:
 Proposed only — NOT applied. Application requires the appropriate synchronization gate.
 
 - **MODULE_REGISTRY.yaml:** set `specification` for `backend-quality` from `UNKNOWN` →
-  `SPEC-QUAL-001@0.1.0 (REVIEW)` (`MODULE_REGISTRY.yaml:119-129`). Do NOT alter `owner` (remains
-  `unassigned`, SYNC-001).
-- **DEPENDENCY_GRAPH.yaml:** no NEW current-state edges proposed — the existing edges
-  (`edge-quality-reads-worker-assignment`, `edge-quality-notifications`,
-  `edge-work-applications-reads-worker-overall-rating`, the three analytics-reads edges, and
-  `edge-mobile-checker-quality`) already reflect current reality. Consider recording the observed
-  `state-attendance` read used for `on_time_rate` if not already edged. NOTE (future, do not add yet):
-  the target adds a new `ReworkTask` model, a 20-minute scheduled rework-timer job, object-storage
-  (S3) photo edges, and WARNING notifications — these become graph edges when M3 is built.
+  `SPEC-QUAL-001@0.1.1 (REVIEW)` (`MODULE_REGISTRY.yaml:119-129`). Do NOT alter `owner` (remains
+  `unassigned`, OQ-06 / SYNC-001).
+- **DEPENDENCY_GRAPH.yaml:** REQUIRED current-state delta (FIND-DEP-001 / FIND-ARCH-003): the
+  `state-attendance` read that derives `on_time_rate` (`service.ts:147-149`, `tx.attendance.count`
+  where status PRESENT) is a genuine MISSING edge. ADD `edge-quality-reads-attendance` (source
+  `backend-quality`, target `state-attendance`, kind `reads-state`, status `observed`, evidence
+  `service.ts:147-149`) AND add `backend-quality` to `state-attendance.readers` (currently
+  `[backend-analytics]` only, `DEPENDENCY_GRAPH.yaml:466-471`). Housekeeping (FIND-DEP-003): when the
+  delta is applied, restamp `DEPENDENCY_GRAPH.yaml` `observed_revision` from `5b16be4` (line 3) to
+  `6e404ab`. The other existing edges (`edge-quality-reads-worker-assignment`,
+  `edge-quality-notifications`, `edge-work-applications-reads-worker-overall-rating`, the three
+  analytics-reads edges, and `edge-mobile-checker-quality`) already reflect current reality. NOTE
+  (future, do not add yet): the target adds a new `ReworkTask` model, a 20-minute scheduled
+  rework-timer job, object-storage (S3) photo edges, and WARNING notifications — these become graph
+  edges when M3 is built.
 - **TERMINOLOGY.md:** promote to canonical (no quality terms are canonical yet): `Quality
   verification`, `Quality score (0–100)`, `Rating`, `Worker overall rating`, `Rating tier`,
   `Warning (<70/<50)`, `Rework task`, `Recency-weighted average` — sourced to code + CONFIRMED
@@ -513,3 +564,4 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 | Version | Date | Change | Findings resolved | Approver |
 |---|---|---|---|---|
 | 0.1.0 | 2026-07-07 | Initial specification for `backend-quality` at `6e404ab`. Current-state reverse spec: REQ-001..018, RULE-001..010. Target layer from confirmed authorities: TREQ-001..010, TRULE-001..007 (all cited to CONFIRMED/PIVOT). MIGRATION GAP enumeration MIG-GAP-01..08. Recorded open decisions OQ-01 (1–5 vs 0–100 Rating reconciliation), OQ-02 (average_score semantics / cross-consumer), OQ-03 (by-hotel scope no-op / cross-tenant), OQ-04 (WorkerOverallRating trigger-vs-app source of truth), OQ-05 (Restrict-vs-Cascade deletion), OQ-06 (owner unassigned / SYNC-001), OQ-07 (no SLO / unpaginated leaderboard), OQ-08 (where tiers/weighting/warnings live + thresholds + photo retention). Flagged UNTESTED criteria: verification status thresholds, NEEDS_REWORK/FAILED notification branches, verification assignment-NotFound, rating assignment-NotFound + worker-mismatch, overall-rating aggregate math, leaderboard ordering + by-hotel scoping, checkHotelAccess bypass, audit writes. | None — REVIEW, not approved. | None — status REVIEW, G2 freeze reserved to human. |
+| 0.1.1 | 2026-07-07 | Applied merged dispositions from four independent PASS_WITH_ACTIONS reviews (architecture, dependency, consistency, security). No REQ/TREQ/RULE/TRULE/MIG-GAP/OQ ids renumbered. **FIND-ARCH-001**: reframed `state-worker-overall-rating` from "schema comment claim" to a CONFIRMED installed DB trigger `Rating_refresh_overall_rating` (`migration.sql:588-631`, writes average_score/total_ratings/last_worked_at only) PLUS the app upsert (full row) — two SAME-OWNER write mechanisms; dual-writer hazard kept as OQ-04; single-authoritative-writer statement reconciled. **FIND-ARCH-002**: softened `[TARGET]` M3 ownership to "candidate owner, pending OQ-08". **FIND-DEP-001/FIND-ARCH-003**: promoted the `state-attendance` read (`service.ts:147-149`) to a REQUIRED graph delta — new `edge-quality-reads-attendance` + add `backend-quality` to `state-attendance.readers`. **FIND-DEP-002**: classified the 1–5→0–100 Rating change (OQ-01/MIG-GAP-01) and average_score redefinition (OQ-02) as BREAKING; recorded transitive mobile-worker consumer via analytics (`edge-mobile-worker-analytics`) and the work-applications `worker_rating_snapshot` coexistence hazard. **FIND-DEP-003**: noted DEPENDENCY_GRAPH `observed_revision` restamp 5b16be4→6e404ab. **FIND-SEC-001**: added OQ-03 severity (Medium) + routed to Risk Assessment. **FIND-SEC-002**: added OQ-09 (write-side cross-hotel exposure) + Trust-boundaries note. **FIND-SEC-003**: recorded leaderboard worker-email PII disclosure. **FIND-SEC-004**: recorded target photo-retrieval authorization obligation under OQ-08. **FIND-CONS-001**: made OQ-06 the defining `SYNC-001` tracking row; cross-spec alignment routed to post-flight. **FIND-CONS-002**: citation 73,445→73,485-490. **FIND-CONS-003**: average_score index citation schema.prisma:458→457. | FIND-ARCH-001, FIND-ARCH-002, FIND-DEP-001, FIND-DEP-002, FIND-DEP-003, FIND-SEC-001, FIND-SEC-002, FIND-SEC-003, FIND-SEC-004, FIND-CONS-001, FIND-CONS-002, FIND-CONS-003. | None — status REVIEW, G2 freeze reserved to human. |
