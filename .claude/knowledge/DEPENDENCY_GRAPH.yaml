@@ -269,6 +269,7 @@ edges:
   # mobile-worker (Expo) via mobile/worker-app/src/lib/api.ts
   - { id: edge-mobile-worker-auth, source: mobile-worker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:61 (/auth); mobile/worker-app/src (/auth)" }
   - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)" }
+  - { id: edge-mobile-worker-work-applications, source: mobile-worker, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:173-183 (applications.apply/withdraw); app/job/[id].tsx:36,57" }  # added by SPEC-JOB-DISPATCH-001 dependency review (FIND-DEP-001)
   - { id: edge-mobile-worker-assignments, source: mobile-worker, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/assignments)" }
   - { id: edge-mobile-worker-attendance, source: mobile-worker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/attendance)" }
   - { id: edge-mobile-worker-analytics, source: mobile-worker, target: backend-analytics, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/analytics)" }
