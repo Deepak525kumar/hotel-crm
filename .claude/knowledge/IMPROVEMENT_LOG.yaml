@@ -63,3 +63,52 @@ records:
     confidence: High
     opened_at: "2026-07-05"
     updated_at: "2026-07-05"
+
+  - id: IMP-003
+    signal_class: documentation-drift
+    summary: >-
+      A reverse specification of implemented code (SPEC-JOB-DISPATCH-001) diverged from confirmed
+      target authority: the deployed marketplace apply/accept flow is explicitly retired by the
+      CONFIRMED_REQUIREMENTS_REGISTER/PIVOT_DESIGN_DOCUMENT two-tier model, yet no module spec had
+      recorded the current-vs-target gap. Multiple open questions raised during authoring (EXPIRED
+      owner, cross-module coupling, manager hotel-scoping) were in fact already resolved by an active
+      foundation document the initial context package did not include.
+    evidence:
+      - "docs/03-modules/job-dispatch/MODULE_SPEC.md (v0.2.0 Migration Gaps MIG-GAP-01..12)"
+      - "docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md:14,182-184,377-384 (WorkApplication removed)"
+      - "docs/00-foundations/CONFIRMED_REQUIREMENTS_REGISTER.md:190-226,437-439 (worker-applications = non-goal)"
+    occurrences: 1
+    recurrence_threshold: 2
+    status: open
+    proposed_improvement: >-
+      Pre-flight context assembly for any current-state module specification MUST include the active
+      target-state foundation documents (PIVOT_DESIGN_DOCUMENT, CONFIRMED_REQUIREMENTS_REGISTER) so
+      current-vs-target drift is surfaced before authoring and open questions are checked against
+      confirmed authority before being escalated. Consider adding a preflight checklist item:
+      "resolve open questions against active foundation docs before recording them as unknowns."
+    confidence: High
+    opened_at: "2026-07-07"
+    updated_at: "2026-07-07"
+
+  - id: IMP-004
+    signal_class: repeated-finding
+    summary: >-
+      Independent security and business-rule reviews both, separately, found the same unguarded
+      state mutation: PATCH /assignments/:id (assignments/service.ts:83-118) has no ownership/role/
+      hotel authorization, while a route comment asserts a non-existent "service-level guard." The
+      convergence of two independent reviewers on one defect indicates missing authorization-coverage
+      discipline for state-transition endpoints.
+    evidence:
+      - "backend/src/modules/assignments/service.ts:83-118; backend/src/modules/assignments/routes.ts:9-14 @f37a39b"
+      - "SPEC-JOB-DISPATCH-001 G4 Security review FIND-SEC-001 (Critical); Business-Rule review FIND-BRV-001 (High)"
+    occurrences: 1
+    recurrence_threshold: 2
+    status: open
+    proposed_improvement: >-
+      Add an authorization-coverage check to the security checklist and to preflight scope validation:
+      every state-mutating route must be traced to an explicit authorization guard (route or service),
+      and code comments asserting a guard must be verified against the implementation. Flag any
+      mutation whose actor identity is used only for audit logging, not for authorization.
+    confidence: High
+    opened_at: "2026-07-07"
+    updated_at: "2026-07-07"

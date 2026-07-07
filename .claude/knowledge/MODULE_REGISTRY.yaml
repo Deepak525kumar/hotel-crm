@@ -77,7 +77,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments; NOT frozen (G2 human)
     evidence: backend/src/routes/v1/index.ts:26; backend/src/modules/work-requests/service.ts:4
 
   - id: backend-work-applications
@@ -89,7 +89,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; NOT frozen (G2 human)
     evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
 
   - id: backend-assignments
@@ -101,7 +101,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; NOT frozen (G2 human)
     evidence: backend/src/routes/v1/index.ts:28
 
   - id: backend-attendance

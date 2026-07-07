@@ -80,6 +80,21 @@ known_drift:
       reserved human authority per Engineering Constitution §20.
     authority_needed: human
 
+  - id: SYNC-008
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-JOB-DISPATCH-001 (Job Dispatch & Assignment Management) authored at v0.2.0, status REVIEW
+      (docs/03-modules/job-dispatch/MODULE_SPEC.md). One bounded capability over backend-work-requests,
+      backend-work-applications, backend-assignments. Current-state marketplace behavior specified and
+      cross-checked against target authorities (PIVOT_DESIGN_DOCUMENT.md, CONFIRMED_REQUIREMENTS_REGISTER.md);
+      12 migration gaps recorded (marketplace apply/accept is retired by the confirmed two-tier calendar+broadcast
+      model). G4 reviews complete: architecture BLOCKED, security FAIL (1 Critical/2 High), dependency/consistency/
+      performance PASS_WITH_ACTIONS. G6 documentation-validation + QA and the v0.2.0 consistency re-review are
+      BLOCKED by an execution-session limit (environment) and must be completed before G2. All blocking findings
+      are human-authority items. Registry specification pointers updated to @0.2.0 (REVIEW). MODULE_SPEC NOT frozen.
+    authority_needed: human  # G2 freeze; OQ-01 CRITICAL remediation decision; SYNC-001 ownership; FIND-ARCH-003 coupling DR
+
 context_invalidators:
   - repository revision changes
   - default branch changes
