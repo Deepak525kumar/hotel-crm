@@ -119,6 +119,38 @@ known_drift:
       after SPEC-ATT-001/SPEC-QUAL-001 merged (PRs #109-#111).
     authority_needed: human  # G2 freeze; OQ-NOTIF-01 Decision Record; OQ-NOTIF-02 retention-tier decision; SYNC-001 ownership
 
+  - id: SYNC-010
+    type: specification
+    status: blocked
+    description: >-
+      SPEC-ANALYTICS-001 (Analytics) authored at v0.1.1, status REVIEW
+      (docs/03-modules/analytics/MODULE_SPEC.md). One bounded capability over backend-analytics —
+      a pure read-only, no-owned-state cross-module aggregator (leaderboard, dashboard stats,
+      hotel summary) reading six state domains owned by five other modules. Current-state behavior
+      reverse-specified (16 requirements, 6 rules) and cross-checked against target authorities
+      (PIVOT_DESIGN_DOCUMENT.md, CONFIRMED_REQUIREMENTS_REGISTER.md); 4 migration gaps recorded for
+      the confirmed "basic analytics" scope (active workers/day, rooms completed per worker,
+      rating/warning counts, sick/vacation counts per hotel) — one (rooms completed per worker,
+      OQ-ANALYTICS-03) directly conflicts with the confirmed no-room-level-task-layer decision and
+      is left unresolved as a blocking product question. G4 reviews complete: architecture/
+      dependency/consistency/performance all PASS_WITH_ACTIONS, zero Critical/High findings, all
+      author-fixable findings applied in v0.1.1. Security review returned **FAIL** (1 Critical,
+      1 Medium): `GET /analytics/leaderboard`(`/by-hotel/:hotel_id`) has no `requireRole`/
+      `checkHotelAccess` gate — any authenticated actor of any role can read any other hotel's
+      worker names + performance ratings, unlike this module's own `/stats`/`/hotel-summary` and
+      the sibling `/quality/leaderboard` route, which guards the identical `WorkerOverallRating`
+      data. This is a live defect in already-deployed code, not a documentation gap; v0.1.1 records
+      it as BLOCKING for G2 freeze per Constitution §12 pending a code fix or an authorized,
+      time-bounded Risk Assessment — it is NOT resolved by this specification. G6 documentation-
+      validation PASS_WITH_ACTIONS (one non-blocking Low finding, a dangling internal
+      cross-reference in Proposed Knowledge Deltas). 11 open decisions carried (OQ-ANALYTICS-01..11),
+      with OQ-ANALYTICS-01 (security Critical) and OQ-ANALYTICS-03 (rooms-completed-per-worker
+      conflict) both blocking further product/architecture progress. Dependency review additionally
+      confirmed `edge-analytics-reads-hotel-worker` is a genuine missing DEPENDENCY_GRAPH.yaml edge
+      (FIND-DEP-001) — proposed, not applied; requires a dependency-synchronization pass. Registry
+      specification pointer updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
+    authority_needed: human  # G2 freeze; OQ-ANALYTICS-01 Critical security fix-or-Risk-Assessment decision; OQ-ANALYTICS-03 rooms-completed-per-worker product decision; SYNC-001 ownership; OQ-ANALYTICS-11 platform-wide cross-module-read Decision Record
+
 context_invalidators:
   - repository revision changes
   - default branch changes
