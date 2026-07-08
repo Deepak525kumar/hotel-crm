@@ -384,14 +384,13 @@ contracts:
     version: unversioned
     owner_module: unassigned
     source: backend/src/middleware/permissions.ts
-    note: "requireRole / requirePermission / checkHotelAccess authorization guards."
+    note: "requireRole / requirePermission / checkHotelAccess authorization guards. backend-assignments removed from consumers 2026-07-08 (SPEC-AUTH-001 dependency review FIND-001, independently confirmed by architecture review): backend/src/modules/assignments/routes.ts imports only authMiddleware, not middleware/permissions; its comments cite service-level guards instead of route-level RBAC."
     consumers:
       - backend-users
       - backend-crm
       - backend-hotel-workers
       - backend-work-requests
       - backend-work-applications
-      - backend-assignments
       - backend-attendance
       - backend-quality
       - backend-hr

@@ -18,8 +18,10 @@ status: verified-inventory
 # reserved human authority). REVIEW-status specifications now exist and are
 # reflected below for backend-work-requests/work-applications/assignments
 # (SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1),
-# and backend-analytics (SPEC-ANALYTICS-001@0.1.1 — security review FAIL,
-# 1 Critical/1 Medium, unresolved and blocking G2; see SYNC_STATE.yaml SYNC-010).
+# backend-analytics (SPEC-ANALYTICS-001@0.1.1 — security review FAIL,
+# 1 Critical/1 Medium, unresolved and blocking G2; see SYNC_STATE.yaml SYNC-010),
+# and backend-auth (SPEC-AUTH-001@0.2.1 — security review FAIL, 1 Critical/4 High,
+# unresolved and blocking G2; see SYNC_STATE.yaml SYNC-011).
 # Known drift (non-blocking, out of scope for the sessions that added this note):
 # docs/03-modules/attendance/MODULE_SPEC.md and docs/03-modules/quality/MODULE_SPEC.md
 # were authored and merged but this registry's `specification` field for
@@ -37,7 +39,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-AUTH-001@0.2.1 (REVIEW)  # docs/03-modules/auth/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/performance all PASS_WITH_ACTIONS, zero Critical/High); security review FAIL (1 Critical, 4 High) against live code -- unauthenticated token-less password-reset account takeover (Critical), JWT refresh-secret fallback, checkHotelAccess admin/manager/checker blanket bypass, cleartext Session.refresh_token storage, and absent MFA (all High); G6-doc PASS_WITH_ACTIONS. NOT frozen (G2 human); Security FAIL blocks G2 pending a code fix or an authorized Risk Assessment (see SYNC_STATE.yaml SYNC-011).
     evidence: backend/src/routes/v1/index.ts:22
 
   - id: backend-users

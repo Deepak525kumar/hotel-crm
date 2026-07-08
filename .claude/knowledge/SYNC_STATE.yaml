@@ -151,6 +151,54 @@ known_drift:
       specification pointer updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
     authority_needed: human  # G2 freeze; OQ-ANALYTICS-01 Critical security fix-or-Risk-Assessment decision; OQ-ANALYTICS-03 rooms-completed-per-worker product decision; SYNC-001 ownership; OQ-ANALYTICS-11 platform-wide cross-module-read Decision Record
 
+  - id: SYNC-011
+    type: specification
+    status: blocked
+    description: >-
+      SPEC-AUTH-001 (Authentication & Authorization) authored at v0.2.1, status REVIEW
+      (docs/03-modules/auth/MODULE_SPEC.md). One bounded capability over backend-auth (signup,
+      login, refresh, logout, password-reset, profile; auth-middleware contract owned by
+      backend-auth and consumed by every other active backend module; permissions-middleware
+      contract, owner unassigned, documented here as the functional RBAC mechanism this
+      capability depends on though not owned or consumed by backend-auth itself; User/Session
+      state, User shared-write with backend-users per SYNC-005). Current-state behavior
+      reverse-specified (24 requirements, 9 rules) and paired with 10 target-state requirements/
+      6 target rules drawn from CONFIRMED_REQUIREMENTS_REGISTER.md §1/§2/§25/§27 and
+      PIVOT_DESIGN_DOCUMENT.md §4.1/§4.3/§4.13/§5.2/§5.3/§5.4/§9.1/§9.3/§10/§12 (5-role model
+      adding Regional Manager, JWT scope claim, MFA for managers, email-mediated forgot-password,
+      failed-login manager notification); 8 migration gaps recorded. G4 reviews complete:
+      architecture/dependency/consistency/performance all PASS_WITH_ACTIONS, zero Critical/High
+      findings, all author-fixable findings applied in v0.2.0. Security review returned **FAIL**
+      (1 Critical, 4 High) against live backend-auth code: `POST /auth/password-reset` is public,
+      token-less, and unconditionally overwrites any active account's password_hash + revokes all
+      sessions from only a known email address (Critical — "a complete, self-service,
+      zero-interaction account-takeover primitive against every active account in the system");
+      JWT_REFRESH_SECRET silently falls back to JWT_SECRET when unset, collapsing access/refresh
+      token-type separation; checkHotelAccess() gives admin/manager/checker a blanket,
+      zero-DB-query bypass, so no hotel-scope is enforced for those roles; Session.refresh_token
+      is stored in cleartext (no hash-at-rest, unlike password_hash); and zero MFA exists anywhere
+      to compensate for the above given CONFIRMED §2 requires it for Hotel Manager and above (all
+      High). The reviewer independently confirmed the specification's documentation of every one
+      of these behaviors is accurate and complete — the FAIL attaches to the underlying code, not
+      to the document — mirroring the SYNC-010 precedent for SPEC-ANALYTICS-001. v0.2.0 records
+      this as BLOCKING for G2 freeze per Constitution §12 pending a code fix or an authorized,
+      time-bounded Risk Assessment; it is NOT resolved by this specification. G6 documentation-
+      validation PASS_WITH_ACTIONS (three non-blocking Medium/Low findings — a self-contradictory
+      route-protection count, a stale registry-delta target version, an off-by-one test citation —
+      corrected in v0.2.1). 15 open decisions carried (OQ-AUTH-01..15), with OQ-AUTH-05 (password-
+      reset, Critical), OQ-AUTH-04 (refresh-secret fallback, High), OQ-AUTH-06 (checkHotelAccess
+      bypass, High), and OQ-AUTH-15 (cleartext session tokens, High, new from security review) all
+      blocking. Dependency review additionally confirmed DEPENDENCY_GRAPH.yaml's
+      permissions-middleware.consumers incorrectly included backend-assignments (FIND-001,
+      independently corroborated by architecture review) — corrected directly in this
+      synchronization pass (backend/src/modules/assignments/routes.ts imports only authMiddleware,
+      not middleware/permissions). Registry specification pointer updated to @0.2.1 (REVIEW).
+      MODULE_SPEC NOT frozen (G2 human). TERMINOLOGY.md updated with Session/Access token/Refresh
+      token/auth-middleware/permissions-middleware/Scope/Regional Manager proposed entries and
+      [TARGET] cross-notes on the four existing role rows, per the spec's own Proposed Knowledge
+      Deltas.
+    authority_needed: human  # G2 freeze; OQ-AUTH-05 Critical password-reset fix-or-Risk-Assessment decision; OQ-AUTH-04/06/15 High fix-or-Risk-Assessment decisions; OQ-AUTH-02 MFA storage model; OQ-AUTH-07 permissions-middleware ownership reassignment; SYNC-001 ownership; SYNC-005 state-user dual-writer
+
 context_invalidators:
   - repository revision changes
   - default branch changes
