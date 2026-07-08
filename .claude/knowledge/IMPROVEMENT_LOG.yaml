@@ -112,3 +112,66 @@ records:
     confidence: High
     opened_at: "2026-07-07"
     updated_at: "2026-07-07"
+
+  - id: IMP-005
+    signal_class: repeated-finding
+    summary: >-
+      Independent security review has now returned a G4 FAIL against a module specification's
+      accurately-and-completely-documented current-state code twice in a row: SPEC-ANALYTICS-001
+      (1 Critical/1 Medium, an unguarded leaderboard route exposing cross-hotel worker data) and
+      SPEC-AUTH-001 (1 Critical/4 High, most severely an unauthenticated, token-less POST
+      /auth/password-reset that unconditionally overwrites any active account's password and
+      revokes its sessions). In both cases the reviewer explicitly confirmed the specification's
+      documentation of the behavior was accurate and complete before the review even ran, and the
+      defect was a pre-existing live-code condition the documentation workflow surfaced as a side
+      effect of reverse-specifying current state, not something introduced by authoring. Both
+      cases discovered a genuinely exploitable, already-deployed defect only at G4 — deep into a
+      multi-hour, multi-agent documentation pipeline — rather than earlier.
+    evidence:
+      - "SPEC-ANALYTICS-001 v0.1.1, .claude/knowledge/SYNC_STATE.yaml SYNC-010 (security FAIL, OQ-ANALYTICS-01 Critical)"
+      - "SPEC-AUTH-001 v0.2.1, .claude/knowledge/SYNC_STATE.yaml SYNC-011 (security FAIL, OQ-AUTH-05 Critical, OQ-AUTH-04/06/15 High)"
+    occurrences: 2
+    recurrence_threshold: 2
+    status: escalated
+    proposed_improvement: >-
+      Since this repository is pre-launch with no production employee data (PIVOT_DESIGN_DOCUMENT.md
+      §10), these are documentation-discovered live defects, not yet field-exploited ones -- but the
+      pattern (two-for-two: every module spec authored so far that touches an authorization or
+      trust-boundary surface has uncovered a Critical/High live defect) suggests a light-weight,
+      targeted security pass during Pre-flight or Requirements scoping -- before the full multi-hour
+      G4 pipeline runs -- would surface exploitable defects faster and let engineering start a fix
+      in parallel with documentation authoring rather than waiting for G4. Escalated per Constitution
+      §22 for human disposition: consider adding an explicit "known-risk endpoint" fast-path (e.g. a
+      narrow, early security-only pass over public/unauthenticated mutating endpoints and any route
+      with a blanket role-bypass) to the Documentation Workflow's Pre-flight step, ahead of full G4.
+    confidence: High
+    opened_at: "2026-07-08"
+    updated_at: "2026-07-08"
+
+  - id: IMP-006
+    signal_class: synchronization-failure
+    summary: >-
+      Post-flight knowledge synchronization for SPEC-AUTH-001 inserted 7 new rows into
+      TERMINOLOGY.md's Project Term Candidates table, shifting every line below the insertion
+      point by +7. Six literal line-number citations pinned into three already-authored,
+      REVIEW-status sibling specs (analytics, calendar, quality) silently resolved to the wrong
+      table row afterward (a separator or an unrelated row, not an error) rather than failing
+      loudly. Caught only by the post-flight Consistency Reviewer's explicit repository-wide grep
+      for `TERMINOLOGY.md:<line>` citations, not by any automated check.
+    evidence:
+      - ".claude/knowledge/TERMINOLOGY.md (SYNC-001 owner-token row: line 44 -> 51; none-observed row: line 45 -> 52, commit 189335c)"
+      - "docs/03-modules/analytics/MODULE_SPEC.md:22,268,494; docs/03-modules/calendar/MODULE_SPEC.md:274; docs/03-modules/quality/MODULE_SPEC.md:210,520 (corrected in commit 289a86a)"
+    occurrences: 1
+    recurrence_threshold: 2
+    status: open
+    proposed_improvement: >-
+      Cross-artifact citations into a shared, append-only knowledge file (TERMINOLOGY.md,
+      MODULE_REGISTRY.yaml, DEPENDENCY_GRAPH.yaml) should reference a stable anchor -- the term
+      name or a stable row id -- rather than a literal line number, wherever the citation's own
+      purpose is "point at this canonical token" rather than "point at this exact historical
+      revision." Post-flight synchronization workflow should add a repository-wide check for
+      `<knowledge-file>:<line>`-style citations whenever the cited file is edited, so a shifted
+      citation is caught mechanically rather than only by an agent's manual grep.
+    confidence: Medium
+    opened_at: "2026-07-08"
+    updated_at: "2026-07-08"
