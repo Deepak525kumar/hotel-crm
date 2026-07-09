@@ -1,0 +1,46 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: accountable owner per module, shared contract, and state
+  domain (framework 1.2.0). Derived from MODULE_REGISTRY.yaml + DEPENDENCY_GRAPH.yaml;
+  summarizes them and never outranks them (knowledge/README.md Rule 3). Consumed by
+  boundary-collision (G1.5) to detect ownership collisions without re-reading the
+  registry/graph. `unassigned` is an evidence-backed value (no CODEOWNERS; empty
+  package.json author), never an invented owner (SYNC-001, blocked, human authority).
+scope: project-runtime
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, .claude/knowledge/DEPENDENCY_GRAPH.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+module_owners:  # every module owner is unassigned by evidence (SYNC-001)
+  default: unassigned
+  note: All 20 registered modules have owner=unassigned; no CODEOWNERS exists and backend/package.json author is empty.
+
+contract_owners:
+  - { contract: notification-service, owner_module: backend-notifications }
+  - { contract: auth-middleware, owner_module: backend-auth }
+  - { contract: prisma-schema, owner_module: unassigned }
+  - { contract: base-service, owner_module: unassigned }
+  - { contract: permissions-middleware, owner_module: unassigned }  # OQ-AUTH-07 reassignment pending (SYNC-011)
+  - { contract: validation-middleware, owner_module: unassigned }
+
+state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDEX for full writer/reader sets)
+  - { domain: state-session, authoritative_writer: backend-auth }
+  - { domain: state-hotel, authoritative_writer: backend-crm }
+  - { domain: state-hotel-worker, authoritative_writer: backend-hotel-workers }
+  - { domain: state-work-request, authoritative_writer: backend-work-requests }
+  - { domain: state-work-application, authoritative_writer: backend-work-applications }
+  - { domain: state-worker-assignment, authoritative_writer: backend-assignments }
+  - { domain: state-attendance, authoritative_writer: backend-attendance }
+  - { domain: state-quality-verification, authoritative_writer: backend-quality }
+  - { domain: state-rating, authoritative_writer: backend-quality }
+  - { domain: state-worker-overall-rating, authoritative_writer: backend-quality }
+  - { domain: state-notification, authoritative_writer: backend-notifications }
+  - { domain: state-user, authoritative_writer: UNKNOWN }       # auth + users both write (SYNC-005, human)
+  - { domain: state-audit-log, authoritative_writer: UNKNOWN }  # shared via BaseService.logAudit (SYNC-005, human)
+
+collision_flags:  # bearing-unknown ownership that G1.5 must escalate rather than silently pass
+  - state-user: dual-writer (backend-auth, backend-users); authoritative writer is a human decision
+  - state-audit-log: shared-write via BaseService; no single owner
+  - all module/contract owners: unassigned pending human assignment (SYNC-001)
+
+invalidated_by: [architecture or ownership decision, MODULE_REGISTRY/DEPENDENCY_GRAPH revision change]

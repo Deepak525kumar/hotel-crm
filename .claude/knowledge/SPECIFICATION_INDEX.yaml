@@ -1,0 +1,99 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: module → specification status, version, and path (framework
+  1.2.0). Derived from MODULE_REGISTRY.yaml; summarizes it and never outranks it
+  (knowledge/README.md Rule 3). Consumed by pre-flight, boundary-collision, and
+  documentation to answer "does a spec exist / is it frozen?" without re-reading
+  the full registry. Revision-bound; invalidated by a specification status change.
+scope: project-runtime
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+# status ∈ { FROZEN, REVIEW, UNKNOWN }. No spec is FROZEN (G2 is reserved human
+# authority). REVIEW specs blocked by unresolved Critical/High security findings
+# are flagged; see SYNC_STATE.yaml SYNC-008..011.
+
+specifications:
+  - module: backend-auth
+    spec: SPEC-AUTH-001
+    version: 0.2.1
+    status: REVIEW
+    path: docs/03-modules/auth/MODULE_SPEC.md
+    freeze_blocked_by: security FAIL (1 Critical/4 High); G2 human (SYNC-011)
+  - module: backend-work-requests
+    spec: SPEC-JOB-DISPATCH-001
+    version: 0.2.0
+    status: REVIEW
+    path: docs/03-modules/job-dispatch/MODULE_SPEC.md
+    freeze_blocked_by: architecture BLOCKED, security FAIL (1 Critical/2 High); G2 human (SYNC-008)
+  - module: backend-work-applications
+    spec: SPEC-JOB-DISPATCH-001
+    version: 0.2.0
+    status: REVIEW
+    path: docs/03-modules/job-dispatch/MODULE_SPEC.md
+    note: one bounded capability shared with work-requests + assignments
+  - module: backend-assignments
+    spec: SPEC-JOB-DISPATCH-001
+    version: 0.2.0
+    status: REVIEW
+    path: docs/03-modules/job-dispatch/MODULE_SPEC.md
+  - module: backend-notifications
+    spec: SPEC-NOTIF-001
+    version: 0.1.1
+    status: REVIEW
+    path: docs/03-modules/notifications/MODULE_SPEC.md
+    note: G4 all PASS_WITH_ACTIONS, zero Critical/High; G6-doc PASS_WITH_ACTIONS; G2 human (SYNC-009)
+  - module: backend-analytics
+    spec: SPEC-ANALYTICS-001
+    version: 0.1.1
+    status: REVIEW
+    path: docs/03-modules/analytics/MODULE_SPEC.md
+    freeze_blocked_by: security FAIL (1 Critical/1 Medium); G2 human (SYNC-010)
+  - module: backend-attendance
+    spec: SPEC-ATT-001
+    version: UNKNOWN
+    status: REVIEW
+    path: docs/03-modules/attendance/MODULE_SPEC.md
+    note: spec merged (PRs #109-#111) but MODULE_REGISTRY.specification never synchronized (known drift, SYNC-009 tail)
+  - module: backend-quality
+    spec: SPEC-QUAL-001
+    version: 0.1.1
+    status: REVIEW
+    path: docs/03-modules/quality/MODULE_SPEC.md
+    note: spec merged but MODULE_REGISTRY.specification never synchronized (known drift)
+  - module: backend-users
+    spec: none
+    status: UNKNOWN
+  - module: backend-crm
+    spec: none
+    status: UNKNOWN
+  - module: backend-hotel-workers
+    spec: none
+    status: UNKNOWN
+  - module: backend-hr
+    spec: none
+    status: UNKNOWN
+  - module: backend-calendar
+    spec: none
+    status: UNKNOWN
+  - module: backend-chatbot
+    spec: none
+    status: UNKNOWN  # placeholder-unregistered stub
+  - module: backend-geo
+    spec: none
+    status: UNKNOWN  # placeholder-unregistered stub
+  - module: frontend-web
+    spec: none
+    status: UNKNOWN
+  - module: mobile-worker
+    spec: none
+    status: UNKNOWN
+  - module: mobile-checker
+    spec: none
+    status: UNKNOWN
+  - module: operations
+    spec: none
+    status: UNKNOWN
+
+invalidated_by: [specification status/version change, new spec authored/frozen, MODULE_REGISTRY revision change]

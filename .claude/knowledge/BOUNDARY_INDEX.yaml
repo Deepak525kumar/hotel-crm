@@ -1,0 +1,120 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: module → its ownership footprint (owned state domains, owned
+  contracts, owned API mounts, accountable owner) for the Boundary Collision gate
+  (G1.5, framework 1.2.0). This is the consolidated per-module view that
+  boundary-collision reads to detect ownership collisions in one lookup instead of
+  cross-referencing OWNERSHIP/STATE_OWNERSHIP/CONTRACT/API indexes separately.
+  Derived from MODULE_REGISTRY.yaml + DEPENDENCY_GRAPH.yaml; summarizes them and
+  never outranks them (knowledge/README.md Rule 3).
+scope: project-runtime
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, .claude/knowledge/DEPENDENCY_GRAPH.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+# A module "owns" a state domain when it is that domain's authoritative_writer, a
+# contract when it is the contract's owner_module, and an API when it is the mount's
+# module. A collision at G1.5 is any scoped change that would give a second owner to
+# an already-owned item, write a domain whose authoritative_writer is another module
+# or UNKNOWN, or contradict a business-rule authority.
+
+modules:
+  - module: backend-auth
+    owner: unassigned
+    owned_state: [state-session]
+    shared_write_state: [state-user]   # dual-writer with backend-users (collision, SYNC-005)
+    owned_contracts: [auth-middleware]
+    owned_apis: [/api/v1/auth]
+    boundary: Authentication, session issuance, authorization middleware.
+  - module: backend-users
+    owner: unassigned
+    owned_state: []
+    shared_write_state: [state-user]
+    owned_contracts: []
+    owned_apis: [/api/v1/users]
+    boundary: User CRUD; shares User writes with backend-auth.
+  - module: backend-crm
+    owner: unassigned
+    owned_state: [state-hotel]
+    owned_contracts: []
+    owned_apis: [/api/v1/crm]
+    boundary: Hotel/CRM records.
+  - module: backend-hotel-workers
+    owner: unassigned
+    owned_state: [state-hotel-worker]
+    owned_contracts: []
+    owned_apis: ["/api/v1/crm/hotels/:hotel_id/workers"]
+    boundary: Hotel-worker roster; reads state-hotel, state-user.
+  - module: backend-work-requests
+    owner: unassigned
+    owned_state: [state-work-request]
+    owned_contracts: []
+    owned_apis: [/api/v1/work-requests]
+    boundary: Work-request lifecycle; state-work-request also written by work-applications (accept tx coupling).
+  - module: backend-work-applications
+    owner: unassigned
+    owned_state: [state-work-application]
+    cross_module_writes: [state-work-request, state-worker-assignment, state-attendance]  # accept-application tx (approved-coupling decision pending)
+    owned_contracts: []
+    owned_apis: ["/api/v1/work-requests/:id/applications"]
+    boundary: Applications + accept-application transaction provisioning other domains.
+  - module: backend-assignments
+    owner: unassigned
+    owned_state: [state-worker-assignment]   # record created by work-applications, owned/updated here
+    owned_contracts: []
+    owned_apis: [/api/v1/assignments]
+    boundary: Worker assignment lifecycle.
+  - module: backend-attendance
+    owner: unassigned
+    owned_state: [state-attendance]
+    owned_contracts: []
+    owned_apis: [/api/v1/attendance]
+    boundary: Attendance records; seeded by work-applications accept tx.
+  - module: backend-quality
+    owner: unassigned
+    owned_state: [state-quality-verification, state-rating, state-worker-overall-rating]
+    owned_contracts: []
+    owned_apis: [/api/v1/quality]
+    boundary: Quality verification + ratings aggregation.
+  - module: backend-notifications
+    owner: unassigned
+    owned_state: [state-notification]
+    owned_contracts: [notification-service]
+    owned_apis: [/api/v1/notifications]
+    boundary: Notification persistence + fan-out contract consumed by four modules.
+  - module: backend-analytics
+    owner: unassigned
+    owned_state: []   # pure read-only aggregator, no owned state
+    owned_contracts: []
+    owned_apis: [/api/v1/analytics]
+    boundary: Read-only cross-module aggregation (leaderboard/stats/hotel-summary). Reads 6 domains owned by others; leaderboard route missing authorization (Critical, SYNC-010).
+  - module: backend-hr
+    owner: unassigned
+    owned_state: []
+    owned_apis: [/api/v1/hr]
+    boundary: Stub (NotImplementedError); mounted + consumed by mobile-worker.
+  - module: backend-calendar
+    owner: unassigned
+    owned_state: []
+    owned_apis: [/api/v1/calendar]
+    boundary: Stub (NotImplementedError); mounted, no consumer.
+  - module: frontend-web
+    owner: unassigned
+    boundary: Next.js web client; consumes-api only, owns no backend state/contract.
+  - module: mobile-worker
+    owner: unassigned
+    boundary: Expo worker client; consumes-api only.
+  - module: mobile-checker
+    owner: unassigned
+    boundary: Expo checker client; consumes-api only.
+  - module: operations
+    owner: unassigned
+    boundary: Infrastructure/deploy surface; deploys-to backend + frontend.
+
+unregistered_or_shared:
+  - { item: state-user, note: dual-writer backend-auth/backend-users — UNKNOWN authoritative writer (G1.5 collision) }
+  - { item: state-audit-log, note: shared-write via BaseService.logAudit — no single owner (G1.5 collision) }
+  - { item: prisma-schema / base-service / permissions-middleware / validation-middleware, note: owner unassigned (shared contracts) }
+  - { item: backend-chatbot / backend-geo, note: placeholder-unregistered stubs; no footprint }
+
+invalidated_by: [architecture or ownership decision, schema/contract/API change, MODULE_REGISTRY/DEPENDENCY_GRAPH revision change]

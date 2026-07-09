@@ -1,0 +1,32 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: state domain → authoritative writer, all writers, and readers
+  (framework 1.2.0). Derived from DEPENDENCY_GRAPH.yaml state_domains; summarizes it
+  and never outranks it (knowledge/README.md Rule 3). Consumed by boundary-collision
+  (G1.5) to detect cross-module state-write collisions and by architecture review.
+  Designating a single authoritative writer where UNKNOWN remains reserved human
+  authority (Constitution §7; SYNC-005).
+scope: project-runtime
+derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+state_domains:
+  - { domain: state-user, model: User, authoritative_writer: UNKNOWN, writers: [backend-auth, backend-users], readers: [backend-hotel-workers], collision: dual-writer (human decision, SYNC-005) }
+  - { domain: state-session, model: Session, authoritative_writer: backend-auth, writers: [backend-auth], readers: [backend-auth] }
+  - { domain: state-hotel, model: Hotel, authoritative_writer: backend-crm, writers: [backend-crm], readers: [backend-work-requests, backend-hotel-workers] }
+  - { domain: state-hotel-worker, model: HotelWorker, authoritative_writer: backend-hotel-workers, writers: [backend-hotel-workers], readers: [backend-work-requests, backend-work-applications, backend-assignments] }
+  - { domain: state-work-request, model: WorkRequest, authoritative_writer: backend-work-requests, writers: [backend-work-requests, backend-work-applications], readers: [backend-work-applications, backend-analytics], collision: cross-module write by work-applications in accept-application tx (approved-coupling decision pending, DEPENDENCY_GRAPH remaining_human_decisions) }
+  - { domain: state-work-application, model: WorkApplication, authoritative_writer: backend-work-applications, writers: [backend-work-applications], readers: [backend-work-requests] }
+  - { domain: state-worker-assignment, model: WorkerAssignment, authoritative_writer: backend-assignments, writers: [backend-assignments, backend-work-applications], readers: [backend-quality, backend-attendance, backend-analytics], collision: record created by work-applications in accept tx, owned/updated by assignments }
+  - { domain: state-attendance, model: Attendance, authoritative_writer: backend-attendance, writers: [backend-attendance, backend-work-applications], readers: [backend-analytics], collision: seeded by work-applications in accept tx }
+  - { domain: state-quality-verification, model: QualityVerification, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-analytics] }
+  - { domain: state-rating, model: Rating, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-analytics] }
+  - { domain: state-worker-overall-rating, model: WorkerOverallRating, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-work-applications, backend-analytics] }
+  - { domain: state-notification, model: Notification, authoritative_writer: backend-notifications, writers: [backend-notifications], readers: [backend-notifications] }
+  - { domain: state-audit-log, model: AuditLog, authoritative_writer: UNKNOWN, writers: [shared-via-base-service], readers: [], collision: shared-write via BaseService.logAudit; no single owner (human decision, SYNC-005) }
+
+cross_module_write_couplings:  # G1.5 must treat these as ownership-bearing
+  - backend-work-applications writes state-work-request, state-worker-assignment, state-attendance during accept-application transaction (backend/src/modules/work-applications/service.ts:219-283)
+
+invalidated_by: [schema change, ownership/state decision, DEPENDENCY_GRAPH revision change]
