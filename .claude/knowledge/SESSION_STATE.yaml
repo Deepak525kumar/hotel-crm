@@ -4,7 +4,7 @@ purpose: >-
   Artifacts across multiple workflows within one repository revision so
   repository discovery, dependency slicing, and boot-policy loading are NOT
   repeated per workflow. Canonical mechanism is defined once in
-  constitution/CONTEXT_ARTIFACTS.md §9; this file is the machine-readable
+  constitution/CONTEXT_ARTIFACTS.md §6; this file is the machine-readable
   per-session record and is never a substitute for current repository truth.
 scope: project-runtime  # session instances are project runtime state; the mechanism is framework
 canonical_policy: .claude/constitution/CONTEXT_ARTIFACTS.md

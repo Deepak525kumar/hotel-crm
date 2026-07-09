@@ -199,9 +199,50 @@ known_drift:
       Deltas.
     authority_needed: human  # G2 freeze; OQ-AUTH-05 Critical password-reset fix-or-Risk-Assessment decision; OQ-AUTH-04/06/15 High fix-or-Risk-Assessment decisions; OQ-AUTH-02 MFA storage model; OQ-AUTH-07 permissions-middleware ownership reassignment; SYNC-001 ownership; SYNC-005 state-user dual-writer
 
+  - id: SYNC-012
+    type: framework-change
+    status: resolved-pending-ratification
+    description: >-
+      Platform v1.2.0 implemented as backward-compatible, fail-safe extensions:
+      the reusable Context Artifacts (constitution/CONTEXT_ARTIFACTS.md), LOOP_CONTROL
+      §7 Incremental Correction and §8 Evidence Reuse, the pre-authoring Boundary
+      Collision gate G1.5 (workflows/boundary-collision.md; REVIEW_GATES.md),
+      Repository Session mode (SESSION_STATE.yaml), Module Memory (MODULE_MEMORY.yaml),
+      Dependency-slice caching (ART-DEPCTX), and six canonical lookup indexes
+      (SPECIFICATION/OWNERSHIP/STATE_OWNERSHIP/CONTRACT/API/BOUNDARY). Independent
+      architecture/dependency/consistency/security/performance reviews were run on
+      the change set; architecture initially FAILed on two contained defects (version
+      not bumped; missing Decision Record), both remediated (VERSION.yaml -> 1.2.0;
+      ADR-009). All other reviews PASS_WITH_ACTIONS; findings applied or tracked (see
+      .claude/PLATFORM_V1_2_VALIDATION.md). VERSION.yaml bumped 1.1.0 -> 1.2.0.
+      Constitutional additions trace to ADR-009 and preserve every prior guarantee;
+      formal human ratification of the constitutional articles (CONTEXT_ARTIFACTS,
+      LOOP_CONTROL §7-8, gate G1.5) remains reserved human authority per Engineering
+      Constitution §20.
+    authority_needed: human  # ADR-009 ratification (Proposed -> Accepted); constitutional articles
+
 context_invalidators:
   - repository revision changes
   - default branch changes
   - architecture or ownership decision
   - canonical terminology or business-rule change
   - contract, event, schema, package, or consumer change
+  - specification status or version change  # invalidates SPECIFICATION_INDEX and affected Module Memory
+  - framework version change  # invalidates Boot Context
+
+cache_state:
+  # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
+  # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
+  # A follow-up session inherits warm, revision-bound context from these records
+  # instead of rediscovering it. Single authoritative writer: Lead Architect.
+  baseline_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+  framework_version: 1.2.0
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.2.0, valid: unbound }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: unbound }
+  dependency_context:  { slices: [], key: baseline_revision+capability }
+  module_memory:       { modules: [], key: module+freeze-revision }
+  note: >-
+    No Context Artifact instance has been produced at a bound revision yet under
+    1.2.0; the first pre-flight to run repository-synchronization binds these.
+    On any doubt about validity, an artifact is treated as stale and reproduced
+    (CONTEXT_ARTIFACTS.md §1 invariant 5).

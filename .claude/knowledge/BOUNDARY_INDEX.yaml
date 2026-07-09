@@ -87,7 +87,7 @@ modules:
     owned_state: []   # pure read-only aggregator, no owned state
     owned_contracts: []
     owned_apis: [/api/v1/analytics]
-    boundary: Read-only cross-module aggregation (leaderboard/stats/hotel-summary). Reads 6 domains owned by others; leaderboard route missing authorization (Critical, SYNC-010).
+    boundary: Read-only cross-module aggregation (leaderboard/stats/hotel-summary). Reads 6 graphed domains owned by others plus state-hotel-worker via a known-missing edge (edge-analytics-reads-hotel-worker, SYNC-010/FIND-DEP-001) = 7; leaderboard route missing authorization (Critical, SYNC-010).
   - module: backend-hr
     owner: unassigned
     owned_state: []

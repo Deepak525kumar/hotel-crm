@@ -13,7 +13,7 @@ observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
 
 module_owners:  # every module owner is unassigned by evidence (SYNC-001)
   default: unassigned
-  note: All 20 registered modules have owner=unassigned; no CODEOWNERS exists and backend/package.json author is empty.
+  note: All 19 registered modules have owner=unassigned; no CODEOWNERS exists and backend/package.json author is empty.
 
 contract_owners:
   - { contract: notification-service, owner_module: backend-notifications }

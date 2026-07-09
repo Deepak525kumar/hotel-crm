@@ -19,7 +19,7 @@ Independently identify dependency, contract, package, and synchronization conseq
 
 ## Entry Conditions
 
-Frozen artifact/diff and the capability's **Dependency Context** slice (`ART-DEPCTX-<capability>`, an immutable reusable graph slice, [CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §2.3) are available; reviewer did not author input. The reviewer consumes the slice rather than traversing the full `DEPENDENCY_GRAPH`, and inspects the repository only to verify a finding or to produce/confirm the slice on a cache miss.
+Frozen artifact/diff and the capability's **Dependency Context** slice (`ART-DEPCTX-<capability>`, an immutable reusable graph slice, [CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §2.3) are available; reviewer did not author input. The reviewer consumes the slice rather than traversing the full `DEPENDENCY_GRAPH`, and inspects the repository only to verify a finding or to verify/confirm the slice on a cache miss (the Lead Architect is the single writer of ART-DEPCTX).
 
 ## Exit Conditions
 

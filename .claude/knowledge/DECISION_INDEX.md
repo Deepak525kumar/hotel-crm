@@ -14,6 +14,7 @@ Decision records belong in the project’s authoritative decision directory and 
 | ADR-006 | AWS Deployment Architecture | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-006-aws-deployment-architecture.md` | Production deployment & edge | — |
 | ADR-007 | Agent-Based Engineering Workflow | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-007-agent-based-engineering-workflow.md` | Engineering execution model | — |
 | ADR-008 | Source of Truth Hierarchy | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-008-source-of-truth-hierarchy.md` | Truth resolution policy | — |
+| ADR-009 | Context-Artifact Token-Optimization Architecture (Platform v1.2) | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md` | Engineering operating system (`.claude/`); adds Context Artifacts, gate G1.5, LOOP_CONTROL §7-8 | — |
 
 ## Unratified Architecture Claims
 

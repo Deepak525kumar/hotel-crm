@@ -8,11 +8,27 @@ schema_version: 1
 
 platform:
   name: AI Engineering Platform
-  current_version: 1.1.0
+  current_version: 1.2.0
   status: Stable
-  released: "2026-07-05"
+  released: "2026-07-09"
 
 history:
+  - version: 1.2.0
+    status: Stable
+    released: "2026-07-09"
+    summary: >-
+      Context-artifact / token-optimization release. Adds the reusable
+      revision-bound Context Artifacts (Boot Context, Evidence Package,
+      Dependency Context, Context Package, Finding/Correction/Review Package,
+      Module Memory), Repository Session mode, the pre-authoring Boundary
+      Collision gate (G1.5), Incremental Correction and Affected-Reviewer
+      Determination, Dependency-slice caching, and six canonical lookup
+      indexes. Discover-once / reuse-by-reference / invalidate-by-digest.
+      Backward compatible and fail-safe: absent any cache, behavior equals
+      1.1.0; no gate, finding schema, confidence rule, loop bound, or
+      specialist boundary is removed or weakened. Constitutional additions
+      (CONTEXT_ARTIFACTS, LOOP_CONTROL 7-8, gate G1.5) trace to ADR-009 and
+      remain pending formal human ratification (Constitution 20; SYNC-012).
   - version: 1.1.0
     status: Stable
     released: "2026-07-05"
@@ -29,5 +45,7 @@ history:
       operating system (constitution, workflows, agents, templates, checklists,
       knowledge layer).
 
-# 1.1.0 supersedes 1.0.0 as the current stable line. 1.0.0 remains valid history.
-# The 1.1.0 change set is additive; no breaking changes (see CHANGELOG).
+# 1.2.0 supersedes 1.1.0 as the current stable line. 1.1.0 and 1.0.0 remain valid history.
+# The 1.2.0 change set is additive and fail-safe; no breaking changes (see CHANGELOG).
+# Constitutional additions in 1.2.0 trace to ADR-009; formal human ratification is
+# reserved human authority per Engineering Constitution 20 (see SYNC_STATE.yaml SYNC-012).

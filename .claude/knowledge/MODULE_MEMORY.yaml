@@ -8,7 +8,7 @@ purpose: >-
   is a CORROBORATING summary, never authoritative over current repository truth;
   on disagreement the repository wins and drift is recorded (Constitution §5;
   Source of Truth §Authority Hierarchy). Canonical mechanism: constitution/
-  CONTEXT_ARTIFACTS.md §10.
+  CONTEXT_ARTIFACTS.md §7.
 scope: project-runtime  # memory instances are project runtime state; the mechanism is framework
 canonical_policy: .claude/constitution/CONTEXT_ARTIFACTS.md
 version_source: .claude/VERSION.yaml

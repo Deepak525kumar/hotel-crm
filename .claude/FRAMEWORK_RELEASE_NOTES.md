@@ -6,7 +6,7 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml).
 
 **Release Date:** 2026-07-05
 
-**Status:** Stable (current)
+**Status:** Superseded by 1.2.0
 
 ---
 
@@ -22,6 +22,30 @@ Highlights:
 - **Version truth reconciled.** A single canonical `VERSION.yaml` now governs the framework version; all version-bearing artifacts reference it.
 
 Compatibility: no breaking changes; no migration required.
+
+---
+
+## Version 1.2.0
+
+**Release Date:** 2026-07-09
+
+**Status:** Stable (current)
+
+---
+
+Version 1.2.0 is the context-artifact / token-optimization release. It reduces total token consumption by making repository, boot, and dependency discovery a produce-once, reuse-by-reference operation, and by making correction and review incremental — while preserving every workflow, validation gate, specialist boundary, and governance guarantee. It is backward compatible and fail-safe: absent any cache, behavior equals 1.1.0.
+
+Highlights:
+
+- **Reusable Context Artifacts.** Boot Context, Evidence Package, Dependency Context, Context Package, Finding/Correction/Review Package, and Module Memory (`constitution/CONTEXT_ARTIFACTS.md`) — discovered once per scope, consumed by reference, invalidated by digest.
+- **Repository Session mode.** Revision-bound artifacts reused across workflows (`knowledge/SESSION_STATE.yaml`); repository discovery runs at most once per `baseline_revision`.
+- **Boundary Collision gate (G1.5).** Pre-authoring, read-only detection of ownership collisions before authoring budget is spent (`workflows/boundary-collision.md`).
+- **Incremental correction & review.** Only reviewers whose domain intersects the changed sections rerun; conservative unknown-⇒-rerun default (`LOOP_CONTROL.md` §7; `REVIEW_GATES.md` Incremental Re-review).
+- **Dependency-slice caching & six canonical indexes.** Reviewers consume slices and O(1) lookups instead of traversing the full graph/registry.
+
+Governance: no gate removed or weakened; G1.5 is additive (no renumbering); reviewer independence, finding schema, confidence rules, and loop bounds unchanged. Constitutional additions trace to ADR-009 and remain pending formal human ratification (Constitution §20).
+
+Compatibility: no breaking changes; no migration required (cache-miss degrades to 1.1.0 behavior).
 
 ---
 
@@ -296,7 +320,7 @@ Breaking changes will be explicitly documented within the changelog and accompan
 
 # Future Roadmap
 
-Version 1.1.0 delivered the platform-audit improvements (bounded loops, registries, standardized findings, learning loop, version-truth reconciliation). Planned objectives for Version 1.2.0 include:
+Version 1.1.0 delivered the platform-audit improvements (bounded loops, registries, standardized findings, learning loop, version-truth reconciliation). Version 1.2.0 delivered the context-artifact / token-optimization work (above). Planned objectives for a subsequent Version 1.3.0 include:
 
 - Runtime enforcement mechanisms
 - Ownership registry completion

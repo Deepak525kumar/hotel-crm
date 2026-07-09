@@ -6,7 +6,7 @@ purpose: >-
   documentation to answer "does a spec exist / is it frozen?" without re-reading
   the full registry. Revision-bound; invalidated by a specification status change.
 scope: project-runtime
-derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml]
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md]  # attendance/quality specs exist in docs but MODULE_REGISTRY.specification still reads UNKNOWN (known drift, SYNC-009 tail); index reflects the docs, registry sync pending
 version_source: .claude/VERSION.yaml
 observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
 

@@ -13,7 +13,9 @@ This document is the single canonical definition of the reusable **Context Artif
 
 ## 1. Design Invariants
 
-1. **Discover once.** Repository discovery ([repository-synchronization](../workflows/repository-synchronization.md)) runs at most once per `baseline_revision` per repository session (§9). Its output is the Evidence Package. Specialists **consume** it; they do not re-run discovery.
+The five invariants below are cited elsewhere as §1.1–§1.5 in list order.
+
+1. **Discover once.** Repository discovery ([repository-synchronization](../workflows/repository-synchronization.md)) runs at most once per `baseline_revision` per repository session (§6). Its output is the Evidence Package. Specialists **consume** it; they do not re-run discovery.
 2. **Revision-bound immutability.** Evidence is immutable for its `baseline_revision`. Only a repository change — the `context_invalidators` recorded in [`../knowledge/SYNC_STATE.yaml`](../knowledge/SYNC_STATE.yaml) — invalidates it.
 3. **Reference over copy.** Every Context Package carries pointers plus content digests into Boot Context, Evidence Package, and Dependency Context, never inlined copies (extends Constitution §17: "path-and-line evidence … over repeated full documents").
 4. **Verify, do not rediscover.** A reviewer inspects the repository **only to verify a specific finding**, never to rediscover implementation the Evidence Package already carries ([REVIEW_GATES.md](REVIEW_GATES.md) Independent Review Protocol, step 1b).
@@ -46,7 +48,7 @@ Every artifact declares **Producer · Consumers · Cache key · Lifecycle · Inv
 
 ### 2.2 Evidence Package (Repository Context) — `ART-EVID-001`
 - **Producer:** Lead Architect via [repository-synchronization](../workflows/repository-synchronization.md); its `ART-REPO-001..003` are the body.
-- **Contents:** Repository State Record, protected-change list, source manifest / divergence report, plus content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the Phase-7 canonical indexes.
+- **Contents:** Repository State Record, protected-change list, source manifest / divergence report, plus content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the six canonical lookup indexes.
 - **Cache key:** `baseline_revision` (+ default-branch id).
 - **Lifecycle:** revision-scoped; immutable while worktree/HEAD unchanged.
 - **Invalidation:** exactly the `SYNC_STATE.yaml.context_invalidators` (repository revision, default branch, architecture/ownership decision, terminology/rule change, contract/event/schema/package/consumer change).
@@ -86,12 +88,12 @@ Every artifact declares **Producer · Consumers · Cache key · Lifecycle · Inv
 - **Cache key:** reviewer × candidate version.
 - **Reuse:** on re-review only the sections intersecting the Correction Package are re-examined; the rest is carried forward by reference.
 
-### 2.8 Module Memory — `ART-MEM-<module>` (see §10)
+### 2.8 Module Memory — `ART-MEM-<module>` (see §7)
 - **Producer:** Lead Architect on specification freeze (G2).
 - **Contents:** immutable, revision-bound distilled summary of a frozen module specification — boundary, owned state, contracts, interfaces, key rules, and the freeze revision.
 - **Cache key:** module id + freeze revision.
 - **Invalidation:** a new frozen specification for the module, or a change to the module's owned state/contracts (a `context_invalidator`).
-- **Reuse:** consumed **before** repository discovery by any future specification touching that module (§10).
+- **Reuse:** consumed **before** repository discovery by any future specification touching that module (§7).
 
 ## 3. Cache, Invalidation, and Synchronization
 
@@ -113,8 +115,9 @@ Each `SYNC_STATE.yaml.context_invalidators` trigger binds to the caches it inval
 | default branch changes | Evidence Package |
 | architecture or ownership decision | Evidence Package, Boundary-Collision result, affected Dependency Context, OWNERSHIP/BOUNDARY indexes |
 | canonical terminology or business-rule change | Boot Context (if constitutional), consistency-domain Review Packages |
-| contract / event / schema / package / consumer change | Dependency Context slice(s) touching the edge; dependency/architecture Review Packages; CONTRACT/API/STATE_OWNERSHIP indexes |
+| contract / event / schema / package / consumer change | Dependency Context slice(s) touching the edge; dependency/architecture Review Packages; CONTRACT/API/STATE_OWNERSHIP/OWNERSHIP/BOUNDARY indexes |
 | framework version change | Boot Context |
+| specification status/version change | SPECIFICATION_INDEX; affected Module Memory |
 
 Rules: (1) invalidation **cascades downstream only** (Evidence → Context Package → Review Package), never upstream; (2) a partial invalidation (one edge) invalidates only the intersecting slice, not the whole Evidence Package; (3) on any uncertainty, treat as stale and reproduce (§1.5).
 
@@ -144,7 +147,7 @@ A specialist expands a reference to full text **only** to verify a specific clai
 
 Reuse is of **evidence**, never of peer **conclusions**. Every reviewer still receives only the immutable candidate and never the author's proposed fixes or peers' in-flight findings before the review-merge sync point ([documentation.md](../workflows/documentation.md) §Context Packages; [REVIEW_GATES.md](REVIEW_GATES.md) Independent Review Protocol step 3). Finding schema, confidence thresholds, the four gate statuses, single-responsibility boundaries, loop bounds (≤3), and termination guarantees are unchanged. Absent any cache, the platform behaves exactly as framework 1.1.0.
 
-## 9. Repository Session (framework 1.2.0)
+## 6. Repository Session (framework 1.2.0)
 
 A **Repository Session** persists revision-bound Context Artifacts across multiple workflows within one repository revision so discovery is not repeated per workflow.
 
@@ -153,7 +156,7 @@ A **Repository Session** persists revision-bound Context Artifacts across multip
 - **Invalidation:** any `context_invalidator` clears the affected artifact from the session; the whole session invalidates when `baseline_revision` or the default branch changes.
 - **Boundary:** a session never carries evidence across a revision change; stale-session reuse is forbidden (§1.5 fail-safe).
 
-## 10. Module Memory (framework 1.2.0)
+## 7. Module Memory (framework 1.2.0)
 
 Each frozen module specification produces an immutable **Module Memory** artifact (`ART-MEM-<module>`) so future specifications consume a distilled, revision-bound module summary **before** repository discovery, narrowing what discovery must re-read.
 

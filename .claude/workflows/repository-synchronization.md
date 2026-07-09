@@ -19,7 +19,7 @@ Create a non-destructive, revision-bound view of current worktree, default branc
 
 ## Evidence Package (framework 1.2.0)
 
-`ART-REPO-001..003` are the **body of the Evidence Package** (`ART-EVID-001`, [Context Artifacts](../constitution/CONTEXT_ARTIFACTS.md) §2.2). On completion the Lead Architect stamps each record with the `baseline_revision` and the content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the Phase-7 canonical indexes, then records the Evidence Package validity in [`../knowledge/SESSION_STATE.yaml`](../knowledge/SESSION_STATE.yaml). This makes the discovery reusable by reference for every downstream workflow at the same revision; discovery re-runs only when a `context_invalidator` fires. The read-only, non-destructive guarantee is unchanged.
+`ART-REPO-001..003` are the **body of the Evidence Package** (`ART-EVID-001`, [Context Artifacts](../constitution/CONTEXT_ARTIFACTS.md) §2.2). On completion the Lead Architect stamps each record with the `baseline_revision` and the content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the six canonical lookup indexes, then records the Evidence Package validity in [`../knowledge/SESSION_STATE.yaml`](../knowledge/SESSION_STATE.yaml). This makes the discovery reusable by reference for every downstream workflow at the same revision; discovery re-runs only when a `context_invalidator` fires. The read-only, non-destructive guarantee is unchanged.
 
 ## Entry Conditions
 

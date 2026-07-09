@@ -33,7 +33,7 @@ Lead Architect (owner — holds global ownership awareness, Constitution §7); h
 
 ```
 Lead Architect (scoped change + ART-EVID-001 + canonical indexes)
-  ↓ read OWNERSHIP_INDEX, BOUNDARY_INDEX, CONTRACT_INDEX, API_INDEX, STATE_OWNERSHIP_INDEX (by reference; no new discovery)
+  ↓ read BOUNDARY_INDEX (consolidated footprint) first; consult an atomic index (OWNERSHIP/STATE_OWNERSHIP/CONTRACT/API) only when its extra fields are needed (by reference; no new discovery)
 Lead Architect — collision detection across the seven dimensions
   ├─ no collision → G1.5 PASS → authoring authorized
   └─ collision    → ART-BOUNDARY-001 (Boundary Conflict Report, canonical finding shape)
@@ -43,7 +43,7 @@ Lead Architect — collision detection across the seven dimensions
 ## Execution Order
 
 1. Identify the scoped change's claimed responsibilities, owned state, business rules, interfaces, contracts, APIs, and state ownership.
-2. Look up each against the canonical indexes (Phase-7) via the Evidence Package — no repository re-inspection.
+2. Look up each against BOUNDARY_INDEX first (the consolidated per-module footprint), consulting an atomic index only when a field it lacks is needed, via the Evidence Package — no repository re-inspection.
 3. Detect a collision when the scoped change would give a second owner to an already-owned responsibility/state/contract/API, contradict a business-rule authority, or write a state domain whose authoritative writer is another module or `unknown`.
 4. If any collision or bearing `unknown` exists, emit `ART-BOUNDARY-001` and set G1.5 `FAIL`; stop before authoring.
 5. Otherwise record G1.5 `PASS` and authorize the downstream authoring/planning workflow.
@@ -52,7 +52,7 @@ Lead Architect — collision detection across the seven dimensions
 
 ### Lead Architect
 
-- **Inputs:** Scoped change (`ART-PREFLIGHT-001`/`ART-REQ-*`); `ART-EVID-001`; `OWNERSHIP_INDEX.yaml`, `BOUNDARY_INDEX.yaml`, `CONTRACT_INDEX.yaml`, `API_INDEX.yaml`, `STATE_OWNERSHIP_INDEX.yaml` (by reference).
+- **Inputs:** Scoped change (`ART-PREFLIGHT-001`/`ART-REQ-*`); `ART-EVID-001`; `BOUNDARY_INDEX.yaml` (consolidated footprint) by reference, plus the atomic indexes (`OWNERSHIP_INDEX`/`STATE_OWNERSHIP_INDEX`/`CONTRACT_INDEX`/`API_INDEX`) only on demand.
 - **Outputs:** G1.5 status; on collision, `ART-BOUNDARY-001` Boundary Conflict Report (canonical finding shape per [REVIEWER_FINDINGS.md](../constitution/REVIEWER_FINDINGS.md)).
 - **Next Consumer:** Downstream authoring/planning workflow (on `PASS`); human (on `FAIL`/`BLOCKED`).
 
@@ -71,7 +71,7 @@ None (single-agent, single-pass gate). G1.5 is itself a synchronization barrier:
 ### Lead Architect receives
 
 - The scoped change and its claimed ownership footprint.
-- `ART-EVID-001` reference + the five canonical-index slices relevant to the footprint. Nothing else (no full graph, no source re-read).
+- `ART-EVID-001` reference + the BOUNDARY_INDEX slice for the footprint; atomic-index slices (OWNERSHIP/STATE_OWNERSHIP/CONTRACT/API) only when a needed field is absent from BOUNDARY_INDEX. Nothing else (no full graph, no source re-read).
 
 ## Status Report
 
