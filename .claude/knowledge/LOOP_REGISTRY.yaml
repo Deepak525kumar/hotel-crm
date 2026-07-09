@@ -38,6 +38,32 @@ loops:
     required_gates: [G0]
     restart_conditions: Repository revision, objective, frozen input, architecture, ownership, or dependency change.
 
+  - id: boundary-collision
+    loop_type: Critic
+    owner: Lead Architect
+    objective: Detect ownership/boundary collisions before authoring so conflict is not paid for with a full author→review cycle.
+    metric: G1.5 evaluates every collision dimension against the canonical indexes; result recorded.
+    boundary: One scoped change at one baseline_revision; single pass; no correction sub-loop.
+    retry_policy: Re-run only on scope change or Evidence Package invalidation (LOOP_CONTROL §3).
+    escalation_policy: Confirmed collision or bearing ownership unknown → human; authoring stays blocked (Constitution §7/§18).
+    confidence_threshold: High
+    produced_artifacts: [Boundary Conflict Report (ART-BOUNDARY-001), G1.5 gate record]
+    required_gates: [G1.5]
+    restart_conditions: Scope change, ownership decision resolving the collision, or Evidence Package invalidation.
+
+  - id: dependency-slice
+    loop_type: Discovery
+    owner: Lead Architect
+    objective: Produce a reusable immutable dependency-graph slice for one capability so reviewers consume it instead of rediscovering graph state.
+    metric: Slice captures every edge/state-domain the capability touches, verified by dependency-review; recorded as ART-DEPCTX-<capability>.
+    boundary: Read-only slice at one baseline_revision; sub-loop of pre-flight; no correction sub-loop.
+    retry_policy: Re-slice only on contract/event/schema/package/consumer change touching the slice (LOOP_CONTROL §3, §8).
+    escalation_policy: Missing/ambiguous edge (e.g., missing DEPENDENCY_GRAPH edge) → dependency-synchronization/human.
+    confidence_threshold: High
+    produced_artifacts: [Dependency Context slice (ART-DEPCTX-<capability>)]
+    required_gates: [G0]  # emitted within pre-flight's G0
+    restart_conditions: Contract/event/schema/package/consumer change touching the slice; baseline_revision change.
+
   - id: requirements
     loop_type: Pipeline
     owner: Requirements Analyst

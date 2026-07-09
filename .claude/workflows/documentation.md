@@ -19,7 +19,7 @@ Author, independently review, validate, and freeze an authoritative specificatio
 
 ## Entry Conditions
 
-G0 passes; G1 passes for behavior-bearing documents; owner, template, and target authority are known.
+G0 passes; G1 passes for behavior-bearing documents; **G1.5 Boundary Collision passes** ([boundary-collision](boundary-collision.md)) — authoring an owned specification does not begin while an ownership/boundary collision is open; owner, template, and target authority are known.
 
 ## Exit Conditions
 

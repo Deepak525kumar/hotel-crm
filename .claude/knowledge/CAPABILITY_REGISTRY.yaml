@@ -34,6 +34,28 @@ capabilities:
       may: [classify sources, bind claims to revisions]
       must_not: [treat inferred as confirmed, resolve same-rank conflict without escalation]
 
+  - id: boundary-collision-detection
+    responsible_agent: lead-architect
+    required_inputs: [scoped change footprint, Evidence Package, canonical indexes]
+    produced_outputs: [Boundary Conflict Report (ART-BOUNDARY-001), G1.5 gate record]
+    applicable_workflows: [boundary-collision, preflight]
+    applicable_gates: [G1.5]
+    dependencies: [repository-truth-resolution]
+    authority:
+      may: [detect ownership/boundary collisions from indexes, stop authoring on collision]
+      must_not: [assign an owner, author the artifact, resolve an ownership conflict without human authority]
+
+  - id: context-artifact-production
+    responsible_agent: lead-architect
+    required_inputs: [repository truth, dependency graph, framework version]
+    produced_outputs: [Boot Context, Evidence Package, Dependency Context, Module Memory, cache-state records]
+    applicable_workflows: [preflight, repository-synchronization, documentation]
+    applicable_gates: [G0, G2]
+    dependencies: [repository-truth-resolution]
+    authority:
+      may: [produce/cache/invalidate revision-bound Context Artifacts, stamp digests]
+      must_not: [promote a cached summary over current repository truth, reuse a stale artifact across a revision change]
+
   - id: requirements-analysis
     responsible_agent: requirements-analyst
     required_inputs: [objective, current-state evidence, product authority]

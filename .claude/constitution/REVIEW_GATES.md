@@ -28,6 +28,7 @@ The Owner column names the gate owner. Where the owner and evidence producer wou
 |---|---|---|---|
 | G0 Pre-flight | Any task work | Lead Architect | synchronized repo state, drift checks, scope, context manifest |
 | G1 Requirements | Specification authoring | Requirements Analyst | confirmed requirements, unknowns resolved or excluded |
+| G1.5 Boundary Collision | Authoring / planning of an owned artifact | Lead Architect | ownership/boundary collision check across responsibilities, owned state, business rules, interfaces, contracts, APIs, state ownership (see [boundary-collision](../workflows/boundary-collision.md)) |
 | G2 Specification Freeze | Implementation planning | Human approver | versioned spec, acceptance criteria, approval record |
 | G3 Plan Review | Code changes | Implementation Planner | mapped tasks, risks, validation, rollback |
 | G4 Independent Reviews | Approval of docs/code | Applicable reviewers | architecture, dependency, consistency, security/performance findings |
@@ -39,6 +40,7 @@ The Owner column names the gate owner. Where the owner and evidence producer wou
 
 ## Applicability Rules
 
+- **Boundary collision (G1.5):** any workflow that authors an owned artifact (documentation, implementation). `NOT_APPLICABLE` only when the change claims no ownership footprint (e.g., a purely editorial edit). Runs before authoring/planning, read-only, from the Evidence Package and canonical indexes.
 - **Architecture review:** module boundary, ownership, state, public contract, infrastructure topology, architectural pattern, or constitutional change.
 - **Dependency review:** package change or any module/API/event/schema/shared-contract edge change.
 - **Consistency review:** all documentation, specification, terminology, shared rule, or cross-module changes.
@@ -63,12 +65,22 @@ Every actionable finding has an ID, evidence, violated criterion, impact, requir
 ## Independent Review Protocol
 
 1. Freeze and identify the review input.
+   1b. Load the Evidence Package (`ART-EVID-001`) and the reviewer's Context Package for the frozen input; use them as the discovered context. Repository inspection is permitted **only to verify a specific finding**, never to rediscover implementation ([CONTEXT_ARTIFACTS.md](CONTEXT_ARTIFACTS.md) §1.4). Reuse of evidence never means reuse of another reviewer's conclusions (step 3 stands).
 2. Dispatch architecture, dependency, consistency, security, and performance reviews independently where applicable.
 3. Reviewers do not read one another’s conclusions before submitting initial findings.
-4. Merge duplicate findings without losing evidence or severity.
-5. Return findings to the author for correction.
-6. Re-review changed areas and regression risk.
-7. Run independent validation.
+4. Merge duplicate findings without losing evidence or severity (recorded as the Finding Package, `ART-FIND-PKG-001`).
+5. Return findings to the author for correction (author emits a Correction Package, `ART-CORR-001`).
+6. Re-review changed areas and regression risk — **only the reviewers in the affected-reviewer union** (see Incremental Re-review).
+7. Run independent validation on the affected dimensions.
+
+## Incremental Re-review (framework 1.2.0)
+
+Correction re-review does only the work a change requires ([LOOP_CONTROL.md](LOOP_CONTROL.md) §7). Given a Correction Package with changed sections `S`:
+
+- **Affected-Reviewer Determination:** reviewer `R` reruns **iff** `domain(R) ∩ sections-touching(S) ≠ ∅`, where `domain(R)` is the reviewer's Applicability Rule above. Example: a terminology-only edit reruns Consistency; an auth-flow edit reruns Security; a purely local wording fix in an unowned section reruns none.
+- **Carry-forward:** a reviewer outside the union carries its prior gate result and finding dispositions forward unchanged (its evidence was invalidated only "for the changed area," which its domain does not touch, [LOOP_CONTROL.md](LOOP_CONTROL.md) §3).
+- **Conservative default:** if a section→domain mapping is `unknown`, the reviewer **reruns** — an unknown is never a silent skip ([LOOP_CONTROL.md](LOOP_CONTROL.md) §4).
+- **Unchanged guarantees:** reviewer independence (step 3), the canonical finding shape, severity/disposition, confidence thresholds, and the rule that critical/high open findings block merge are all preserved. Incremental re-review changes only *which* reviewers rerun, never *whether* a blocking finding gates.
 
 ## Merge Policy
 

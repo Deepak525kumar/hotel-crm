@@ -19,7 +19,7 @@ Plan and implement a frozen specification with bounded scope, traceability, safe
 
 ## Entry Conditions
 
-G0 and G2 pass; exact frozen spec, review dispositions, affected ownership, and dependencies are known.
+G0 and G2 pass; **G1.5 Boundary Collision passes** for the change footprint ([boundary-collision](boundary-collision.md)) — planning does not begin while an ownership/boundary collision is open (for a change entering from a frozen spec, G1.5 is confirmed against the spec's ownership footprint); exact frozen spec, review dispositions, affected ownership, and dependencies are known.
 
 ## Exit Conditions
 
