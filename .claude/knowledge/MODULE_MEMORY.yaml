@@ -1,0 +1,45 @@
+schema_version: 1
+purpose: >-
+  Index of immutable, revision-bound Module Memory artifacts (framework 1.2.0).
+  Each frozen module specification (G2) produces one ART-MEM-<module> entry: a
+  distilled summary (boundary, owned state, contracts, interfaces, key rules)
+  bound to the freeze revision. Future specifications consume the relevant entry
+  BEFORE repository discovery to narrow what discovery must re-read. Module Memory
+  is a CORROBORATING summary, never authoritative over current repository truth;
+  on disagreement the repository wins and drift is recorded (Constitution §5;
+  Source of Truth §Authority Hierarchy). Canonical mechanism: constitution/
+  CONTEXT_ARTIFACTS.md §10.
+scope: project-runtime  # memory instances are project runtime state; the mechanism is framework
+canonical_policy: .claude/constitution/CONTEXT_ARTIFACTS.md
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+# An entry is created ONLY at G2 specification freeze (reserved human authority).
+# No frozen module specification exists yet in this project: every module spec is
+# REVIEW status (SPEC-JOB-DISPATCH-001@0.2.0, SPEC-NOTIF-001@0.1.1,
+# SPEC-ANALYTICS-001@0.1.1, SPEC-AUTH-001@0.2.1, SPEC-ATT-001, SPEC-QUAL-001), so
+# this index is intentionally empty of memory entries and carries only the schema.
+
+entry_schema:
+  required: [artifact, module, freeze_revision, spec, summary, authority, invalidated_by]
+  fields:
+    artifact: ART-MEM-<module>
+    module: <module id from MODULE_REGISTRY.yaml>
+    freeze_revision: <sha at G2 freeze>
+    spec: <ART-SPEC id> v<X.Y.Z> (FROZEN)
+    summary:
+      boundary: <one-line responsibility>
+      owned_state: [<state domains from STATE_OWNERSHIP_INDEX>]
+      owned_contracts: [<contract ids from CONTRACT_INDEX>]
+      interfaces: [<public interfaces from API_INDEX>]
+      key_rules: [RULE-*]
+    authority: corroborating
+    invalidated_by: [new frozen spec for module, owned-state/contract change]
+
+module_memory: []  # populated on each G2 freeze; empty until the first spec is frozen (human authority)
+
+production_rule:
+  produced_at: G2 specification freeze
+  producer: Lead Architect (from the frozen ART-SPEC)
+  consumed_at: pre-flight of any future workflow whose scope touches the module — before repository discovery
+  consumed_as: first-pass corroborating source; never a substitute for the Evidence Package at the current revision

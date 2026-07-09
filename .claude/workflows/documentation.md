@@ -52,6 +52,7 @@ Documentation Validator — objective compliance check
   ↓ ART-VAL-001 (documentation dimensions)
 Human approver — target-state / decision content approval
   ↓ ART-SPEC-001 vX.Y.Z (FROZEN)
+Lead Architect — produce Module Memory (ART-MEM-<module>) from the frozen spec; record in MODULE_MEMORY.yaml
 G2 record + documentation portion of G6 record
 ```
 
@@ -189,7 +190,7 @@ New requirement, architecture decision, authority conflict, canonical-source amb
 
 ## Artifacts Produced
 
-Versioned document, evidence manifest, independent review reports, finding/disposition log, Validation Report, approval record.
+Versioned document, evidence manifest, independent review reports, Finding Package (`ART-FIND-PKG-001`), Correction Package(s) (`ART-CORR-001`), Review Packages (`ART-REV-PKG-*`), Validation Report, approval record, and — on freeze — Module Memory (`ART-MEM-<module>`) recorded in `MODULE_MEMORY.yaml`.
 
 ## Failure Handling
 
