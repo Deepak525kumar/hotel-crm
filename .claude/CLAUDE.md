@@ -6,6 +6,7 @@ This repository uses a documentation-first, evidence-gated engineering operating
 
 Before any engineering activity:
 
+0. Load or reuse the **Boot Context** (`ART-BOOT-001`) keyed to [VERSION.yaml](VERSION.yaml) `current_version`, and reuse any valid **Repository Session** Context Artifacts for the current `baseline_revision` (see [Context Artifacts](constitution/CONTEXT_ARTIFACTS.md)). If a valid Boot Context exists for the current framework version, reference it instead of re-reading the documents in steps 1–2 and 5; steps 1–6 are the **producers** of Boot Context on a cache miss. Re-read a source only when its Context Artifact is absent or its version/revision key no longer matches.
 1. Read [Engineering Constitution](constitution/ENGINEERING_CONSTITUTION.md).
 2. Resolve truth with [Source of Truth](constitution/SOURCE_OF_TRUTH.md).
 3. Run the [Pre-flight Workflow](workflows/preflight.md) and record its evidence.
@@ -25,6 +26,7 @@ No implementation may begin from an unfrozen specification. No phase may advance
 - Cite repository paths, revisions, commands, or approved decisions for material claims.
 - Mark unknowns explicitly. Never convert an assumption into a requirement.
 - Keep module ownership, contracts, and dependencies synchronized in `knowledge/`.
+- Prefer the revision-bound **Evidence Package** over re-inspecting the worktree; inspect directly only to verify a specific claim or when its `baseline_revision` key is stale ([Context Artifacts](constitution/CONTEXT_ARTIFACTS.md)).
 
 ## Agent System
 
@@ -59,6 +61,8 @@ The context package should contain only:
 - required validation gates
 
 Do not load unrelated project context.
+
+The context package is assembled **by reference** to the canonical [Context Artifacts](constitution/CONTEXT_ARTIFACTS.md) — Boot Context, Evidence Package, and Dependency Context — never by inlining copies of sources whose digest is unchanged. Never re-read a source whose revision/version digest is unchanged; expand a reference to full text only to verify a specific claim.
 
 The Lead Architect maintains global awareness.
 Specialist agents receive only the minimum required context.

@@ -1,0 +1,55 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: shared contract → owner module, source, interface, and consumers
+  (framework 1.2.0). Derived from DEPENDENCY_GRAPH.yaml contracts; summarizes it and
+  never outranks it (knowledge/README.md Rule 3). Consumed by boundary-collision
+  (G1.5), dependency review, and architecture review to answer "who owns/consumes
+  this contract?" without traversing the full graph. All contracts are unversioned
+  (version assignment is a pending human decision, DEPENDENCY_GRAPH remaining_human_decisions).
+scope: project-runtime
+derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+contracts:
+  - id: notification-service
+    owner_module: backend-notifications
+    version: unversioned
+    source: backend/src/modules/notifications/service.ts
+    interface: "sendNotification(userId, NotificationPayload); getNotifications; markAsRead"
+    consumers: [backend-work-requests, backend-work-applications, backend-attendance, backend-quality]
+  - id: prisma-schema
+    owner_module: unassigned
+    version: unversioned
+    source: backend/prisma/schema.prisma
+    interface: "@prisma/client types + shared PrismaClient (central shared data contract)"
+    consumers: [backend-auth, backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics]
+  - id: base-service
+    owner_module: unassigned
+    version: unversioned
+    source: backend/src/lib/base-service.ts
+    interface: "abstract BaseService: PrismaClient access + logAudit (writes state-audit-log)"
+    consumers: [backend-auth, backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics, backend-hr, backend-calendar]
+  - id: auth-middleware
+    owner_module: backend-auth
+    version: unversioned
+    source: backend/src/middleware/auth.ts
+    interface: "authMiddleware / optionalAuthMiddleware (global on v1 router + per-module)"
+    consumers: [backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-hr, backend-notifications, backend-analytics, backend-calendar, backend-auth]
+  - id: permissions-middleware
+    owner_module: unassigned  # OQ-AUTH-07 reassignment pending (SYNC-011)
+    version: unversioned
+    source: backend/src/middleware/permissions.ts
+    interface: "requireRole / requirePermission / checkHotelAccess authorization guards"
+    consumers: [backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-attendance, backend-quality, backend-hr, backend-analytics, backend-calendar]
+    note: backend-assignments removed 2026-07-08 (SPEC-AUTH-001 FIND-001, arch-confirmed); routes.ts imports only authMiddleware.
+  - id: validation-middleware
+    owner_module: unassigned
+    version: unversioned
+    source: backend/src/middleware/validation.ts
+    interface: "validateBody / validateQuery (zod-schema request validation)"
+    consumers: [backend-users, backend-crm, backend-auth]
+
+events: []  # No event bus exists (verified absent, DEPENDENCY_GRAPH events). No publish/subscribe contracts.
+
+invalidated_by: [contract/interface change, consumer change, ownership decision, DEPENDENCY_GRAPH revision change]

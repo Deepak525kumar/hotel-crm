@@ -6,7 +6,7 @@
 - **Objective:** Author, independently review, validate, and freeze an authoritative specification or engineering document.
 - **Metric:** G2, G4, and the documentation portion of G6 pass; artifact marked `FROZEN`/`CURRENT`.
 - **Boundary:** One candidate; every semantic correction increments the candidate version; at most three review→fix cycles before escalation (§3).
-- **Retry policy:** Semantic edit → new version → impact-based re-review of affected sections only ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3).
+- **Retry policy:** Semantic edit → new version → **Correction Package** (`ART-CORR-001`) records changed sections and findings addressed → **Affected-Reviewer Determination** reruns only intersecting reviewers; unchanged sections are never re-authored and unaffected reviewers do not rerun ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §3, §7; [REVIEW_GATES.md](../constitution/REVIEW_GATES.md) Incremental Re-review).
 - **Escalation policy:** See Escalation Conditions; Constitution §18.
 - **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
 - **Success condition:** Approved, versioned, traceable, review-complete document.
@@ -19,7 +19,7 @@ Author, independently review, validate, and freeze an authoritative specificatio
 
 ## Entry Conditions
 
-G0 passes; G1 passes for behavior-bearing documents; owner, template, and target authority are known.
+G0 passes; G1 passes for behavior-bearing documents; **G1.5 Boundary Collision passes** ([boundary-collision](boundary-collision.md)) — authoring an owned specification does not begin while an ownership/boundary collision is open; owner, template, and target authority are known.
 
 ## Exit Conditions
 
@@ -41,9 +41,10 @@ Module Author (or document owner) — author from confirmed evidence
   ├─ (parallel, applicability-gated) Consistency Reviewer    → ART-CONS-REV-001
   ├─ (parallel, applicability-gated) Security Reviewer       → ART-SEC-REV-001
   └─ (parallel, applicability-gated) Performance Reviewer    → ART-PERF-REV-001
-       ↓ SYNC-doc-1 (Lead Architect merges findings by FIND-* + severity)
-Module Author — apply corrections; increment version
-  ↓ ART-SPEC-001 v0.n+1 (impact-based re-review of affected sections only)
+       ↓ SYNC-doc-1 (Lead Architect merges findings by FIND-* + severity → ART-FIND-PKG-001)
+Module Author — apply corrections; increment version; emit ART-CORR-001 (changed sections + findings-addressed map)
+  ↓ ART-SPEC-001 v0.n+1
+  ↓ Affected-Reviewer Determination (Lead Architect): only reviewers whose domain intersects the changed sections rerun (REVIEW_GATES Incremental Re-review); others carry prior PASS + Review Package forward by reference
   ↓ (repeat review→fix; bound: 3 cycles)
 G4 evaluation (applicable review components) — Lead Architect
   ↓
@@ -51,6 +52,7 @@ Documentation Validator — objective compliance check
   ↓ ART-VAL-001 (documentation dimensions)
 Human approver — target-state / decision content approval
   ↓ ART-SPEC-001 vX.Y.Z (FROZEN)
+Lead Architect — produce Module Memory (ART-MEM-<module>) from the frozen spec; record in MODULE_MEMORY.yaml
 G2 record + documentation portion of G6 record
 ```
 
@@ -188,11 +190,11 @@ New requirement, architecture decision, authority conflict, canonical-source amb
 
 ## Artifacts Produced
 
-Versioned document, evidence manifest, independent review reports, finding/disposition log, Validation Report, approval record.
+Versioned document, evidence manifest, independent review reports, Finding Package (`ART-FIND-PKG-001`), Correction Package(s) (`ART-CORR-001`), Review Packages (`ART-REV-PKG-*`), Validation Report, approval record, and — on freeze — Module Memory (`ART-MEM-<module>`) recorded in `MODULE_MEMORY.yaml`.
 
 ## Failure Handling
 
-Return to the responsible author at the failed criterion. Any semantic correction increments candidate version and invalidates affected review evidence.
+Return to the responsible author at the failed criterion. Any semantic correction increments candidate version, is recorded in a Correction Package (`ART-CORR-001`), and invalidates review evidence **for the changed sections only**; reviewers outside the affected-reviewer union carry their prior Review Package (`ART-REV-PKG-*`) forward unchanged ([REVIEW_GATES.md](../constitution/REVIEW_GATES.md) Incremental Re-review).
 
 ## Restart Conditions
 

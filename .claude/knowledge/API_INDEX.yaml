@@ -1,0 +1,36 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: HTTP API mount → owning module and client consumers (framework
+  1.2.0). Derived from DEPENDENCY_GRAPH.yaml runtime.route_registration + consumes-api
+  edges; summarizes them and never outranks them (knowledge/README.md Rule 3).
+  Consumed by boundary-collision (G1.5) to detect API-ownership collisions and by
+  dependency/architecture review, without re-reading routes/v1/index.ts or client code.
+scope: project-runtime
+derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
+version_source: .claude/VERSION.yaml
+observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+
+# All routes are mounted under /api/v1 (backend/src/app.ts:51). optionalAuthMiddleware
+# is applied to the whole v1 router; authMiddleware/requireRole/requirePermission/
+# checkHotelAccess are applied per-module in each routes.ts.
+
+apis:
+  - { mount: /api/v1/auth, module: backend-auth, evidence: routes/v1/index.ts:22, clients: [frontend-web, mobile-worker, mobile-checker] }
+  - { mount: /api/v1/users, module: backend-users, evidence: routes/v1/index.ts:23, clients: [] }
+  - { mount: /api/v1/crm, module: backend-crm, evidence: routes/v1/index.ts:24, clients: [frontend-web] }
+  - { mount: "/api/v1/crm/hotels/:hotel_id/workers", module: backend-hotel-workers, nested_under: backend-crm, evidence: routes/v1/index.ts:25, clients: [] }
+  - { mount: /api/v1/work-requests, module: backend-work-requests, evidence: routes/v1/index.ts:26, clients: [frontend-web, mobile-worker] }
+  - { mount: "/api/v1/work-requests/:id/applications", module: backend-work-applications, nested_under: backend-work-requests, evidence: routes/v1/index.ts:27, clients: [frontend-web, mobile-worker] }
+  - { mount: /api/v1/assignments, module: backend-assignments, evidence: routes/v1/index.ts:28, clients: [frontend-web, mobile-worker] }
+  - { mount: /api/v1/attendance, module: backend-attendance, evidence: routes/v1/index.ts:29, clients: [frontend-web, mobile-worker, mobile-checker] }
+  - { mount: /api/v1/quality, module: backend-quality, evidence: routes/v1/index.ts:30, clients: [mobile-checker] }
+  - { mount: /api/v1/hr, module: backend-hr, evidence: routes/v1/index.ts:31, clients: [mobile-worker], note: stub service (NotImplementedError) but mounted + consumed }
+  - { mount: /api/v1/notifications, module: backend-notifications, evidence: routes/v1/index.ts:32, clients: [frontend-web, mobile-worker, mobile-checker] }
+  - { mount: /api/v1/analytics, module: backend-analytics, evidence: routes/v1/index.ts:33, clients: [mobile-worker], note: "leaderboard routes lack requireRole/checkHotelAccess — Critical security defect OQ-ANALYTICS-01 (SYNC-010)" }
+  - { mount: /api/v1/calendar, module: backend-calendar, evidence: routes/v1/index.ts:34, clients: [], note: stub service (NotImplementedError); no discovered consumer }
+
+unregistered:  # not mounted; hold only a .placeholder file; no API surface
+  - backend-chatbot
+  - backend-geo
+
+invalidated_by: [route registration change, client consumer change, DEPENDENCY_GRAPH revision change]

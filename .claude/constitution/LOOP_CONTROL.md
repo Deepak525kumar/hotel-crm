@@ -80,3 +80,19 @@ Confidence is a deterministic, three-level scale used by every reviewer, validat
 ## 6. Relationship to Existing Policy
 
 This document extends, and never overrides, the [Engineering Constitution](ENGINEERING_CONSTITUTION.md), [Review Gates](REVIEW_GATES.md), and [Source of Truth](SOURCE_OF_TRUTH.md). Where a gate status, severity, or source-authority rule already exists, this document references it and adds only iteration and termination semantics.
+
+## 7. Incremental Correction (framework 1.2.0)
+
+Correction iterations do only the work a change requires. This section operationalizes the §3 rule that a semantic change "invalidates dependent review/validation evidence for the changed area only"; it changes no bound, threshold, or terminal state.
+
+- A corrective iteration produces a **Correction Package** ([CONTEXT_ARTIFACTS.md](CONTEXT_ARTIFACTS.md) §2.6) naming exactly the changed sections and the findings addressed. Unchanged sections are never re-authored.
+- Re-review scope is the **union of reviewer domains that intersect the changed sections** (the Affected-Reviewer Determination rule, [REVIEW_GATES.md](REVIEW_GATES.md) Incremental Re-review). Reviewers outside that union carry their prior gate result and finding dispositions forward unchanged; their evidence was invalidated only "for the changed area," which their domain does not touch.
+- Validation re-runs only the dimensions tied to the changed sections; unaffected dimensions carry prior evidence forward by reference.
+- **Preserved unchanged:** the ≤3 correction bound (§3), the changed-hypothesis rule (§3), confidence thresholds (§5), the four terminal states (§4), reviewer independence, and the rule that a `Low`-confidence blocking finding is unresolved. Affected-Reviewer Determination defaults **conservatively**: if a section→domain mapping is `unknown`, the reviewer **reruns** (an unknown is never a silent skip, §4).
+
+## 8. Evidence Reuse (framework 1.2.0)
+
+Evidence, once recorded against a revision, is immutable for that revision and is reused **by reference**. Re-deriving already-recorded evidence at an unchanged revision is a defect, symmetric to §3's prohibition on repeating an identical attempt.
+
+- Repository discovery, dependency slicing, and boot-policy loading occur **once per their cache scope** ([CONTEXT_ARTIFACTS.md](CONTEXT_ARTIFACTS.md) §3.1) and are consumed by reference thereafter.
+- A cache is advisory and reconstructable: on any doubt about validity the artifact is treated as **stale** and reproduced by re-running its producing workflow. A missing or stale cache degrades to full re-derivation — exactly pre-1.2.0 behavior — so evidence reuse can never weaken a gate.

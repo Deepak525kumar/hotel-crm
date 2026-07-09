@@ -83,5 +83,16 @@ Workflow artifacts use stable, workflow-scoped IDs so downstream consumers can c
 | `ART-POST` | Post-flight Record and impact inventory | postflight |
 | `ART-DRIFT` | Drift Report and repair plan | self-healing |
 | `ART-IMP` | Improvement records in `IMPROVEMENT_LOG.yaml` (advisory) | learning |
+| `ART-BOOT` | Boot Context (framework-version-scoped policy index) | preflight (boot) |
+| `ART-EVID` | Evidence Package / Repository Context (revision-scoped) | preflight / repository-synchronization |
+| `ART-DEPCTX` | Dependency Context (capability graph slice) | preflight / dependency-review |
+| `ART-CTX` | Context Package (per-specialist reference manifest) | all (Lead Architect) |
+| `ART-BOUNDARY` | Boundary Conflict Report | boundary-collision |
+| `ART-FIND-PKG` | Finding Package (merged findings) | all reviews (Lead Architect merger) |
+| `ART-CORR` | Correction Package (changed sections + findings-addressed map) | documentation / implementation |
+| `ART-REV-PKG` | Review Package (reviewer report bound to candidate version) | all reviews |
+| `ART-MEM` | Module Memory (frozen-spec distilled summary) | documentation (on freeze) |
+
+The `ART-BOOT`, `ART-EVID`, `ART-DEPCTX`, `ART-CTX`, `ART-FIND-PKG`, `ART-CORR`, `ART-REV-PKG`, and `ART-MEM` artifacts are the reusable **Context Artifacts** defined canonically in [../constitution/CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md); their lifecycle, cache key, and invalidation live there and are not restated in workflow files.
 
 Finding, requirement, rule, decision, and risk IDs (`FIND-*`, `REQ-*`, `RULE-*`, `ADR-*`, `RISK-*`) continue to follow Constitution §15 and live inside artifacts; workflow-level `ART-*` IDs address the enclosing artifact instance.

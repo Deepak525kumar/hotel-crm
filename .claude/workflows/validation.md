@@ -6,7 +6,7 @@
 - **Objective:** Independently prove that documentation and implementation satisfy approved requirements and system laws before progress.
 - **Metric:** Gate G6 passes across all mandatory dimensions.
 - **Boundary:** One immutable candidate; a candidate change invalidates affected dimensions and re-validates only those.
-- **Retry policy:** Re-validate failed dimensions after fixes (§3); full re-validation on revision-identity or frozen-requirement change.
+- **Retry policy:** Re-validate failed dimensions after fixes (§3); on a Correction Package (`ART-CORR-001`), re-validate **only** the dimensions tied to the changed sections and carry unaffected-dimension evidence forward by reference ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §7); full re-validation on revision-identity or frozen-requirement change.
 - **Escalation policy:** See Escalation Conditions; Constitution §18.
 - **Termination:** Success, Failure, or Blocked ([LOOP_CONTROL.md](../constitution/LOOP_CONTROL.md) §4).
 - **Success condition:** G6 `PASS` with no open blocker.

@@ -15,6 +15,48 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); t
 
 ---
 
+# Version 1.2.0
+
+**Release Date:** 2026-07-09
+
+**Status:** Stable
+
+## Overview
+
+Version 1.2.0 is the context-artifact / token-optimization release. It reduces total token consumption by making repository/boot/dependency discovery a produce-once, reuse-by-reference operation and by making correction and review incremental. It is backward compatible and fail-safe: absent any cache the platform behaves exactly as 1.1.0, and no gate, finding schema, confidence rule, loop bound, or specialist boundary is removed or weakened. Design invariant: discover once, freeze to a revision, reuse by reference, invalidate by digest. Constitutional additions trace to ADR-009 and remain pending formal human ratification (Constitution §20; SYNC-012).
+
+## Added
+
+- **Context Artifacts** (`constitution/CONTEXT_ARTIFACTS.md`): Boot Context, Evidence Package, Dependency Context, Context Package, Finding Package, Correction Package, Review Package, and Module Memory — each with owner, lifecycle, cache key, invalidation, and reuse policy.
+- **Boundary Collision gate G1.5** (`workflows/boundary-collision.md`; `constitution/REVIEW_GATES.md`): pre-authoring, read-only detection of ownership/boundary collisions across responsibilities, owned state, business rules, interfaces, contracts, APIs, and state ownership; stops before authoring on collision.
+- **Repository Session mode** (`knowledge/SESSION_STATE.yaml`): revision-bound Context Artifacts reused across workflows; discovery runs at most once per `baseline_revision`.
+- **Module Memory** (`knowledge/MODULE_MEMORY.yaml`): immutable revision-bound frozen-spec summaries consumed before discovery.
+- **Six canonical lookup indexes** (`knowledge/{SPECIFICATION,OWNERSHIP,STATE_OWNERSHIP,CONTRACT,API,BOUNDARY}_INDEX.yaml`) derived from `MODULE_REGISTRY` + `DEPENDENCY_GRAPH`.
+- **Context Artifact templates** (`templates/CONTEXT_ARTIFACT_TEMPLATES.md`, `templates/BOUNDARY_CONFLICT_REPORT_TEMPLATE.md`).
+- **ADR-009** (`docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md`) and `cache_state` in `knowledge/SYNC_STATE.yaml`.
+
+## Improved
+
+- **LOOP_CONTROL** §7 Incremental Correction and §8 Evidence Reuse: correction reruns only the affected-reviewer union; unchanged sections are never re-authored.
+- **REVIEW_GATES** Independent Review Protocol step 1b (consume Evidence Package; inspect only to verify a finding) and Incremental Re-review (Affected-Reviewer Determination with conservative unknown-⇒-rerun default).
+- **CLAUDE.md** boot sequence (step 0, Boot Context reuse) and Context Assembly (assemble by reference).
+- **preflight / repository-synchronization / documentation / implementation / validation / dependency-review / architecture-review** wired to produce or consume Context Artifacts.
+- **LOOP_REGISTRY / CAPABILITY_REGISTRY**: new `boundary-collision` and `dependency-slice` loops; `boundary-collision-detection` and `context-artifact-production` capabilities.
+
+## Fixed
+
+- Independent review of the change set: reconciled framework version truth (`VERSION.yaml` → 1.2.0), added the required Decision Record (ADR-009), backed `cache_state`, corrected the OWNERSHIP_INDEX module count, completed §3.2 invalidation bindings, removed a double index read on the G1.5 hot path, and closed section-numbering/terminology gaps (see `PLATFORM_V1_2_VALIDATION.md`).
+
+## Breaking Changes
+
+None. All additions are backward compatible and fail-safe to 1.1.0 behavior.
+
+## Migration Notes
+
+No action required. On any cache miss the producing workflow runs exactly as in 1.1.0. Formal human ratification of the constitutional additions (ADR-009) is the one outstanding human-authority item.
+
+---
+
 # Version 1.1.0
 
 **Release Date:** 2026-07-05
@@ -292,9 +334,9 @@ AI Contributors
 
 ## Next Planned Release
 
-### Version 1.2.0
+### Version 1.3.0
 
-Planned objectives (carried forward; not delivered in 1.1.0):
+Planned objectives (carried forward; the 1.2.0 line delivered the context-artifact / token-optimization work above, distinct from these items):
 
 - Runtime enforcement
 - Ownership registry completion (SYNC-001)
@@ -310,3 +352,7 @@ End of Version 1.0.0
 ---
 
 End of Version 1.1.0
+
+---
+
+End of Version 1.2.0
