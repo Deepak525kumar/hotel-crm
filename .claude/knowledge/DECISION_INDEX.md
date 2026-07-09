@@ -15,6 +15,7 @@ Decision records belong in the project’s authoritative decision directory and 
 | ADR-007 | Agent-Based Engineering Workflow | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-007-agent-based-engineering-workflow.md` | Engineering execution model | — |
 | ADR-008 | Source of Truth Hierarchy | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-008-source-of-truth-hierarchy.md` | Truth resolution policy | — |
 | ADR-009 | Context-Artifact Token-Optimization Architecture (Platform v1.2) | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md` | Engineering operating system (`.claude/`); adds Context Artifacts, gate G1.5, LOOP_CONTROL §7-8 | — |
+| ADR-010 | Governance Layer for the Specification Issues Register (Platform v1.3) | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md` | Engineering operating system (`.claude/`); adds the `governance/` top-level category, the Specification Issues Register, and the `SIR-*` artifact-ID class; amends CLAUDE.md Knowledge Separation | — |
 
 ## Unratified Architecture Claims
 

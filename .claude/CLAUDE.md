@@ -76,4 +76,4 @@ Repository-specific knowledge belongs exclusively in `knowledge/`.
 
 Framework behaviour belongs exclusively in `.claude/`.
 
-Do not mix reusable engineering policy with project-specific information.
+Do not mix reusable engineering policy with project-specific information, with one explicit, bounded exception: `governance/` (see [ADR-010](../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md)) holds continuously-live, append-only registers — synchronized as a mandatory step of existing workflows rather than re-derived per revision — whose *mechanism* (schema, ID scheme, update protocol) is reusable framework policy and whose *entries* are project-specific. This differs from `knowledge/`, which holds revision-bound snapshots invalidated by repository change (Rule 4, `knowledge/README.md`). Adding a new file to `governance/` requires a Decision Record, the same authority this exception itself required.

@@ -86,7 +86,7 @@ loops:
     retry_policy: Semantic edit → new version → impact-based re-review (LOOP_CONTROL §3).
     escalation_policy: New requirement, authority conflict, or unresolved high finding → human/gate.
     confidence_threshold: High
-    produced_artifacts: [Versioned document, evidence manifest, independent review reports, finding/disposition log, Validation Report, approval record]
+    produced_artifacts: [Versioned document, evidence manifest, independent review reports, finding/disposition log, Validation Report, approval record, Module Memory (on freeze), Specification Issues Register synchronization]
     required_gates: [G2, G4, G6-doc]
     restart_conditions: Scope/requirement change (author), semantic edit (review), corrective metadata (validation).
 
@@ -229,7 +229,7 @@ loops:
     retry_policy: Reopen responsible sync/documentation step on failure (LOOP_CONTROL §3).
     escalation_policy: Undocumented scope, ownership conflict, or breaking dependent → escalate; parent stays open.
     confidence_threshold: High
-    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list]
+    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization (ART-POST-004a)]
     required_gates: [G9]
     restart_conditions: Any final-state change or finding correction.
     invokes: [learning]
