@@ -13,6 +13,9 @@ This directory is the only project-specific layer of the reusable platform. It c
 - `LOOP_REGISTRY.yaml` — framework-scoped index classifying every workflow as a bounded loop (see `../constitution/LOOP_CONTROL.md`).
 - `CAPABILITY_REGISTRY.yaml` — framework-scoped index of platform capabilities mapped to responsible agents, inputs, outputs, workflows, gates, and authority.
 - `IMPROVEMENT_LOG.yaml` — deterministic improvement records produced by the learning workflow (`../workflows/learning.md`).
+- `SESSION_STATE.yaml` — Repository Session record: revision-bound Context Artifacts reused across workflows (framework 1.2.0; mechanism in `../constitution/CONTEXT_ARTIFACTS.md` §9).
+- `MODULE_MEMORY.yaml` — index of immutable, revision-bound Module Memory artifacts produced on specification freeze (framework 1.2.0; `../constitution/CONTEXT_ARTIFACTS.md` §10).
+- `SPECIFICATION_INDEX.yaml`, `BOUNDARY_INDEX.yaml`, `OWNERSHIP_INDEX.yaml`, `CONTRACT_INDEX.yaml`, `API_INDEX.yaml`, `STATE_OWNERSHIP_INDEX.yaml` — canonical lookup indexes (framework 1.2.0) derived from `MODULE_REGISTRY.yaml` + `DEPENDENCY_GRAPH.yaml`; they summarize those sources and never outrank them (Rule 3).
 
 `LOOP_REGISTRY.yaml` and `CAPABILITY_REGISTRY.yaml` index reusable framework workflows and capabilities; they are co-located here for discoverability and travel with the framework rather than with project-specific entries.
 
