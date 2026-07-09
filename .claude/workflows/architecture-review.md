@@ -19,7 +19,7 @@ Independently assess a frozen design before implementation for architecture conf
 
 ## Entry Conditions
 
-Review input version is frozen; architecture decisions, registry, graph, and applicability are available; reviewer did not author input.
+Review input version is frozen; architecture decisions, registry, the capability's **Dependency Context** slice (`ART-DEPCTX-<capability>`), the **Evidence Package** (`ART-EVID-001`), and applicability are available; reviewer did not author input. The reviewer consumes these reusable artifacts and inspects the repository only to verify a specific finding ([CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §1.4).
 
 ## Exit Conditions
 

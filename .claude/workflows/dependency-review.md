@@ -19,7 +19,7 @@ Independently identify dependency, contract, package, and synchronization conseq
 
 ## Entry Conditions
 
-Frozen artifact/diff and current dependency graph/manifests are available; reviewer did not author input.
+Frozen artifact/diff and the capability's **Dependency Context** slice (`ART-DEPCTX-<capability>`, an immutable reusable graph slice, [CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §2.3) are available; reviewer did not author input. The reviewer consumes the slice rather than traversing the full `DEPENDENCY_GRAPH`, and inspects the repository only to verify a finding or to produce/confirm the slice on a cache miss.
 
 ## Exit Conditions
 
@@ -33,8 +33,8 @@ Dependency Reviewer (owner); author/implementer for fixes; Security Reviewer for
 
 ```
 Lead Architect (dispatch)
-  ↓ immutable ART-SPEC-001 v0.n (or diff/plan) + DEPENDENCY_GRAPH + manifests/lockfiles
-Dependency Reviewer — capture declared and observed baseline
+  ↓ immutable ART-SPEC-001 v0.n (or diff/plan) + ART-DEPCTX-<capability> slice (reused if valid for baseline_revision) + manifests/lockfiles
+Dependency Reviewer — capture declared and observed baseline (from the slice; the slice is verified here, not rediscovered by consumers)
   ↓
   ├─ (parallel) internal edge tracing — added/removed/changed contracts/events/schemas/ownership
   └─ (parallel) external package fitness (with Security Reviewer for security)
