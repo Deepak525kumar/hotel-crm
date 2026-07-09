@@ -29,7 +29,7 @@ Compatibility: no breaking changes; no migration required.
 
 **Release Date:** 2026-07-09
 
-**Status:** Stable (current)
+**Status:** Superseded by 1.3.0
 
 ---
 
@@ -46,6 +46,28 @@ Highlights:
 Governance: no gate removed or weakened; G1.5 is additive (no renumbering); reviewer independence, finding schema, confidence rules, and loop bounds unchanged. Constitutional additions trace to ADR-009 and remain pending formal human ratification (Constitution §20).
 
 Compatibility: no breaking changes; no migration required (cache-miss degrades to 1.1.0 behavior).
+
+---
+
+## Version 1.3.0
+
+**Release Date:** 2026-07-09
+
+**Status:** Stable (current)
+
+---
+
+Version 1.3.0 is the Specification Issues Register release. It gives the platform a permanent, cross-specification memory of unresolved issues (open decisions, blocking findings, ownership gaps, migration gaps) so they are never silently rediscovered, duplicated, or dropped across sessions — extending the "discover once, reuse by reference" invariant from 1.2.0's repository/dependency evidence to specification-issue tracking. It is additive: no gate, finding schema, confidence rule, loop bound, or specialist boundary is changed.
+
+Highlights:
+
+- **Specification Issues Register** (`governance/SPECIFICATION_ISSUES_REGISTER.md`). A single, continuously-updated index of unresolved issues aggregated **by reference** from `knowledge/SYNC_STATE.yaml` and every module specification's own Risks/Open-Decisions section, under stable `SIR-<SCOPE>-<NNN>` IDs.
+- **Governance layer** (`governance/`, [ADR-010](../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md)). A third top-level category alongside `knowledge/`, for continuously-live, append-only registers synchronized as a workflow step rather than re-derived per revision.
+- **Workflow integration.** Register synchronization is now a mandatory exit condition of the Documentation Workflow and step `ART-POST-004a` of the Post-flight Workflow, scoped to the affected-module slice with a no-op carve-out for purely corrective nonsemantic metadata edits.
+
+Governance: no gate removed or weakened; no new constitutional article. Ratification of ADR-010 (like ADR-001..009) remains reserved human authority (Constitution §20).
+
+Compatibility: no breaking changes; no migration required.
 
 ---
 
@@ -320,11 +342,11 @@ Breaking changes will be explicitly documented within the changelog and accompan
 
 # Future Roadmap
 
-Version 1.1.0 delivered the platform-audit improvements (bounded loops, registries, standardized findings, learning loop, version-truth reconciliation). Version 1.2.0 delivered the context-artifact / token-optimization work (above). Planned objectives for a subsequent Version 1.3.0 include:
+Version 1.1.0 delivered the platform-audit improvements (bounded loops, registries, standardized findings, learning loop, version-truth reconciliation). Version 1.2.0 delivered the context-artifact / token-optimization work. Version 1.3.0 delivered the Specification Issues Register (above) — narrower in scope than originally planned below; the remaining items are carried forward, unstarted, to a subsequent version:
 
 - Runtime enforcement mechanisms
 - Ownership registry completion
-- Architecture Decision Record ratification
+- Architecture Decision Record ratification (now including ADR-010, in addition to ADR-001..009)
 - Dependency graph completion
 - Pilot execution on a production module
 - Framework refinements based on operational feedback

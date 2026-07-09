@@ -23,7 +23,7 @@ G0 passes; G1 passes for behavior-bearing documents; **G1.5 Boundary Collision p
 
 ## Exit Conditions
 
-Artifact is approved, versioned, traceable, internally consistent, review-complete, and marked `FROZEN` or `CURRENT`.
+Artifact is approved, versioned, traceable, internally consistent, review-complete, and marked `FROZEN` or `CURRENT`. A documentation session (freeze or correction pass) is not exit-complete until the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`) reflects the session's unresolved issues (appended, never duplicated — merge by canonical source ID) and any issue the session resolved (marked `RESOLVED`, history preserved).
 
 ## Participating Agents
 
@@ -53,6 +53,7 @@ Documentation Validator — objective compliance check
 Human approver — target-state / decision content approval
   ↓ ART-SPEC-001 vX.Y.Z (FROZEN)
 Lead Architect — produce Module Memory (ART-MEM-<module>) from the frozen spec; record in MODULE_MEMORY.yaml
+Lead Architect — synchronize Specification Issues Register (../governance/SPECIFICATION_ISSUES_REGISTER.md) from this candidate's final unresolved/resolved issues
 G2 record + documentation portion of G6 record
 ```
 
@@ -67,6 +68,7 @@ G2 record + documentation portion of G6 record
 7. Documentation Validator checks complete artifact and evidence.
 8. Human approves target-state/decision content.
 9. Set version/status and update indexes/cross-references.
+10. Synchronize the Specification Issues Register with this candidate's final unresolved and resolved issues (append/resolve/merge by canonical source ID; never duplicate, never delete history) — a no-op confirmation for a purely corrective nonsemantic metadata edit (Restart Conditions).
 
 ## Agent I/O Contracts
 
@@ -190,7 +192,7 @@ New requirement, architecture decision, authority conflict, canonical-source amb
 
 ## Artifacts Produced
 
-Versioned document, evidence manifest, independent review reports, Finding Package (`ART-FIND-PKG-001`), Correction Package(s) (`ART-CORR-001`), Review Packages (`ART-REV-PKG-*`), Validation Report, approval record, and — on freeze — Module Memory (`ART-MEM-<module>`) recorded in `MODULE_MEMORY.yaml`.
+Versioned document, evidence manifest, independent review reports, Finding Package (`ART-FIND-PKG-001`), Correction Package(s) (`ART-CORR-001`), Review Packages (`ART-REV-PKG-*`), Validation Report, approval record, and — on freeze — Module Memory (`ART-MEM-<module>`) recorded in `MODULE_MEMORY.yaml`; and, on every candidate version that changed a Risks/Open-Decisions/Findings section, a Specification Issues Register synchronization (`../governance/SPECIFICATION_ISSUES_REGISTER.md`) — a purely corrective nonsemantic metadata edit (Restart Conditions, below) records a no-op confirmation ("no register rows affected") instead of a full register pass.
 
 ## Failure Handling
 
@@ -198,4 +200,4 @@ Return to the responsible author at the failed criterion. Any semantic correctio
 
 ## Restart Conditions
 
-Restart at authoring for scope/requirement changes, at review for semantic edits, or at validation for purely corrective nonsemantic metadata edits.
+Restart at authoring for scope/requirement changes, at review for semantic edits, or at validation for purely corrective nonsemantic metadata edits. A purely corrective nonsemantic metadata edit (LOOP_CONTROL §7 incremental-scope principle) is exempt from a full Specification Issues Register synchronization pass: record a one-line no-op confirmation that no register row is affected, rather than re-running the full append/resolve/merge pass.

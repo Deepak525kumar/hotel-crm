@@ -20,6 +20,7 @@ No implementation may begin from an unfrozen specification. No phase may advance
 
 ## Repository Rules
 
+- Before authoring or correcting any module specification, check the [Specification Issues Register](governance/SPECIFICATION_ISSUES_REGISTER.md) for that module's already-known unresolved issues; verify them against the repository rather than rediscovering them, and synchronize the register (append/resolve/merge, never duplicate, never delete history) as an exit condition of the Documentation and Post-flight workflows.
 - Inspect the current worktree before relying on conversation history.
 - Preserve unrelated changes; never silently rewrite user work.
 - Treat `docs/legacy/` and equivalent archive paths as historical evidence only.
@@ -75,4 +76,4 @@ Repository-specific knowledge belongs exclusively in `knowledge/`.
 
 Framework behaviour belongs exclusively in `.claude/`.
 
-Do not mix reusable engineering policy with project-specific information.
+Do not mix reusable engineering policy with project-specific information, with one explicit, bounded exception: `governance/` (see [ADR-010](../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md)) holds continuously-live, append-only registers — synchronized as a mandatory step of existing workflows rather than re-derived per revision — whose *mechanism* (schema, ID scheme, update protocol) is reusable framework policy and whose *entries* are project-specific. This differs from `knowledge/`, which holds revision-bound snapshots invalidated by repository change (Rule 4, `knowledge/README.md`). Adding a new file to `governance/` requires a Decision Record, the same authority this exception itself required.
