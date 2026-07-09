@@ -20,6 +20,7 @@ No implementation may begin from an unfrozen specification. No phase may advance
 
 ## Repository Rules
 
+- Before authoring or correcting any module specification, check the [Specification Issues Register](governance/SPECIFICATION_ISSUES_REGISTER.md) for that module's already-known unresolved issues; verify them against the repository rather than rediscovering them, and synchronize the register (append/resolve/merge, never duplicate, never delete history) as an exit condition of the Documentation and Post-flight workflows.
 - Inspect the current worktree before relying on conversation history.
 - Preserve unrelated changes; never silently rewrite user work.
 - Treat `docs/legacy/` and equivalent archive paths as historical evidence only.

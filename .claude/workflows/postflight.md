@@ -24,7 +24,7 @@ The active workflow reached a terminal candidate state and its changes/findings 
 
 ## Exit Conditions
 
-Affected modules and dependents are reconciled; documentation and knowledge match the final state; follow-ups have owners; G9 is recorded.
+Affected modules and dependents are reconciled; documentation and knowledge match the final state; the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`) reflects the terminal state's unresolved and resolved issues; follow-ups have owners; G9 is recorded.
 
 ## Participating Agents
 
@@ -48,6 +48,8 @@ Consistency Reviewer (final) — verify no orphaned artifact, contradiction, or 
   ↓ ART-POST-003 (post-flight consistency confirmation)
 Lead Architect — create synchronization tasks for deferred non-blocking work; confirm no temporary bypass, unresolved blocking finding, or orphaned artifact
   ↓ ART-POST-004 (residual-risk/follow-up list)
+Lead Architect — synchronize the Specification Issues Register (../governance/SPECIFICATION_ISSUES_REGISTER.md): append newly-discovered unresolved issues, mark issues verified-resolved as RESOLVED (history preserved, never deleted), merge by canonical source ID
+  ↓ ART-POST-004a (register synchronization confirmation)
 Lead Architect — record knowledge deltas + revision-bound sync state; record G9 and terminal workflow state
   ↓ ART-POST-005 (Post-flight Record with G9 status)
 Learning workflow invocation (per Loop Metadata hook)
@@ -62,7 +64,8 @@ Learning workflow invocation (per Loop Metadata hook)
 5. Record knowledge/index changes and revision-bound synchronization state.
 6. Create future synchronization tasks for intentionally deferred non-blocking work.
 7. Confirm no temporary bypass, unresolved blocking finding, or orphaned artifact remains.
-8. Record G9 and terminal workflow state.
+8. Synchronize the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`): collect unresolved issues remaining after final delivery, append genuinely new ones, mark resolved ones `RESOLVED` without deleting history, and merge by canonical source ID so no issue is duplicated.
+9. Record G9 and terminal workflow state.
 
 ## Agent I/O Contracts
 
@@ -105,6 +108,7 @@ Learning workflow invocation (per Loop Metadata hook)
 | Updated docs + updated graph/registry | Responsible authors + Dependency Reviewer | `ART-POST-002` slice | reconciled active docs + updated graph/registry | Consistency Reviewer (SYNC-post-1) |
 | `ART-POST-003` | Consistency Reviewer | reconciled docs + graph/registry + terminology | post-flight consistency confirmation | Lead Architect |
 | `ART-POST-004` | Lead Architect | `ART-POST-003` + deferred non-blocking items | residual-risk/follow-up list with owners and due gates | Future workflows; escalation where required |
+| `ART-POST-004a` | Lead Architect | `ART-POST-004` + prior register state | Specification Issues Register synchronization (append/resolve/merge) | `ART-POST-005`; future documentation/postflight sessions |
 | `ART-POST-005` | Lead Architect | all above + G9 evaluation | Post-flight Record with G9 status + knowledge/sync-state deltas | Learning workflow; parent workflow's terminal state |
 
 ## Synchronization Points
@@ -155,8 +159,8 @@ G9 passes only when all affected artifacts are current or a permitted non-blocki
 
 ### Required Inputs → Produced Outputs
 
-- **G9** inputs: `ART-POST-001..004`; `ART-POST-003` consistency confirmation; owned follow-up entries for any deferred work.
-- **G9** outputs: `ART-POST-005` Post-flight Record; knowledge/sync-state deltas committed; parent workflow's terminal state recorded; learning workflow invoked.
+- **G9** inputs: `ART-POST-001..004`; `ART-POST-004a` register synchronization; `ART-POST-003` consistency confirmation; owned follow-up entries for any deferred work.
+- **G9** outputs: `ART-POST-005` Post-flight Record; knowledge/sync-state deltas committed; Specification Issues Register synchronized; parent workflow's terminal state recorded; learning workflow invoked.
 
 ## Escalation Conditions
 
@@ -164,7 +168,7 @@ Change reveals undocumented scope, ownership conflict, breaking dependent, unres
 
 ## Artifacts Produced
 
-Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list.
+Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization.
 
 ## Failure Handling
 

@@ -15,6 +15,41 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); t
 
 ---
 
+# Version 1.3.0
+
+**Release Date:** 2026-07-09
+
+**Status:** Stable
+
+## Overview
+
+Version 1.3.0 is the Specification Issues Register release. It gives the platform a permanent, cross-specification memory of unresolved issues so they are never silently rediscovered, duplicated, or dropped across sessions — extending the "discover once, reuse by reference" invariant introduced in 1.2.0 from repository/dependency evidence to specification-issue tracking. It is additive: no gate, finding schema, confidence rule, loop bound, or specialist boundary is changed, and no new constitutional article is introduced.
+
+## Added
+
+- **Specification Issues Register** (`governance/SPECIFICATION_ISSUES_REGISTER.md`): a single, continuously-updated index of unresolved issues — open decisions, blocking security/architecture findings, ownership gaps, and migration gaps — aggregated **by reference** from `knowledge/SYNC_STATE.yaml` and every `docs/03-modules/*/MODULE_SPEC.md`'s own Risks/Open-Decisions section. Entries carry a stable `SIR-<SCOPE>-<NNN>` ID, a canonical-source cross-reference (`SYNC-*`/`OQ-*`/`FIND-*`/`OD-*`), category, severity, evidence, authority-needed, and status. Resolved issues are marked `RESOLVED`, never deleted — a permanent history section preserves every disposition.
+- **`SIR` artifact-ID prefix** (`workflows/README.md`): registered alongside the existing `ART-*` prefixes, with an explicit note that `SIR-*` IDs persist across many workflow runs (unlike per-workflow-instance `ART-*` IDs) until the tracked issue resolves.
+
+## Improved
+
+- **documentation.md**: register synchronization added as a Documentation Workflow exit condition and execution-order step, and as an `Artifacts Produced` item — a Specification Freeze or correction pass is not exit-complete until the register reflects its unresolved and resolved issues.
+- **postflight.md**: register synchronization added as `ART-POST-004a`, a mandatory step between the residual-risk/follow-up list and G9 recording; G9's required inputs/outputs updated accordingly.
+- **knowledge/README.md / CLAUDE.md**: cross-linked to the new register so a session checks it before re-deriving already-known specification issues.
+
+## Fixed
+
+None — this release adds a new artifact and two workflow steps; no defect in prior framework behavior was identified or corrected as part of this change.
+
+## Breaking Changes
+
+None. The register and its workflow hooks are additive; a session that predates this version behaves exactly as 1.2.0.
+
+## Migration Notes
+
+No action required. The register is initialized from currently-known, already-verified issues (`SYNC-001/002/005/008/009/010/011/012` and the per-module Open Decisions/Findings they summarize); no new issue-discovery pass was required to populate it.
+
+---
+
 # Version 1.2.0
 
 **Release Date:** 2026-07-09

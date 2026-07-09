@@ -19,6 +19,10 @@ This directory is the only project-specific layer of the reusable platform. It c
 
 `LOOP_REGISTRY.yaml` and `CAPABILITY_REGISTRY.yaml` index reusable framework workflows and capabilities; they are co-located here for discoverability and travel with the framework rather than with project-specific entries.
 
+## Related governance artifact
+
+`../governance/SPECIFICATION_ISSUES_REGISTER.md` is the permanent, cross-specification register of unresolved issues (open decisions, blocking findings, ownership gaps, migration gaps) aggregated from `SYNC_STATE.yaml` and every `docs/03-modules/*/MODULE_SPEC.md`. It lives under `.claude/governance/` rather than here because it is a continuously-updated, cross-cutting index synchronized by the Documentation and Post-flight workflows on every session, not a revision-bound snapshot of one repository fact; its entries are nonetheless project-specific and subject to the same rules above (cite sources, never invent, summarize and never outrank the canonical `SYNC-*`/`OQ-*`/`FIND-*` source).
+
 ## Rules
 
 1. Every entry cites a repository source or approved decision.

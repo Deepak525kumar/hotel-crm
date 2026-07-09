@@ -8,11 +8,26 @@ schema_version: 1
 
 platform:
   name: AI Engineering Platform
-  current_version: 1.2.0
+  current_version: 1.3.0
   status: Stable
   released: "2026-07-09"
 
 history:
+  - version: 1.3.0
+    status: Stable
+    released: "2026-07-09"
+    summary: >-
+      Specification Issues Register release. Adds the permanent, cross-specification
+      Specification Issues Register (governance/SPECIFICATION_ISSUES_REGISTER.md):
+      a single, continuously-updated index of unresolved issues (open decisions,
+      blocking findings, ownership gaps, migration gaps) aggregated by reference
+      from SYNC_STATE.yaml and every module specification, so issues are never
+      silently rediscovered, duplicated, or dropped across sessions. Wires
+      register synchronization into the Documentation Workflow (exit condition)
+      and Post-flight Workflow (ART-POST-004a) as a mandatory, non-optional step;
+      registers the SIR-<SCOPE>-<NNN> ID prefix. Backward compatible and additive:
+      no gate, finding schema, confidence rule, loop bound, or specialist boundary
+      is changed; introduces no new constitutional article.
   - version: 1.2.0
     status: Stable
     released: "2026-07-09"
@@ -45,7 +60,8 @@ history:
       operating system (constitution, workflows, agents, templates, checklists,
       knowledge layer).
 
-# 1.2.0 supersedes 1.1.0 as the current stable line. 1.1.0 and 1.0.0 remain valid history.
-# The 1.2.0 change set is additive and fail-safe; no breaking changes (see CHANGELOG).
-# Constitutional additions in 1.2.0 trace to ADR-009; formal human ratification is
-# reserved human authority per Engineering Constitution 20 (see SYNC_STATE.yaml SYNC-012).
+# 1.3.0 supersedes 1.2.0 as the current stable line. 1.2.0, 1.1.0, and 1.0.0 remain valid history.
+# The 1.3.0 change set is additive; no breaking changes and no new constitutional article
+# (see CHANGELOG). Constitutional additions in 1.2.0 trace to ADR-009; formal human
+# ratification is reserved human authority per Engineering Constitution 20 (see
+# SYNC_STATE.yaml SYNC-012).

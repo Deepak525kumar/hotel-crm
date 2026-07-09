@@ -92,7 +92,8 @@ Workflow artifacts use stable, workflow-scoped IDs so downstream consumers can c
 | `ART-CORR` | Correction Package (changed sections + findings-addressed map) | documentation / implementation |
 | `ART-REV-PKG` | Review Package (reviewer report bound to candidate version) | all reviews |
 | `ART-MEM` | Module Memory (frozen-spec distilled summary) | documentation (on freeze) |
+| `SIR` | Specification Issues Register entry (`../governance/SPECIFICATION_ISSUES_REGISTER.md`); aggregates `SYNC-*`/`OQ-*`/`FIND-*`/`OD-*` by canonical source, never duplicates them | documentation (exit condition) / postflight (`ART-POST-004a`) |
 
 The `ART-BOOT`, `ART-EVID`, `ART-DEPCTX`, `ART-CTX`, `ART-FIND-PKG`, `ART-CORR`, `ART-REV-PKG`, and `ART-MEM` artifacts are the reusable **Context Artifacts** defined canonically in [../constitution/CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md); their lifecycle, cache key, and invalidation live there and are not restated in workflow files.
 
-Finding, requirement, rule, decision, and risk IDs (`FIND-*`, `REQ-*`, `RULE-*`, `ADR-*`, `RISK-*`) continue to follow Constitution §15 and live inside artifacts; workflow-level `ART-*` IDs address the enclosing artifact instance.
+Finding, requirement, rule, decision, and risk IDs (`FIND-*`, `REQ-*`, `RULE-*`, `ADR-*`, `RISK-*`) continue to follow Constitution §15 and live inside artifacts; workflow-level `ART-*` IDs address the enclosing artifact instance. `SIR-<SCOPE>-<NNN>` IDs are a permanent, never-reused register-row identity (Constitution §15) distinct from the `ART-*` per-workflow-instance IDs above; unlike `ART-*` IDs, a `SIR-*` ID persists across many workflow runs until the issue it tracks is marked `RESOLVED`.
