@@ -9,8 +9,10 @@ export const SignupSchema = z.object({
   first_name: z.string().min(2).max(50),
   last_name: z.string().min(2).max(50),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
-  role: z.enum(['worker', 'checker', 'manager', 'admin']).optional(),
-});
+  // SECURITY (HOTFIX-AUTH-001): public signup must never accept a client-supplied
+  // role. Privileged roles are assigned server-side only (via the users module).
+  // The `role` field is intentionally excluded so any injected value is stripped.
+}).strict();
 
 export const LoginSchema = z.object({
   email: z.string().email('Invalid email address'),

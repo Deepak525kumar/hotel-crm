@@ -82,32 +82,54 @@ describe('AuthService', () => {
       expect(mockPrisma.session.create).toHaveBeenCalledTimes(1);
     });
 
-    it('assigns ROLE_PERMISSIONS based on role', async () => {
+    it('assigns the non-privileged WORKER role and permissions on legitimate signup', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
-        id: 'user_2',
-        email: 'admin@test.com',
-        first_name: 'Admin',
-        last_name: 'User',
-        role: 'ADMIN',
-        permissions: ['admin:*'],
-        is_active: true,
-        created_at: new Date(),
+        id: 'user_2', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
+        role: 'WORKER', permissions: [], is_active: true, created_at: new Date(),
       });
       mockPrisma.session.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.signup({
-        email: 'admin@test.com',
-        password: 'password123',
-        first_name: 'Admin',
-        last_name: 'User',
-        role: 'admin',
+        email: 'worker@test.com', password: 'password123', first_name: 'Work', last_name: 'Er',
       });
 
       const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string; permissions: string[] } }>;
-      expect(createCall[0]?.data.role).toBe('ADMIN');
-      expect(createCall[0]?.data.permissions).toContain('admin:*');
+      expect(createCall[0]?.data.role).toBe('WORKER');
+      expect(createCall[0]?.data.permissions).not.toContain('admin:*');
+      expect(createCall[0]?.data.permissions).toEqual(
+        expect.arrayContaining(['hotels:read', 'rooms:read', 'tasks:read', 'notifications:read'])
+      );
+    });
+
+    // HOTFIX-AUTH-001: privilege-escalation regression suite. The server must
+    // never honour a client-supplied role on public signup — every injected
+    // role must collapse to a non-privileged WORKER account.
+    it.each([
+      ['admin', 'admin:*'],
+      ['manager', 'staffing:write'],
+      ['checker', 'quality:write'],
+      ['regional_manager', 'admin:*'],
+    ])('ignores injected role "%s" and never grants privileged permissions', async (injectedRole: string, privilegedPerm: string) => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'user_x', email: 'attacker@test.com', first_name: 'Mal', last_name: 'Ory',
+        role: 'WORKER', permissions: [], is_active: true, created_at: new Date(),
+      });
+      mockPrisma.session.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.signup({
+        email: 'attacker@test.com', password: 'password123', first_name: 'Mal', last_name: 'Ory',
+        // Simulate an attacker bypassing the schema and injecting a privileged role.
+        role: injectedRole,
+      } as any);
+
+      const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string; permissions: string[] } }>;
+      expect(createCall[0]?.data.role).toBe('WORKER');
+      expect(createCall[0]?.data.permissions).not.toContain(privilegedPerm);
+      expect(createCall[0]?.data.permissions).not.toContain('admin:*');
     });
   });
 

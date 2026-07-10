@@ -383,6 +383,34 @@ known_drift:
       findings do.
     authority_needed: human  # G2 freeze; OQ-01 headline Rating-model decision; OQ-03/OQ-09 Risk Assessment authorization; OQ-04 dual-writer decision (now carrying FIND-PERF-001 workload evidence); OQ-06/SYNC-001 ownership
 
+  - id: SYNC-016
+    type: security-hotfix
+    status: resolved
+    description: >-
+      HOTFIX-AUTH-001 (P0, backend-auth) -- confirmed and closed a live Critical
+      privilege-escalation vulnerability in public signup. The unauthenticated
+      POST /auth/signup accepted a client-supplied role (SignupSchema enumerated
+      worker/checker/manager/admin, validation.ts:12) which AuthService.signup
+      trusted verbatim (service.ts:22-23), assigning ROLE_PERMISSIONS[role]
+      including admin:* -- any anonymous caller could self-provision an ADMIN
+      account and token. Independently reproduced against the pre-fix worktree
+      before trusting the report. This was the live-code disproof of the
+      "self-signup WORKER" baseline that SIR-ANLY-001/SIR-AUTH-003 assume.
+      Fix (minimum, bounded to backend-auth): removed role from the public
+      SignupSchema and hardened it with .strict() so injected keys are rejected;
+      AuthService.signup now hardcodes a non-privileged WORKER. Legitimate
+      self-signup behaviour is unchanged; privileged elevation remains available
+      only through the authenticated users module under RBAC (untouched). A
+      regression suite (worker/manager/admin/checker/regional_manager injection)
+      was added to auth.test.ts -- it fails against pre-fix source and passes
+      after; full backend suite green (134/134). Recorded in the Specification
+      Issues Register as SIR-AUTH-016 (standing row + Resolved History). No human
+      authority required -- server-side-only role determination is a security
+      invariant, not a product decision. No unrelated specification modified;
+      SPEC-AUTH-001 spec text not altered (this is an implementation-level fix of
+      a defect the spec did not sanction).
+    authority_needed: none  # code fix of a Critical security defect; no reserved-authority decision
+
 context_invalidators:
   - repository revision changes
   - default branch changes
