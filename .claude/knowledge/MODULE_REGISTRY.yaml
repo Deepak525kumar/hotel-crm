@@ -63,7 +63,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-CRM-001@0.1.1 (REVIEW)  # docs/03-modules/crm/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); all author-fixable findings applied at v0.1.1; NOT frozen (G2 human) -- pending disposition of OD-CRM-01/02/05/10/11 plus OD-CRM-14..17
     evidence: backend/src/routes/v1/index.ts:24
 
   - id: backend-hotel-workers

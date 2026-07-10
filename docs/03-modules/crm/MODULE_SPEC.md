@@ -159,7 +159,7 @@ All contracts are **Current Repository Behaviour** unless marked *(target)*. Dir
 - **Manager write authority (OD-CRM-02):** `POST`/`PATCH` gate on `requireRole(['admin','manager'])` **and** `requirePermission('hotels:write')`, but `ROLE_PERMISSIONS.MANAGER` (`config/constants.ts:103-114`) grants only `hotels:read`, not `hotels:write`. A manager therefore passes the role gate and **fails** the permission gate, so today only Admin can create/update hotels. This *aligns* with CRR §11's "Admin/HQ only" **for creation**, but *contradicts* the target's "Regional/Property Managers may manage their assigned hotels" **for update** (REQ-CRM-010). The route's inclusion of `manager` in the role list is misleading dead intent.
 - **List permission vs. role gate (OD-CRM-07):** WORKER/CHECKER/MANAGER all hold `hotels:read` (`constants.ts:104,116,124`) and the service has a defensive "non-admin/manager sees only active" branch (`service.ts:26-28`), yet `GET /crm/hotels` is gated `requireRole(['admin','manager'])`, so Worker/Checker cannot list hotels over HTTP and that branch is unreachable. Intended audience for listing is unresolved.
 - **Query param drift (OD-CRM-08):** the frontend requests `/crm/hotels?per_page=100` (`frontend/lib/api.ts:333`) but the query schema names the field `limit` (`types.ts:21`); `per_page` is ignored and the list silently caps at the default 20. The response pagination echoes `per_page` (`service.ts:47`) while the request expects `limit` — asymmetric naming.
-- **Inactive-hotel read (OD-CRM-09):** `getHotel` does not filter `is_active`/`deleted_at` (`service.ts:56-64`), so a roster-ACTIVE worker passing `checkHotelAccess` could read a soft-deleted hotel.
+- **Inactive-hotel read (OD-CRM-09):** `getHotel` does not filter `is_active`/`deleted_at` (`service.ts:56-64`); admin/manager/checker can read a soft-deleted hotel unconditionally (`checkHotelAccess`'s blanket bypass), and a roster-ACTIVE worker can too since soft-delete does not cascade-deactivate `HotelWorker` rows.
 
 ## Events
 
@@ -246,7 +246,7 @@ This module is part of the marketplace → Workforce Operations Platform forward
 
 **Backward compatibility:** any change to the Hotel field set is constrained by two downstream readers (`work-requests`, `hotel-workers`) and the frontend list consumer; additive columns (pause flag, group FK) are safe; renames/removals of read fields are breaking and must be sequenced. Removing a hotel remains a non-destructive soft-delete (`RULE-CRM-05`).
 
-**Rollback:** because target changes are additive and pre-launch, rollback is disabling the feature flag and redeploying the prior build (PDD §10).
+**Rollback:** because target changes are additive and pre-launch, rollback is a version-control revert and redeploy of the prior build — not a feature-flag toggle, since no `FEATURE_*` mechanism currently exists (`OD-CRM-14`; see Feature flags above).
 
 **Removal criteria:** not applicable — the hotel reference and its organizational grouping are foundational, permanently-owned domain state.
 
