@@ -199,6 +199,14 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/quality/service.ts:19,100,150 (workerAssignment.findUnique/findFirst)"
+  - id: edge-quality-reads-attendance
+    source: backend-quality
+    target: state-attendance
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/quality/service.ts:147-149 (tx.attendance.count, status PRESENT, on_time_rate recompute)"
+    note: "Added by SPEC-QUAL-001 dependency review (FIND-DEP-001/FIND-ARCH-003); previously a genuine missing edge."
   - id: edge-hotel-workers-reads-hotel
     source: backend-hotel-workers
     target: state-hotel
@@ -466,8 +474,8 @@ state_domains:
     model: Attendance
     authoritative_writer: backend-attendance
     writers: [backend-attendance, backend-work-applications]
-    readers: [backend-analytics]
-    evidence: "attendance writes: backend/src/modules/attendance/service.ts:57,179; work-applications creates placeholder (accept tx): backend/src/modules/work-applications/service.ts:256; analytics reads: backend/src/modules/analytics/service.ts:87,88,200"
+    readers: [backend-analytics, backend-quality]
+    evidence: "attendance writes: backend/src/modules/attendance/service.ts:57,179; work-applications creates placeholder (accept tx): backend/src/modules/work-applications/service.ts:256; analytics reads: backend/src/modules/analytics/service.ts:87,88,200; quality reads: backend/src/modules/quality/service.ts:147-149 (on_time_rate recompute)"
     note: "work-applications seeds the initial Attendance row during accept (cross-module write)."
   - id: state-quality-verification
     model: QualityVerification

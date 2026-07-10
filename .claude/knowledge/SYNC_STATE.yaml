@@ -329,6 +329,60 @@ known_drift:
       updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
     authority_needed: human  # G2 freeze; OD-CRM-01/02/05/10/11 disposition; OD-CRM-15 platform-wide route-nesting Decision Record; OD-CRM-16 bilateral Decision Record with job-dispatch; SYNC-001 ownership; TERMINOLOGY.md canonical-source decision for Regional Manager/Scope (SPEC-AUTH-001 vs SPEC-CRM-001); scope of onboarding/MODULE_SPEC.md inclusion in OD-CRM-06 reconciliation
 
+  - id: SYNC-015
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-QUAL-001 (Quality Management) completed its G4 independent-review round
+      at v0.1.2 (docs/03-modules/quality/MODULE_SPEC.md). v0.1.1 already carried
+      PASS_WITH_ACTIONS architecture/dependency/consistency/security dispositions
+      (zero Critical/High); this session ran the fifth and final dimension,
+      Performance, independently: PASS_WITH_ACTIONS, zero Critical/High. Three
+      findings recorded, none blocking: FIND-PERF-001 (Medium) -- the installed DB
+      trigger Rating_refresh_overall_rating (migration.sql:588-631) is provably
+      overwritten milliseconds later by the app's own upsert (service.ts:174) on
+      every createRating call, ~2x avoidable read scans and two physical writes
+      instead of one; added as workload evidence to the already-open OQ-04
+      dual-writer decision, does not resolve it. FIND-PERF-002 (Low) -- both
+      write mechanisms rescan a worker's entire rating/assignment history on
+      every write (O(n), uncapped); recorded as a forward-looking capacity note
+      under OQ-08 for the M3 recency-weighted aggregate (TREQ-004). FIND-PERF-003
+      (Low) -- the by-hotel leaderboard has no compound HotelWorker(hotel_id,status)
+      index and its query-plan cost is data-distribution-dependent, distinct from
+      the global leaderboard's efficient index-scan-plus-limit pattern; recorded
+      under OQ-07 as a pre/post-launch EXPLAIN ANALYZE measurement item. All five
+      G4 dimensions are now PASS_WITH_ACTIONS with zero Critical/High across the
+      whole round -- this is the third freeze candidate (after Notifications and
+      CRM) to clear G4 entirely clean. G6 documentation-validation ran next:
+      PASS_WITH_ACTIONS, 20/20 template-compliance criteria, zero orphaned
+      REQ/TREQ/RULE/TRULE/MIG-GAP/OQ/FIND ids. Two non-blocking nonsemantic
+      corrections (FIND-DOCVAL-001: seven MODULE_REGISTRY.yaml citations off by
+      10 lines, :119-129 -> :129-139; FIND-DOCVAL-002: v0.1.1 change-log row's
+      "Findings resolved" list omitted FIND-ARCH-003, already dispositioned in
+      the row's own prose) were applied directly per LOOP_CONTROL.md §7 without a
+      version bump. A third finding (FIND-DOCVAL-003, Specification Issues
+      Register under FIND-PERF-* content) is remediated by this synchronization
+      pass itself (see governance/SPECIFICATION_ISSUES_REGISTER.md Quality
+      section). MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml synchronized:
+      backend-quality's specification field, UNKNOWN since SYNC-009's tail note,
+      now reads SPEC-QUAL-001@0.1.2 (REVIEW) -- this closes that module's share of
+      the SYNC-009/SIR-GLOB-005 registry-sync gap (backend-attendance's equivalent
+      gap remains open). DEPENDENCY_GRAPH.yaml synchronized per the spec's own
+      Proposed Knowledge Deltas: added edge-quality-reads-attendance
+      (backend-quality reads state-attendance for the on_time_rate recompute,
+      service.ts:147-149; previously a confirmed-missing edge, FIND-DEP-001/
+      FIND-ARCH-003) and added backend-quality to state-attendance.readers.
+      DEPENDENCY_GRAPH.yaml's global observed_revision was NOT restamped --
+      it remains stale platform-wide per the pre-existing SIR-GLOB-009 finding,
+      out of scope for a single-module documentation session; a full
+      repository-synchronization pass is still pending. MODULE_SPEC NOT frozen
+      (G2 human) -- OQ-01 (headline 1-5-vs-0-100 Rating reconciliation), OQ-03/
+      OQ-09 (Medium cross-tenant security items, routed to a Risk Assessment),
+      and OQ-06/SYNC-001 (ownership) remain the standing human-authority items;
+      none is Critical/High and none blocks G2 the way SYNC-010/011's Critical
+      findings do.
+    authority_needed: human  # G2 freeze; OQ-01 headline Rating-model decision; OQ-03/OQ-09 Risk Assessment authorization; OQ-04 dual-writer decision (now carrying FIND-PERF-001 workload evidence); OQ-06/SYNC-001 ownership
+
 context_invalidators:
   - repository revision changes
   - default branch changes

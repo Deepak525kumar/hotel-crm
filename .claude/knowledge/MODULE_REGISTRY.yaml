@@ -18,16 +18,18 @@ status: verified-inventory
 # reserved human authority). REVIEW-status specifications now exist and are
 # reflected below for backend-work-requests/work-applications/assignments
 # (SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1),
+# backend-quality (SPEC-QUAL-001@0.1.2 — all five G4 dimensions PASS_WITH_ACTIONS,
+# zero Critical/High, G6-doc PASS_WITH_ACTIONS; NOT frozen, G2 human),
 # backend-analytics (SPEC-ANALYTICS-001@0.1.1 — security review FAIL,
 # 1 Critical/1 Medium, unresolved and blocking G2; see SYNC_STATE.yaml SYNC-010),
 # and backend-auth (SPEC-AUTH-001@0.2.1 — security review FAIL, 1 Critical/4 High,
 # unresolved and blocking G2; see SYNC_STATE.yaml SYNC-011).
 # Known drift (non-blocking, out of scope for the sessions that added this note):
-# docs/03-modules/attendance/MODULE_SPEC.md and docs/03-modules/quality/MODULE_SPEC.md
-# were authored and merged but this registry's `specification` field for
-# backend-attendance/backend-quality was never updated to reflect them — still
-# reads UNKNOWN below. A future synchronization pass should close this gap for
-# those two modules.
+# docs/03-modules/attendance/MODULE_SPEC.md was authored and merged but this
+# registry's `specification` field for backend-attendance was never updated to
+# reflect it — still reads UNKNOWN below. A future synchronization pass should
+# close this gap (backend-quality's equivalent gap was closed by the session
+# that added this line; see SYNC_STATE.yaml SYNC-015).
 
 modules:
   - id: backend-auth
@@ -135,7 +137,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-QUAL-001@0.1.2 (REVIEW)  # docs/03-modules/quality/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); G6-doc PASS_WITH_ACTIONS; NOT frozen (G2 human) -- pending disposition of OQ-01 (headline 1-5 vs 0-100 Rating reconciliation) through OQ-09
     evidence: backend/src/routes/v1/index.ts:30; backend/src/modules/quality/service.ts:4
 
   - id: backend-hr
@@ -264,7 +266,7 @@ unresolved:
   - All accountable owners require authoritative human assignment (SYNC-001, blocked); no CODEOWNERS exists and backend/package.json "author" is empty.
   - backend-chatbot and backend-geo are declared-but-unimplemented stubs (directories contain only .placeholder; not route-registered).
   - backend-hr and backend-calendar are active but lack a dedicated test file in backend/src/__tests__/.
-  - No frozen module specification exists yet for any registered module (G2 freeze is reserved human authority); REVIEW-status specifications exist for job-dispatch (backend-work-requests/work-applications/assignments, SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1), and backend-analytics (SPEC-ANALYTICS-001@0.1.1).
-  - docs/03-modules/attendance/MODULE_SPEC.md (SPEC-ATT-001) and docs/03-modules/quality/MODULE_SPEC.md (SPEC-QUAL-001, v0.1.1) exist and were merged (PRs #109, #110, #111) but this registry's `specification` field for backend-attendance/backend-quality was never synchronized to reflect them — still UNKNOWN below; a future synchronization pass should close this gap.
+  - No frozen module specification exists yet for any registered module (G2 freeze is reserved human authority); REVIEW-status specifications exist for job-dispatch (backend-work-requests/work-applications/assignments, SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1), backend-quality (SPEC-QUAL-001@0.1.2, all five G4 dimensions PASS_WITH_ACTIONS, zero Critical/High), and backend-analytics (SPEC-ANALYTICS-001@0.1.1).
+  - docs/03-modules/attendance/MODULE_SPEC.md (SPEC-ATT-001) exists and was merged (PRs #109-#111) but this registry's `specification` field for backend-attendance was never synchronized to reflect it — still UNKNOWN below; a future synchronization pass should close this gap. (backend-quality's equivalent gap was closed by this synchronization pass; see SYNC_STATE.yaml SYNC-015.)
   - backend-analytics's `GET /analytics/leaderboard`(`/by-hotel/:hotel_id`) routes have no `requireRole`/`checkHotelAccess` gate, unlike the module's own `/stats`/`/hotel-summary` and the sibling `/quality/leaderboard` route that guards the identical `WorkerOverallRating` data — classified Critical by independent security review (SPEC-ANALYTICS-001 v0.1.1, OQ-ANALYTICS-01). This is a live code defect in already-deployed code, not a documentation gap; it blocks SPEC-ANALYTICS-001's G2 freeze per Constitution §12 and requires either a code fix or a human-authorized Risk Assessment. Not remediated by this synchronization pass.
   - `edge-analytics-reads-hotel-worker` is confirmed missing from DEPENDENCY_GRAPH.yaml (dependency review, SPEC-ANALYTICS-001 v0.1.1 FIND-DEP-001) — `backend-analytics`'s `getLeaderboard` reads `state-hotel-worker` via a relation filter with no corresponding graph edge. Proposed, not applied; requires a dependency-synchronization pass.
