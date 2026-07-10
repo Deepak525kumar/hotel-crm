@@ -30,16 +30,25 @@ export const UpdateProfileSchema = z.object({
   profile_photo_url: z.string().url('Invalid URL').optional(),
 });
 
-export const PasswordResetSchema = z.object({
+// HOTFIX-AUTH-002: password reset is a two-step, server-authoritative flow.
+// The request step accepts only an email (never a new password) and never
+// reveals account existence; the confirm step requires the single-use token
+// issued by the request step as proof of email ownership.
+export const PasswordResetRequestSchema = z.object({
   email: z.string().email('Invalid email address'),
+}).strict();
+
+export const PasswordResetConfirmSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
   new_password: z.string()
     .min(8, 'Password must be at least 8 characters')
     .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
     .regex(/[0-9]/, 'Password must contain at least one digit'),
-});
+}).strict();
 
 export type SignupRequest = z.infer<typeof SignupSchema>;
 export type LoginRequest = z.infer<typeof LoginSchema>;
 export type RefreshTokenRequest = z.infer<typeof RefreshTokenSchema>;
 export type UpdateProfileRequest = z.infer<typeof UpdateProfileSchema>;
-export type PasswordResetRequest = z.infer<typeof PasswordResetSchema>;
+export type PasswordResetRequestInput = z.infer<typeof PasswordResetRequestSchema>;
+export type PasswordResetConfirmInput = z.infer<typeof PasswordResetConfirmSchema>;

@@ -129,3 +129,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 export const BCRYPT_ROUNDS = 12;
+
+// HOTFIX-AUTH-002: password-reset tokens are single-use and expire quickly to
+// bound the window an intercepted/leaked token remains exploitable.
+export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
