@@ -383,6 +383,60 @@ known_drift:
       findings do.
     authority_needed: human  # G2 freeze; OQ-01 headline Rating-model decision; OQ-03/OQ-09 Risk Assessment authorization; OQ-04 dual-writer decision (now carrying FIND-PERF-001 workload evidence); OQ-06/SYNC-001 ownership
 
+  - id: SYNC-016
+    type: specification
+    status: blocked
+    description: >-
+      SPEC-USERS-001 (User Account Management) authored at v0.1.0, status REVIEW
+      (docs/03-modules/users/MODULE_SPEC.md). First specification for backend-users,
+      selected as the next eligible module per DEPENDENCY_GRAPH.yaml-based preflight
+      (dependencies: [], only peer relationship is the already-documented state-user
+      co-writer backend-auth; no prerequisite module undocumented; no boundary
+      collision against any of the 11 already-authored specs, independently verified
+      by grep before authoring). Documents the five-route User CRUD surface (list/get/
+      create/update/soft-delete), role assignment, and permissions-array administration,
+      explicitly out of scope for Authentication/session (backend-auth, SPEC-AUTH-001).
+      First G4 independent-review round complete against v0.1.0 (commit 84d880a,
+      re-verified content-identical at d5b986e): architecture PASS_WITH_ACTIONS
+      (Low + Medium, the Medium being a newly-found deactivation/role-change
+      token-revocation gap also independently found by security review, merged as
+      one register row); dependency PASS_WITH_ACTIONS (Medium — missing
+      backend-users -> state-hotel-worker DEPENDENCY_GRAPH.yaml edge; Low/Note);
+      performance PASS_WITH_ACTIONS (2 Low + 3 Note, missing-index/pagination
+      disclosures); consistency **FAIL** (High — REQ-USERS-003 through REQ-USERS-012
+      are each defined twice with unrelated meanings across the Evidence and
+      Requirements tables, a mechanical author-fixable ID collision); security
+      **FAIL** (**Critical** — a previously-undiscovered, unauthenticated
+      privilege-escalation-to-Admin defect in backend-auth's POST /auth/signup path:
+      SignupSchema accepts an optional role field including 'admin' with no
+      restriction anywhere in the request path, and AuthService.signup assigns the
+      requested role's full ROLE_PERMISSIONS set, including the admin:* wildcard,
+      directly to the newly created account. Independently reproduced end-to-end by
+      the Lead Architect against the live code, not merely reported by the reviewer.
+      This is a live backend-auth code defect, not a backend-users defect or a pure
+      documentation gap -- it falsifies SPEC-USERS-001's own "Admin-only in
+      practice" exploitability framing (OQ-USERS-02/03) and is additionally BLOCKING
+      for SPEC-AUTH-001's own G2 freeze, in addition to that spec's four pre-existing
+      Critical/High findings (SIR-AUTH-001..004). Recorded platform-wide as
+      SIR-GLOB-012 (Specification Issues Register), thin-cross-referenced from this
+      module's own section as SIR-USERS-018. Plus one Medium cross-hotel PII-read
+      finding (routed to Risk Assessment, same disposition track as
+      SIR-QUAL-003/004) and three Low/Medium disclosure-completeness gaps.
+      Per explicit human instruction, the Documentation Workflow's correction cycle
+      (author fixes -> re-review -> G6) was paused before starting: no finding has
+      been applied to SPEC-USERS-001's substantive content. Only the document's
+      Document Control and Review-and-Change-Log were updated to accurately record
+      the G4 outcome (a nonsemantic recording edit exempted from a version bump per
+      LOOP_CONTROL.md §7); the document's substantive claims (including the
+      now-known-inaccurate OQ-USERS-02/03 framing) remain uncorrected pending
+      resumption. MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml/DEPENDENCY_GRAPH.yaml
+      synchronization (including the SIR-USERS-016 graph-edge delta) is likewise
+      deferred to the resumed session, since it is more naturally an exit condition
+      of the not-yet-run correction/G6 cycle than of this recording pass.
+      Workflow termination state for this candidate: Blocked (LOOP_CONTROL.md §4),
+      not Success/Failure.
+    authority_needed: human  # urgent: SIR-GLOB-012 Critical signup-role-injection fix-or-Risk-Assessment decision (blocks both SPEC-AUTH-001 and SPEC-USERS-001); resumption of SPEC-USERS-001's correction cycle (SIR-USERS-010 High consistency fix, SIR-USERS-002/003 framing correction, SIR-USERS-005 Risk Assessment); SYNC-001 ownership
+
 context_invalidators:
   - repository revision changes
   - default branch changes
