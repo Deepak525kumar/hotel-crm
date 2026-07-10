@@ -286,6 +286,49 @@ known_drift:
       publication boundary.
     authority_needed: human  # ADR-010 ratification; optional repository-synchronization pass to re-bind the stale caches noted above; publication-boundary confirmation
 
+  - id: SYNC-014
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-CRM-001 (CRM / Hotel & Organization Management) authored at v0.1.1,
+      status REVIEW (docs/03-modules/crm/MODULE_SPEC.md). One bounded capability
+      over backend-crm -- sole authoritative writer of Hotel state (state-hotel),
+      read by backend-work-requests and backend-hotel-workers, consumed by
+      frontend-web. Current-state Hotel CRUD reverse-specified (5 requirements,
+      6 rules) and cross-checked against target authorities
+      (PIVOT_DESIGN_DOCUMENT.md, CONFIRMED_REQUIREMENTS_REGISTER.md); 7 migration
+      gaps recorded (Hotel Group/Organization entity, manager write-authority
+      contradiction, pause-jobs toggle, scope+Regional-Manager role, unused
+      contact fields, dedicated-manager association, shared billing). G4 reviews
+      complete: architecture/dependency/consistency/security/performance ALL
+      PASS_WITH_ACTIONS, zero Critical/High findings across all five -- this is
+      the first CRM-family freeze candidate (alongside Calendar,
+      Employee-Management) to clear its first G4 round without any FAIL. All
+      26 findings were Medium/Low/Note and author-fixable at the documentation
+      level; applied in full at v0.1.1 (corrected REQ-CRM-005 acceptance
+      criteria after security review independently discovered the list does
+      not default-exclude soft-deleted hotels; fixed three 400->422 error-code
+      citations; disclosed the checkHotelAccess admin/manager/checker bypass;
+      corrected a false "FEATURE_* convention already exists" claim inherited
+      from PDD; four new open decisions OD-CRM-14..17 added for
+      human/architecture-authority items). 17 open decisions carried
+      (OD-CRM-01..17); OD-CRM-01/02/05/10/11 already gated FROZEN status at
+      v0.1.0 and remain open; none of the four new items is blocking.
+      Consistency review additionally found docs/03-modules/onboarding/MODULE_SPEC.md
+      asserts settled Hotel/Hotel-Group ownership ("Hotels module owns Hotel
+      and Hotel Group records") directly conflicting with this spec's own
+      OD-CRM-01 (widened into OD-CRM-06); also flagged and prevented a
+      canonical-terminology-authority collision with SPEC-AUTH-001 over
+      "Regional Manager"/"Scope" before the Knowledge Delta could silently
+      reattribute it. Architecture review additionally found a platform-wide
+      route-nesting execution coupling (CRM<->hotel-workers, also
+      work-requests<->work-applications; OD-CRM-15) and a one-sided pause-jobs
+      cross-module contract with the not-yet-aware job-dispatch spec
+      (OD-CRM-16). DEPENDENCY_GRAPH.yaml edge-frontend-crm reclassified
+      unknown->conditional (FIND-DEP-CRM-002). Registry specification pointer
+      updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
+    authority_needed: human  # G2 freeze; OD-CRM-01/02/05/10/11 disposition; OD-CRM-15 platform-wide route-nesting Decision Record; OD-CRM-16 bilateral Decision Record with job-dispatch; SYNC-001 ownership; TERMINOLOGY.md canonical-source decision for Regional Manager/Scope (SPEC-AUTH-001 vs SPEC-CRM-001); scope of onboarding/MODULE_SPEC.md inclusion in OD-CRM-06 reconciliation
+
 context_invalidators:
   - repository revision changes
   - default branch changes

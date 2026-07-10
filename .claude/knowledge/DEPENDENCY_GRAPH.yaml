@@ -265,7 +265,7 @@ edges:
   - { id: edge-frontend-attendance, source: frontend-web, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/attendance)" }
   - { id: edge-frontend-assignments, source: frontend-web, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/assignments)" }
   - { id: edge-frontend-notifications, source: frontend-web, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/notifications)" }
-  - { id: edge-frontend-crm, source: frontend-web, target: backend-crm, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/crm)" }
+  - { id: edge-frontend-crm, source: frontend-web, target: backend-crm, kind: consumes-api, compatibility: conditional, status: observed, evidence: "frontend/lib/api.ts:333 (/crm, per_page=100 vs. backend limit param, def 20)" }  # reclassified unknown->conditional by SPEC-CRM-001 dependency review (FIND-DEP-CRM-002); functions today, silently truncates past 20 active hotels -- see OD-CRM-08
   # mobile-worker (Expo) via mobile/worker-app/src/lib/api.ts
   - { id: edge-mobile-worker-auth, source: mobile-worker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:61 (/auth); mobile/worker-app/src (/auth)" }
   - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)" }

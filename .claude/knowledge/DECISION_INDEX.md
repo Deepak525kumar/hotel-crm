@@ -17,6 +17,21 @@ Decision records belong in the project’s authoritative decision directory and 
 | ADR-009 | Context-Artifact Token-Optimization Architecture (Platform v1.2) | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md` | Engineering operating system (`.claude/`); adds Context Artifacts, gate G1.5, LOOP_CONTROL §7-8 | — |
 | ADR-010 | Governance Layer for the Specification Issues Register (Platform v1.3) | Proposed | `../../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md` | Engineering operating system (`.claude/`); adds the `governance/` top-level category, the Specification Issues Register, and the `SIR-*` artifact-ID class; amends CLAUDE.md Knowledge Separation | — |
 
+## Pending Decision Records (SPEC-CRM-001)
+
+Decisions surfaced by `docs/03-modules/crm/MODULE_SPEC.md` (SPEC-CRM-001, v0.1.1) requiring a Decision Record before target-state implementation or G2 freeze. No ADR yet exists for any of these; recorded here as pending per the Proposed Knowledge Deltas of that specification.
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `OD-CRM-01` | Hotel Group / Organization data-model ownership unproven — CRR §11 requires it, PDD §9.3 names no entity | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-01` | Human/architecture decision on data-model home before `REQ-CRM-006/007` implementation |
+| `OD-CRM-02` | Manager hotel-write authority contradiction — route role gate includes `manager`, permission map does not | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-02` | Human decision: reconcile route/permission-map, or accept current Admin-only behavior |
+| `OD-CRM-05` | Scope + Regional Manager role absent from current enum/token model | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-05` | Human/architecture decision, coordinated with `SPEC-AUTH-001`'s own scope/role proposal |
+| `OD-CRM-07` | List-endpoint role gate vs. permission map disagree on WORKER/CHECKER read access | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-07` | Human decision on intended list-audience |
+| `OD-CRM-10` | Shared-billing ownership for a Hotel Group undefined | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-10` | Product/architecture decision before `REQ-CRM-007` implementation |
+| `OD-CRM-12` | Interface/event contract versioning scheme undefined for this module | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-12` | Architecture decision, platform-wide event/versioning policy |
+| `OD-CRM-15` | Route-nesting execution coupling (CRM↔hotel-workers, also work-requests↔work-applications) — platform-wide, not CRM-scoped | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-15`; architecture review `FIND-001` | Lead Architect platform-wide Decision Record |
+| `OD-CRM-16` | Pause-jobs enforcement is a one-sided cross-module contract with `job-dispatch` | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-16`; architecture review `FIND-002` | Bilateral Decision Record or reciprocal spec reference with `SPEC-JOB-DISPATCH-001` |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |
