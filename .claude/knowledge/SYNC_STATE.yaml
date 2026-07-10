@@ -435,7 +435,38 @@ known_drift:
       of the not-yet-run correction/G6 cycle than of this recording pass.
       Workflow termination state for this candidate: Blocked (LOOP_CONTROL.md §4),
       not Success/Failure.
-    authority_needed: human  # urgent: SIR-GLOB-012 Critical signup-role-injection fix-or-Risk-Assessment decision (blocks both SPEC-AUTH-001 and SPEC-USERS-001); resumption of SPEC-USERS-001's correction cycle (SIR-USERS-010 High consistency fix, SIR-USERS-002/003 framing correction, SIR-USERS-005 Risk Assessment); SYNC-001 ownership
+    authority_needed: human  # urgent: SIR-GLOB-012 Critical signup-role-injection fix-or-Risk-Assessment decision (blocks both SPEC-AUTH-001 and SPEC-USERS-001) -- NOW RESOLVED IN CODE by SYNC-017/HOTFIX-AUTH-001; resumption of SPEC-USERS-001's correction cycle (SIR-USERS-010 High consistency fix, SIR-USERS-002/003 framing correction, SIR-USERS-005 Risk Assessment); SYNC-001 ownership
+
+  - id: SYNC-017
+    type: security-hotfix
+    status: resolved
+    description: >-
+      HOTFIX-AUTH-001 (P0, backend-auth) -- confirmed and closed a live Critical
+      privilege-escalation vulnerability in public signup. The unauthenticated
+      POST /auth/signup accepted a client-supplied role (SignupSchema enumerated
+      worker/checker/manager/admin, validation.ts:12) which AuthService.signup
+      trusted verbatim (service.ts:22-23), assigning ROLE_PERMISSIONS[role]
+      including admin:* -- any anonymous caller could self-provision an ADMIN
+      account and token. Independently reproduced against the pre-fix worktree
+      before trusting the report. This is the SAME defect the concurrent
+      SPEC-USERS-001 review (SYNC-016) independently found and recorded platform-wide
+      as SIR-GLOB-012 (thin-cross-referenced SIR-USERS-018); this hotfix RESOLVES it,
+      clearing that blocker for both SPEC-AUTH-001 and SPEC-USERS-001. It was also
+      the live-code disproof of the "self-signup WORKER" baseline that
+      SIR-ANLY-001/SIR-AUTH-003 assume.
+      Fix (minimum, bounded to backend-auth): removed role from the public
+      SignupSchema and hardened it with .strict() so injected keys are rejected;
+      AuthService.signup now hardcodes a non-privileged WORKER. Legitimate
+      self-signup behaviour is unchanged; privileged elevation remains available
+      only through the authenticated users module under RBAC (untouched). A
+      regression suite (worker/manager/admin/checker/regional_manager injection)
+      was added to auth.test.ts -- it fails against pre-fix source and passes
+      after; full backend suite green (134/134). Recorded in the Specification
+      Issues Register as SIR-AUTH-016 (standing row + Resolved History) with
+      SIR-GLOB-012/SIR-USERS-018 marked RESOLVED and cross-linked. No human
+      authority required -- server-side-only role determination is a security
+      invariant, not a product decision. No specification text altered.
+    authority_needed: none  # code fix of a Critical security defect; no reserved-authority decision
 
 context_invalidators:
   - repository revision changes

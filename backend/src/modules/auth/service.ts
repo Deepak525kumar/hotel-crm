@@ -19,8 +19,12 @@ export class AuthService extends BaseService {
     }
 
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
-    const role = (data.role?.toUpperCase() ?? 'WORKER') as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
-    const permissions = ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS['WORKER'];
+    // SECURITY (HOTFIX-AUTH-001): public self-signup is always a non-privileged
+    // WORKER. The server determines the role; client input is never trusted for
+    // privilege assignment. Elevation happens only through the authenticated
+    // users module under RBAC.
+    const role = 'WORKER' as const;
+    const permissions = ROLE_PERMISSIONS['WORKER'] ?? [];
 
     const user = await this.prisma.user.create({
       data: {
