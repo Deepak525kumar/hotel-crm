@@ -86,6 +86,17 @@ export class UserService extends BaseService {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new ConflictError('Email already registered');
 
+    // SECURITY (HOTFIX-AUTH-003): assigning a privileged role is a server-side
+    // authority decision, not a caller-supplied one. The authenticated admin-
+    // creation workflow is role-gated to {admin, manager} at the route, but a
+    // manager must not be able to mint an ADMIN account through this path.
+    // Mirror the elevation guard already enforced on updateUser: only an admin
+    // may assign the admin role. Preserves the legitimate admin-creates-admin
+    // and manager-creates-worker/checker/manager workflows.
+    if (data.role === 'admin' && actorRole !== 'admin') {
+      throw new ForbiddenError('Only admins can assign admin role');
+    }
+
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
     const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
     const permissions = ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS['WORKER'];
