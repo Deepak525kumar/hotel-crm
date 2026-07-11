@@ -468,6 +468,66 @@ known_drift:
       invariant, not a product decision. No specification text altered.
     authority_needed: none  # code fix of a Critical security defect; no reserved-authority decision
 
+  - id: SYNC-018
+    type: security-hotfix
+    status: resolved
+    description: >-
+      HOTFIX-AUTH-002 (P0, backend-auth) -- confirmed and closed a live Critical
+      unauthenticated account-takeover primitive in password reset. The public,
+      token-less POST /auth/password-reset accepted only {email, new_password}
+      and unconditionally overwrote password_hash + revoked all sessions for
+      whichever account matched that email (routes.ts:11 pre-fix, no
+      authMiddleware; service.ts:201-216 pre-fix resetPassword). Anyone who knew
+      a victim's email could take over the account with zero proof of ownership.
+      Independently reproduced against the pre-fix worktree before trusting the
+      pre-existing report (SIR-AUTH-001 / SIR-GLOB-004).
+      Fix (minimum, bounded to backend-auth): replaced the single-step overwrite
+      with a two-step, server-issued single-use token flow entirely within
+      backend/src/modules/auth/. New PasswordResetToken Prisma model (token_hash
+      unique, expires_at, used_at) plus migration. requestPasswordReset (request
+      step, still POST /auth/password-reset) accepts only email, never accepts
+      or writes a new password, never reveals account existence, and invalidates
+      any still-outstanding token before issuing a new crypto.randomBytes(32)
+      token (sha256-hashed at rest, 30-minute TTL). confirmPasswordReset (new
+      POST /auth/password-reset/confirm) requires that token, rejects missing/
+      forged/random/expired/reused tokens with one generic UnauthorizedError,
+      and on success atomically ($transaction) updates password_hash, marks the
+      token used, and deletes all sessions. Legitimate self-signup/login/
+      refresh/logout/getCurrentUser/updateProfile confirmed byte-for-byte
+      unchanged by diff. Actual delivery of the raw token to the user's inbox
+      is out of this hotfix's bounded scope -- no email-transport capability
+      exists anywhere in the platform yet (NotificationService.sendEmail throws
+      NotImplementedError; SIR-NOTIF-007/SIR-AUTH-005, unwired SendGrid/Resend
+      choice) -- wiring it would expand into backend-notifications, which the
+      required Boundary Collision Check ruled out of scope.
+      Regression suite added to auth.test.ts (26 cases: no-enumeration for
+      unknown/disabled/deleted accounts, prior-token invalidation, hashed/
+      expiring token issuance, new_password-injection ignored, valid reset +
+      session wipe, forged/random token, expired token, reused token/replay,
+      token for deactivated account, unauthorized reset with no valid token) --
+      fails against pre-fix source, passes after; full backend suite green
+      (146/146); typecheck and lint clean.
+      Independently reviewed (three specialist gates, each given only the diff
+      and file pointers, not this description): Security PASS_WITH_ACTIONS (0
+      Critical/High; 1 Medium timing-based-enumeration finding recorded as
+      SIR-AUTH-017, mirrors an identical pre-existing unaddressed gap in this
+      module's own login(); 1 Low rate-limiting/token-sweep finding recorded as
+      SIR-AUTH-018, analogous to the already-tracked SIR-AUTH-014 Session-sweep
+      gap -- the token-invalidation portion of that finding was fixed in this
+      same hotfix, rate-limiting itself is a repo-wide platform gap out of
+      bounded scope); Architecture PASS (one Note: knowledge artifacts
+      temporarily lag the code for the new state domain, closed by this same
+      synchronization pass); Performance PASS (two Low, non-blocking:
+      speculative secondary indexes, unswept token table analogous to
+      SIR-AUTH-014).
+      Recorded in the Specification Issues Register as SIR-AUTH-001 (standing
+      row, now RESOLVED) with SIR-GLOB-004's auth portion marked resolved
+      (analytics portion remains OPEN, unrelated, out of this module's scope).
+      No human authority required -- server-side-only reset authorization is a
+      security invariant, not a product decision. No specification text
+      altered (Documentation Workflow explicitly not run for this hotfix).
+    authority_needed: none  # code fix of a Critical security defect; no reserved-authority decision
+
 context_invalidators:
   - repository revision changes
   - default branch changes

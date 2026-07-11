@@ -17,6 +17,7 @@ const mockPrisma = {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    deleteMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -273,8 +274,25 @@ describe('AuthService', () => {
       expect(mockPrisma.passwordResetToken.create).not.toHaveBeenCalled();
     });
 
+    it('invalidates any prior outstanding tokens before issuing a new one', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.passwordResetToken.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.requestPasswordReset({ email: activeUser.email });
+
+      expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { user_id: activeUser.id, used_at: null },
+      });
+      const deleteOrder = (mockPrisma.passwordResetToken.deleteMany as jest.Mock).mock.invocationCallOrder[0];
+      const createOrder = (mockPrisma.passwordResetToken.create as jest.Mock).mock.invocationCallOrder[0];
+      expect(deleteOrder).toBeLessThan(createOrder);
+    });
+
     it('creates a hashed, expiring, single-use token for a known active user', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
       mockPrisma.passwordResetToken.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 

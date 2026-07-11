@@ -25,6 +25,7 @@ state_domains:
   - { domain: state-worker-overall-rating, model: WorkerOverallRating, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-work-applications, backend-analytics] }
   - { domain: state-notification, model: Notification, authoritative_writer: backend-notifications, writers: [backend-notifications], readers: [backend-notifications] }
   - { domain: state-audit-log, model: AuditLog, authoritative_writer: UNKNOWN, writers: [shared-via-base-service], readers: [], collision: shared-write via BaseService.logAudit; no single owner (human decision, SYNC-005) }
+  - { domain: state-password-reset-token, model: PasswordResetToken, authoritative_writer: backend-auth, writers: [backend-auth], readers: [backend-auth], note: "added by HOTFIX-AUTH-002 (SIR-AUTH-001); single-writer, no collision" }
 
 cross_module_write_couplings:  # G1.5 must treat these as ownership-bearing
   - backend-work-applications writes state-work-request, state-worker-assignment, state-attendance during accept-application transaction (backend/src/modules/work-applications/service.ts:219-283)

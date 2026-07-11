@@ -210,6 +210,13 @@ export class AuthService extends BaseService {
       return;
     }
 
+    // Invalidate any still-outstanding tokens from earlier requests so at
+    // most one reset token is ever valid for an account at a time (security
+    // review FIND-02: shrinks standing attack surface from stale tokens).
+    await this.prisma.passwordResetToken.deleteMany({
+      where: { user_id: user.id, used_at: null },
+    });
+
     const rawToken = crypto.randomBytes(32).toString('hex');
     const token_hash = crypto.createHash('sha256').update(rawToken).digest('hex');
 

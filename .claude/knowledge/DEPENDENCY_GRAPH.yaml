@@ -73,6 +73,7 @@ nodes:
   - { id: state-worker-overall-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:445 (model WorkerOverallRating)" }
   - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
   - { id: state-audit-log, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
+  - { id: state-password-reset-token, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma (model PasswordResetToken, added by HOTFIX-AUTH-002)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -509,6 +510,13 @@ state_domains:
     readers: []
     evidence: "backend/src/lib/base-service.ts:19 (logAudit -> this.prisma.auditLog.create); inherited by every service"
     note: "Written through the shared BaseService.logAudit by any module; no single module owns it."
+  - id: state-password-reset-token
+    model: PasswordResetToken
+    authoritative_writer: backend-auth
+    writers: [backend-auth]
+    readers: [backend-auth]
+    evidence: "backend/src/modules/auth/service.ts (requestPasswordReset/confirmPasswordReset: passwordResetToken.deleteMany/create/findUnique/update); added by HOTFIX-AUTH-002 (SIR-AUTH-001)"
+    note: "Single-writer, no collision. Mirrors the existing state-session pattern (FK-cascaded from User, backend-auth-only)."
 
 analysis:
   circular_dependencies:
