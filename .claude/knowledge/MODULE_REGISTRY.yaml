@@ -54,12 +54,13 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN  # SPEC-USERS-001 v0.1.0 authored and G4-reviewed (REVIEW; consistency FAIL, security FAIL) but registry-pointer sync is explicitly deferred to that specification's own paused correction/G6 cycle, not this repository-synchronization session; see SYNC_STATE.yaml SYNC-016/SYNC-020.
+    specification: SPEC-USERS-001@0.1.1 (REVIEW)  # SYNC-016's paused correction/G6 cycle resumed and completed: consistency FAIL resolved (mechanical REQ-USERS-003..012 ID-collision fix, SIR-USERS-010) and security FAIL root cause resolved in code (HOTFIX-AUTH-001, SYNC-017); registry pointer updated per that session's own deferral. Not FROZEN -- G2 remains reserved human authority, blocked on SYNC-001/OQ-USERS-01/04/05/06/07. See SYNC_STATE.yaml SYNC-016/SYNC-021.
     evidence: backend/src/routes/v1/index.ts:23
     # UPDATE 2026-07-11 (SYNC-020/HOTFIX-AUTH-003): the createUser privilege-escalation
     # gap independently found by SPEC-USERS-001's own security review (SIR-USERS-003
     # facet a) is RESOLVED in code -- createUser now mirrors updateUser's admin-role-
-    # assignment guard (service.ts:89-95). Two non-blocking follow-ups remain open,
+    # assignment guard (service.ts:96-98, line shifted after the guard's own comment
+    # block was added; content unchanged). Two non-blocking follow-ups remain open,
     # tracked in the Auth section of the Specification Issues Register (SIR-AUTH-019
     # target-admin-protection gap; SIR-AUTH-020 guard-duplication cleanup). This UPDATE
     # note records live code state only; it does not re-run SPEC-USERS-001's own G4
