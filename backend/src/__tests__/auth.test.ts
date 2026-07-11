@@ -13,9 +13,16 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     deleteMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  passwordResetToken: {
+    create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    deleteMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({
@@ -228,6 +235,185 @@ describe('AuthService', () => {
       await expect(service.getCurrentUser('nonexistent')).rejects.toMatchObject({
         name: 'NotFoundError',
       });
+    });
+  });
+
+  // HOTFIX-AUTH-002: the previous single-step `resetPassword(email, new_password)`
+  // let anyone who knew a victim's email overwrite their password with no proof
+  // of account ownership. This regression suite covers the replacement two-step,
+  // server-issued single-use token flow (request -> confirm).
+  describe('requestPasswordReset', () => {
+    const activeUser = {
+      id: 'user_1',
+      email: 'victim@test.com',
+      role: 'WORKER',
+      is_active: true,
+      deleted_at: null,
+    };
+
+    it('silently succeeds for an unknown email (no account enumeration)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.requestPasswordReset({ email: 'nobody@test.com' })
+      ).resolves.toBeUndefined();
+      expect(mockPrisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('silently succeeds without issuing a token for a disabled account', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ ...activeUser, is_active: false });
+
+      await service.requestPasswordReset({ email: activeUser.email });
+      expect(mockPrisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('silently succeeds without issuing a token for a soft-deleted account', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ ...activeUser, deleted_at: new Date() });
+
+      await service.requestPasswordReset({ email: activeUser.email });
+      expect(mockPrisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('invalidates any prior outstanding tokens before issuing a new one', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 1 });
+      mockPrisma.passwordResetToken.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.requestPasswordReset({ email: activeUser.email });
+
+      expect(mockPrisma.passwordResetToken.deleteMany).toHaveBeenCalledWith({
+        where: { user_id: activeUser.id, used_at: null },
+      });
+      const deleteOrder = (mockPrisma.passwordResetToken.deleteMany as jest.Mock).mock.invocationCallOrder[0];
+      const createOrder = (mockPrisma.passwordResetToken.create as jest.Mock).mock.invocationCallOrder[0];
+      expect(deleteOrder).toBeLessThan(createOrder);
+    });
+
+    it('creates a hashed, expiring, single-use token for a known active user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.passwordResetToken.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.passwordResetToken.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.requestPasswordReset({ email: activeUser.email }, '127.0.0.1');
+
+      expect(mockPrisma.passwordResetToken.create).toHaveBeenCalledTimes(1);
+      const createCall = (mockPrisma.passwordResetToken.create as jest.Mock).mock.calls[0] as Array<{
+        data: { user_id: string; token_hash: string; expires_at: Date };
+      }>;
+      expect(createCall[0]?.data.user_id).toBe(activeUser.id);
+      // The raw token is never persisted — only a hash, and it must not be a
+      // trivially-guessable/short value.
+      expect(createCall[0]?.data.token_hash).toMatch(/^[a-f0-9]{64}$/);
+      expect(createCall[0]?.data.expires_at.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('never overwrites password_hash directly, even if new_password is injected into the request', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.passwordResetToken.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      // Simulate an attacker bypassing the schema (which no longer declares
+      // new_password on the request step) and injecting it directly.
+      await service.requestPasswordReset({
+        email: activeUser.email,
+        new_password: 'Attacker123',
+      } as any);
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('confirmPasswordReset', () => {
+    const activeUser = {
+      id: 'user_1',
+      email: 'victim@test.com',
+      role: 'WORKER',
+      is_active: true,
+      deleted_at: null,
+    };
+    const validRawToken = 'a'.repeat(64);
+    const validTokenRecord = {
+      id: 'prt_1',
+      user_id: activeUser.id,
+      token_hash: require('node:crypto').createHash('sha256').update(validRawToken).digest('hex'),
+      expires_at: new Date(Date.now() + 15 * 60 * 1000),
+      used_at: null,
+    };
+
+    it('performs a valid password reset and invalidates all sessions', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(validTokenRecord);
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.passwordResetToken.update.mockResolvedValue({});
+      mockPrisma.session.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' });
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: activeUser.id } })
+      );
+      expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: validTokenRecord.id }, data: expect.objectContaining({ used_at: expect.any(Date) }) })
+      );
+      expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({ where: { user_id: activeUser.id } });
+    });
+
+    it('rejects a random/forged token that was never issued', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.confirmPasswordReset({ token: 'totally-forged-random-token', new_password: 'NewPassw0rd' })
+      ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an expired token', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        ...validTokenRecord,
+        expires_at: new Date(Date.now() - 60 * 1000),
+      });
+
+      await expect(
+        service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' })
+      ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a reused token (token replay)', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue({
+        ...validTokenRecord,
+        used_at: new Date(),
+      });
+
+      await expect(
+        service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' })
+      ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a token belonging to a deleted or deactivated account', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(validTokenRecord);
+      mockPrisma.user.findUnique.mockResolvedValue({ ...activeUser, is_active: false });
+
+      await expect(
+        service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' })
+      ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unauthorized reset attempt with no valid token in the system', async () => {
+      // No request step was ever performed for this user (no token was ever
+      // issued) -- the original vulnerability let anyone reset a password by
+      // email alone; confirming now unconditionally requires a real token.
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.confirmPasswordReset({ token: 'guess', new_password: 'NewPassw0rd' })
+      ).rejects.toMatchObject({ name: 'UnauthorizedError' });
     });
   });
 });

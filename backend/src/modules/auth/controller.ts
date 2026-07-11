@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { authService } from './service.js';
-import { SignupSchema, LoginSchema, RefreshTokenSchema, UpdateProfileSchema, PasswordResetSchema } from './validation.js';
+import { SignupSchema, LoginSchema, RefreshTokenSchema, UpdateProfileSchema, PasswordResetRequestSchema, PasswordResetConfirmSchema } from './validation.js';
 import { validateBody } from '../../middleware/validation.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 
@@ -82,14 +82,30 @@ export class AuthController {
     }
   }
 
-  passwordReset = [
-    validateBody(PasswordResetSchema),
+  requestPasswordReset = [
+    validateBody(PasswordResetRequestSchema),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
-        await authService.resetPassword(req.body, req.ip);
+        await authService.requestPasswordReset(req.body, req.ip);
         res.status(200).json({
           status: 'success',
-          data: { message: 'If that email exists, the password has been reset' },
+          data: { message: 'If that email exists, a password reset has been initiated' },
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  confirmPasswordReset = [
+    validateBody(PasswordResetConfirmSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        await authService.confirmPasswordReset(req.body, req.ip);
+        res.status(200).json({
+          status: 'success',
+          data: { message: 'Password has been reset successfully' },
           meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
         });
       } catch (error) {
