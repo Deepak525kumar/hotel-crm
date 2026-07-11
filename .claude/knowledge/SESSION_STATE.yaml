@@ -16,15 +16,16 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: unbound   # set to HEAD sha when the first workflow of a revision runs discovery
+  baseline_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5
   default_branch: main
-  framework_version: see .claude/VERSION.yaml
-  opened_at: null              # ISO-8601 when discovery first runs this revision
+  framework_version: see .claude/VERSION.yaml   # 1.3.0
+  opened_at: "2026-07-11T00:00:00Z"
   note: >-
-    No workflow has yet opened a Repository Session at a bound revision under
-    framework 1.2.0. The first pre-flight to run repository-synchronization
-    binds baseline_revision, records the Evidence Package, and future workflows
-    at the same revision reuse it by reference.
+    Bound by SYNC-020 (Repository Synchronization Session, .claude/knowledge/SYNC_STATE.yaml).
+    Repository discovery ran once for this revision; downstream workflows at
+    the same baseline_revision reuse the Evidence Package by reference instead
+    of re-running discovery. Invalidates on the next baseline_revision or
+    default-branch change (CONTEXT_ARTIFACTS.md §6).
 
 # Context Artifacts produced/reused this session. Each entry records its cache
 # key and validity so a later workflow reuses instead of rediscovering.
@@ -32,13 +33,13 @@ context_artifacts:
   boot_context:
     id: ART-BOOT-001
     cache_scope: framework-version
-    key: see .claude/VERSION.yaml current_version
-    valid: unbound
+    key: see .claude/VERSION.yaml current_version   # 1.3.0
+    valid: bound
   evidence_package:
     id: ART-EVID-001
     cache_scope: revision
     key: baseline_revision
-    valid: unbound
+    valid: bound
     body: [ART-REPO-001, ART-REPO-002, ART-REPO-003]
   dependency_context:
     # one entry per capability/module-set slice, keyed baseline_revision + capability

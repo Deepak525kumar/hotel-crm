@@ -1,7 +1,7 @@
 schema_version: 1
 project: hotel-crm
-checked_at: "2026-07-04"
-baseline_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+checked_at: "2026-07-11"
+baseline_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5
 default_branch: main
 status: governance-artifacts-generated
 
@@ -589,6 +589,77 @@ known_drift:
       specification; status remains `REVIEW`.
     authority_needed: human  # G2 freeze; OQ-03 Decision Record (or superseded-by-pivot record) for the cross-owner state-attendance write; OQ-02 fix-or-authorized-Risk-Assessment decision (High, blocks G2 per Constitution §12); SYNC-001 ownership assignment (also blocks authorizing the OQ-03 Decision Record); OQ-11/OQ-12 disposition (Medium/Low, non-blocking)
 
+  - id: SYNC-020
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository Synchronization Session covering everything merged since this
+      file's `cache_state` was last bound at `5b16be40` (PRs #109-#125). Two
+      parts:
+      (1) HOTFIX-AUTH-003 (P0-adjacent, backend-users) had no `SYNC_STATE.yaml`
+      entry despite merging (PR #124, commit `7191066`), unlike HOTFIX-AUTH-001
+      (SYNC-017) and HOTFIX-AUTH-002 (SYNC-018) — a synchronization gap this
+      session closes. The hotfix closed the authenticated-admin-creation
+      counterpart of HOTFIX-AUTH-001's public-signup privilege escalation:
+      `POST /users` is route-gated to `{admin, manager}`, `CreateUserSchema`
+      permits `role: 'admin'`, and `UserService.createUser` assigned it with no
+      authority check, letting a manager mint a full ADMIN account.
+      `createUser` now mirrors the elevation guard already enforced in
+      `updateUser` (`if (data.role === 'admin' && actorRole !== 'admin') throw
+      ForbiddenError(...)`, `backend/src/modules/users/service.ts:89-95`);
+      legitimate admin-creates-admin and manager-creates-worker/checker/manager
+      workflows are preserved; regression suite added
+      (`backend/src/__tests__/users.test.ts`). Independently reviewed (security
+      + architecture, diff-and-pointers only): two non-blocking follow-ups
+      recorded directly in the governance register by that session (commit
+      `ea8b5a8`) as `SIR-AUTH-019` (Medium — `updateUser` protects role
+      *assignment* but not an existing admin *target* from
+      deactivation/demotion/modification) and `SIR-AUTH-020` (Low — the guard
+      is now duplicated in `createUser`+`updateUser`, recommend a shared
+      `assertCanAssignRole` helper). No human authority required for the code
+      fix itself (server-side-only role determination is a security invariant).
+      `MODULE_REGISTRY.yaml`'s `backend-users` entry `specification` field
+      remains `UNKNOWN` per `SYNC-016`'s explicit deferral (registry-pointer
+      sync for `SPEC-USERS-001` is scoped to that specification's own paused
+      correction/G6 cycle, not to this repository-synchronization session); an
+      `UPDATE` note citing the hotfix was appended to that entry instead,
+      mirroring the pattern already used for `backend-auth`/HOTFIX-AUTH-002
+      (`SYNC-018`). This session additionally verified and applied
+      `SIR-USERS-003`'s `createUser`-guard facet as RESOLVED by the code above
+      (independently re-derived against current `backend/src/modules/users/service.ts`,
+      not merely asserted) while its second facet (`updateUser` checks only the
+      *incoming* role, never the *target's current* role) remains open, now
+      tracked as `SIR-AUTH-019` — the register row was narrowed, not deleted,
+      per the register's append/resolve/merge protocol.
+      (2) Full Context Artifact cache rebind, closing `SIR-GLOB-009`: every
+      knowledge index whose `observed_revision`/`baseline_revision` still read
+      `5b16be40ef0aa9ac3f186e7323b960886a6153c2` (`MODULE_REGISTRY.yaml`,
+      `SPECIFICATION_INDEX.yaml`, `DEPENDENCY_GRAPH.yaml`,
+      `OWNERSHIP_INDEX.yaml`, `STATE_OWNERSHIP_INDEX.yaml`,
+      `BOUNDARY_INDEX.yaml`, `CONTRACT_INDEX.yaml`, `API_INDEX.yaml`,
+      `MODULE_MEMORY.yaml`, and this file's own `cache_state` block) is
+      restamped to current `HEAD` (`9142bee`). No drift beyond what is already
+      individually tracked (`SYNC-008..019`, the register) was found in module
+      inventory, contract ownership, or API-mount content during this pass —
+      each of those files' substantive content was already kept current
+      incrementally by the sessions that produced `SYNC-008` through `SYNC-019`;
+      only the revision stamps themselves, and the one below, were stale.
+      One additional evidence-backed, independently-already-reviewed
+      `DEPENDENCY_GRAPH.yaml` delta was applied as part of this rebind (not a
+      new discovery — proposed and left unapplied since `SPEC-USERS-001`'s own
+      dependency review): `edge-users-reads-hotel-worker`
+      (`backend-users` reads `state-hotel-worker` via the `hotel_id` relation
+      filter in `listUsers`, `backend/src/modules/users/service.ts:16`),
+      closing `SIR-USERS-016`; `state-hotel-worker.readers` in
+      `DEPENDENCY_GRAPH.yaml`/`STATE_OWNERSHIP_INDEX.yaml` now includes
+      `backend-users`. The separate, still-open `edge-analytics-reads-hotel-worker`
+      gap (`SYNC-010`/`FIND-DEP-001`) is intentionally left untouched — it
+      belongs to a different, still-blocked module (`SPEC-ANALYTICS-001`,
+      Critical security FAIL) and was not part of the evidence gathered by
+      this session. No specification was authored, reviewed, or frozen by this
+      session; no G4 reviewers were executed; no source code was modified.
+    authority_needed: none  # pure knowledge-layer synchronization; the two open follow-ups (SIR-AUTH-019/020) and SYNC-016's own standing human-authority items are unaffected and unresolved by this pass
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -604,14 +675,16 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
-  framework_version: 1.2.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.2.0, valid: unbound }
-  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: unbound }
+  baseline_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5
+  framework_version: 1.3.0
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-11" }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-11" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    No Context Artifact instance has been produced at a bound revision yet under
-    1.2.0; the first pre-flight to run repository-synchronization binds these.
-    On any doubt about validity, an artifact is treated as stale and reproduced
-    (CONTEXT_ARTIFACTS.md §1 invariant 5).
+    Bound by SYNC-020 (Repository Synchronization Session, 2026-07-11): first
+    Context Artifact instance produced at a bound revision under 1.3.0. All
+    nine `observed_revision`-keyed knowledge indexes (see SYNC-020) restamped
+    to this same `baseline_revision`, closing SIR-GLOB-009. On any doubt about
+    validity, an artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md
+    §1 invariant 5); the next repository-revision change re-opens this block.

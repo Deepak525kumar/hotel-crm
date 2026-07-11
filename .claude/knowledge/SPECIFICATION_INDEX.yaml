@@ -8,7 +8,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md]  # both attendance's and quality's registry-sync gaps are now closed (SYNC-019, SYNC-015) -- MODULE_REGISTRY.specification reads SPEC-ATT-001@0.1.1 (REVIEW) and SPEC-QUAL-001@0.1.2 (REVIEW) respectively
 version_source: .claude/VERSION.yaml
-observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
+observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
 
 # status ∈ { FROZEN, REVIEW, UNKNOWN }. No spec is FROZEN (G2 is reserved human
 # authority). REVIEW specs blocked by unresolved Critical/High security findings
