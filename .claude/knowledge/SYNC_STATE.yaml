@@ -528,6 +528,67 @@ known_drift:
       altered (Documentation Workflow explicitly not run for this hotfix).
     authority_needed: none  # code fix of a Critical security defect; no reserved-authority decision
 
+  - id: SYNC-019
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-ATT-001 (Attendance Management) completed its first-ever G4
+      independent-review round, v0.1.0 -> v0.1.1 (docs/03-modules/attendance/MODULE_SPEC.md).
+      All five dimensions run in parallel against the immutable v0.1.0 candidate
+      (authored 2026-07-07, never previously reviewed): architecture **BLOCKED**
+      (2 High -- FIND-ARCH-001: no Decision Record or superseded-by-pivot record
+      exists anywhere in the repository for the cross-owner `state-attendance`
+      write from `backend-work-applications` (OQ-03), same unresolved class
+      already blocking `SPEC-JOB-DISPATCH-001`'s own architecture gate for the
+      identical code; FIND-ARCH-002: module/state ownership unassigned (SYNC-001),
+      which additionally blocks authorizing FIND-ARCH-001's Decision Record);
+      dependency **PASS_WITH_ACTIONS** (1 Medium, 1 Low); consistency
+      **PASS_WITH_ACTIONS** (3 Medium, 1 Low); security **FAIL** (1 High --
+      FIND-SEC-002: independently reproduced OQ-02's cross-tenant hotel-scoping
+      gap against live code and rated it High, confirmed exploitable by any
+      already-privileged, server-assigned admin/manager/checker account against
+      any hotel; wiring the existing `checkHotelAccess()` middleware alone would
+      NOT close this, since that middleware's own design bypasses hotel-membership
+      checks for exactly these three roles; 1 Medium -- FIND-SEC-003, a
+      previously-undisclosed audit-trail gap: `AuditLog.old_values`/`new_values`
+      are never populated; 1 Low); performance **PASS_WITH_ACTIONS** (2 Medium,
+      2 Low, 1 Note). Zero Critical findings across all five dimensions.
+      All eleven author-fixable Medium/Low findings applied at v0.1.1: disclosed
+      the previously-undocumented `backend-quality` reader of `state-attendance`
+      (`edge-quality-reads-attendance`, independently found by both architecture
+      and dependency review -- the graph itself was already correct, added by
+      `SPEC-QUAL-001`'s own dependency review commit `c56ff94`, only this spec's
+      Dependencies table and Proposed Knowledge Deltas were stale); corrected a
+      false "`FEATURE_*` convention" rollback claim (same falsified claim already
+      recorded for four other modules: `SIR-NOTIF-003`, `SIR-AUTH-012`,
+      CRM's `OD-CRM-14`, Users' `ASM-USERS-01`); corrected 9 stale
+      `DEPENDENCY_GRAPH.yaml`, 3 `MODULE_REGISTRY.yaml`, and 4 `schema.prisma`
+      citations that drifted after unrelated intervening work (`SPEC-QUAL-001`'s
+      dependency-graph sync, `HOTFIX-AUTH-002`'s schema insertion) -- none is a
+      change to this module's own code, independently confirmed unchanged since
+      `cca1d29` through current HEAD `f39332e` by every reviewer; clarified the
+      pre-existing OQ-08 numbering gap is not a dropped item; recorded security's
+      independent Low rating on OQ-01 and added two new open decisions (OQ-11
+      audit-trail gap, OQ-12 concurrency/double-submit race, the latter merging
+      FIND-ARCH-005 and FIND-PERF-003's independent confirmation of the spec's
+      own self-reported "theoretical double-submit window" with the codebase's
+      existing `WorkRequest.version` optimistic-lock precedent). G6 documentation
+      validation performed as a self-check (the documentation-validator subagent
+      hit a session rate limit mid-run; Lead Architect independently re-verified
+      template compliance, full ID traceability -- zero orphaned REQ/TREQ/RULE/
+      TRULE/MIG-GAP/OQ/FIND references -- and every corrected citation directly
+      against the live repository). Registry synchronization completed by this
+      pass: `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml` `specification`
+      field for `backend-attendance` updated `UNKNOWN` -> `SPEC-ATT-001@0.1.1
+      (REVIEW)`, closing this module's share of the long-standing `SIR-GLOB-005`
+      registry-sync gap (backend-quality's equivalent share was already closed by
+      `SYNC-015`; no other module's share of `SIR-GLOB-005` is affected).
+      `DEPENDENCY_GRAPH.yaml` required no change (already correct). MODULE_SPEC
+      NOT frozen (G2 human) -- architecture `BLOCKED` and security `FAIL` are
+      both human/architecture-authority items, not resolved by this
+      specification; status remains `REVIEW`.
+    authority_needed: human  # G2 freeze; OQ-03 Decision Record (or superseded-by-pivot record) for the cross-owner state-attendance write; OQ-02 fix-or-authorized-Risk-Assessment decision (High, blocks G2 per Constitution §12); SYNC-001 ownership assignment (also blocks authorizing the OQ-03 Decision Record); OQ-11/OQ-12 disposition (Medium/Low, non-blocking)
+
 context_invalidators:
   - repository revision changes
   - default branch changes

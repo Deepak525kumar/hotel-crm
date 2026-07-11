@@ -6,7 +6,7 @@ purpose: >-
   documentation to answer "does a spec exist / is it frozen?" without re-reading
   the full registry. Revision-bound; invalidated by a specification status change.
 scope: project-runtime
-derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md]  # attendance spec exists in docs but MODULE_REGISTRY.specification still reads UNKNOWN (known drift, SYNC-009 tail); quality's equivalent gap was closed (SYNC-015) -- its MODULE_REGISTRY.specification now reads SPEC-QUAL-001@0.1.2 (REVIEW)
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md]  # both attendance's and quality's registry-sync gaps are now closed (SYNC-019, SYNC-015) -- MODULE_REGISTRY.specification reads SPEC-ATT-001@0.1.1 (REVIEW) and SPEC-QUAL-001@0.1.2 (REVIEW) respectively
 version_source: .claude/VERSION.yaml
 observed_revision: 5b16be40ef0aa9ac3f186e7323b960886a6153c2
 
@@ -52,10 +52,11 @@ specifications:
     freeze_blocked_by: security FAIL (1 Critical/1 Medium); G2 human (SYNC-010)
   - module: backend-attendance
     spec: SPEC-ATT-001
-    version: UNKNOWN
+    version: 0.1.1
     status: REVIEW
     path: docs/03-modules/attendance/MODULE_SPEC.md
-    note: spec merged (PRs #109-#111) but MODULE_REGISTRY.specification never synchronized (known drift, SYNC-009 tail)
+    freeze_blocked_by: architecture BLOCKED (2 High: unratified cross-owner-write Decision Record OQ-03, unassigned ownership SYNC-001); security FAIL (1 High: cross-tenant hotel-scoping OQ-02); G2 human (SYNC-019)
+    note: first G4 round complete; dependency/consistency/performance all PASS_WITH_ACTIONS; MODULE_REGISTRY.specification synchronized (SYNC-019)
   - module: backend-quality
     spec: SPEC-QUAL-001
     version: 0.1.2
