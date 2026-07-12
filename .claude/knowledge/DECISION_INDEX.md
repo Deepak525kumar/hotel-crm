@@ -33,6 +33,14 @@ Decisions surfaced by `docs/03-modules/crm/MODULE_SPEC.md` (SPEC-CRM-001, v0.1.1
 | `OD-CRM-15` | Route-nesting execution coupling (CRM↔hotel-workers, also work-requests↔work-applications) — platform-wide, not CRM-scoped | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-15`; architecture review `FIND-001` | Lead Architect platform-wide Decision Record |
 | `OD-CRM-16` | Pause-jobs enforcement is a one-sided cross-module contract with `job-dispatch` | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-16`; architecture review `FIND-002` | Bilateral Decision Record or reciprocal spec reference with `SPEC-JOB-DISPATCH-001` |
 
+## Pending Decision Records (SPEC-HR-001 / Onboarding / SPEC-CONTRACTS-001 boundary)
+
+Decisions surfaced by `docs/03-modules/hr/MODULE_SPEC.md` (`OD-HR-01a`/`OD-HR-01b`) and reconfirmed by a Boundary Collision Gate (G1.5) run for a proposed `SPEC-CONTRACTS-001` (`SYNC-023`). No ADR yet exists. Recorded here, mirroring the `SPEC-CRM-001` pending-decisions pattern above, so a future session sees the requirement immediately instead of rediscovering it.
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `OD-HR-01a` / `OD-HR-01b` | Contracts capability-ownership conflict — `docs/03-modules/hr/MODULE_SPEC.md` (`SPEC-HR-001`) and `docs/03-modules/onboarding/MODULE_SPEC.md` both claim first-person ownership of contract generation and manager-confirmation capture (identical CRR §9 behavior). Separately, `docs/03-modules/onboarding/MODULE_SPEC.md` §6.5 and `docs/03-modules/employee-management/MODULE_SPEC.md` §4 both already name a distinct, not-yet-built "Contracts module" as the intended eventual owner of contract template/versioning/storage and the ongoing lifecycle. A proposed `SPEC-CONTRACTS-001` (capability scope: contract lifecycle, versions, amendments, signatures, renewal, expiry, metadata, state) was blocked at the pre-authoring Boundary Collision Gate (G1.5) rather than authored, to avoid adding a third competing claim. | `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-HR-001`; `docs/03-modules/hr/MODULE_SPEC.md` `OD-HR-01a`/`OD-HR-01b`; `docs/03-modules/onboarding/MODULE_SPEC.md:87-88,187,190,230-231`; `docs/03-modules/employee-management/MODULE_SPEC.md:40`; `.claude/knowledge/SYNC_STATE.yaml` `SYNC-023` | Human/architecture Decision Record (ADR), structurally analogous to `ADR-011`, settling whether Contracts becomes a standalone module carved out of `backend-hr`, or `backend-hr` retains it with the "Contracts module" references elsewhere re-labeled as `backend-hr` aliases. Required before `SPEC-HR-001` G2 freeze, the onboarding spec's contract-related sections reach G2 freeze, or any `SPEC-CONTRACTS-001` is authored. |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |
