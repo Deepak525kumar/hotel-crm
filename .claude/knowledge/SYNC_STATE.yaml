@@ -878,6 +878,67 @@ known_drift:
       and alters no backend/frontend/test code.
     authority_needed: none  # ADR-012 IS the human product/architecture decision; owner assignment for backend-hr remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
 
+  - id: SYNC-025
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-DOCUMENTS-001 (Documents) authored at v0.1.2, status REVIEW
+      (docs/03-modules/documents/MODULE_SPEC.md). One bounded capability
+      over an entirely unbuilt module -- backend/src/modules/documents does
+      not exist, no Document/WorkerDocument Prisma model exists anywhere;
+      the only document-adjacent code is backend-hr's narrow, self-disclosed,
+      non-functional stub (POST /workers/:worker_id/documents, unconditional
+      NotImplementedError). This is the first module specification in this
+      repository authored for a capability with zero existing code.
+      Boundary Collision Gate (G1.5) executed by the Lead Architect before
+      authoring, per CLAUDE.md pre-flight rule 4 and workflows/boundary-
+      collision.md: PASS -- no other module specification claims document
+      lifecycle/metadata/uploads/storage-abstraction/version-history/status/
+      categories/permissions/access/retrieval/archival/relationships;
+      hr/MODULE_SPEC.md, employee-management/MODULE_SPEC.md, and
+      onboarding/MODULE_SPEC.md all independently disclaim ownership of this
+      capability and attribute it to a conceptual "Documents" module,
+      consistent with ADR-012 (Documents named there only as a Contracts
+      consumer). Current-state (repository-authoritative) vs. target-state
+      (CRR SS4/7/8/9/25/26/27, PDD SS5.2/5.7/7.1/8.1/9.3/10/14 -- sole target
+      entity WorkerDocument, PDD SS9.3) reverse-specified per MODULE_SPEC_
+      TEMPLATE.md. First G4 independent-review round complete against v0.1.0:
+      architecture PASS_WITH_ACTIONS (1 Medium + 2 Low), dependency
+      PASS_WITH_ACTIONS (2 Medium + 1 Low), consistency FAIL (2 High -- an
+      unsubstantiated G1.5 record-citation claim and a REQ-DOC-013 ID
+      collision with three orphaned requirement ids), security FAIL (1 High
+      -- a document-level RBAC/IDOR-shaped gap across four MUST-priority
+      interfaces touching identity/residence/work-authorization documents,
+      mirroring the already-resolved SIR-HR-004/OD-HR-10 pattern), performance
+      PASS_WITH_ACTIONS (4 Low/Note). All 19 round-1 findings applied at
+      v0.1.1 (merged where two reviewers independently converged on the same
+      defect). Incremental re-review (architecture/dependency/consistency/
+      security, per REVIEW_GATES.md's affected-reviewer determination) all
+      returned PASS_WITH_ACTIONS -- zero Critical/High findings remain
+      anywhere across the full G4 round. Five remaining named non-blocking
+      actions closed in a v0.1.2 polish pass. G6 documentation validation
+      (PASS_WITH_ACTIONS, 4 Low findings) applied directly per LOOP_CONTROL.md
+      SS7 without a further version bump. One issue discovered incidentally
+      by this session's own citations -- a pre-existing REQ-HR-015 ID
+      collision in hr/MODULE_SPEC.md, unrelated to and out of scope for this
+      specification -- was escalated to the Specification Issues Register
+      (SIR-HR-019) rather than fixed here. Specification Issues Register
+      synchronized: new "Module: Documents" section added (SIR-DOC-001..020,
+      seeded from OD-DOC-001..019 plus the consolidated migration-gap row).
+      DECISION_INDEX.md synchronized: new "Pending Decision Records
+      (SPEC-DOCUMENTS-001)" section added. MODULE_REGISTRY.yaml/
+      SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml deliberately NOT updated
+      with a backend-documents entry -- no code exists yet, and unlike
+      Hotels/Contracts/Scheduling (ADR-011/ADR-012, no-standalone-module
+      decisions with an existing owner to redirect to), Documents has no
+      existing owner and no code to register; the specification's own
+      Proposed Knowledge Deltas remain the authoritative record of what a
+      future synchronization pass should apply once backend-documents
+      exists. MODULE_SPEC.md NOT frozen (G2 human) -- OD-DOC-014/SYNC-001
+      (ownership) and OD-DOC-005's permission-half/OD-DOC-007 (both blocks
+      G2 per FIND-SEC-DOC-01) remain the standing human-authority items.
+    authority_needed: human  # G2 freeze; OD-DOC-005 permission-half/OD-DOC-007 RBAC model decision (blocks G2); SYNC-001 ownership; OD-DOC-001/002/003/006/008/012 open decisions; SIR-HR-019 (hr/MODULE_SPEC.md REQ-HR-015 collision, out of this specification's own scope)
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -893,19 +954,22 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 5a81b65a9ede77382d8ae65cbaa220100111cfc3
+  baseline_revision: a36da7d25c0b4828c53d0e5433b7d72092fd0e28
   framework_version: 1.3.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-11" }
-  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-11" }
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-12" }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-12" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Rebound by SYNC-021 (SPEC-USERS-001 resumed correction session, 2026-07-11),
-    advancing from SYNC-020's `9142bee` bind. Only `SPECIFICATION_INDEX.yaml`
-    and `MODULE_REGISTRY.yaml`'s `backend-users` entry changed in this pass
-    (registry-pointer sync deferred by SYNC-016); no other knowledge index
-    required a change (DEPENDENCY_GRAPH/STATE_OWNERSHIP/CONTRACT/API/OWNERSHIP
-    already reflected current repository state going into this session). On
-    any doubt about validity, an artifact is treated as stale and reproduced
-    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision change
-    re-opens this block.
+    Rebound by SYNC-025 (SPEC-DOCUMENTS-001 specification-freeze session,
+    2026-07-12), advancing from SYNC-021's `5a81b65` bind. Only this
+    session's own artifacts changed: docs/03-modules/documents/MODULE_SPEC.md
+    (new), governance/SPECIFICATION_ISSUES_REGISTER.md (new Documents
+    section + SIR-HR-019), knowledge/DECISION_INDEX.md (new pending-decision
+    section), and this file's own SYNC-025 entry/cache_state block. No other
+    knowledge index required a change -- MODULE_REGISTRY.yaml/
+    SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml deliberately left untouched
+    since no backend-documents code module exists yet (see SYNC-025's own
+    reasoning). On any doubt about validity, an artifact is treated as stale
+    and reproduced (CONTEXT_ARTIFACTS.md §1 invariant 5); the next
+    repository-revision change re-opens this block.
