@@ -1043,6 +1043,63 @@ known_drift:
       the pattern `SYNC-023` used for the Contracts collision.
     authority_needed: human/architecture  # Decision Record required settling whether Chatbot becomes/remains a standalone module (backend-chatbot) that Onboarding consumes via an interface contract, or Onboarding retains first-person chatbot-execution ownership and backend-chatbot is retired/re-labeled as an alias -- structurally analogous to ADR-011/ADR-012; no owner may be assigned or capability boundary settled by this session
 
+  - id: SYNC-028
+    type: governance-synchronization
+    status: complete
+    description: >-
+      Governance-synchronization session resolving `SIR-GLOB-015`/`SYNC-027`
+      (follow-on to the Boundary Collision Gate stop for a proposed
+      `SPEC-CHATBOT-001`). Recorded a commissioning human-approved
+      architecture decision: the Chatbot / AI-execution capability
+      (conversation lifecycle, LLM provider abstraction, prompts,
+      orchestration, context assembly, tool execution, memory, AI sessions,
+      token/cost management, guardrails, AI audit) SHALL be owned by
+      `backend-chatbot`, specified by `SPEC-CHATBOT-001`; `backend-onboarding`
+      (`docs/03-modules/onboarding/MODULE_SPEC.md`) owns the onboarding
+      business workflow (workflow, state, steps, validation, completion,
+      business rules) and consumes Chatbot through `IF-CHATBOT-*` interface
+      contracts, not first-person execution. Decision recorded as `ADR-013`
+      (Accepted, `docs/09-decisions/architecture-decisions/
+      ADR-013-chatbot-ai-capability-ownership-vs-onboarding-workflow.md`)
+      and indexed in `DECISION_INDEX.md`.
+      Unlike the `ADR-012` precedent (which left Onboarding's Contracts-
+      related first-person text as historical disclosure, resolved only by
+      reference), `docs/03-modules/onboarding/MODULE_SPEC.md` is corrected
+      in place to v1.1 in this same session per explicit human instruction:
+      removed the superseded execution-ownership claims from §3 (line 45),
+      §5 Responsibility 3 (line 86), §6.3 (lines 142-160, rewritten as a
+      consumption contract rather than an agent specification), §12
+      (transport/input-validation guardrails reattributed), §16.1 (rewritten
+      as reacting to a Chatbot-module fallback signal, not managing token
+      limits itself), §18 Dependencies (line 498, "Claude API" replaced with
+      "Chatbot (backend-chatbot/SPEC-CHATBOT-001)"), and the Cross-Module
+      References table; added an explicit Out-of-Scope disclaimer (§4)
+      naming the Chatbot/AI-execution capability; added a `## 22. Change Log`
+      section (the document predates the newer Document-Control/Review-and-
+      Change-Log template) recording this correction. No onboarding-workflow-
+      owned responsibility (intake, document-collection orchestration,
+      contract coordination, pool/claim, hire approval, business rules)
+      changed. Specification Issues Register synchronized: `SIR-GLOB-015`
+      updated to RESOLVED in place (not duplicated); `SIR-GLOB-015`'s
+      "Section last verified" marker and a Change Log row added.
+      `DECISION_INDEX.md`'s "Pending Decision Records (Chatbot / Onboarding
+      boundary)" section (added by `SYNC-027`) removed now that `ADR-013`
+      resolves it, its history preserved in the Specification Issues
+      Register and this ADR; new `ADR-013` row added to the top ADR table.
+      `BOUNDARY_INDEX.yaml`'s `backend-chatbot` line updated from BLOCKED to
+      RESOLVED, naming it the canonical home of the Chatbot/AI-execution
+      capability. Independently validated by a fresh consistency-reviewer
+      pass before commit. This pass authors, reviews, or freezes no module
+      specification other than the bounded `docs/03-modules/onboarding/
+      MODULE_SPEC.md` boundary correction described above; `SPEC-CHATBOT-001`
+      itself is authored in a separate, subsequent session under this ADR's
+      now-settled authority. `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml`/
+      `DEPENDENCY_GRAPH.yaml`/`API_INDEX.yaml` `backend-chatbot` entries are
+      deliberately NOT updated here -- they are synchronized as an exit
+      condition of `SPEC-CHATBOT-001`'s own Documentation Workflow, not by
+      this governance-only pass.
+    authority_needed: none  # ADR-013 IS the human product/architecture decision; owner assignment for backend-chatbot/backend-onboarding remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
+
 context_invalidators:
   - repository revision changes
   - default branch changes
