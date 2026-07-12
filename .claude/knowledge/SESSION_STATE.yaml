@@ -16,16 +16,20 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5
+  baseline_revision: 5a81b65a9ede77382d8ae65cbaa220100111cfc3
   default_branch: main
   framework_version: see .claude/VERSION.yaml   # 1.3.0
   opened_at: "2026-07-11T00:00:00Z"
   note: >-
-    Bound by SYNC-020 (Repository Synchronization Session, .claude/knowledge/SYNC_STATE.yaml).
-    Repository discovery ran once for this revision; downstream workflows at
-    the same baseline_revision reuse the Evidence Package by reference instead
-    of re-running discovery. Invalidates on the next baseline_revision or
-    default-branch change (CONTEXT_ARTIFACTS.md §6).
+    Rebound by SYNC-021 (SPEC-USERS-001 resumed correction session): the
+    prior 9142bee stamp (bound by SYNC-020) was already one commit stale
+    relative to actual HEAD (5a81b65, SYNC-020's own PR #126 merge) at the
+    start of this session -- corrected here per the fail-safe invariant
+    (CONTEXT_ARTIFACTS.md §1.5). Repository discovery ran once for this
+    revision; downstream workflows at the same baseline_revision reuse the
+    Evidence Package by reference instead of re-running discovery.
+    Invalidates on the next baseline_revision or default-branch change
+    (CONTEXT_ARTIFACTS.md §6).
 
 # Context Artifacts produced/reused this session. Each entry records its cache
 # key and validity so a later workflow reuses instead of rediscovering.

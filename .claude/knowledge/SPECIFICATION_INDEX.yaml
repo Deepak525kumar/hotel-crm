@@ -6,9 +6,9 @@ purpose: >-
   documentation to answer "does a spec exist / is it frozen?" without re-reading
   the full registry. Revision-bound; invalidated by a specification status change.
 scope: project-runtime
-derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md]  # both attendance's and quality's registry-sync gaps are now closed (SYNC-019, SYNC-015) -- MODULE_REGISTRY.specification reads SPEC-ATT-001@0.1.1 (REVIEW) and SPEC-QUAL-001@0.1.2 (REVIEW) respectively
+derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md, docs/03-modules/users/MODULE_SPEC.md]  # attendance's, quality's, and now users' registry-sync gaps are closed (SYNC-019, SYNC-015, SYNC-021) -- MODULE_REGISTRY.specification reads SPEC-ATT-001@0.1.1 (REVIEW), SPEC-QUAL-001@0.1.2 (REVIEW), and SPEC-USERS-001@0.1.1 (REVIEW) respectively
 version_source: .claude/VERSION.yaml
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 5a81b65a9ede77382d8ae65cbaa220100111cfc3  # rebound by SYNC-021 (SPEC-USERS-001 registry-pointer sync); prior SYNC-020 rebind was 9142bee
 
 # status ∈ { FROZEN, REVIEW, UNKNOWN }. No spec is FROZEN (G2 is reserved human
 # authority). REVIEW specs blocked by unresolved Critical/High security findings
@@ -64,8 +64,11 @@ specifications:
     path: docs/03-modules/quality/MODULE_SPEC.md
     note: all five G4 dimensions PASS_WITH_ACTIONS (zero Critical/High); G6-doc PASS_WITH_ACTIONS; MODULE_REGISTRY.specification synchronized (SYNC-015); G2 human
   - module: backend-users
-    spec: none
-    status: UNKNOWN
+    spec: SPEC-USERS-001
+    version: 0.1.1
+    status: REVIEW
+    path: docs/03-modules/users/MODULE_SPEC.md
+    note: consistency FAIL resolved (mechanical ID-collision fix, SIR-USERS-010); security FAIL root cause resolved in code (HOTFIX-AUTH-001, SYNC-017), framing corrected in-document; architecture/dependency/performance all PASS_WITH_ACTIONS from the first G4 round; MODULE_REGISTRY.specification synchronized (SYNC-021); G2 human
   - module: backend-crm
     spec: none
     status: UNKNOWN

@@ -660,6 +660,65 @@ known_drift:
       session; no G4 reviewers were executed; no source code was modified.
     authority_needed: none  # pure knowledge-layer synchronization; the two open follow-ups (SIR-AUTH-019/020) and SYNC-016's own standing human-authority items are unaffected and unresolved by this pass
 
+  - id: SYNC-021
+    type: specification
+    status: in-review
+    description: >-
+      Resumed SPEC-USERS-001's paused Documentation Workflow correction cycle
+      (`SYNC-016`) and applied every author-fixable finding, bringing the
+      specification to v0.1.1 (`docs/03-modules/users/MODULE_SPEC.md`). The
+      blocking consistency `FAIL` (`SIR-USERS-010`, High — `REQ-USERS-003..012`
+      each defined twice with unrelated meanings across the Evidence and
+      Requirements tables) is resolved: the colliding Evidence-table claims were
+      mechanically renumbered to `REQ-USERS-025..034`; the Requirements-table
+      `REQ-USERS-003..012` IDs are unchanged. Every downstream citation
+      (Interfaces, Validation Plan, Business Rules, trust-boundary prose) was
+      individually re-pointed to whichever ID actually matches its content —
+      several citations turned out to intend the Evidence-table meaning, not
+      the Requirements-table one, confirming the collision was a genuine
+      ambiguity, not merely cosmetic. The blocking security `FAIL`
+      (`SIR-GLOB-012`/`SIR-USERS-018`, Critical — public-signup role injection)
+      has its root cause already resolved in code by `HOTFIX-AUTH-001`
+      (`SYNC-017`, prior to this session); this session corrects the
+      document's own "Admin-only in practice" framing (`SIR-USERS-002`) to
+      disclose that history explicitly, since the restriction was not
+      meaningfully trust-bearing during the vulnerable window. Independently,
+      while re-verifying current-state citations against `HEAD` `5a81b65` (up
+      from the v0.1.0 authoring revision `fc69858`), this session found and
+      corrected live-code drift undocumented until now: `HOTFIX-AUTH-003`
+      (`SYNC-020`) added a `createUser` role-elevation guard mirroring
+      `updateUser`'s (`service.ts:96-98`), resolving the create/update
+      asymmetry `SIR-USERS-003` recorded; `OQ-USERS-03` is narrowed to the
+      still-open incoming-role-only gap already tracked as `SIR-AUTH-019`
+      (this document cannot resolve that facet unilaterally). The Proposed
+      Knowledge Deltas' incorrect "no new edges are asserted" claim
+      (`SIR-USERS-016`) is corrected — `edge-users-reads-hotel-worker` was a
+      genuine missing edge at v0.1.0 authoring time, already applied by
+      `SYNC-020`. `DEPENDENCY_GRAPH.yaml` citation drift introduced by
+      `SYNC-020`'s intervening insertion was re-verified and corrected
+      (`state-user` block and `edge-hotel-workers-reads-user`); the remaining,
+      already-registered Low/non-blocking citation-precision gaps
+      (`SIR-USERS-017`, other contract-block ranges) were left as-is, unchanged
+      disposition. Six Low/author-optional cleanups were also applied
+      (`SIR-USERS-013/014/017/019`). Registry-pointer synchronization, deferred
+      by `SYNC-016` to this resumed session, is applied here:
+      `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml` `backend-users`
+      `specification` field updated `UNKNOWN` → `SPEC-USERS-001@0.1.1
+      (REVIEW)`, closing `backend-users`' share of the long-standing
+      `SIR-GLOB-005`-class registry-sync gap. No reviewer was re-run: every
+      applied correction was either mechanical (ID renumbering), a
+      already-landed code fact re-verified directly against the live
+      repository, or a Low/non-blocking author-optional item explicitly
+      dispositioned by the original G4 round — none introduces new
+      architecture, dependency, consistency, security, or performance surface
+      requiring independent re-review. `MODULE_SPEC.md` NOT frozen (G2 human)
+      — standing human-authority items are unaffected by this pass:
+      `OQ-USERS-01` (5-role model), `OQ-USERS-04`/`SYNC-005` (`state-user`
+      dual-writer), `OQ-USERS-05` (cross-hotel read surface, routed to Risk
+      Assessment, not authorized), `OQ-USERS-06` (GDPR PII-nulling design),
+      `OQ-USERS-07`/`SYNC-001` (ownership).
+    authority_needed: human  # G2 freeze; OQ-USERS-01 5-role Decision Record; OQ-USERS-04/SYNC-005 state-user dual-writer decision; OQ-USERS-05 Risk Assessment authorization; OQ-USERS-06 GDPR PII-nulling design decision; SYNC-001 ownership; OQ-USERS-03 narrowed incoming-role-only fix (SIR-AUTH-019, code-level, out of this document's scope)
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -675,16 +734,19 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5
+  baseline_revision: 5a81b65a9ede77382d8ae65cbaa220100111cfc3
   framework_version: 1.3.0
   boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-11" }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-11" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Bound by SYNC-020 (Repository Synchronization Session, 2026-07-11): first
-    Context Artifact instance produced at a bound revision under 1.3.0. All
-    nine `observed_revision`-keyed knowledge indexes (see SYNC-020) restamped
-    to this same `baseline_revision`, closing SIR-GLOB-009. On any doubt about
-    validity, an artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md
-    §1 invariant 5); the next repository-revision change re-opens this block.
+    Rebound by SYNC-021 (SPEC-USERS-001 resumed correction session, 2026-07-11),
+    advancing from SYNC-020's `9142bee` bind. Only `SPECIFICATION_INDEX.yaml`
+    and `MODULE_REGISTRY.yaml`'s `backend-users` entry changed in this pass
+    (registry-pointer sync deferred by SYNC-016); no other knowledge index
+    required a change (DEPENDENCY_GRAPH/STATE_OWNERSHIP/CONTRACT/API/OWNERSHIP
+    already reflected current repository state going into this session). On
+    any doubt about validity, an artifact is treated as stale and reproduced
+    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision change
+    re-opens this block.
