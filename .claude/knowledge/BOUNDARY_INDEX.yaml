@@ -38,7 +38,7 @@ modules:
     owned_state: [state-hotel]
     owned_contracts: []
     owned_apis: [/api/v1/crm]
-    boundary: Hotel/CRM records.
+    boundary: Hotel/CRM records. Canonical home of the Hotels capability (SPEC-CRM-001); "Hotels module" is an alias for this module, not a standalone boundary -- no SPEC-HOTELS-001/backend-hotels exists (ADR-011, SIR-GLOB-013).
   - module: backend-hotel-workers
     owner: unassigned
     owned_state: [state-hotel-worker]
@@ -97,7 +97,7 @@ modules:
     owner: unassigned
     owned_state: []
     owned_apis: [/api/v1/calendar]
-    boundary: Stub (NotImplementedError); mounted, no consumer.
+    boundary: Stub (NotImplementedError); mounted, no consumer. Canonical home of the Calendar capability (SPEC-CALENDAR-001) and, by extension, Scheduling -- Scheduling is not a standalone boundary; no SPEC-SCHEDULING-001/backend-scheduling exists and future scheduling functionality evolves SPEC-CALENDAR-001 (ADR-011, SIR-GLOB-013).
   - module: frontend-web
     owner: unassigned
     boundary: Next.js web client; consumes-api only, owns no backend state/contract.
