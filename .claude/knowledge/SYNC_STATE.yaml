@@ -819,6 +819,65 @@ known_drift:
       DECISION_INDEX.md so a future session sees the requirement immediately.
     authority_needed: human/architecture  # Decision Record required (OD-HR-01a/OD-HR-01b); no owner may be assigned or capability boundary settled by this session
 
+  - id: SYNC-024
+    type: governance-synchronization
+    status: complete
+    description: >-
+      Governance-synchronization session (no new specifications; follow-on to
+      SYNC-023's Boundary Collision Gate stop). Recorded a commissioning
+      human-approved architecture decision: the Contracts capability SHALL
+      remain inside the HR bounded context. Canonical owner: backend-hr /
+      SPEC-HR-001. No standalone Contracts module, no backend-contracts
+      module, and no SPEC-CONTRACTS-001 will ever exist. backend-hr owns the
+      complete contract capability -- lifecycle, templates, generation,
+      metadata, versions, amendments, signatures, manager confirmation,
+      acceptance workflow, renewals, expiry, and archival state. Onboarding,
+      Employee Management, Documents, Payslips, Compliance, and every future
+      capability consume this functionality through backend-hr's interfaces;
+      they do not own it. Decision recorded as ADR-012 (Accepted,
+      docs/09-decisions/architecture-decisions/ADR-012-contracts-ownership-hr-
+      bounded-context.md) and indexed in DECISION_INDEX.md (new ADR-012 row;
+      the now-resolved "Pending Decision Records (SPEC-HR-001 / Onboarding /
+      SPEC-CONTRACTS-001 boundary)" table added by SYNC-023 was removed, its
+      history preserved instead in the Specification Issues Register and this
+      ADR). Specification Issues Register synchronized: SIR-HR-001
+      (OD-HR-01a/OD-HR-01b) marked RESOLVED by ADR-012 -- the row is updated
+      in place, not duplicated, and its full prior disclosure text is
+      preserved per the register's append/merge protocol; SIR-GLOB-003's HR
+      clause updated to reflect the closure (its other three items --
+      job-dispatch FIND-ARCH-003, attendance OQ-03, quality OQ-01 -- remain
+      OPEN, so the row's overall status is "partially resolved," not
+      RESOLVED); new cross-cutting row SIR-GLOB-014 records the Contracts
+      capability-ownership decision, mirroring SIR-GLOB-013's shape for
+      ADR-011. The empty placeholder docs/03-modules/contracts/ (previously
+      only .gitkeep) now carries a redirect README.md pointing to SPEC-HR-001,
+      mirroring the docs/03-modules/hotels/ pattern from ADR-011. BOUNDARY_
+      INDEX.yaml's backend-hr boundary line annotated to state the Contracts
+      capability home and the no-standalone-module decision, mirroring the
+      backend-crm/backend-calendar ADR-011 annotations. Boundary check
+      completed: repository-wide search for "Contracts module" /
+      "backend-contracts" / "SPEC-CONTRACTS" / "Contract Management module"
+      found exactly the occurrences already known from SYNC-023 (docs/03-
+      modules/hr/MODULE_SPEC.md, docs/03-modules/onboarding/MODULE_SPEC.md,
+      docs/03-modules/employee-management/MODULE_SPEC.md -- all three left
+      as-authored per the same historical-disclosure rule ADR-011 applied to
+      "Hotels module" text) plus this session's own governance edits; no
+      occurrence exists anywhere in MODULE_REGISTRY.yaml, SPECIFICATION_
+      INDEX.yaml, BOUNDARY_INDEX.yaml (prior to this session's own addition),
+      MODULE_MEMORY.yaml, DEPENDENCY_GRAPH.yaml, README.md, or docs/00-
+      foundations/ -- so none of those required a correction beyond the
+      additions listed above. MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml's
+      pre-existing backend-hr specification:UNKNOWN/spec:none staleness is
+      the separate, already-tracked SIR-GLOB-005 registry-pointer gap and is
+      unrelated to the Contracts ownership question; left untouched,
+      out of this session's scope (no scope-widening). This pass authors,
+      corrects, or freezes no module specification (SPEC-HR-001 and the
+      onboarding spec remain in their current REVIEW status; their first-
+      person "Contracts module"/contract-generation-ownership text is
+      preserved as historical disclosure, resolved by reference to ADR-012)
+      and alters no backend/frontend/test code.
+    authority_needed: none  # ADR-012 IS the human product/architecture decision; owner assignment for backend-hr remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
+
 context_invalidators:
   - repository revision changes
   - default branch changes
