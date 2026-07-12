@@ -34,6 +34,19 @@ Decisions surfaced by `docs/03-modules/crm/MODULE_SPEC.md` (SPEC-CRM-001, v0.1.1
 | `OD-CRM-15` | Route-nesting execution coupling (CRM↔hotel-workers, also work-requests↔work-applications) — platform-wide, not CRM-scoped | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-15`; architecture review `FIND-001` | Lead Architect platform-wide Decision Record |
 | `OD-CRM-16` | Pause-jobs enforcement is a one-sided cross-module contract with `job-dispatch` | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-16`; architecture review `FIND-002` | Bilateral Decision Record or reciprocal spec reference with `SPEC-JOB-DISPATCH-001` |
 
+## Pending Decision Records (SPEC-DOCUMENTS-001)
+
+Decisions surfaced by `docs/03-modules/documents/MODULE_SPEC.md` (SPEC-DOCUMENTS-001, v0.1.2) requiring a Decision Record before target-state implementation or G2 freeze. No ADR yet exists for any of these; recorded here as pending per the Proposed Knowledge Deltas of that specification. Two items (`OD-DOC-005` permission-half, `OD-DOC-007`) additionally block G2 Specification Freeze per the G4 Security review round — see `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-DOC-005`/`SIR-DOC-007`.
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `OD-DOC-001` | GDPR retention-tier assignment for general uploaded documents and work-permit documents is unstated by CRR/PDD | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-001` | Human/product decision on Tier 2 vs. Tier 3 (or a document-type-specific split) |
+| `OD-DOC-002` | Special-category document-type applicability (CRR §27 names fields, not document types) is unconfirmed | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-002` | Human/product decision before any special-category-classified document type is introduced |
+| `OD-DOC-005` | Document category taxonomy + permission/access-control granularity — permission-half **blocks G2** | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-005` | Human/architecture decision on the downstream RBAC/management-chain model, coordinated with the self-scoping discipline already required on every `IF-DOC-*` interface |
+| `OD-DOC-007` | No document-level RBAC/permission model exists beyond self-upload and manager-on-behalf-of-worker — **blocks G2** | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-007` | Human/architecture decision, same scope as `OD-DOC-005` |
+| `OD-DOC-008` | Version history, document relationships, and archival mechanics have zero CRR/PDD textual basis — whether these responsibilities are confirmed or descoped from the module boundary | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-008` | Human/product decision; may require a future revision to formally descope if never confirmed |
+| `OD-DOC-014` | Module owner unassigned; no `backend-documents` module id is registered anywhere (no code exists yet) | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-014`; tracked under the existing `SYNC-001`/`SIR-GLOB-001` umbrella, not a new item | Human ownership assignment |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |

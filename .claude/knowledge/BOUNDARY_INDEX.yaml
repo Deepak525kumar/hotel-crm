@@ -116,5 +116,6 @@ unregistered_or_shared:
   - { item: state-audit-log, note: shared-write via BaseService.logAudit — no single owner (G1.5 collision) }
   - { item: prisma-schema / base-service / permissions-middleware / validation-middleware, note: owner unassigned (shared contracts) }
   - { item: backend-chatbot / backend-geo, note: placeholder-unregistered stubs; no footprint }
+  - { item: backend-documents (proposed, not registered), note: "Documents capability specified at SPEC-DOCUMENTS-001@0.1.2 (REVIEW); zero code exists (no backend/src/modules/documents, no Document/WorkerDocument Prisma model) so no module entry is added to this index, MODULE_REGISTRY.yaml, or SPECIFICATION_INDEX.yaml — a G1.5 Boundary Collision Gate PASS (SYNC-025) confirmed no other module claims this capability; hr/employee-management/onboarding all disclaim it and attribute it to this conceptual module, consistent with ADR-012 naming Documents only as a Contracts consumer. The only document-adjacent code today is backend-hr's narrow, self-disclosed stub (POST /workers/:worker_id/documents) — architectural debt (SIR-DOC-015/OD-DOC-015), not this capability's own footprint." }
 
 invalidated_by: [architecture or ownership decision, schema/contract/API change, MODULE_REGISTRY/DEPENDENCY_GRAPH revision change]
