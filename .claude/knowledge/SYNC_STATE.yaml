@@ -765,6 +765,60 @@ known_drift:
       not touched here.
     authority_needed: none  # ADR-011 IS the human product/architecture decision (Decisions 1 and 2); owner assignment for backend-crm/backend-calendar remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
 
+  - id: SYNC-023
+    type: boundary-collision-stop
+    status: complete
+    description: >-
+      Specification-Freeze preflight session for a proposed SPEC-CONTRACTS-001
+      (capability: Contracts -- contract lifecycle, versions, amendments,
+      signatures, renewal workflow, expiry workflow, contract metadata,
+      contract state; primary repository scope backend/src/modules/contracts,
+      which does not exist in code). The Boundary Collision Gate (G1.5) was
+      executed before authoring, per CLAUDE.md pre-flight rule 4 and
+      workflows/boundary-collision.md, and returned FAIL: the identical
+      capability is already claimed by two actively-maintained specifications.
+      docs/03-modules/hr/MODULE_SPEC.md (SPEC-HR-001 v0.2.1, REVIEW) claims the
+      full contract-lifecycle/versions/signatures/renewal/expiry/metadata/state
+      surface in RULE-HR-01..RULE-HR-15, its Ownership and Boundaries owned-
+      state block, and IF-HR-GenerateContract/IF-HR-UploadSignedContract/
+      IF-HR-ConfirmContractSigned/IF-HR-GetContractStatus. docs/03-modules/
+      onboarding/MODULE_SPEC.md independently claims first-person execution
+      ownership of contract generation & presentation and hand-signed contract
+      capture/confirmation (Sec 5 items 4-5, Sec 7 steps 7-8) for the identical
+      CRR Sec 9 behavior. This exact HR-vs-Onboarding conflict was already
+      registered as SIR-HR-001 (High, OPEN -- BLOCKING) and OD-HR-01a/OD-HR-01b
+      (docs/03-modules/hr/MODULE_SPEC.md Risks/Open-Decisions table), converged
+      on independently by three prior G4 reviewers (architecture BLOCKED,
+      dependency FIND-DEP-HR-02 High, consistency FIND-CONS-HR-01 High); this
+      session re-verified it against the current worktree rather than
+      rediscovering it and confirms it still stands unresolved. Additionally,
+      both the onboarding spec (Sec 6.5, lines 187/190) and
+      docs/03-modules/employee-management/MODULE_SPEC.md (Sec 4 Out of Scope,
+      line 40) independently name a distinct, not-yet-built "Contracts module"
+      as the intended eventual owner of contract template/versioning/storage
+      and the ongoing lifecycle -- three documents converge on the concept this
+      task's own capability boundary describes, but none has authority to
+      instantiate it unilaterally (OD-HR-01b: "Neither this spec's author nor
+      the onboarding spec's author has the authority to unilaterally settle
+      it"). Authoring a third claim (SPEC-CONTRACTS-001) without a ratified
+      Decision Record would add a competing claim rather than resolve the
+      existing one. Per the Boundary Collision workflow's failure handling,
+      this session did not proceed to the Documentation Workflow: no
+      docs/03-modules/contracts/MODULE_SPEC.md was authored (directory retains
+      only .gitkeep), and no backend/frontend/test code was touched. Full
+      Boundary Collision Report (ART-BOUNDARY-001) delivered to the human in
+      this session's conversation, recommending a human-ratified Decision
+      Record -- structurally analogous to ADR-011 -- to settle whether
+      Contracts becomes a standalone module carved out of backend-hr, or
+      backend-hr retains it with Onboarding/SPEC-EMP-001's "Contracts module"
+      references re-labeled as backend-hr aliases (the same alias pattern
+      ADR-011 used for "Hotels module"). SIR-HR-001's Last verified date
+      updated in the Specification Issues Register to reflect this
+      independent re-confirmation; no register row duplicated. A pending-
+      decision-record cross-reference for OD-HR-01a/OD-HR-01b was added to
+      DECISION_INDEX.md so a future session sees the requirement immediately.
+    authority_needed: human/architecture  # Decision Record required (OD-HR-01a/OD-HR-01b); no owner may be assigned or capability boundary settled by this session
+
 context_invalidators:
   - repository revision changes
   - default branch changes
