@@ -327,7 +327,7 @@ known_drift:
       (OD-CRM-16). DEPENDENCY_GRAPH.yaml edge-frontend-crm reclassified
       unknown->conditional (FIND-DEP-CRM-002). Registry specification pointer
       updated to @0.1.1 (REVIEW). MODULE_SPEC NOT frozen (G2 human).
-    authority_needed: human  # G2 freeze; OD-CRM-01/02/05/10/11 disposition; OD-CRM-15 platform-wide route-nesting Decision Record; OD-CRM-16 bilateral Decision Record with job-dispatch; SYNC-001 ownership; TERMINOLOGY.md canonical-source decision for Regional Manager/Scope (SPEC-AUTH-001 vs SPEC-CRM-001); scope of onboarding/MODULE_SPEC.md inclusion in OD-CRM-06 reconciliation
+    authority_needed: human  # G2 freeze; OD-CRM-01/02/05/10/11 disposition; OD-CRM-15 platform-wide route-nesting Decision Record; OD-CRM-16 bilateral Decision Record with job-dispatch; SYNC-001 ownership; TERMINOLOGY.md canonical-source decision for Regional Manager/Scope (SPEC-AUTH-001 vs SPEC-CRM-001). RESOLVED item: OD-CRM-06 "Hotels module" naming and the scope of onboarding/MODULE_SPEC.md inclusion in its reconciliation are now settled by SYNC-022/ADR-011 (Hotels capability owned by backend-crm/SPEC-CRM-001, no standalone module) -- see SIR-CRM-006 (RESOLVED), SIR-GLOB-013
 
   - id: SYNC-015
     type: specification
@@ -718,6 +718,52 @@ known_drift:
       Assessment, not authorized), `OQ-USERS-06` (GDPR PII-nulling design),
       `OQ-USERS-07`/`SYNC-001` (ownership).
     authority_needed: human  # G2 freeze; OQ-USERS-01 5-role Decision Record; OQ-USERS-04/SYNC-005 state-user dual-writer decision; OQ-USERS-05 Risk Assessment authorization; OQ-USERS-06 GDPR PII-nulling design decision; SYNC-001 ownership; OQ-USERS-03 narrowed incoming-role-only fix (SIR-AUTH-019, code-level, out of this document's scope)
+
+  - id: SYNC-022
+    type: governance-synchronization
+    status: complete
+    description: >-
+      Governance-synchronization session (no new specifications). Recorded two
+      intentional product/architecture ownership decisions and synchronized the
+      governance/knowledge layer so future preflight reaches them immediately
+      rather than rediscovering them. Decision 1: the Hotels capability SHALL
+      NOT become an independent module or specification -- its canonical owner
+      is backend-crm / SPEC-CRM-001; Hotel Management remains within the CRM
+      bounded context; no SPEC-HOTELS-001 / backend-hotels shall exist.
+      Decision 2: Scheduling SHALL NOT become an independent module or
+      specification -- it is an extension of the Calendar capability owned by
+      backend-calendar / SPEC-CALENDAR-001; no SPEC-SCHEDULING-001 /
+      backend-scheduling shall exist. Both decisions recorded as ADR-011
+      (Accepted, docs/09-decisions/architecture-decisions/ADR-011-hotels-and-
+      scheduling-capability-ownership.md) and indexed in DECISION_INDEX.md.
+      Specification Issues Register synchronized: SIR-CRM-006 (OD-CRM-06
+      "Hotels module" naming ambiguity) marked RESOLVED by ADR-011 -- "Hotels
+      module" is now a settled alias for backend-crm/SPEC-CRM-001, and the
+      previously-blocking "scope of onboarding inclusion in the reconciliation"
+      question is moot; new cross-cutting row SIR-GLOB-013 records both
+      capability-ownership decisions. The empty placeholder docs/03-modules/
+      hotels/ now carries a redirect README.md pointing to SPEC-CRM-001.
+      BOUNDARY_INDEX.yaml backend-crm/backend-calendar boundary lines
+      annotated to state the capability homes and the no-standalone-module
+      decision. Boundary check for SPEC-HOTELS / backend-hotels / SPEC-
+      SCHEDULING / backend-scheduling / "Hotels module" / "Scheduling module"
+      completed: no such module, specification, or registry entry exists
+      anywhere (MODULE_REGISTRY.yaml, SPECIFICATION_INDEX.yaml, BOUNDARY_INDEX
+      .yaml, OWNERSHIP_INDEX.yaml, DEPENDENCY_GRAPH.yaml all already correctly
+      attribute Hotel state to backend-crm and register backend-calendar);
+      remaining textual "Hotels module" / "Calendar/Scheduling module" mentions
+      live inside module specifications (SPEC-EMP-001, onboarding, calendar
+      OD-CAL context) and the foundational PIVOT_DESIGN_DOCUMENT.md and are
+      preserved as historical/aliased references -- this pass authors, corrects,
+      or freezes no module specification (all specs left in their current
+      REVIEW/FROZEN state) and alters no backend/frontend/test code. Scope
+      strictly limited to governance synchronization. Note (unchanged by this
+      pass): SPEC-CALENDAR-001 exists at docs/03-modules/calendar/MODULE_SPEC.md
+      but MODULE_REGISTRY/SPECIFICATION_INDEX still show backend-calendar
+      specification as UNKNOWN -- that is the pre-existing SIR-GLOB-005-class
+      registry-pointer sync gap, out of this governance session's scope and
+      not touched here.
+    authority_needed: none  # ADR-011 IS the human product/architecture decision (Decisions 1 and 2); owner assignment for backend-crm/backend-calendar remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
 
 context_invalidators:
   - repository revision changes
