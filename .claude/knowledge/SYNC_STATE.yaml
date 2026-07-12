@@ -981,6 +981,68 @@ known_drift:
       `cache_state` below and `SESSION_STATE.yaml` rebound to `552edf1`.
     authority_needed: none  # pure knowledge-layer cache rebind; no drift correction, no reserved-authority decision surfaced
 
+  - id: SYNC-027
+    type: boundary-collision-stop
+    status: complete
+    description: >-
+      Specification-Freeze preflight session for a proposed `SPEC-CHATBOT-001`
+      (capability: Chatbot -- the AI-agent document-collection conversation
+      during onboarding and its reuse for GDPR subject-rights requests;
+      primary repository scope `backend/src/modules/chatbot`, a
+      placeholder-unregistered stub holding only `.placeholder`, not
+      imported or route-mounted anywhere). The Boundary Collision Gate
+      (G1.5) was executed before authoring, per `CLAUDE.md` pre-flight rule
+      4 and `workflows/boundary-collision.md`, and returned **FAIL**:
+      `docs/03-modules/onboarding/MODULE_SPEC.md` independently claims
+      first-person execution ownership of the identical capability this
+      module id exists to specify. Evidence: Sec 3 Scope (line 45,
+      "Chatbot-guided document collection: an AI agent using the Claude API
+      to query workers for missing documents with cost controls and
+      fallback to static UI"); Sec 5 Responsibilities item 3 (line 86,
+      "Chatbot execution: running an AI-guided conversation with cost
+      controls, caching, token limits, and graceful fallback"); Sec 6.3
+      (lines 142-160, "Document Collection Chatbot" -- a full agent
+      specification naming the Provider (Claude API), Model (Claude Haiku),
+      conversation Behavior/loop, and mandatory Cost controls); and Sec 18
+      Dependencies (line 498, listing "Claude API" itself -- not
+      `backend-chatbot` -- as one of Onboarding's own direct module
+      dependencies, i.e. the specification models Onboarding as directly
+      integrating with the external LLM provider rather than consuming an
+      intermediary chatbot module/service). This is the same collision
+      shape as `SYNC-023`'s Contracts finding: a capability the repository
+      separately registers as its own module id (`MODULE_REGISTRY.yaml:
+      202-212`, `DEPENDENCY_GRAPH.yaml:40-43`, `API_INDEX.yaml:33-34`,
+      prior `BOUNDARY_INDEX.yaml:118`; `PIVOT_DESIGN_DOCUMENT.md` Sec 2.2
+      line 44 lists "chatbot (placeholder)" as its own current module,
+      parallel to "geo (placeholder)") is independently claimed by another
+      module's specification as a first-person execution responsibility,
+      with no ratified Decision Record settling which one owns it.
+      Corroborating, not conflicting: `docs/03-modules/documents/MODULE_SPEC.md`
+      (SPEC-DOCUMENTS-001, authored under `SYNC-025`) already treats
+      `backend-chatbot` as "a distinct capability... Documents is the
+      storage/retrieval target the chatbot's document-collection flow
+      writes to and reads from, not the chatbot itself" -- i.e. Documents'
+      own spec assumes the separate-module reading, sharpening rather than
+      resolving the conflict with Onboarding's first-person claim.
+      Onboarding has no registered `backend-onboarding` module id in
+      `MODULE_REGISTRY.yaml` (pre-existing gap, `SIR-GLOB-005`) and no
+      `OD-*`-numbered Open Decision covering this question in its own Sec
+      20 Open Questions (`OPQ-1..12`; `OPQ-3` addresses conversation
+      persistence/consent, a different question) -- this is a genuinely
+      new finding, not a rediscovery of an already-tracked item. Per the
+      Boundary Collision workflow's failure handling, this session did not
+      proceed to the Documentation Workflow: no
+      `docs/03-modules/chatbot/MODULE_SPEC.md` was authored (directory
+      retains only `.gitkeep`), and no backend/frontend/test code was
+      touched. Governance layer synchronized so the finding is not
+      rediscovered: `BOUNDARY_INDEX.yaml`'s `backend-chatbot` line
+      annotated (split from the prior combined `backend-chatbot /
+      backend-geo` row); new `SIR-GLOB-015` added to the Specification
+      Issues Register; a "Pending Decision Records (Chatbot / Onboarding
+      boundary)" cross-reference added to `DECISION_INDEX.md`, mirroring
+      the pattern `SYNC-023` used for the Contracts collision.
+    authority_needed: human/architecture  # Decision Record required settling whether Chatbot becomes/remains a standalone module (backend-chatbot) that Onboarding consumes via an interface contract, or Onboarding retains first-person chatbot-execution ownership and backend-chatbot is retired/re-labeled as an alias -- structurally analogous to ADR-011/ADR-012; no owner may be assigned or capability boundary settled by this session
+
 context_invalidators:
   - repository revision changes
   - default branch changes

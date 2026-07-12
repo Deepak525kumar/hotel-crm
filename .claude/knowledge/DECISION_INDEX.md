@@ -47,6 +47,14 @@ Decisions surfaced by `docs/03-modules/documents/MODULE_SPEC.md` (SPEC-DOCUMENTS
 | `OD-DOC-008` | Version history, document relationships, and archival mechanics have zero CRR/PDD textual basis — whether these responsibilities are confirmed or descoped from the module boundary | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-008` | Human/product decision; may require a future revision to formally descope if never confirmed |
 | `OD-DOC-014` | Module owner unassigned; no `backend-documents` module id is registered anywhere (no code exists yet) | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-014`; tracked under the existing `SYNC-001`/`SIR-GLOB-001` umbrella, not a new item | Human ownership assignment |
 
+## Pending Decision Records (Chatbot / Onboarding boundary)
+
+Discovered by a Boundary Collision Gate (G1.5) run for a proposed `SPEC-CHATBOT-001` (`SYNC-027`). No ADR yet exists. Recorded here, mirroring the pattern used for the now-resolved `SPEC-HR-001`/Onboarding/`SPEC-CONTRACTS-001` boundary (`ADR-012`), so a future session sees the requirement immediately instead of rediscovering it.
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `SIR-GLOB-015` | Chatbot capability-ownership conflict — `docs/03-modules/onboarding/MODULE_SPEC.md` claims first-person execution ownership of the AI-agent document-collection chatbot (provider, model, conversation loop, cost controls — Sec 3 line 45, Sec 5 item 3 line 86, Sec 6.3 lines 142-160, Sec 18 line 498) for the identical capability the repository separately registers as its own module id `backend-chatbot` (`MODULE_REGISTRY.yaml:202-212`; `PIVOT_DESIGN_DOCUMENT.md` §2.2 line 44 lists "chatbot (placeholder)" as its own current module, parallel to "geo (placeholder)"). `docs/03-modules/documents/MODULE_SPEC.md` independently assumes the opposite reading, treating `backend-chatbot` as a distinct capability. A proposed `SPEC-CHATBOT-001` was blocked at the pre-authoring Boundary Collision Gate (G1.5) rather than authored, to avoid adding a second competing claim. | `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-015`; `docs/03-modules/onboarding/MODULE_SPEC.md:45,86,142-160,498`; `docs/03-modules/documents/MODULE_SPEC.md` (Chatbot disclaimer); `.claude/knowledge/SYNC_STATE.yaml` `SYNC-027` | Human/architecture Decision Record (ADR), structurally analogous to `ADR-011`/`ADR-012`, settling whether Chatbot becomes/remains a standalone module (`backend-chatbot`) that Onboarding consumes through an interface contract, or Onboarding retains first-person chatbot-execution ownership and `backend-chatbot` is retired or re-labeled as an alias. Required before any `SPEC-CHATBOT-001` is authored, or the onboarding spec's chatbot-related sections reach G2 freeze. |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |
