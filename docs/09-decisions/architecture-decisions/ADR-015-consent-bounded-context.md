@@ -1,0 +1,50 @@
+# ADR-015: Consent Capability Ownership (Standalone Bounded Context)
+
+- **Status:** Accepted — ratified by the commissioning human decision recorded in this record (2026-07-13).
+- **Date:** 2026-07-13
+- **Scope:** Module/ownership boundaries — the Consent capability (consent lifecycle, records, versions, withdrawal, renewal, audit history, validation) vs. `docs/03-modules/onboarding/MODULE_SPEC.md`'s `OPQ-3` (possible Onboarding-owned one-time chatbot consent gate) vs. Compliance's stated "consent governance" ownership vs. the recurring/daily GDPR access-gate references to an unbuilt "Consent" module made by `docs/03-modules/employee-management/MODULE_SPEC.md`, `docs/03-modules/calendar/MODULE_SPEC.md`, `docs/03-modules/notifications/MODULE_SPEC.md`, `docs/03-modules/job-dispatch/MODULE_SPEC.md`, and `docs/03-modules/documents/MODULE_SPEC.md` (CRR §24). Target module id `backend-consent`, target specification `SPEC-CONSENT-001` (`docs/03-modules/consent/MODULE_SPEC.md`, currently only `.gitkeep`).
+- **Supersedes:** none (additive; pre-empts a Boundary Collision Gate (G1.5) finding before `SPEC-CONSENT-001` authoring — no SIR entry had yet been opened specifically for this ambiguity, unlike the Payslips (`SIR-GLOB-017`/`ADR-014`) and Chatbot (`SIR-GLOB-015`/`ADR-013`) precedents which were discovered by a G1.5 run that already produced a SIR record).
+- **Change class:** Material architecture/ownership decision requiring a Decision Record per Constitution §6/§7. This record settles the boundary only; the consequential edits to `docs/03-modules/onboarding/MODULE_SPEC.md` (`OPQ-3`) and the governance/knowledge-layer synchronization are separate Documentation Workflow actions performed under its authority, not part of this ADR itself. Authoring `docs/03-modules/consent/MODULE_SPEC.md` (`SPEC-CONSENT-001`) is a further, separate Documentation Workflow action this ADR unblocks but does not itself perform.
+
+## Problem
+
+Five module specifications — `docs/03-modules/employee-management/MODULE_SPEC.md`, `docs/03-modules/calendar/MODULE_SPEC.md`, `docs/03-modules/notifications/MODULE_SPEC.md`, `docs/03-modules/job-dispatch/MODULE_SPEC.md`, and `docs/03-modules/documents/MODULE_SPEC.md` — already reference a not-yet-built "Consent" module as the owner of a recurring/daily GDPR access gate (CRR §24), e.g. `employee-management/MODULE_SPEC.md:205` ("Daily consent gate is an access precondition | referenced (Consent-owned)") and `documents/MODULE_SPEC.md:33` ("`docs/03-modules/consent/` holds only `.gitkeep`"). No `SPEC-CONSENT-001` exists yet and no `backend-consent` module id is registered in `MODULE_REGISTRY.yaml`.
+
+Independently, two other specifications describe consent-adjacent behavior without a settled owner:
+
+1. `docs/03-modules/onboarding/MODULE_SPEC.md` `OPQ-3` ("Chatbot conversation persistence & consent") asks whether engaging the chatbot requires explicit data-processing consent, and its §17.4 hypothetical ("Worker Declines Consent During Onboarding") frames this as a possible Onboarding-owned gate ("Onboarding may contain a GDPR consent gate").
+2. The same file's §4 Out of Scope and §18 Dependencies state "Compliance owns... consent governance" and "Compliance: Owns data retention, consent governance, and special-category handling," and its Cross-Module References table (line 606) repeats "Compliance owns retention policy, consent, special-category handling."
+
+This is a three-way boundary ambiguity, structurally analogous to the Contracts (`ADR-012`), Chatbot (`ADR-013`), and Payslips (`ADR-014`) collisions: a capability five specifications already treat as its own future module (the recurring daily access gate) risks being fragmented by (a) Onboarding claiming a second, one-time consent gate of its own (`OPQ-3`) and (b) Compliance's "consent governance" language being read as first-person ownership of consent lifecycle/records rather than governance-layer consumption of them. No `SIR-*` entry had yet been opened specifically for this ambiguity (`SIR-GLOB-017`/`SIR-HR-020`, resolved by `ADR-014`, are unrelated — they concern Payslips/HR).
+
+## Decision
+
+1. **Consent is a standalone bounded context.** `backend-consent`, specified by `docs/03-modules/consent/MODULE_SPEC.md` (target `SPEC-CONSENT-001`), is the canonical and exclusive owner of the full consent lifecycle: consent records, versions, granting, withdrawal, renewal, audit history, and validation — covering both the recurring/daily GDPR access gate (CRR §24) the five referencing specifications already anticipate and any one-time consent capture (e.g., chatbot data-processing consent) surfaced by Onboarding's `OPQ-3`. No second, competing consent gate or consent-state model is created inside any other module.
+2. **Onboarding requests consent only through `IF-CONSENT-*` interface contracts.** Onboarding owns no independent consent gate, logic, or state of its own. `OPQ-3` is resolved accordingly: whether engaging the chatbot requires explicit data-processing consent, and whether declining blocks onboarding, are Consent-module product/design decisions exposed to Onboarding through `IF-CONSENT-*`, not decisions Onboarding adjudicates or implements itself.
+3. **Chatbot only initiates the consent flow through Consent's published interfaces.** It never owns consent logic or state, mirroring the consumption pattern `ADR-013` already established for Chatbot's relationship to Onboarding.
+4. **Compliance consumes Consent for governance and audit only; it is not an owner.** The "consent governance" language in `docs/03-modules/onboarding/MODULE_SPEC.md` (§4, §18, Cross-Module References) is clarified, not retracted: Compliance's role is reading consent state/audit history for policy governance and regulatory reporting, not authoring or storing consent records, versions, withdrawal, or renewal logic.
+5. **Every other referencing module (Employee Management, Calendar, Notifications, Job Dispatch, Documents, and any future consumer) is a consumer only.** None may own consent lifecycle, records, versions, withdrawal, renewal, audit history, or validation; each continues to treat the daily access gate as an externally-owned precondition, exactly as already written (e.g., `calendar/MODULE_SPEC.md:227`, `notifications/MODULE_SPEC.md:125`).
+6. No module other than `backend-consent` owns consent lifecycle, records, versions, withdrawal, renewal, audit history, or validation.
+
+## Alternatives Considered
+
+- **Fold the one-time chatbot consent gate into Onboarding, leaving the recurring daily gate as a separate future Consent module** — this was the reading `docs/03-modules/onboarding/MODULE_SPEC.md`'s own `OPQ-3`/§17.4 text already assumed. **Rejected by the commissioning human decision recorded in this record.** Splitting consent into a one-time (Onboarding-owned) and recurring (Consent-owned) model would duplicate consent-record/versioning/audit machinery across two modules for what is, at the data-model level, the same underlying capability — the same reasoning `ADR-012`/`ADR-013`/`ADR-014` already applied to structurally similar candidate splits.
+- **Ratify Compliance as the consent owner**, reading "Compliance owns... consent governance" literally as full ownership. **Rejected.** Five other specifications already model consent as a distinct future module (`docs/03-modules/consent/`) separate from Compliance's placeholder (`docs/03-modules/compliance/`, also `.gitkeep`-only); collapsing consent into Compliance would contradict that already-established multi-module expectation and conflate policy governance/audit consumption with system-of-record ownership.
+- **Leave the ambiguity open pending `SPEC-CONSENT-001` authoring** — rejected: proceeding to author a consent specification without first settling Onboarding's `OPQ-3` and Compliance's governance language would risk authoring `SPEC-CONSENT-001` into a fourth competing claim rather than a resolved boundary; the product owner has made the call now, before authoring begins.
+
+## Compatibility
+
+Strictly additive to the knowledge/governance layer. `docs/03-modules/consent/` remains an unregistered placeholder (`.gitkeep` only) until `SPEC-CONSENT-001` is authored as a separate Documentation Workflow action; this ADR does not itself register `backend-consent` in `MODULE_REGISTRY.yaml`/`DEPENDENCY_GRAPH.yaml`/`BOUNDARY_INDEX.yaml` beyond what the synchronization step performed under this ADR's authority adds. No `state-*` domain changes owner; no API mount moves.
+
+## Reversibility
+
+Reversing this decision would require a new ADR that supersedes it, plus a corrective edit to any specification (including `SPEC-CONSENT-001`, once authored) that had come to assume this boundary. No data is uniquely stored by this record.
+
+## Consequences
+
+- **Positive:** Future preflight, boundary-collision (G1.5), and consistency passes reach the Consent→`backend-consent` conclusion immediately from the governance layer instead of rediscovering the ambiguity. `docs/03-modules/onboarding/MODULE_SPEC.md` `OPQ-3` closes as a design question Onboarding itself must adjudicate (it becomes a Consent-module question, exposed to Onboarding via `IF-CONSENT-*`). `SPEC-CONSENT-001` may now be authored against a settled, non-competing boundary.
+- **Negative / cost:** `docs/03-modules/onboarding/MODULE_SPEC.md` requires corrective edits (performed separately, under this ADR's authority) to `OPQ-3`, §17.4, §4 Out of Scope, §18 Dependencies, and its Cross-Module References table, clarifying Compliance's role as consumer rather than owner and Onboarding's as a pure `IF-CONSENT-*` consumer.
+
+## Human Decision Required
+
+None outstanding for the ownership question itself — this record *is* that decision. Owner *assignment* for `backend-consent` (a named accountable person/team) remains blocked on `SYNC-001`/`SIR-GLOB-001`, unchanged by this ADR, mirroring `ADR-011`–`ADR-014`. `SPEC-CONSENT-001`'s own future authoring, G4 review, and G2 freeze status are unaffected by this record beyond the boundary it settles.

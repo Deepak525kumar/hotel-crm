@@ -1268,6 +1268,74 @@ known_drift:
       payslip-request-ownership question.
     authority_needed: human/architecture  # Decision Record required settling whether Payslips becomes/remains a standalone module (SPEC-PAYSLIPS-001/backend-payslips) that carves the payslip-request capability out of backend-hr, or backend-hr/SPEC-HR-001 remains its canonical owner and "Payslips" is an alias -- structurally analogous to ADR-011/ADR-012/ADR-013; no owner may be assigned or capability boundary settled by this session
 
+  - id: SYNC-032
+    type: adr-ratification
+    status: complete
+    description: >-
+      Commissioning human decision resolves `SIR-GLOB-017`/`SIR-HR-020`
+      (`SYNC-031`'s Boundary Collision Gate stop for a proposed
+      `SPEC-PAYSLIPS-001`). `ADR-014` (Accepted, 2026-07-13) settles the
+      payslip-request-to-manager-fulfilment capability as owned exclusively
+      by `backend-hr`/`SPEC-HR-001` -- request intake, manual manager
+      fulfilment routing/email, the `Requested -> Fulfilled` state machine,
+      `RULE-HR-09`/`RULE-HR-12`, `IF-HR-RequestPayslip`/
+      `IF-HR-FulfilPayslipRequest`, `EVT-HR-PayslipRequested`/
+      `EVT-HR-PayslipFulfilled`, and the payslip-request audit trail/
+      retention lifecycle. No `SPEC-PAYSLIPS-001`/`backend-payslips` module
+      is created; `docs/03-modules/payslips/` remains a non-owning
+      placeholder (`.gitkeep` only). A chatbot or other consumer may
+      initiate the payslip workflow only through the published
+      `IF-HR-RequestPayslip`/`IF-HR-FulfilPayslipRequest` interfaces, never
+      owning payslip business logic or state. No `docs/03-modules/hr/
+      MODULE_SPEC.md` edit was required (unlike `ADR-013`'s onboarding
+      correction) -- HR's existing text already only claims what this ADR
+      confirms it owns; nothing in it was superseded. Governance layer
+      synchronized: `SIR-GLOB-017`/`SIR-HR-020` updated to RESOLVED (not
+      duplicated); `DECISION_INDEX.md`'s "Pending Decision Records
+      (Payslips / HR boundary)" section and `OD-PAYSLIPS-001` row marked
+      RESOLVED; `BOUNDARY_INDEX.yaml`'s `backend-hr` annotation updated from
+      OPEN/BLOCKED to RESOLVED. `MODULE_REGISTRY.yaml` requires no change --
+      no standalone Payslips module id is registered (mirrors the
+      Documents/Chatbot zero-code deferral precedent in outcome, here
+      because no standalone module exists at all rather than because of
+      zero-code status).
+    authority_needed: none  # ratification consumed; owner assignment for backend-hr remains SYNC-001/SIR-GLOB-001, unchanged by this ADR
+
+  - id: SYNC-033
+    type: adr-ratification
+    status: complete
+    description: >-
+      Commissioning human decision pre-empts a Consent boundary-collision
+      finding before `SPEC-CONSENT-001` authoring. `ADR-015` (Accepted,
+      2026-07-13) settles Consent as a standalone bounded context:
+      `backend-consent`/`SPEC-CONSENT-001` (target: `docs/03-modules/consent/
+      MODULE_SPEC.md`, currently `.gitkeep` only) is the canonical and
+      exclusive owner of consent lifecycle, records, versions, withdrawal,
+      renewal, audit history, and validation -- covering both the
+      recurring/daily GDPR access gate (CRR §24) five specifications
+      (`employee-management`, `calendar`, `notifications`, `job-dispatch`,
+      `documents`) already anticipate as owned by an unbuilt "Consent"
+      module, and the one-time chatbot data-processing consent question
+      raised by `docs/03-modules/onboarding/MODULE_SPEC.md`'s `OPQ-3`.
+      Onboarding requests consent only via `IF-CONSENT-*` and owns no
+      consent gate/logic/state of its own (`OPQ-3` resolved accordingly);
+      Chatbot only initiates the flow through Consent's interfaces;
+      Compliance consumes Consent for governance/audit only, not as owner.
+      No prior SIR entry existed specifically for this ambiguity (unlike
+      the Payslips/Chatbot precedents, which were discovered by a G1.5 run
+      that had already produced a SIR record) -- this ADR pre-empts one, so
+      no new SIR row was needed. Governance layer synchronized:
+      `docs/03-modules/onboarding/MODULE_SPEC.md` corrected (`OPQ-3`,
+      §17.4, §4 Out of Scope, §18 Dependencies, Cross-Module References
+      table) to reflect Onboarding-as-consumer and Compliance-as-consumer;
+      no Compliance module spec exists yet to correct (`docs/03-modules/
+      compliance/` is `.gitkeep` only); `MODULE_REGISTRY.yaml` gains a
+      `backend-consent` (unregistered/not-yet-built) note; `BOUNDARY_INDEX.
+      yaml` gains a `backend-consent` row recording the settled boundary
+      ahead of `SPEC-CONSENT-001` authoring; `DECISION_INDEX.md` records
+      `ADR-015`.
+    authority_needed: none  # ratification consumed; owner assignment for backend-consent deferred to SYNC-001/SIR-GLOB-001 once the module is registered
+
 context_invalidators:
   - repository revision changes
   - default branch changes
