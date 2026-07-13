@@ -82,8 +82,8 @@ specifications:
     spec: none
     status: UNKNOWN
   - module: backend-chatbot
-    spec: none
-    status: UNKNOWN  # placeholder-unregistered stub
+    spec: SPEC-CHATBOT-001@0.1.3
+    status: REVIEW  # G4 round complete, zero Critical/High findings anywhere; NOT FROZEN -- G2 blocked on OD-CHAT-005/006/013 (SYNC-029)
   - module: backend-geo
     spec: none
     status: UNKNOWN  # placeholder-unregistered stub

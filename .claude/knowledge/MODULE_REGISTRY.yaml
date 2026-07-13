@@ -208,7 +208,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-CHATBOT-001@0.1.3 (REVIEW)  # G4 round complete (architecture/dependency/consistency/performance/security all PASS_WITH_ACTIONS, zero Critical/High); G2 freeze remains reserved human authority, blocked on OD-CHAT-005/006/013 (SYNC-029)
     evidence: backend/src/modules/chatbot/.placeholder
 
   - id: backend-geo
