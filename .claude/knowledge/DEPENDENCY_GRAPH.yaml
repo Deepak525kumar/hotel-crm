@@ -39,6 +39,14 @@ nodes:
   - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: stub }
   # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
   # file); not imported or mounted anywhere. No relationships exist.
+  # backend-chatbot: SPEC-CHATBOT-001@0.1.3 (REVIEW) now exists (SYNC-029), but no
+  # code exists yet -- the module/edge/node facts below remain unchanged (this graph
+  # records only repository-observed relationships, never speculative ones for an
+  # unbuilt module); the specification's own Proposed Knowledge Deltas (new
+  # state-domain/external-service/infrastructure/contract nodes and consumer edges)
+  # are intentionally NOT applied here, mirroring SPEC-DOCUMENTS-001's identical
+  # zero-code deferral -- they become authoritative graph entries only once
+  # backend-chatbot has real code to observe.
   - { id: backend-chatbot, kind: module, owner: unassigned, source: backend/src/modules/chatbot, lifecycle: placeholder-unregistered }
   - { id: backend-geo, kind: module, owner: unassigned, source: backend/src/modules/geo, lifecycle: placeholder-unregistered }
 

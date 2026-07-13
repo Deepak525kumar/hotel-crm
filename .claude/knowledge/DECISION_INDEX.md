@@ -48,6 +48,20 @@ Decisions surfaced by `docs/03-modules/documents/MODULE_SPEC.md` (SPEC-DOCUMENTS
 | `OD-DOC-008` | Version history, document relationships, and archival mechanics have zero CRR/PDD textual basis — whether these responsibilities are confirmed or descoped from the module boundary | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-008` | Human/product decision; may require a future revision to formally descope if never confirmed |
 | `OD-DOC-014` | Module owner unassigned; no `backend-documents` module id is registered anywhere (no code exists yet) | `docs/03-modules/documents/MODULE_SPEC.md` `OD-DOC-014`; tracked under the existing `SYNC-001`/`SIR-GLOB-001` umbrella, not a new item | Human ownership assignment |
 
+## Pending Decision Records (SPEC-CHATBOT-001)
+
+Decisions surfaced by `docs/03-modules/chatbot/MODULE_SPEC.md` (SPEC-CHATBOT-001, v0.1.3) requiring a Decision Record before target-state implementation or G2 freeze. No ADR yet exists for any of these; recorded here as pending per the specification's own Proposed Knowledge Deltas. Two items (`OD-CHAT-005`, `OD-CHAT-006`) additionally block G2 Specification Freeze per the G4 review round -- see `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-CHAT-005`/`SIR-CHAT-006`.
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `OD-CHAT-002` | Tool-execution scope -- whether the chatbot agent performs any function/tool call beyond conversational text exchange is unconfirmed by CRR/PDD | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-002` | Product/architecture decision before any concrete tool-calling contract is specified |
+| `OD-CHAT-003` | File-byte handling/storage-write mechanism -- whether Chatbot's tool-execution surface ever calls Documents' upload interface directly, or file upload is a separate non-conversational UI action entirely outside Chatbot's scope | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-003`; contingent candidate edge `edge-chatbot-consumes-documents` vs. `documents/MODULE_SPEC.md:190`'s `edge-onboarding-consumes-documents` | Architecture decision, coordinated with `SPEC-DOCUMENTS-001` |
+| `OD-CHAT-005` | No conversation-level RBAC/permission model beyond self-scoping (owning worker) is specified, now also covering the write-path/initiation-scope question (whether a calling module may ever direct a conversation start toward a worker other than the one whose own request triggered it) -- **blocks G2** | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-005` | Human/architecture decision on the downstream RBAC/management-chain model |
+| `OD-CHAT-006` | Prompt-injection-resistance guardrail -- an AI-specific risk class with only an interim mitigation posture stated, not a confirmed design -- **blocks G2** | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-006` | Human/architecture decision on the LLM guardrail design before implementation |
+| `OD-CHAT-013` | Module owner unassigned; tracked under the existing `SYNC-001`/`SIR-GLOB-001` umbrella, not a new item | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-013` | Human ownership assignment |
+| `OD-CHAT-019` | GDPR retention-tier assignment for conversation-adjacent records is unstated by CRR/PDD | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-019` | Human/product decision on retention tier, mirroring `OD-DOC-001`/`OD-HR-11` |
+| `OD-CHAT-023` | Cross-cutting: no repository-wide convention distinguishes in-process module-to-module calls from genuine HTTP contracts under one `IF-*`-style ID scheme (affects Chatbot, Documents, and any future in-process-consuming module) | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-023`; mirrors the `SIR-GLOB-010`/`SIR-GLOB-011` promotion pattern | Lead Architect platform-wide Decision Record; see `SIR-GLOB-016` |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |

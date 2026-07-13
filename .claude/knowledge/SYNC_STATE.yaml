@@ -1100,6 +1100,90 @@ known_drift:
       this governance-only pass.
     authority_needed: none  # ADR-013 IS the human product/architecture decision; owner assignment for backend-chatbot/backend-onboarding remains blocked on SYNC-001/SIR-GLOB-001, unchanged by this pass
 
+  - id: SYNC-029
+    type: specification
+    status: in-review
+    description: >-
+      SPEC-CHATBOT-001 (Chatbot / AI-execution capability) authored at
+      v0.1.3, status REVIEW (docs/03-modules/chatbot/MODULE_SPEC.md).
+      Authored under ADR-013's settled Chatbot-vs-Onboarding boundary
+      (SYNC-028), which resolved the G1.5 Boundary Collision Gate FAIL
+      recorded at SYNC-027; the gate was not re-run for this authoring
+      session per explicit task instruction, citing ADR-013/SYNC-027/
+      SYNC-028/SIR-GLOB-015 (RESOLVED) as the evidence of record. First
+      specification for backend-chatbot -- unlike SPEC-DOCUMENTS-001, this
+      module already carried a MODULE_REGISTRY.yaml/DEPENDENCY_GRAPH.yaml/
+      API_INDEX.yaml entry (a real .placeholder file predates the
+      specification), though it remains genuinely zero-code.
+      Current-state (zero implementation) vs. target-state (CRR SS8/SS26;
+      PDD SS2.2/SS4.14/SS5.6/SS7.1/SS8.1/SS9.3/SS10/SS11) reverse-specified
+      per MODULE_SPEC_TEMPLATE.md, cross-checked against
+      docs/03-modules/onboarding/MODULE_SPEC.md v1.1's consumption-contract
+      shape and docs/03-modules/documents/MODULE_SPEC.md's own Chatbot
+      disclaimer.
+      Full G4 independent-review round across three cycles (maximum
+      allowed): round 1 on v0.1.0 -- Architecture/Dependency/Consistency/
+      Performance all PASS_WITH_ACTIONS, Security FAIL (3 High: an
+      unresolved worker-routing/auth-binding premise; a missing
+      self-scoping requirement on the GDPR subject-rights path;
+      prompt-injection not elevated to blocking) -- corrected to v0.1.1
+      (collapsed a redundant duplicate interface, resolved the routing
+      question in favor of direct end-user access via the existing
+      auth-middleware pattern, elevated the prompt-injection open decision
+      to block G2, plus assorted Medium/Low fixes across all five
+      dimensions). Round-2 re-review on v0.1.1 -- Security and Dependency
+      both PASS_WITH_ACTIONS (all round-1 findings independently confirmed
+      resolved), but Architecture returned a new FAIL: the v0.1.1
+      direct-access resolution itself created an incompatible
+      Direction/Auth pairing on the merged interface, leaving the
+      completion-signal delivery mechanism for a MUST requirement
+      unspecified -- corrected to v0.1.2 by splitting the interaction
+      model into in-process module-to-module calls (mirroring this
+      platform's existing notification-service singleton-call precedent,
+      DEPENDENCY_GRAPH.yaml:82-89,431) for module-orchestration calls, and
+      direct worker-facing calls only for the live conversation turn.
+      Round-3 re-review on v0.1.2 -- Architecture, Dependency, and Security
+      all returned PASS_WITH_ACTIONS, confirming the new FAIL resolved,
+      with three small new Medium findings (a mischaracterized
+      failure-propagation-semantics citation; a missing contract-node
+      proposal; an unstated MUST-level provenance precondition) -- closed
+      in a v0.1.3 polish pass requiring no further review cycle, per this
+      register's established SPEC-DOCUMENTS-001 polish-pass precedent.
+      Zero Critical/High findings remain anywhere across all five G4
+      dimensions after the full round. G6 documentation validation on
+      v0.1.3: PASS_WITH_ACTIONS (20/20 template-compliance criteria, full
+      ID traceability, zero orphaned references, 11/11 evidence spot-checks
+      accurate, all six internal counts confirmed by direct recount; one
+      Low/Note non-blocking finding on stale-reference framing, not
+      applied).
+      Knowledge synchronization completed by this pass: MODULE_REGISTRY.yaml/
+      SPECIFICATION_INDEX.yaml backend-chatbot specification field updated
+      UNKNOWN/none -> SPEC-CHATBOT-001@0.1.3 (REVIEW), mirroring the
+      backend-users/backend-quality/backend-attendance precedent (not the
+      SPEC-DOCUMENTS-001 deferral, since a registry entry already existed).
+      DEPENDENCY_GRAPH.yaml/BOUNDARY_INDEX.yaml annotated with the
+      specification's existence; the specification's own Proposed Knowledge
+      Deltas (new state-domain/external-service/infrastructure/
+      chatbot-service-contract graph nodes and consumer edges) are
+      deliberately NOT applied to the graph -- backend-chatbot remains
+      genuinely zero-code, so these stay proposal-only, mirroring
+      SPEC-DOCUMENTS-001's identical zero-code deferral. Specification
+      Issues Register synchronized: new "Module: Chatbot" section added
+      (SIR-CHAT-001..024, seeded from OD-CHAT-001..023 plus the
+      consolidated migration-gap row -- SIR-CHAT-024 corrects a same-session
+      mislabeling where OD-CHAT-010's content was initially filed under the
+      SIR-CHAT-009 ID; SIR-CHAT-009 is now correctly OD-CHAT-009, per the
+      register's never-renumber-an-assigned-ID rule); OD-CHAT-023 (a cross-cutting
+      in-process-vs-HTTP contract-naming-convention gap, not
+      chatbot-specific) promoted platform-wide as SIR-GLOB-016, mirroring
+      the SIR-GLOB-010/SIR-GLOB-011 promotion pattern. DECISION_INDEX.md
+      synchronized: new "Pending Decision Records (SPEC-CHATBOT-001)"
+      section added. MODULE_SPEC.md NOT frozen (G2 human) -- OD-CHAT-005
+      (conversation-level RBAC, blocks G2), OD-CHAT-006 (prompt-injection,
+      blocks G2), and OD-CHAT-013/SYNC-001 (ownership) remain the standing
+      human-authority items.
+    authority_needed: human  # G2 freeze; OD-CHAT-005 RBAC/management-chain model decision (blocks G2); OD-CHAT-006 prompt-injection guardrail design decision (blocks G2); SYNC-001 ownership; OD-CHAT-002/003 tool-execution-scope and file-handling-mechanism decisions; SIR-GLOB-016 platform-wide in-process-vs-HTTP naming-convention Decision Record (non-blocking, cross-cutting)
+
 context_invalidators:
   - repository revision changes
   - default branch changes
