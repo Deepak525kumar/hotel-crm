@@ -62,6 +62,14 @@ Decisions surfaced by `docs/03-modules/chatbot/MODULE_SPEC.md` (SPEC-CHATBOT-001
 | `OD-CHAT-019` | GDPR retention-tier assignment for conversation-adjacent records is unstated by CRR/PDD | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-019` | Human/product decision on retention tier, mirroring `OD-DOC-001`/`OD-HR-11` |
 | `OD-CHAT-023` | Cross-cutting: no repository-wide convention distinguishes in-process module-to-module calls from genuine HTTP contracts under one `IF-*`-style ID scheme (affects Chatbot, Documents, and any future in-process-consuming module) | `docs/03-modules/chatbot/MODULE_SPEC.md` `OD-CHAT-023`; mirrors the `SIR-GLOB-010`/`SIR-GLOB-011` promotion pattern | Lead Architect platform-wide Decision Record; see `SIR-GLOB-016` |
 
+## Pending Decision Records (Payslips / HR boundary)
+
+A Boundary Collision Gate (G1.5) run for a proposed `SPEC-PAYSLIPS-001` (target: `docs/03-modules/payslips/MODULE_SPEC.md`, currently only `.gitkeep`) found that `docs/03-modules/hr/MODULE_SPEC.md` (`SPEC-HR-001`) already claims complete, first-person ownership of the payslip-request-to-manager-fulfilment capability (CRR §23; PDD §7.7): `RULE-HR-09`/`REQ-HR-009`, `RULE-HR-12`/`REQ-HR-012`, `IF-HR-RequestPayslip`, `IF-HR-FulfilPayslipRequest`, `EVT-HR-PayslipRequested`/`EVT-HR-PayslipFulfilled`, and a dedicated `Requested → Fulfilled` state machine. No ADR yet settles whether Payslips is a standalone module or an alias for `backend-hr`/`SPEC-HR-001` (mirroring `ADR-012`/`ADR-011`/`ADR-013`'s precedent for Contracts/Hotels-Scheduling/Chatbot). No `SPEC-PAYSLIPS-001` was authored; recorded here as pending, tracked at `SIR-GLOB-017`/`SIR-HR-020` in the [Specification Issues Register](../governance/SPECIFICATION_ISSUES_REGISTER.md).
+
+| Candidate | Summary | Evidence | Required action |
+|---|---|---|---|
+| `OD-PAYSLIPS-001` | Whether the payslip-request capability becomes/remains owned entirely by `backend-hr`/`SPEC-HR-001` (no standalone module or spec), or is carved out into its own `SPEC-PAYSLIPS-001`/`backend-payslips` module, is undecided. `ADR-012` settled Contracts ownership and named Payslips only as a consumer of that capability — it did not itself adjudicate payslip-request ownership. | `docs/03-modules/hr/MODULE_SPEC.md` `RULE-HR-09`/`RULE-HR-12`, `OD-HR-01a`; `docs/09-decisions/architecture-decisions/ADR-012-contracts-ownership-hr-bounded-context.md` | Human/architecture Decision Record (ADR), mirroring `ADR-012`/`ADR-013`, before `docs/03-modules/payslips/MODULE_SPEC.md` may be authored |
+
 ## Unratified Architecture Claims
 
 | Candidate | Repository claim | Evidence | Required action |
