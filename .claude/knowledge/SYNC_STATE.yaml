@@ -1,7 +1,7 @@
 schema_version: 1
 project: hotel-crm
 checked_at: "2026-07-13"
-baseline_revision: 60a40d52d134db8337293d417cf95d7bdbd3bf37  # SYNC-030; see cache_state block below for the actively-maintained per-revision record
+baseline_revision: 3513c776ad570e66693955398ad163fcdb056392  # SYNC-031; see cache_state block below for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
 
@@ -1217,6 +1217,57 @@ known_drift:
       human-authority items, unchanged by this pass.
     authority_needed: none  # pure cache-rebind; no drift found requiring a decision
 
+  - id: SYNC-031
+    type: boundary-collision-stop
+    status: complete
+    description: >-
+      Fast Documentation Workflow preflight session for a proposed
+      `SPEC-PAYSLIPS-001` (target: `docs/03-modules/payslips/MODULE_SPEC.md`,
+      currently only `.gitkeep`). Pre-flight found the SESSION_STATE.yaml/
+      SYNC_STATE.yaml baseline_revision stamp (60a40d5) one merge commit
+      stale relative to actual HEAD (3513c77, PR #135 merging SYNC-030's own
+      branch); diff 60a40d5..3513c77 touches only SESSION_STATE.yaml/
+      SYNC_STATE.yaml themselves (the SYNC-030 rebind landing), no other
+      content -- treated as no additional drift beyond the stamp itself,
+      consistent with the fail-safe rule already applied by SYNC-026/SYNC-030,
+      and not re-run as a full repository-synchronization pass. The Boundary
+      Collision Gate (G1.5) was then executed before authoring, per
+      `CLAUDE.md` pre-flight rule 4, and returned **FAIL**:
+      `docs/03-modules/hr/MODULE_SPEC.md` (`SPEC-HR-001`) already claims
+      complete first-person ownership of the payslip-request-to-manager-
+      fulfilment capability (CRR §23; PDD §7.7) -- `RULE-HR-09`/`REQ-HR-009`
+      ("Accept a worker's payslip request and route it for manual manager
+      fulfilment by email"), `RULE-HR-12`/`REQ-HR-012` (Tier-3 retention
+      classification of payslip-request records), the
+      `IF-HR-RequestPayslip`/`IF-HR-FulfilPayslipRequest` interfaces, the
+      `EVT-HR-PayslipRequested`/`EVT-HR-PayslipFulfilled` events, and a
+      dedicated `Requested -> Fulfilled` state machine -- the identical
+      capability a standalone `SPEC-PAYSLIPS-001` would otherwise specify.
+      This is the same collision shape as `SYNC-023` (Contracts) and
+      `SYNC-027` (Chatbot): a capability another module's specification
+      already claims in full, with no ratified Decision Record settling
+      whether Payslips is a standalone module or an alias for `backend-hr`.
+      `SPEC-HR-001`'s own authoring note and `OD-HR-01a` already disclose the
+      near-empty `docs/03-modules/payslips/` directory as part of the same
+      docs<->docs ambiguity that produced `ADR-012` for Contracts;
+      critically, `ADR-012` itself named Payslips only as a **consumer** of
+      the Contracts capability and never adjudicated payslip-request
+      ownership -- so this is a genuinely open, previously-untracked
+      collision, not a rediscovery of an already-settled item. Per the
+      Boundary Collision workflow's failure handling, this session did not
+      proceed to the Documentation Workflow: no
+      `docs/03-modules/payslips/MODULE_SPEC.md` was authored (directory
+      retains only `.gitkeep`), and no backend/frontend/test code was
+      touched. Governance layer synchronized so the finding is not
+      rediscovered: new `SIR-GLOB-017` (OPEN -- BLOCKED) added to the
+      Specification Issues Register, plus a thin cross-reference
+      `SIR-HR-020` in the HR module section (mirroring the
+      `SIR-HR-001`/`SIR-GLOB-014` pattern); a "Pending Decision Records
+      (Payslips / HR boundary)" section added to `DECISION_INDEX.md`;
+      `BOUNDARY_INDEX.yaml`'s `backend-hr` line annotated with the open
+      payslip-request-ownership question.
+    authority_needed: human/architecture  # Decision Record required settling whether Payslips becomes/remains a standalone module (SPEC-PAYSLIPS-001/backend-payslips) that carves the payslip-request capability out of backend-hr, or backend-hr/SPEC-HR-001 remains its canonical owner and "Payslips" is an alias -- structurally analogous to ADR-011/ADR-012/ADR-013; no owner may be assigned or capability boundary settled by this session
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1232,26 +1283,25 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 60a40d52d134db8337293d417cf95d7bdbd3bf37
+  baseline_revision: 3513c776ad570e66693955398ad163fcdb056392
   framework_version: 1.3.0
   boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-13" }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-13" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Rebound by SYNC-030 (Repository Synchronization session, 2026-07-13),
-    advancing from SYNC-026's `552edf1` bind, five commits stale relative to
-    HEAD (`60a40d5`): `97d0eaa` (G1.5 stop), `181529e`/`1b2d444` (ADR-013 +
-    onboarding correction + governance sync), `3c27818`/`9702e14`/`f466c76`/
-    `73fb035` (SPEC-CHATBOT-001 authoring through v0.1.3), `57a7539` (SYNC-029
-    knowledge synchronization), and merge commits `f8064ad`/`60a40d5` (PR
-    #133/#134). This session independently re-verified all five commits'
-    content-bearing effects and found no drift beyond the stamp itself:
-    MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml/DEPENDENCY_GRAPH.yaml/
-    BOUNDARY_INDEX.yaml/API_INDEX.yaml/DECISION_INDEX.md/
-    SPECIFICATION_ISSUES_REGISTER.md were independently spot-checked against
-    the live repository for ADR-013 and SPEC-CHATBOT-001 references and found
-    accurate; no knowledge-index content changed by this synchronization pass
-    beyond this file and SESSION_STATE.yaml. On any doubt about validity, an
-    artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1
-    invariant 5); the next repository-revision change re-opens this block.
+    Rebound by SYNC-031 (Boundary Collision Gate stop for a proposed
+    `SPEC-PAYSLIPS-001`, 2026-07-13), advancing from SYNC-030's `60a40d5`
+    bind, one merge commit stale relative to HEAD (`3513c77`, PR #135 merging
+    SYNC-030's own rebind branch). Diff `60a40d5..3513c77` touches only this
+    file and `SESSION_STATE.yaml` (the SYNC-030 landing itself); no other
+    knowledge-index content changed -- no drift beyond the stamp itself,
+    consistent with the fail-safe rule already applied at the SYNC-026/
+    SYNC-030 transition. This session's objective did not proceed past the
+    pre-authoring Boundary Collision Gate (G1.5): `docs/03-modules/hr/
+    MODULE_SPEC.md` already claims the payslip-request capability a proposed
+    `SPEC-PAYSLIPS-001` would specify. `SIR-GLOB-017`/`SIR-HR-020` added;
+    `DECISION_INDEX.md`/`BOUNDARY_INDEX.yaml` annotated. On any doubt about
+    validity, an artifact is treated as stale and reproduced
+    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision
+    change re-opens this block.
