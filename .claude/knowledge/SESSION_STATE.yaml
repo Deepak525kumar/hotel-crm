@@ -16,29 +16,30 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: 552edf18e663397e799adaf6d0997fb80beee028
+  baseline_revision: 60a40d52d134db8337293d417cf95d7bdbd3bf37
   default_branch: main
   framework_version: see .claude/VERSION.yaml   # 1.3.0
-  opened_at: "2026-07-12T12:18:00Z"
+  opened_at: "2026-07-13T00:00:00Z"
   note: >-
-    Rebound by SYNC-026 (Repository Synchronization session, governance/
-    knowledge-layer scope only). The prior a36da7d stamp (bound mid-session
-    by SYNC-025) was two commits stale relative to actual HEAD (552edf1):
-    commit 12e0f01 (G6 nonsemantic fixes + governance/knowledge sync for
-    SPEC-DOCUMENTS-001) and its merge commit 552edf1 (PR #131) landed after
-    the SYNC-025 note was written, since a session cannot know its own future
-    merge-commit hash while authoring it. Both commits were independently
-    re-verified against the live worktree by this session (diff a36da7d..HEAD
-    touches only SPECIFICATION_ISSUES_REGISTER.md, BOUNDARY_INDEX.yaml,
-    DECISION_INDEX.md, SESSION_STATE.yaml, SYNC_STATE.yaml, and
-    docs/03-modules/documents/MODULE_SPEC.md -- all already fully accounted
-    for by SYNC-025's own description) -- no additional drift found beyond
-    the revision stamp itself, consistent with the §1.5 fail-safe rule.
-    This branch (claude/sync-and-chatbot-spec-7lbuwe) is confirmed at zero
-    divergence from origin/main at this revision. Downstream workflows at
-    the same baseline_revision reuse this session's evidence by reference
-    instead of re-running discovery. Invalidates on the next baseline_revision
-    or default-branch change (CONTEXT_ARTIFACTS.md §6).
+    Rebound by SYNC-030 (Repository Synchronization session, knowledge-layer
+    scope only). The prior 552edf1 stamp (bound by SYNC-026) was five commits
+    stale relative to actual HEAD (60a40d5): 97d0eaa (Boundary Collision Gate
+    G1.5 stop), 181529e (ADR-013 + onboarding boundary correction) and its
+    governance-sync commit 1b2d444, the SPEC-CHATBOT-001 authoring/G4-correction
+    commits (3c27818, 9702e14, f466c76, 73fb035), 57a7539 (SYNC-029 knowledge
+    synchronization), and merge commits f8064ad (PR #133) / 60a40d5 (PR #134).
+    This session independently re-verified the diff against the live worktree:
+    MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml/
+    DEPENDENCY_GRAPH.yaml/API_INDEX.yaml backend-chatbot entries, DECISION_INDEX.md's
+    ADR-013 row, and SPECIFICATION_ISSUES_REGISTER.md's SIR-CHAT-001..024/
+    SIR-GLOB-015 (RESOLVED)/SIR-GLOB-016 rows all already fully match SYNC-029's
+    own description -- no additional drift found beyond the revision stamp
+    itself, consistent with the §1.5 fail-safe rule. This branch
+    (claude/repo-sync-pr-133-2dai6u) is confirmed at zero divergence from
+    origin/main at this revision. Downstream workflows at the same
+    baseline_revision reuse this session's evidence by reference instead of
+    re-running discovery. Invalidates on the next baseline_revision or
+    default-branch change (CONTEXT_ARTIFACTS.md §6).
 
 # Context Artifacts produced/reused this session. Each entry records its cache
 # key and validity so a later workflow reuses instead of rediscovering.

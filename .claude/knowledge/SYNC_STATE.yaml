@@ -1,7 +1,7 @@
 schema_version: 1
 project: hotel-crm
-checked_at: "2026-07-12"
-baseline_revision: 552edf18e663397e799adaf6d0997fb80beee028  # SYNC-026; see cache_state block below for the actively-maintained per-revision record
+checked_at: "2026-07-13"
+baseline_revision: 60a40d52d134db8337293d417cf95d7bdbd3bf37  # SYNC-030; see cache_state block below for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
 
@@ -1184,6 +1184,39 @@ known_drift:
       human-authority items.
     authority_needed: human  # G2 freeze; OD-CHAT-005 RBAC/management-chain model decision (blocks G2); OD-CHAT-006 prompt-injection guardrail design decision (blocks G2); SYNC-001 ownership; OD-CHAT-002/003 tool-execution-scope and file-handling-mechanism decisions; SIR-GLOB-016 platform-wide in-process-vs-HTTP naming-convention Decision Record (non-blocking, cross-cutting)
 
+  - id: SYNC-030
+    type: repository-synchronization
+    status: complete
+    description: >-
+      Repository Synchronization session following the merge of PR #133
+      (ADR-013 + onboarding boundary correction + SPEC-CHATBOT-001 authoring)
+      and PR #134 (SYNC-029 knowledge synchronization) -- no code changes, no
+      specification authoring/review/freeze performed. This session's own
+      cache-binding files (SYNC_STATE.yaml's baseline_revision/cache_state and
+      SESSION_STATE.yaml) were the only artifacts still stamped at SYNC-026's
+      552edf1, five commits stale relative to actual HEAD (60a40d5): 97d0eaa,
+      181529e, 1b2d444, 3c27818, 9702e14, f466c76, 73fb035, 57a7539 (SYNC-029),
+      f8064ad (PR #133 merge), 60a40d5 (PR #134 merge). All content-bearing
+      knowledge artifacts were independently re-verified against the live
+      worktree and found already fully synchronized by SYNC-029: MODULE_REGISTRY.yaml
+      and SPECIFICATION_INDEX.yaml both carry backend-chatbot / SPEC-CHATBOT-001@0.1.3
+      (REVIEW); DEPENDENCY_GRAPH.yaml, BOUNDARY_INDEX.yaml, and API_INDEX.yaml
+      annotate the specification's existence while correctly deferring graph
+      application (module remains zero-code); DECISION_INDEX.md carries the
+      ADR-013 row; SPECIFICATION_ISSUES_REGISTER.md carries SIR-CHAT-001..024
+      and SIR-GLOB-015 (RESOLVED)/SIR-GLOB-016. No stale revision hashes
+      remained in any content file -- only this file's own baseline_revision/
+      cache_state and SESSION_STATE.yaml's session block needed rebinding.
+      STATE_OWNERSHIP_INDEX.yaml, CONTRACT_INDEX.yaml, and OWNERSHIP_INDEX.yaml
+      carry no chatbot-specific entries, consistent with the module's zero-code
+      status (no state domain, contract, or ownership assignment exists to
+      index). No new Specification Issues Register entries required. No
+      reserved human-authority decision required to complete this
+      synchronization; OD-CHAT-005/006/013 (G2 freeze), SYNC-001 (ownership),
+      and SIR-GLOB-016 (platform-wide naming convention) remain the standing
+      human-authority items, unchanged by this pass.
+    authority_needed: none  # pure cache-rebind; no drift found requiring a decision
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1199,23 +1232,26 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 552edf18e663397e799adaf6d0997fb80beee028
+  baseline_revision: 60a40d52d134db8337293d417cf95d7bdbd3bf37
   framework_version: 1.3.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-12" }
-  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-12" }
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-13" }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-13" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Rebound by SYNC-026 (Repository Synchronization session, 2026-07-12),
-    advancing from SYNC-025's `a36da7d` bind (itself unable to include its
-    own two closing commits `12e0f01`/`552edf1`). This session verified those
-    two commits and found no drift beyond the stamp itself: MODULE_REGISTRY.
-    yaml/SPECIFICATION_INDEX.yaml/DEPENDENCY_GRAPH.yaml/BOUNDARY_INDEX.yaml/
-    API_INDEX.yaml were independently spot-checked against the live
-    repository for the backend-chatbot placeholder entry (ahead of the
-    Phase 2 SPEC-CHATBOT-001 authoring this session also performs) and found
-    accurate; no knowledge-index content changed by this synchronization
-    pass beyond this file and SESSION_STATE.yaml. On any doubt about
-    validity, an artifact is treated as stale and reproduced
-    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision
-    change re-opens this block.
+    Rebound by SYNC-030 (Repository Synchronization session, 2026-07-13),
+    advancing from SYNC-026's `552edf1` bind, five commits stale relative to
+    HEAD (`60a40d5`): `97d0eaa` (G1.5 stop), `181529e`/`1b2d444` (ADR-013 +
+    onboarding correction + governance sync), `3c27818`/`9702e14`/`f466c76`/
+    `73fb035` (SPEC-CHATBOT-001 authoring through v0.1.3), `57a7539` (SYNC-029
+    knowledge synchronization), and merge commits `f8064ad`/`60a40d5` (PR
+    #133/#134). This session independently re-verified all five commits'
+    content-bearing effects and found no drift beyond the stamp itself:
+    MODULE_REGISTRY.yaml/SPECIFICATION_INDEX.yaml/DEPENDENCY_GRAPH.yaml/
+    BOUNDARY_INDEX.yaml/API_INDEX.yaml/DECISION_INDEX.md/
+    SPECIFICATION_ISSUES_REGISTER.md were independently spot-checked against
+    the live repository for ADR-013 and SPEC-CHATBOT-001 references and found
+    accurate; no knowledge-index content changed by this synchronization pass
+    beyond this file and SESSION_STATE.yaml. On any doubt about validity, an
+    artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1
+    invariant 5); the next repository-revision change re-opens this block.
