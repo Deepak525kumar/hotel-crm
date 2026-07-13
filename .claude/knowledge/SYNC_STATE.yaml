@@ -1268,6 +1268,39 @@ known_drift:
       payslip-request-ownership question.
     authority_needed: human/architecture  # Decision Record required settling whether Payslips becomes/remains a standalone module (SPEC-PAYSLIPS-001/backend-payslips) that carves the payslip-request capability out of backend-hr, or backend-hr/SPEC-HR-001 remains its canonical owner and "Payslips" is an alias -- structurally analogous to ADR-011/ADR-012/ADR-013; no owner may be assigned or capability boundary settled by this session
 
+  - id: SYNC-032
+    type: adr-ratification
+    status: complete
+    description: >-
+      Commissioning human decision resolves `SIR-GLOB-017`/`SIR-HR-020`
+      (`SYNC-031`'s Boundary Collision Gate stop for a proposed
+      `SPEC-PAYSLIPS-001`). `ADR-014` (Accepted, 2026-07-13) settles the
+      payslip-request-to-manager-fulfilment capability as owned exclusively
+      by `backend-hr`/`SPEC-HR-001` -- request intake, manual manager
+      fulfilment routing/email, the `Requested -> Fulfilled` state machine,
+      `RULE-HR-09`/`RULE-HR-12`, `IF-HR-RequestPayslip`/
+      `IF-HR-FulfilPayslipRequest`, `EVT-HR-PayslipRequested`/
+      `EVT-HR-PayslipFulfilled`, and the payslip-request audit trail/
+      retention lifecycle. No `SPEC-PAYSLIPS-001`/`backend-payslips` module
+      is created; `docs/03-modules/payslips/` remains a non-owning
+      placeholder (`.gitkeep` only). A chatbot or other consumer may
+      initiate the payslip workflow only through the published
+      `IF-HR-RequestPayslip`/`IF-HR-FulfilPayslipRequest` interfaces, never
+      owning payslip business logic or state. No `docs/03-modules/hr/
+      MODULE_SPEC.md` edit was required (unlike `ADR-013`'s onboarding
+      correction) -- HR's existing text already only claims what this ADR
+      confirms it owns; nothing in it was superseded. Governance layer
+      synchronized: `SIR-GLOB-017`/`SIR-HR-020` updated to RESOLVED (not
+      duplicated); `DECISION_INDEX.md`'s "Pending Decision Records
+      (Payslips / HR boundary)" section and `OD-PAYSLIPS-001` row marked
+      RESOLVED; `BOUNDARY_INDEX.yaml`'s `backend-hr` annotation updated from
+      OPEN/BLOCKED to RESOLVED. `MODULE_REGISTRY.yaml` requires no change --
+      no standalone Payslips module id is registered (mirrors the
+      Documents/Chatbot zero-code deferral precedent in outcome, here
+      because no standalone module exists at all rather than because of
+      zero-code status).
+    authority_needed: none  # ratification consumed; owner assignment for backend-hr remains SYNC-001/SIR-GLOB-001, unchanged by this ADR
+
 context_invalidators:
   - repository revision changes
   - default branch changes
