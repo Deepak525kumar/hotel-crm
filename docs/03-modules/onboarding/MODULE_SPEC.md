@@ -55,7 +55,7 @@ In scope for this module:
 
 - **Onboarding** owns **intake workflows, document collection, contract signing, and hire approval decisioning.**
 - **Employee Management** owns **resulting employee records and employee state** (identity linkage, core profile fields, lifecycle status, skills).
-- **Compliance** owns **policy governance**: retention policy, consent governance, and compliance automation.
+- **Compliance** owns **policy governance**: retention policy and compliance automation, and consumes Consent for governance/audit purposes only. Consent lifecycle, records, versions, withdrawal, renewal, audit history, and validation are owned by **Consent** (`backend-consent`, target `SPEC-CONSENT-001`), a standalone bounded context (`ADR-015`); Onboarding requests consent only via `IF-CONSENT-*` (see §17.4, OPQ-3).
 
 Owned by other modules and **referenced, never redefined** here:
 
@@ -471,7 +471,7 @@ Worker fills Personalfragebogen with Name = "Max Müller" but later uploads an I
 
 ### 17.4 Worker Declines Consent During Onboarding
 
-Onboarding may contain a GDPR consent gate (e.g., data-processing consent for chatbot). [OPEN] Whether declining blocks onboarding or is optional (OPQ-3).
+Engaging the chatbot may require a GDPR data-processing consent gate (e.g., before chatbot-guided document collection). Per `ADR-015`, this gate is owned and implemented entirely by `backend-consent`/`SPEC-CONSENT-001`, exposed to Onboarding via `IF-CONSENT-*`; Onboarding requests consent through that interface and reacts to its outcome, but does not own the gate, its logic, or its state. [OPEN] Whether a decline blocks onboarding or is optional is a Consent-module product/design decision (OPQ-3).
 
 ## 18. Dependencies
 
@@ -481,7 +481,8 @@ Onboarding may contain a GDPR consent gate (e.g., data-processing consent for ch
 2. **Employee Management:** Owns the employee record and lifecycle — creates the Inactive record at signup and transitions it (Inactive → Under Review → Active/Rejected) in response to Onboarding's completion signal and approval/rejection decisions (CRR §6–§10; EM §7, §14).
 3. **Documents:** Stores uploaded documents; validates non-EU work-permit requirements (CRR §7).
 4. **Contracts/HR:** Manages the contract template and versioning, stores the manager-confirmed hand-signed contract, and owns the ongoing contract lifecycle (expiry at 1yr → optional +1yr with no new probation → permanent after 2yr) and expiry reminders (CRR §9; PDD §5.6, §7.7).
-5. **Compliance:** Owns data retention, consent governance, and special-category handling; Onboarding defers to it (CRR §25–§27).
+5. **Compliance:** Owns data retention and special-category handling; Onboarding defers to it (CRR §25–§27).
+5a. **Consent (`backend-consent`, target `SPEC-CONSENT-001`):** Owns the consent lifecycle (records, versions, withdrawal, renewal, audit history, validation), including any data-processing consent gate for chatbot engagement; consumed by Onboarding only through `IF-CONSENT-*` interfaces — Onboarding owns no consent gate/logic/state of its own (`ADR-015`; see §17.4, OPQ-3).
 6. **Hotels:** Hotel Group context for pool/claim scope (managers see applications for their Hotel Group) (CRR §11).
 7. **Chatbot (`backend-chatbot`, `SPEC-CHATBOT-001`):** Powers the document-collection AI-agent conversation, consumed through `IF-CHATBOT-*` interfaces; Onboarding does not integrate with the Claude API directly — that integration, and the agent's execution, are owned by the Chatbot module (CRR §8; PDD §4.14, §7.1; ADR-013).
 8. **S3 (EU) storage:** Holds uploaded documents and the scanned hand-signed contract; no data leaves the EU/EEA (storage owned by the Documents/Contracts module) (CRR §9; PDD §5.7).
@@ -522,10 +523,10 @@ The following genuine unknowns are unresolved and will block final implementatio
 - Should Documents module publish validation-status events (e.g., "Document is valid work permit"), or is synchronous API-call validation sufficient?
 - Impacts: Chatbot knows when to stop requesting documents.
 
-**OPQ-3: Chatbot conversation persistence & consent**
-- Are chatbot conversations (with worker) persisted for future reference / subject-rights export, or discarded after onboarding? This is a Chatbot-module (`backend-chatbot`) decision per `ADR-013`; Onboarding only consumes the outcome.
-- Does engaging the chatbot require explicit data-processing consent?
-- Impacts: Compliance/audit trail; GDPR subject-rights scope.
+**OPQ-3: Chatbot conversation persistence & consent** — **RESOLVED (consent portion) by `ADR-015`**
+- Are chatbot conversations (with worker) persisted for future reference / subject-rights export, or discarded after onboarding? This is a Chatbot-module (`backend-chatbot`) decision per `ADR-013`; Onboarding only consumes the outcome. This portion remains open (tracked at `SIR-CHAT-008`).
+- Does engaging the chatbot require explicit data-processing consent? **Resolved by `ADR-015`:** Consent is a standalone bounded context owned by `backend-consent`/`SPEC-CONSENT-001`. Whether chatbot engagement requires explicit consent, and whether declining blocks onboarding (see §17.4), is a Consent-module product/design decision exposed to Onboarding via `IF-CONSENT-*` interfaces. Onboarding owns no consent gate, logic, or state of its own.
+- Impacts: Compliance/audit trail (Compliance consumes Consent for governance/audit only, per `ADR-015` — it is not the consent owner); GDPR subject-rights scope.
 
 **OPQ-4: Rejected applicant re-application**
 - Can a rejected applicant re-apply immediately, or is there a cooldown?
@@ -603,7 +604,8 @@ The runtime event exchange is **bidirectional**: Employee Management publishes `
 | Employee Management | §6–§10 (employee lifecycle) | EM owns the employee record (created Inactive at signup) and all lifecycle transitions; Onboarding progresses it and relays approval/rejection |
 | Documents | §7 (work-permit requirement) | Documents module owns document storage, expiry, and the non-EU work-permit requirement/validation |
 | Contracts/HR | §9 (contract template, hand-signed contract, lifecycle) | Contracts/HR module owns the contract template, versioning, storage of the manager-confirmed hand-signed contract, and the ongoing lifecycle/expiry reminders |
-| Compliance | §13–14, §25–27 (GDPR, audit, retention) | Compliance owns retention policy, consent, special-category handling |
+| Compliance | §13–14, §25–27 (GDPR, audit, retention) | Compliance owns retention policy and special-category handling; consumes Consent for governance/audit only (not owner, `ADR-015`) |
+| Consent | §17.4, §20 OPQ-3 (chatbot data-processing consent gate) | Consent module (`backend-consent`, target `SPEC-CONSENT-001`) owns consent lifecycle/records/versions/withdrawal/renewal/audit/validation; Onboarding consumes via `IF-CONSENT-*` only, owns no consent gate/logic/state (`ADR-015`) |
 | Authentication | §9, §5 (login, MFA for managers) | Auth module owns account creation and session management |
 | Hotels | §5, §9, §10 (Hotel Group scope) | Hotels module owns Hotel and Hotel Group records |
 | Notifications | §10 (notifications to managers/workers) | Notifications module owns push delivery |

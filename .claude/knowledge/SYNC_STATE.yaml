@@ -1301,6 +1301,41 @@ known_drift:
       zero-code status).
     authority_needed: none  # ratification consumed; owner assignment for backend-hr remains SYNC-001/SIR-GLOB-001, unchanged by this ADR
 
+  - id: SYNC-033
+    type: adr-ratification
+    status: complete
+    description: >-
+      Commissioning human decision pre-empts a Consent boundary-collision
+      finding before `SPEC-CONSENT-001` authoring. `ADR-015` (Accepted,
+      2026-07-13) settles Consent as a standalone bounded context:
+      `backend-consent`/`SPEC-CONSENT-001` (target: `docs/03-modules/consent/
+      MODULE_SPEC.md`, currently `.gitkeep` only) is the canonical and
+      exclusive owner of consent lifecycle, records, versions, withdrawal,
+      renewal, audit history, and validation -- covering both the
+      recurring/daily GDPR access gate (CRR §24) five specifications
+      (`employee-management`, `calendar`, `notifications`, `job-dispatch`,
+      `documents`) already anticipate as owned by an unbuilt "Consent"
+      module, and the one-time chatbot data-processing consent question
+      raised by `docs/03-modules/onboarding/MODULE_SPEC.md`'s `OPQ-3`.
+      Onboarding requests consent only via `IF-CONSENT-*` and owns no
+      consent gate/logic/state of its own (`OPQ-3` resolved accordingly);
+      Chatbot only initiates the flow through Consent's interfaces;
+      Compliance consumes Consent for governance/audit only, not as owner.
+      No prior SIR entry existed specifically for this ambiguity (unlike
+      the Payslips/Chatbot precedents, which were discovered by a G1.5 run
+      that had already produced a SIR record) -- this ADR pre-empts one, so
+      no new SIR row was needed. Governance layer synchronized:
+      `docs/03-modules/onboarding/MODULE_SPEC.md` corrected (`OPQ-3`,
+      §17.4, §4 Out of Scope, §18 Dependencies, Cross-Module References
+      table) to reflect Onboarding-as-consumer and Compliance-as-consumer;
+      no Compliance module spec exists yet to correct (`docs/03-modules/
+      compliance/` is `.gitkeep` only); `MODULE_REGISTRY.yaml` gains a
+      `backend-consent` (unregistered/not-yet-built) note; `BOUNDARY_INDEX.
+      yaml` gains a `backend-consent` row recording the settled boundary
+      ahead of `SPEC-CONSENT-001` authoring; `DECISION_INDEX.md` records
+      `ADR-015`.
+    authority_needed: none  # ratification consumed; owner assignment for backend-consent deferred to SYNC-001/SIR-GLOB-001 once the module is registered
+
 context_invalidators:
   - repository revision changes
   - default branch changes
