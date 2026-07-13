@@ -22,7 +22,7 @@ No behaviour in this document is derived from any other source.
 
 The Onboarding Module is the system responsible for **new-hire intake, document collection, legal contract execution, and hire approval decisioning**. It orchestrates the journey from first signup through manager approval to the point where the employee becomes active in Employee Management.
 
-The module is customer-facing for workers (self-service signup, Personalfragebogen form, document upload chatbot, contract download/print for hand signing) and manager-facing for hiring decisioning (contract-scan upload and confirmation, pool/claim review mechanism, approve/reject).
+The module is customer-facing for workers (self-service signup, Personalfragebogen form, document upload via the Chatbot module, contract download/print for hand signing) and manager-facing for hiring decisioning (contract-scan upload and confirmation, pool/claim review mechanism, approve/reject).
 
 Onboarding produces two critical outputs: (1) a **completed onboarding** for the employee — the Employee-Management-owned employee record (created **Inactive** at signup) is progressed through the onboarding workflow and signalled complete, so Employee Management moves it to **Under Review**; and (2) a **manager decision** (approve/reject) that Employee Management uses to transition the employee to **Active** or **Rejected** (CRR §6–§10; EM §7–§8). Onboarding does **not** create the employee record — Employee Management owns employee creation and all lifecycle transitions (EM §7, §14).
 
@@ -42,7 +42,7 @@ In scope for this module:
 
 - **Personalfragebogen (new-hire form):** a self-service digital form with all confirmed German onboarding fields (CRR §6).
 - **Document collection and orchestration:** capturing required documents from workers and orchestrating the collection workflow; geofencing work-permit requirements to non-EU/EEA/Swiss workers (document validation itself is owned by the Documents module) (CRR §7).
-- **Chatbot-guided document collection:** an AI agent using the Claude API to query workers for missing documents with cost controls and fallback to static UI (CRR §8).
+- **Chatbot-guided document collection (consumed):** triggering the Chatbot module's (`backend-chatbot`, `SPEC-CHATBOT-001`) AI-agent conversation to query workers for missing documents, and reacting to its completion or fallback-triggered signal; the agent's execution, provider, cost controls, and fallback logic are owned and implemented by the Chatbot module, not by Onboarding (CRR §8; ADR-013).
 - **Contract delivery and hand-signing capture:** generating the pre-filled contract PDF for download/print, then capturing the manager-confirmed hand-signed contract (the signed paper scan is uploaded and the manager marks it signed & valid) (CRR §9; PDD §7.1).
 - **Pool/claim hiring review:** a shared inbox mechanism where managers claim applications, review materials, and approve/reject new hires (CRR §10).
 - **Hire approval decisioning:** manager judgment on probation suitability and contract approval — entirely manual, no rating thresholds or automation (CRR §10).
@@ -65,7 +65,8 @@ Owned by other modules and **referenced, never redefined** here:
 - **Document storage, expiry tracking, and the non-EU work-permit requirement** (including validation of work-permit documents) — Documents module (CRR §7; EM §4).
 - **Contract template ownership, version control, and storage of the manager-confirmed hand-signed contract** — Contracts module (CRR §9; EM §4).
 - **Storage of the scanned signed contract in S3 (EU) and the ongoing contract lifecycle (expiry/renewal/permanent) and expiry reminders** — Contracts/HR module (CRR §9; PDD §5.7, §7.7).
-- **Chatbot user data and GDPR subject-rights exports** — the chatbot is reused for subject-rights requests; Compliance module owns the subject-rights workflow and data provision (CRR §8, §26; [OPEN] event contract — see §20 OPQ-3).
+- **Chatbot / AI-agent execution** — conversation lifecycle, LLM provider abstraction, prompts, orchestration, context assembly, tool execution, conversation memory, AI sessions, token/cost management, guardrails, and AI audit — Chatbot module (`backend-chatbot`, `SPEC-CHATBOT-001`); Onboarding consumes it through `IF-CHATBOT-*` interface contracts, it does not implement or configure it (CRR §8; ADR-013).
+- **Chatbot user data and GDPR subject-rights exports** — the chatbot is reused for subject-rights requests, executed by the Chatbot module; Compliance module owns the subject-rights workflow and data provision (CRR §8, §26; [OPEN] event contract — see §20 OPQ-3).
 - **Special-category data handling, retention tiers, and policy enforcement** — Compliance module (CRR §25–§27; PDD §5.4, §5.7).
 - **Three-tier automatic deletion jobs** — Retention module (CRR §25).
 - **Push notification delivery** — Notifications module (CRR §18).
@@ -83,7 +84,7 @@ The module is responsible for:
 
 1. **Personalfragebogen capture:** providing a self-service digital form with all confirmed fields, presented during initial signup (CRR §6).
 2. **Document collection orchestration:** determining which documents are required based on worker nationality/residency status; requesting them via chatbot and fallback UI (CRR §7, §8).
-3. **Chatbot execution:** running an AI-guided conversation with cost controls, caching, token limits, and graceful fallback (CRR §8; PDD §4.14, §7.1).
+3. **Chatbot invocation (not execution):** initiating a document-collection conversation through the Chatbot module (`backend-chatbot`) and receiving its completion/fallback signal; Onboarding does not run the conversation, select the provider/model, or manage cost controls, caching, token limits, or fallback logic — those are owned by the Chatbot module (CRR §8; PDD §4.14, §7.1; ADR-013).
 4. **Contract generation & presentation:** generating a pre-filled contract PDF from Personalfragebogen data (incl. the 1-year fixed term and 6-month probation clause) and making it available to download/print for hand signing (CRR §9; PDD §7.1).
 5. **Hand-signed contract capture:** accepting the scanned/photographed signed paper contract (stored in S3 (EU)) and recording the manager's confirmation that it is "signed & valid"; the system does not capture, verify, or auto-detect the signature (CRR §9; PDD §5.7, §7.1).
 6. **Account activation gate:** blocking account activation until all required documents are uploaded AND a contract file is uploaded AND the manager marks it signed & valid; a visible "contract pending signature" status exists until then (CRR §8, §9).
@@ -139,25 +140,17 @@ The module is responsible for:
 
 **Chatbot coordination:** The document-collection chatbot (§6.3) queries workers for documents and resubmits missing ones until the requirement is met.
 
-### 6.3 Document Collection Chatbot
+### 6.3 Document Collection Chatbot (Consumed Capability)
 
-**Definition:** An AI agent that guides workers through document collection during signup, asking for missing documents until all requirements are satisfied.
+**Definition:** An AI agent, owned and executed entirely by the Chatbot module (`backend-chatbot`, `SPEC-CHATBOT-001`), that guides workers through document collection during signup, asking for missing documents until all requirements are satisfied. Onboarding **consumes** this capability; it does not implement, configure, or operate the agent (CRR §8; PDD §4.14, §7.1; ADR-013).
 
-**Specifications** (CRR §8; PDD §4.14, §7.1):
+**Onboarding's consumption contract** (execution detail owned and specified by `SPEC-CHATBOT-001`, not restated here):
 
-- **Provider:** Claude API (not a static wizard; an AI agent).
-- **Model:** Claude Haiku (cheapest tier) recommended.
-- **Behavior:**
-  - Asks workers which documents they have.
-  - If documents are incomplete, asks again for missing ones.
-  - Loops until all required documents are uploaded OR the worker gives up.
-- **Cost controls (mandatory):**
-  - Hard monthly token budget cap, stored in configuration.
-  - Per-conversation token limit.
-  - Cached required-document list to reduce repeated API calls.
-  - Graceful fallback to a static checklist UI if token limits are exceeded.
-- **Secondary use:** The same agent is reused for GDPR subject-rights requests (owned by Compliance module) (CRR §8, §26).
-- **Conversation state:** [OPEN] whether conversation history is persisted for the worker, or discarded after onboarding completion (see §20 OPQ-3).
+- **What Onboarding provides:** the worker's required-document context (which documents are outstanding, driven by nationality/residency status per §6.2) at conversation start, through the Chatbot module's `IF-CHATBOT-*` interface.
+- **What Onboarding receives:** a completion signal (all required documents uploaded) or a fallback-triggered signal (the Chatbot module's own cost/token guardrails were hit), which advances or diverts the onboarding workflow (§7 state 4 "Document collection in progress"); Onboarding does not itself decide when to fall back — the Chatbot module owns that guardrail.
+- **What Onboarding does not own:** the agent's provider/model selection, prompt construction, conversation-loop behavior, token/cost budgets, caching strategy, and conversation-memory/session state — all owned by the Chatbot module.
+- **Secondary use:** The same agent is reused for GDPR subject-rights requests, executed by the Chatbot module under a workflow owned by Compliance (CRR §8, §26); this is a separate consumer of the Chatbot module, not an Onboarding responsibility.
+- **Conversation state:** [OPEN] whether conversation history is persisted for the worker, or discarded after onboarding completion — this is a Chatbot-module decision (see §20 OPQ-3).
 
 ### 6.4 Familiarization Period (Trial Work)
 
@@ -329,12 +322,7 @@ Onboarding consumes events from other modules:
 
 **Transmission:**
 - Document uploads: transmitted over TLS (HTTPS) in transit, terminated at the platform edge (PDD §5.2).
-- Chatbot conversations: transmitted over TLS (HTTPS) in transit; not end-to-end encrypted (PDD §5.2).
-
-**Chatbot input validation:** Worker input is validated to reject:
-- SQL injection attempts.
-- Script injection / XSS attempts.
-- File-type uploads outside the expected set (chatbot should only accept document uploads, not executable files).
+- Chatbot conversations: transmitted over TLS (HTTPS) in transit; not end-to-end encrypted (PDD §5.2) — transport and input-validation guardrails for the conversation itself (injection defense, accepted-upload-type enforcement) are owned and implemented by the Chatbot module (`backend-chatbot`), not by Onboarding (ADR-013).
 
 **Contract signing:** The contract is signed **by hand on paper**, not electronically; there is no e-signature provider. The scanned signed contract is stored in **S3 (EU)** and owned by the Contracts module; Onboarding records only the manager's "signed & valid" confirmation (Manager ID, timestamp) and a reference to the stored scan. The system does not capture, verify, or auto-detect the handwritten signature.
 
@@ -422,11 +410,11 @@ Every Onboarding action produces an audit log entry:
 
 ## 16. Error Scenarios & Recovery
 
-### 16.1 Chatbot Token Limit Exceeded
+### 16.1 Chatbot Fallback Signal Received
 
-**Scenario:** Worker is in document-collection chatbot; token budget for the conversation is exceeded.
+**Scenario:** Worker is in the document-collection conversation; the Chatbot module's own token/cost guardrail is triggered (budget or per-conversation limit exceeded — mechanism owned and enforced by `backend-chatbot`, not Onboarding).
 
-**Behavior:** Chatbot gracefully falls back to a **static checklist UI** listing all required documents, with manual upload. Worker continues with fallback UI until documents are complete.
+**Behavior:** Onboarding receives the Chatbot module's fallback-triggered signal and renders a **static checklist UI** listing all required documents, with manual upload. Worker continues with fallback UI until documents are complete. Onboarding does not itself decide when fallback occurs; it only reacts to the signal.
 
 **Recovery:** No error message shown; seamless transition to fallback.
 
@@ -495,7 +483,7 @@ Onboarding may contain a GDPR consent gate (e.g., data-processing consent for ch
 4. **Contracts/HR:** Manages the contract template and versioning, stores the manager-confirmed hand-signed contract, and owns the ongoing contract lifecycle (expiry at 1yr → optional +1yr with no new probation → permanent after 2yr) and expiry reminders (CRR §9; PDD §5.6, §7.7).
 5. **Compliance:** Owns data retention, consent governance, and special-category handling; Onboarding defers to it (CRR §25–§27).
 6. **Hotels:** Hotel Group context for pool/claim scope (managers see applications for their Hotel Group) (CRR §11).
-7. **Claude API:** Powers the document-collection chatbot and subject-rights agent (CRR §8; PDD §4.14, §7.1).
+7. **Chatbot (`backend-chatbot`, `SPEC-CHATBOT-001`):** Powers the document-collection AI-agent conversation, consumed through `IF-CHATBOT-*` interfaces; Onboarding does not integrate with the Claude API directly — that integration, and the agent's execution, are owned by the Chatbot module (CRR §8; PDD §4.14, §7.1; ADR-013).
 8. **S3 (EU) storage:** Holds uploaded documents and the scanned hand-signed contract; no data leaves the EU/EEA (storage owned by the Documents/Contracts module) (CRR §9; PDD §5.7).
 9. **Notifications:** Sends notifications to managers and workers (application ready, approval, rejection) (CRR §18).
 
@@ -535,7 +523,7 @@ The following genuine unknowns are unresolved and will block final implementatio
 - Impacts: Chatbot knows when to stop requesting documents.
 
 **OPQ-3: Chatbot conversation persistence & consent**
-- Are chatbot conversations (with worker) persisted for future reference / subject-rights export, or discarded after onboarding?
+- Are chatbot conversations (with worker) persisted for future reference / subject-rights export, or discarded after onboarding? This is a Chatbot-module (`backend-chatbot`) decision per `ADR-013`; Onboarding only consumes the outcome.
 - Does engaging the chatbot require explicit data-processing consent?
 - Impacts: Compliance/audit trail; GDPR subject-rights scope.
 
@@ -591,7 +579,7 @@ The following genuine unknowns are unresolved and will block final implementatio
 **Design decisions:**
 
 - **Self-service Personalfragebogen only:** Worker fills form themselves; no manager entry or PDF-upload-after-the-fact.
-- **Chatbot with cost controls:** AI-guided document collection with hard budget caps and fallback.
+- **Chatbot with cost controls (consumed):** AI-guided document collection with hard budget caps and fallback; execution and cost controls are owned by the Chatbot module (`backend-chatbot`), Onboarding only triggers and reacts to it (`ADR-013`).
 - **Hand-signed, manager-confirmed contract:** The contract is signed by hand on paper (wet-ink); the manager uploads the scan and marks it "signed & valid," which activates the account. There is no e-signature integration.
 - **Pool/claim mechanism:** Prevents duplicate simultaneous review; simple, auditable, no auto-assignment logic.
 - **Manual approval, no automation:** Probation suitability is purely manager judgment; no rating thresholds or system gates.
@@ -619,12 +607,21 @@ The runtime event exchange is **bidirectional**: Employee Management publishes `
 | Authentication | §9, §5 (login, MFA for managers) | Auth module owns account creation and session management |
 | Hotels | §5, §9, §10 (Hotel Group scope) | Hotels module owns Hotel and Hotel Group records |
 | Notifications | §10 (notifications to managers/workers) | Notifications module owns push delivery |
-| Claude API | §6.3 (chatbot) | Zirove integrates Claude API for document-collection agent |
+| Chatbot | §6.3 (chatbot invocation) | Chatbot module (`backend-chatbot`/`SPEC-CHATBOT-001`) owns AI-agent execution (provider, model, prompts, cost controls, conversation state); Onboarding consumes it via `IF-CHATBOT-*` interfaces, it does not integrate with Claude API directly (ADR-013) |
 | S3 (EU) storage | §9 (scanned signed contract) | Documents/Contracts module stores uploaded documents and the scanned hand-signed contract in S3 (EU); no data leaves the EU/EEA |
 
 ---
 
-**Document version:** 1.0  
-**Last updated:** 2026-07-01  
-**Authority:** CONFIRMED_REQUIREMENTS_REGISTER.md, PIVOT_DESIGN_DOCUMENT.md  
+## 22. Change Log
+
+| Version | Date | Change |
+|---|---|---|
+| 1.0 | 2026-07-01 | Initial foundational Onboarding module specification. |
+| 1.1 | 2026-07-12 | Boundary correction per `ADR-013`: removed first-person Chatbot/AI-agent execution-ownership claims (§3, §5 item 3, §6.3, §18, Cross-Module References table) and reframed them as consumption of the Chatbot module (`backend-chatbot`/`SPEC-CHATBOT-001`) via `IF-CHATBOT-*` interface contracts; added an explicit Out-of-Scope disclaimer (§4) naming the Chatbot/AI-execution capability; reattributed the chatbot conversation's transport/input-validation guardrails (§12) and token/cost fallback behavior (§16.1) to the Chatbot module. No onboarding-workflow-owned responsibility (intake, document-collection orchestration, contract coordination, pool/claim, hire approval, business rules) changed. Resolves `SIR-GLOB-015`. |
+
+---
+
+**Document version:** 1.1  
+**Last updated:** 2026-07-12  
+**Authority:** CONFIRMED_REQUIREMENTS_REGISTER.md, PIVOT_DESIGN_DOCUMENT.md, `ADR-013`  
 **Status:** Foundational specification — ready for downstream module specifications to reference as authority on Onboarding boundary.
