@@ -1367,32 +1367,42 @@ known_drift:
 
   - id: SYNC-035
     type: boundary-collision
-    status: blocked
+    status: resolved
     description: >-
       Boundary Collision Gate (G1.5) run for a proposed `SPEC-COMPLIANCE-001`
       (target: `docs/03-modules/compliance/MODULE_SPEC.md`, currently
-      `.gitkeep` only), pre-authoring per `CLAUDE.md` rule 4. Returned FAIL:
-      `backend/prisma/schema.prisma:507-509`'s `// COMPLIANCE MODULE //`
-      comment above the `AuditLog` model, plus CRR §30, ground Compliance's
-      clearest owned-state claim in `state-audit-log` -- but that state
-      domain is already a shared-write collision with
-      `authoritative_writer: UNKNOWN` (`STATE_OWNERSHIP_INDEX.yaml:27`,
-      written from at least eight modules via `BaseService.logAudit`) and
-      already blocked on an unresolved human ownership decision (`SYNC-005`,
-      `SIR-GLOB-006`, OPEN since 2026-07-04). Authoring the specification
-      would resolve or silently pre-empt that reserved decision rather than
-      disclose it. No specification was authored; the directory retains
-      only `.gitkeep`. Added `## Module: Compliance` to the Specification
+      `.gitkeep` only), pre-authoring per `CLAUDE.md` rule 4. Originally
+      returned FAIL (2026-07-14): `backend/prisma/schema.prisma:507-509`'s
+      `// COMPLIANCE MODULE //` comment above the `AuditLog` model, plus
+      CRR §30, ground Compliance's clearest owned-state claim in
+      `state-audit-log` -- but that state domain was a shared-write
+      collision with `authoritative_writer: UNKNOWN`
+      (`STATE_OWNERSHIP_INDEX.yaml:27`, written from at least eight modules
+      via `BaseService.logAudit`) and blocked on an unresolved human
+      ownership decision (`SYNC-005`, `SIR-GLOB-006`, OPEN since
+      2026-07-04). Added `## Module: Compliance` to the Specification
       Issues Register (`SIR-COMPLIANCE-001..003`; `SIR-COMPLIANCE-001` is a
-      thin cross-reference to `SIR-GLOB-006`, no duplicate created);
-      `SIR-GLOB-006` updated in place, "Last verified" bumped to 2026-07-14.
+      thin cross-reference to `SIR-GLOB-006`, no duplicate created).
       Added "Pending Decision Records (Compliance / AuditLog boundary)" to
-      `DECISION_INDEX.md` (`OD-COMPLIANCE-001`). No knowledge-graph
-      (`MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml`/
-      `BOUNDARY_INDEX.yaml`/`DEPENDENCY_GRAPH.yaml`) edits made -- mirrors
-      the `SYNC-023`/`SYNC-027`/`SYNC-031` G1.5-stop precedent (nothing to
-      register for a spec that was never authored).
-    authority_needed: human  # SYNC-005/SIR-GLOB-006's pre-existing state-audit-log ownership decision now also gates Compliance's authoring
+      `DECISION_INDEX.md` (`OD-COMPLIANCE-001`).
+      **RESOLVED same-day (2026-07-14) by human-authority decision `ADR-016`**
+      (`docs/09-decisions/architecture-decisions/ADR-016-audit-log-ownership-auth-writer-compliance-reader.md`):
+      `backend-auth` is the authoritative writer of `state-audit-log`;
+      `backend-compliance` is a read-only consumer, never writer/lifecycle
+      owner; Compliance's positive scope settled as governance,
+      verification, reporting, policy evaluation, evidence generation, and
+      regulatory workflows. `STATE_OWNERSHIP_INDEX.yaml`'s `state-audit-log`
+      row updated (`authoritative_writer: backend-auth`); `SIR-GLOB-006`
+      narrowed in place (state-audit-log half RESOLVED, state-user half
+      remains OPEN); `SIR-COMPLIANCE-001` updated to RESOLVED;
+      `OD-COMPLIANCE-001`/`DECISION_INDEX.md` updated to RESOLVED, linked to
+      `ADR-016`. A re-run of G1.5 against the new state ownership found no
+      further genuine boundary collision across Compliance's other claimed
+      capabilities (governance, verification, reporting, policy evaluation,
+      evidence generation, regulatory workflows) -- see the same-session
+      `SPEC-COMPLIANCE-001` authoring pass (`docs/03-modules/compliance/MODULE_SPEC.md`
+      v0.1.0) for the full G1.5 re-run record and G4/G6 disposition.
+    authority_needed: none  # ADR-016 is the decision; state-user's dual-writer half of SYNC-005/SIR-GLOB-006 remains its own separate open item
 
 context_invalidators:
   - repository revision changes

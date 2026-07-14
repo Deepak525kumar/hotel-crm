@@ -24,7 +24,7 @@ state_domains:
   - { domain: state-rating, model: Rating, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-analytics] }
   - { domain: state-worker-overall-rating, model: WorkerOverallRating, authoritative_writer: backend-quality, writers: [backend-quality], readers: [backend-work-applications, backend-analytics] }
   - { domain: state-notification, model: Notification, authoritative_writer: backend-notifications, writers: [backend-notifications], readers: [backend-notifications] }
-  - { domain: state-audit-log, model: AuditLog, authoritative_writer: UNKNOWN, writers: [shared-via-base-service], readers: [], collision: shared-write via BaseService.logAudit; no single owner (human decision, SYNC-005) }
+  - { domain: state-audit-log, model: AuditLog, authoritative_writer: backend-auth, writers: [shared-via-base-service], readers: [backend-compliance], note: "authoritative_writer resolved backend-auth by ADR-016 (Accepted, 2026-07-14); existing writers continue writing via the shared BaseService.logAudit helper unchanged (no refactor performed by this record); backend-compliance is a read-only consumer of AuditLog, never a writer, per ADR-016 -- closes SYNC-005/SIR-GLOB-006's state-audit-log half. state-user's dual-writer collision (below) remains unresolved." }
   - { domain: state-password-reset-token, model: PasswordResetToken, authoritative_writer: backend-auth, writers: [backend-auth], readers: [backend-auth], note: "added by HOTFIX-AUTH-002 (SIR-AUTH-001); single-writer, no collision" }
 
 cross_module_write_couplings:  # G1.5 must treat these as ownership-bearing
