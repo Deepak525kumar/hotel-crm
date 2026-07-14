@@ -220,7 +220,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-GEO-001@0.1.1 (REVIEW)  # G4 round complete (architecture/dependency/performance PASS, consistency PASS, security PASS_WITH_ACTIONS); G2 freeze reserved human authority, blocked on OD-GEO-001/002 (ownership split) and owner assignment (SYNC-001)
     evidence: backend/src/modules/geo/.placeholder
 
   - id: frontend-web
