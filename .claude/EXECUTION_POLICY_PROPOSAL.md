@@ -1,6 +1,6 @@
 # Framework Improvement Proposal — Execution Policy (Model, Reasoning Effort, Agent Deployment)
 
-**Status:** Proposed (not implemented). Fast Documentation Workflow output; documentation artifact, `REVIEW`-complete, **not frozen**.
+**Status:** Proposed (not implemented), candidate `v0.2`. Fast Documentation Workflow output; documentation artifact, `REVIEW`-complete, **not frozen**.
 **Change class:** Framework + Constitutional (Constitution §20); human approval required.
 **Target framework version:** 1.4.0 (additive, backward-compatible; follows the 1.1.0→1.2.0 and 1.2.0→1.3.0 additive precedent — ADR-009/SYNC-007, ADR-010).
 **Baseline evidence:** `.claude/` at `VERSION.yaml.current_version = 1.3.0`, branch `claude/framework-documentation-workflow-pyejoh`, worktree clean.
@@ -64,11 +64,19 @@ The load-bearing idea: because `loop_type`, `capability`, `gate`, and `confidenc
 
 - **Coupling:** tier, effort, and deployment resolve together from the same keys; separating them forces three cross-referencing files each repeating the applicability table (`loop_type × capability × gate`). Constitution §6: "Shared rules have one canonical definition and may be referenced, not copied."
 - **Existing homes:** token optimization is Constitution §17 + `CONTEXT_ARTIFACTS.md`; parallelization is Constitution §3.10/§17 + `REVIEW_GATES` protocol; resume-vs-restart is `CONTEXT_ARTIFACTS §6` + workflow Restart Conditions. A standalone `TOKEN_OPTIMIZATION.md` would **duplicate** §17 — a consistency violation. `EXECUTION_POLICY.md` therefore *extends by reference* and owns only the genuinely-new part: **model tier + reasoning effort + the deployment predicate**.
-- **Data vs. mechanism split (mirrors LOOP_CONTROL ↔ LOOP_REGISTRY):** the *mechanism* (resolution functions) is constitutional policy in `EXECUTION_POLICY.md`; the *assignments* (which capability is opus-class) are tuning data on `CAPABILITY_REGISTRY.yaml` / `LOOP_REGISTRY.yaml`, evolvable through the normal Documentation Workflow without a constitutional edit — exactly how loop *semantics* are constitutional while loop *entries* are registry data.
+- **Data vs. mechanism split (mirrors LOOP_CONTROL ↔ LOOP_REGISTRY):** the *mechanism* (resolution functions) is constitutional policy in `EXECUTION_POLICY.md`; the *assignments* (which capability is opus-class) are tuning data in a registry, evolvable through the normal Documentation Workflow without a constitutional edit — exactly how loop *semantics* are constitutional while loop *entries* are registry data. §1.3a resolves **where** that data lives.
+
+### 1.3a Where the assignment data lives: a dedicated `EXECUTION_REGISTRY.yaml`, not fields on `CAPABILITY_REGISTRY`/`LOOP_REGISTRY` (revised in review, see Validation FIND-07)
+
+The mechanism/data split above does not mean the *data* belongs on the two registries it reads from. `knowledge/README.md` shows the framework's settled convention: `SPECIFICATION_INDEX`, `BOUNDARY_INDEX`, `OWNERSHIP_INDEX`, `CONTRACT_INDEX`, `API_INDEX`, and `STATE_OWNERSHIP_INDEX` are **six separate files**, every one of them derived from `MODULE_REGISTRY.yaml` + `DEPENDENCY_GRAPH.yaml` — yet none is merged into those two sources. The framework consistently keeps orthogonal concerns in orthogonal files, cross-referenced by ID, rather than accreting fields onto whichever registry happens to name the same entity.
+
+Model tier, reasoning effort, and execution mode — plus the forward-looking fields an execution/resource policy will eventually need (cost budget, retry policy, caching strategy, fallback-model chain, adaptive-execution triggers) — are exactly such an orthogonal concern: they describe *how much to spend executing* a capability/loop, not *what the capability is authorized to do* (`CAPABILITY_REGISTRY.yaml`, owned by Constitution §7 module-ownership authority) or *how a loop iterates and terminates* (`LOOP_REGISTRY.yaml`, owned by `LOOP_CONTROL.md`). Bolting a fast-growing field set onto those two registries would couple an execution/resource authority to two schemas owned by unrelated constitutional documents, and would force every future execution-policy field to be a Documentation Workflow edit against `CAPABILITY_REGISTRY.yaml`/`LOOP_REGISTRY.yaml` rather than against its own file.
+
+**Revised design:** a new `knowledge/EXECUTION_REGISTRY.yaml`, keyed by `capability_id` (foreign key into `CAPABILITY_REGISTRY.yaml`) and `loop_id` (foreign key into `LOOP_REGISTRY.yaml`) — reference, never copy, mirroring how `DEPENDENCY_GRAPH.yaml` already references `MODULE_REGISTRY.yaml` entries by id. It carries three specified fields (`model_tier`, `reasoning_effort`, `execution_mode`, §1.4) plus explicitly reserved, currently-unspecified extension points named for future use only — `cost_budget`, `retry_policy`, `caching_strategy`, `fallback_model_chain`, `adaptive_execution_triggers` — marked `unspecified: true` per entry until each is separately proposed through the Documentation Workflow. Naming a reserved key is schema forward-compatibility, not a requirement (Constitution §5: "Mark unknowns explicitly. Never convert an assumption into a requirement."); no behavior is defined for any reserved field by this proposal.
 
 ### 1.4 Deterministic policy tables (the substance)
 
-**A. Model tier by capability** — realizing the task's Agent Deployment Principles against the actual capabilities in `CAPABILITY_REGISTRY.yaml`:
+**A. Model tier by capability** — realizing the task's Agent Deployment Principles against the actual capabilities in `CAPABILITY_REGISTRY.yaml`, with the tier itself recorded in `EXECUTION_REGISTRY.yaml` (§1.3a):
 
 | Principle (task) | Tier | Capabilities (from CAPABILITY_REGISTRY) |
 |---|---|---|
@@ -113,12 +121,12 @@ Strictly additive; no rule deleted or weakened. Ordered by dependency.
 | 1 | `docs/09-decisions/architecture-decisions/ADR-017-execution-policy-model-effort-deployment.md` | **New** ADR (problem, alternatives, compatibility, migration) | Decision Record |
 | 2 | `constitution/EXECUTION_POLICY.md` | **New** canonical policy (§1.2–§1.4 functions + tables) | Constitutional (new file) |
 | 3 | `constitution/ENGINEERING_CONSTITUTION.md` | Add **§23 Execution and Resource Policy** — a short article pointing to `EXECUTION_POLICY.md` (mirrors §21→LOOP_CONTROL, §16→CONTEXT_ARTIFACTS); extend §17 with a one-line model/effort-tier reference | Constitutional (additive) |
-| 4 | `knowledge/CAPABILITY_REGISTRY.yaml` | Add `model_tier` + `reasoning_effort` fields per capability (the natural home — each entry already names `responsible_agent`, `applicable_gates`) | Registry data |
-| 5 | `knowledge/LOOP_REGISTRY.yaml` | Add `execution_mode` (`parallel`/`sequential`) per loop | Registry data |
-| 6 | `agents/*.md` (16) | Keep `model: inherit`; add a **one-line** comment that tier is resolved from the capability's `model_tier` (documents meaning; changes no runtime default) | Contract metadata |
+| 4 | `knowledge/EXECUTION_REGISTRY.yaml` | **New** dedicated registry (§1.3a): `model_tier` + `reasoning_effort` keyed by `capability_id`; `execution_mode` keyed by `loop_id`; reserved (`unspecified: true`) extension points for cost budget, retry policy, caching strategy, fallback-model chain, adaptive-execution triggers | Registry data (new file) |
+| 5 | `knowledge/CAPABILITY_REGISTRY.yaml`, `knowledge/LOOP_REGISTRY.yaml` | **No schema change** — referenced by id from `EXECUTION_REGISTRY.yaml`, never duplicated | Unmodified (referenced) |
+| 6 | `agents/*.md` (16) | Keep `model: inherit`; add a **one-line** comment that tier is resolved from the capability's `EXECUTION_REGISTRY.yaml` entry (documents meaning; changes no runtime default) | Contract metadata |
 | 7 | `CLAUDE.md` | §Agent System + §Context Assembly: one sentence each pointing to `EXECUTION_POLICY.md` (no operating-model change) | Bootloader (additive) |
 | 8 | `VERSION.yaml`, `CHANGELOG.md`, `FRAMEWORK_RELEASE_NOTES.md` | Version → 1.4.0 + narrate the additive release | Release records |
-| 9 | `knowledge/DECISION_INDEX.md`, `knowledge/SYNC_STATE.yaml` | Register ADR-017; record the framework change + `cache_state`/context notes | Knowledge sync |
+| 9 | `knowledge/DECISION_INDEX.md`, `knowledge/SYNC_STATE.yaml`, `knowledge/README.md` | Register ADR-017; record the framework change + `cache_state`/context notes; add `EXECUTION_REGISTRY.yaml` to the `## Files` list alongside the other five lookup indexes | Knowledge sync |
 | 10 | `knowledge/IMPROVEMENT_LOG.yaml` | (optional) seed the post-adoption measurement record | Learning (advisory) |
 
 **Not modified:** every `workflows/*.md`, every gate, `REVIEWER_FINDINGS.md`, `LOOP_CONTROL.md` semantics, `CONTEXT_ARTIFACTS.md`. Workflows inherit execution policy **by reference**; they do not restate it (workflows/README "reference existing constitutional policy; never restate").
@@ -176,7 +184,7 @@ Additive; mirrors ADR-009→1.2.0 and ADR-010→1.3.0. Phased, each phase indepe
 
 - **Phase 0 — ADR-017** (human approval; Constitution §20).
 - **Phase 1 — Canonical policy:** add `EXECUTION_POLICY.md`; add Constitution §23 + extend §17. Consistency + Architecture review; human ratification.
-- **Phase 2 — Registry data:** add `model_tier`/`reasoning_effort` to `CAPABILITY_REGISTRY.yaml`, `execution_mode` to `LOOP_REGISTRY.yaml`. Pure vocabulary; no runtime change yet.
+- **Phase 2 — Registry data:** add `knowledge/EXECUTION_REGISTRY.yaml` with `model_tier`/`reasoning_effort` per `capability_id` and `execution_mode` per `loop_id` (§1.3a), plus the reserved (`unspecified: true`) extension points; register it in `knowledge/README.md`. `CAPABILITY_REGISTRY.yaml`/`LOOP_REGISTRY.yaml` are unmodified. Pure vocabulary; no runtime change yet.
 - **Phase 3 — Documentation of meaning:** agent-contract comments + CLAUDE.md pointers. `model: inherit` stays the enforced default.
 - **Phase 4 — Enable resolution:** Lead Architect begins stamping resolved tier/effort/mode into context manifests. Shadow first (record the resolution without acting) for one cycle, then apply.
 - **Phase 5 — Version bump 1.4.0** + CHANGELOG/FRAMEWORK_RELEASE_NOTES; DECISION_INDEX + SYNC_STATE updated. Learning loop begins measuring.
@@ -194,13 +202,13 @@ Additive; mirrors ADR-009→1.2.0 and ADR-010→1.3.0. Phased, each phase indepe
 | Reasoning-effort *enforcement* | **Honest unknown** — `model:` is a supported, enforceable agent-frontmatter key (High confidence; it is already in every contract). Whether the harness exposes a per-agent `reasoning_effort` **enforcement** key is **Unknown/Low confidence**; the proposal therefore treats effort as *policy metadata* consumed by the Lead Architect and human operator, with the registry field ready to become the binding source if/when the harness exposes it | Constitution §5 (mark unknowns; no assumption→requirement) |
 | Gates, findings, confidence, loop bounds, boundaries | **Untouched** — execution policy sits at Decision-Hierarchy rank 6 and can never relax rank 1–5 | Constitution §2; §3 of this proposal |
 | Parallelization semantics | **Preserved** — `execution_mode` restates Constitution §3.10/§17 + REVIEW_GATES by reference; centralization, not change | §1.4-D |
-| Reversibility | **Full** — delete `EXECUTION_POLICY.md`, §23, and the registry fields ⇒ exact 1.3.0 semantics, no data loss | additive-only diff |
+| Reversibility | **Full** — delete `EXECUTION_POLICY.md`, §23, and `EXECUTION_REGISTRY.yaml` ⇒ exact 1.3.0 semantics, no data loss (`CAPABILITY_REGISTRY.yaml`/`LOOP_REGISTRY.yaml` were never touched) | additive-only diff |
 
 ---
 
 ## Validation — Independent Reviews of This Proposal
 
-Per the Documentation Workflow, independent reviews were run against this frozen proposal `v0.1`; findings use the canonical shape (`REVIEWER_FINDINGS.md`); dispositions applied in this version where author-fixable.
+Per the Documentation Workflow, independent reviews were run against this frozen proposal `v0.1`; findings use the canonical shape (`REVIEWER_FINDINGS.md`); dispositions applied in this version where author-fixable. `v0.2` (this revision) incorporates a human review round (Correction Package: changed sections §1.3–§1.3a, §2 rows 4–5, §1.4-A, §7 Phase 2, backward-compatibility Reversibility row — FIND-07 below); all prior findings/dispositions carry forward unchanged (LOOP_CONTROL §7).
 
 **FIND-01 · Consistency · High · High confidence.** A standalone `TOKEN_OPTIMIZATION.md` (as sketched in the request) would duplicate Constitution §17 + `CONTEXT_ARTIFACTS.md`, creating two authorities for one rule (§6 violation). *Disposition: fixed* — §1.3 recommends one file that *extends §17 by reference* and owns only model-tier + effort + deployment. **Resolved.**
 
@@ -213,6 +221,8 @@ Per the Documentation Workflow, independent reviews were run against this frozen
 **FIND-05 · Token-Optimization · Medium · Medium confidence.** A magnitude percentage would overstate confidence without in-repo instrumentation. *Disposition: fixed* — §6 claims only the High-confidence prompt-restatement removal; magnitude is deferred to Learning-loop measurement. **Resolved.**
 
 **FIND-06 · Consistency · Low · High confidence.** Registry-data vs. constitutional-mechanism could blur (can tiers change without a constitutional edit?). *Disposition: fixed* — §1.3 splits mechanism (constitutional, `EXECUTION_POLICY.md`) from assignments (registry data, normal Documentation Workflow), mirroring LOOP_CONTROL ↔ LOOP_REGISTRY. **Resolved.**
+
+**FIND-07 · Architecture · Medium · High confidence (human review, `v0.2`).** Reviewer feedback: "decide whether execution metadata should extend existing registries or evolve into a dedicated `EXECUTION_REGISTRY.yaml` to better support future capabilities such as cost budgets, retries, caching, fallback models, and adaptive execution." Bolting a fast-growing, execution/resource-scoped field set onto `CAPABILITY_REGISTRY.yaml` (owned by Constitution §7 module-ownership authority) and `LOOP_REGISTRY.yaml` (owned by `LOOP_CONTROL.md`) would couple an orthogonal concern to two schemas owned by unrelated constitutional documents, and contradicts the framework's own convention of keeping derived, single-purpose indexes separate (`knowledge/README.md`: `SPECIFICATION_INDEX`/`BOUNDARY_INDEX`/`OWNERSHIP_INDEX`/`CONTRACT_INDEX`/`API_INDEX`/`STATE_OWNERSHIP_INDEX` are six separate files, all derived from `MODULE_REGISTRY.yaml` + `DEPENDENCY_GRAPH.yaml`, none merged into either). *Disposition: fixed* — §1.3a introduces a dedicated `knowledge/EXECUTION_REGISTRY.yaml`, keyed by `capability_id`/`loop_id` (reference, never copy, mirroring `DEPENDENCY_GRAPH.yaml`'s existing reference-by-id discipline), carrying the three specified fields plus reserved (`unspecified: true`) extension points named for the cited future needs — without specifying their behavior now (Constitution §5: mark unknowns, never convert an assumption into a requirement). `CAPABILITY_REGISTRY.yaml`/`LOOP_REGISTRY.yaml` remain schema-unchanged. **Resolved.**
 
 **Merged result:** 0 open Critical/High findings; all High findings resolved. Terminal review state: **PASS_WITH_ACTIONS** — the actions are the Phase-4 shadow cycle and the Learning-loop measurement (§7), owned and time-bound to their phase.
 
