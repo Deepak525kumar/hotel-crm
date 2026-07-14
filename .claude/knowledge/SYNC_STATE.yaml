@@ -1336,6 +1336,35 @@ known_drift:
       `ADR-015`.
     authority_needed: none  # ratification consumed; owner assignment for backend-consent deferred to SYNC-001/SIR-GLOB-001 once the module is registered
 
+  - id: SYNC-034
+    type: repository-synchronization
+    status: complete
+    description: >-
+      Repository Synchronization Workflow run per `.claude/workflows/
+      repository-synchronization.md` (pre-existing, canonical, unchanged by
+      this pass). Prior session's `baseline_revision` (`3513c77`, bound by
+      `SYNC-031`) was stale: two PRs merged since (#138 `SPEC-GEO-001`
+      authoring/G4/knowledge-sync, #139 `SPEC-RETENTION-001` G4/G6 review),
+      advancing `HEAD` to `e3607a9` on `main` with zero local worktree
+      divergence (clean tree, local `main` == `origin/main`). Read-only
+      inspection found: (1) `SPEC-RETENTION-001`'s zero-registration status
+      against `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml`/
+      `DEPENDENCY_GRAPH.yaml` reconfirmed as an intentional zero-code
+      deferral (mirrors `backend-documents`/`backend-payslips`), not drift
+      requiring a knowledge-index edit; (2) `FIND-CONS-002` (`SPEC-RETENTION-
+      001` v0.2.0 consistency review, routed here rather than fixed
+      in-module) independently confirmed as live terminology drift --
+      `docs/03-modules/documents/MODULE_SPEC.md` and `docs/03-modules/hr/
+      MODULE_SPEC.md` both still name the sweep executor "Compliance"
+      predating Retention's registration -- recorded as new `SIR-GLOB-018`
+      (no prior SIR row covered this cross-spec item). No destructive or
+      correction action taken (repository-synchronization is read-only
+      discovery per its own Loop Metadata; correcting Documents/HR text is
+      documentation-workflow/module-author scope). `SESSION_STATE.yaml` and
+      this file's own `cache_state` rebound to `baseline_revision: e3607a9`
+      below.
+    authority_needed: none  # discovery-only; SIR-GLOB-018's correction step needs no new human authority beyond existing documentation-workflow routing
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1351,10 +1380,10 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 3513c776ad570e66693955398ad163fcdb056392
+  baseline_revision: e3607a9fcffa7dbc5131393ba119271e7109fe63
   framework_version: 1.3.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-13" }
-  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-13" }
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-14" }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-14" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
