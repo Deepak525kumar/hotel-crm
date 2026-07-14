@@ -1365,6 +1365,35 @@ known_drift:
       below.
     authority_needed: none  # discovery-only; SIR-GLOB-018's correction step needs no new human authority beyond existing documentation-workflow routing
 
+  - id: SYNC-035
+    type: boundary-collision
+    status: blocked
+    description: >-
+      Boundary Collision Gate (G1.5) run for a proposed `SPEC-COMPLIANCE-001`
+      (target: `docs/03-modules/compliance/MODULE_SPEC.md`, currently
+      `.gitkeep` only), pre-authoring per `CLAUDE.md` rule 4. Returned FAIL:
+      `backend/prisma/schema.prisma:507-509`'s `// COMPLIANCE MODULE //`
+      comment above the `AuditLog` model, plus CRR §30, ground Compliance's
+      clearest owned-state claim in `state-audit-log` -- but that state
+      domain is already a shared-write collision with
+      `authoritative_writer: UNKNOWN` (`STATE_OWNERSHIP_INDEX.yaml:27`,
+      written from at least eight modules via `BaseService.logAudit`) and
+      already blocked on an unresolved human ownership decision (`SYNC-005`,
+      `SIR-GLOB-006`, OPEN since 2026-07-04). Authoring the specification
+      would resolve or silently pre-empt that reserved decision rather than
+      disclose it. No specification was authored; the directory retains
+      only `.gitkeep`. Added `## Module: Compliance` to the Specification
+      Issues Register (`SIR-COMPLIANCE-001..003`; `SIR-COMPLIANCE-001` is a
+      thin cross-reference to `SIR-GLOB-006`, no duplicate created);
+      `SIR-GLOB-006` updated in place, "Last verified" bumped to 2026-07-14.
+      Added "Pending Decision Records (Compliance / AuditLog boundary)" to
+      `DECISION_INDEX.md` (`OD-COMPLIANCE-001`). No knowledge-graph
+      (`MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml`/
+      `BOUNDARY_INDEX.yaml`/`DEPENDENCY_GRAPH.yaml`) edits made -- mirrors
+      the `SYNC-023`/`SYNC-027`/`SYNC-031` G1.5-stop precedent (nothing to
+      register for a spec that was never authored).
+    authority_needed: human  # SYNC-005/SIR-GLOB-006's pre-existing state-audit-log ownership decision now also gates Compliance's authoring
+
 context_invalidators:
   - repository revision changes
   - default branch changes
