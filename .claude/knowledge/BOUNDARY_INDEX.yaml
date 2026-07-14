@@ -10,7 +10,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, .claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: ADR-016 propagated (backend-auth owned_state gains state-audit-log; stale state-audit-log unregistered_or_shared/collision row removed); edge-analytics-reads-hotel-worker applied (analytics boundary note updated)
 
 # A module "owns" a state domain when it is that domain's authoritative_writer, a
 # contract when it is the contract's owner_module, and an API when it is the mount's
@@ -21,11 +21,11 @@ observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-0
 modules:
   - module: backend-auth
     owner: unassigned
-    owned_state: [state-session]
+    owned_state: [state-session, state-audit-log]   # state-audit-log authoritative writer resolved by ADR-016 (Accepted, 2026-07-14); physical writes remain shared via BaseService.logAudit across all modules (unchanged by this record) -- backend-auth is the accountable/governance owner, not the sole physical writer
     shared_write_state: [state-user]   # dual-writer with backend-users (collision, SYNC-005)
     owned_contracts: [auth-middleware]
     owned_apis: [/api/v1/auth]
-    boundary: Authentication, session issuance, authorization middleware.
+    boundary: Authentication, session issuance, authorization middleware. Accountable owner of state-audit-log (ADR-016); backend-compliance is a read-only consumer, never a writer.
   - module: backend-users
     owner: unassigned
     owned_state: []
@@ -87,7 +87,7 @@ modules:
     owned_state: []   # pure read-only aggregator, no owned state
     owned_contracts: []
     owned_apis: [/api/v1/analytics]
-    boundary: Read-only cross-module aggregation (leaderboard/stats/hotel-summary). Reads 6 graphed domains owned by others plus state-hotel-worker via a known-missing edge (edge-analytics-reads-hotel-worker, SYNC-010/FIND-DEP-001) = 7; leaderboard route missing authorization (Critical, SYNC-010).
+    boundary: Read-only cross-module aggregation (leaderboard/stats/hotel-summary). Reads 7 graphed domains owned by others, including state-hotel-worker via edge-analytics-reads-hotel-worker (applied by repository-synchronization Package A step 5, AUDIT-M3; formerly a known-missing edge, SYNC-010/FIND-DEP-001); leaderboard route missing authorization (Critical, SYNC-010).
   - module: backend-hr
     owner: unassigned
     owned_state: []
@@ -113,7 +113,6 @@ modules:
 
 unregistered_or_shared:
   - { item: state-user, note: dual-writer backend-auth/backend-users — UNKNOWN authoritative writer (G1.5 collision) }
-  - { item: state-audit-log, note: shared-write via BaseService.logAudit — no single owner (G1.5 collision) }
   - { item: prisma-schema / base-service / permissions-middleware / validation-middleware, note: owner unassigned (shared contracts) }
   - { item: backend-geo, note: "placeholder-unregistered stub (backend/src/modules/geo/.placeholder only; not imported/mounted, zero code). docs/03-modules/geo/MODULE_SPEC.md now exists (SPEC-GEO-001@0.1.1, status REVIEW, authored 2026-07-14) -- defines the geofence distance-check service (100m radius) consumed by backend-attendance's Start/Close, plus candidate ownership of hotel-coordinate storage and the 6-month coordinate retention job, contingent on two open decisions. Completed a first G4 Independent Review round (Architecture/Dependency/Performance PASS_WITH_ACTIONS or PASS, Consistency PASS, Security PASS_WITH_ACTIONS after a GPS-spoofing disclosure correction), zero Critical/High findings remaining. Not frozen (G2 human) -- owner assignment (SYNC-001) and OD-GEO-001 (hotel-coordinate storage ownership: new Hotel columns under backend-crm vs a new backend-geo-owned domain) and OD-GEO-002 (retention-job/coordinate-column ownership split with backend-attendance) remain the two boundary-relevant open decisions; docs/03-modules/attendance/MODULE_SPEC.md line ~238-240 already hedges this identical split without resolving it. See governance/SPECIFICATION_ISSUES_REGISTER.md's Module: Geo section (SIR-GEO-001..009)." }
   - { item: backend-chatbot, note: "placeholder-unregistered stub (backend/src/modules/chatbot/.placeholder only; not imported/mounted). Canonical home of the Chatbot / AI-execution capability (SPEC-CHATBOT-001@0.1.3, REVIEW) -- conversation lifecycle, LLM provider abstraction, prompts, orchestration, context assembly, tool execution, memory, AI sessions, token/cost management, guardrails, and AI audit. Resolved a Boundary Collision Gate (G1.5) FAIL against a first-person execution claim in docs/03-modules/onboarding/MODULE_SPEC.md (Sec 3, Sec 5 item 3, Sec 6.3, Sec 18); ADR-013 (Accepted) settles it: backend-onboarding owns the onboarding business workflow and consumes Chatbot via IF-CHATBOT-* interfaces, not first-person execution (docs/03-modules/onboarding/MODULE_SPEC.md v1.1). See SYNC-027, SYNC-028, SIR-GLOB-015 (RESOLVED). Specification now complete: full G4 round (architecture/dependency/consistency/performance/security) all PASS_WITH_ACTIONS, zero Critical/High findings; NOT FROZEN -- G2 blocked on OD-CHAT-005 (RBAC)/OD-CHAT-006 (prompt-injection)/OD-CHAT-013 (owner, SYNC-001). See SYNC-029." }

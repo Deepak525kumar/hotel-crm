@@ -9,7 +9,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- stamp-only: content already reflected ADR-016 (state-audit-log authoritative_writer: backend-auth) at HEAD eff2ebb, no change required; this was the source of truth OWNERSHIP_INDEX.yaml/BOUNDARY_INDEX.yaml were re-propagated to match (AUDIT-H1)
 
 state_domains:
   - { domain: state-user, model: User, authoritative_writer: UNKNOWN, writers: [backend-auth, backend-users], readers: [backend-hotel-workers], collision: dual-writer (human decision, SYNC-005) }

@@ -16,22 +16,30 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: e3607a9fcffa7dbc5131393ba119271e7109fe63
+  baseline_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d
   default_branch: main
   framework_version: see .claude/VERSION.yaml   # 1.3.0
   opened_at: "2026-07-14T00:00:00Z"
   note: >-
-    Rebound by SYNC-034 (Repository Synchronization Workflow, run against the
-    pre-existing canonical `.claude/workflows/repository-synchronization.md`).
-    The prior 3513c77 stamp (bound by SYNC-031) was two merges stale: PR #138
-    (`SPEC-GEO-001` authoring/G4/knowledge-sync) and PR #139 (`SPEC-RETENTION-
-    001` G4/G6 review) both landed on `main` since, advancing HEAD to
-    `e3607a9` with zero local worktree divergence (clean tree; local `main`
-    == `origin/main`). This session's objective (repository synchronization)
-    found no knowledge-index drift requiring correction (Retention's
-    zero-registration status is an intentional zero-code deferral, reconfirmed
-    not remediated) but did confirm and record new cross-spec terminology
-    drift (`SIR-GLOB-018`, from `SPEC-RETENTION-001`'s `FIND-CONS-002`).
+    Rebound by SYNC-036 (Repository Synchronization Workflow, Package A of
+    `docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`). The prior
+    `e3607a9` stamp (bound by SYNC-034) was four merges stale: PR #140
+    (SYNC-034's own rebind), PR #141 (`ADR-016`/`SPEC-COMPLIANCE-001`
+    authoring, `SYNC-035`), PR #142 (execution-policy documentation), and
+    PR #143 (this audit) landed on `main` since, advancing HEAD to `39fc1f5`
+    with zero local worktree divergence (clean tree; local `main` ==
+    `origin/main`). This session applied the audit's Package A corrections:
+    ADR-016 fully propagated into `OWNERSHIP_INDEX.yaml`/`BOUNDARY_INDEX.yaml`
+    (closing AUDIT-H1, the cross-index contradiction `SYNC-035` left
+    incomplete); all nine project-runtime indexes plus this file and
+    `SYNC_STATE.yaml`'s `cache_state` rebound (AUDIT-H4, closing this file's
+    own stale-`active`-flag instance of AUDIT-L5); `SPECIFICATION_INDEX.yaml`
+    CRM/calendar pointers synchronized to `MODULE_REGISTRY.yaml` (AUDIT-M2/
+    AUDIT-L1); `backend-compliance`/`backend-retention` zero-code-deferral
+    rationale disclosed in `MODULE_REGISTRY.yaml` (AUDIT-M1);
+    `edge-analytics-reads-hotel-worker` applied to `DEPENDENCY_GRAPH.yaml`
+    and the `state-hotel-worker` reader count reconciled to 5 (AUDIT-M3/
+    AUDIT-L2). See `SYNC_STATE.yaml` SYNC-036 for the full record.
     Downstream workflows at the same baseline_revision reuse this session's
     evidence by reference instead of re-running discovery. Invalidates on the
     next baseline_revision or default-branch change (CONTEXT_ARTIFACTS.md §6).

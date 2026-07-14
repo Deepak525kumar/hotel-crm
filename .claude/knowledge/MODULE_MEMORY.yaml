@@ -12,7 +12,7 @@ purpose: >-
 scope: project-runtime  # memory instances are project runtime state; the mechanism is framework
 canonical_policy: .claude/constitution/CONTEXT_ARTIFACTS.md
 version_source: .claude/VERSION.yaml
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- stamp-only, no content change; no module reached G2 freeze during this pass, entries: [] unchanged
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # No frozen module specification exists yet in this project: every module spec is
