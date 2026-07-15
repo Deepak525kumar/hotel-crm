@@ -8,7 +8,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendance/MODULE_SPEC.md, docs/03-modules/quality/MODULE_SPEC.md, docs/03-modules/users/MODULE_SPEC.md]  # attendance's, quality's, and now users' registry-sync gaps are closed (SYNC-019, SYNC-015, SYNC-021) -- MODULE_REGISTRY.specification reads SPEC-ATT-001@0.1.1 (REVIEW), SPEC-QUAL-001@0.1.2 (REVIEW), and SPEC-USERS-001@0.1.1 (REVIEW) respectively
 version_source: .claude/VERSION.yaml
-observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: backend-crm pointer synchronized to registry (SPEC-CRM-001@0.1.1, REVIEW; AUDIT-M2, was none/UNKNOWN); backend-calendar pointer set to SPEC-CALENDAR-001@0.1.0 (REVIEW; AUDIT-L1). Prior rebind was SYNC-021 (5a81b65)
+observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: backend-crm pointer synchronized to registry, SPEC-CRM-001@0.1.1 REVIEW, AUDIT-M2, was none/UNKNOWN; backend-calendar pointer set to SPEC-CALENDAR-001@0.1.0 REVIEW, AUDIT-L1) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16. Prior rebind was SYNC-021 (5a81b65)
 
 # status ∈ { FROZEN, REVIEW, UNKNOWN }. No spec is FROZEN (G2 is reserved human
 # authority). REVIEW specs blocked by unresolved Critical/High security findings

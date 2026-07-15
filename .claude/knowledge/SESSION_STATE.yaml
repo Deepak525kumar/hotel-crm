@@ -16,33 +16,28 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d
+  baseline_revision: 09e0b162297162c8a93975ce55ccd3c406218606
   default_branch: main
   framework_version: see .claude/VERSION.yaml   # 1.3.0
   opened_at: "2026-07-14T00:00:00Z"
   note: >-
-    Rebound by SYNC-036 (Repository Synchronization Workflow, Package A of
-    `docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`). The prior
-    `e3607a9` stamp (bound by SYNC-034) was four merges stale: PR #140
-    (SYNC-034's own rebind), PR #141 (`ADR-016`/`SPEC-COMPLIANCE-001`
-    authoring, `SYNC-035`), PR #142 (execution-policy documentation), and
-    PR #143 (this audit) landed on `main` since, advancing HEAD to `39fc1f5`
-    with zero local worktree divergence (clean tree; local `main` ==
-    `origin/main`). This session applied the audit's Package A corrections:
-    ADR-016 fully propagated into `OWNERSHIP_INDEX.yaml`/`BOUNDARY_INDEX.yaml`
-    (closing AUDIT-H1, the cross-index contradiction `SYNC-035` left
-    incomplete); all nine project-runtime indexes plus this file and
-    `SYNC_STATE.yaml`'s `cache_state` rebound (AUDIT-H4, closing this file's
-    own stale-`active`-flag instance of AUDIT-L5); `SPECIFICATION_INDEX.yaml`
-    CRM/calendar pointers synchronized to `MODULE_REGISTRY.yaml` (AUDIT-M2/
-    AUDIT-L1); `backend-compliance`/`backend-retention` zero-code-deferral
-    rationale disclosed in `MODULE_REGISTRY.yaml` (AUDIT-M1);
-    `edge-analytics-reads-hotel-worker` applied to `DEPENDENCY_GRAPH.yaml`
-    and the `state-hotel-worker` reader count reconciled to 5 (AUDIT-M3/
-    AUDIT-L2). See `SYNC_STATE.yaml` SYNC-036 for the full record.
-    Downstream workflows at the same baseline_revision reuse this session's
-    evidence by reference instead of re-running discovery. Invalidates on the
-    next baseline_revision or default-branch change (CONTEXT_ARTIFACTS.md §6).
+    Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
+    mode). The prior `39fc1f5` stamp (bound by SYNC-036, Package A) was two
+    merges stale: Package A's own merge (`4b58a42`) and the Fast Documentation
+    Workflow's Package B commit + merge (`9ba8944`/`09e0b16`) landed on `main`
+    since, advancing HEAD to `09e0b16` with zero local worktree divergence
+    (clean tree; local `main` == `origin/main`). Verified `git diff
+    4b58a42..09e0b16 -- .claude/knowledge/` is empty (Package B touched only
+    `docs/03-modules/*.md`), so this is a pure stamp-only rebind: no content,
+    knowledge, governance, or specification change accompanies it. All nine
+    project-runtime indexes plus this file and `SYNC_STATE.yaml`'s
+    `cache_state` rebound to `09e0b16`. See `SYNC_STATE.yaml` SYNC-037 for the
+    full record; this also closes `SIR-GLOB-009`'s residual recurrence noted
+    at the prior Package C sync pass (governance register, not touched by
+    this session). Downstream workflows at the same baseline_revision reuse
+    this session's evidence by reference instead of re-running discovery.
+    Invalidates on the next baseline_revision or default-branch change
+    (CONTEXT_ARTIFACTS.md §6).
 
 # Context Artifacts produced/reused this session. Each entry records its cache
 # key and validity so a later workflow reuses instead of rediscovering.

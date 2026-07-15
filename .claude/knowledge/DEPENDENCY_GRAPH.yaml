@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: edge-analytics-reads-hotel-worker applied (AUDIT-M3/FIND-DEP-001); state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5 (AUDIT-L2)
+observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
 status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
 # MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
