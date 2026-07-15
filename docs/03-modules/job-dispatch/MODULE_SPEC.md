@@ -16,12 +16,12 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-JOB-DISPATCH-001 / 0.2.0` |
-| Status | `REVIEW` |
+| Spec ID / version | `SPEC-JOB-DISPATCH-001 / 0.3.0` |
+| Status | `FROZEN` |
 | Owner | `unassigned (SYNC-001, human authority required; PIVOT §13 names "Owner: Mayank (Lead), Reviewers: Ritik (PM)" for the design doc — corroborating only, not a knowledge-layer encoding)` |
 | Authors / reviewers | Author: Module Author agent. Reviewers (G4 complete): Architecture (BLOCKED — human), Dependency (PASS_WITH_ACTIONS), Consistency (PASS_WITH_ACTIONS), Security (FAIL — 1 Critical/2 High), Performance (PASS_WITH_ACTIONS). |
 | Repository revision | Code base described: `f37a39bf8535973366f5b1ccc4f2ccbaa3c60090` (`f37a39b`). Candidate reviewed/committed at `22569f0` (also `f74f039`) — identical working trees to `f37a39b` (FIND-ARCH-005, FIND-CONS-003). Branch `claude/spec-freeze-job-dispatch-fuyxmw`. |
-| Approved by / at | Not approved. G2 freeze is reserved human authority; do NOT mark FROZEN. |
+| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-15 by the commissioning human via the G2 Approval Workflow. Per the approving decision, the specification is frozen independently of implementation security findings: the open security findings recorded against this module remain **implementation/release prerequisites** (must be fixed or re-reviewed before G8 Release Readiness), NOT specification-freeze blockers. No temporary Risk Assessment was created. Cross-cutting G2 blockers cleared by ADR-001..010 (ratified 2026-07-15) and the cross-owner accept-transaction coupling disposed as superseded-by-pivot by ADR-018 (Accepted, 2026-07-15), clearing the Architecture `BLOCKED`. Security posture: the Critical (`PATCH /assignments/:id` unguarded) + 2 High findings stay OPEN as release prerequisites (must be fixed before G8; the Critical warrants immediate remediation on a security timeline). |
 | Supersedes | Supersedes `SPEC-JOB-DISPATCH-001 / 0.1.0`. First specification for these three modules (registry `specification: UNKNOWN` prior). |
 
 ## Purpose and Scope

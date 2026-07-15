@@ -1,6 +1,6 @@
 # ADR-010: Governance Layer for the Specification Issues Register (Platform v1.3)
 
-- **Status:** Proposed — ratification (Proposed → Accepted) reserved to human authority (Engineering Constitution §20), consistent with ADR-001..009.
+- **Status:** Accepted — ratified (Proposed → Accepted) by the commissioning human on 2026-07-15 via the G2 Approval Workflow (Engineering Constitution §20), consistent with ADR-001..009.
 - **Date:** 2026-07-09
 - **Scope:** Engineering operating system (`.claude/`) — framework 1.3.0.
 - **Supersedes:** none (additive to ADR-002 AI Engineering Platform Adoption; clarifies, does not contradict, the Knowledge Separation rule in `.claude/CLAUDE.md`).
@@ -46,6 +46,6 @@ Independent architecture, dependency, consistency, security, and performance rev
 - **Positive:** resolves the Knowledge Separation contradiction without relocating the register away from the location the task that commissioned it specified; gives future governance artifacts an explicit approval path instead of ad hoc directory creation.
 - **Negative / cost:** introduces a third top-level category for future contributors to learn, beyond the existing `knowledge/`-vs-`.claude/` framework-vs-project distinction.
 
-## Human Decision Required
+## Human Decision Required — SATISFIED
 
-Ratify (Proposed → Accepted) this Decision Record per Constitution §20, consistent with ADR-001..009's pending ratification. Until ratified, this record documents intended framework state and does not constitute immutable law.
+Ratify (Proposed → Accepted) this Decision Record per Constitution §20, consistent with ADR-001..009. **Ratified by the commissioning human on 2026-07-15 via the G2 Approval Workflow, together with ADR-001..009; this record now constitutes immutable framework law.**

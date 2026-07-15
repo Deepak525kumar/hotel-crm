@@ -10,34 +10,41 @@ derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, docs/03-modules/attendanc
 version_source: .claude/VERSION.yaml
 observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: backend-crm pointer synchronized to registry, SPEC-CRM-001@0.1.1 REVIEW, AUDIT-M2, was none/UNKNOWN; backend-calendar pointer set to SPEC-CALENDAR-001@0.1.0 REVIEW, AUDIT-L1) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16. Prior rebind was SYNC-021 (5a81b65)
 
-# status ∈ { FROZEN, REVIEW, UNKNOWN }. No spec is FROZEN (G2 is reserved human
-# authority). REVIEW specs blocked by unresolved Critical/High security findings
-# are flagged; see SYNC_STATE.yaml SYNC-008..011.
+# status ∈ { FROZEN, REVIEW, UNKNOWN }. FROZEN specs (G2 Specification Freeze, human
+# authority) as of 2026-07-15 (G2 Approval Workflow): SPEC-AUTH-001, SPEC-JOB-DISPATCH-001,
+# SPEC-ATT-001 — frozen independently of open security findings, which are RELEASE
+# PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling.
+# Cross-cutting G2 blockers cleared by ADR-001..010 (ratified), ADR-017 (state-user),
+# ADR-018 (accept-transaction coupling superseded-by-pivot). REVIEW specs blocked by
+# open product/architecture decisions; see SYNC_STATE.yaml.
 
 specifications:
   - module: backend-auth
     spec: SPEC-AUTH-001
-    version: 0.2.1
-    status: REVIEW
+    version: 0.3.0
+    status: FROZEN
     path: docs/03-modules/auth/MODULE_SPEC.md
-    freeze_blocked_by: security FAIL (1 Critical/4 High); G2 human (SYNC-011)
+    frozen_at: 2026-07-15 (G2 Approval Workflow); state-user ambiguity resolved by ADR-017
+    release_prerequisites: 4 High security findings OPEN in code (OQ-AUTH-04/06/15, absent MFA); Critical already fixed by HOTFIX-AUTH-002; review by G8 -- NOT freeze blockers per human ruling
   - module: backend-work-requests
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.2.0
-    status: REVIEW
+    version: 0.3.0
+    status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    freeze_blocked_by: architecture BLOCKED, security FAIL (1 Critical/2 High); G2 human (SYNC-008)
+    frozen_at: 2026-07-15 (G2 Approval Workflow); architecture BLOCKED cleared by ADR-018 (coupling superseded-by-pivot)
+    release_prerequisites: security FAIL (1 Critical PATCH /assignments/:id + 2 High) OPEN in code; Critical warrants immediate remediation; review by G8 -- NOT freeze blockers per human ruling
   - module: backend-work-applications
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.2.0
-    status: REVIEW
+    version: 0.3.0
+    status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    note: one bounded capability shared with work-requests + assignments
+    note: one bounded capability shared with work-requests + assignments; FROZEN 2026-07-15 (G2 Approval Workflow)
   - module: backend-assignments
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.2.0
-    status: REVIEW
+    version: 0.3.0
+    status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
+    note: FROZEN 2026-07-15 (G2 Approval Workflow)
   - module: backend-notifications
     spec: SPEC-NOTIF-001
     version: 0.1.1
@@ -52,10 +59,11 @@ specifications:
     freeze_blocked_by: security FAIL (1 Critical/1 Medium); G2 human (SYNC-010)
   - module: backend-attendance
     spec: SPEC-ATT-001
-    version: 0.1.1
-    status: REVIEW
+    version: 0.2.0
+    status: FROZEN
     path: docs/03-modules/attendance/MODULE_SPEC.md
-    freeze_blocked_by: architecture BLOCKED (2 High: unratified cross-owner-write Decision Record OQ-03, unassigned ownership SYNC-001); security FAIL (1 High: cross-tenant hotel-scoping OQ-02); G2 human (SYNC-019)
+    frozen_at: 2026-07-15 (G2 Approval Workflow); architecture BLOCKED cleared by ADR-018 (EXPECTED-seed coupling superseded-by-pivot)
+    release_prerequisites: security FAIL (1 High cross-tenant hotel-scoping OQ-02) OPEN in code; ownership assignment SYNC-001 OPEN (impl track); review by G8 -- NOT freeze blockers per human ruling
     note: first G4 round complete; dependency/consistency/performance all PASS_WITH_ACTIONS; MODULE_REGISTRY.specification synchronized (SYNC-019)
   - module: backend-quality
     spec: SPEC-QUAL-001

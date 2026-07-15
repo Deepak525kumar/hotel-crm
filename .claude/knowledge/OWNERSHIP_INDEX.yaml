@@ -35,11 +35,10 @@ state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDE
   - { domain: state-rating, authoritative_writer: backend-quality }
   - { domain: state-worker-overall-rating, authoritative_writer: backend-quality }
   - { domain: state-notification, authoritative_writer: backend-notifications }
-  - { domain: state-user, authoritative_writer: UNKNOWN }       # auth + users both write (SYNC-005, human)
+  - { domain: state-user, authoritative_writer: backend-auth }  # resolved by ADR-017 (Accepted, 2026-07-15); backend-users is a bounded profile writer/reader (non-security fields only); physical call sites unchanged by this record
   - { domain: state-audit-log, authoritative_writer: backend-auth }  # resolved by ADR-016 (Accepted, 2026-07-14); physical writes remain shared via BaseService.logAudit (unchanged by this record); backend-compliance is a read-only consumer, never a writer
 
 collision_flags:  # bearing-unknown ownership that G1.5 must escalate rather than silently pass
-  - state-user: dual-writer (backend-auth, backend-users); authoritative writer is a human decision
   - all module/contract owners: unassigned pending human assignment (SYNC-001)
 
 invalidated_by: [architecture or ownership decision, MODULE_REGISTRY/DEPENDENCY_GRAPH revision change]

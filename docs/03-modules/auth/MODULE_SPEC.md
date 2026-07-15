@@ -18,12 +18,12 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-AUTH-001 / 0.2.2` |
-| Status | `REVIEW` |
+| Spec ID / version | `SPEC-AUTH-001 / 0.3.0` |
+| Status | `FROZEN` |
 | Owner | `unassigned (SYNC-001, human authority required)` |
 | Authors / reviewers | Author: Module Author agent. Reviewers: Architecture, Dependency, Consistency, and Performance reviews completed — all returned `PASS_WITH_ACTIONS`; dispositions applied at v0.2.0 (see Review and Change Log). Security review completed — returned **`FAIL`** (1 Critical, 4 High): Critical — `POST /password-reset` account-takeover (`REQ-AUTH-007`/`RULE-AUTH-004`, `OQ-AUTH-05`); High — JWT refresh-secret fallback (`REQ-AUTH-015`/`RULE-AUTH-008`, `OQ-AUTH-04`), `checkHotelAccess` admin/manager/checker bypass (`REQ-AUTH-013`/`RULE-AUTH-006`, `OQ-AUTH-06`), cleartext `Session.refresh_token` storage (new finding, `OQ-AUTH-15`), and absence of any MFA compensating control (`REQ-AUTH-022`). None of these findings is resolved by this document — they are live code defects — and each is recorded as a blocking, unassigned residual risk pending a code fix or an authorized Risk Assessment per Constitution §12 (see "Risks, Assumptions, and Open Decisions" below). The Security Reviewer independently confirmed every flagged current-state behavior in v0.1.0 was documented accurately and completely; the FAIL attaches to the underlying code, not to this document. This status does NOT clear the Security gate. |
 | Repository revision | `db4dbbb5416c78d6420ae0b9ef97b2c10be6c67a` |
-| Approved by / at | Not approved. G2 freeze is reserved human authority; do NOT mark FROZEN — additionally blocked by an unresolved Security `FAIL` (1 Critical, 4 High) against this candidate, pending a human fix-or-Risk-Assessment decision per Constitution §12. |
+| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-15 by the commissioning human via the G2 Approval Workflow. Per the approving decision, the specification is frozen independently of implementation security findings: the open security findings recorded against this module remain **implementation/release prerequisites** (must be fixed or re-reviewed before G8 Release Readiness), NOT specification-freeze blockers. No temporary Risk Assessment was created. Cross-cutting G2 blockers cleared by ADR-001..010 (ratified 2026-07-15) and by the `state-user` authoritative-writer decision ADR-017 (Accepted, 2026-07-15). Security posture: the Critical (`POST /password-reset`) was already resolved in code by HOTFIX-AUTH-002; the 4 remaining High findings (`OQ-AUTH-04`/`06`/`15`, absent MFA) stay OPEN as release prerequisites, review by G8. |
 | Supersedes | None — first specification for `backend-auth` (registry `specification: UNKNOWN` prior; `.claude/knowledge/MODULE_REGISTRY.yaml:40`). |
 
 ## Purpose and Scope
