@@ -620,10 +620,11 @@ The runtime event exchange is **bidirectional**: Employee Management publishes `
 |---|---|---|
 | 1.0 | 2026-07-01 | Initial foundational Onboarding module specification. |
 | 1.1 | 2026-07-12 | Boundary correction per `ADR-013`: removed first-person Chatbot/AI-agent execution-ownership claims (§3, §5 item 3, §6.3, §18, Cross-Module References table) and reframed them as consumption of the Chatbot module (`backend-chatbot`/`SPEC-CHATBOT-001`) via `IF-CHATBOT-*` interface contracts; added an explicit Out-of-Scope disclaimer (§4) naming the Chatbot/AI-execution capability; reattributed the chatbot conversation's transport/input-validation guardrails (§12) and token/cost fallback behavior (§16.1) to the Chatbot module. No onboarding-workflow-owned responsibility (intake, document-collection orchestration, contract coordination, pool/claim, hire approval, business rules) changed. Resolves `SIR-GLOB-015`. |
+| 1.2 | 2026-07-15 | Fast Documentation Workflow (Package B, `AUDIT-REPO-2026-07-14` `AUDIT-L3`): this Change Log lagged the document's own body, which already cites and applies `ADR-015` (Accepted, 2026-07-13; Consent standalone bounded context) in §20 OPQ-3 and the Index of Cross-Module References' Consent row, with no corresponding Change Log entry. Added this row to record that `ADR-015` correction: OPQ-3's consent-requirement sub-question is resolved (Consent is a standalone bounded context owned by `backend-consent`/`SPEC-CONSENT-001`; Onboarding owns no consent gate, logic, or state of its own and consumes the decision via `IF-CONSENT-*`); the chatbot-persistence sub-question remains open, tracked at `SIR-CHAT-008`, unaffected by `ADR-015`. No further body text changed by this pass — §20 OPQ-3 and the Cross-Module References Consent row already carried the correct `ADR-015` content; only this Change Log's own completeness gap is corrected. |
 
 ---
 
-**Document version:** 1.1  
-**Last updated:** 2026-07-12  
-**Authority:** CONFIRMED_REQUIREMENTS_REGISTER.md, PIVOT_DESIGN_DOCUMENT.md, `ADR-013`  
+**Document version:** 1.2  
+**Last updated:** 2026-07-15  
+**Authority:** CONFIRMED_REQUIREMENTS_REGISTER.md, PIVOT_DESIGN_DOCUMENT.md, `ADR-013`, `ADR-015`  
 **Status:** Foundational specification — ready for downstream module specifications to reference as authority on Onboarding boundary.
