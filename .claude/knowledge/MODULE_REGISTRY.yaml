@@ -42,7 +42,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-AUTH-001@0.2.1 (REVIEW)  # docs/03-modules/auth/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/performance all PASS_WITH_ACTIONS, zero Critical/High); security review FAIL (1 Critical, 4 High) against live code -- unauthenticated token-less password-reset account takeover (Critical), JWT refresh-secret fallback, checkHotelAccess admin/manager/checker blanket bypass, cleartext Session.refresh_token storage, and absent MFA (all High); G6-doc PASS_WITH_ACTIONS. NOT frozen (G2 human); Security FAIL blocks G2 pending a code fix or an authorized Risk Assessment (see SYNC_STATE.yaml SYNC-011). UPDATE 2026-07-10 (SYNC-018/HOTFIX-AUTH-002): the Critical (password-reset account takeover) is RESOLVED in code -- see SIR-AUTH-001. The 4 High findings are unaffected and remain open; the spec's own Security G4 gate has not been re-run (that is a Documentation Workflow activity, not performed by this hotfix) so `specification` status here still reflects the FAIL recorded against SYNC-011 for the 4 remaining High items.
+    specification: SPEC-AUTH-001@0.3.0 (FROZEN)  # docs/03-modules/auth/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/performance all PASS_WITH_ACTIONS, zero Critical/High); security review FAIL (1 Critical, 4 High) against live code -- unauthenticated token-less password-reset account takeover (Critical), JWT refresh-secret fallback, checkHotelAccess admin/manager/checker blanket bypass, cleartext Session.refresh_token storage, and absent MFA (all High); G6-doc PASS_WITH_ACTIONS. NOT frozen (G2 human); Security FAIL blocks G2 pending a code fix or an authorized Risk Assessment (see SYNC_STATE.yaml SYNC-011). UPDATE 2026-07-10 (SYNC-018/HOTFIX-AUTH-002): the Critical (password-reset account takeover) is RESOLVED in code -- see SIR-AUTH-001. The 4 High findings are unaffected and remain open; the spec's own Security G4 gate has not been re-run (that is a Documentation Workflow activity, not performed by this hotfix) so `specification` status here still reflects the FAIL recorded against SYNC-011 for the 4 remaining High items. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. state-user dual-writer ambiguity resolved by ADR-017 (Accepted, 2026-07-15).
     evidence: backend/src/routes/v1/index.ts:22
 
   - id: backend-users
@@ -100,7 +100,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments; NOT frozen (G2 human)
+    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (accept-transaction coupling superseded-by-pivot, Accepted 2026-07-15).
     evidence: backend/src/routes/v1/index.ts:26; backend/src/modules/work-requests/service.ts:4
 
   - id: backend-work-applications
@@ -112,7 +112,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; NOT frozen (G2 human)
+    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018.
     evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
 
   - id: backend-assignments
@@ -124,7 +124,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.2.0 (REVIEW)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; NOT frozen (G2 human)
+    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018.
     evidence: backend/src/routes/v1/index.ts:28
 
   - id: backend-attendance
@@ -136,7 +136,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-ATT-001@0.1.1 (REVIEW)  # docs/03-modules/attendance/MODULE_SPEC.md; G4 reviews complete: architecture BLOCKED (2 High -- unratified cross-owner-write Decision Record OQ-03, unassigned ownership SYNC-001), security FAIL (1 High -- cross-tenant hotel-scoping OQ-02), dependency/consistency/performance all PASS_WITH_ACTIONS (zero Critical/High); all author-fixable Medium/Low findings applied at v0.1.1. NOT frozen (G2 human); architecture BLOCKED and security FAIL block G2 pending human/architecture authority (see SYNC_STATE.yaml SYNC-019).
+    specification: SPEC-ATT-001@0.2.0 (FROZEN)  # docs/03-modules/attendance/MODULE_SPEC.md; G4 reviews complete: architecture BLOCKED (2 High -- unratified cross-owner-write Decision Record OQ-03, unassigned ownership SYNC-001), security FAIL (1 High -- cross-tenant hotel-scoping OQ-02), dependency/consistency/performance all PASS_WITH_ACTIONS (zero Critical/High); all author-fixable Medium/Low findings applied at v0.1.1. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (EXPECTED-seed cross-owner coupling superseded-by-pivot, Accepted 2026-07-15); the 1 High security finding (cross-tenant hotel-scoping OQ-02) is a release prerequisite (see SYNC_STATE.yaml SYNC-019).
     evidence: backend/src/routes/v1/index.ts:29; backend/src/modules/attendance/service.ts:4
 
   - id: backend-quality

@@ -2,14 +2,14 @@
 
 ## Status
 
-**Proposed** — 2026-07-04
+**Accepted** — 2026-07-04 (ratified 2026-07-15 by the commissioning human via the G2 Approval Workflow; see `.claude/CHANGELOG.md`)
 
-Deciders: Authored by AI Engineering Platform; formal ratification is reserved human authority (see `.claude/CHANGELOG.md` v1.0.0 Known Limitations).
+Deciders: Authored by AI Engineering Platform; formal ratification was granted by the commissioning human on 2026-07-15 (G2 Approval Workflow; see `.claude/CHANGELOG.md`).
 
 - Supersedes: none
 - Superseded by: none
 
-This record documents the architecture currently implemented in the repository; it is not yet human-ratified.
+This record documents the architecture currently implemented in the repository; it was human-ratified on 2026-07-15 (G2 Approval Workflow).
 
 ## Context
 
@@ -87,5 +87,5 @@ Neutral / operational:
 ## Open Questions
 
 - Ownership: no accountable owner is assigned for the backend or its modules (no CODEOWNERS; `backend/package.json:23` author empty). Pending human authority; module ownership assignment is a v1.0.0 known limitation (`.claude/CHANGELOG.md`).
-- Ratification: this ADR is `Proposed`; ratification is reserved human authority.
+- Ratification: this ADR was ratified (Proposed → Accepted) by the commissioning human on 2026-07-15 (G2 Approval Workflow).
 - The `README.md` structure diagram (`README.md:24-63`) lists module directory names (e.g. `staffing`) that differ from the registered route modules; reconciling the documented module map with the implemented router is an open synchronization item (UNKNOWN whether intentional).

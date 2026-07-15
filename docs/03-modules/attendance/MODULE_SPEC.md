@@ -15,12 +15,12 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-ATT-001 / 0.1.1` |
-| Status | `REVIEW` |
+| Spec ID / version | `SPEC-ATT-001 / 0.2.0` |
+| Status | `FROZEN` |
 | Owner | `unassigned (SYNC-001, human authority required)`. No CODEOWNERS entry; MODULE_REGISTRY `owner: unassigned` (`.claude/knowledge/MODULE_REGISTRY.yaml:122`). Owner assignment is NOT invented here. |
 | Authors / reviewers | Author: Module Author agent / Lead Architect (correction pass). Reviewers (first G4 round, v0.1.0): Architecture (`BLOCKED` — 2 High: unratified cross-owner-write Decision Record, unassigned ownership), Dependency (`PASS_WITH_ACTIONS`), Consistency (`PASS_WITH_ACTIONS`), Security (`FAIL` — 1 High: cross-tenant hotel-scoping), Performance (`PASS_WITH_ACTIONS`). See Review and Change Log. |
 | Repository revision | Module code base described: `cca1d29bcf21f9f8b8fe0f08d61350e6e31dc205` (`cca1d29`) — confirmed unchanged through current HEAD `f39332e0be2e97d9c4f34289f4482fdad32762f9` by every G4 reviewer (`git diff cca1d29..HEAD -- backend/src/modules/attendance` is empty). Shared-file citations (`schema.prisma`, `MODULE_REGISTRY.yaml`, `DEPENDENCY_GRAPH.yaml`) refreshed against `f39332e` in this correction pass; those files drifted due to unrelated intervening work (`HOTFIX-AUTH-002`, `SPEC-QUAL-001`'s own dependency-graph sync), not any change to this module. |
-| Approved by / at | Not approved — G2 freeze reserved to human. Do NOT mark FROZEN. |
+| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-15 by the commissioning human via the G2 Approval Workflow. Per the approving decision, the specification is frozen independently of implementation security findings: the open security findings recorded against this module remain **implementation/release prerequisites** (must be fixed or re-reviewed before G8 Release Readiness), NOT specification-freeze blockers. No temporary Risk Assessment was created. Cross-cutting G2 blockers cleared by ADR-001..010 (ratified 2026-07-15) and the cross-owner `EXPECTED`-seed coupling disposed as superseded-by-pivot by ADR-018 (Accepted, 2026-07-15), clearing the Architecture `BLOCKED`. Security posture: the 1 High finding (cross-tenant hotel-scoping, `OQ-02`) stays OPEN as a release prerequisite, review by G8. |
 | Supersedes | None. First specification for `backend-attendance` (registry `specification: UNKNOWN` prior, `MODULE_REGISTRY.yaml:128`). |
 
 ## Purpose and Scope

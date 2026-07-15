@@ -562,6 +562,6 @@ analysis:
 remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "Designate the authoritative writer for state-user (backend-auth vs backend-users both write the User model)."
-  - "Confirm the intentional cross-module write coupling in the accept-application transaction: backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules (backend/src/modules/work-applications/service.ts:219-283). Decide whether this is approved architectural coupling or should be delegated to the owning modules' services."
+  - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs."
   - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub modules backend-hr and backend-calendar."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."

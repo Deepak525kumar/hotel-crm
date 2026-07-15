@@ -2,14 +2,14 @@
 
 ## Status
 
-**Proposed** — 2026-07-04
+**Accepted** — 2026-07-04 (ratified 2026-07-15 by the commissioning human via the G2 Approval Workflow; see `.claude/CHANGELOG.md`)
 
-Deciders: Authored by AI Engineering Platform; formal ratification is reserved human authority (see `.claude/CHANGELOG.md` v1.0.0 Known Limitations).
+Deciders: Authored by AI Engineering Platform; formal ratification was granted by the commissioning human on 2026-07-15 (G2 Approval Workflow; see `.claude/CHANGELOG.md`).
 
 - Supersedes: none
 - Superseded by: none
 
-This record documents the data-access and migration tooling currently implemented in the repository; it is not yet human-ratified.
+This record documents the data-access and migration tooling currently implemented in the repository; it was human-ratified on 2026-07-15 (G2 Approval Workflow).
 
 ## Context
 
@@ -85,4 +85,4 @@ Neutral / operational:
 ## Open Questions
 
 - Ownership: no accountable owner is assigned for the data-access layer (no CODEOWNERS; `backend/package.json:23` author empty). Pending human authority.
-- Ratification: this ADR is `Proposed`; ratification is reserved human authority.
+- Ratification: this ADR was ratified (Proposed → Accepted) by the commissioning human on 2026-07-15 (G2 Approval Workflow).

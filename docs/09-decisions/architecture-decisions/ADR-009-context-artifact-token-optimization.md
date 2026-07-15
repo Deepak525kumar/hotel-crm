@@ -1,6 +1,6 @@
 # ADR-009: Context-Artifact Token-Optimization Architecture (Platform v1.2)
 
-- **Status:** Proposed — formal ratification (Proposed → Accepted) reserved to human authority (Engineering Constitution §20).
+- **Status:** Accepted — ratified (Proposed → Accepted) by the commissioning human on 2026-07-15 via the G2 Approval Workflow (Engineering Constitution §20).
 - **Date:** 2026-07-09
 - **Scope:** Engineering operating system (`.claude/`) — framework 1.2.0.
 - **Supersedes:** none (additive to ADR-002 AI Engineering Platform Adoption and ADR-007 Agent-Based Engineering Workflow).
@@ -49,6 +49,6 @@ Architecture, dependency, consistency, security/governance, and performance revi
 - **Positive:** removes repeated discovery/boot/graph reads and correction-cycle rework; ownership conflicts caught before authoring spend; O(1) index lookups replace full-registry/graph scans.
 - **Negative / cost:** artifact production and index regeneration carry a write-side cost that is a net win only under reuse (multi-workflow session and/or ≥1 correction round and/or a later same-revision consumer); the realized token reduction is to be measured by the learning loop (`IMPROVEMENT_LOG.yaml`), not asserted as fact.
 
-## Human Decision Required
+## Human Decision Required — SATISFIED
 
-Ratify (Proposed → Accepted) the constitutional additions (CONTEXT_ARTIFACTS, LOOP_CONTROL §7–§8, gate G1.5) per Constitution §20. Until ratified, these records document intended framework state and do not constitute immutable law.
+Ratify (Proposed → Accepted) the constitutional additions (CONTEXT_ARTIFACTS, LOOP_CONTROL §7–§8, gate G1.5) per Constitution §20. **Ratified by the commissioning human on 2026-07-15 via the G2 Approval Workflow; these records now constitute immutable framework law.**
