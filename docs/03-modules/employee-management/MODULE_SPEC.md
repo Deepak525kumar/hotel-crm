@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-EMP-001 / 0.1.0` |
+| Spec ID / version | `SPEC-EMP-001 / 0.1.1` |
 | Status | `REVIEW` (freeze candidate; G2 Specification-Freeze pending — see Review and Change Log) |
 | Owner | `unassigned` — reserved human authority (SYNC-001); no `CODEOWNERS` exists and `backend/package.json` author is empty |
 | Authors / reviewers | Author: Module Author (documentation workflow). Independent reviewers (architecture, dependency, consistency): **pending** (G4) |
@@ -42,7 +42,7 @@
 - Broadcast job requests, direct assignment, skill-based eligibility computation, and daily assignment exclusivity enforcement (Job Dispatch module; CRR §13).
 - Quality scoring, rating computation, rating tiers, recency weighting, warnings, and the rework flow (Quality module; CRR §14–§16).
 - Geofenced clock-in/out and coordinate capture/retention (Attendance/Geo module; CRR §17).
-- Push notification delivery (Notifications module; CRR §18), payslip request flow (Payslips module; CRR §23), the daily GDPR consent gate (Consent module; CRR §24), the three-tier automatic deletion jobs (Retention module; CRR §25), policy governance and subject-rights automation (Compliance module; CRR §26, §27, §33), hotel/Hotel-Group records and the pause-jobs toggle (Hotels module; CRR §11), and basic analytics (Analytics module; CRR §21).
+- Push notification delivery (Notifications module; CRR §18), payslip request flow (owned by `backend-hr`/`SPEC-HR-001` per `ADR-014`; no standalone Payslips module — `docs/03-modules/payslips/` remains a non-owning placeholder; CRR §23), the daily GDPR consent gate (Consent module; CRR §24), the three-tier automatic deletion jobs (Retention module; CRR §25), policy governance and subject-rights automation (Compliance module; CRR §26, §27, §33), hotel/Hotel-Group records and the pause-jobs toggle (Hotels module; CRR §11), and basic analytics (Analytics module; CRR §21).
 
 **Non-goals:** (confirmed out of the platform entirely — CRR §3, §4, §13, §22, §23, Explicit Non-Goals)
 
@@ -201,7 +201,7 @@ For each API, command, query, event, job, or UI contract:
 | Quality | Scores/ratings/tiers/warnings surfaced in profile view | consumed event (candidate) | conditional | Stale ratings in view; no status impact |
 | Attendance/Geo | Clock-in/out + coordinates → work history; coordinate 6-month tier | consumed event (candidate) | conditional | Stale history in view |
 | Notifications | Push delivery of employee-related events | `notification-service` (reused) | compatible | Events undelivered; state unaffected |
-| Payslips | Payslip-request processor context for Konfession visibility | referenced | conditional | Konfession visibility audience incomplete |
+| HR (Payslips, `ADR-014`) | Payslip-request processor context for Konfession visibility — owned by `backend-hr`/`SPEC-HR-001`, no standalone Payslips module | referenced | conditional | Konfession visibility audience incomplete |
 | Consent | Daily consent gate is an access precondition | referenced (Consent-owned) | compatible | Declined consent → access blocked + manager notified |
 | Retention | Executes automatic tiered deletion of classified fields | classification metadata (this module) | conditional | Fields not deleted on schedule (compliance risk) |
 | Compliance | Special-category policy + subject-rights automation | `IF-EMP-ExportEmployeeData` | conditional | Subject-rights fulfilment incomplete |
@@ -328,3 +328,4 @@ This module is part of the marketplace → Workforce Operations Platform forward
 | Version | Date | Change | Findings resolved | Approver |
 |---|---|---|---|---|
 | 0.1.0 | 2026-07-05 | Initial canonical-template authoring from CRR/PDD; supersedes the prior free-form business specification at this path (rev `7c71498`). Freeze candidate submitted for G4 independent review (architecture, dependency, consistency) and G2 human approval. Author cannot self-approve blocking findings (Constitution §12); **FROZEN status is withheld pending human approval and disposition of open decisions OD-EMP-04..15.** | — (none dispositioned yet) | — (pending) |
+| 0.1.1 | 2026-07-15 | Fast Documentation Workflow (Package B, `AUDIT-REPO-2026-07-14` `AUDIT-L4`): the Out of Scope list's payslip-request bullet and the Dependencies table's "Payslips" row both named "Payslips module" as if it were a standalone owning module, contradicting `ADR-014` (Accepted, 2026-07-13; `docs/03-modules/hr/MODULE_SPEC.md`'s `SIR-GLOB-017`-resolving precedent), which settled `backend-hr`/`SPEC-HR-001` as the payslip-request capability's canonical and exclusive owner with no standalone Payslips module. Corrected both references to attribute the capability to `backend-hr`/`SPEC-HR-001` per `ADR-014`, explicitly noting `docs/03-modules/payslips/` remains a non-owning placeholder; renamed the Dependencies table row from "Payslips" to "HR (Payslips, `ADR-014`)" for consistency with the sibling "Contracts"/"Documents" rows' referenced-elsewhere framing. No requirement/rule identifier renumbered, no open decision added or removed. Document Control bumped to `0.1.1`. Status remains as before this pass; G2 approval and OD-EMP-04..15 disposition remain pending. | AUDIT-L4 (`AUDIT-REPO-2026-07-14`). | — (pending; human approval unaffected by this correction) |
