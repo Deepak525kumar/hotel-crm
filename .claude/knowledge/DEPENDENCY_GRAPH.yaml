@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: edge-analytics-reads-hotel-worker applied (AUDIT-M3/FIND-DEP-001); state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5 (AUDIT-L2)
 status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
 # MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
@@ -281,6 +281,14 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/analytics/service.ts:37 (this.prisma.workerOverallRating.findMany)"
+  - id: edge-analytics-reads-hotel-worker
+    source: backend-analytics
+    target: state-hotel-worker
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts:26-35 (getLeaderboard HotelWorker relation filter)"
+    note: "Applied by repository-synchronization pass (Package A step 5, AUDIT-M3); previously a confirmed-missing edge (SYNC-010/FIND-DEP-001), proposed by SPEC-ANALYTICS-001's own dependency review, left unapplied pending this synchronization pass."
 
   # --- Client -> backend API consumption (consumes-api) ---
   # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
@@ -465,9 +473,9 @@ state_domains:
     model: HotelWorker
     authoritative_writer: backend-hotel-workers
     writers: [backend-hotel-workers]
-    readers: [backend-work-requests, backend-work-applications, backend-assignments, backend-users]
-    evidence: "hotel-workers writes: backend/src/modules/hotel-workers/service.ts:51,133,163; reads: backend/src/modules/work-requests/service.ts:101,135,233, backend/src/modules/work-applications/service.ts:50, backend/src/modules/assignments/service.ts:69, backend/src/modules/users/service.ts:16"
-    caveat: "backend-analytics also reads via getLeaderboard relation filter — edge-analytics-reads-hotel-worker remains a known-missing DEPENDENCY_GRAPH edge (SYNC-010/FIND-DEP-001), out of this session's scope; true reader count is 8, apply on that module's own dependency-sync then re-derive"
+    readers: [backend-work-requests, backend-work-applications, backend-assignments, backend-users, backend-analytics]
+    evidence: "hotel-workers writes: backend/src/modules/hotel-workers/service.ts:51,133,163; reads: backend/src/modules/work-requests/service.ts:101,135,233, backend/src/modules/work-applications/service.ts:50, backend/src/modules/assignments/service.ts:69, backend/src/modules/users/service.ts:16, backend/src/modules/analytics/service.ts:26-35"
+    note: "edge-analytics-reads-hotel-worker applied by repository-synchronization pass (Package A step 5, AUDIT-M3); reader count re-derived from graph edges to 5 (AUDIT-L2 -- the prior 'true reader count is 8' caveat was itself unreconstructable from the graph's own edges and is withdrawn, not carried forward)."
   - id: state-work-request
     model: WorkRequest
     authoritative_writer: backend-work-requests

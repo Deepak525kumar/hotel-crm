@@ -9,7 +9,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, .claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 9142beeed0af10aaff6f4b46b2c5a775ab4833a5  # rebound by SYNC-020
+observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: ADR-016 propagated (state-audit-log authoritative_writer UNKNOWN -> backend-auth; stale collision_flags row removed)
 
 module_owners:  # every module owner is unassigned by evidence (SYNC-001)
   default: unassigned
@@ -36,11 +36,10 @@ state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDE
   - { domain: state-worker-overall-rating, authoritative_writer: backend-quality }
   - { domain: state-notification, authoritative_writer: backend-notifications }
   - { domain: state-user, authoritative_writer: UNKNOWN }       # auth + users both write (SYNC-005, human)
-  - { domain: state-audit-log, authoritative_writer: UNKNOWN }  # shared via BaseService.logAudit (SYNC-005, human)
+  - { domain: state-audit-log, authoritative_writer: backend-auth }  # resolved by ADR-016 (Accepted, 2026-07-14); physical writes remain shared via BaseService.logAudit (unchanged by this record); backend-compliance is a read-only consumer, never a writer
 
 collision_flags:  # bearing-unknown ownership that G1.5 must escalate rather than silently pass
   - state-user: dual-writer (backend-auth, backend-users); authoritative writer is a human decision
-  - state-audit-log: shared-write via BaseService; no single owner
   - all module/contract owners: unassigned pending human assignment (SYNC-001)
 
 invalidated_by: [architecture or ownership decision, MODULE_REGISTRY/DEPENDENCY_GRAPH revision change]

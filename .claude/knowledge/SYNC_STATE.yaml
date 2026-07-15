@@ -1404,6 +1404,75 @@ known_drift:
       v0.1.0) for the full G1.5 re-run record and G4/G6 disposition.
     authority_needed: none  # ADR-016 is the decision; state-user's dual-writer half of SYNC-005/SIR-GLOB-006 remains its own separate open item
 
+  - id: SYNC-036
+    type: repository-synchronization
+    status: complete
+    description: >-
+      Repository Synchronization Workflow (Package A) run per
+      `docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`
+      (`AUDIT-REPO-2026-07-14`, produced at `eff2ebb`). `eff2ebb..HEAD`
+      (`39fc1f5`, PR #142 execution-policy documentation, PR #143 this audit
+      itself) touches no file under `.claude/knowledge/`, `.claude/governance/`,
+      or `docs/03-modules/`, so the audit's findings are unchanged and current
+      at `39fc1f5`; all five Package A steps applied at that revision in one
+      pass:
+      (1) **AUDIT-H1** (Accepted `ADR-016` only partially propagated) --
+      `OWNERSHIP_INDEX.yaml`'s `state_owners.state-audit-log` corrected
+      `UNKNOWN` -> `backend-auth`; its stale `collision_flags` row for
+      `state-audit-log` removed. `BOUNDARY_INDEX.yaml`'s `backend-auth` module
+      entry gained `state-audit-log` in `owned_state` (with a note that
+      physical writes remain shared via `BaseService.logAudit`, unchanged);
+      the stale `state-audit-log` row in `unregistered_or_shared` (still
+      calling it a no-single-owner G1.5 collision) removed. Both indexes now
+      agree with `STATE_OWNERSHIP_INDEX.yaml`/`DEPENDENCY_GRAPH.yaml`, which
+      already carried the ADR-016 content since `SYNC-035`.
+      (2) **AUDIT-H4/AUDIT-L5** (stamp-vs-content drift; stale session flag)
+      -- `observed_revision`/`baseline_revision` rebound to `39fc1f5` on all
+      nine project-runtime indexes (`MODULE_REGISTRY.yaml`,
+      `SPECIFICATION_INDEX.yaml`, `DEPENDENCY_GRAPH.yaml`,
+      `OWNERSHIP_INDEX.yaml`, `STATE_OWNERSHIP_INDEX.yaml`,
+      `BOUNDARY_INDEX.yaml`, `CONTRACT_INDEX.yaml`, `API_INDEX.yaml`,
+      `MODULE_MEMORY.yaml`) plus `SESSION_STATE.yaml` and this file's own
+      `cache_state` block; per-file stamp-only-vs-content-change disposition
+      recorded in each file's own `observed_revision` comment (five files
+      carried a content change under steps 1/3/4/5 below; four -- `STATE_
+      OWNERSHIP_INDEX`, `CONTRACT_INDEX`, `API_INDEX`, `MODULE_MEMORY` --
+      were stamp-only). `SESSION_STATE.yaml`'s `active: true` flag at the
+      stale `e3607a9` baseline (AUDIT-L5) is resolved by this same rebind.
+      (3) **AUDIT-M2/AUDIT-L1** (index/registry pointer contradictions) --
+      `SPECIFICATION_INDEX.yaml`'s `backend-crm` row synchronized to
+      `MODULE_REGISTRY.yaml`'s existing `SPEC-CRM-001@0.1.1 (REVIEW)` (was
+      `spec: none` / `UNKNOWN`); `backend-calendar` row set to
+      `SPEC-CALENDAR-001@0.1.0 (REVIEW)` in both `SPECIFICATION_INDEX.yaml`
+      and `MODULE_REGISTRY.yaml` (both previously read `UNKNOWN`, the
+      registry's row citing a now-stale "no frozen spec currently maps to
+      it" rationale).
+      (4) **AUDIT-M1** (undisclosed zero-code-deferral specs) --
+      `MODULE_REGISTRY.yaml`'s `unresolved:` block gained `backend-compliance`
+      and `backend-retention` rows mirroring the existing `backend-consent`
+      precedent, so a reader of the registry alone now sees both specs exist
+      (`SPEC-COMPLIANCE-001@0.1.0`, `SPEC-RETENTION-001@0.2.0`, both `REVIEW`,
+      zero code footprint) instead of only via `BOUNDARY_INDEX.yaml`'s
+      stale-stamped notes.
+      (5) **AUDIT-M3/AUDIT-L2** (missing dependency edge; unreconstructable
+      reader count) -- `edge-analytics-reads-hotel-worker` applied to
+      `DEPENDENCY_GRAPH.yaml` (`backend-analytics` reads `state-hotel-worker`
+      via `getLeaderboard`'s relation filter, `service.ts:26-35`);
+      `state-hotel-worker.readers` gained `backend-analytics` (now 5 modules,
+      matching the edge count); the prior "true reader count is 8" caveat,
+      itself unreconstructable from the graph's own edges, was withdrawn
+      rather than carried forward. `MODULE_REGISTRY.yaml`'s `unresolved:`
+      note and `BOUNDARY_INDEX.yaml`'s `backend-analytics` boundary prose
+      updated from "known-missing"/"= 7" to APPLIED/"7 graphed domains".
+      No specification was authored, reviewed, or frozen by this session; no
+      G4 reviewers were executed; no source code was modified; no SIR content
+      was changed beyond synchronization (Package C is a separate, not-yet-run
+      pass per the audit's own package grouping). `knowledge/EXECUTION_REGISTRY.yaml`
+      referenced by `.claude/EXECUTION_POLICY_PROPOSAL.md` does not yet exist
+      on disk (proposal not yet implemented as of `39fc1f5`) -- "synchronize
+      execution registry where applicable" is not applicable this pass.
+    authority_needed: none  # pure knowledge-layer synchronization, agent-performable per Package A's own classification; Package B (documentation corrections), Package C (register sync), and Package D (reserved human authority) are explicitly out of this session's scope
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1419,25 +1488,27 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: e3607a9fcffa7dbc5131393ba119271e7109fe63
+  baseline_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d
   framework_version: 1.3.0
   boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-14" }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-14" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Rebound by SYNC-031 (Boundary Collision Gate stop for a proposed
-    `SPEC-PAYSLIPS-001`, 2026-07-13), advancing from SYNC-030's `60a40d5`
-    bind, one merge commit stale relative to HEAD (`3513c77`, PR #135 merging
-    SYNC-030's own rebind branch). Diff `60a40d5..3513c77` touches only this
-    file and `SESSION_STATE.yaml` (the SYNC-030 landing itself); no other
-    knowledge-index content changed -- no drift beyond the stamp itself,
-    consistent with the fail-safe rule already applied at the SYNC-026/
-    SYNC-030 transition. This session's objective did not proceed past the
-    pre-authoring Boundary Collision Gate (G1.5): `docs/03-modules/hr/
-    MODULE_SPEC.md` already claims the payslip-request capability a proposed
-    `SPEC-PAYSLIPS-001` would specify. `SIR-GLOB-017`/`SIR-HR-020` added;
-    `DECISION_INDEX.md`/`BOUNDARY_INDEX.yaml` annotated. On any doubt about
-    validity, an artifact is treated as stale and reproduced
-    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision
-    change re-opens this block.
+    Rebound by SYNC-036 (Repository Synchronization Workflow, Package A of
+    `AUDIT-REPO-2026-07-14`), advancing from SYNC-034's `e3607a9` bind.
+    `e3607a9..39fc1f5` (PRs #140-#143) merged SYNC-034 itself, `ADR-016`/
+    `SPEC-COMPLIANCE-001` authoring (`SYNC-035`), the repository-wide
+    specification audit, and an execution-policy documentation proposal --
+    none of which touched `.claude/knowledge/` content ahead of this pass
+    (verified: `git diff eff2ebb..HEAD -- .claude/knowledge/ docs/03-modules/
+    .claude/governance/` is empty). This session applied the audit's Package
+    A corrections (see SYNC-036 above): ADR-016 propagated into
+    `OWNERSHIP_INDEX.yaml`/`BOUNDARY_INDEX.yaml`; all nine project-runtime
+    indexes plus this block rebound; `SPECIFICATION_INDEX.yaml`'s CRM/
+    calendar pointers synchronized to the registry; `backend-compliance`/
+    `backend-retention` zero-code-deferral rationale added to
+    `MODULE_REGISTRY.yaml`; `edge-analytics-reads-hotel-worker` applied to
+    `DEPENDENCY_GRAPH.yaml`. On any doubt about validity, an artifact is
+    treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1 invariant 5);
+    the next repository-revision change re-opens this block.
