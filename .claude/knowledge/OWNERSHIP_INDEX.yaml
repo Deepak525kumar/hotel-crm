@@ -9,7 +9,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/MODULE_REGISTRY.yaml, .claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- content change: ADR-016 propagated (state-audit-log authoritative_writer UNKNOWN -> backend-auth; stale collision_flags row removed)
+observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: ADR-016 propagated, state-audit-log authoritative_writer UNKNOWN -> backend-auth, stale collision_flags row removed) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16
 
 module_owners:  # every module owner is unassigned by evidence (SYNC-001)
   default: unassigned

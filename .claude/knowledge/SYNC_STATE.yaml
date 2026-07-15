@@ -1473,6 +1473,38 @@ known_drift:
       execution registry where applicable" is not applicable this pass.
     authority_needed: none  # pure knowledge-layer synchronization, agent-performable per Package A's own classification; Package B (documentation corrections), Package C (register sync), and Package D (reserved human authority) are explicitly out of this session's scope
 
+  - id: SYNC-037
+    type: repository-synchronization
+    status: complete
+    description: >-
+      Repository Synchronization Workflow, Revision Rebind mode, run after
+      `SYNC-036` (Package A) and the Fast Documentation Workflow's Package B
+      (both of `docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`)
+      merged to `main`. `39fc1f5..HEAD` (`09e0b16`) comprises Package A's own
+      merge commit (`4b58a42`) and Package B's documentation-correction
+      commit + merge (`9ba8944`/`09e0b16`); verified `git diff
+      4b58a42..09e0b16 -- .claude/knowledge/` is empty (Package B touched
+      only five files under `docs/03-modules/`, none under `.claude/
+      knowledge/`, `.claude/governance/`, or any specification's frozen
+      status). This session therefore performed a pure stamp-only rebind,
+      scoped exclusively to revision metadata per its own mode declaration:
+      `observed_revision`/`baseline_revision` advanced from `39fc1f5` to
+      `09e0b16` on all nine project-runtime indexes (`MODULE_REGISTRY.yaml`,
+      `SPECIFICATION_INDEX.yaml`, `DEPENDENCY_GRAPH.yaml`,
+      `OWNERSHIP_INDEX.yaml`, `STATE_OWNERSHIP_INDEX.yaml`,
+      `BOUNDARY_INDEX.yaml`, `CONTRACT_INDEX.yaml`, `API_INDEX.yaml`,
+      `MODULE_MEMORY.yaml`), `SESSION_STATE.yaml`, and this file's own
+      `cache_state` block. No index content, no governance artifact (a
+      separate, not-yet-merged Package C register-synchronization pass exists
+      as an open pull request at the time of this session, out of scope
+      here), no module specification, and no source code was modified; no
+      G4/G6 reviewer was executed; no ADR was authored; no architectural
+      change was introduced. This closes the residual gap the Package C
+      governance pass had flagged (its own `SIR-GLOB-009` extension): the
+      nine indexes were, until this session, still two merge commits behind
+      true `HEAD`.
+    authority_needed: none  # pure revision-metadata rebind, agent-performable; explicitly excludes governance/specification/knowledge-content changes per its own mode scope
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1488,27 +1520,22 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d
+  baseline_revision: 09e0b162297162c8a93975ce55ccd3c406218606
   framework_version: 1.3.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-14" }
-  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-14" }
+  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-15" }
+  evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }
   note: >-
-    Rebound by SYNC-036 (Repository Synchronization Workflow, Package A of
-    `AUDIT-REPO-2026-07-14`), advancing from SYNC-034's `e3607a9` bind.
-    `e3607a9..39fc1f5` (PRs #140-#143) merged SYNC-034 itself, `ADR-016`/
-    `SPEC-COMPLIANCE-001` authoring (`SYNC-035`), the repository-wide
-    specification audit, and an execution-policy documentation proposal --
-    none of which touched `.claude/knowledge/` content ahead of this pass
-    (verified: `git diff eff2ebb..HEAD -- .claude/knowledge/ docs/03-modules/
-    .claude/governance/` is empty). This session applied the audit's Package
-    A corrections (see SYNC-036 above): ADR-016 propagated into
-    `OWNERSHIP_INDEX.yaml`/`BOUNDARY_INDEX.yaml`; all nine project-runtime
-    indexes plus this block rebound; `SPECIFICATION_INDEX.yaml`'s CRM/
-    calendar pointers synchronized to the registry; `backend-compliance`/
-    `backend-retention` zero-code-deferral rationale added to
-    `MODULE_REGISTRY.yaml`; `edge-analytics-reads-hotel-worker` applied to
-    `DEPENDENCY_GRAPH.yaml`. On any doubt about validity, an artifact is
-    treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1 invariant 5);
-    the next repository-revision change re-opens this block.
+    Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
+    mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`
+    comprises Package A's own merge (`4b58a42`) and the Fast Documentation
+    Workflow's Package B commit + merge (`9ba8944`/`09e0b16`); verified `git
+    diff 4b58a42..09e0b16 -- .claude/knowledge/` is empty (Package B touched
+    only `docs/03-modules/*.md`). This session performed a pure stamp-only
+    rebind (see SYNC-037 above): all nine project-runtime indexes plus this
+    block and `SESSION_STATE.yaml` advanced from `39fc1f5` to `09e0b16`; zero
+    content, governance, or specification change accompanies it. On any
+    doubt about validity, an artifact is treated as stale and reproduced
+    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision
+    change re-opens this block.

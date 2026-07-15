@@ -8,7 +8,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 39fc1f5cef778f4a76af79236d6911bee696dd5d  # rebound by repository-synchronization (Package A, AUDIT-REPO-2026-07-14) -- stamp-only, no content change; route-registration/consumes-api edges unaffected by this pass
+observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; route-registration/consumes-api edges unaffected
 
 # All routes are mounted under /api/v1 (backend/src/app.ts:51). optionalAuthMiddleware
 # is applied to the whole v1 router; authMiddleware/requireRole/requirePermission/
