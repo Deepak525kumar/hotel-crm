@@ -1505,6 +1505,43 @@ known_drift:
       true `HEAD`.
     authority_needed: none  # pure revision-metadata rebind, agent-performable; explicitly excludes governance/specification/knowledge-content changes per its own mode scope
 
+  - id: SYNC-038
+    type: repository-synchronization
+    status: complete
+    description: >-
+      Repository Synchronization Workflow, Targeted Correction mode, resolving
+      `VERIFY-01` of the `VERIFY-REPO-2026-07-15` verification audit. Root
+      cause: `SYNC-036` (Package A, AUDIT-M3/AUDIT-L2) applied
+      `edge-analytics-reads-hotel-worker` to `DEPENDENCY_GRAPH.yaml` and
+      re-derived `state-hotel-worker.readers` to the five graph-backed readers
+      (`backend-work-requests`, `backend-work-applications`,
+      `backend-assignments`, `backend-users`, `backend-analytics`), and
+      updated `MODULE_REGISTRY.yaml` and `BOUNDARY_INDEX.yaml` to match, but
+      left `STATE_OWNERSHIP_INDEX.yaml`'s `state-hotel-worker` row unchanged
+      (four readers, plus a now-stale caveat asserting `backend-analytics`'s
+      edge is "known-missing" and "true reader count is 8"). `SYNC-037` was a
+      stamp-only revision rebind and did not touch index content, so the
+      cross-index contradiction between the authoritative graph and its own
+      summary index persisted. This pass re-derived the reader set for
+      `state-hotel-worker` directly from the five `reads-state` edges targeting
+      `state-hotel-worker` in `DEPENDENCY_GRAPH.yaml`
+      (`edge-{work-requests,work-applications,assignments,users,analytics}-reads-hotel-worker`,
+      lines 155-290) and rewrote `STATE_OWNERSHIP_INDEX.yaml`'s
+      `state-hotel-worker` row: `readers` now lists all five modules (matching
+      the graph and the graph's own `state_domains` block, line 476), the
+      stale "known-missing edge / true reader count is 8" caveat is withdrawn,
+      and a `note` records the reader count of 5 and its derivation. Scope was
+      strictly this single row; no specification, governance artifact,
+      unrelated knowledge artifact, ADR, or source code was modified, and no
+      architectural change was introduced. `VERIFY-02` treated as expected
+      framework revision-metadata lag per the audit's own guidance; no
+      repository inconsistency beyond metadata was found, so it is out of this
+      targeted pass. Post-fix cross-index check:
+      `STATE_OWNERSHIP_INDEX.yaml`, `DEPENDENCY_GRAPH.yaml`,
+      `MODULE_REGISTRY.yaml`, and `BOUNDARY_INDEX.yaml` now agree on
+      `state-hotel-worker`'s reader set and count (5).
+    authority_needed: none  # single-row summary-index re-derivation from the authoritative graph, agent-performable; no ownership/state/architecture decision required
+
 context_invalidators:
   - repository revision changes
   - default branch changes
