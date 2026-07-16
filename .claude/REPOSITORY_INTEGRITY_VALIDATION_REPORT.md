@@ -4,7 +4,7 @@ Follows [`templates/REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md`](templates/REPO
 
 ## Control
 
-- **Repository revision:** working tree on branch `claude/repo-integrity-validation-lxv3iw`, on top of commit `9ac2291` (this document's own revision, post-review-correction).
+- **Repository revision:** working tree on branch `claude/repo-integrity-validation-lxv3iw`, on top of merge commit `835ca54` (reconciles this change with `origin/main`'s independent PR #152 ADR restoration — see Convergence with PR #152, below).
 - **Command invoked:** `node .claude/tooling/repository-integrity-check.js --format md --out <path>`
 - **Exit code:** `0`
 - **Baseline file:** `.claude/tooling/repository-integrity-baseline.json` (3 entries after dedup, `generated_at: 2026-07-16`; regenerated after the SEC-1 fingerprint fix below — see Review Corrections)
