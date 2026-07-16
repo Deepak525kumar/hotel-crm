@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-07-16",
+  "note": "Pre-existing findings accepted at Repository Integrity Validation adoption time (framework v1.4.0). See repository-integrity-check.js Design Note and SIR-GLOB-020 (governance/SPECIFICATION_ISSUES_REGISTER.md) for remediation tracking. New findings not present here fail CI.",
+  "entries": [
+    {
+      "fingerprint": "8c97b2419ec62695",
+      "checkId": "broken-relative-path",
+      "file": "backend/README.md",
+      "target": "MASTER_ARCHITECTURE.md",
+      "note": "Target does not exist anywhere in the repository (not even under docs/legacy/); replacement current-doc target is unknown and out of this change's scope. Tracked as SIR-GLOB-020."
+    },
+    {
+      "fingerprint": "9ed97b3a3aa30752",
+      "checkId": "broken-relative-path",
+      "file": "backend/README.md",
+      "target": "API_STANDARDS.md",
+      "note": "Target does not exist anywhere in the repository; two occurrences in this file share this fingerprint. Tracked as SIR-GLOB-020."
+    },
+    {
+      "fingerprint": "ea55ec4396a35a27",
+      "checkId": "broken-relative-path",
+      "file": "backend/README.md",
+      "target": "AWS_DEPLOYMENT_GUIDE.md",
+      "note": "Target exists only at docs/legacy/infrastructure/AWS_DEPLOYMENT_GUIDE.md, not at repo root as linked; current-doc replacement unknown. Tracked as SIR-GLOB-020."
+    }
+  ]
+}

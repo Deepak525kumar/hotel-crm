@@ -75,6 +75,7 @@ Workflow artifacts use stable, workflow-scoped IDs so downstream consumers can c
 | `ART-ARCH-REV` | Architecture Review report | architecture-review |
 | `ART-DEP-REV` | Dependency Review report and graph delta | dependency-review |
 | `ART-CONS-REV` | Consistency Review report | consistency-review |
+| `ART-INTEGRITY` | Repository Integrity Validation Report — deterministic, tool-generated (`../tooling/repository-integrity-check.js`); the single implementation consumed identically by G4-consistency, G6, G9, and CI (`../../.github/workflows/ci.yml`, job `repository-integrity`) | consistency-review (framework-tooling-produced, not authored per candidate) |
 | `ART-SEC-REV` | Security Review report and residual-risk statement | security-review |
 | `ART-PERF-REV` | Performance Review report and measurements | performance-review |
 | `ART-SYNC-FND` | Foundation Drift Report and synchronized dependents | foundation-synchronization |

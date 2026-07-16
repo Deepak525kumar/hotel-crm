@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "description": "Configuration for repository-integrity-check.js. Repository-specific knobs only; check logic itself lives in the script (Knowledge Separation, ../CLAUDE.md).",
+  "ignoreDirNames": [
+    "node_modules", ".git", "dist", "build", ".next", "coverage",
+    ".antigravity", "out", ".turbo", "android", "ios"
+  ],
+  "ignoreFilePatterns": [
+    "package-lock.json", "*.drawio"
+  ],
+  "markdownExtensions": [".md"],
+  "yamlExtensions": [".yaml", ".yml"],
+  "yamlPathKeys": ["source", "path", "file", "ref", "canonical", "doc", "spec_path", "version_source", "derived_from"],
+  "identityKeys": ["id", "module"],
+  "legacyRoots": ["docs/legacy"],
+  "orphanScanRoots": [
+    ".claude/constitution",
+    ".claude/workflows",
+    ".claude/agents",
+    ".claude/templates",
+    ".claude/checklists",
+    ".claude/governance",
+    "docs/03-modules",
+    "docs/14-governance/architecture-decisions",
+    "docs/00-foundations"
+  ],
+  "orphanExemptBasenames": [
+    "README.md", "CLAUDE.md", "AGENTS.md", "CHANGELOG.md",
+    "MIGRATION_NOTICE.md", "FRAMEWORK_RELEASE_NOTES.md"
+  ],
+  "orphanEntryPoints": [
+    "README.md",
+    ".claude/CLAUDE.md",
+    ".claude/README.md"
+  ],
+  "categoryPathPatterns": [
+    { "id": "broken-adr-reference", "match": "architecture-decisions/ADR-" },
+    { "id": "broken-specification-reference", "match": "docs/03-modules/" },
+    { "id": "broken-governance-reference", "match": ".claude/governance/" },
+    { "id": "broken-knowledge-reference", "match": ".claude/knowledge/" },
+    { "id": "broken-implementation-execution-reference", "match": "docs/04-implementation/" },
+    { "id": "broken-implementation-execution-reference", "match": "docs/05-execution/" }
+  ]
+}

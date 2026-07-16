@@ -1,12 +1,7 @@
-# ADR Migration Notice
+# ADR Migration Notice — Resolved
 
-A previous folder `docs/09-decisions/` may contain Architectural Decision Records. To avoid accidental deletions and to give reviewers control, ADRs have not been auto-moved.
+The prior folder `docs/09-decisions/` contained Architectural Decision Records (ADR-001..018). During the 2026-07-16 documentation structure change (commit `e0c5e8b`), the directory was renamed via `.gitkeep` placeholders but the ADR files themselves were not copied to this new location, leaving `docs/14-governance/architecture-decisions/` with only this notice and every cross-reference to an ADR broken repository-wide.
 
-Suggested migration steps:
+**Migration completed** as part of the Repository Integrity Validation framework change (see `.claude/knowledge/SYNC_STATE.yaml`, `.claude/knowledge/DECISION_INDEX.md`): all 18 ADR files were recovered from git history (`e0c5e8b^:docs/09-decisions/architecture-decisions/`) and copied here byte-for-byte. No ADR content was altered. `docs/09-decisions/` is retired; do not re-create it.
 
-1. Review files under `docs/09-decisions/`.
-2. Copy ADR files to `docs/14-governance/architecture-decisions/`.
-3. Update any links that reference the old path.
-4. After verification, remove the originals or keep them under `legacy/` if you prefer.
-
-If you want me to perform the migration automatically, confirm and I will move the files and update cross-references.
+This file is retained as historical evidence of the gap and its resolution; it establishes no current obligation.

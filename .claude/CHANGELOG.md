@@ -15,6 +15,40 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); t
 
 ---
 
+# Version 1.4.0
+
+**Release Date:** 2026-07-16
+
+**Status:** Stable
+
+## Overview
+
+Version 1.4.0 is the Repository Integrity Validation release. It closes a gap the platform had no deterministic answer to: whether cross-repository references (links, ADR/specification/governance/knowledge/implementation-execution citations, cross-index paths, identity keys) actually resolve, enforced identically whether a change is authored by the AI framework or by a human contributor. It is additive: no gate, finding schema, confidence rule, loop bound, or specialist boundary is removed or weakened, and no new workflow is introduced — the check is a mandatory sub-check of the existing Consistency Review.
+
+## Added
+
+- **`tooling/repository-integrity-check.js`**: a dependency-free Node script implementing every deterministic integrity check — broken markdown links, broken relative paths, broken ADR/specification/governance/knowledge/implementation-execution references, broken cross-index references, duplicate ADR numbers, duplicate YAML identity keys, missing canonical references (`MODULE_REGISTRY.yaml` → `SPECIFICATION_INDEX.yaml`), and orphan documents (WARN, non-blocking). One implementation, reused unchanged by the AI framework and by CI.
+- **`tooling/repository-integrity.config.json`** and **`tooling/repository-integrity-baseline.json`**: repository-specific scan configuration and a checked-in, fingerprinted baseline of findings accepted at adoption time, so only new regressions block CI.
+- **`.github/workflows/ci.yml` job `repository-integrity`**: runs the script on every pull request, independent of any AI execution.
+- **`ART-INTEGRITY` artifact prefix** (`workflows/README.md`) and **`templates/REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md`**.
+- **`checklists/consistency.md` `CS-11`** and a Consistency Reviewer agent-contract update instructing it to run/reuse the tool rather than manually re-derive what it already proves.
+
+## Changed
+
+- **`constitution/REVIEW_GATES.md`**: Applicability Rules gains a Repository Integrity Validation entry describing scope, ownership, and the CI enforcement backstop.
+- **`workflows/consistency-review.md`**, **`workflows/validation.md`**, **`workflows/postflight.md`**: each now cites `ART-INTEGRITY-001` as evidence at G4/G6/G9 respectively, reused by reference rather than re-derived per gate.
+- **`knowledge/LOOP_REGISTRY.yaml`**: `consistency-review`/`validation`/`postflight` entries each gain a `produced_artifacts` item for the Repository Integrity Validation Report.
+
+## Fixed
+
+- **18 ADR files (ADR-001..018) recovered.** The tool's first run discovered they had been lost from the working tree during a 2026-07-16 documentation-directory restructuring (commit `e0c5e8b`, `docs/09-decisions/` → `docs/14-governance/`) with no copy step performed, breaking 20+ cross-references across `CLAUDE.md`, `DECISION_INDEX.md`, this changelog, `FRAMEWORK_RELEASE_NOTES.md`, and the governance register. Files recovered byte-for-byte from git history; every cross-reference corrected. See `governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-021` (RESOLVED).
+
+## Decision Records
+
+- **ADR-019** (`docs/14-governance/architecture-decisions/ADR-019-repository-integrity-validation-gate.md`) — Proposed, pending human ratification.
+
+---
+
 # Version 1.3.0
 
 **Release Date:** 2026-07-09
@@ -68,7 +102,7 @@ Version 1.2.0 is the context-artifact / token-optimization release. It reduces t
 - **Module Memory** (`knowledge/MODULE_MEMORY.yaml`): immutable revision-bound frozen-spec summaries consumed before discovery.
 - **Six canonical lookup indexes** (`knowledge/{SPECIFICATION,OWNERSHIP,STATE_OWNERSHIP,CONTRACT,API,BOUNDARY}_INDEX.yaml`) derived from `MODULE_REGISTRY` + `DEPENDENCY_GRAPH`.
 - **Context Artifact templates** (`templates/CONTEXT_ARTIFACT_TEMPLATES.md`, `templates/BOUNDARY_CONFLICT_REPORT_TEMPLATE.md`).
-- **ADR-009** (`docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md`) and `cache_state` in `knowledge/SYNC_STATE.yaml`.
+- **ADR-009** (`docs/14-governance/architecture-decisions/ADR-009-context-artifact-token-optimization.md`) and `cache_state` in `knowledge/SYNC_STATE.yaml`.
 
 ## Improved
 

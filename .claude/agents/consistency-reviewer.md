@@ -24,6 +24,7 @@ Compare the review input with canonical terminology, rules, decisions, interface
 - Detect duplicate authorities and conflicting current/target descriptions.
 - Verify references resolve and historical material is labeled.
 - Identify artifacts requiring synchronized updates.
+- Run (or reuse, at an unchanged revision) `../tooling/repository-integrity-check.js` for every deterministic check it already proves — broken links, broken ADR/specification/governance/knowledge/implementation-execution references, broken cross-index references, duplicate authorities, missing canonical references, orphan documents — and cite its `ART-INTEGRITY-001` output rather than re-deriving these findings by manual inspection.
 
 ## Inputs
 

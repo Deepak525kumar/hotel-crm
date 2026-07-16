@@ -1542,6 +1542,66 @@ known_drift:
       `state-hotel-worker`'s reader set and count (5).
     authority_needed: none  # single-row summary-index re-derivation from the authoritative graph, agent-performable; no ownership/state/architecture decision required
 
+  - id: SYNC-039
+    type: framework-change
+    status: resolved-pending-ratification
+    description: >-
+      Platform v1.4.0 (Repository Integrity Validation) implemented as an
+      additive, backward-compatible extension: a deterministic, dependency-free
+      checker (`.claude/tooling/repository-integrity-check.js`) added as a
+      mandatory sub-check owned by the existing Consistency Reviewer wherever
+      consistency review applies (G4), reused unchanged at G6 (Documentation
+      Validator) and G9 (Post-flight) rather than re-derived per gate. The
+      identical script is independently enforced by a new CI job
+      (`.github/workflows/ci.yml`, job `repository-integrity`) on every pull
+      request, giving human- and AI-authored changes symmetric enforcement. No
+      new workflow or gate: `constitution/REVIEW_GATES.md` gains one
+      Applicability Rules entry; `knowledge/LOOP_REGISTRY.yaml` gains one
+      `produced_artifacts` item each on `consistency-review`/`validation`/
+      `postflight`; `workflows/README.md` registers the new `ART-INTEGRITY`
+      artifact-id prefix; `templates/REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md`
+      and `checklists/consistency.md` `CS-11` added. A checked-in baseline
+      (`.claude/tooling/repository-integrity-baseline.json`) fingerprints
+      pre-existing findings so only new regressions block CI; every baselined
+      finding is tracked to a `SIR-*` row (governance register). VERSION.yaml
+      bumped 1.3.0 -> 1.4.0; ADR-019 authored (Proposed, pending ratification,
+      same posture as ADR-001..009 before their 2026-07-15 ratification).
+      Self-reviewed by the Lead Architect against Constitution §6/§7/§17/§19
+      given this change's scope (process tooling, not a Security Principles
+      §11 high-risk surface); an independent Consistency Reviewer and Security
+      Reviewer pass was additionally run against the new script and CI
+      workflow specifically before the PR was opened (path handling, command
+      construction, CI trust boundary) — see the PR description for findings
+      and dispositions.
+
+      The tool's first run against this repository independently discovered a
+      real, pre-existing defect this session also remediates: the 2026-07-16
+      "documentation structure change" (commit `e0c5e8b`) renamed
+      `docs/09-decisions/` to `docs/14-governance/` via `.gitkeep`-only
+      directory moves and left a `MIGRATION_NOTICE.md` asking for confirmation
+      before copying the 18 ADR files themselves — the copy step was never
+      performed, silently deleting ADR-001..018 from the working tree and
+      breaking 20+ cross-references (`CLAUDE.md`, `DECISION_INDEX.md`,
+      `CHANGELOG.md`, `FRAMEWORK_RELEASE_NOTES.md`, 13 rows of the governance
+      register, two module-directory redirect READMEs). All 18 files recovered
+      byte-for-byte from git history (`e0c5e8b^:docs/09-decisions/architecture-decisions/`)
+      into `docs/14-governance/architecture-decisions/`; every cross-reference
+      in the files above corrected; `MIGRATION_NOTICE.md` updated to record
+      completion. A second, smaller drift of the same class (`docs/audits/` ->
+      `docs/15-audits/`, 3 references) was found and corrected in the same
+      pass. `docs/03-modules/*/MODULE_SPEC.md` files citing the stale
+      `docs/09-decisions/` path were intentionally left untouched — they are
+      governed by their own Documentation Workflow correction cycle, not this
+      framework change; tracked as the residual share of `SIR-GLOB-021`.
+      `backend/README.md`'s three broken links (two targets absent
+      repository-wide, one pointing above its true `docs/legacy/` location)
+      have no evident current-doc replacement and were accepted into the
+      baseline rather than guessed at; tracked as `SIR-GLOB-020` (OPEN).
+      Specification Issues Register synchronized: `SIR-GLOB-020` (OPEN) and
+      `SIR-GLOB-021` (RESOLVED) added; Global/Cross-Cutting section marker
+      updated.
+    authority_needed: human  # ADR-019 ratification (Proposed -> Accepted); SIR-GLOB-020 backend/README.md replacement-target decision
+
 context_invalidators:
   - repository revision changes
   - default branch changes

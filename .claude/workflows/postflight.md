@@ -24,7 +24,7 @@ The active workflow reached a terminal candidate state and its changes/findings 
 
 ## Exit Conditions
 
-Affected modules and dependents are reconciled; documentation and knowledge match the final state; the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`) reflects the terminal state's unresolved and resolved issues; follow-ups have owners; G9 is recorded.
+Affected modules and dependents are reconciled; documentation and knowledge match the final state; the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`) reflects the terminal state's unresolved and resolved issues; Repository Integrity Validation (`ART-INTEGRITY-001`) reports zero new blocking findings, or every new finding is either fixed or recorded as an owned follow-up in the Specification Issues Register; follow-ups have owners; G9 is recorded.
 
 ## Participating Agents
 
@@ -44,7 +44,9 @@ Lead Architect — determine affected modules and upstream/downstream consumers 
   └─ (parallel) graph/registry reconciliation
          (Lead Architect + Dependency Reviewer; updates contracts, edges, ownership; refreshes DEPENDENCY_GRAPH, MODULE_REGISTRY, cross-references, TERMINOLOGY, DECISION_INDEX)
        ↓ SYNC-post-1 (both reconciliation branches complete)
-Consistency Reviewer (final) — verify no orphaned artifact, contradiction, or unresolved cross-reference
+Consistency Reviewer (final) — verify no orphaned artifact, contradiction, or unresolved cross-reference;
+  re-run `../tooling/repository-integrity-check.js` at the terminal candidate revision (ART-INTEGRITY-001) and
+  confirm zero new (non-baselined) blocking findings
   ↓ ART-POST-003 (post-flight consistency confirmation)
 Lead Architect — create synchronization tasks for deferred non-blocking work; confirm no temporary bypass, unresolved blocking finding, or orphaned artifact
   ↓ ART-POST-004 (residual-risk/follow-up list)
@@ -89,8 +91,8 @@ Learning workflow invocation (per Loop Metadata hook)
 
 ### Consistency Reviewer (final)
 
-- **Inputs:** Reconciled active docs + updated graph/registry + terminology + decision index.
-- **Outputs:** `ART-POST-003` post-flight consistency confirmation.
+- **Inputs:** Reconciled active docs + updated graph/registry + terminology + decision index; `../tooling/repository-integrity-check.js` run at the terminal candidate revision.
+- **Outputs:** `ART-POST-003` post-flight consistency confirmation, including the `ART-INTEGRITY-001` result (zero new blocking findings, or named follow-ups per Failure Handling).
 - **Next Consumer:** Lead Architect.
 
 ### Release Manager (only when release artifacts changed)

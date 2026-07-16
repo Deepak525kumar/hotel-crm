@@ -37,7 +37,12 @@ Lead Architect (dispatch)
 Consistency Reviewer — identify candidate terms, IDs, rules, states, examples, references
   ↓
   ├─ (parallel) terminology comparison         (candidate vs TERMINOLOGY.md)
-  ├─ (parallel) cross-reference resolution     (candidate vs referenced artifacts)
+  ├─ (parallel) cross-reference resolution     (candidate vs referenced artifacts; deterministic checks — broken links,
+  │                                             broken ADR/spec/governance/knowledge/implementation-execution references,
+  │                                             broken cross-index references, duplicate authorities, missing canonical
+  │                                             references, orphan documents — run via the single implementation at
+  │                                             ../tooling/repository-integrity-check.js, producing ART-INTEGRITY-001;
+  │                                             never re-derived by hand)
   └─ (parallel) rule/duplication comparison    (candidate vs canonical rule sources)
        ↓ SYNC-cons-1 (authority classification for each finding)
 Consistency Reviewer — record contradictions, duplication, unresolved refs, stale dependents
@@ -62,8 +67,8 @@ Lead Architect — record consistency component of G4; route synchronization inv
 
 ### Consistency Reviewer
 
-- **Inputs:** Immutable `ART-SPEC-001` v0.n (or frozen diff); `TERMINOLOGY.md`; rule sources; `DECISION_INDEX.md`; active docs; `MODULE_REGISTRY.yaml`; `DEPENDENCY_GRAPH.yaml`.
-- **Outputs:** `ART-CONS-REV-001` — terminology delta + cross-reference report + synchronization inventory + findings (canonical schema, each identifying both conflicting locations, authority class, canonical candidate if known, required sync set) + gate recommendation bound to the reviewed version.
+- **Inputs:** Immutable `ART-SPEC-001` v0.n (or frozen diff); `TERMINOLOGY.md`; rule sources; `DECISION_INDEX.md`; active docs; `MODULE_REGISTRY.yaml`; `DEPENDENCY_GRAPH.yaml`; `ART-INTEGRITY-001` (run or reuse `../tooling/repository-integrity-check.js` at the candidate revision — never hand-derive what the deterministic tool already proves).
+- **Outputs:** `ART-CONS-REV-001` — terminology delta + cross-reference report (citing `ART-INTEGRITY-001` for every deterministic broken-reference/duplicate-authority/orphan finding) + synchronization inventory + findings (canonical schema, each identifying both conflicting locations, authority class, canonical candidate if known, required sync set) + gate recommendation bound to the reviewed version.
 - **Next Consumer:** Lead Architect (G4 merge; post-flight synchronization inventory); source owners for fixes; human for semantic terminology decisions.
 
 ### Author / Source owner (correction step)
@@ -136,7 +141,7 @@ Equal-authority conflict, no canonical term, semantic rename, unexpected synchro
 
 ## Artifacts Produced
 
-Consistency Review, terminology delta, cross-reference report, synchronization inventory.
+Consistency Review, terminology delta, cross-reference report, synchronization inventory, `ART-INTEGRITY-001` Repository Integrity Validation Report (produced by `../tooling/repository-integrity-check.js`; reused unchanged by G6 and G9, see [REVIEW_GATES.md](../constitution/REVIEW_GATES.md) Applicability Rules).
 
 ## Failure Handling
 
