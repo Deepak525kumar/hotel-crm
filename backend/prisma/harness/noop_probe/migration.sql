@@ -1,0 +1,13 @@
+-- No-op harness probe — forward.
+-- A deliberately schema-neutral migration used only by the migration + rollback
+-- harness (backend/scripts/migrate-harness.sh `verify`). Applying it registers a
+-- row in `_prisma_migrations` and rolling it back removes that row, while the
+-- database schema is provably unchanged before and after. This isolates and
+-- proves the forward → rollback → recovery machinery end-to-end independently of
+-- any real schema change (EPIC-PLATFORM S0-2 acceptance: "A no-op migration
+-- proves forward + rollback end-to-end").
+--
+-- This directory lives under backend/prisma/harness/, NOT backend/prisma/migrations/,
+-- so `prisma migrate deploy` never applies it to a real environment. The harness
+-- copies it onto a throwaway copy of the migration chain for the self-test only.
+SELECT 1;

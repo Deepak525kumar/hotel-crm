@@ -33,7 +33,7 @@ Per-phase status (`IN_PROGRESS`/`NOT_STARTED`) is tracked once in
 
 ## Sprint 0 Progress
 
-**1 / 7 items done (14%).** Per-item status, owner, and issue/PR live only in
+**2 / 7 items done (29%).** Per-item status, owner, and issue/PR live only in
 [CURRENT_SPRINT.md](CURRENT_SPRINT.md#sprint-backlog) — not duplicated here.
 
 ## Blockers Summary

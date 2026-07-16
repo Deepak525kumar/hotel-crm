@@ -96,6 +96,8 @@ jobs:
             # renamed table, narrowed type, etc.) cannot be recovered by this
             # workflow and REQUIRES MANUAL DB RECOVERY (restore from backup /
             # apply a compensating migration). Keep migrations additive.
+            # Manual DB rollback procedure + rehearsal harness:
+            # docs/11-deployment/ci-cd/MIGRATION_ROLLBACK_HARNESS.md
             # ---------------------------------------------------------------------
 
             # Record the currently-deployed SHA so we can roll back to it if the

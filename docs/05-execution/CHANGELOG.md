@@ -9,6 +9,69 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-16 — S0-2 Prisma migration + rollback harness (EPIC-PLATFORM) → DONE
+
+Implemented the second Sprint 0 backlog item (S0-2) via the Implementation Workflow, closing the
+EPIC-PLATFORM deliverable "Prisma migration + rollback harness; production-shaped snapshot for
+dry-runs (ADR-004/005)" and its acceptance criterion "a no-op migration proves forward + rollback
+end-to-end."
+
+- **Verified current strategy first:** forward migrations are applied by `prisma migrate deploy`
+  in `ci.yml` and both deploy workflows (ADR-004); the deploy workflows already gate on
+  `prisma migrate status` for failed/drift detection. The gap: Prisma Migrate has **no native
+  down/rollback**, and `deploy-production.yml`'s rollback is explicitly *code-only* and assumes
+  backward-compatible migrations. S0-2 adds a deterministic rollback path on top — it does not
+  replace `migrate deploy`.
+- **What changed (all additive; no runtime dependency introduced):**
+  - **Paired-down convention** — added [`down.sql`](../../backend/prisma/migrations/) to both
+    existing migrations (`20260613120000_v2_marketplace_init`, `20260710000000_add_password_reset_token`),
+    each idempotent (`DROP ... IF EXISTS ... CASCADE`) and reversing exactly what its `migration.sql`
+    creates.
+  - **Harness** — [`backend/scripts/migrate-harness.sh`](../../backend/scripts/migrate-harness.sh):
+    `check-pairs` (enforces every migration has a `down.sql`), `forward`, `down [N]` (runs `down.sql`
+    in a transaction, then removes the `_prisma_migrations` history row so `migrate deploy` re-applies
+    it — recovery), `snapshot` (data-free production-shaped schema export), and `verify` (the
+    end-to-end proof).
+  - **No-op probe** — [`backend/prisma/harness/noop_probe/`](../../backend/prisma/harness/) — a
+    schema-neutral migration used only by the harness self-test, kept **outside** `prisma/migrations/`
+    so `migrate deploy` never applies it to a real environment. Proves forward → rollback → recovery
+    independently of any real schema change (the literal S0-2 acceptance criterion).
+  - **CI** — [`.github/workflows/migration-harness.yml`](../../.github/workflows/migration-harness.yml):
+    runs `check-pairs` then `verify` against a Postgres 15 service (same image `ci.yml` uses) on any
+    push/PR touching the migration chain, harness, `schema.prisma`, or the workflow; uploads the
+    production-shaped snapshot as an artifact. Reuses existing CI infrastructure — no new service.
+  - **Runbook** —
+    [`docs/11-deployment/ci-cd/MIGRATION_ROLLBACK_HARNESS.md`](../11-deployment/ci-cd/MIGRATION_ROLLBACK_HARNESS.md);
+    `deploy-production.yml`'s rollback-model comment now points at it for the manual
+    destructive-migration recovery path (one-line, non-behavioral).
+- **Production-shaped snapshot for dry-runs:** the harness runs the committed migration chain on an
+  empty database, whose schema is the exact production shape with no developer drift; `verify` dry-runs
+  against precisely that, and `snapshot` exports it for offline dry-runs (CI artifact
+  `production-shape-schema`).
+- **Verification:** `bash -n` clean; `check-pairs` passes against the real repo; the `verify`
+  control flow (forward → full teardown-to-empty → recovery with schema identity → single-step
+  rollback + recovery → no-op probe round-trip) was exercised end-to-end via psql/pg_dump/prisma
+  stubs (no live Postgres in the authoring sandbox); the executable proof against real Postgres is
+  the `migration-harness` CI job. Two workflow YAMLs validated.
+- **Independent reviews (gate evidence):**
+  - *Consistency Review* — one Major finding (CONS-001) fixed before commit: the marketplace-init
+    forward migration also creates two PL/pgSQL functions (`refresh_worker_overall_rating`,
+    `trg_rating_refresh_overall`) and the `Rating_refresh_overall_rating` trigger; the trigger drops
+    with `Rating` via CASCADE, but the two standalone functions were leaking. Added explicit
+    `DROP TRIGGER`/`DROP FUNCTION` to the init `down.sql`, and broadened the harness teardown
+    assertion (`count_app_relations`) to count **any** `CREATE ` object (not just tables/types) so
+    the "returns to empty" proof catches such leaks. All other consistency checks (links, numbers,
+    ci.yml-convention parity, password-reset down, no-op probe) passed.
+  - *Security Review* — PASS, no blocking findings. Two Low findings addressed defensively: migration
+    directory names are now validated (`[A-Za-z0-9_]`) before being embedded in a SQL literal
+    (`assert_safe_migration_name`), and destructive commands (`verify`/`down`) require an explicit
+    `MIGRATE_HARNESS_YES=1` interlock (set by the CI job against its ephemeral DB). Informational
+    action-tag-pinning finding accepted as consistent with the `ci.yml` baseline.
+  - *Repository Integrity Validation* — 0 new blocking findings (pre-existing baselined/warn items only).
+- **Tracker updates:** `CURRENT_SPRINT.md` S0-2 → `DONE` (owner: Infrastructure Engineer);
+  `PROGRESS.md` Sprint 0 → 2/7 (29%). No blocker changed (`BLOCKERS.md` unchanged). Phase 0 remains
+  `IN_PROGRESS` — EPIC-PLATFORM still has S0-3/S0-4 open, and EPIC-SECREM/EPIC-OWNERSHIP remain.
+
 ## 2026-07-16 — S0-1 CI blocking checks, per workspace (EPIC-PLATFORM) → DONE
 
 Implemented the first Sprint 0 backlog item (S0-1) via the Implementation Workflow, closing the
