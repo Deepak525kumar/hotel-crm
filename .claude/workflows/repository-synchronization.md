@@ -21,6 +21,8 @@ Create a non-destructive, revision-bound view of current worktree, default branc
 
 `ART-REPO-001..003` are the **body of the Evidence Package** (`ART-EVID-001`, [Context Artifacts](../constitution/CONTEXT_ARTIFACTS.md) §2.2). On completion the Lead Architect stamps each record with the `baseline_revision` and the content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the six canonical lookup indexes, then records the Evidence Package validity in [`../knowledge/SESSION_STATE.yaml`](../knowledge/SESSION_STATE.yaml). This makes the discovery reusable by reference for every downstream workflow at the same revision; discovery re-runs only when a `context_invalidator` fires. The read-only, non-destructive guarantee is unchanged.
 
+**Execution-context rebuild (framework 1.5.0).** After stamping the Evidence Package — in particular on a revision rebind, when `baseline_revision` advances — the Lead Architect rebuilds the Context Management Layer projection so no stale checkpoint survives the revision change: `node .claude/tooling/context-loader.js resolve --workflow <entering-workflow> --emit --prune` regenerates `../context/SESSION_CONTEXT.yaml` and `../context/CACHE_STATE.yaml` against the new `baseline_revision` ([CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §8). Because those projections are advisory and `.gitignore`d, this rebuild is purely mechanical and never itself a `context_invalidator`; it only prevents a prior-revision checkpoint from being reused after HEAD moves (§1.5 prevent-stale-context).
+
 ## Entry Conditions
 
 Repository root is known and readable.

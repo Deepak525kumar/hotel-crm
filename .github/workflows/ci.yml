@@ -37,6 +37,24 @@ jobs:
           name: repository-integrity-report
           path: integrity-report.md
 
+  context-manifest:
+    name: Context Manifest Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate Context Management Layer manifests
+        run: node .claude/tooling/context-loader.js --validate
+
+      - name: Report context-loading reduction
+        if: always()
+        run: node .claude/tooling/context-loader.js --measure >> "$GITHUB_STEP_SUMMARY"
+
   ci:
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest

@@ -46,7 +46,8 @@ Lead Architect — determine affected modules and upstream/downstream consumers 
        ↓ SYNC-post-1 (both reconciliation branches complete)
 Consistency Reviewer (final) — verify no orphaned artifact, contradiction, or unresolved cross-reference;
   re-run `../tooling/repository-integrity-check.js` at the terminal candidate revision (ART-INTEGRITY-001) and
-  confirm zero new (non-baselined) blocking findings
+  confirm zero new (non-baselined) blocking findings; also confirm `../tooling/context-loader.js --validate` is clean
+  (Context Management Layer manifests still structurally sound after this change; CONTEXT_ARTIFACTS.md §8)
   ↓ ART-POST-003 (post-flight consistency confirmation)
 Lead Architect — create synchronization tasks for deferred non-blocking work; confirm no temporary bypass, unresolved blocking finding, or orphaned artifact
   ↓ ART-POST-004 (residual-risk/follow-up list)
@@ -63,7 +64,7 @@ Learning workflow invocation (per Loop Metadata hook)
 2. Determine affected modules and upstream/downstream consumers from the graph.
 3. Update or verify contracts, dependency edges, module ownership, cross-references, terminology, and decision index.
 4. Update active documentation and mark superseded/historical material.
-5. Record knowledge/index changes and revision-bound synchronization state.
+5. Record knowledge/index changes and revision-bound synchronization state. Then regenerate and **prune** the Context Management Layer projection to the terminal revision so no stale checkpoint survives: `node .claude/tooling/context-loader.js resolve --workflow postflight --emit --prune` ([CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §8; automatic context pruning). This is mechanical on the advisory, `.gitignore`d checkpoints and is never itself a `context_invalidator`.
 6. Create future synchronization tasks for intentionally deferred non-blocking work.
 7. Confirm no temporary bypass, unresolved blocking finding, or orphaned artifact remains.
 8. Synchronize the Specification Issues Register (`../governance/SPECIFICATION_ISSUES_REGISTER.md`), scoped to the modules in `ART-POST-002`'s affected-module map (fall back to a full-register pass only when `ART-POST-002` shows cross-module ambiguity): collect unresolved issues remaining after final delivery, append genuinely new ones, mark resolved ones `RESOLVED` without deleting history, and merge by canonical source ID so no issue is duplicated.

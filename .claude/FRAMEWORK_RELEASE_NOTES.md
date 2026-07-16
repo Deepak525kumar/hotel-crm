@@ -75,7 +75,7 @@ Compatibility: no breaking changes; no migration required.
 
 **Release Date:** 2026-07-16
 
-**Status:** Stable (current)
+**Status:** Stable (superseded by 1.5.0)
 
 ---
 
@@ -88,6 +88,29 @@ Highlights:
 - **A real defect found and fixed on day one.** The tool's first run discovered that a same-day documentation-directory restructuring (commit `e0c5e8b`) had deleted all 18 ADR files from the working tree, breaking 20+ cross-references platform-wide. Recovered from git history as part of this release; see `governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-021`.
 
 Governance: no gate removed or weakened; no new constitutional article. ADR-019 is Proposed, pending human ratification (Constitution §20), consistent with the ADR-001..010 precedent.
+
+Compatibility: no breaking changes; no migration required.
+
+---
+
+## Version 1.5.0
+
+**Release Date:** 2026-07-16
+
+**Status:** Stable (current)
+
+---
+
+Version 1.5.0 is the Context Management Layer release. It operationalizes — without changing — the reusable Context Artifacts policy from 1.2.0 (`constitution/CONTEXT_ARTIFACTS.md`). The policy already defined the revision-bound artifacts and their invalidation; what was missing was a deterministic, executable answer to *which* artifacts a given workflow must load, so that minimisation could be measured and enforced rather than re-derived in prose per workflow. It is additive and fail-safe: absent the manifests or the loader, behaviour equals 1.4.0. No gate, finding schema, confidence rule, loop bound, or specialist boundary is changed, and no new workflow is introduced.
+
+Highlights:
+
+- **A declarative load plan.** `context/EXECUTION_MANIFEST.yaml` declares the minimum artifact set per workflow (one entry per `workflows/*.md`), `context/BOOT_MANIFEST.yaml` the boot document set, and `context/ARTIFACT_DEPENDENCIES.yaml` the dependency + invalidation graph — the machine-readable projection of `CONTEXT_ARTIFACTS.md` §2/§3.2, restating no policy.
+- **One deterministic engine.** `tooling/context-loader.js` resolves the minimum set for a workflow (deterministic + artifact-level dependency + lazy loading), reuses warm Repository-Session artifacts, loads only the delta since the last checkpoint, applies revision-aware validity and cache invalidation, checkpoints/prunes sessions, measures the reduction, and validates the manifests. Reused unchanged by the AI framework (Pre-flight resolve, repository-synchronization rebuild, Post-flight prune) and by a new CI job (`context-manifest`) that runs on every pull request independent of AI execution.
+- **No duplicate authority.** The generated `context/SESSION_CONTEXT.yaml` / `context/CACHE_STATE.yaml` are `.gitignore`d, advisory projections of the authoritative `SESSION_STATE.yaml` / `SYNC_STATE.yaml` `cache_state` — deleting them changes nothing.
+- **Measured minimisation.** Average minimum-load reduction ~84%, and ~90% on a warm session, versus a naive full load across all 19 workflows (`context-loader.js --measure`).
+
+Governance: no gate removed or weakened; `CONTEXT_ARTIFACTS.md` gains an additive §8 and `REVIEW_GATES.md` one Applicability entry. ADR-020 is Proposed, pending human ratification (Constitution §20), consistent with the ADR-019 precedent.
 
 Compatibility: no breaking changes; no migration required.
 

@@ -15,6 +15,43 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); t
 
 ---
 
+# Version 1.5.0
+
+**Release Date:** 2026-07-16
+
+**Status:** Stable
+
+## Overview
+
+Version 1.5.0 is the **Context Management Layer** release. It operationalizes — without changing — the reusable Context Artifacts policy introduced in 1.2.0 ([`constitution/CONTEXT_ARTIFACTS.md`](constitution/CONTEXT_ARTIFACTS.md)). Before 1.5.0 the policy defined *what* the reusable artifacts are and how they invalidate, but *which* artifacts a workflow must load was expressed only in each workflow's prose and re-derived per workflow. This release makes that load plan declarative, generated, executable, measurable, and tool-enforced. It is additive and fail-safe: absent the manifests or the loader, behaviour equals 1.4.0 (read every authoritative document). No gate, finding schema, confidence rule, loop bound, or specialist boundary is removed or weakened, and no new workflow is introduced.
+
+## Added
+
+- **`context/` directory** with three authored, machine-readable load-plan manifests: `BOOT_MANIFEST.yaml` (minimum boot document set), `EXECUTION_MANIFEST.yaml` (minimum artifact set per workflow — one entry per `.claude/workflows/*.md`), and `ARTIFACT_DEPENDENCIES.yaml` (artifact dependency + invalidation graph). Each references canonical artifact IDs and document paths; none restates policy. See [`context/README.md`](context/README.md).
+- **`context/SESSION_CONTEXT.yaml` and `context/CACHE_STATE.yaml`**: generated, `.gitignore`d, non-authoritative projections of the authoritative [`knowledge/SESSION_STATE.yaml`](knowledge/SESSION_STATE.yaml) and [`knowledge/SYNC_STATE.yaml`](knowledge/SYNC_STATE.yaml) `cache_state`. They hold no unique authority (no duplicate-authority); deleting them changes nothing.
+- **`tooling/context-loader.js`**: a dependency-free Node engine — the single implementation of the loading behaviour. `resolve --workflow <id>` yields the minimum document + artifact set (deterministic + artifact-level dependency + lazy loading), reuses warm Repository-Session artifacts, loads only the delta since the last checkpoint, and applies revision-aware validity + the §3.2 invalidation bindings; `--emit`/`--prune` checkpoint and prune sessions; `--measure` reports the reduction; `--validate` structurally checks the manifests. Reused unchanged by the AI framework and by CI.
+- **CI job `context-manifest`** ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)): runs `context-loader.js --validate` on every pull request regardless of authorship, and reports the reduction — the same human-and-AI-symmetric enforcement as the 1.4.0 `repository-integrity` job.
+- **`ART-MANIFEST`** artifact-id prefix registered in [`workflows/README.md`](workflows/README.md).
+- **ADR-020** (Proposed, pending ratification) recording the decision; [`knowledge/DECISION_INDEX.md`](knowledge/DECISION_INDEX.md) row added.
+
+## Changed (additive only)
+
+- **`constitution/CONTEXT_ARTIFACTS.md`** gains section §8 (Context Management Layer), Proposed pending ratification.
+- **`constitution/REVIEW_GATES.md`** Applicability Rules gain one entry (Context Manifest Validation), a Consistency-Reviewer sub-check reused at G6/G9 and enforced by CI.
+- **`knowledge/LOOP_REGISTRY.yaml`**: `preflight`, `repository-synchronization`, and `postflight` each gain one `produced_artifacts` item.
+- **`workflows/preflight.md`, `repository-synchronization.md`, `postflight.md`, `CLAUDE.md`** reference the loader for resolution, revision-rebind rebuild, and post-flight prune respectively.
+
+## Measured
+
+Average minimum-load reduction ~84% (and ~90% on a warm session) versus a naive full load across all 19 workflows (`context-loader.js --measure`).
+
+## Known Limitations
+
+- ADR-020, `CONTEXT_ARTIFACTS.md` §8, and the `REVIEW_GATES.md` Applicability entry are **Proposed**, pending human ratification per Constitution §20 (same posture as ADR-019).
+- The `--measure` token figures use a deterministic byte/4 proxy, for *relative* reduction only — not an authoritative tokenizer count.
+
+---
+
 # Version 1.4.0
 
 **Release Date:** 2026-07-16

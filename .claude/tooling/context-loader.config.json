@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "description": "Configuration for context-loader.js (Context Management Layer, framework 1.5.0). Repository-specific knobs only; the loader logic and the canonical loading policy live elsewhere (Knowledge Separation, ../CLAUDE.md; canonical policy constitution/CONTEXT_ARTIFACTS.md). This file names paths and the token-cost model; it never restates what to load — that is the authored EXECUTION_MANIFEST/BOOT_MANIFEST.",
+  "paths": {
+    "version": ".claude/VERSION.yaml",
+    "syncState": ".claude/knowledge/SYNC_STATE.yaml",
+    "sessionState": ".claude/knowledge/SESSION_STATE.yaml",
+    "bootManifest": ".claude/context/BOOT_MANIFEST.yaml",
+    "executionManifest": ".claude/context/EXECUTION_MANIFEST.yaml",
+    "artifactDependencies": ".claude/context/ARTIFACT_DEPENDENCIES.yaml",
+    "workflowsDir": ".claude/workflows",
+    "emitDir": ".claude/context"
+  },
+  "emit": {
+    "sessionContext": ".claude/context/SESSION_CONTEXT.yaml",
+    "cacheState": ".claude/context/CACHE_STATE.yaml"
+  },
+  "tokenModel": {
+    "bytesPerToken": 4,
+    "note": "Deterministic proxy: ceil(fileBytes / bytesPerToken). Used only for relative reduction reporting, never as an authoritative token count."
+  },
+  "universe": {
+    "note": "The 'full load' baseline against which minimisation is measured: every authoritative document a naive, non-manifest boot would read.",
+    "roots": [
+      ".claude/constitution",
+      ".claude/knowledge",
+      ".claude/governance",
+      ".claude/workflows",
+      ".claude/templates",
+      ".claude/checklists"
+    ],
+    "includeExtensions": [".md", ".yaml", ".yml"],
+    "excludeBasenames": ["README.md"]
+  },
+  "knownArtifactPrefixes": [
+    "ART-BOOT", "ART-EVID", "ART-DEPCTX", "ART-CTX", "ART-MEM",
+    "ART-FIND-PKG", "ART-CORR", "ART-REV-PKG", "ART-MANIFEST",
+    "ART-PREFLIGHT", "ART-REPO", "ART-INTEGRITY", "ART-BOUNDARY"
+  ],
+  "workflowIgnore": ["README.md"]
+}

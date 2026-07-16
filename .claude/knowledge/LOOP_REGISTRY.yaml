@@ -21,7 +21,7 @@ loops:
     retry_policy: Re-run whole workflow on state change; no in-place fact retry (LOOP_CONTROL §3).
     escalation_policy: Unknown dirty-change ownership or ambiguous baseline → human (Constitution §18).
     confidence_threshold: High
-    produced_artifacts: [Repository State Record, source manifest, divergence report, protected-change list]
+    produced_artifacts: [Repository State Record, source manifest, divergence report, protected-change list, Context Management Layer rebuild on revision rebind (ART-MANIFEST, context-loader.js resolve --emit --prune; framework 1.5.0)]
     required_gates: [G0-repository-check]
     restart_conditions: Branch, HEAD, worktree, remote metadata, or PR baseline change.
 
@@ -34,7 +34,7 @@ loops:
     retry_policy: Re-run full pre-flight on any input change (LOOP_CONTROL §3).
     escalation_policy: Any check FAIL/BLOCKED, missing authority, or destructive action → human.
     confidence_threshold: High
-    produced_artifacts: [Pre-flight Record, evidence ledger, scope statement, affected-module list, drift reports, context manifests, workflow/gate plan]
+    produced_artifacts: [Pre-flight Record, evidence ledger, scope statement, affected-module list, drift reports, context manifests, workflow/gate plan, Context Management Layer resolution (ART-MANIFEST, context-loader.js resolve --emit; framework 1.5.0)]
     required_gates: [G0]
     restart_conditions: Repository revision, objective, frozen input, architecture, ownership, or dependency change.
 
@@ -229,7 +229,7 @@ loops:
     retry_policy: Reopen responsible sync/documentation step on failure (LOOP_CONTROL §3).
     escalation_policy: Undocumented scope, ownership conflict, or breaking dependent → escalate; parent stays open.
     confidence_threshold: High
-    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization (ART-POST-004a), Repository Integrity Validation confirmation (ART-INTEGRITY-001, zero new blocking findings)]
+    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization (ART-POST-004a), Repository Integrity Validation confirmation (ART-INTEGRITY-001, zero new blocking findings), Context Manifest Validation confirmation + checkpoint prune (ART-MANIFEST, context-loader.js --validate / resolve --emit --prune; framework 1.5.0)]
     required_gates: [G9]
     restart_conditions: Any final-state change or finding correction.
     invokes: [learning]
