@@ -1,7 +1,7 @@
 # Repository Verification Audit
 
 **Verification ID:** VERIFY-REPO-2026-07-15
-**Verifies:** `AUDIT-REPO-2026-07-14` (`docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`)
+**Verifies:** `AUDIT-REPO-2026-07-14` (`docs/15-audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`)
 **Verification revision:** `a9cb7b5` (HEAD of the audit branch at verification time; merge of PR #146)
 **Framework version:** 1.3.0 (`.claude/VERSION.yaml`)
 **Date:** 2026-07-15

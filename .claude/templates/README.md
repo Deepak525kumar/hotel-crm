@@ -15,6 +15,7 @@ These are the fixed output shapes for framework artifacts. Authors and reviewers
 - [PERFORMANCE_REVIEW_TEMPLATE.md](PERFORMANCE_REVIEW_TEMPLATE.md) — independent performance and scalability review.
 - [PR_REVIEW_TEMPLATE.md](PR_REVIEW_TEMPLATE.md) — pull-request review record.
 - [RELEASE_REPORT_TEMPLATE.md](RELEASE_REPORT_TEMPLATE.md) — release candidate, gate evidence, and rollback package.
+- [REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md](REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md) — deterministic, tool-generated broken-reference/duplicate-authority/orphan-document report (`ART-INTEGRITY-001`).
 - [REQUIREMENTS_REGISTER_TEMPLATE.md](REQUIREMENTS_REGISTER_TEMPLATE.md) — scoped, traceable requirements and acceptance criteria.
 - [RISK_ASSESSMENT_TEMPLATE.md](RISK_ASSESSMENT_TEMPLATE.md) — authorized residual-risk acceptance.
 - [SECURITY_REVIEW_TEMPLATE.md](SECURITY_REVIEW_TEMPLATE.md) — independent security and privacy review.

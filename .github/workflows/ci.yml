@@ -8,6 +8,31 @@ on:
   workflow_call:
 
 jobs:
+  repository-integrity:
+    name: Repository Integrity Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run deterministic integrity checks
+        run: node .claude/tooling/repository-integrity-check.js --format md --out integrity-report.md
+
+      - name: Show report
+        if: always()
+        run: cat integrity-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: repository-integrity-report
+          path: integrity-report.md
+
   ci:
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest

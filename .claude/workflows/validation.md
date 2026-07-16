@@ -63,8 +63,8 @@ G6 evaluation — Lead Architect
 
 ### Documentation Validator
 
-- **Inputs:** Frozen `ART-SPEC-001`; templates/checklists; source ledger; `ART-*-REV-001` reports and dispositions; approval record.
-- **Outputs:** `ART-VAL-DOC-001` documentation-dimension results (per criterion `PASS`/`FAIL`/`BLOCKED`/`N/A`).
+- **Inputs:** Frozen `ART-SPEC-001`; templates/checklists; source ledger; `ART-*-REV-001` reports and dispositions; approval record; `ART-INTEGRITY-001` (Repository Integrity Validation Report — reused from consistency review at the same revision, not re-derived).
+- **Outputs:** `ART-VAL-DOC-001` documentation-dimension results (per criterion `PASS`/`FAIL`/`BLOCKED`/`N/A`; the repository-consistency criterion cites `ART-INTEGRITY-001` directly).
 - **Next Consumer:** Lead Architect (consolidation); responsible author on failure.
 
 ### Architecture Validator

@@ -8,11 +8,40 @@ schema_version: 1
 
 platform:
   name: AI Engineering Platform
-  current_version: 1.3.0
+  current_version: 1.4.0
   status: Stable
-  released: "2026-07-09"
+  released: "2026-07-16"
 
 history:
+  - version: 1.4.0
+    status: Stable
+    released: "2026-07-16"
+    summary: >-
+      Repository Integrity Validation release. Adds a deterministic, dependency-free
+      checker (.claude/tooling/repository-integrity-check.js) as a mandatory
+      sub-check owned by the existing Consistency Reviewer wherever consistency
+      review applies (G4), reused unchanged at G6 (Documentation Validator) and
+      G9 (Post-flight) rather than re-derived. The identical script is enforced
+      independently of AI execution by a new CI job
+      (.github/workflows/ci.yml, job repository-integrity) on every pull request,
+      so human- and AI-authored changes get symmetric enforcement. Detects broken
+      markdown links, broken ADR/specification/governance/knowledge/
+      implementation-execution references, broken cross-index references,
+      duplicate authorities (ADR numbers, index identity keys), missing canonical
+      references, and orphan documents (WARN-severity, non-blocking). A checked-in
+      baseline (.claude/tooling/repository-integrity-baseline.json) fingerprints
+      pre-existing findings so only new regressions block CI. No new workflow or
+      gate is introduced; REVIEW_GATES.md gains one Applicability Rules entry,
+      LOOP_REGISTRY.yaml gains one produced_artifacts item each on
+      consistency-review/validation/postflight, and workflows/README.md registers
+      the new ART-INTEGRITY artifact-id prefix. The tool's first run independently
+      discovered and this release remediates a real defect: 18 ADR files lost from
+      the working tree during a 2026-07-16 documentation restructuring (commit
+      e0c5e8b) with no copy step performed, breaking 20+ cross-references
+      platform-wide (see governance/SPECIFICATION_ISSUES_REGISTER.md SIR-GLOB-021,
+      RESOLVED; SIR-GLOB-020, OPEN/baselined). See ADR-019 (Proposed, pending
+      human ratification per Constitution §20, consistent with the ADR-001..010
+      precedent).
   - version: 1.3.0
     status: Stable
     released: "2026-07-09"
@@ -60,8 +89,10 @@ history:
       operating system (constitution, workflows, agents, templates, checklists,
       knowledge layer).
 
-# 1.3.0 supersedes 1.2.0 as the current stable line. 1.2.0, 1.1.0, and 1.0.0 remain valid history.
-# The 1.3.0 change set is additive; no breaking changes and no new constitutional article
-# (see CHANGELOG). Constitutional additions in 1.2.0 trace to ADR-009; formal human
+# 1.4.0 supersedes 1.3.0 as the current stable line. 1.3.0, 1.2.0, 1.1.0, and 1.0.0 remain valid
+# history. The 1.4.0 change set is additive; no breaking changes and no new constitutional article
+# (see CHANGELOG). ADR-019 (Repository Integrity Validation) is Proposed, pending human
+# ratification per Engineering Constitution §20, consistent with the ADR-001..010 precedent (see
+# SYNC_STATE.yaml SYNC-039). Constitutional additions in 1.2.0 trace to ADR-009; formal human
 # ratification is reserved human authority per Engineering Constitution 20 (see
 # SYNC_STATE.yaml SYNC-012).

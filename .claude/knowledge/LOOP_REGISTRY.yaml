@@ -125,7 +125,7 @@ loops:
     retry_policy: Re-validate failed dimensions after fixes (LOOP_CONTROL §3).
     escalation_policy: Conflicting validator results or constitutional failure → human.
     confidence_threshold: High
-    produced_artifacts: [Validation Report, criterion matrix, reproduced-command evidence, residual limitation list, G6 result]
+    produced_artifacts: [Validation Report, criterion matrix, reproduced-command evidence, residual limitation list, G6 result, Repository Integrity Validation Report (ART-INTEGRITY-001, consumed by the documentation dimension)]
     required_gates: [G6]
     restart_conditions: Revision identity, frozen requirements, architecture, or core evidence change.
 
@@ -164,7 +164,7 @@ loops:
     retry_policy: Restart affected comparisons after edits (LOOP_CONTROL §3).
     escalation_policy: Equal-authority conflict, no canonical term, or historical-as-current → source owner/human.
     confidence_threshold: High
-    produced_artifacts: [Consistency Review, terminology delta, cross-reference report, synchronization inventory]
+    produced_artifacts: [Consistency Review, terminology delta, cross-reference report, synchronization inventory, Repository Integrity Validation Report (ART-INTEGRITY-001)]
     required_gates: [G4-consistency]
     restart_conditions: Canonical source, terminology, or scope change (full), else affected comparisons.
 
@@ -229,7 +229,7 @@ loops:
     retry_policy: Reopen responsible sync/documentation step on failure (LOOP_CONTROL §3).
     escalation_policy: Undocumented scope, ownership conflict, or breaking dependent → escalate; parent stays open.
     confidence_threshold: High
-    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization (ART-POST-004a)]
+    produced_artifacts: [Post-flight Record, final impact inventory, knowledge deltas, synchronization tasks, residual-risk/follow-up list, Specification Issues Register synchronization (ART-POST-004a), Repository Integrity Validation confirmation (ART-INTEGRITY-001, zero new blocking findings)]
     required_gates: [G9]
     restart_conditions: Any final-state change or finding correction.
     invokes: [learning]

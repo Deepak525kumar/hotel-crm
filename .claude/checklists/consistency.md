@@ -10,3 +10,4 @@
 - [ ] `CS-08` All links, IDs, paths, and cross-references resolve to the intended active artifact.
 - [ ] `CS-09` Status/version/approval metadata and supersession relationships agree.
 - [ ] `CS-10` Every affected active dependent is updated or recorded as a blocking synchronization item.
+- [ ] `CS-11` Repository Integrity Validation (`../tooling/repository-integrity-check.js`, `ART-INTEGRITY-001`) reports zero new (non-baselined) blocking findings — broken markdown links, broken ADR/specification/governance/knowledge/implementation-execution references, broken cross-index references, duplicate authorities, and missing canonical references; any new finding is fixed or recorded in the Specification Issues Register before this check passes.

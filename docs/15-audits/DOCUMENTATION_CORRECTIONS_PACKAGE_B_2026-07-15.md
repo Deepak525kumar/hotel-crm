@@ -1,6 +1,6 @@
 # Documentation Corrections Report — Package B
 
-**Source audit:** `AUDIT-REPO-2026-07-14` (`docs/audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`)
+**Source audit:** `AUDIT-REPO-2026-07-14` (`docs/15-audits/REPOSITORY_SPECIFICATION_AUDIT_2026-07-14.md`)
 **Package:** B — Documentation Workflow / module-author corrections
 **Date:** 2026-07-15
 **Session/branch:** `claude/fast-documentation-workflow-b5chdi`
