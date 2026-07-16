@@ -4,11 +4,21 @@ Follows [`templates/REPOSITORY_INTEGRITY_VALIDATION_TEMPLATE.md`](templates/REPO
 
 ## Control
 
-- **Repository revision:** `031b9387d814266dbaaf5755ee8c6a1e5c45eed0` (branch `claude/repo-integrity-validation-lxv3iw`, working tree at the time of this change set's final commit).
+- **Repository revision:** working tree on branch `claude/repo-integrity-validation-lxv3iw`, on top of commit `9ac2291` (this document's own revision, post-review-correction).
 - **Command invoked:** `node .claude/tooling/repository-integrity-check.js --format md --out <path>`
 - **Exit code:** `0`
-- **Baseline file:** `.claude/tooling/repository-integrity-baseline.json` (4 entries, `generated_at: 2026-07-16`)
+- **Baseline file:** `.claude/tooling/repository-integrity-baseline.json` (3 entries after dedup, `generated_at: 2026-07-16`; regenerated after the SEC-1 fingerprint fix below — see Review Corrections)
 - **Consuming gate:** G4-consistency (this change's own Consistency Review component); reused unchanged at G6/G9 per [`constitution/REVIEW_GATES.md`](constitution/REVIEW_GATES.md) Applicability Rules.
+
+## Review Corrections (post-implementation, pre-merge)
+
+An independent Security Reviewer and Consistency Reviewer pass was run against this change set before opening the PR (per the commitment in ADR-019 §Validation). Three findings were confirmed and fixed; none required reverting the approach:
+
+1. **SEC-1 (High, confirmed).** The initial `fingerprint()` implementation contained two literal NUL bytes (byte offsets 8268/8276) as field separators, invisible in every text-rendering path used during authoring. Independently reproduced via raw-byte read. Patched to ordinary ASCII spaces; verified zero non-whitespace control bytes remain anywhere in the new tooling tree. **This changed every fingerprint hash, which invalidated the original baseline — regenerated via `--write-baseline` and re-annotated.**
+2. **SEC-2 (Medium, confirmed).** `resolveLinkTarget`/`resolveBacktickTarget` resolved `../`-heavy targets without verifying containment under `REPO_ROOT`, letting a crafted markdown/YAML citation make `exists()` run `fs.statSync` against arbitrary absolute paths (existence-oracle only — no `readFileSync` on the escaped path was ever reachable). Fixed with a new `isContained()` guard; both resolvers now return `null` for any target that escapes the repository root, handled identically to an external URL.
+3. **CR-1 (Low, confirmed).** `FRAMEWORK_RELEASE_NOTES.md` inserted the new 1.4.0 section between 1.2.0 and 1.3.0, breaking the file's established ascending version order. Reordered to 1.1.0 → 1.2.0 → 1.3.0 → 1.4.0 → 1.0.0 (matching the file's own convention).
+
+Full reviewer reports are in the PR description.
 
 ## Before / After
 
@@ -24,7 +34,8 @@ That number was dominated by a backtick-path heuristic later removed as unworkab
 |---|---|---|
 | Second run (markdown-link + YAML-key mechanisms only, no baseline) | 82 | 30 |
 | After fixing the 18-ADR-file loss + 2 redirect READMEs + `docs/audits/` path drift | 54 | 4 |
-| **Current (with baseline)** | **55** | **0** |
+| After the code-span-masking fix (illustrative `` `[text](path)` `` syntax no longer misparsed) | 53 | 4 (unbaselined at that point) |
+| **Current (with baseline, post SEC-1/SEC-2 fixes)** | **53** | **0** |
 
 ## Findings Fixed in This Change Set
 
@@ -44,30 +55,30 @@ That number was dominated by a backtick-path heuristic later removed as unworkab
 
 # Repository Integrity Validation Report
 
-Generated: 2026-07-16T11:10:07.195Z
+Generated: 2026-07-16T11:21:02.958Z
 
 | Total | New (blocking) | Baselined | Warn |
 |---|---|---|---|
-| 55 | 0 | 4 | 51 |
+| 53 | 0 | 4 | 49 |
 
 ## Findings by check
 
 | Check | Total | New |
 |---|---|---|
 | broken-relative-path | 4 | 0 |
-| orphan-document | 51 | 0 |
+| orphan-document | 49 | 0 |
 
-## Warnings (non-blocking, 51)
+## Warnings (non-blocking, 49)
 
-All 51 are `orphan-document` findings — `.claude/agents/*.md`, `.claude/checklists/*.md`, two `.claude/templates/*.md`, `docs/00-foundations/*.md`, 9 `docs/03-modules/*/MODULE_SPEC.md`, and 8 `docs/14-governance/architecture-decisions/ADR-*.md`. Every one is a false positive relative to actual usage: this repository's convention references agents/checklists/templates/ADRs/module specs **by name in prose** (e.g. "per `ADR-016`", "the Consistency Reviewer") rather than as markdown links, which the tool's link-graph-based orphan detector cannot credit. This is exactly why `orphan-document` is WARN-severity, non-blocking, by design (see the tool's header comment and ADR-019 Decision §5) — spot-checked a sample of 5 and confirmed each is actively cross-referenced by name at least once.
+All 49 are `orphan-document` findings — `.claude/agents/*.md`, `.claude/checklists/*.md`, two `.claude/templates/*.md`, `docs/00-foundations/*.md`, 9 `docs/03-modules/*/MODULE_SPEC.md`, and 7 `docs/14-governance/architecture-decisions/ADR-*.md` (ADR-019 itself is not in this list — the Framework Improvement Proposal links to it directly, so it has a real inbound reference). Every one is a false positive relative to actual usage: this repository's convention references agents/checklists/templates/ADRs/module specs **by name in prose** (e.g. "per `ADR-016`", "the Consistency Reviewer") rather than as markdown links, which the tool's link-graph-based orphan detector cannot credit. This is exactly why `orphan-document` is WARN-severity, non-blocking, by design (see the tool's header comment and ADR-019 Decision §5) — spot-checked a sample of 5 and confirmed each is actively cross-referenced by name at least once.
 
 <!-- END tool output -->
 
 ## Disposition
 
 - New (non-baselined) blocking findings: **0**. `PASS`.
-- Baselined findings (4): tracked as `SIR-GLOB-020`, OPEN, owner: human/documentation (content decision on replacement targets).
-- Warn findings (51, `orphan-document`): reviewed, confirmed false-positive-by-design, no action required.
+- Baselined findings (4, 3 distinct fingerprints — one target cited twice in the same file): tracked as `SIR-GLOB-020`, OPEN, owner: human/documentation (content decision on replacement targets).
+- Warn findings (49, `orphan-document`): reviewed, confirmed false-positive-by-design, no action required.
 
 ## Recommendation
 

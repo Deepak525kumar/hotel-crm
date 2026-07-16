@@ -41,6 +41,7 @@ Version 1.4.0 is the Repository Integrity Validation release. It closes a gap th
 
 ## Fixed
 
+- **Pre-merge review corrections.** An independent Security Reviewer pass found and fixed two defects in the new script before this change was opened as a PR: literal NUL-byte field separators in `fingerprint()` (invisible in normal text rendering; patched to ASCII spaces, which also required regenerating the baseline since it changed every hash), and a missing repository-root containment check in path resolution (a crafted `../`-heavy citation could make the existence check `stat` arbitrary absolute paths; fixed with an explicit containment guard). An independent Consistency Reviewer pass found `FRAMEWORK_RELEASE_NOTES.md`'s 1.4.0 section broke the file's established version ordering; reordered. See `REPOSITORY_INTEGRITY_VALIDATION_REPORT.md` Review Corrections.
 - **18 ADR files (ADR-001..018) recovered.** The tool's first run discovered they had been lost from the working tree during a 2026-07-16 documentation-directory restructuring (commit `e0c5e8b`, `docs/09-decisions/` → `docs/14-governance/`) with no copy step performed, breaking 20+ cross-references across `CLAUDE.md`, `DECISION_INDEX.md`, this changelog, `FRAMEWORK_RELEASE_NOTES.md`, and the governance register. Files recovered byte-for-byte from git history; every cross-reference corrected. See `governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-021` (RESOLVED).
 
 ## Decision Records

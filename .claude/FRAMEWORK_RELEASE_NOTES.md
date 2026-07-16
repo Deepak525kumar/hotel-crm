@@ -49,28 +49,6 @@ Compatibility: no breaking changes; no migration required (cache-miss degrades t
 
 ---
 
-## Version 1.4.0
-
-**Release Date:** 2026-07-16
-
-**Status:** Stable (current)
-
----
-
-Version 1.4.0 is the Repository Integrity Validation release. It gives the platform a deterministic, dependency-free answer to whether cross-repository references actually resolve — broken markdown links, broken ADR/specification/governance/knowledge/implementation-execution references, broken cross-index references, duplicate authorities, missing canonical references, and orphan documents — enforced identically for AI-authored and human-authored pull requests. It is additive: no gate, finding schema, confidence rule, loop bound, or specialist boundary is changed, and no new workflow is introduced.
-
-Highlights:
-
-- **`tooling/repository-integrity-check.js`.** One deterministic implementation, reused unchanged by the Consistency Reviewer (G4), the Documentation Validator (G6), Post-flight (G9), and by a new CI job (`.github/workflows/ci.yml`, job `repository-integrity`) that runs on every pull request independent of AI execution.
-- **Baseline adoption.** `tooling/repository-integrity-baseline.json` fingerprints pre-existing findings at adoption time so only new regressions block CI, without hiding the remainder — every baselined finding is tracked to a `SIR-*` row in the governance register.
-- **A real defect found and fixed on day one.** The tool's first run discovered that a same-day documentation-directory restructuring (commit `e0c5e8b`) had deleted all 18 ADR files from the working tree, breaking 20+ cross-references platform-wide. Recovered from git history as part of this release; see `governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-021`.
-
-Governance: no gate removed or weakened; no new constitutional article. ADR-019 is Proposed, pending human ratification (Constitution §20), consistent with the ADR-001..010 precedent.
-
-Compatibility: no breaking changes; no migration required.
-
----
-
 ## Version 1.3.0
 
 **Release Date:** 2026-07-09
@@ -88,6 +66,28 @@ Highlights:
 - **Workflow integration.** Register synchronization is now a mandatory exit condition of the Documentation Workflow and step `ART-POST-004a` of the Post-flight Workflow, scoped to the affected-module slice with a no-op carve-out for purely corrective nonsemantic metadata edits.
 
 Governance: no gate removed or weakened; no new constitutional article. Ratification of ADR-010 (like ADR-001..009) remains reserved human authority (Constitution §20).
+
+Compatibility: no breaking changes; no migration required.
+
+---
+
+## Version 1.4.0
+
+**Release Date:** 2026-07-16
+
+**Status:** Stable (current)
+
+---
+
+Version 1.4.0 is the Repository Integrity Validation release. It gives the platform a deterministic, dependency-free answer to whether cross-repository references actually resolve — broken markdown links, broken ADR/specification/governance/knowledge/implementation-execution references, broken cross-index references, duplicate authorities, missing canonical references, and orphan documents — enforced identically for AI-authored and human-authored pull requests. It is additive: no gate, finding schema, confidence rule, loop bound, or specialist boundary is changed, and no new workflow is introduced.
+
+Highlights:
+
+- **`tooling/repository-integrity-check.js`.** One deterministic implementation, reused unchanged by the Consistency Reviewer (G4), the Documentation Validator (G6), Post-flight (G9), and by a new CI job (`.github/workflows/ci.yml`, job `repository-integrity`) that runs on every pull request independent of AI execution.
+- **Baseline adoption.** `tooling/repository-integrity-baseline.json` fingerprints pre-existing findings at adoption time so only new regressions block CI, without hiding the remainder — every baselined finding is tracked to a `SIR-*` row in the governance register.
+- **A real defect found and fixed on day one.** The tool's first run discovered that a same-day documentation-directory restructuring (commit `e0c5e8b`) had deleted all 18 ADR files from the working tree, breaking 20+ cross-references platform-wide. Recovered from git history as part of this release; see `governance/SPECIFICATION_ISSUES_REGISTER.md` `SIR-GLOB-021`.
+
+Governance: no gate removed or weakened; no new constitutional article. ADR-019 is Proposed, pending human ratification (Constitution §20), consistent with the ADR-001..010 precedent.
 
 Compatibility: no breaking changes; no migration required.
 

@@ -126,9 +126,19 @@ function isExternalTarget(target) {
   return /^(https?:|mailto:|ftp:|tel:)/i.test(target) || target.startsWith('#') || target.trim() === '';
 }
 
+// True iff `abs` is REPO_ROOT itself or a path underneath it. Every resolver
+// below MUST pass its result through this before treating a target as a
+// repository reference — otherwise a crafted "../../../../etc/passwd"-style
+// target in a PR-supplied markdown/YAML file would make exists() run
+// fs.statSync against arbitrary paths on the machine running this script.
+function isContained(abs) {
+  const rel = path.relative(REPO_ROOT, abs);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
+}
+
 // Resolve a link target found inside `sourceFile` to a repo-relative path, or
 // null if it is not a repository-relative filesystem reference (external URL,
-// pure in-page anchor, etc).
+// pure in-page anchor, path that escapes the repository root, etc).
 function resolveLinkTarget(sourceFileAbs, rawTarget) {
   let target = rawTarget.trim();
   if (isExternalTarget(target)) return null;
@@ -144,14 +154,17 @@ function resolveLinkTarget(sourceFileAbs, rawTarget) {
   } else {
     abs = path.resolve(path.dirname(sourceFileAbs), target);
   }
+  if (!isContained(abs)) return null;
   return toRel(path.relative(REPO_ROOT, abs));
 }
 
 // Resolve a bare, backtick-quoted path citation. Unlike markdown links these
 // are always written as full repository-relative citations in this codebase's
 // documentation convention (see Design Note), so resolution is root-relative.
+// Returns null if the target escapes the repository root (see isContained).
 function resolveBacktickTarget(rawTarget) {
   const abs = path.join(REPO_ROOT, rawTarget);
+  if (!isContained(abs)) return null;
   return toRel(path.relative(REPO_ROOT, abs));
 }
 
@@ -164,14 +177,17 @@ function exists(relPath) {
   }
 }
 
-// Mask fenced (```) and inline (`) code spans so illustrative markdown
-// syntax shown as literal text — e.g. a sentence containing the literal
-// characters `[text](path)` to describe link syntax — is never re-parsed as
-// a real link. Preserves string length and line breaks (mask char can't
-// itself form `[]()`  syntax) so line numbers stay meaningful if ever needed.
+// Mask fenced (```) and inline code spans — including the CommonMark
+// double-backtick-or-more escape used to show a literal backtick inside a
+// span (e.g. `` `[text](path)` `` to display backtick-quoted link syntax) —
+// so illustrative markdown syntax shown as literal text is never re-parsed
+// as a real link. A run of N backticks opens a span closed by the same-length
+// run (backreference \1 handles any N uniformly). Preserves string length
+// and line breaks (mask char can't itself form `[]()` syntax) so line
+// numbers stay meaningful if ever needed.
 function maskCodeSpans(content) {
   let masked = content.replace(/```[\s\S]*?```/g, (m) => m.replace(/[^\n]/g, '#'));
-  masked = masked.replace(/`[^`\n]+`/g, (m) => m.replace(/[^\n]/g, '#'));
+  masked = masked.replace(/(`+)[\s\S]*?\1/g, (m) => m.replace(/[^\n]/g, '#'));
   return masked;
 }
 
@@ -187,7 +203,7 @@ function classify(relPath, fallback) {
 const findings = [];
 
 function fingerprint(checkId, file, target) {
-  return crypto.createHash('sha1').update(`${checkId} ${file} ${target}`).digest('hex').slice(0, 16);
+  return crypto.createHash('sha1').update(`${checkId} ${file} ${target}`).digest('hex').slice(0, 16);
 }
 
 function addFinding(checkId, file, target, detail) {
@@ -255,7 +271,7 @@ function checkYamlFile(fileAbs, relFile) {
       if (!/\//.test(candidate) || !/\.(md|yaml|yml)$/i.test(candidate)) continue;
       if (isExternalTarget(candidate)) continue;
       const resolved = resolveBacktickTarget(candidate);
-      if (exists(resolved)) continue;
+      if (resolved === null || exists(resolved)) continue;
       const checkId = classify(resolved, 'broken-cross-index-reference');
       addFinding(checkId, relFile, resolved, `YAML key "${key}" cites a path that does not exist`);
     }
@@ -410,7 +426,7 @@ function run() {
       const value = stripYamlValue(m[2]);
       if (/\/.+\.(md|yaml|yml)$/i.test(value)) {
         const resolved = resolveBacktickTarget(value);
-        if (exists(resolved)) captureInbound(resolved);
+        if (resolved !== null && exists(resolved)) captureInbound(resolved);
       }
     }
   }
