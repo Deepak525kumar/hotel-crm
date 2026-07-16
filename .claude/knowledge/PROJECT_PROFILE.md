@@ -34,7 +34,7 @@
 
 - `docs/00-foundations/` contains current foundation candidates.
 - `docs/01-product/` through `docs/13-testing/` contain active-structure candidates but must be classified per artifact; empty directories do not establish authority.
-- `docs/14-governance/architecture-decisions/` holds ADR-001..018 (Accepted status as of `DECISION_INDEX.md`); path corrected 2026-07-16 (was `docs/09-decisions/`, retired — see `docs/14-governance/architecture-decisions/MIGRATION_NOTICE.md`). This profile is otherwise unrefreshed since 2026-07-04 (see `Profile date` above) and a full repository-synchronization pass remains pending.
+- `docs/14-governance/architecture-decisions/` is the designated decision area and holds the ADR corpus (ADR-001..018, Accepted status as of `DECISION_INDEX.md`), indexed in `DECISION_INDEX.md`; the prior `docs/09-decisions/` location is retired (see `docs/15-audits/ADR_INTEGRITY_RESTORATION_2026-07-16.md`). This profile is otherwise unrefreshed since 2026-07-04 (see `Profile date` above) and a full repository-synchronization pass remains pending.
 - `docs/legacy/` is historical evidence only unless an approved current source explicitly promotes content.
 - Root `README.md` is repository guidance and an architecture claim; it is not automatically a frozen specification or ADR.
 - Nested `frontend/CLAUDE.md` and `frontend/AGENTS.md` apply to frontend-scoped work after conflict checking against higher repository policy.

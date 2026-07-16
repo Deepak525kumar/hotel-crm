@@ -48,7 +48,7 @@ known_drift:
   - id: SYNC-002
     type: architecture-decisions
     status: resolved-proposed
-    description: ADR-001..008 authored in docs/09-decisions/architecture-decisions/ and indexed in DECISION_INDEX.md. Records exist in Proposed status; formal ratification (Proposed -> Accepted) remains reserved human authority.
+    description: ADR-001..008 authored in docs/14-governance/architecture-decisions/ and indexed in DECISION_INDEX.md. Records exist in Proposed status; formal ratification (Proposed -> Accepted) remains reserved human authority.
     authority_needed: human
   - id: SYNC-003
     type: dependency-graph
@@ -256,7 +256,7 @@ known_drift:
       contradiction of CLAUDE.md's Knowledge Separation "exclusively"/"do not mix"
       wording; and the absence of a Decision Record for the new governance/
       directory and SIR artifact class. Both remediated: ADR-010 authored
-      (docs/09-decisions/architecture-decisions/ADR-010-governance-layer-
+      (docs/14-governance/architecture-decisions/ADR-010-governance-layer-
       specification-issues-register.md), establishing governance/ as an explicit
       third top-level category and amending CLAUDE.md accordingly; LOOP_REGISTRY.yaml
       produced_artifacts synced for documentation/postflight (architecture Medium).
@@ -734,7 +734,7 @@ known_drift:
       specification -- it is an extension of the Calendar capability owned by
       backend-calendar / SPEC-CALENDAR-001; no SPEC-SCHEDULING-001 /
       backend-scheduling shall exist. Both decisions recorded as ADR-011
-      (Accepted, docs/09-decisions/architecture-decisions/ADR-011-hotels-and-
+      (Accepted, docs/14-governance/architecture-decisions/ADR-011-hotels-and-
       scheduling-capability-ownership.md) and indexed in DECISION_INDEX.md.
       Specification Issues Register synchronized: SIR-CRM-006 (OD-CRM-06
       "Hotels module" naming ambiguity) marked RESOLVED by ADR-011 -- "Hotels
@@ -835,7 +835,7 @@ known_drift:
       Employee Management, Documents, Payslips, Compliance, and every future
       capability consume this functionality through backend-hr's interfaces;
       they do not own it. Decision recorded as ADR-012 (Accepted,
-      docs/09-decisions/architecture-decisions/ADR-012-contracts-ownership-hr-
+      docs/14-governance/architecture-decisions/ADR-012-contracts-ownership-hr-
       bounded-context.md) and indexed in DECISION_INDEX.md (new ADR-012 row;
       the now-resolved "Pending Decision Records (SPEC-HR-001 / Onboarding /
       SPEC-CONTRACTS-001 boundary)" table added by SYNC-023 was removed, its
@@ -1059,7 +1059,7 @@ known_drift:
       business workflow (workflow, state, steps, validation, completion,
       business rules) and consumes Chatbot through `IF-CHATBOT-*` interface
       contracts, not first-person execution. Decision recorded as `ADR-013`
-      (Accepted, `docs/09-decisions/architecture-decisions/
+      (Accepted, `docs/14-governance/architecture-decisions/
       ADR-013-chatbot-ai-capability-ownership-vs-onboarding-workflow.md`)
       and indexed in `DECISION_INDEX.md`.
       Unlike the `ADR-012` precedent (which left Onboarding's Contracts-
@@ -1386,7 +1386,7 @@ known_drift:
       Added "Pending Decision Records (Compliance / AuditLog boundary)" to
       `DECISION_INDEX.md` (`OD-COMPLIANCE-001`).
       **RESOLVED same-day (2026-07-14) by human-authority decision `ADR-016`**
-      (`docs/09-decisions/architecture-decisions/ADR-016-audit-log-ownership-auth-writer-compliance-reader.md`):
+      (`docs/14-governance/architecture-decisions/ADR-016-audit-log-ownership-auth-writer-compliance-reader.md`):
       `backend-auth` is the authoritative writer of `state-audit-log`;
       `backend-compliance` is a read-only consumer, never writer/lifecycle
       owner; Compliance's positive scope settled as governance,
@@ -1586,13 +1586,21 @@ known_drift:
       register, two module-directory redirect READMEs). All 18 files recovered
       byte-for-byte from git history (`e0c5e8b^:docs/09-decisions/architecture-decisions/`)
       into `docs/14-governance/architecture-decisions/`; every cross-reference
-      in the files above corrected; `MIGRATION_NOTICE.md` updated to record
-      completion. A second, smaller drift of the same class (`docs/audits/` ->
-      `docs/15-audits/`, 3 references) was found and corrected in the same
-      pass. `docs/03-modules/*/MODULE_SPEC.md` files citing the stale
-      `docs/09-decisions/` path were intentionally left untouched — they are
-      governed by their own Documentation Workflow correction cycle, not this
-      framework change; tracked as the residual share of `SIR-GLOB-021`.
+      in the files above corrected. A second, smaller drift of the same class
+      (`docs/audits/` -> `docs/15-audits/`, 3 references) was found and
+      corrected in the same pass. `docs/03-modules/*/MODULE_SPEC.md` files
+      citing the stale `docs/09-decisions/` path were intentionally left
+      untouched at authoring time — governed by their own Documentation
+      Workflow correction cycle, not this framework change. **Reconciled at
+      merge time with PR #152 ("Restore ADR corpus to canonical governance
+      location"), which independently found and fixed the identical defect
+      first**, additionally correcting the module-spec citations this session
+      deferred and removing `MIGRATION_NOTICE.md`/`scripts/rename_docs_dirs.sh`
+      (migration complete) in favor of a dedicated incident report
+      (`docs/15-audits/ADR_INTEGRITY_RESTORATION_2026-07-16.md`, authoritative
+      going forward). Both restorations recovered byte-identical ADR content;
+      the merge is clean and non-conflicting on substance. `SIR-GLOB-021`
+      updated to record the convergence; no residual open citation remains.
       `backend/README.md`'s three broken links (two targets absent
       repository-wide, one pointing above its true `docs/legacy/` location)
       have no evident current-doc replacement and were accepted into the
