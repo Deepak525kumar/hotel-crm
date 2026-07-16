@@ -19,7 +19,7 @@ restated here.
 | # | Item | Epic | Status | Owner | Issue/PR | Blocker |
 |---|---|---|---|---|---|---|
 | S0-1 | [CI blocking checks, per workspace](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | DONE | Infrastructure Engineer | [#154](https://github.com/Deepak525kumar/hotel-crm/pull/154) | — |
-| S0-2 | [Migration + rollback harness](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
+| S0-2 | [Migration + rollback harness](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | DONE | Infrastructure Engineer | — | — |
 | S0-3 | [Observability baseline](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
 | S0-4 | [Feature-flag mechanism (pivot cutover)](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
 | S0-5 | [Analytics leaderboard authz hotfix](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-secrem--security-release-prerequisite-remediation) | EPIC-SECREM | NOT_STARTED | unassigned | — | — |

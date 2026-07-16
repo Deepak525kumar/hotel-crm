@@ -1,0 +1,89 @@
+name: Migration Harness
+
+# Deterministic forward + rollback + recovery proof for Prisma migrations
+# (EPIC-PLATFORM S0-2). Runs on any change that touches the migration chain,
+# the harness, or this workflow. Reuses the same Postgres 15 service and
+# `prisma migrate deploy` step as ci.yml — no new infrastructure.
+
+on:
+  push:
+    branches: ['feature/**', 'fix/**', 'develop', 'main']
+    paths:
+      - 'backend/prisma/migrations/**'
+      - 'backend/prisma/harness/**'
+      - 'backend/prisma/schema.prisma'
+      - 'backend/scripts/migrate-harness.sh'
+      - '.github/workflows/migration-harness.yml'
+  pull_request:
+    branches: ['develop', 'main']
+    paths:
+      - 'backend/prisma/migrations/**'
+      - 'backend/prisma/harness/**'
+      - 'backend/prisma/schema.prisma'
+      - 'backend/scripts/migrate-harness.sh'
+      - '.github/workflows/migration-harness.yml'
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-harness:
+    name: Forward · Rollback · Recovery
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hotelcrm_migration_harness
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/hotelcrm_migration_harness
+      # Explicit opt-in for the harness's destructive operations. Safe here: the
+      # target is the ephemeral, throwaway `postgres` service DB above.
+      MIGRATE_HARNESS_YES: '1'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend deps
+        run: npm ci
+        working-directory: backend
+
+      - name: Enforce paired-down convention
+        run: bash scripts/migrate-harness.sh check-pairs
+        working-directory: backend
+
+      - name: Verify forward + rollback + recovery (incl. no-op probe)
+        run: bash scripts/migrate-harness.sh verify
+        working-directory: backend
+
+      - name: Export production-shaped schema snapshot (dry-run artifact)
+        if: always()
+        run: |
+          bash scripts/migrate-harness.sh snapshot production-shape.sql || true
+        working-directory: backend
+
+      - name: Upload production-shaped snapshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-shape-schema
+          path: backend/production-shape.sql
+          if-no-files-found: ignore
