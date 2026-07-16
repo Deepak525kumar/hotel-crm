@@ -68,7 +68,7 @@ Version 1.2.0 is the context-artifact / token-optimization release. It reduces t
 - **Module Memory** (`knowledge/MODULE_MEMORY.yaml`): immutable revision-bound frozen-spec summaries consumed before discovery.
 - **Six canonical lookup indexes** (`knowledge/{SPECIFICATION,OWNERSHIP,STATE_OWNERSHIP,CONTRACT,API,BOUNDARY}_INDEX.yaml`) derived from `MODULE_REGISTRY` + `DEPENDENCY_GRAPH`.
 - **Context Artifact templates** (`templates/CONTEXT_ARTIFACT_TEMPLATES.md`, `templates/BOUNDARY_CONFLICT_REPORT_TEMPLATE.md`).
-- **ADR-009** (`docs/09-decisions/architecture-decisions/ADR-009-context-artifact-token-optimization.md`) and `cache_state` in `knowledge/SYNC_STATE.yaml`.
+- **ADR-009** (`docs/14-governance/architecture-decisions/ADR-009-context-artifact-token-optimization.md`) and `cache_state` in `knowledge/SYNC_STATE.yaml`.
 
 ## Improved
 

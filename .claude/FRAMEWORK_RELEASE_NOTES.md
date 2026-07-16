@@ -62,7 +62,7 @@ Version 1.3.0 is the Specification Issues Register release. It gives the platfor
 Highlights:
 
 - **Specification Issues Register** (`governance/SPECIFICATION_ISSUES_REGISTER.md`). A single, continuously-updated index of unresolved issues aggregated **by reference** from `knowledge/SYNC_STATE.yaml` and every module specification's own Risks/Open-Decisions section, under stable `SIR-<SCOPE>-<NNN>` IDs.
-- **Governance layer** (`governance/`, [ADR-010](../docs/09-decisions/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md)). A third top-level category alongside `knowledge/`, for continuously-live, append-only registers synchronized as a workflow step rather than re-derived per revision.
+- **Governance layer** (`governance/`, [ADR-010](../docs/14-governance/architecture-decisions/ADR-010-governance-layer-specification-issues-register.md)). A third top-level category alongside `knowledge/`, for continuously-live, append-only registers synchronized as a workflow step rather than re-derived per revision.
 - **Workflow integration.** Register synchronization is now a mandatory exit condition of the Documentation Workflow and step `ART-POST-004a` of the Post-flight Workflow, scoped to the affected-module slice with a no-op carve-out for purely corrective nonsemantic metadata edits.
 
 Governance: no gate removed or weakened; no new constitutional article. Ratification of ADR-010 (like ADR-001..009) remains reserved human authority (Constitution §20).

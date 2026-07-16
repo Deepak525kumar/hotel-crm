@@ -20,7 +20,7 @@ module," or "Contract Management module" (e.g. `../onboarding/MODULE_SPEC.md`,
 `backend-hr` / `SPEC-HR-001`**, not as a separate ownership boundary.
 
 This decision is recorded in
-[`ADR-012`](../../09-decisions/architecture-decisions/ADR-012-contracts-ownership-hr-bounded-context.md)
+[`ADR-012`](../../14-governance/architecture-decisions/ADR-012-contracts-ownership-hr-bounded-context.md)
 (Accepted) and tracked at `SIR-GLOB-014` / `SIR-HR-001` (RESOLVED) in the
 [Specification Issues Register](../../../.claude/governance/SPECIFICATION_ISSUES_REGISTER.md).
 
