@@ -1,0 +1,180 @@
+{
+  "_kind": "authored framework policy — the one input not derivable from existing metadata",
+  "_canonical_policy": ".claude/constitution/CONTEXT_ARTIFACTS.md",
+  "_note": "The minimum document + artifact load set per workflow. This is the single piece of information the platform did not already hold in machine-readable form: which authoritative sources a workflow consumes. It cannot be derived from workflow prose without parsing natural language, which ADR-020 rejected on determinism grounds. Everything derivable is NOT stored here: the workflow file is derived as .claude/workflows/<id>.md, and gate planning stays with the workflow / LOOP_REGISTRY.yaml (not duplicated). Every .claude/workflows/*.md file MUST appear here exactly once (context-loader.js --validate enforces). artifacts are Context Artifact ids (CONTEXT_ARTIFACTS §2) whose transitive dependencies the loader expands from ARTIFACT_DEPENDENCIES.json.",
+  "workflows": [
+    { "id": "preflight",
+      "documents": [
+        { "path": ".claude/workflows/preflight.md", "load": "eager" },
+        { "path": ".claude/knowledge/MODULE_REGISTRY.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/DEPENDENCY_GRAPH.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/SYNC_STATE.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/SESSION_STATE.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/CAPABILITY_REGISTRY.yaml", "load": "lazy" },
+        { "path": ".claude/checklists/preflight.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-BOOT-001", "ART-EVID-001"] },
+
+    { "id": "repository-synchronization",
+      "documents": [
+        { "path": ".claude/workflows/repository-synchronization.md", "load": "eager" },
+        { "path": ".claude/knowledge/MODULE_REGISTRY.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/DEPENDENCY_GRAPH.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/SYNC_STATE.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/SESSION_STATE.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/TERMINOLOGY.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-EVID-001", "ART-REPO-001"] },
+
+    { "id": "requirements",
+      "documents": [
+        { "path": ".claude/workflows/requirements.md", "load": "eager" },
+        { "path": ".claude/templates/REQUIREMENTS_REGISTER_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/TERMINOLOGY.md", "load": "eager" },
+        { "path": ".claude/checklists/business-rules.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX", "ART-EVID-001"] },
+
+    { "id": "documentation",
+      "documents": [
+        { "path": ".claude/workflows/documentation.md", "load": "eager" },
+        { "path": ".claude/templates/MODULE_SPEC_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/SPECIFICATION_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/MODULE_MEMORY.yaml", "load": "eager" },
+        { "path": ".claude/governance/SPECIFICATION_ISSUES_REGISTER.md", "load": "eager" }
+      ],
+      "artifacts": ["ART-CTX", "ART-MEM", "ART-FIND-PKG", "ART-CORR"] },
+
+    { "id": "implementation",
+      "documents": [
+        { "path": ".claude/workflows/implementation.md", "load": "eager" },
+        { "path": ".claude/templates/IMPLEMENTATION_PLAN_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/templates/IMPLEMENTATION_REPORT_TEMPLATE.md", "load": "lazy" },
+        { "path": ".claude/knowledge/MODULE_REGISTRY.yaml", "load": "eager" }
+      ],
+      "artifacts": ["ART-CTX", "ART-CORR"] },
+
+    { "id": "testing",
+      "documents": [
+        { "path": ".claude/workflows/testing.md", "load": "eager" },
+        { "path": ".claude/templates/TEST_PLAN_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/checklists/testing.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX"] },
+
+    { "id": "validation",
+      "documents": [
+        { "path": ".claude/workflows/validation.md", "load": "eager" },
+        { "path": ".claude/templates/VALIDATION_REPORT_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/checklists/validation.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX", "ART-FIND-PKG", "ART-INTEGRITY-001"] },
+
+    { "id": "architecture-review",
+      "documents": [
+        { "path": ".claude/workflows/architecture-review.md", "load": "eager" },
+        { "path": ".claude/templates/ARCHITECTURE_REVIEW_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/BOUNDARY_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/STATE_OWNERSHIP_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/checklists/architecture.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX", "ART-DEPCTX", "ART-REV-PKG"] },
+
+    { "id": "dependency-review",
+      "documents": [
+        { "path": ".claude/workflows/dependency-review.md", "load": "eager" },
+        { "path": ".claude/templates/DEPENDENCY_REVIEW_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/DEPENDENCY_GRAPH.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/CONTRACT_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/API_INDEX.yaml", "load": "lazy" },
+        { "path": ".claude/checklists/dependency.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-DEPCTX", "ART-REV-PKG"] },
+
+    { "id": "consistency-review",
+      "documents": [
+        { "path": ".claude/workflows/consistency-review.md", "load": "eager" },
+        { "path": ".claude/templates/CONSISTENCY_REVIEW_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/TERMINOLOGY.md", "load": "eager" },
+        { "path": ".claude/knowledge/DECISION_INDEX.md", "load": "lazy" },
+        { "path": ".claude/checklists/consistency.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-REV-PKG", "ART-INTEGRITY-001"] },
+
+    { "id": "security-review",
+      "documents": [
+        { "path": ".claude/workflows/security-review.md", "load": "eager" },
+        { "path": ".claude/templates/SECURITY_REVIEW_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/checklists/security.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX", "ART-REV-PKG"] },
+
+    { "id": "performance-review",
+      "documents": [
+        { "path": ".claude/workflows/performance-review.md", "load": "eager" },
+        { "path": ".claude/templates/PERFORMANCE_REVIEW_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/checklists/performance.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX", "ART-REV-PKG"] },
+
+    { "id": "boundary-collision",
+      "documents": [
+        { "path": ".claude/workflows/boundary-collision.md", "load": "eager" },
+        { "path": ".claude/templates/BOUNDARY_CONFLICT_REPORT_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/knowledge/BOUNDARY_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/OWNERSHIP_INDEX.yaml", "load": "eager" }
+      ],
+      "artifacts": ["ART-DEPCTX", "ART-BOUNDARY-001"] },
+
+    { "id": "foundation-synchronization",
+      "documents": [
+        { "path": ".claude/workflows/foundation-synchronization.md", "load": "eager" },
+        { "path": ".claude/knowledge/TERMINOLOGY.md", "load": "eager" },
+        { "path": ".claude/knowledge/DECISION_INDEX.md", "load": "eager" },
+        { "path": ".claude/templates/DECISION_RECORD_TEMPLATE.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-EVID-001"] },
+
+    { "id": "dependency-synchronization",
+      "documents": [
+        { "path": ".claude/workflows/dependency-synchronization.md", "load": "eager" },
+        { "path": ".claude/knowledge/DEPENDENCY_GRAPH.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/CONTRACT_INDEX.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/API_INDEX.yaml", "load": "lazy" }
+      ],
+      "artifacts": ["ART-DEPCTX"] },
+
+    { "id": "release",
+      "documents": [
+        { "path": ".claude/workflows/release.md", "load": "eager" },
+        { "path": ".claude/templates/RELEASE_REPORT_TEMPLATE.md", "load": "eager" },
+        { "path": ".claude/checklists/release.md", "load": "lazy" },
+        { "path": ".claude/checklists/merge.md", "load": "lazy" }
+      ],
+      "artifacts": ["ART-CTX"] },
+
+    { "id": "postflight",
+      "documents": [
+        { "path": ".claude/workflows/postflight.md", "load": "eager" },
+        { "path": ".claude/checklists/postflight.md", "load": "eager" },
+        { "path": ".claude/governance/SPECIFICATION_ISSUES_REGISTER.md", "load": "eager" },
+        { "path": ".claude/knowledge/SYNC_STATE.yaml", "load": "eager" },
+        { "path": ".claude/knowledge/SESSION_STATE.yaml", "load": "eager" }
+      ],
+      "artifacts": ["ART-INTEGRITY-001", "ART-EVID-001"] },
+
+    { "id": "self-healing",
+      "documents": [
+        { "path": ".claude/workflows/self-healing.md", "load": "eager" },
+        { "path": ".claude/knowledge/SYNC_STATE.yaml", "load": "eager" }
+      ],
+      "artifacts": ["ART-EVID-001"] },
+
+    { "id": "learning",
+      "documents": [
+        { "path": ".claude/workflows/learning.md", "load": "eager" },
+        { "path": ".claude/knowledge/IMPROVEMENT_LOG.yaml", "load": "eager" }
+      ],
+      "artifacts": ["ART-CTX"] }
+  ]
+}

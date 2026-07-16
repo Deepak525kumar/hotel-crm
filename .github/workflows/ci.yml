@@ -51,10 +51,6 @@ jobs:
       - name: Validate Context Management Layer manifests
         run: node .claude/tooling/context-loader.js --validate
 
-      - name: Report context-loading reduction
-        if: always()
-        run: node .claude/tooling/context-loader.js --measure >> "$GITHUB_STEP_SUMMARY"
-
   ci:
     name: Lint · Typecheck · Test
     runs-on: ubuntu-latest

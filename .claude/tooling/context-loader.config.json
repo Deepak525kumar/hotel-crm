@@ -1,26 +1,21 @@
 {
-  "schema_version": 1,
-  "description": "Configuration for context-loader.js (Context Management Layer, framework 1.5.0). Repository-specific knobs only; the loader logic and the canonical loading policy live elsewhere (Knowledge Separation, ../CLAUDE.md; canonical policy constitution/CONTEXT_ARTIFACTS.md). This file names paths and the token-cost model; it never restates what to load — that is the authored EXECUTION_MANIFEST/BOOT_MANIFEST.",
+  "schema_version": 2,
+  "description": "Configuration for context-loader.js (Context Management Layer, framework 1.5.0). Repository-specific knobs only; loader logic and canonical loading policy live elsewhere (Knowledge Separation, ../CLAUDE.md; canonical policy constitution/CONTEXT_ARTIFACTS.md §8). Names paths and the token-cost ESTIMATE model; never restates what to load.",
   "paths": {
     "version": ".claude/VERSION.yaml",
     "syncState": ".claude/knowledge/SYNC_STATE.yaml",
     "sessionState": ".claude/knowledge/SESSION_STATE.yaml",
-    "bootManifest": ".claude/context/BOOT_MANIFEST.yaml",
-    "executionManifest": ".claude/context/EXECUTION_MANIFEST.yaml",
-    "artifactDependencies": ".claude/context/ARTIFACT_DEPENDENCIES.yaml",
-    "workflowsDir": ".claude/workflows",
-    "emitDir": ".claude/context"
-  },
-  "emit": {
-    "sessionContext": ".claude/context/SESSION_CONTEXT.yaml",
-    "cacheState": ".claude/context/CACHE_STATE.yaml"
+    "bootManifest": ".claude/context/BOOT_MANIFEST.json",
+    "executionManifest": ".claude/context/EXECUTION_MANIFEST.json",
+    "artifactDependencies": ".claude/context/ARTIFACT_DEPENDENCIES.json",
+    "workflowsDir": ".claude/workflows"
   },
   "tokenModel": {
     "bytesPerToken": 4,
-    "note": "Deterministic proxy: ceil(fileBytes / bytesPerToken). Used only for relative reduction reporting, never as an authoritative token count."
+    "note": "ESTIMATE ONLY: ceil(fileBytes / bytesPerToken). A deterministic byte proxy for RELATIVE reduction reporting — NOT a tokenizer measurement. Never presented as an authoritative token count."
   },
   "universe": {
-    "note": "The 'full load' baseline against which minimisation is measured: every authoritative document a naive, non-manifest boot would read.",
+    "note": "The naive full-load baseline against which reduction is estimated: every authoritative document a non-manifest boot would read.",
     "roots": [
       ".claude/constitution",
       ".claude/knowledge",

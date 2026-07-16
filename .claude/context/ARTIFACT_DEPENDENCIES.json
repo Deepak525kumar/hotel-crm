@@ -1,0 +1,18 @@
+{
+  "_kind": "authored framework policy — projection of the §2 dependency graph only",
+  "_canonical_policy": ".claude/constitution/CONTEXT_ARTIFACTS.md",
+  "_note": "Machine-readable projection of the Context Artifact DEPENDENCY graph (§2) and CACHE SCOPES (§3.1) — the only two facts the loader needs to expand dependencies and compute warm/cold. Invalidation semantics are NOT copied here: they live solely in CONTEXT_ARTIFACTS §3.2 (no duplicated authority). depends_on cascades downstream only (§3.2). cache_scope values are exactly the §3.1 taxonomy; the framework-version-scoped Boot Context is keyed by a content digest of its boot documents (see BOOT_MANIFEST.json, §8). lazy = resolved on demand.",
+  "artifacts": [
+    { "id": "ART-BOOT-001", "cache_scope": "framework-version", "lazy": false, "depends_on": [] },
+    { "id": "ART-REPO-001", "cache_scope": "revision", "lazy": false, "depends_on": [] },
+    { "id": "ART-EVID-001", "cache_scope": "revision", "lazy": false, "depends_on": ["ART-REPO-001"] },
+    { "id": "ART-DEPCTX", "cache_scope": "revision+capability", "lazy": true, "depends_on": ["ART-EVID-001"] },
+    { "id": "ART-MEM", "cache_scope": "module+freeze-revision", "lazy": true, "depends_on": ["ART-EVID-001"] },
+    { "id": "ART-CTX", "cache_scope": "candidate-version", "lazy": false, "depends_on": ["ART-BOOT-001", "ART-EVID-001", "ART-DEPCTX"] },
+    { "id": "ART-BOUNDARY-001", "cache_scope": "revision", "lazy": true, "depends_on": ["ART-DEPCTX"] },
+    { "id": "ART-REV-PKG", "cache_scope": "candidate-version", "lazy": false, "depends_on": ["ART-CTX"] },
+    { "id": "ART-FIND-PKG", "cache_scope": "candidate-version", "lazy": false, "depends_on": ["ART-REV-PKG"] },
+    { "id": "ART-CORR", "cache_scope": "candidate-version", "lazy": false, "depends_on": ["ART-FIND-PKG"] },
+    { "id": "ART-INTEGRITY-001", "cache_scope": "revision", "lazy": false, "depends_on": [] }
+  ]
+}
