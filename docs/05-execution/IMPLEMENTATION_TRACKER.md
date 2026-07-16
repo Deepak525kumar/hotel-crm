@@ -46,32 +46,33 @@ per phase are defined once in [IMPLEMENTATION_PHASES.md](../04-implementation/IM
 
 Each epic's prerequisites, deliverables, dependencies, and acceptance criteria are defined in
 [IMPLEMENTATION_BACKLOG.md](../04-implementation/IMPLEMENTATION_BACKLOG.md); this table only tracks
-execution status and owner.
+execution status, owner, and — where one is open — the tracking blocker ID. A blocker's full
+description lives once in [BLOCKERS.md](BLOCKERS.md); it is not restated here.
 
-| Epic | Phase | Status | Owner | Notes / current blocker |
+| Epic | Phase | Status | Owner | Blocker |
 |---|---|---|---|---|
-| EPIC-PLATFORM | 0 | IN_PROGRESS | *unassigned — see [BLOCKERS.md](BLOCKERS.md)* | Sprint 0 scope; see [CURRENT_SPRINT.md](CURRENT_SPRINT.md) |
-| EPIC-SECREM | 0 | IN_PROGRESS | *unassigned — see [BLOCKERS.md](BLOCKERS.md)* | Analytics leaderboard hotfix is the immediate, independent item |
-| EPIC-OWNERSHIP | 0 | IN_PROGRESS | Human (reserved authority) | Blocking for first G5 sign-off across all epics |
-| EPIC-AUTH | 1 | NOT_STARTED | — | Spec FROZEN; waiting on Phase 0 exit |
-| EPIC-USERS | 1 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-USERS-001` |
-| EPIC-CRM | 2 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-CRM-001` |
-| EPIC-HOTELWORKERS | 2 | NOT_STARTED | — | No spec exists yet — critical-path risk (see [BLOCKERS.md](BLOCKERS.md)) |
-| EPIC-NOTIFICATIONS | 2 (contract) / 5 (internals) | NOT_STARTED | — | `PRE: G2 freeze of SPEC-NOTIF-001` |
-| EPIC-CALENDAR | 3 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-CALENDAR-001` — highest sequencing priority |
-| EPIC-JOBDISPATCH | 3 | NOT_STARTED | — | Spec FROZEN; hard prerequisite on EPIC-CALENDAR |
-| EPIC-ATTENDANCE | 4 | NOT_STARTED | — | Spec FROZEN; prerequisite on EPIC-JOBDISPATCH target state |
-| EPIC-QUALITY | 4 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-QUAL-001` (pending OQ-01) |
-| EPIC-ANALYTICS | 5 | NOT_STARTED | — | Freeze blocked by security FAIL until EPIC-SECREM leaderboard fix lands |
-| EPIC-HR | 6 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-HR-001` |
-| EPIC-ONBOARDING | 6 | NOT_STARTED | — | `PRE: G2 freeze` of onboarding spec |
-| EPIC-EMPLOYEE | 6 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-EMP-001` |
-| EPIC-DOCUMENTS | 6 | NOT_STARTED | — | Blocked by OD-DOC-005/007 RBAC decisions |
-| EPIC-CONSENT | 6 | NOT_STARTED | — | Blocked by owner assignment + SIR-CONSENT-001..011 |
-| EPIC-COMPLIANCE | 6 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-COMPLIANCE-001` |
-| EPIC-RETENTION | 6 | NOT_STARTED | — | `PRE: G2 freeze of SPEC-RETENTION-001` |
-| EPIC-CHATBOT | 7 | NOT_STARTED | — | Blocked by OD-CHAT-005/006 decisions |
-| EPIC-GEO | 7 | NOT_STARTED | — | Blocked by OD-GEO-001/002 ownership split |
+| EPIC-PLATFORM | 0 | IN_PROGRESS | unassigned | [BLK-001](BLOCKERS.md); scope in [CURRENT_SPRINT.md](CURRENT_SPRINT.md) |
+| EPIC-SECREM | 0 | IN_PROGRESS | unassigned | [BLK-001](BLOCKERS.md); scope in [CURRENT_SPRINT.md](CURRENT_SPRINT.md) |
+| EPIC-OWNERSHIP | 0 | IN_PROGRESS | Human (reserved authority) | [BLK-001](BLOCKERS.md) |
+| EPIC-AUTH | 1 | NOT_STARTED | — | Phase 0 exit; release-prereqs [BLK-009](BLOCKERS.md) |
+| EPIC-USERS | 1 | NOT_STARTED | — | PRE: SPEC-USERS-001 G2 (backlog) |
+| EPIC-CRM | 2 | NOT_STARTED | — | PRE: SPEC-CRM-001 G2 (backlog) |
+| EPIC-HOTELWORKERS | 2 | NOT_STARTED | — | [BLK-002](BLOCKERS.md) |
+| EPIC-NOTIFICATIONS | 2 (contract) / 5 (internals) | NOT_STARTED | — | PRE: SPEC-NOTIF-001 G2 (backlog) |
+| EPIC-CALENDAR | 3 | NOT_STARTED | — | [BLK-003](BLOCKERS.md) |
+| EPIC-JOBDISPATCH | 3 | NOT_STARTED | — | Depends on EPIC-CALENDAR — [BLK-003](BLOCKERS.md) |
+| EPIC-ATTENDANCE | 4 | NOT_STARTED | — | Depends on EPIC-JOBDISPATCH; [BLK-010](BLOCKERS.md) (mobile readiness) |
+| EPIC-QUALITY | 4 | NOT_STARTED | — | PRE: SPEC-QUAL-001 G2 (backlog) |
+| EPIC-ANALYTICS | 5 | NOT_STARTED | — | [BLK-004](BLOCKERS.md) |
+| EPIC-HR | 6 | NOT_STARTED | — | PRE: SPEC-HR-001 G2 (backlog) |
+| EPIC-ONBOARDING | 6 | NOT_STARTED | — | PRE: onboarding spec G2 (backlog) |
+| EPIC-EMPLOYEE | 6 | NOT_STARTED | — | PRE: SPEC-EMP-001 G2 (backlog) |
+| EPIC-DOCUMENTS | 6 | NOT_STARTED | — | [BLK-005](BLOCKERS.md) |
+| EPIC-CONSENT | 6 | NOT_STARTED | — | [BLK-006](BLOCKERS.md) |
+| EPIC-COMPLIANCE | 6 | NOT_STARTED | — | PRE: SPEC-COMPLIANCE-001 G2 (backlog) |
+| EPIC-RETENTION | 6 | NOT_STARTED | — | PRE: SPEC-RETENTION-001 G2 (backlog) |
+| EPIC-CHATBOT | 7 | NOT_STARTED | — | [BLK-007](BLOCKERS.md) |
+| EPIC-GEO | 7 | NOT_STARTED | — | [BLK-008](BLOCKERS.md) |
 | EPIC-FE-WEB | continuous | NOT_STARTED | — | Builds only against frozen contracts |
 | EPIC-MOBILE-WORKER | continuous | NOT_STARTED | — | Builds only against frozen contracts |
 | EPIC-MOBILE-CHECKER | continuous | NOT_STARTED | — | Builds only against frozen contracts |
