@@ -223,7 +223,7 @@ authorize a Decision Record on its own behalf (FIND-ARCH-002).
 `DEPENDENCY_GRAPH.yaml:131`). Thus this module owns the domain but is NOT its sole writer. This is
 the same class of coupling flagged as FIND-ARCH-003 for job-dispatch. Independent architecture review
 of this candidate (v0.1.0) confirmed no Decision Record or superseded-by-pivot record exists for this
-coupling anywhere in `docs/09-decisions/architecture-decisions/`, and recommended `BLOCKED` pending
+coupling anywhere in `docs/14-governance/architecture-decisions/`, and recommended `BLOCKED` pending
 one (FIND-ARCH-001) — this does not change the disposition below, which already correctly identifies
 the gap as open. `[OPEN DECISION]` OQ-03: whether this warrants a Decision Record or a
 "superseded-by-pivot" record; and `[OPEN DECISION]` OQ-05: whether seeding moves out of

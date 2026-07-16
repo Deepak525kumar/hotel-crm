@@ -34,7 +34,7 @@
 
 - `docs/00-foundations/` contains current foundation candidates.
 - `docs/01-product/` through `docs/13-testing/` contain active-structure candidates but must be classified per artifact; empty directories do not establish authority.
-- `docs/09-decisions/architecture-decisions/` now holds ADR-001..008 (Proposed status); `docs/09-decisions/` is the designated decision area, indexed in `DECISION_INDEX.md`.
+- `docs/14-governance/architecture-decisions/` is the designated decision area and holds the ADR corpus (ADR-001..018), indexed in `DECISION_INDEX.md`.
 - `docs/legacy/` is historical evidence only unless an approved current source explicitly promotes content.
 - Root `README.md` is repository guidance and an architecture claim; it is not automatically a frozen specification or ADR.
 - Nested `frontend/CLAUDE.md` and `frontend/AGENTS.md` apply to frontend-scoped work after conflict checking against higher repository policy.
@@ -53,7 +53,7 @@ Commands must still be inspected in the affected workspace before use. This tabl
 ## Known Gaps Requiring Pre-flight Resolution
 
 - Human/accountable owners are not encoded in repository evidence.
-- Architecture decisions are now recorded as ADR-001..008 in `docs/09-decisions/architecture-decisions/` (Proposed; pending human ratification). Product-decision directory remains empty.
+- Architecture decisions are now recorded as ADR-001..008 in `docs/14-governance/architecture-decisions/` (Proposed; pending human ratification). Product-decision directory remains empty.
 - Documentation contains both active and legacy trees; artifact-by-artifact authority classification is required.
 - Module names in documentation and implementation are not one-to-one; do not infer equivalence.
 - Dependency graph is seeded only with directly observed imports and must be extended through validated analysis.

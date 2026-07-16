@@ -118,7 +118,7 @@ Strictly additive; no rule deleted or weakened. Ordered by dependency.
 
 | # | File | Change | Kind |
 |---|---|---|---|
-| 1 | `docs/09-decisions/architecture-decisions/ADR-017-execution-policy-model-effort-deployment.md` | **New** ADR (problem, alternatives, compatibility, migration) | Decision Record |
+| 1 | `docs/14-governance/architecture-decisions/ADR-017-execution-policy-model-effort-deployment.md` | **New** ADR (problem, alternatives, compatibility, migration) | Decision Record |
 | 2 | `constitution/EXECUTION_POLICY.md` | **New** canonical policy (§1.2–§1.4 functions + tables) | Constitutional (new file) |
 | 3 | `constitution/ENGINEERING_CONSTITUTION.md` | Add **§23 Execution and Resource Policy** — a short article pointing to `EXECUTION_POLICY.md` (mirrors §21→LOOP_CONTROL, §16→CONTEXT_ARTIFACTS); extend §17 with a one-line model/effort-tier reference | Constitutional (additive) |
 | 4 | `knowledge/EXECUTION_REGISTRY.yaml` | **New** dedicated registry (§1.3a): `model_tier` + `reasoning_effort` keyed by `capability_id`; `execution_mode` keyed by `loop_id`; reserved (`unspecified: true`) extension points for cost budget, retry policy, caching strategy, fallback-model chain, adaptive-execution triggers | Registry data (new file) |

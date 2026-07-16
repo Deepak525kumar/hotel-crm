@@ -36,7 +36,7 @@ that Attendance's own spec explicitly declines to claim sole ownership of.
   placeholder-unregistered` and states "not imported or mounted anywhere. No relationships exist."
   `DEPENDENCY_GRAPH.yaml:339-340` lists it as an orphan module for the identical reason.
   `BOUNDARY_INDEX.yaml:118`: "placeholder-unregistered stub; no footprint." ADR-003
-  (`docs/09-decisions/architecture-decisions/ADR-003-modular-monolith-architecture.md:27,37`)
+  (`docs/14-governance/architecture-decisions/ADR-003-modular-monolith-architecture.md:27,37`)
   independently confirms: "Two module directories exist but are empty stubs ... and are NOT
   registered in the router: `backend/src/modules/chatbot/` and `backend/src/modules/geo/`" and
   records both as "declared-but-unimplemented stubs ... recorded as deferred Phase 2+ scope, not as
@@ -100,7 +100,7 @@ coordinates live on the `Hotel` model or a new `backend-geo`-owned model.
 | Listed as `orphan_modules` entry: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." | `DEPENDENCY_GRAPH.yaml:339-340` | Graph | Observed (High) |
 | "placeholder-unregistered stub; no footprint" | `BOUNDARY_INDEX.yaml:118` | Boundary index | Observed (High) |
 | `spec: none`, `status: UNKNOWN # placeholder-unregistered stub` | `SPECIFICATION_INDEX.yaml:87-89` | Spec index | Observed (High) |
-| Declared-but-unimplemented Phase 2+ stub, not route-registered | ADR-003 (`docs/09-decisions/architecture-decisions/ADR-003-modular-monolith-architecture.md:27,37`) | Architecture decision | Confirmed |
+| Declared-but-unimplemented Phase 2+ stub, not route-registered | ADR-003 (`docs/14-governance/architecture-decisions/ADR-003-modular-monolith-architecture.md:27,37`) | Architecture decision | Confirmed |
 | `Hotel` Prisma model has no latitude/longitude field (fields: `id, name, city, country, address, timezone, contact_email, contact_phone, is_active, deleted_at, created_at, updated_at`) | `backend/prisma/schema.prisma:192-215` @HEAD (verified directly) | Code (direct inspection) | Observed (High) — current-state gap |
 | `geo (placeholder)` listed among current modules | `PIVOT_DESIGN_DOCUMENT.md` §2.2 line 44 | Pivot doc | Confirmed |
 
