@@ -18,7 +18,7 @@ restated here.
 
 | # | Item | Epic | Status | Owner | Issue/PR | Blocker |
 |---|---|---|---|---|---|---|
-| S0-1 | [CI blocking checks, per workspace](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
+| S0-1 | [CI blocking checks, per workspace](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | DONE | Infrastructure Engineer | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) | — |
 | S0-2 | [Migration + rollback harness](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
 | S0-3 | [Observability baseline](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
 | S0-4 | [Feature-flag mechanism (pivot cutover)](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
