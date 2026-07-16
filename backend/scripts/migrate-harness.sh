@@ -146,10 +146,15 @@ snapshot() {
     --schema-only --no-owner --no-privileges \
     --exclude-table='_prisma_migrations' \
     > "$raw"
-  # Strip noise (comments, SET/SELECT config lines, blanks). grep exits 1 when an
-  # empty schema yields no kept lines — tolerate that so a fully torn-down schema
-  # produces an empty snapshot instead of aborting the harness.
-  grep -vE '^\s*(--|SET |SELECT pg_catalog|$)' "$raw" > "$out" || true
+  # Strip noise so two dumps of an identical schema compare equal:
+  #   - comments (--), SET/SELECT config lines, blank lines;
+  #   - psql meta-commands (lines starting with a backslash). Notably pg_dump 16+
+  #     emits `\restrict <token>` / `\unrestrict <token>` wrappers whose token is
+  #     randomised per invocation — leaving them in makes recovery-identity diffs
+  #     spuriously fail.
+  # grep exits 1 when an empty schema yields no kept lines — tolerate that so a
+  # fully torn-down schema produces an empty snapshot instead of aborting.
+  grep -vE '^\s*(--|SET |SELECT pg_catalog|\\|$)' "$raw" > "$out" || true
   rm -f "$raw"
 }
 
