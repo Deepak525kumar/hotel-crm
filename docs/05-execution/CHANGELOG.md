@@ -9,6 +9,49 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-16 — S0-1 CI blocking checks, per workspace (EPIC-PLATFORM) → DONE
+
+Implemented the first Sprint 0 backlog item (S0-1) via the Implementation Workflow, closing the
+in-repo per-workspace gate gaps in the EPIC-PLATFORM "CI pipeline running type-check, build, test
+as blocking checks, per workspace (backend/frontend/mobile)" deliverable. Two acceptance dimensions
+are satisfied by documented exception rather than a new gate step (see **Residual / caveats** below);
+they do not require further code here.
+
+- **What changed:** [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) only.
+  - Added a `Build` step (`npm run build`) to the backend `ci` job — the harness previously ran
+    typecheck + lint + test but not the build gate.
+  - Added a new `frontend` job covering the `frontend` workspace, which had **no** CI gate at all:
+    root `npm ci` (the frontend workspace has no standalone lockfile; deps resolve through the root
+    workspaces `package-lock.json`), then `type-check`, `lint`, and `build` via `--workspace frontend`.
+  - Mobile jobs (`worker-app`, `checker-app`) already run typecheck + test and are unchanged; native
+    binary build is an out-of-band EAS cloud build, not a PR-blocking check, so it is intentionally
+    excluded from the gate harness.
+  - Added a top-level `permissions: contents: read` least-privilege token scope (independent security
+    review, finding SEC-001) — behavior-neutral hardening; CI only needs to read the repository.
+- **Lineage:** `ci.yml` was introduced by PR #106 (`c47df39`) with the backend (`ci`) and mobile
+  jobs; PR #153 (`9ac2291`) later added only the `repository-integrity` job. S0-1 was never formally
+  closed against the backlog. This change adds the previously-missing backend `Build` step and the
+  entire `frontend` job, and moves S0-1 to `DONE`.
+- **Residual / caveats (satisfied by documented exception, not a gate step):**
+  - *Frontend `test` gate:* the deliverable lists `npm test` per workspace, but `frontend/package.json`
+    defines no `test` script and the frontend workspace has no test suite yet — there is nothing to
+    gate. No frontend test step is wired; when a suite is added, a `test` step should join this job.
+    (Mirrors the mobile-build exception: a gate is omitted only where the underlying task does not
+    exist in that workspace.)
+  - *"a failing check blocks merge":* the workflow produces the required status checks on every PR to
+    `develop`/`main`, but marking them **required** (branch protection) is a repository-admin setting
+    outside the repository tree and cannot be encoded here. S0-1 is recorded `DONE` for its in-repo
+    deliverable; enabling branch protection to enforce the checks is a one-time admin action tracked
+    as a follow-up note, not additional code.
+- **Verification (local, pre-merge):** `type-check`, `lint`, and `build` all exit 0 for the frontend
+  workspace; backend `build` (tsc) exits 0. YAML validated. The workflow triggers on `pull_request`
+  to `develop`/`main`, so every PR runs the full gate harness (branch-protection enforcement noted
+  under **Residual / caveats**).
+- **Tracker updates:** `CURRENT_SPRINT.md` S0-1 → `DONE` (owner: Infrastructure Engineer);
+  `PROGRESS.md` Sprint 0 → 1/7 (14%). No blocker changed (no new impediment; `BLOCKERS.md`
+  unchanged). Phase 0 remains `IN_PROGRESS` — its exit gate still requires the remaining
+  EPIC-PLATFORM/SECREM/OWNERSHIP items.
+
 ## 2026-07-16 — Execution Documentation Refinement
 
 Refined the execution layer per the Execution Documentation Refinement Workflow. No status
