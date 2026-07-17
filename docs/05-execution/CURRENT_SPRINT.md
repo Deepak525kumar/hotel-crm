@@ -22,7 +22,7 @@ restated here.
 | S0-2 | [Migration + rollback harness](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | DONE | Infrastructure Engineer | — | — |
 | S0-3 | [Observability baseline](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
 | S0-4 | [Feature-flag mechanism (pivot cutover)](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-platform--foundation--enablement) | EPIC-PLATFORM | NOT_STARTED | unassigned | — | — |
-| S0-5 | [Analytics leaderboard authz hotfix](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-secrem--security-release-prerequisite-remediation) | EPIC-SECREM | DONE | Backend Engineer | _PR pending_ | — |
+| S0-5 | [Analytics leaderboard authz hotfix](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-secrem--security-release-prerequisite-remediation) | EPIC-SECREM | DONE | Backend Engineer | [#157](https://github.com/Deepak525kumar/hotel-crm/pull/157) | — |
 | S0-6 | [Regression test for S0-5](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-secrem--security-release-prerequisite-remediation) | EPIC-SECREM | NOT_STARTED | unassigned | — | — |
 | S0-7 | [Owner assignment + CODEOWNERS](../04-implementation/IMPLEMENTATION_BACKLOG.md#epic-ownership--accountable-owner-assignment-governance) | EPIC-OWNERSHIP | NOT_STARTED | Human (reserved authority) | — | [BLK-001](BLOCKERS.md) (this item *is* the resolution) |
 
