@@ -9,6 +9,57 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-17 — S0-5 Analytics leaderboard authz hotfix (EPIC-SECREM) → DONE
+
+Implemented the fifth Sprint 0 backlog item (S0-5) via the Implementation Workflow, closing the
+EPIC-SECREM "immediate (live, deployed defect)" deliverable: guard `GET /analytics/leaderboard`
+and `/leaderboard/by-hotel/:hotel_id` with `requireRole`/`checkHotelAccess` to match
+`/quality/leaderboard`. This is the Critical `OQ-ANALYTICS-01` / `SIR-ANLY-001` authorization
+defect — the highest-priority unblocked Sprint 0 item (a live, deployed Critical, explicitly
+"independent — start now" in the backlog).
+
+- **Verified the defect against live code first:** `backend/src/modules/analytics/routes.ts`
+  mounted both leaderboard routes under `authMiddleware` only — no role gate, no hotel-scope check
+  — so any authenticated actor of any role (including a self-signup WORKER or CHECKER) could read
+  any hotel's worker names + `WorkerOverallRating` performance data by passing an arbitrary
+  `hotel_id`, while the module's own `/stats`/`/hotel-summary` (`requireRole(['admin','manager'])`)
+  and the sibling `/quality/leaderboard` (`requirePermission('quality:read')` + `checkHotelAccess()`)
+  guard the byte-identical data.
+- **What changed (one file, additive middleware only — no service/controller/schema change):**
+  [`backend/src/modules/analytics/routes.ts`](../../backend/src/modules/analytics/routes.ts) —
+  added `requireRole(['admin','manager'])` to both leaderboard routes (matching the module's own
+  `/stats`/`/hotel-summary` guards for the same data) and `checkHotelAccess()` to
+  `/leaderboard/by-hotel/:hotel_id` (mirroring the sibling `quality/routes.ts:18` by-hotel pattern).
+  The route param is `:hotel_id`, which `checkHotelAccess()` reads directly, so the tenant check is
+  not silently bypassed. Reused existing middleware — no new infrastructure.
+- **Smallest correct change:** S0-5's acceptance criterion is the code guard; the paired
+  security-regression test is the separately-tracked Sprint 0 item **S0-6** (EPIC-SECREM
+  "one security-regression test per finding"), left for its own execution per the sprint
+  decomposition — this item ships exactly the guard.
+- **Validation:** backend `npm run typecheck` (tsc --noEmit) clean; `npm run build` (tsc) clean;
+  `npm test` green — **149/149** across 13 suites, including `analytics.test.ts` (the existing
+  `requireRole` middleware tests still pass; no test asserted the pre-fix open behavior, so none
+  regressed).
+- **Independent review (gate evidence):** *Security Review* — **PASS**, Critical `OQ-ANALYTICS-01`
+  confirmed closed (WORKER/CHECKER/unauthenticated now 403 before the service runs; middleware
+  order fail-closed; param name matches route; symmetry with sibling guards restored). Two
+  pre-existing, out-of-scope residuals recorded, not fixed here: manager cross-tenant visibility on
+  `/by-hotel/:hotel_id` and the un-gated `getHotelSummary.top_workers` slice — both downstream of
+  the already-tracked `checkHotelAccess` admin/manager/checker blanket bypass (`SIR-AUTH-003`),
+  logged as `SIR-ANLY-014` (non-blocking).
+- **Governance sync:** `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` — `SIR-ANLY-001` →
+  `RESOLVED` (S0-5), `SIR-GLOB-004` updated (both deployed-code Criticals now closed; 4 High auth
+  findings + human G2 remain), `SIR-ANLY-014` appended (residuals), Analytics + Global section
+  markers dated 2026-07-17. `.claude/knowledge/MODULE_REGISTRY.yaml` — `unresolved:` leaderboard
+  entry and the `backend-analytics` `specification` note updated to reflect the Critical closed in
+  code (only the Medium `OQ-ANALYTICS-11` remains for that spec's G2).
+- **Tracker updates:** `CURRENT_SPRINT.md` S0-5 → `DONE` (owner: Backend Engineer);
+  `PROGRESS.md` Sprint 0 → 3/7 (43%); `BLOCKERS.md` BLK-004 annotated — its Critical component is
+  now resolved in code, blocker remains `OPEN` only on the Medium `OQ-ANALYTICS-11` + reserved-human
+  G2 (blocker count unchanged at 10 open). EPIC-SECREM remains `IN_PROGRESS` — its per-epic findings
+  (auth/job-dispatch/attendance) ride their owning epics, and S0-6 (regression test) remains open.
+  Phase 0 remains `IN_PROGRESS`.
+
 ## 2026-07-16 — S0-2 Prisma migration + rollback harness (EPIC-PLATFORM) → DONE
 
 Implemented the second Sprint 0 backlog item (S0-2) via the Implementation Workflow, closing the
