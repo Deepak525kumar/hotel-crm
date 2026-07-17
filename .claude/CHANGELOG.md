@@ -15,6 +15,42 @@ The canonical framework version is declared in [`VERSION.yaml`](VERSION.yaml); t
 
 ---
 
+# Version 1.5.0
+
+**Release Date:** 2026-07-16
+
+**Status:** Stable
+
+## Overview
+
+Version 1.5.0 is the **Context Management Layer** release. It operationalizes — without changing — the reusable Context Artifacts policy introduced in 1.2.0 ([`constitution/CONTEXT_ARTIFACTS.md`](constitution/CONTEXT_ARTIFACTS.md)). Before 1.5.0 the policy defined *what* the reusable artifacts are and how they invalidate, but *which* artifacts a workflow must load was expressed only in each workflow's prose and re-derived per workflow. This release makes that load plan declarative, generated, executable, measurable, and tool-enforced. It is additive and fail-safe: absent the manifests or the loader, behaviour equals 1.4.0 (read every authoritative document). No gate, finding schema, confidence rule, loop bound, or specialist boundary is removed or weakened, and no new workflow is introduced.
+
+## Added
+
+- **`context/` directory** with three authored, machine-readable **JSON** load-plan manifests: `BOOT_MANIFEST.json` (minimum boot document set), `EXECUTION_MANIFEST.json` (minimum artifact set per workflow — one entry per `.claude/workflows/*.md`), and `ARTIFACT_DEPENDENCIES.json` (artifact dependency graph + cache scopes). Each references canonical artifact IDs and document paths; none restates policy — invalidation semantics stay in `CONTEXT_ARTIFACTS.md` §3.2 and version authority in `VERSION.yaml` (the manifests carry neither). JSON so the loader needs no parser. See [`context/README.md`](context/README.md).
+- **`tooling/context-loader.js`**: a dependency-free Node engine — the single implementation of the loading behaviour, and **stateless**. `resolve --workflow <id>` yields the minimum document + artifact set (deterministic + artifact-level dependency + lazy loading), reuses warm Repository-Session artifacts, and reports the load delta (the cold set) — warm/cold and the delta derived at call time from the authoritative [`knowledge/SESSION_STATE.yaml`](knowledge/SESSION_STATE.yaml) and [`knowledge/SYNC_STATE.yaml`](knowledge/SYNC_STATE.yaml) `cache_state`, with no files written. `--measure` reports the estimated reduction; `--validate` structurally checks the manifests.
+- **CI job `context-manifest`** ([`../.github/workflows/ci.yml`](../.github/workflows/ci.yml)): runs `context-loader.js --validate` (correctness only) on every pull request regardless of authorship — the same human-and-AI-symmetric enforcement as the 1.4.0 `repository-integrity` job. Measurement is a human-facing estimate and is not run in blocking CI.
+- **`ART-MANIFEST`** artifact-id prefix registered in [`workflows/README.md`](workflows/README.md).
+- **ADR-020** (Proposed, pending ratification) recording the decision; [`knowledge/DECISION_INDEX.md`](knowledge/DECISION_INDEX.md) row added.
+
+## Changed (additive only)
+
+- **`constitution/CONTEXT_ARTIFACTS.md`** gains section §8 (Context Management Layer), Proposed pending ratification. The framework-version-scoped Boot Context is keyed by a **content digest of its boot documents** (§8), reducing invalidation scope versus a version-string key.
+- **`constitution/REVIEW_GATES.md`** Applicability Rules gain one entry (Context Manifest Validation, correctness-only), a Consistency-Reviewer sub-check reused at G6/G9 and enforced by CI.
+- **`knowledge/LOOP_REGISTRY.yaml`**: `preflight`, `repository-synchronization`, and `postflight` each gain one `produced_artifacts` item.
+- **`workflows/preflight.md`, `repository-synchronization.md`, `postflight.md`, `CLAUDE.md`** reference the loader; revision-rebind rebuild and post-flight prune are noted as automatic (no persistent state to rebuild or prune).
+
+## Measured
+
+Estimated average minimum-load reduction ~83% (and ~90% on a warm session) versus a naive full load across all 19 workflows (`context-loader.js --measure`). Figures are a deterministic byte/4 proxy for *relative* comparison — not authoritative tokenizer counts.
+
+## Known Limitations
+
+- ADR-020, `CONTEXT_ARTIFACTS.md` §8, and the `REVIEW_GATES.md` Applicability entry are **Proposed**, pending human ratification per Constitution §20 (same posture as ADR-019).
+- The `--measure` figures are a deterministic byte/4 estimate, for *relative* reduction only — not an authoritative tokenizer count.
+
+---
+
 # Version 1.4.0
 
 **Release Date:** 2026-07-16

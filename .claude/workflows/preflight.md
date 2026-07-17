@@ -25,6 +25,8 @@ Pre-flight is the platform's single production/reuse point for the revision-boun
 - Otherwise, produce them: repository-synchronization emits the Evidence Package body, dependency slicing (step 4) emits the Dependency Context slice, and any prior **Module Memory** (`ART-MEM-<module>`) for in-scope modules is consumed as a first-pass source before discovery.
 - Any `context_invalidator` (`SYNC_STATE.yaml`) clears the affected artifact and forces its re-production; a `baseline_revision` or default-branch change invalidates the whole session.
 
+The **minimum load set for the entering workflow** is resolved deterministically by the Context Management Layer ([CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §8), not re-derived in prose: `node .claude/tooling/context-loader.js resolve --workflow <id>` reads [`../context/EXECUTION_MANIFEST.json`](../context/EXECUTION_MANIFEST.json) + [`../context/BOOT_MANIFEST.json`](../context/BOOT_MANIFEST.json), expands artifact dependencies ([`../context/ARTIFACT_DEPENDENCIES.json`](../context/ARTIFACT_DEPENDENCIES.json)), reuses warm session artifacts by reference, and reports the load delta (the cold set) — all derived at call time from `SESSION_STATE.yaml` / `SYNC_STATE.yaml`, with no state written. `ART-PREFLIGHT-003` (context manifests) is the human-readable record of this resolved set. This makes every workflow inherit minimum loading with no duplicated logic; absent the loader the step degrades to reading every authoritative document (§1.5 fail-safe).
+
 ## Entry Conditions
 
 A human objective exists; repository access is available; no task artifact has begun.

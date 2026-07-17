@@ -65,6 +65,8 @@ Do not load unrelated project context.
 
 The context package is assembled **by reference** to the canonical [Context Artifacts](constitution/CONTEXT_ARTIFACTS.md) — Boot Context, Evidence Package, and Dependency Context — never by inlining copies of sources whose digest is unchanged. Never re-read a source whose revision/version digest is unchanged; expand a reference to full text only to verify a specific claim.
 
+This assembly is not re-derived in prose per workflow: the **Context Management Layer** ([Context Artifacts](constitution/CONTEXT_ARTIFACTS.md) §8) resolves the minimum load set deterministically from the authored [`context/`](context/README.md) manifests via `node .claude/tooling/context-loader.js resolve --workflow <id>` — expanding artifact dependencies, reusing warm session context, and loading only the delta. Absent the loader this degrades to reading every authoritative document (fail-safe).
+
 The Lead Architect maintains global awareness.
 Specialist agents receive only the minimum required context.
 

@@ -21,6 +21,8 @@ Create a non-destructive, revision-bound view of current worktree, default branc
 
 `ART-REPO-001..003` are the **body of the Evidence Package** (`ART-EVID-001`, [Context Artifacts](../constitution/CONTEXT_ARTIFACTS.md) §2.2). On completion the Lead Architect stamps each record with the `baseline_revision` and the content digests of `MODULE_REGISTRY`, `DEPENDENCY_GRAPH`, `TERMINOLOGY`, `PROJECT_PROFILE`, and the six canonical lookup indexes, then records the Evidence Package validity in [`../knowledge/SESSION_STATE.yaml`](../knowledge/SESSION_STATE.yaml). This makes the discovery reusable by reference for every downstream workflow at the same revision; discovery re-runs only when a `context_invalidator` fires. The read-only, non-destructive guarantee is unchanged.
 
+**Execution-context rebuild (framework 1.5.0).** The Context Management Layer holds no persistent state ([CONTEXT_ARTIFACTS.md](../constitution/CONTEXT_ARTIFACTS.md) §8), so a revision rebind requires no manual rebuild: once `baseline_revision` advances in this file's `cache_state` and in `../knowledge/SESSION_STATE.yaml`, the next `context-loader.js resolve` derives warm/cold against the new revision automatically, and stale context cannot be reused (a prior-revision session no longer matches, so its revision-scoped artifacts resolve cold). There is nothing to regenerate, invalidate, or prune by hand — the guarantee is structural, not a step.
+
 ## Entry Conditions
 
 Repository root is known and readable.

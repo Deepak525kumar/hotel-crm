@@ -1610,6 +1610,51 @@ known_drift:
       updated.
     authority_needed: human  # ADR-019 ratification (Proposed -> Accepted); SIR-GLOB-020 backend/README.md replacement-target decision
 
+  - id: SYNC-040
+    type: framework-change
+    status: resolved-pending-ratification
+    description: >-
+      Platform v1.5.0 (Context Management Layer) implemented as an additive,
+      backward-compatible extension that operationalizes — without changing —
+      the existing 1.2.0 Context Artifacts policy (constitution/CONTEXT_ARTIFACTS.md).
+      New `.claude/context/` directory holds three authored, machine-readable
+      JSON load-plan manifests (`BOOT_MANIFEST.json`, `EXECUTION_MANIFEST.json`,
+      `ARTIFACT_DEPENDENCIES.json`) that carry neither invalidation semantics
+      (§3.2) nor version authority (VERSION.yaml), so no authority is duplicated.
+      A single dependency-free, stateless engine (`.claude/tooling/context-loader.js`,
+      added to the ADR-019 tooling dir) resolves the minimum load set per
+      workflow (deterministic + artifact-level dependency + lazy loading), reuses
+      warm Repository-Session artifacts, and reports the load delta (the cold
+      set) — warm/cold and the delta derived at call time from the authoritative
+      `SESSION_STATE.yaml` / `SYNC_STATE.yaml` `cache_state`, writing no files
+      (nothing to store, rebuild, or prune). Estimated reduction ~83% average
+      minimum-load, ~90% warm across all 19 workflows (a byte proxy, not a
+      tokenizer count). `context-loader.js --validate` (correctness only) is a
+      deterministic sub-check owned by the existing Consistency Reviewer wherever
+      consistency review applies (G4), reused unchanged at G6/G9, and
+      independently enforced by a new CI job (`.github/workflows/ci.yml`, job
+      `context-manifest`) on every pull request. No new workflow or gate:
+      `CONTEXT_ARTIFACTS.md` gains one additive section (§8), `REVIEW_GATES.md`
+      gains one Applicability entry, `LOOP_REGISTRY.yaml` gains one
+      `produced_artifacts` item each on `preflight`/`repository-synchronization`/
+      `postflight`, `workflows/README.md` registers the new `ART-MANIFEST`
+      prefix, `DECISION_INDEX.md` adds the ADR-020 row, and `CLAUDE.md`/
+      `preflight.md`/`repository-synchronization.md`/`postflight.md` reference the
+      loader. VERSION.yaml bumped 1.4.0 -> 1.5.0; ADR-020 authored (Proposed,
+      pending ratification, same posture as ADR-019). Boot Context (ART-BOOT-001)
+      is keyed by a content DIGEST of its boot documents, not the framework-version
+      string (§8, reduced invalidation scope): `cache_state.boot_context.key`
+      below records that digest and stays `bound` while the boot documents are
+      unchanged — a version bump alone no longer invalidates it. The
+      revision-scoped Evidence Package and its baseline are unchanged. This
+      1.5.0 change set was subsequently refined before merge (JSON manifests,
+      stateless loader, digest-keyed boot, correctness-only CI) per the
+      Framework Improvement Workflow; the refinement changed no gate, guarantee,
+      or authority. Self-reviewed by the Lead Architect against Constitution
+      §5/§6/§7/§17/§19 given this change's scope (process tooling, not a Security
+      Principles §11 high-risk surface).
+    authority_needed: human  # ADR-020 ratification (Proposed -> Accepted); CONTEXT_ARTIFACTS §8 and REVIEW_GATES Applicability additions
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1626,8 +1671,8 @@ cache_state:
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
   baseline_revision: 09e0b162297162c8a93975ce55ccd3c406218606
-  framework_version: 1.3.0
-  boot_context:        { id: ART-BOOT-001, key: framework-version 1.3.0, valid: bound, bound_at: "2026-07-15" }
+  framework_version: 1.5.0
+  boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [], key: module+freeze-revision }

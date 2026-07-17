@@ -1,0 +1,15 @@
+{
+  "_kind": "authored framework policy — do not derive; the boot document set is authored",
+  "_canonical_policy": ".claude/constitution/CONTEXT_ARTIFACTS.md",
+  "_note": "Machine-readable projection of the Boot Context (ART-BOOT-001, CONTEXT_ARTIFACTS §2.1). Restates no policy. No framework_version field: VERSION.yaml is the sole version authority, and the boot cache key is a content digest of these documents (a blob-digest form §3.1 already permits), NOT the version string — so a version bump that changes no boot document does not invalidate Boot Context (§8, reduced invalidation scope). load: eager = resolved at boot; lazy = resolved on demand (§1.3).",
+  "boot_context_id": "ART-BOOT-001",
+  "documents": [
+    { "path": ".claude/constitution/ENGINEERING_CONSTITUTION.md", "load": "eager" },
+    { "path": ".claude/constitution/SOURCE_OF_TRUTH.md", "load": "eager" },
+    { "path": ".claude/constitution/REVIEW_GATES.md", "load": "eager" },
+    { "path": ".claude/constitution/LOOP_CONTROL.md", "load": "eager" },
+    { "path": ".claude/constitution/CONTEXT_ARTIFACTS.md", "load": "eager" },
+    { "path": ".claude/knowledge/PROJECT_PROFILE.md", "load": "eager" },
+    { "path": ".claude/constitution/REVIEWER_FINDINGS.md", "load": "lazy" }
+  ]
+}
