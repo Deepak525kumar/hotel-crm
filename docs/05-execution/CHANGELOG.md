@@ -9,6 +9,39 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-17 — S0-6 Security-regression test for the analytics leaderboard authz fix (EPIC-SECREM) → DONE
+
+Implemented the sixth Sprint 0 backlog item (S0-6) via the Implementation Workflow, closing the
+EPIC-SECREM deliverable "one security-regression test per finding" for the Critical
+`OQ-ANALYTICS-01` / `SIR-ANLY-001` leaderboard-authz defect whose code guard shipped in S0-5
+(PR #157). This is the paired regression test the S0-5 changelog entry explicitly deferred to
+its own execution.
+
+- **What changed (one new test file, no product-code change):**
+  [`backend/src/__tests__/analytics-leaderboard-authz.test.ts`](../../backend/src/__tests__/analytics-leaderboard-authz.test.ts)
+  — mounts the **real** analytics router (`modules/analytics/routes.ts`) in an Express app via
+  `supertest` (existing dev dependency — no new infrastructure) and exercises the guarded routes
+  end-to-end. `authMiddleware` is replaced with a test-controlled context injector, the controller
+  is stubbed to a 200, and `getPrisma` is stubbed for `checkHotelAccess()`'s membership lookup, so
+  each case isolates the authorization decision from business logic.
+- **Coverage (the finding's attack path):** `GET /analytics/leaderboard` — WORKER 403, CHECKER 403,
+  admin 200, manager 200; `GET /analytics/leaderboard/by-hotel/:hotel_id` — WORKER role-denied 403
+  *before* any hotel scoping (the original any-authenticated-actor read path, denied even for a
+  member worker), admin 200, manager 200. Removing `requireRole` from either route, or
+  `checkHotelAccess()` from the by-hotel route, re-opens the defect and fails this suite.
+- **Validation:** backend `npm run typecheck` (tsc --noEmit) clean; `npm run build` (tsc) clean;
+  `npm test` green — the new suite passes and the full backend suite remains green.
+- **Independent review (gate evidence):** *Security Review* — the regression test asserts the
+  fail-closed behavior of the S0-5 guards at the route boundary; no product code changed, so no new
+  attack surface introduced.
+- **Governance sync:** `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` — `SIR-ANLY-001`
+  evidence updated to cite the new regression suite; Analytics section marker dated 2026-07-17
+  (S0-6). No status transition (finding already `RESOLVED` by S0-5).
+- **Tracker updates:** `CURRENT_SPRINT.md` S0-6 → `DONE` (owner: Backend Engineer);
+  `PROGRESS.md` Sprint 0 → 4/7 (57%). EPIC-SECREM remains `IN_PROGRESS` — its per-epic
+  auth/job-dispatch/attendance findings ride their owning epics. Phase 0 remains `IN_PROGRESS`
+  (S0-3, S0-4 open; S0-7 reserved-human).
+
 ## 2026-07-17 — S0-5 Analytics leaderboard authz hotfix (EPIC-SECREM) → DONE
 
 Implemented the fifth Sprint 0 backlog item (S0-5) via the Implementation Workflow, closing the
