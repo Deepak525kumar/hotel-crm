@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { optionalAuthMiddleware } from '../../middleware/auth.js';
+import { checkReadiness } from '../../lib/health.js';
+import { HTTP_STATUS } from '../../config/constants.js';
 
 import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
@@ -33,9 +35,24 @@ router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/calendar', calendarRoutes);
 
-// Health endpoint used by deploy scripts and GitHub Actions health checks
+// Liveness endpoint used by deploy scripts and GitHub Actions health checks:
+// answers "is the process up" without touching dependencies.
 router.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+});
+
+// Readiness endpoint: verifies critical dependencies (database) are reachable so
+// an orchestrator can withhold traffic from a running-but-not-serving process.
+// Returns 503 when any dependency is down.
+router.get('/health/ready', async (_req, res, next) => {
+  try {
+    const report = await checkReadiness();
+    const statusCode =
+      report.status === 'ready' ? HTTP_STATUS.OK : HTTP_STATUS.SERVICE_UNAVAILABLE;
+    res.status(statusCode).json({ ...report, timestamp: new Date().toISOString() });
+  } catch (error) {
+    next(error);
+  }
 });
 
 router.get('/status', (req, res) => {

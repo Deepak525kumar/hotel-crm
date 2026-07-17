@@ -9,6 +9,43 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-17 — S0-3 Observability baseline (EPIC-PLATFORM) → DONE
+
+Implemented the third Sprint 0 backlog item (S0-3) via the Implementation Workflow, closing the
+EPIC-PLATFORM deliverable "Observability baseline (structured logs via existing
+`requestLoggerMiddleware`, error tracking, health checks)". Structured request/response logging
+via `requestLoggerMiddleware` (winston) already existed and was reused unchanged; this item closes
+the two remaining gaps — an **error-tracking seam** and a **dependency-aware readiness health
+check** — with the smallest change that satisfies the deliverable.
+
+- **What changed (two new lib modules + three wiring points + two test suites):**
+  - [`backend/src/lib/error-tracker.ts`](../../backend/src/lib/error-tracker.ts) — dependency-free
+    `captureException()` seam that normalizes an error and emits it on a dedicated `error_tracking`
+    structured channel (default logger sink), with an installable `setErrorSink()` transport point
+    for the already-declared but previously-unconsumed `SENTRY_DSN`. Never throws, so observability
+    cannot become a source of outages.
+  - [`backend/src/lib/health.ts`](../../backend/src/lib/health.ts) — `checkDatabase()` /
+    `checkReadiness()` probes that verify DB reachability with a cheap `SELECT 1` round-trip and
+    never throw.
+  - Wiring: `errorHandler` forwards unexpected (non-`AppError`, non-`SyntaxError`) server faults to
+    `captureException`; `server.ts` forwards `uncaughtException`/`unhandledRejection`; the v1 router
+    exposes `GET /api/v1/health/ready` returning 200 when ready and 503 when a dependency is down
+    (the shallow liveness `GET /health` and `GET /api/v1/health` used by deploy scripts are
+    unchanged).
+- **Reuse:** no new runtime dependency added; existing winston logger, Prisma client, `HTTP_STATUS`
+  constants, and `supertest`/jest infrastructure reused.
+- **Tests:** [`backend/src/__tests__/error-tracker.test.ts`](../../backend/src/__tests__/error-tracker.test.ts)
+  and [`backend/src/__tests__/health.test.ts`](../../backend/src/__tests__/health.test.ts) — 8 new
+  cases (sink routing, non-Error normalization, custom-transport override, throw-safety; DB up/down
+  and ready/not_ready aggregation).
+- **Validation:** backend `npm run typecheck` (tsc --noEmit) clean; `npm run build` (tsc) clean;
+  `npm run lint` clean; `npm test` green — 164/164 (16 suites), including the 8 new cases.
+- **Independent review (gate evidence):** *Security Review* — the readiness endpoint exposes no
+  tenant data (only `up`/`down` + latency); the error-tracking default sink logs through the
+  existing channel and adds no external egress absent an explicitly installed transport.
+- **Tracker updates:** `CURRENT_SPRINT.md` S0-3 → `DONE` (owner: Infrastructure Engineer);
+  `PROGRESS.md` Sprint 0 roll-up 4/7 → 5/7.
+
 ## 2026-07-17 — S0-6 Security-regression test for the analytics leaderboard authz fix (EPIC-SECREM) → DONE
 
 Implemented the sixth Sprint 0 backlog item (S0-6) via the Implementation Workflow, closing the

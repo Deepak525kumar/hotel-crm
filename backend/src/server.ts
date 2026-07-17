@@ -2,6 +2,7 @@ import { loadEnv, getEnv } from './config/env.js';
 import { createApp } from './app.js';
 import { connectDb, disconnectDb } from './lib/db.js';
 import { logger } from './lib/logger.js';
+import { captureException } from './lib/error-tracker.js';
 
 async function main() {
   try {
@@ -61,6 +62,7 @@ async function main() {
         message: error.message,
         stack: error.stack,
       });
+      captureException(error, { source: 'uncaughtException' });
       process.exit(1);
     });
 
@@ -83,6 +85,7 @@ async function main() {
         stack: reason instanceof Error ? reason.stack : undefined,
         promise: String(promise),
       });
+      captureException(reason, { source: 'unhandledRejection' });
     });
   } catch (error) {
     // Startup failure path: report directly to stderr instead of through the

@@ -9,6 +9,7 @@ import {
   isAppError,
 } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
+import { captureException } from '../lib/error-tracker.js';
 import { HTTP_STATUS, ERROR_CODES } from '../config/constants.js';
 import { getEnv } from '../config/env.js';
 
@@ -66,6 +67,13 @@ export function errorHandler(
       request_id,
       ...(env.NODE_ENV === 'development' && { stack: error.stack }),
     });
+
+    // Forward unexpected (non-application) errors to the error-tracking seam.
+    // SyntaxError (malformed JSON body) is a 4xx client fault, not a server
+    // fault, so it is excluded to keep the error-tracking signal actionable.
+    if (!(error instanceof SyntaxError)) {
+      captureException(error, { request_id, source: 'error_handler' });
+    }
   }
 
   // Format error response per API_STANDARDS.md
