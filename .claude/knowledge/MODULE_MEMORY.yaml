@@ -15,10 +15,12 @@ version_source: .claude/VERSION.yaml
 observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; no module reached G2 freeze, entries: [] unchanged
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
-# No frozen module specification exists yet in this project: every module spec is
-# REVIEW status (SPEC-JOB-DISPATCH-001@0.2.0, SPEC-NOTIF-001@0.1.1,
-# SPEC-ANALYTICS-001@0.1.1, SPEC-AUTH-001@0.2.1, SPEC-ATT-001, SPEC-QUAL-001), so
-# this index is intentionally empty of memory entries and carries only the schema.
+# backend-users reached G2 freeze on 2026-07-19 (SPEC-USERS-001@0.2.0) and its
+# ART-MEM-backend-users entry is recorded below. NOTE (pre-existing backlog, not
+# addressed by this session): SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
+# were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
+# that backfill is out of scope here (this session froze only backend-users) and is
+# left as a known gap for a repository-synchronization pass.
 
 entry_schema:
   required: [artifact, module, freeze_revision, spec, summary, authority, invalidated_by]
@@ -36,7 +38,20 @@ entry_schema:
     authority: corroborating
     invalidated_by: [new frozen spec for module, owned-state/contract change]
 
-module_memory: []  # populated on each G2 freeze; empty until the first spec is frozen (human authority)
+module_memory:
+  - artifact: ART-MEM-backend-users
+    module: backend-users
+    freeze_revision: 7762de5c04d850df1107c7afcc67afd235c1c72d  # HEAD at G2 freeze (2026-07-19); code-truth basis of the spec is 5a81b65 (backend/src unchanged since)
+    spec: SPEC-USERS-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: User account management -- list/get/create/update/soft-delete of User records, role-driven permissions-array assignment, audit logging; distinct from Authentication (backend-auth).
+      owned_state: [state-user]  # shared-write: backend-auth authoritative writer per ADR-017; backend-users is a bounded profile writer/reader (non-security fields only). Reads HotelWorker (backend-hotel-workers) and ROLE_PERMISSIONS (shared config), never writes them.
+      owned_contracts: [IF-USERS-ListUsers/v1, IF-USERS-GetUser/v1, IF-USERS-CreateUser/v1, IF-USERS-UpdateUser/v1, IF-USERS-DeleteUser/v1]
+      interfaces: ["GET /api/v1/users", "GET /api/v1/users/:user_id", "POST /api/v1/users", "PUT /api/v1/users/:user_id", "DELETE /api/v1/users/:user_id"]  # all behind authMiddleware; reads gate on users:read (Admin/Manager), writes net-effect Admin-only, delete on requireRole('admin')
+      key_rules: [RULE-USERS-01, RULE-USERS-02, RULE-USERS-03, RULE-USERS-04, RULE-USERS-05, RULE-USERS-06, RULE-USERS-07, RULE-USERS-08, RULE-USERS-09, RULE-USERS-10, RULE-USERS-11]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-users, owned-state/contract change]
+    open_prerequisites: [OQ-USERS-01, OQ-USERS-02, OQ-USERS-05, OQ-USERS-06, OQ-USERS-07/SYNC-001, SIR-USERS-005]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze

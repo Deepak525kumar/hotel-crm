@@ -54,7 +54,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-USERS-001@0.1.1 (REVIEW)  # SYNC-016's paused correction/G6 cycle resumed and completed: consistency FAIL resolved (mechanical REQ-USERS-003..012 ID-collision fix, SIR-USERS-010) and security FAIL root cause resolved in code (HOTFIX-AUTH-001, SYNC-017); registry pointer updated per that session's own deferral. Not FROZEN -- G2 remains reserved human authority, blocked on SYNC-001/OQ-USERS-01/04/05/06/07. See SYNC_STATE.yaml SYNC-016/SYNC-021.
+    specification: SPEC-USERS-001@0.2.0 (FROZEN)  # FROZEN at G2 on 2026-07-19 by the commissioning human (SYNC-041), reusing the completed G4 evidence; zero open Critical/High. state-user ownership cleared by ADR-017 (Accepted 2026-07-15), SYNC-005 RESOLVED. Open decisions OQ-USERS-01/02/05/06 + SIR-USERS-005 (Medium) and owner assignment SYNC-001/OQ-USERS-07 remain implementation/release prerequisites reviewed by G8, NOT freeze blockers (SPEC-AUTH-001/SPEC-ATT-001 precedent). See SYNC_STATE.yaml SYNC-021/SYNC-041; MODULE_MEMORY.yaml ART-MEM-backend-users.
     evidence: backend/src/routes/v1/index.ts:23
     # UPDATE 2026-07-11 (SYNC-020/HOTFIX-AUTH-003): the createUser privilege-escalation
     # gap independently found by SPEC-USERS-001's own security review (SIR-USERS-003
