@@ -60,15 +60,9 @@ known_drift:
     description: Active documentation tree requires artifact-level authority classification.
   - id: SYNC-005
     type: state-ownership
-    status: resolved
-    description: >-
-      Both shared-write authoritative-writer ambiguities are now resolved by ratified Decision Records,
-      matching governance/SPECIFICATION_ISSUES_REGISTER.md SIR-GLOB-006 (RESOLVED, both halves): state-audit-log
-      -> backend-auth by ADR-016 (Accepted, 2026-07-14, backend-compliance read-only consumer); state-user ->
-      backend-auth by ADR-017 (Accepted, 2026-07-15, backend-users bounded profile writer/reader, non-security
-      fields only). DEPENDENCY_GRAPH.yaml, STATE_OWNERSHIP_INDEX.yaml, OWNERSHIP_INDEX.yaml, and BOUNDARY_INDEX.yaml
-      all now record both. Node-level accountable-owner assignment across modules/contracts/state-domains (SYNC-001)
-      remains separately OPEN and is unaffected by this record.
+    status: blocked
+    description: State domains are mapped to an owning module, but the single authoritative writer for shared-write models (state-user - auth+users; state-audit-log - shared via BaseService) is UNKNOWN and requires a human ownership decision (see DEPENDENCY_GRAPH.yaml pending_verification).
+    authority_needed: human
   - id: SYNC-006
     type: documentation-authority
     status: pending
