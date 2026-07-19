@@ -9,6 +9,32 @@ Entries are newest-first. Each entry cites what changed, in which execution docu
 (with a repository reference where applicable). This is not a duplicate of git history — it is
 the human-readable narrative of execution progress.
 
+## 2026-07-19 — S0-4 Feature-flag mechanism (pivot cutover) (EPIC-PLATFORM) → DONE
+
+Implemented Sprint 0 backlog item S0-4 via the Implementation Workflow, closing the EPIC-PLATFORM
+deliverable "Feature-flag mechanism for the pivot cutover (marketplace ↔ direct-dispatch)". No
+existing flag mechanism was found, so each surface's existing environment-configuration
+infrastructure was reused (never duplicated) to add a single `PIVOT_MODE` flag
+(`marketplace` | `direct_dispatch`, default `marketplace` — no behavioral change until a workspace
+opts in) that toggles independently per workspace, per the acceptance criterion.
+
+- **Backend** — added `PIVOT_MODE` to the existing zod-validated env schema
+  ([`backend/src/config/env.ts`](../../backend/src/config/env.ts)) and a small reader,
+  [`backend/src/config/feature-flags.ts`](../../backend/src/config/feature-flags.ts)
+  (`getPivotMode()` / `isDirectDispatchMode()`), plus `backend/.env.example`. Regression test:
+  [`backend/src/__tests__/feature-flags.test.ts`](../../backend/src/__tests__/feature-flags.test.ts).
+- **Web (frontend)** — added `PIVOT_MODE` / `isDirectDispatchMode()` to the existing runtime-config
+  module ([`frontend/lib/config.ts`](../../frontend/lib/config.ts)), read from
+  `NEXT_PUBLIC_PIVOT_MODE`, plus `frontend/.env.example`.
+- **Mobile (worker-app, checker-app)** — added the same `PIVOT_MODE` / `isDirectDispatchMode()`
+  pair to each app's existing `constants/app-config.ts`, read from `EXPO_PUBLIC_PIVOT_MODE`, plus
+  each app's `.env.example`. Regression tests: `mobile/worker-app/src/__tests__/app-config.test.ts`,
+  `mobile/checker-app/src/__tests__/app-config.test.ts`.
+- **Validation:** `typecheck`/`build`/`test` green in all four workspaces (backend, frontend,
+  worker-app, checker-app) — the per-workspace CI blocking checks from S0-1.
+- **Sprint tracking:** [`CURRENT_SPRINT.md`](CURRENT_SPRINT.md) S0-4 → DONE (6/7 Sprint 0 items
+  done); [`PROGRESS.md`](PROGRESS.md) roll-up updated to match.
+
 ## 2026-07-17 — S0-3 Observability baseline (EPIC-PLATFORM) → DONE
 
 Implemented the third Sprint 0 backlog item (S0-3) via the Implementation Workflow, closing the

@@ -54,6 +54,11 @@ const envSchema = z.object({
 
   // Frontend URL (for CORS, email links, etc)
   FRONTEND_URL: z.string().optional(),
+
+  // Pivot cutover feature flag (S0-4): toggles the dispatch model between the
+  // legacy marketplace (worker applications) and the new direct-dispatch
+  // (broadcast/assignment) flow. See docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md.
+  PIVOT_MODE: z.enum(['marketplace', 'direct_dispatch']).default('marketplace'),
 });
 
 type Env = z.infer<typeof envSchema>;
