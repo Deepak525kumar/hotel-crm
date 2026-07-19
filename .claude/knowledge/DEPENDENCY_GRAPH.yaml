@@ -452,11 +452,11 @@ events: []
 state_domains:
   - id: state-user
     model: User
-    authoritative_writer: UNKNOWN
+    authoritative_writer: backend-auth
     writers: [backend-auth, backend-users]
     readers: [backend-hotel-workers]
     evidence: "auth writes: backend/src/modules/auth/service.ts:25,205,218; users writes: backend/src/modules/users/service.ts:93,132,164; hotel-workers reads: backend/src/modules/hotel-workers/service.ts:40"
-    note: "Two modules write User (auth on register/password reset; users on CRUD). Single authoritative writer is a human ownership decision."
+    note: "authoritative_writer resolved backend-auth by ADR-017 (Accepted, 2026-07-15); backend-users is a bounded profile writer/reader (non-security profile fields only), not a co-authoritative writer -- role/permission/credential/account writes are exclusively backend-auth. Existing call sites unchanged by this record -- closes SYNC-005/SIR-GLOB-006's state-user half (state-audit-log half already closed by ADR-016). Node-level accountable owner (SYNC-001) remains unassigned; this record settles the authoritative-writer boundary only, mirroring the state-audit-log/ADR-016 precedent."
   - id: state-session
     model: Session
     authoritative_writer: backend-auth
@@ -556,12 +556,12 @@ analysis:
     - { id: backend-calendar, note: "stub service (NotImplementedError); mounted but no consumer discovered." }
   unknown_relationships:
     - "All module owners (node owner) and contract versions are UNKNOWN — human assignment required (per MODULE_REGISTRY.yaml)."
-    - "state-user authoritative_writer UNKNOWN (auth and users both write)."
+    - "state-user authoritative_writer RESOLVED backend-auth by ADR-017 (2026-07-15); backend-users is a bounded profile writer/reader (non-security fields only). Node-level accountable owner (SYNC-001) remains UNKNOWN."
     - "state-audit-log authoritative_writer RESOLVED backend-auth by ADR-016 (2026-07-14); shared-write via BaseService across 8+ modules continues unchanged, only the accountable/governance owner is newly designated."
 
 remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
-  - "Designate the authoritative writer for state-user (backend-auth vs backend-users both write the User model)."
+  - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
   - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs."
   - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub modules backend-hr and backend-calendar."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
