@@ -1660,6 +1660,39 @@ known_drift:
       §5/§6/§7/§17/§19 given this change's scope (process tooling, not a Security
       Principles §11 high-risk surface).
     authority_needed: human  # ADR-020 ratification (Proposed -> Accepted); CONTEXT_ARTIFACTS §8 and REVIEW_GATES Applicability additions
+  - id: SYNC-041
+    type: specification-freeze
+    status: resolved
+    description: >-
+      SPEC-USERS-001 (backend-users, User Account Management) FROZEN at G2 on
+      2026-07-19 by the commissioning human, on the synchronized repository state
+      and reusing the completed first-round G4 evidence without reopening any
+      review. Frozen v0.1.1 (REVIEW) -> v0.2.0 (FROZEN) with no content change
+      beyond Document Control (Status, version, Approved-by/at, Supersedes) and one
+      Review-and-Change-Log row: every author-fixable finding was already applied
+      at v0.1.1 (SYNC-021), no Critical/High finding is open, and no reviewer
+      required re-running. The last shared cross-cutting blocker on this
+      candidate -- the state-user dual-writer axis (OQ-USERS-04/SYNC-005) -- was
+      cleared by ADR-017 (Accepted 2026-07-15, backend-auth authoritative writer)
+      and its propagation into DEPENDENCY_GRAPH.yaml/SYNC_STATE.yaml SYNC-005 was
+      completed earlier this session. Per the SPEC-AUTH-001/SPEC-JOB-DISPATCH-001/
+      SPEC-ATT-001 precedent (2026-07-15), the remaining open decisions are
+      dispositioned as implementation/release prerequisites reviewed by G8, NOT
+      freeze blockers: OQ-USERS-01 (5-role model), OQ-USERS-02 (Manager
+      write-authority contradiction, framing corrected/decision open), OQ-USERS-05
+      + SIR-USERS-005 (Medium cross-hotel read; tracked fix = target role×scope
+      REQ-USERS-022..024; no temporary Risk Assessment created), OQ-USERS-06 (GDPR
+      PII-nulling design). OQ-USERS-07/SYNC-001 accountable-owner assignment
+      remains OPEN (owner unassigned, impl track), identical to the 2026-07-15
+      freezes. Knowledge synchronized this pass: SPECIFICATION_INDEX.yaml
+      (backend-users REVIEW->FROZEN@0.2.0), MODULE_REGISTRY.yaml (specification
+      pointer), MODULE_MEMORY.yaml (ART-MEM-backend-users produced), and the
+      Specification Issues Register (Users section marker + Resolved Issues
+      History freeze row). Deferred to a Repository Synchronization pass (not this
+      freeze): rebinding cache_state/observed_revision across the runtime indexes
+      from 09e0b16 to the freeze HEAD, and the pre-existing MODULE_MEMORY backfill
+      for the three 2026-07-15 freezes.
+    authority_needed: none  # G2 authorization was provided by the commissioning human this session; this record documents the freeze
 
 context_invalidators:
   - repository revision changes
@@ -1681,7 +1714,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [], key: module+freeze-revision }
+  module_memory:       { modules: [backend-users], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); entries for the 2026-07-15 freezes remain a known backfill gap" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

@@ -73,10 +73,12 @@ specifications:
     note: all five G4 dimensions PASS_WITH_ACTIONS (zero Critical/High); G6-doc PASS_WITH_ACTIONS; MODULE_REGISTRY.specification synchronized (SYNC-015); G2 human
   - module: backend-users
     spec: SPEC-USERS-001
-    version: 0.1.1
-    status: REVIEW
+    version: 0.2.0
+    status: FROZEN
     path: docs/03-modules/users/MODULE_SPEC.md
-    note: consistency FAIL resolved (mechanical ID-collision fix, SIR-USERS-010); security FAIL root cause resolved in code (HOTFIX-AUTH-001, SYNC-017), framing corrected in-document; architecture/dependency/performance all PASS_WITH_ACTIONS from the first G4 round; MODULE_REGISTRY.specification synchronized (SYNC-021); G2 human
+    frozen_at: 2026-07-19 (G2 Specification Freeze, commissioning human); state-user ownership axis cleared by ADR-017 (Accepted 2026-07-15), SYNC-005 RESOLVED
+    release_prerequisites: open decisions OQ-USERS-01/02/05/06 + SIR-USERS-005 (Medium cross-hotel read, fix = target role×scope REQ-USERS-022..024) remain implementation/release prerequisites reviewed by G8 -- NOT freeze blockers per human ruling; SYNC-001 owner assignment (OQ-USERS-07) OPEN (impl track), same as the 2026-07-15 freezes
+    note: all G4 dimensions resolved/PASS_WITH_ACTIONS from the first round, zero open Critical/High; consistency FAIL (SIR-USERS-010) and security FAIL (SIR-GLOB-012, HOTFIX-AUTH-001) both closed at v0.1.1; frozen with no content change beyond Document Control + change-log row; ART-MEM-backend-users produced (SYNC-041)
   - module: backend-crm
     spec: SPEC-CRM-001
     version: 0.1.1
