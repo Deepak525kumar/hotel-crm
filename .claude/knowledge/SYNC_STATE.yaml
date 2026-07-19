@@ -1693,6 +1693,34 @@ known_drift:
       from 09e0b16 to the freeze HEAD, and the pre-existing MODULE_MEMORY backfill
       for the three 2026-07-15 freezes.
     authority_needed: none  # G2 authorization was provided by the commissioning human this session; this record documents the freeze
+  - id: SYNC-042
+    type: specification-review
+    status: blocked
+    description: >-
+      SPEC-CALENDAR-001 (backend-calendar) first-ever G4 independent-review round
+      run under the auto-continue directive after the USERS freeze merged.
+      Outcome: NOT frozen; BLOCKED at the human-decision gate. Two of five
+      reviewers completed -- Architecture BLOCKED (FIND-001/002/003 High: Calendar's
+      target claims over CalendarEntry, daily-exclusivity enforcement, and
+      WorkerAssignment creation/auto-cancel collide with the already-FROZEN
+      SPEC-JOB-DISPATCH-001@0.3.0 and SPEC-EMP-001 RULE-EMP-05 -- a conflict between
+      accepted/frozen authorities); Security PASS_WITH_ACTIONS (stub non-exploitable;
+      target-design scoping gaps are release-by-G8 prerequisites). The other three
+      reviewers (dependency, consistency, performance) terminated early on a shared
+      session limit (resets 2026-07-19 23:40 UTC) and must be re-run for a complete
+      G4 record; they do not change the BLOCKED outcome. Per human direction (narrow
+      Calendar), Proposed ADR-021 authored (Calendar<->Job-Dispatch scheduling-ownership
+      boundary): Job Dispatch retains assignment creation/daily-exclusivity/CalendarEntry;
+      Calendar narrowed to a new state-calendar-absence domain + the availability
+      read-model, auto-cancel via EVT-CAL-SickVacationMarked (no cross-boundary write);
+      resolves OD-CAL-01/02/03 + SPEC-EMP-001 OD-EMP-07, no change to the frozen spec.
+      DECISION_INDEX.md registers ADR-021 (Proposed); SIR-CAL-001/002/003 annotated;
+      register history row added. ADR-021 is Proposed -- NOT ratified: no knowledge-layer
+      ownership edit applied (no state-calendar-absence domain added, no ownership moved)
+      and SPEC-CALENDAR-001 NOT re-authored or frozen. Required before any Calendar
+      freeze: (1) human ratification of ADR-021; (2) re-author SPEC-CALENDAR-001 to the
+      narrowed scope; (3) re-run the three interrupted G4 reviewers; (4) G2 human freeze.
+    authority_needed: human  # ADR-021 ratification (Proposed -> Accepted); then Calendar spec re-authoring + G4 completion + G2 freeze
 
 context_invalidators:
   - repository revision changes
