@@ -94,9 +94,7 @@ specifications:
     version: 0.2.0
     status: FROZEN
     path: docs/03-modules/employee-management/MODULE_SPEC.md
-    note: FROZEN at G2 2026-07-20 (commissioning human, conditional on Security pass). Security upgraded FAIL->PASS_WITH_ACTIONS by targeted re-verification against ADR-023 (OD-EMP-05 resolved); FIND-001/FIND-002 carried forward as G8 release prerequisites, matching SPEC-AUTH-001/SPEC-ATT-001 precedent. ART-MEM-backend-hr produced.
-    path: docs/03-modules/employee-management/MODULE_SPEC.md
-    note: G4 independent review round complete 2026-07-20 -- architecture PASS_WITH_ACTIONS, dependency PASS_WITH_ACTIONS, consistency PASS_WITH_ACTIONS, security FAIL (2 High -- checkHotelAccess scoping bypass OD-EMP-05, special-category access/audit controls unbuilt), performance PASS_WITH_ACTIONS (no budget defined, non-blocking). NOT frozen (G2 human).
+    note: FROZEN at G2 2026-07-20 (commissioning human, conditional on Security pass). Security upgraded FAIL->PASS_WITH_ACTIONS by targeted re-verification against ADR-023 (OD-EMP-05 resolved); FIND-001/FIND-002 carried forward as G8 release prerequisites, matching SPEC-AUTH-001/SPEC-ATT-001 precedent. ART-MEM-backend-hr produced. DISCOVERABILITY CROSS-REFERENCE (Repository Synchronization Workflow, 2026-07-20) -- docs/03-modules/hr/MODULE_SPEC.md (SPEC-HR-001@0.2.1, REVIEW, architecture BLOCKED) targets this same module id/code path for a different, disputed capability set (contracts/payslip-request); see MODULE_REGISTRY.yaml backend-hr `related_specification` and OD-HR-01a/OD-EMP-10. Not a second mapping for this row; SPEC-EMP-001@0.2.0 (FROZEN) remains the sole `spec` value here.
   - module: backend-calendar
     spec: SPEC-CALENDAR-001
     version: 0.3.0

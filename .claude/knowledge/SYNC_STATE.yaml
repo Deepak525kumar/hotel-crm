@@ -1944,6 +1944,39 @@ known_drift:
       REVIEW-status candidates (backend-chatbot/SPEC-CHATBOT-001, backend-geo/SPEC-GEO-001) are
       unimplemented stubs -- lower priority; evaluate whether the standing auto-continue
       instruction extends to them or whether to stop and report the backlog is otherwise clear.
+  - id: SYNC-050
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository Synchronization Workflow run 2026-07-20 following PR #175's merge (all
+      implementation-backed module specifications now G2 FROZEN). Three tasks: (1) discoverability
+      -- SIR-HR-010's registry-collision disclosure (backend-hr's single `specification:` field
+      independently claimed by both SPEC-EMP-001, FROZEN, and SPEC-HR-001, REVIEW/BLOCKED) was
+      cross-referenced, not resolved: added MODULE_REGISTRY.yaml backend-hr.related_specification,
+      SPECIFICATION_INDEX.yaml backend-hr.note, and a reciprocal BOUNDARY_INDEX.yaml backend-hr
+      sentence, each pointing a reader from one spec's claim to the other's; SIR-HR-010 updated to
+      record the cross-references while remaining OPEN (joint disposition is still human/architecture
+      authority, per OD-HR-01a/OD-EMP-10 -- no architecture changed, no capability merged). (2) Module
+      Memory backfill -- produced ART-MEM-backend-auth, ART-MEM-backend-work-requests, and
+      ART-MEM-backend-attendance for the three specs frozen 2026-07-15 that had never received one
+      (a gap MODULE_MEMORY.yaml's own header had carried since); content reused verbatim from each
+      frozen spec, nothing reinterpreted. All ten FROZEN modules now have an ART-MEM entry. (3)
+      Verification pass across MODULE_REGISTRY.yaml, SPECIFICATION_INDEX.yaml, MODULE_MEMORY.yaml,
+      DECISION_INDEX.md, DEPENDENCY_GRAPH.yaml, BOUNDARY_INDEX.yaml, STATE_OWNERSHIP_INDEX.yaml,
+      OWNERSHIP_INDEX.yaml -- found and fixed two genuine inconsistencies: SPECIFICATION_INDEX.yaml's
+      backend-hr row carried a duplicate, pre-freeze `path:`/`note:` pair (leftover from before the
+      freeze edit, describing a stale REVIEW-not-yet-frozen state) -- removed; MODULE_REGISTRY.yaml's
+      file-level header and `unresolved:` list both still asserted "no frozen module specification
+      exists for any registered module," directly contradicted by the ten FROZEN entries below --
+      corrected to an accurate current-state summary. No other file needed synchronization (DEPENDENCY_GRAPH/BOUNDARY_INDEX/STATE_OWNERSHIP_INDEX/OWNERSHIP_INDEX/DECISION_INDEX headers
+      make no stale FROZEN/REVIEW claims of their own). Ran repository-integrity-check.js (0
+      new/blocking findings) and context-loader.js --validate (0 errors) as final validation.
+    authority_needed: none  # documentation-synchronization/discoverability work, no architecture or freeze decision made
+    next_step: >-
+      Documentation Completion Report delivered. No further action pending except reserved human
+      decisions already tracked (owner assignment SYNC-001; OD-HR-01a/OD-EMP-10 joint disposition;
+      the various per-module G8 release prerequisites). Do not freeze SPEC-CHATBOT-001/SPEC-GEO-001
+      or author new specifications absent explicit instruction.
 
 context_invalidators:
   - repository revision changes
@@ -1965,7 +1998,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); entries for the 2026-07-15 freezes remain a known backfill gap" }
+  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics, backend-auth, backend-work-requests, backend-attendance], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); ART-MEM-backend-auth/backend-work-requests/backend-attendance backfilled by SYNC-050 (Repository Synchronization Workflow, 2026-07-20) for the three specs frozen 2026-07-15 that had never received one -- all ten FROZEN modules now have a Module Memory entry, no backfill gap remains" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

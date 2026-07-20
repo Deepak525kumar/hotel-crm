@@ -29,12 +29,13 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 # after independently re-verifying that the Critical OQ-ANALYTICS-01 finding
 # was resolved in live code on 2026-07-17, preceded by a substantive
 # current-state correction pass reconciling the spec text to match). Their
-# ART-MEM entries are recorded below. NOTE (pre-existing backlog, not
-# addressed by this session):
-# SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
-# were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
-# that backfill is out of scope here (this session froze only backend-users) and is
-# left as a known gap for a repository-synchronization pass.
+# ART-MEM entries are recorded below.
+# BACKFILL (Repository Synchronization Workflow, 2026-07-20): the previously-noted
+# gap -- SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001 were frozen at G2 on
+# 2026-07-15 but never received Module Memory entries -- is now closed. ART-MEM-backend-auth,
+# ART-MEM-backend-work-requests, and ART-MEM-backend-attendance were produced by reusing
+# each frozen specification's content verbatim (no requirement reinterpreted, no spec
+# content changed). All ten FROZEN modules now have a Module Memory entry.
 
 entry_schema:
   required: [artifact, module, freeze_revision, spec, summary, authority, invalidated_by]
@@ -144,6 +145,45 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-analytics, owned-state/contract change, OQ-ANALYTICS-03 resolution (rooms-completed-per-worker metric definition)]
     open_prerequisites: [OQ-ANALYTICS-02, OQ-ANALYTICS-03 (headline, blocking implementation), OQ-ANALYTICS-04, OQ-ANALYTICS-05, OQ-ANALYTICS-06/SYNC-001, OQ-ANALYTICS-07, OQ-ANALYTICS-08, OQ-ANALYTICS-09, OQ-ANALYTICS-10, OQ-ANALYTICS-11 (Medium, platform-wide ADR), OQ-ANALYTICS-12 (Low, checkHotelAccess bypass)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-auth
+    module: backend-auth
+    freeze_revision: 6e1af5e94c7237646e5c6a07d424fba47106f102  # HEAD at backfill (Repository Synchronization Workflow, 2026-07-20); spec's own code-truth basis unchanged since 1fa5566 (HOTFIX-AUTH-002); backfills the Module Memory gap this file's own header noted since the 2026-07-15 G2 freeze -- no spec content reinterpreted, reused verbatim from SPEC-AUTH-001 v0.3.0
+    spec: SPEC-AUTH-001 v0.3.0 (FROZEN)
+    summary:
+      boundary: Authentication and session lifecycle -- signup/login/logout/refresh, password reset, the authoritative-writer half of state-user, and the platform's shared authMiddleware/JWT/permissions-middleware primitives. Distinct from account/profile management (backend-users).
+      owned_state: [state-user, state-session, state-audit-log]  # state-user: shared-write with backend-users, authoritative_writer backend-auth per ADR-017 (role/permission/credential/account fields only). state-session: Session model, sole owner. state-audit-log: shared-write across 8+ modules, authoritative_writer backend-auth per ADR-016.
+      owned_contracts: [auth-middleware]  # authMiddleware (JWT verification, req.auth population); permissions-middleware (requireRole/requirePermission/checkHotelAccess) is a DISTINCT, unassigned-owned contract this module does not itself own (OQ-AUTH-07), despite both implementing RBAC end-to-end.
+      interfaces: ["POST /auth/signup", "POST /auth/login", "GET /me", "POST /refresh", "POST /logout", "POST /password-reset"]  # signup/login/password-reset are public (no authMiddleware); me/refresh/logout require an authenticated session. password-reset's Critical account-takeover gap (OQ-AUTH-05/SIR-AUTH-001) was resolved in code by HOTFIX-AUTH-002 (2026-07-10); the 3 remaining High findings (OQ-AUTH-04 JWT refresh-secret fallback, OQ-AUTH-06 checkHotelAccess bypass, OQ-AUTH-15 cleartext refresh_token) are unaffected and still open.
+      key_rules: [RULE-AUTH-001, RULE-AUTH-002, RULE-AUTH-003, RULE-AUTH-004, RULE-AUTH-005, RULE-AUTH-006, RULE-AUTH-007, RULE-AUTH-008, RULE-AUTH-009]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-auth, owned-state/contract change, OQ-AUTH-04/06/15 code fix]
+    open_prerequisites: [OQ-AUTH-01, OQ-AUTH-02 (MFA storage model undefined), OQ-AUTH-04 (High, JWT refresh-secret fallback), OQ-AUTH-06 (High, checkHotelAccess bypass), OQ-AUTH-07, OQ-AUTH-08, OQ-AUTH-09, OQ-AUTH-10/SYNC-001, OQ-AUTH-11, OQ-AUTH-12, OQ-AUTH-13, OQ-AUTH-14, OQ-AUTH-15 (High, cleartext Session.refresh_token)]  # release/impl prerequisites reviewed by G8, not freeze blockers; SIR-AUTH-001 (Critical) already RESOLVED by HOTFIX-AUTH-002, not carried here
+  - artifact: ART-MEM-backend-work-requests
+    module: backend-work-requests
+    freeze_revision: 6e1af5e94c7237646e5c6a07d424fba47106f102  # HEAD at backfill (Repository Synchronization Workflow, 2026-07-20); spec's own code-truth basis is the 0.3.1 amendment (ADR-021, 2026-07-19); backfills the Module Memory gap this file's own header noted since the 2026-07-15 G2 freeze -- no spec content reinterpreted, reused verbatim from SPEC-JOB-DISPATCH-001 v0.3.1
+    spec: SPEC-JOB-DISPATCH-001 v0.3.1 (FROZEN)
+    summary:
+      boundary: One bounded capability spanning three code modules -- work-request posting/lifecycle (backend-work-requests), marketplace-style application/accept flow (backend-work-applications, RETIRED in target per TREQ-011), and worker-assignment lifecycle (backend-assignments). Amended 0.3.0->0.3.1 (ADR-021) to narrow CalendarEntry to assignment-kind-only and convert the sick/vacation auto-cancel to consuming Calendar's EVT-CAL-SickVacationMarked event.
+      owned_state: [state-work-request, state-work-application, state-worker-assignment]  # state-work-request: owner backend-work-requests, target-repurposed as JobRequest. state-work-application: owner backend-work-applications, target REMOVED (PIVOT §9.2, TREQ-011). state-worker-assignment: owner backend-assignments, target drops application_id FK, adds CalendarEntry (assignment-kind only, per ADR-021).
+      owned_contracts: []  # no named contract objects; unversioned baseline/UNKNOWN endpoints
+      interfaces: ["POST /work-requests", "GET /work-requests", "GET /work-requests/:id", "PATCH /work-requests/:id", "POST /work-requests/:id/applications", "GET /work-requests/:id/applications", "PATCH /work-requests/:id/applications/:applicationId", "GET /assignments", "GET /assignments/:id", "PATCH /assignments/:id"]  # the three application routes are [TARGET: REMOVED] per TREQ-011. PATCH /assignments/:id has NO route-level or service-level authz guard -- Critical, FIND-SEC-001/OQ-01, exploitable now.
+      key_rules: [RULE-001, RULE-002, RULE-003, RULE-004, RULE-005, RULE-006, RULE-007, RULE-008, RULE-009, RULE-010, RULE-011a, RULE-011b, RULE-011c, RULE-011d, RULE-011e, RULE-012, RULE-013]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-work-requests/backend-work-applications/backend-assignments, owned-state/contract change, OQ-01/FIND-SEC-001 code fix]
+    open_prerequisites: [OQ-01/FIND-SEC-001 (Critical, unguarded PATCH /assignments/:id -- warrants immediate remediation), OQ-07 (hotel/group scoping gap, MIG-GAP-07), owner assignment/SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; OQ-02..06/08/09 are RESOLVED-BY-TARGET or SUPERSEDED per the spec's own disposition, not carried here as open
+  - artifact: ART-MEM-backend-attendance
+    module: backend-attendance
+    freeze_revision: 6e1af5e94c7237646e5c6a07d424fba47106f102  # HEAD at backfill (Repository Synchronization Workflow, 2026-07-20); spec's own code-truth basis unchanged since cca1d29; backfills the Module Memory gap this file's own header noted since the 2026-07-15 G2 freeze -- no spec content reinterpreted, reused verbatim from SPEC-ATT-001 v0.2.0
+    spec: SPEC-ATT-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Presence/verification lifecycle of a worker against a confirmed assignment -- check-in/check-out, minutes-late/minutes-worked computation, manager records-verification (distinct from target geofence presence verification, OQ-09).
+      owned_state: [state-attendance]  # owner backend-attendance, but NOT sole writer -- the EXPECTED row is cross-owner-seeded by backend-work-applications' accept transaction (OQ-03, architecture BLOCKED pending a Decision Record or superseded-by-pivot disposition, same class as job-dispatch FIND-ARCH-003).
+      owned_contracts: []  # no named contract objects; unversioned baseline/UNKNOWN endpoints
+      interfaces: ["POST /attendance", "GET /attendance", "GET /attendance/:id", "PATCH /attendance/:id"]  # POST requires requireRole(['worker']); GET/PATCH have NO route-level role guard, access enforced in-service (RULE-004/007/008); NO hotel-scoping on any read/verify (OQ-02, High, blocking G2 as a release prerequisite per precedent)
+      key_rules: [RULE-001, RULE-002, RULE-003, RULE-004, RULE-005, RULE-006, RULE-007, RULE-008, RULE-009, RULE-010, RULE-011]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-attendance, owned-state/contract change, OQ-02 code fix, OQ-03 Decision Record]
+    open_prerequisites: [OQ-02 (High, no hotel-scoping on management actions), OQ-03 (architecture BLOCKED, cross-owner EXPECTED-row seed needs a Decision Record), OQ-01, OQ-04, OQ-05, OQ-06, OQ-07, OQ-09, OQ-10, OQ-11, OQ-12, owner assignment/SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze

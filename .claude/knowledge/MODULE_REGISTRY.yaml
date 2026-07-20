@@ -14,23 +14,21 @@ status: verified-inventory
 # consumes-api, and operations deploys-to edges -- are recorded authoritatively in
 # DEPENDENCY_GRAPH.yaml, not duplicated here. All modules share Prisma/PostgreSQL
 # via a shared BaseService (shared infrastructure, not a module contract).
-# No frozen module specification exists for any registered module (G2 freeze is
-# reserved human authority). REVIEW-status specifications now exist and are
-# reflected below for backend-work-requests/work-applications/assignments
-# (SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1),
-# backend-quality (SPEC-QUAL-001@0.1.2 — all five G4 dimensions PASS_WITH_ACTIONS,
-# zero Critical/High, G6-doc PASS_WITH_ACTIONS; NOT frozen, G2 human),
-# backend-attendance (SPEC-ATT-001@0.1.1 — architecture BLOCKED (2 High: unratified
-# cross-owner-write Decision Record, unassigned ownership), security FAIL (1 High:
-# cross-tenant hotel-scoping), dependency/consistency/performance all
-# PASS_WITH_ACTIONS; NOT frozen, G2 human; see SYNC_STATE.yaml SYNC-019),
-# backend-analytics (SPEC-ANALYTICS-001@0.1.1 — security review FAIL,
-# 1 Critical/1 Medium, unresolved and blocking G2; see SYNC_STATE.yaml SYNC-010),
-# and backend-auth (SPEC-AUTH-001@0.2.1 — security review FAIL, 1 Critical/4 High,
-# unresolved and blocking G2; see SYNC_STATE.yaml SYNC-011).
-# backend-attendance's registry/index synchronization gap (SIR-GLOB-005) is now
-# CLOSED by the session that added this line — `specification` below reflects
-# SPEC-ATT-001@0.1.1.
+# STATUS AS OF 2026-07-20 (Repository Synchronization Workflow, superseding the stale
+# "no frozen module specification exists" claim this block previously made): ten module
+# specifications are now FROZEN (G2 Specification Freeze, reserved human authority) --
+# SPEC-AUTH-001@0.3.0, SPEC-JOB-DISPATCH-001@0.3.1 (backend-work-requests/work-applications/
+# assignments), SPEC-ATT-001@0.2.0, SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0,
+# SPEC-EMP-001@0.2.0, SPEC-CRM-001@0.2.0, SPEC-NOTIF-001@0.2.0, SPEC-QUAL-001@0.2.0, and
+# SPEC-ANALYTICS-001@0.2.0 -- see each module's own `specification` field below for its
+# freeze date and disposition, and MODULE_MEMORY.yaml for the corroborating ART-MEM summary
+# now produced for all ten (backfilled for backend-auth/work-requests/attendance by this
+# pass; the remaining seven were produced at their own freeze). Every FROZEN module carries
+# open security/decision/owner-assignment items forward as G8 release prerequisites, not
+# freeze blockers, per the human ruling first applied to SPEC-AUTH-001/SPEC-JOB-DISPATCH-001/
+# SPEC-ATT-001 on 2026-07-15. Only backend-chatbot (SPEC-CHATBOT-001@0.1.3) and backend-geo
+# (SPEC-GEO-001@0.1.1) remain REVIEW-status, both unimplemented stubs blocked on open
+# decisions (see SPECIFICATION_INDEX.yaml). backend-hotel-workers is RETIRED (ADR-022).
 
 modules:
   - id: backend-auth
@@ -161,6 +159,7 @@ modules:
     published_events: none-observed
     consumed_events: none-observed
     specification: SPEC-EMP-001@0.2.0 (FROZEN)  # docs/03-modules/employee-management/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow, conditional authorization contingent on Security pass). G4: architecture/dependency/consistency/performance PASS_WITH_ACTIONS; security PASS_WITH_ACTIONS (upgraded from FAIL by targeted re-verification -- OD-EMP-05/checkHotelAccess scoping resolved by ADR-023; special-category access/audit controls unbuilt but adequately disclosed). Both remaining High findings are release/G8 prerequisites, not freeze blockers, per SPEC-AUTH-001/SPEC-ATT-001 precedent.
+    related_specification: SPEC-HR-001@0.2.1 (REVIEW, architecture BLOCKED)  # DISCOVERABILITY CROSS-REFERENCE, added by Repository Synchronization Workflow 2026-07-20 -- not a second specification field, not an alternate mapping. docs/03-modules/hr/MODULE_SPEC.md targets this SAME registry id/code path (backend/src/modules/hr) for a DIFFERENT capability set (contract lifecycle/generation, payslip-request-to-fulfilment, contract-scan upload) than the FROZEN SPEC-EMP-001 above (employment record/lifecycle). The two specifications' boundary claims conflict with each other and with docs/03-modules/onboarding/MODULE_SPEC.md over contract generation/confirmation ownership -- disclosed, not resolved, at OD-HR-01a/OD-HR-01b (docs/03-modules/hr/MODULE_SPEC.md) and OD-EMP-10 (this module's own frozen spec, which itself states the docs<->code mapping to backend-hr is "proposed, not asserted"). This note does not change architecture, does not merge responsibilities, and does not resolve OD-HR-01a/OD-EMP-10 -- those remain reserved human/architecture decisions. It exists solely so a reader of this registry entry discovers that a second, non-frozen specification also claims this module id before starting implementation against it.
     evidence: backend/src/routes/v1/index.ts:31
 
   - id: backend-notifications
@@ -277,8 +276,7 @@ unresolved:
   - All accountable owners require authoritative human assignment (SYNC-001, blocked); no CODEOWNERS exists and backend/package.json "author" is empty.
   - backend-chatbot and backend-geo are declared-but-unimplemented stubs (directories contain only .placeholder; not route-registered).
   - backend-hr and backend-calendar are active but lack a dedicated test file in backend/src/__tests__/.
-  - No frozen module specification exists yet for any registered module (G2 freeze is reserved human authority); REVIEW-status specifications exist for job-dispatch (backend-work-requests/work-applications/assignments, SPEC-JOB-DISPATCH-001@0.2.0), backend-notifications (SPEC-NOTIF-001@0.1.1), backend-quality (SPEC-QUAL-001@0.1.2, all five G4 dimensions PASS_WITH_ACTIONS, zero Critical/High), backend-attendance (SPEC-ATT-001@0.1.1, architecture BLOCKED + security FAIL, see SYNC-019), and backend-analytics (SPEC-ANALYTICS-001@0.1.1).
-  - backend-attendance's registry/index synchronization gap is now CLOSED (this synchronization pass; see SYNC_STATE.yaml SYNC-019) — `specification` above now reads `SPEC-ATT-001@0.1.1 (REVIEW)`. (backend-quality's equivalent gap was closed earlier; see SYNC_STATE.yaml SYNC-015.)
+  - SUPERSEDED (2026-07-20, Repository Synchronization Workflow): the prior claim here ("no frozen module specification exists yet") is stale -- ten module specifications are now FROZEN (see the file header above and each module's own `specification` field); only backend-chatbot/backend-geo remain REVIEW-status, both unimplemented stubs. Retained as historical trail, not current state.
   - backend-analytics's `GET /analytics/leaderboard`(`/by-hotel/:hotel_id`) Critical authz gap (OQ-ANALYTICS-01 / SIR-ANLY-001) is now RESOLVED in code by Sprint 0 item S0-5 (EPIC-SECREM, 2026-07-17): both routes enforce `requireRole(['admin','manager'])`, and `/by-hotel/:hotel_id` additionally enforces `checkHotelAccess()`, matching the module's own `/stats`/`/hotel-summary` and the sibling `/quality/leaderboard`. Independent security review PASS (Critical closed); backend suite green (149/149). The Critical no longer blocks SPEC-ANALYTICS-001's G2; the residual manager cross-tenant visibility on `/by-hotel` and the un-gated `getHotelSummary.top_workers` slice are tracked non-blocking under SIR-ANLY-014 (downstream of SIR-AUTH-003).
   - `edge-analytics-reads-hotel-worker` (dependency review, SPEC-ANALYTICS-001 v0.1.1 FIND-DEP-001) is now APPLIED to DEPENDENCY_GRAPH.yaml by the repository-synchronization pass (Package A step 5, AUDIT-M3); `state-hotel-worker.readers` now includes `backend-analytics`.
   - `backend-consent` (target `SPEC-CONSENT-001@0.1.1`, status `REVIEW`) has zero code footprint — no `backend/src/modules/consent` directory exists at all (not even a `.placeholder`, unlike `backend-chatbot`/`backend-geo`) — so no module entry is added here, mirroring the `backend-documents`/`backend-payslips` zero-code deferral pattern. `docs/03-modules/consent/MODULE_SPEC.md` now exists (authored under `ADR-015`, 2026-07-13; completed its first G4 Independent Review round — Architecture/Dependency/Consistency/Security/Performance all `PASS_WITH_ACTIONS`, zero Critical/High findings remaining after v0.1.0→v0.1.1 correction — and G6 documentation validation, `PASS_WITH_ACTIONS`; see `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`'s `## Module: Consent` section, `SIR-CONSENT-001..011`). `ADR-015` (Accepted, 2026-07-13) pre-emptively settles the ownership boundary: `backend-consent` is the exclusive owner of consent lifecycle/records/versions/withdrawal/renewal/audit history/validation, covering the recurring GDPR access gate (CRR §24) five specs already anticipate plus the one-time chatbot-consent question in `docs/03-modules/onboarding/MODULE_SPEC.md` `OPQ-3` (resolved by that ADR). Not frozen (G2 human) — owner assignment and all 11 open decisions remain standing human-authority items. See `BOUNDARY_INDEX.yaml`'s `backend-consent` row and `DECISION_INDEX.md`.
