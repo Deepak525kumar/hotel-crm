@@ -2,6 +2,15 @@
 
 **Profile status:** Provisional repository-derived baseline; ownership and architecture decisions require formal confirmation
 
+## Repository Phase: Implementation Mode (entered 2026-07-20, human decision)
+
+All ten implementation-backed module specifications are G2 FROZEN (see `SPECIFICATION_INDEX.yaml`); the discoverability/Module-Memory backfill pass closed the last open documentation-synchronization gap (PR #176, merged). The commissioning human has explicitly ended the documentation-authoring loop at this point and directed the repository into **Implementation Mode**:
+
+- **Documentation is locked** — no further specification authoring, freezing, ADR creation, or repository-wide documentation audits are to be initiated proactively. The only documentation changes permitted going forward are **corrections discovered as a byproduct of implementation work** (e.g., a spec's stale citation found while writing code against it), applied narrowly to the affected section, not as a standalone documentation pass.
+- **Implementation sequencing authority** is `docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md` (epic order, PR order, dependency graph, branch strategy, Definition of Done, testing/rollback strategy) — consult it before starting new implementation work instead of re-deriving priority order.
+- **First implementation target (human-confirmed):** `SPEC-JOB-DISPATCH-001`'s unguarded `PATCH /assignments/:id` (OQ-01/FIND-SEC-001, Critical).
+- This note itself is a project-specific operating-mode fact, not a framework rule change — the underlying documentation workflows in `.claude/workflows/` remain available for the narrow correction case above.
+
 **Observed repository revision:** `5b16be40ef0aa9ac3f186e7323b960886a6153c2`
 
 **Observed default branch:** `main` via `refs/remotes/origin/HEAD`
