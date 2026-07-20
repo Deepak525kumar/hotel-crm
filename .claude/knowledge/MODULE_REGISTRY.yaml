@@ -83,12 +83,12 @@ modules:
     type: backend-module
     path: backend/src/modules/hotel-workers
     owner: unassigned
-    lifecycle: active
+    lifecycle: deprecated  # ADR-022 (Accepted, ratified by merge of PR #166, 2026-07-20): not part of the target architecture; retained as an implementation compatibility layer pending migration prerequisites (EMP employment record on backend-hr, Hotel-Group model OD-EMP-05, role x scope JWT authz TREQ-008/REQ-USERS-022..024). Physical removal is separately gated.
     implementation_status: active
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: RETIRED (ADR-022)  # was UNKNOWN; no SPEC-HOTELWORKERS-001 will be authored/frozen. Employment-record ownership moves to SPEC-EMP-001/backend-hr.
     evidence: backend/src/routes/v1/index.ts:25
 
   - id: backend-work-requests
