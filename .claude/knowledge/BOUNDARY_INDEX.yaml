@@ -41,10 +41,11 @@ modules:
     boundary: Hotel/CRM records. Canonical home of the Hotels capability (SPEC-CRM-001); "Hotels module" is an alias for this module, not a standalone boundary -- no SPEC-HOTELS-001/backend-hotels exists (ADR-011, SIR-GLOB-013).
   - module: backend-hotel-workers
     owner: unassigned
-    owned_state: [state-hotel-worker]
+    lifecycle: deprecated  # ADR-022 (Accepted, ratified by merge of PR #166, 2026-07-20); see MODULE_REGISTRY.yaml
+    owned_state: [state-hotel-worker]  # REPURPOSE-PENDING -> backend-hr/SPEC-EMP-001
     owned_contracts: []
     owned_apis: ["/api/v1/crm/hotels/:hotel_id/workers"]
-    boundary: Hotel-worker roster; reads state-hotel, state-user.
+    boundary: Hotel-worker roster; reads state-hotel, state-user. NOT part of the target architecture (ADR-022) -- retained only as an implementation compatibility layer until migration to backend-hr/SPEC-EMP-001 completes.
   - module: backend-work-requests
     owner: unassigned
     owned_state: [state-work-request]

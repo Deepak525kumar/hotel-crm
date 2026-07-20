@@ -26,7 +26,7 @@ contract_owners:
 state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDEX for full writer/reader sets)
   - { domain: state-session, authoritative_writer: backend-auth }
   - { domain: state-hotel, authoritative_writer: backend-crm }
-  - { domain: state-hotel-worker, authoritative_writer: backend-hotel-workers }
+  - { domain: state-hotel-worker, authoritative_writer: backend-hotel-workers }  # REPURPOSE-PENDING per ADR-022 (Accepted, ratified by merge of PR #166, 2026-07-20): target authoritative_writer migrates to backend-hr/SPEC-EMP-001 once EMP employment-record build + Hotel-Group model (OD-EMP-05) + role x scope JWT authz (TREQ-008/REQ-USERS-022..024) land; see STATE_OWNERSHIP_INDEX.yaml for detail
   - { domain: state-work-request, authoritative_writer: backend-work-requests }
   - { domain: state-work-application, authoritative_writer: backend-work-applications }
   - { domain: state-worker-assignment, authoritative_writer: backend-assignments }
