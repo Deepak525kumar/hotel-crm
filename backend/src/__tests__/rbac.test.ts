@@ -1,6 +1,6 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
-import { requireRole, requirePermission, checkHotelAccess } from '../middleware/permissions.js';
+import { requireRole, requirePermission, checkHotelAccess, resolveHotelAccess } from '../middleware/permissions.js';
 
 jest.mock('../lib/logger.js', () => ({
   logger: { info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, warn: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, debug: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, error: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -106,6 +106,15 @@ describe('checkHotelAccess middleware', () => {
     expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
   });
 
+  it('allows checkers unconditionally (PATCH-04 §4c bypass — no DB query)', async () => {
+    const req = makeReq({ userId: 'c1', role: 'checker', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    await checkHotelAccess()(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+  });
+
   it('allows workers with an ACTIVE HotelWorker membership row', async () => {
     mockHotelWorkerFindFirst.mockResolvedValue({ id: 'hw1' });
     const req = makeReq({ userId: 'w1', role: 'worker', hotel_ids: [], permissions: [] });
@@ -132,5 +141,40 @@ describe('checkHotelAccess middleware', () => {
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
     await checkHotelAccess()(req, makeRes(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
+  });
+});
+
+// Characterization suite for the Epic 3 centralization seam (Execution Plan
+// §2 "Shared authorization centralization seam"): resolveHotelAccess() is now
+// the single role->scope resolution point every consumer of
+// checkHotelAccess() goes through. These cases lock the exact allow/deny
+// outcome per role — pinning current behavior so Epic 5's authz flip has a
+// documented baseline to diverge from deliberately, not accidentally.
+describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
+  beforeEach(() => {
+    mockHotelWorkerFindFirst.mockReset();
+  });
+
+  it.each(['admin', 'manager', 'checker'])('allows %s via bypass, with no DB query', async (role) => {
+    const decision = await resolveHotelAccess(role, 'u1', 'h1');
+    expect(decision).toEqual({ allowed: true, viaBypass: true });
+    expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('allows a worker with an ACTIVE HotelWorker membership row', async () => {
+    mockHotelWorkerFindFirst.mockResolvedValue({ id: 'hw1' });
+    const decision = await resolveHotelAccess('worker', 'w1', 'h1');
+    expect(decision).toEqual({ allowed: true, viaBypass: false });
+  });
+
+  it('denies a worker with no ACTIVE membership row', async () => {
+    mockHotelWorkerFindFirst.mockResolvedValue(null);
+    const decision = await resolveHotelAccess('worker', 'w1', 'h1');
+    expect(decision).toEqual({ allowed: false, reason: 'no_membership' });
+  });
+
+  it('denies a worker when no hotel_id is provided', async () => {
+    const decision = await resolveHotelAccess('worker', 'w1', undefined);
+    expect(decision).toEqual({ allowed: false, reason: 'missing_hotel_id' });
   });
 });
