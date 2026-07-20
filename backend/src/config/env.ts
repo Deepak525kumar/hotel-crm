@@ -16,7 +16,11 @@ const envSchema = z.object({
 
   // JWT
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
-  JWT_REFRESH_SECRET: z.string().min(32).optional(),
+  // SECURITY (OQ-AUTH-04): dedicated secret is mandatory — no fallback to
+  // JWT_SECRET. Reusing the access-token secret for refresh tokens means a
+  // leaked access secret (e.g. via an access-token verification oracle)
+  // also forges long-lived refresh tokens. Fail closed at startup instead.
+  JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
   JWT_ACCESS_EXPIRY: z.string().default('1h'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 

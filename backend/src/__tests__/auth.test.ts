@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import crypto from 'node:crypto';
 
 // Mock the Prisma client before any imports that use it
 const mockPrisma = {
@@ -195,14 +196,15 @@ describe('AuthService', () => {
       });
     });
 
-    it('deletes specific session when refresh token provided', async () => {
+    it('deletes specific session when refresh token provided (looked up by hash, not raw value)', async () => {
       mockPrisma.session.deleteMany.mockResolvedValue({ count: 1 });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.logout('user_1', 'specific-refresh-token');
 
+      const expectedHash = crypto.createHash('sha256').update('specific-refresh-token').digest('hex');
       expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({
-        where: { user_id: 'user_1', refresh_token: 'specific-refresh-token' },
+        where: { user_id: 'user_1', refresh_token: expectedHash },
       });
     });
   });

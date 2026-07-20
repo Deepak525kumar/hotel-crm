@@ -13,6 +13,14 @@ import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest,
 import { AuthResponse } from './types.js';
 
 export class AuthService extends BaseService {
+  // SECURITY (OQ-AUTH-15): only a SHA-256 digest of the refresh token is ever
+  // persisted (same pattern as PasswordResetToken.token_hash below) — a
+  // database read (backup, replica, injection) no longer yields a token an
+  // attacker can replay against POST /auth/refresh or /auth/logout.
+  private hashRefreshToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
   async signup(data: SignupRequest, ip?: string): Promise<AuthResponse> {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) {
@@ -49,7 +57,7 @@ export class AuthService extends BaseService {
     await this.prisma.session.create({
       data: {
         user_id: user.id,
-        refresh_token: tokens.refresh_token,
+        refresh_token: this.hashRefreshToken(tokens.refresh_token),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -100,7 +108,7 @@ export class AuthService extends BaseService {
     await this.prisma.session.create({
       data: {
         user_id: user.id,
-        refresh_token: tokens.refresh_token,
+        refresh_token: this.hashRefreshToken(tokens.refresh_token),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -134,7 +142,7 @@ export class AuthService extends BaseService {
     }
 
     const session = await this.prisma.session.findFirst({
-      where: { refresh_token: data.refresh_token, user_id: payload.sub },
+      where: { refresh_token: this.hashRefreshToken(data.refresh_token), user_id: payload.sub },
     });
     if (!session || session.expires_at < new Date()) {
       throw new UnauthorizedError('Session expired or not found');
@@ -155,7 +163,7 @@ export class AuthService extends BaseService {
     await this.prisma.session.update({
       where: { id: session.id },
       data: {
-        refresh_token: tokens.refresh_token,
+        refresh_token: this.hashRefreshToken(tokens.refresh_token),
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
@@ -170,7 +178,7 @@ export class AuthService extends BaseService {
   async logout(userId: string, refreshToken?: string): Promise<void> {
     if (refreshToken) {
       await this.prisma.session.deleteMany({
-        where: { user_id: userId, refresh_token: refreshToken },
+        where: { user_id: userId, refresh_token: this.hashRefreshToken(refreshToken) },
       });
     } else {
       await this.prisma.session.deleteMany({ where: { user_id: userId } });
