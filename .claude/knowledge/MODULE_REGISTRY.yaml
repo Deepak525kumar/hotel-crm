@@ -160,7 +160,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-EMP-001@0.1.1 (REVIEW)  # docs/03-modules/employee-management/MODULE_SPEC.md; G4 independent review not yet run; NOT frozen (G2 human). Registry pointer was stale (UNKNOWN) despite the spec existing since 1796c37.
+    specification: SPEC-EMP-001@0.1.2 (REVIEW)  # docs/03-modules/employee-management/MODULE_SPEC.md; G4 independent review round complete 2026-07-20 -- architecture/dependency/consistency/performance PASS_WITH_ACTIONS, security FAIL (2 High: checkHotelAccess scoping bypass OD-EMP-05, special-category access/audit controls unbuilt). NOT frozen (G2 human).
     evidence: backend/src/routes/v1/index.ts:31
 
   - id: backend-notifications
