@@ -28,23 +28,24 @@ specifications:
     release_prerequisites: 4 High security findings OPEN in code (OQ-AUTH-04/06/15, absent MFA); Critical already fixed by HOTFIX-AUTH-002; review by G8 -- NOT freeze blockers per human ruling
   - module: backend-work-requests
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
     frozen_at: 2026-07-15 (G2 Approval Workflow); architecture BLOCKED cleared by ADR-018 (coupling superseded-by-pivot)
     release_prerequisites: security FAIL (1 Critical PATCH /assignments/:id + 2 High) OPEN in code; Critical warrants immediate remediation; review by G8 -- NOT freeze blockers per human ruling
+    amended: 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021 -- CalendarEntry narrowed to assignment-kind only, TREQ-009/TRULE-008 auto-cancel converted from atomic transaction to consuming EVT-CAL-SickVacationMarked, sick/vacation manager notification ceded to Calendar; FROZEN status retained (narrow reconciliation, not a re-open); see SYNC_STATE.yaml SYNC-042
   - module: backend-work-applications
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    note: one bounded capability shared with work-requests + assignments; FROZEN 2026-07-15 (G2 Approval Workflow)
+    note: one bounded capability shared with work-requests + assignments; FROZEN 2026-07-15 (G2 Approval Workflow); amended 0.3.0->0.3.1 (2026-07-19) per ADR-021, see backend-work-requests row
   - module: backend-assignments
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    note: FROZEN 2026-07-15 (G2 Approval Workflow)
+    note: FROZEN 2026-07-15 (G2 Approval Workflow); amended 0.3.0->0.3.1 (2026-07-19) per ADR-021 -- this module now consumes EVT-CAL-SickVacationMarked to cancel same-day assignments (TREQ-009/TRULE-008), see backend-work-requests row
   - module: backend-notifications
     spec: SPEC-NOTIF-001
     version: 0.1.1

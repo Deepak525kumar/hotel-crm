@@ -1721,6 +1721,29 @@ known_drift:
       freeze: (1) human ratification of ADR-021; (2) re-author SPEC-CALENDAR-001 to the
       narrowed scope; (3) re-run the three interrupted G4 reviewers; (4) G2 human freeze.
     authority_needed: human  # ADR-021 ratification (Proposed -> Accepted); then Calendar spec re-authoring + G4 completion + G2 freeze
+  - id: SYNC-043
+    type: specification-correction
+    status: in_progress
+    description: >-
+      Human ratified ADR-021 (Proposed -> Accepted, 2026-07-19) and directed the full
+      execution sequence. SPEC-CALENDAR-001 re-authored 0.1.0 -> 0.2.0 to the narrowed
+      boundary (state-calendar-absence + availability read-model; no cross-boundary write;
+      event-driven auto-cancel). G4 re-run against v0.2.0: Consistency PASS_WITH_ACTIONS
+      (5 findings, all independent of ADR-021, applied directly, no version bump); Performance
+      PASS_WITH_ACTIONS (2 findings, ADR-021-related, applied directly); Dependency BLOCKED
+      -- FIND-DEP-001/002/003 (2 High + 1 Medium) found that the FROZEN
+      SPEC-JOB-DISPATCH-001@0.3.0 already claimed CalendarEntry's sick/vacation kinds, an
+      atomic single-transaction auto-cancel with zero declared consumed events, and the
+      sick/vacation manager notification -- directly contradicting ADR-021's "Job Dispatch
+      unchanged" premise. Per human direction, SPEC-JOB-DISPATCH-001 amended (0.3.0 -> 0.3.1,
+      Correction, FROZEN status retained): CalendarEntry narrowed to assignment-kind only;
+      TREQ-009/TRULE-008 converted from atomic transaction to consuming
+      EVT-CAL-SickVacationMarked; sick/vacation notification ceded to Calendar. Knowledge
+      synchronized: SPECIFICATION_INDEX.yaml/MODULE_REGISTRY.yaml (all three job-dispatch
+      module rows -> @0.3.1). Dependency re-verification against both amended documents is
+      the remaining step before Calendar's G2 freeze.
+    authority_needed: none  # amendment executed under this session's explicit human direction; re-verification is the next mechanical step, not a new decision
+    next_step: dispatch Dependency (and Architecture, as the affected-reviewer union for a frozen-spec correction) re-verification against SPEC-CALENDAR-001@0.2.0 + SPEC-JOB-DISPATCH-001@0.3.1; if clean, G2 freeze Calendar and continue the auto-continue loop
 
 context_invalidators:
   - repository revision changes

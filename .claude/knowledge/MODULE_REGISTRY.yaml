@@ -100,7 +100,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (accept-transaction coupling superseded-by-pivot, Accepted 2026-07-15).
+    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (accept-transaction coupling superseded-by-pivot, Accepted 2026-07-15). Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021 (Calendar boundary): CalendarEntry narrowed to assignment-kind only; TREQ-009/TRULE-008 auto-cancel converted to consuming EVT-CAL-SickVacationMarked; sick/vacation manager notification ceded to Calendar. FROZEN status retained (narrow reconciliation, not a re-open); see SYNC_STATE.yaml SYNC-042.
     evidence: backend/src/routes/v1/index.ts:26; backend/src/modules/work-requests/service.ts:4
 
   - id: backend-work-applications
@@ -112,7 +112,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018.
+    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; see backend-work-requests entry.
     evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
 
   - id: backend-assignments
@@ -124,7 +124,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.0 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018.
+    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; see backend-work-requests entry.
     evidence: backend/src/routes/v1/index.ts:28
 
   - id: backend-attendance
