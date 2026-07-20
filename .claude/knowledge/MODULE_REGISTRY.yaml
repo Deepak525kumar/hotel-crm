@@ -160,7 +160,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-EMP-001@0.1.2 (REVIEW)  # docs/03-modules/employee-management/MODULE_SPEC.md; G4 independent review round complete 2026-07-20 -- architecture/dependency/consistency/performance PASS_WITH_ACTIONS, security FAIL (2 High: checkHotelAccess scoping bypass OD-EMP-05, special-category access/audit controls unbuilt). NOT frozen (G2 human).
+    specification: SPEC-EMP-001@0.2.0 (FROZEN)  # docs/03-modules/employee-management/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow, conditional authorization contingent on Security pass). G4: architecture/dependency/consistency/performance PASS_WITH_ACTIONS; security PASS_WITH_ACTIONS (upgraded from FAIL by targeted re-verification -- OD-EMP-05/checkHotelAccess scoping resolved by ADR-023; special-category access/audit controls unbuilt but adequately disclosed). Both remaining High findings are release/G8 prerequisites, not freeze blockers, per SPEC-AUTH-001/SPEC-ATT-001 precedent.
     evidence: backend/src/routes/v1/index.ts:31
 
   - id: backend-notifications

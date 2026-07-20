@@ -1777,6 +1777,35 @@ known_drift:
     authority_needed: none  # G2 authorization was provided by the commissioning human this session; this record documents the freeze
     next_step: continue the auto-continue loop to the next specification in dependency order (backend-hotel-workers -- currently UNKNOWN, no spec authored)
 
+  - id: SYNC-045
+    type: specification-freeze
+    status: resolved
+    description: >-
+      SPEC-EMP-001 (backend-hr) FROZEN at G2 on 2026-07-20 by the commissioning human, conditional
+      authorization ("if Security passes... execute the G2 freeze workflow"). Sequence this
+      session: (1) ADR-023 (Hotel Group domain model) Proposed -> Accepted, ratified by merge of
+      PR #170, treated as ratification consistent with the ADR-022 precedent; (2) v0.1.2 -> v0.1.3
+      consumed ADR-023 to resolve OD-EMP-05 (HotelGroup entity owned by backend-crm; employment
+      record's hotel_group_id field; RM/HM scope; discriminated JWT scope claim) -- Owned state,
+      REQ-EMP-012, Trust boundaries/authorization, Evidence table, Dependencies, Proposed Knowledge
+      Deltas updated; (3) targeted Security re-verification (not a full G4 rerun) scoped only to
+      FIND-001/FIND-002's relationship to ADR-023: Security upgraded FAIL -> PASS_WITH_ACTIONS --
+      FIND-001 (checkHotelAccess scoping bypass) downgraded to a disclosed G8 release/ADR-022-
+      migration prerequisite (design gap closed by the ratified ADR); FIND-002 (special-category
+      access controls, unimplemented) remains open but was already adequately disclosed in
+      REQ-EMP-007's acceptance criteria, matching the SPEC-AUTH-001 absent-MFA precedent; (4) v0.1.3
+      -> v0.2.0 G2 freeze, reusing Architecture/Dependency/Consistency/Performance
+      PASS_WITH_ACTIONS from the 2026-07-20 G4 round without reopening them. Open decisions
+      OD-EMP-04/06/07(text-sync)/08/09/10/12/13/14/16 and owner assignment OD-EMP-15/SYNC-001
+      remain implementation/release prerequisites reviewed by G8, NOT freeze blockers, per the
+      SPEC-AUTH-001/SPEC-ATT-001/SPEC-USERS-001/SPEC-CALENDAR-001 precedent. Knowledge
+      synchronized: DECISION_INDEX.md (ADR-023 registered; OD-EMP-05 pending-decision-record
+      resolved), SPECIFICATION_ISSUES_REGISTER.md (SIR-EMP-002 RESOLVED), SPECIFICATION_INDEX.yaml,
+      MODULE_REGISTRY.yaml (-> SPEC-EMP-001@0.2.0 FROZEN), MODULE_MEMORY.yaml (ART-MEM-backend-hr
+      produced).
+    authority_needed: none  # G2 authorization was provided by the commissioning human this session, conditional on the Security re-verification outcome; this record documents the freeze
+    next_step: none -- draft PR opened per explicit instruction; session stops here
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1797,7 +1826,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users, backend-calendar], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); entries for the 2026-07-15 freezes remain a known backfill gap" }
+  module_memory:       { modules: [backend-users, backend-calendar, backend-hr], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); entries for the 2026-07-15 freezes remain a known backfill gap" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

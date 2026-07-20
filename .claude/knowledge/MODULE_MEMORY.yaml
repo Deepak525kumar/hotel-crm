@@ -16,8 +16,10 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
-# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0) and their ART-MEM entries are
-# recorded below. NOTE (pre-existing backlog, not addressed by this session):
+# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr reached G2 freeze
+# on 2026-07-20 (SPEC-EMP-001@0.2.0, conditional on the targeted Security
+# re-verification against ADR-023 passing PASS_WITH_ACTIONS). Their ART-MEM
+# entries are recorded below. NOTE (pre-existing backlog, not addressed by this session):
 # SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
@@ -66,6 +68,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-calendar, owned-state/contract change, state-calendar-absence Prisma model landing]
     open_prerequisites: [OD-CAL-04, OD-CAL-06, OD-CAL-07, OD-CAL-08, OD-CAL-09/SYNC-001, OD-CAL-10, OD-CAL-11, FIND-SEC-CAL-001, FIND-SEC-CAL-002, FIND-SEC-CAL-004]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-hr
+    module: backend-hr
+    freeze_revision: 1796c370ec2639ea801f8f057a15918b8cbd41fc  # code-truth basis of the spec; backend/src/modules/hr unchanged since (stub, service.ts throws NotImplementedError)
+    spec: SPEC-EMP-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Single authoritative employment record per employee -- identity linkage, core employment fields, lifecycle status, skills, hotel blocklist, unified profile-and-history view (the platform's performance-review surface). Repurposes the retired HotelWorker roster (ADR-022); Employee Management is the long-term owner, not backend-hotel-workers.
+      owned_state: [state-employment-record]  # target-only, zero-code deferral: backend-hr is a stub (service.ts throws NotImplementedError). Owned fields: Employee ID/Job Title/Start Date, lifecycle status, hotel_group_id (ADR-023, foreign key to backend-crm's HotelGroup), skill tags + assessment basis, Personalfragebogen-sourced personal data incl. special-category (Konfession, disability), hotel blocklist entries, per-field retention-tier classification.
+      owned_contracts: [IF-EMP-CreateEmployee/v0, IF-EMP-GetProfileHistory/v0, IF-EMP-GetSkills/v0, IF-EMP-GetBlocklist/v0, IF-EMP-SetBlocklist/v0, IF-EMP-GetSpecialCategory/v0, IF-EMP-ExportEmployeeData/v0, IF-EMP-Deactivate/v0, IF-EMP-LifecycleSignal/v0]  # target-only, unbuilt; concrete transport/schema OPEN (OD-EMP-09)
+      interfaces: []  # backend-hr is a stub; no built target interface exists yet
+      key_rules: [RULE-EMP-01, RULE-EMP-02, RULE-EMP-03, RULE-EMP-04, RULE-EMP-05, RULE-EMP-06, RULE-EMP-07, RULE-EMP-08, RULE-EMP-09, RULE-EMP-10, RULE-EMP-11, RULE-EMP-12]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-hr, owned-state/contract change, ADR-023's HotelGroup entity landing in schema.prisma]
+    open_prerequisites: [OD-EMP-04, OD-EMP-06, OD-EMP-08, OD-EMP-09, OD-EMP-10, OD-EMP-12, OD-EMP-13, OD-EMP-14, OD-EMP-15/SYNC-001, OD-EMP-16, SIR-EMP-014, Security FIND-001 (ADR-023 build), Security FIND-002 (special-category access/audit controls)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze
