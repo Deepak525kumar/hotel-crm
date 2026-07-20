@@ -1845,6 +1845,31 @@ known_drift:
       candidates; backend-chatbot/SPEC-CHATBOT-001 and backend-geo/SPEC-GEO-001 are unimplemented
       stubs).
 
+  - id: SYNC-047
+    type: specification-freeze
+    status: resolved
+    description: >-
+      SPEC-NOTIF-001 (backend-notifications) FROZEN at G2 on 2026-07-20 by the commissioning
+      human, continuing the standing auto-continue instruction after SPEC-CRM-001's freeze
+      (SYNC-046). Selected as next-highest-priority: G4 already complete with zero Critical/High
+      across all five dimensions at v0.1.1, no ADR-023 relevance (unlike EMP/CRM), simplest
+      remaining live-code candidate. No content change beyond Document Control and one change-log
+      row -- v0.1.1 -> v0.2.0 directly, reusing all five G4 dimensions unchanged. Open decisions
+      OQ-NOTIF-01..09 and owner assignment (SYNC-001) are implementation/release prerequisites
+      reviewed by G8, NOT freeze blockers -- OQ-NOTIF-01 specifically gates target-state
+      implementation planning for TREQ-002/TREQ-012 per its own text (a Decision Record is
+      "REQUIRED... before any target-state implementation planning begins"), a distinct gate from
+      G2 freeze, per the SPEC-AUTH-001/SPEC-ATT-001/SPEC-USERS-001/SPEC-CALENDAR-001/SPEC-EMP-001/
+      SPEC-CRM-001 precedent. Knowledge synchronized: SPECIFICATION_INDEX.yaml (merged with a
+      pre-existing note line found on this pass, not overwritten), MODULE_REGISTRY.yaml (->
+      SPEC-NOTIF-001@0.2.0 FROZEN), MODULE_MEMORY.yaml (ART-MEM-backend-notifications produced).
+    authority_needed: none  # standing authorization ("automatically move to the next highest priority spec and continue the process") covers this freeze
+    next_step: >-
+      Open the draft PR for this freeze, then continue the standing auto-continue instruction:
+      evaluate the next REVIEW-status spec (backend-quality/SPEC-QUAL-001,
+      backend-analytics/SPEC-ANALYTICS-001 are the remaining live-code, G4-complete candidates;
+      backend-chatbot/SPEC-CHATBOT-001 and backend-geo/SPEC-GEO-001 are unimplemented stubs).
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1865,7 +1890,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); entries for the 2026-07-15 freezes remain a known backfill gap" }
+  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); entries for the 2026-07-15 freezes remain a known backfill gap" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

@@ -172,7 +172,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-NOTIF-001@0.1.1 (REVIEW)  # docs/03-modules/notifications/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); G6-doc PASS_WITH_ACTIONS; NOT frozen (G2 human)
+    specification: SPEC-NOTIF-001@0.2.0 (FROZEN)  # docs/03-modules/notifications/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High), reused unchanged for freeze; G6-doc PASS_WITH_ACTIONS. Open decisions OQ-NOTIF-01..09 and owner assignment (SYNC-001) are release/G8 prerequisites, not freeze blockers.
     evidence: backend/src/routes/v1/index.ts:32
 
   - id: backend-analytics
