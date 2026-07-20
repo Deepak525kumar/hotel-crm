@@ -54,10 +54,10 @@ specifications:
     note: FROZEN at G2 2026-07-20 (commissioning human). G4 all PASS_WITH_ACTIONS, zero Critical/High, reused unchanged (see SYNC-009 for the original G4-complete record). OQ-NOTIF-01..09 and owner assignment (SYNC-001) are G8 release prerequisites. ART-MEM-backend-notifications produced.
   - module: backend-analytics
     spec: SPEC-ANALYTICS-001
-    version: 0.1.1
-    status: REVIEW
+    version: 0.2.0
+    status: FROZEN
     path: docs/03-modules/analytics/MODULE_SPEC.md
-    freeze_blocked_by: security FAIL (1 Critical/1 Medium); G2 human (SYNC-010)
+    note: FROZEN at G2 2026-07-20 (commissioning human). Security upgraded FAIL->PASS_WITH_ACTIONS -- Critical OQ-ANALYTICS-01 resolved in code 2026-07-17 (SIR-ANLY-001, Sprint 0 S0-5), independently re-verified at freeze time. Medium OQ-ANALYTICS-11 and new Low OQ-ANALYTICS-12 are G8 release prerequisites. ART-MEM-backend-analytics produced.
   - module: backend-attendance
     spec: SPEC-ATT-001
     version: 0.2.0
