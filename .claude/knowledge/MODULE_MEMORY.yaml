@@ -16,13 +16,16 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
-# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr, backend-crm, and
-# backend-notifications reached G2 freeze on 2026-07-20 (SPEC-EMP-001@0.2.0,
-# conditional on the targeted Security re-verification against ADR-023 passing
-# PASS_WITH_ACTIONS; SPEC-CRM-001@0.2.0, G4 already zero Critical/High, ADR-023
-# consumed for OD-CRM-01's Hotel Group facet; SPEC-NOTIF-001@0.2.0, G4 already
-# zero Critical/High, no ADR-023 relevance). Their ART-MEM entries are recorded
-# below. NOTE (pre-existing backlog, not addressed by this session):
+# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr, backend-crm,
+# backend-notifications, and backend-quality reached G2 freeze on 2026-07-20
+# (SPEC-EMP-001@0.2.0, conditional on the targeted Security re-verification
+# against ADR-023 passing PASS_WITH_ACTIONS; SPEC-CRM-001@0.2.0, G4 already
+# zero Critical/High, ADR-023 consumed for OD-CRM-01's Hotel Group facet;
+# SPEC-NOTIF-001@0.2.0, G4 already zero Critical/High, no ADR-023 relevance;
+# SPEC-QUAL-001@0.2.0, G4 already zero Critical/High, preceded by a
+# documentation-accuracy correction reconciling a stale "REQUIRED" knowledge
+# delta already applied by an earlier sync pass). Their ART-MEM entries are
+# recorded below. NOTE (pre-existing backlog, not addressed by this session):
 # SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
@@ -110,6 +113,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-notifications, owned-state/contract change, OQ-NOTIF-01 resolution (NotificationChannel enum shape)]
     open_prerequisites: [OQ-NOTIF-01 (Decision Record REQUIRED before TREQ-002/TREQ-012 implementation planning), OQ-NOTIF-02, OQ-NOTIF-03, OQ-NOTIF-04, OQ-NOTIF-05, OQ-NOTIF-06, OQ-NOTIF-07, OQ-NOTIF-08, OQ-NOTIF-09, SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-quality
+    module: backend-quality
+    freeze_revision: 6e404ab9d52daf04f144673030de731bbe1af5d6  # HEAD at G4 completion; backend/src/modules/quality unchanged since
+    spec: SPEC-QUAL-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Quality verification (0-100 inspection score), 1-5 star rating, and worker-overall-rating/leaderboard aggregation against a confirmed assignment. Target (largely unbuilt): 0-100-only model, no 5-star, photo-with-rating, rating tiers, recency-weighted average, warnings, and a rework loop with 20-minute escalation.
+      owned_state: [state-quality-verification, state-rating, state-worker-overall-rating]  # all three writer: [backend-quality]. state-worker-overall-rating has two SAME-OWNER write mechanisms (app upsert + installed DB trigger Rating_refresh_overall_rating) -- dual-writer source-of-truth question, OQ-04.
+      owned_contracts: []  # no named contract objects; unversioned baseline/UNKNOWN endpoints
+      interfaces: ["POST /quality/verifications", "POST /quality/ratings", "GET /quality/leaderboard", "GET /quality/leaderboard/by-hotel/:hotel_id"]  # writes gate on quality:write (ADMIN/CHECKER); reads on quality:read (ADMIN/MANAGER/CHECKER); by-hotel adds checkHotelAccess() but it bypasses admin/manager/checker (OQ-03 Medium); writes have no hotel-scope check at all (OQ-09 Medium)
+      key_rules: [RULE-001, RULE-002, RULE-003, RULE-004, RULE-005, RULE-006, RULE-007, RULE-008, RULE-009, RULE-010]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-quality, owned-state/contract change, OQ-01 resolution (1-5 vs 0-100 Rating model)]
+    open_prerequisites: [OQ-01 (headline 1-5 vs 0-100 Rating reconciliation), OQ-02, OQ-03 (Medium, Risk Assessment), OQ-04, OQ-05, OQ-06/SYNC-001, OQ-07, OQ-08, OQ-09 (Medium, Risk Assessment)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze

@@ -148,7 +148,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-QUAL-001@0.1.2 (REVIEW)  # docs/03-modules/quality/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); G6-doc PASS_WITH_ACTIONS; NOT frozen (G2 human) -- pending disposition of OQ-01 (headline 1-5 vs 0-100 Rating reconciliation) through OQ-09
+    specification: SPEC-QUAL-001@0.2.0 (FROZEN)  # docs/03-modules/quality/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High), reused unchanged for freeze; G6-doc PASS_WITH_ACTIONS. OQ-01..09 and owner assignment (OQ-06/SYNC-001) are release/G8 prerequisites; OQ-03/OQ-09 (Medium, cross-tenant) routed to Risk Assessment.
     evidence: backend/src/routes/v1/index.ts:30; backend/src/modules/quality/service.ts:4
 
   - id: backend-hr
