@@ -91,8 +91,10 @@ specifications:
     status: RETIRED (ADR-022)
   - module: backend-hr
     spec: SPEC-EMP-001
-    version: 0.1.2
-    status: REVIEW
+    version: 0.2.0
+    status: FROZEN
+    path: docs/03-modules/employee-management/MODULE_SPEC.md
+    note: FROZEN at G2 2026-07-20 (commissioning human, conditional on Security pass). Security upgraded FAIL->PASS_WITH_ACTIONS by targeted re-verification against ADR-023 (OD-EMP-05 resolved); FIND-001/FIND-002 carried forward as G8 release prerequisites, matching SPEC-AUTH-001/SPEC-ATT-001 precedent. ART-MEM-backend-hr produced.
     path: docs/03-modules/employee-management/MODULE_SPEC.md
     note: G4 independent review round complete 2026-07-20 -- architecture PASS_WITH_ACTIONS, dependency PASS_WITH_ACTIONS, consistency PASS_WITH_ACTIONS, security FAIL (2 High -- checkHotelAccess scoping bypass OD-EMP-05, special-category access/audit controls unbuilt), performance PASS_WITH_ACTIONS (no budget defined, non-blocking). NOT frozen (G2 human).
   - module: backend-calendar
