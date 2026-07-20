@@ -76,7 +76,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-CRM-001@0.1.1 (REVIEW)  # docs/03-modules/crm/MODULE_SPEC.md; G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High); all author-fixable findings applied at v0.1.1; NOT frozen (G2 human) -- pending disposition of OD-CRM-01/02/05/10/11 plus OD-CRM-14..17
+    specification: SPEC-CRM-001@0.2.0 (FROZEN)  # docs/03-modules/crm/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High), reused unchanged for freeze. OD-CRM-01's Hotel Group facet RESOLVED by ADR-023 (HotelGroup entity owned by backend-crm); dedicated-Hotel-Manager facet plus OD-CRM-02/03/04/05(implementation)/06..17 and owner assignment (SYNC-001) are release/G8 prerequisites, not freeze blockers.
     evidence: backend/src/routes/v1/index.ts:24
 
   - id: backend-hotel-workers

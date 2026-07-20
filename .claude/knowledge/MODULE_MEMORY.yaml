@@ -16,10 +16,12 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
-# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr reached G2 freeze
-# on 2026-07-20 (SPEC-EMP-001@0.2.0, conditional on the targeted Security
-# re-verification against ADR-023 passing PASS_WITH_ACTIONS). Their ART-MEM
-# entries are recorded below. NOTE (pre-existing backlog, not addressed by this session):
+# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr and backend-crm
+# reached G2 freeze on 2026-07-20 (SPEC-EMP-001@0.2.0, conditional on the
+# targeted Security re-verification against ADR-023 passing PASS_WITH_ACTIONS;
+# SPEC-CRM-001@0.2.0, G4 already zero Critical/High, ADR-023 consumed for
+# OD-CRM-01's Hotel Group facet). Their ART-MEM entries are recorded below.
+# NOTE (pre-existing backlog, not addressed by this session):
 # SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
@@ -81,6 +83,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-hr, owned-state/contract change, ADR-023's HotelGroup entity landing in schema.prisma]
     open_prerequisites: [OD-EMP-04, OD-EMP-06, OD-EMP-08, OD-EMP-09, OD-EMP-10, OD-EMP-12, OD-EMP-13, OD-EMP-14, OD-EMP-15/SYNC-001, OD-EMP-16, SIR-EMP-014, Security FIND-001 (ADR-023 build), Security FIND-002 (special-category access/audit controls)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-crm
+    module: backend-crm
+    freeze_revision: 5651915f614b1da900eb541a9d66838e85ddeac9  # code-truth basis of the spec; backend/src/modules/crm unchanged since, independently re-verified by all five G4 reviewers
+    spec: SPEC-CRM-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Single authoritative record and management surface for hotels (operating properties) and the Hotel Group organizational unit under which they are administered. Canonical home of the Hotels capability (ADR-011); "Hotels module" is an alias, not a standalone boundary.
+      owned_state: [state-hotel, state-hotel-group]  # state-hotel: current, live (Hotel CRUD). state-hotel-group: target, decided (ADR-023) but not yet built in schema.prisma -- HotelGroup {id, name, billing_info, regional_manager_user_id}, Hotel.hotel_group_id many-to-one.
+      owned_contracts: [IF-CRM-ListHotels/v1, IF-CRM-GetHotel/v1, IF-CRM-CreateHotel/v1, IF-CRM-UpdateHotel/v1, IF-CRM-DeleteHotel/v1]  # live. IF-CRM-PauseJobs/v0 and IF-CRM-Hotel Group CRUD/v0 are target, unbuilt (OD-CRM-04, OD-CRM-01 dedicated-manager facet).
+      interfaces: ["GET /api/v1/crm/hotels", "GET /api/v1/crm/hotels/:hotel_id", "POST /api/v1/crm/hotels", "PATCH /api/v1/crm/hotels/:hotel_id", "DELETE /api/v1/crm/hotels/:hotel_id"]  # all behind authMiddleware; list/get gate on hotels:read (admin/manager net effect), create/update net-effect Admin-only (OD-CRM-02 contradiction), delete on requireRole('admin')
+      key_rules: [RULE-CRM-01, RULE-CRM-02, RULE-CRM-03, RULE-CRM-04, RULE-CRM-05, RULE-CRM-06, RULE-CRM-07, RULE-CRM-08, RULE-CRM-09, RULE-CRM-10, RULE-CRM-11]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-crm, owned-state/contract change, state-hotel-group Prisma model landing]
+    open_prerequisites: [OD-CRM-01 (dedicated-Hotel-Manager facet), OD-CRM-02, OD-CRM-03, OD-CRM-04, OD-CRM-05 (implementation), OD-CRM-06, OD-CRM-07, OD-CRM-08, OD-CRM-09, OD-CRM-10, OD-CRM-11/SYNC-001, OD-CRM-12, OD-CRM-13, OD-CRM-14, OD-CRM-15, OD-CRM-16, OD-CRM-17]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze
