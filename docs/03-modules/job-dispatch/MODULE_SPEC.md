@@ -595,6 +595,10 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
   - NOTE (future, do not add yet): target introduces Redis (broadcast slot locks), and new `CalendarEntry`
     and `JobRequest` state domains + a 6h auto-close scheduled job (PIVOT §5.5, §5.6, §9.3). The current
     cross-owner accept-tx write edges become removable when the accept flow is deleted (Phase 1).
+  - ADD (per `ADR-021`, Correction v0.3.1): this capability **consumes** `EVT-CAL-SickVacationMarked`
+    (published by `backend-calendar`) to drive `TREQ-009`/`TRULE-008`'s same-day assignment cancellation.
+    Mirrors `SPEC-CALENDAR-001`'s own publisher-side proposed delta so the bidirectional edge has a
+    proposal from both endpoints; contract `[OPEN]` (OD-CAL-08), target-plane only, no code yet.
 - **TERMINOLOGY.md:** promote to canonical: `Work request`, `Work application` (mark "current-state,
   retired in target"), `Assignment` (WorkerAssignment), `Roster`, `Slot`. ADD role-token case mapping
   (`UserRole.WORKER` == guard `'worker'`, etc., FIND-CONS-001) and standardized verb note (worker
