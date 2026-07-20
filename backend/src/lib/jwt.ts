@@ -34,8 +34,7 @@ export function signAccessToken(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>
 
 export function signRefreshToken(userId: string): string {
   const env = getEnv();
-  const secret = env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
-  return jwt.sign({ sub: userId, type: 'refresh' }, secret, {
+  return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_REFRESH_SECRET, {
     expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
     algorithm: 'HS256',
   });
@@ -69,9 +68,8 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
   const env = getEnv();
-  const secret = env.JWT_REFRESH_SECRET ?? env.JWT_SECRET;
   try {
-    const decoded = jwt.verify(token, secret) as RefreshTokenPayload;
+    const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
     if (decoded.type !== 'refresh') {
       return null;
     }
