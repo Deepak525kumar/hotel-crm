@@ -196,7 +196,7 @@ modules:
     dependencies: []
     published_events: none-observed  # current code; target (ADR-021): publishes EVT-CAL-SickVacationMarked
     consumed_events: none-observed
-    specification: SPEC-CALENDAR-001@0.2.0 (REVIEW)  # docs/03-modules/calendar/MODULE_SPEC.md; re-authored to the accepted ADR-021 boundary (narrow Calendar: owns state-calendar-absence + availability read-model; Job Dispatch retains WorkerAssignment/CalendarEntry/exclusivity). G4 Dependency/Consistency/Performance re-run then G2 freeze. See SYNC_STATE.yaml SYNC-042; DECISION_INDEX ADR-021 (Accepted)
+    specification: SPEC-CALENDAR-001@0.3.0 (FROZEN)  # docs/03-modules/calendar/MODULE_SPEC.md. FROZEN at G2 on 2026-07-19 by the commissioning human, on the ADR-021 boundary (narrow Calendar: owns state-calendar-absence + availability read-model; Job Dispatch retains WorkerAssignment/CalendarEntry/exclusivity). All five G4 dimensions PASS_WITH_ACTIONS or better, zero open Critical/High. Open decisions OD-CAL-04/06/07/08/10/11 + owner assignment OD-CAL-09/SYNC-001 are release/implementation prerequisites reviewed by G8, NOT freeze blockers. See SYNC_STATE.yaml SYNC-042/043/044; DECISION_INDEX ADR-021 (Accepted); MODULE_MEMORY.yaml ART-MEM-backend-calendar
     evidence: backend/src/routes/v1/index.ts:34
 
   - id: backend-chatbot

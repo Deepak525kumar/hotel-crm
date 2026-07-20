@@ -1723,7 +1723,7 @@ known_drift:
     authority_needed: human  # ADR-021 ratification (Proposed -> Accepted); then Calendar spec re-authoring + G4 completion + G2 freeze
   - id: SYNC-043
     type: specification-correction
-    status: in_progress
+    status: resolved
     description: >-
       Human ratified ADR-021 (Proposed -> Accepted, 2026-07-19) and directed the full
       execution sequence. SPEC-CALENDAR-001 re-authored 0.1.0 -> 0.2.0 to the narrowed
@@ -1743,7 +1743,39 @@ known_drift:
       module rows -> @0.3.1). Dependency re-verification against both amended documents is
       the remaining step before Calendar's G2 freeze.
     authority_needed: none  # amendment executed under this session's explicit human direction; re-verification is the next mechanical step, not a new decision
-    next_step: dispatch Dependency (and Architecture, as the affected-reviewer union for a frozen-spec correction) re-verification against SPEC-CALENDAR-001@0.2.0 + SPEC-JOB-DISPATCH-001@0.3.1; if clean, G2 freeze Calendar and continue the auto-continue loop
+    resolution: >-
+      Dependency re-verification RESOLVED all three findings (BLOCKED -> PASS_WITH_ACTIONS);
+      2 new Low findings applied directly. Architecture re-verified the amended boundary
+      (PASS_WITH_ACTIONS -- internally consistent, no new ownership ambiguity, Correction
+      mechanism confirmed constitutionally sound per LOOP_CONTROL.md §3); flagged 2 new
+      Medium/Low findings (SPEC-EMP-001 RULE-EMP-06 misattribution; JD reviewer-row staleness),
+      both applied directly. Consistency ran a targeted cross-document pass closing the
+      affected-reviewer union gap (PASS_WITH_ACTIONS; 1 new Medium -- a stale duplicate
+      Validation Plan row -- + 1 new Low, both applied directly). See SYNC-044 for the
+      resulting G2 freeze.
+  - id: SYNC-044
+    type: specification-freeze
+    status: resolved
+    description: >-
+      SPEC-CALENDAR-001 (backend-calendar) FROZEN at G2 on 2026-07-19 by the commissioning
+      human, on the fully reconciled ADR-021 boundary, closing the SYNC-042/043 correction
+      cycle. v0.2.0 -> v0.3.0, no content change beyond Document Control and one change-log
+      row. All five G4 dimensions clear with zero open Critical/High across the entire
+      reconciliation: Architecture (BLOCKED at first round, cleared by ADR-021 + confirmed
+      by re-verification), Security PASS_WITH_ACTIONS, Dependency PASS_WITH_ACTIONS (upgraded
+      from BLOCKED), Consistency PASS_WITH_ACTIONS, Performance PASS_WITH_ACTIONS. Open
+      decisions OD-CAL-04/06/07/08/10/11 and owner assignment OD-CAL-09/SYNC-001 are
+      implementation/release prerequisites reviewed by G8, NOT freeze blockers, per the
+      SPEC-AUTH-001/SPEC-JOB-DISPATCH-001/SPEC-ATT-001/SPEC-USERS-001 precedent; Security's
+      FIND-SEC-CAL-001/002/004 carry forward as release prerequisites unchanged. Knowledge
+      synchronized: SPECIFICATION_INDEX.yaml, MODULE_REGISTRY.yaml (-> SPEC-CALENDAR-001@0.3.0
+      FROZEN), MODULE_MEMORY.yaml (ART-MEM-backend-calendar produced), and the Specification
+      Issues Register. state-calendar-absence remains a zero-code deferral in
+      DEPENDENCY_GRAPH.yaml/STATE_OWNERSHIP_INDEX.yaml/OWNERSHIP_INDEX.yaml (no Prisma model
+      yet); BOUNDARY_INDEX.yaml already carries its target_owned_state annotation from
+      ADR-021 ratification.
+    authority_needed: none  # G2 authorization was provided by the commissioning human this session; this record documents the freeze
+    next_step: continue the auto-continue loop to the next specification in dependency order (backend-hotel-workers -- currently UNKNOWN, no spec authored)
 
 context_invalidators:
   - repository revision changes
@@ -1765,7 +1797,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); entries for the 2026-07-15 freezes remain a known backfill gap" }
+  module_memory:       { modules: [backend-users, backend-calendar], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); entries for the 2026-07-15 freezes remain a known backfill gap" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

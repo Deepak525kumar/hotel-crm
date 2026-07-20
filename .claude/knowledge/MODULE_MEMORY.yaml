@@ -15,9 +15,10 @@ version_source: .claude/VERSION.yaml
 observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; no module reached G2 freeze, entries: [] unchanged
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
-# backend-users reached G2 freeze on 2026-07-19 (SPEC-USERS-001@0.2.0) and its
-# ART-MEM-backend-users entry is recorded below. NOTE (pre-existing backlog, not
-# addressed by this session): SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
+# backend-users and backend-calendar reached G2 freeze on 2026-07-19
+# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0) and their ART-MEM entries are
+# recorded below. NOTE (pre-existing backlog, not addressed by this session):
+# SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
 # left as a known gap for a repository-synchronization pass.
@@ -52,6 +53,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-users, owned-state/contract change]
     open_prerequisites: [OQ-USERS-01, OQ-USERS-02, OQ-USERS-05, OQ-USERS-06, OQ-USERS-07/SYNC-001, SIR-USERS-005]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-calendar
+    module: backend-calendar
+    freeze_revision: 9560c04720fc3f61f2191bec1b3973db2e038666  # HEAD at G2 freeze (2026-07-19); code-truth basis of the spec is 555839c (backend/src/modules/calendar unchanged since -- route-registered stub)
+    spec: SPEC-CALENDAR-001 v0.3.0 (FROZEN)
+    summary:
+      boundary: Worker-absence (sick/vacation self-marking) and the today-only red/green availability read-model. Scheduling-ownership boundary settled by ADR-021 -- narrowed FROM the original v0.1.0 scope (WorkerAssignment/CalendarEntry/assignment-creation/daily-exclusivity-enforcement, all remain with Job Dispatch/backend-assignments). Calendar performs no cross-boundary write; the same-day auto-cancel is event-driven (Calendar publishes EVT-CAL-SickVacationMarked, Job Dispatch/assignments consumes and cancels).
+      owned_state: [state-calendar-absence]  # target-only, zero-code deferral: no Prisma model exists yet (unbuilt stub, service.ts throws NotImplementedError); authoritative_writer backend-calendar per ADR-021, kind in {sick, vacation}. Reads (does not write) state-worker-assignment via Job Dispatch/assignments for the availability derivation.
+      owned_contracts: [IF-CAL-GetOwnCalendar/v0, IF-CAL-MarkSickVacation/v0, IF-CAL-GetAvailability/v0]  # target-only, unbuilt; contract schema itself OPEN (OD-CAL-08). IF-CAL-PlaceAssignment is a Job-Dispatch delegation, not a Calendar-owned write.
+      interfaces: []  # current code is two stub endpoints (GET/POST /hotels/:hotel_id/operations) modeling unrelated reception data (OD-CAL-10), not this module's target scheduling/absence surface; no built target interface exists yet
+      key_rules: [RULE-CAL-01, RULE-CAL-02, RULE-CAL-03, RULE-CAL-04, RULE-CAL-05, RULE-CAL-06, RULE-CAL-07, RULE-CAL-08]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-calendar, owned-state/contract change, state-calendar-absence Prisma model landing]
+    open_prerequisites: [OD-CAL-04, OD-CAL-06, OD-CAL-07, OD-CAL-08, OD-CAL-09/SYNC-001, OD-CAL-10, OD-CAL-11, FIND-SEC-CAL-001, FIND-SEC-CAL-002, FIND-SEC-CAL-004]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze
