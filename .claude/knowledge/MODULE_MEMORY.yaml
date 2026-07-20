@@ -16,12 +16,13 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
-# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr and backend-crm
-# reached G2 freeze on 2026-07-20 (SPEC-EMP-001@0.2.0, conditional on the
-# targeted Security re-verification against ADR-023 passing PASS_WITH_ACTIONS;
-# SPEC-CRM-001@0.2.0, G4 already zero Critical/High, ADR-023 consumed for
-# OD-CRM-01's Hotel Group facet). Their ART-MEM entries are recorded below.
-# NOTE (pre-existing backlog, not addressed by this session):
+# (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr, backend-crm, and
+# backend-notifications reached G2 freeze on 2026-07-20 (SPEC-EMP-001@0.2.0,
+# conditional on the targeted Security re-verification against ADR-023 passing
+# PASS_WITH_ACTIONS; SPEC-CRM-001@0.2.0, G4 already zero Critical/High, ADR-023
+# consumed for OD-CRM-01's Hotel Group facet; SPEC-NOTIF-001@0.2.0, G4 already
+# zero Critical/High, no ADR-023 relevance). Their ART-MEM entries are recorded
+# below. NOTE (pre-existing backlog, not addressed by this session):
 # SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
@@ -96,6 +97,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-crm, owned-state/contract change, state-hotel-group Prisma model landing]
     open_prerequisites: [OD-CRM-01 (dedicated-Hotel-Manager facet), OD-CRM-02, OD-CRM-03, OD-CRM-04, OD-CRM-05 (implementation), OD-CRM-06, OD-CRM-07, OD-CRM-08, OD-CRM-09, OD-CRM-10, OD-CRM-11/SYNC-001, OD-CRM-12, OD-CRM-13, OD-CRM-14, OD-CRM-15, OD-CRM-16, OD-CRM-17]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-notifications
+    module: backend-notifications
+    freeze_revision: efde2a9f0393cccc2168cd1d2d89ea9cbc21033a  # HEAD at G4 completion; backend/src/modules/notifications unchanged since
+    spec: SPEC-NOTIF-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Notification create/list/read-tracking and the notification-service in-process contract exposed to four producer modules and three clients. Current state is persist-only (IN_APP-default); target state is push-only (APNs/FCM) plus at least 8 new confirmed trigger categories, almost entirely unbuilt.
+      owned_state: [state-notification]  # Notification model, schema.prisma:466-488; sole owner backend-notifications. NotificationType/NotificationChannel enums functionally owned (referenced only by this model).
+      owned_contracts: [notification-service]  # notificationService.sendNotification/getNotifications/markAsRead/sendEmail/sendPushNotification, in-process TS contract, not HTTP/event-bus
+      interfaces: ["GET /notifications", "POST /notifications/:notification_id/read"]  # both behind authMiddleware only, no role gate (REQ-006); ownership-scoped at the service layer (RULE-001)
+      key_rules: [RULE-001, RULE-002, RULE-003, RULE-004, RULE-005, RULE-006, RULE-007]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-notifications, owned-state/contract change, OQ-NOTIF-01 resolution (NotificationChannel enum shape)]
+    open_prerequisites: [OQ-NOTIF-01 (Decision Record REQUIRED before TREQ-002/TREQ-012 implementation planning), OQ-NOTIF-02, OQ-NOTIF-03, OQ-NOTIF-04, OQ-NOTIF-05, OQ-NOTIF-06, OQ-NOTIF-07, OQ-NOTIF-08, OQ-NOTIF-09, SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze
