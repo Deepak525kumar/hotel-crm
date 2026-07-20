@@ -17,15 +17,20 @@ observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Reposi
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
 # (SPEC-USERS-001@0.2.0, SPEC-CALENDAR-001@0.3.0); backend-hr, backend-crm,
-# backend-notifications, and backend-quality reached G2 freeze on 2026-07-20
-# (SPEC-EMP-001@0.2.0, conditional on the targeted Security re-verification
-# against ADR-023 passing PASS_WITH_ACTIONS; SPEC-CRM-001@0.2.0, G4 already
-# zero Critical/High, ADR-023 consumed for OD-CRM-01's Hotel Group facet;
-# SPEC-NOTIF-001@0.2.0, G4 already zero Critical/High, no ADR-023 relevance;
-# SPEC-QUAL-001@0.2.0, G4 already zero Critical/High, preceded by a
-# documentation-accuracy correction reconciling a stale "REQUIRED" knowledge
-# delta already applied by an earlier sync pass). Their ART-MEM entries are
-# recorded below. NOTE (pre-existing backlog, not addressed by this session):
+# backend-notifications, backend-quality, and backend-analytics reached G2
+# freeze on 2026-07-20 (SPEC-EMP-001@0.2.0, conditional on the targeted
+# Security re-verification against ADR-023 passing PASS_WITH_ACTIONS;
+# SPEC-CRM-001@0.2.0, G4 already zero Critical/High, ADR-023 consumed for
+# OD-CRM-01's Hotel Group facet; SPEC-NOTIF-001@0.2.0, G4 already zero
+# Critical/High, no ADR-023 relevance; SPEC-QUAL-001@0.2.0, G4 already zero
+# Critical/High, preceded by a documentation-accuracy correction reconciling
+# a stale "REQUIRED" knowledge delta already applied by an earlier sync pass;
+# SPEC-ANALYTICS-001@0.2.0, Security gate upgraded FAIL->PASS_WITH_ACTIONS
+# after independently re-verifying that the Critical OQ-ANALYTICS-01 finding
+# was resolved in live code on 2026-07-17, preceded by a substantive
+# current-state correction pass reconciling the spec text to match). Their
+# ART-MEM entries are recorded below. NOTE (pre-existing backlog, not
+# addressed by this session):
 # SPEC-AUTH-001, SPEC-JOB-DISPATCH-001, and SPEC-ATT-001
 # were frozen at G2 on 2026-07-15 but their Module Memory entries were never produced;
 # that backfill is out of scope here (this session froze only backend-users) and is
@@ -126,6 +131,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-quality, owned-state/contract change, OQ-01 resolution (1-5 vs 0-100 Rating model)]
     open_prerequisites: [OQ-01 (headline 1-5 vs 0-100 Rating reconciliation), OQ-02, OQ-03 (Medium, Risk Assessment), OQ-04, OQ-05, OQ-06/SYNC-001, OQ-07, OQ-08, OQ-09 (Medium, Risk Assessment)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+  - artifact: ART-MEM-backend-analytics
+    module: backend-analytics
+    freeze_revision: 5ddf1dea633e1bde0977fa3f7e7ff1c3ed7b3f2c  # HEAD at G2 freeze; spec authoring basis was ef25dae6, re-verified against this later HEAD since routes.ts changed (S0-5/S0-6 security fix + regression test)
+    spec: SPEC-ANALYTICS-001 v0.2.0 (FROZEN)
+    summary:
+      boundary: Read-only cross-module analytics aggregation (leaderboard, dashboard stats, hotel summary). Owns no Prisma model / state domain of its own -- a pure aggregator reading six state domains owned by five other modules.
+      owned_state: []  # NONE -- pure read-only aggregator
+      owned_contracts: []  # no named contract objects; unversioned baseline/UNKNOWN endpoints
+      interfaces: ["GET /analytics/leaderboard", "GET /analytics/leaderboard/by-hotel/:hotel_id", "GET /analytics/stats", "GET /analytics/hotel-summary/:hotel_id"]  # all four require requireRole(['admin','manager']) (leaderboard routes fixed 2026-07-17, Sprint 0 S0-5, SIR-ANLY-001); by-hotel additionally requires checkHotelAccess() (itself bypasses admin/manager/checker, OQ-ANALYTICS-12/SIR-ANLY-014, non-blocking)
+      key_rules: [RULE-ANALYTICS-001, RULE-ANALYTICS-002, RULE-ANALYTICS-003, RULE-ANALYTICS-004, RULE-ANALYTICS-005]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-analytics, owned-state/contract change, OQ-ANALYTICS-03 resolution (rooms-completed-per-worker metric definition)]
+    open_prerequisites: [OQ-ANALYTICS-02, OQ-ANALYTICS-03 (headline, blocking implementation), OQ-ANALYTICS-04, OQ-ANALYTICS-05, OQ-ANALYTICS-06/SYNC-001, OQ-ANALYTICS-07, OQ-ANALYTICS-08, OQ-ANALYTICS-09, OQ-ANALYTICS-10, OQ-ANALYTICS-11 (Medium, platform-wide ADR), OQ-ANALYTICS-12 (Low, checkHotelAccess bypass)]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
 
 production_rule:
   produced_at: G2 specification freeze

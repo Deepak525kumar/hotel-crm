@@ -17,12 +17,12 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-ANALYTICS-001 / 0.1.1` |
-| Status | `REVIEW` |
+| Spec ID / version | `SPEC-ANALYTICS-001 / 0.2.0` |
+| Status | `FROZEN` |
 | Owner | `unassigned`. `MODULE_REGISTRY.yaml` records `backend-analytics` owner as `unassigned` (`.claude/knowledge/MODULE_REGISTRY.yaml:161-171`); no CODEOWNERS entry exists. Owner assignment is reserved human authority (`SYNC-001`, `TERMINOLOGY.md:51`) and is blocked pending it — NOT invented here (OQ-ANALYTICS-06). |
-| Authors / reviewers | Author: Module Author agent. Reviewers: Architecture, Dependency, Consistency, and Performance reviews completed — all returned `PASS_WITH_ACTIONS`; dispositions applied at v0.1.1 (see Review and Change Log). Security review completed — returned **`FAIL`** (1 Critical, 1 Medium); the Critical finding cannot be resolved by this document (it is a live code defect) and is recorded as a blocking, unassigned residual risk pending a code fix or an authorized Risk Assessment (see OQ-ANALYTICS-01 and "Trust boundaries/authorization" below). This status does NOT clear the Security gate — it only ensures the finding is accurately represented. |
-| Repository revision | `ef25dae6a5e89cabe1f5e82453386705decbc3cf` |
-| Approved by / at | Not approved — G2 freeze reserved to human. Do NOT mark FROZEN. |
+| Authors / reviewers | Author: Module Author agent. Reviewers: Architecture, Dependency, Consistency, and Performance reviews completed — all returned `PASS_WITH_ACTIONS`; dispositions applied at v0.1.1 (see Review and Change Log). Security review originally returned **`FAIL`** (1 Critical, 1 Medium) at v0.1.1; the Critical (`OQ-ANALYTICS-01`, unguarded leaderboard routes) was **RESOLVED in live code** on 2026-07-17 by Sprint 0 item S0-5 (`SIR-ANLY-001`), independently re-verified against current `routes.ts` in this pass — both leaderboard routes now enforce `requireRole(['admin','manager'])`, and `/by-hotel/:hotel_id` additionally enforces `checkHotelAccess()`; a regression test (`analytics-leaderboard-authz.test.ts`, S0-6) guards against reintroduction. Security is now `PASS_WITH_ACTIONS` — the residual Medium (this module's own cross-module-reads/no-governing-ADR finding, `OQ-ANALYTICS-11`) and a new Low finding (`SIR-ANLY-014`: manager cross-tenant visibility via the pre-existing `checkHotelAccess()` admin/manager/checker bypass) are both non-blocking. |
+| Repository revision | `5ddf1dea633e1bde0977fa3f7e7ff1c3ed7b3f2c` (current HEAD; re-verified against `ef25dae6`'s original v0.1.1 claims — `backend/src/modules/analytics/routes.ts` changed by S0-5/S0-6, all other cited current-state code unchanged). |
+| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-20 by the commissioning human (standing session authorization to freeze each spec once its G4 gate is clean), reusing the existing Architecture/Dependency/Consistency/Performance evidence — all `PASS_WITH_ACTIONS`, zero Critical/High, unaffected by this pass. Security's live-code Critical (`OQ-ANALYTICS-01`) is independently re-verified RESOLVED (`SIR-ANLY-001`), clearing the only Constitution §12 freeze blocker this spec ever carried. `OQ-ANALYTICS-03` (headline product decision), `OQ-ANALYTICS-04..10`, `OQ-ANALYTICS-11` (Medium), the new `OQ-ANALYTICS-12` (Low, residual `checkHotelAccess` bypass), and owner assignment (`OQ-ANALYTICS-06`/`SYNC-001`) are implementation/release prerequisites reviewed by G8, not freeze blockers, matching the established precedent. |
 | Supersedes | None. First specification for `backend-analytics` (registry `specification: UNKNOWN` prior, `MODULE_REGISTRY.yaml:170`). |
 
 ## Purpose and Scope
@@ -81,7 +81,7 @@ below.
 |---|---|---|---|
 | `REQ-ANALYTICS-001` module owns no Prisma model / state domain; mounted at `/api/v1/analytics` | `backend/src/modules/analytics/{service.ts,types.ts}` (no model); `backend/src/routes/v1/index.ts:33` @ef25dae6 | Code | Observed (High) |
 | `REQ-ANALYTICS-002` all analytics routes require `authMiddleware`; `AnalyticsService extends BaseService` | `analytics/routes.ts:6-7`; `analytics/service.ts:19` @ef25dae6 | Code | Observed (High) |
-| `REQ-ANALYTICS-003` `GET /leaderboard` and `GET /leaderboard/by-hotel/:hotel_id` have NO `requireRole` and NO `checkHotelAccess` — any authenticated actor of any role may call either, for any `hotel_id` | `analytics/routes.ts:9-14` | Code | Observed (High); UNTESTED |
+| `REQ-ANALYTICS-003` `GET /leaderboard` requires `requireRole(['admin','manager'])`; `GET /leaderboard/by-hotel/:hotel_id` additionally requires `checkHotelAccess()` (fixed 2026-07-17, Sprint 0 S0-5, `SIR-ANLY-001` — v0.1.1 described the pre-fix unguarded state) | `analytics/routes.ts:9-19` @`5ddf1de` | Code | Observed (High); TESTED (`analytics-leaderboard-authz.test.ts`) |
 | `REQ-ANALYTICS-004` `GET /stats` requires `requireRole(['admin','manager'])` | `analytics/routes.ts:15-19` | Code | Observed (High); TESTED (`analytics.test.ts:36,48,54`) |
 | `REQ-ANALYTICS-005` `GET /hotel-summary/:hotel_id` requires `requireRole(['admin','manager'])` | `analytics/routes.ts:20-24` | Code | Observed (High); TESTED (`analytics.test.ts:42`) |
 | `REQ-ANALYTICS-006` `getLeaderboard(hotelId?)` reads `WorkerOverallRating`, `orderBy average_score desc`, `take 50`, optional hotel filter via `worker.hotel_workers.some({hotel_id, status:ACTIVE})` | `analytics/service.ts:26-57` | Code | Observed (High); ordering/filter UNTESTED |
@@ -143,7 +143,7 @@ does not promote new canonical terminology.
 |---|---|---|---|---|
 | REQ-ANALYTICS-001 | The module owns no Prisma model; it is mounted at `/api/v1/analytics`. | Must | No model file/domain under `analytics/`; mount `routes/v1/index.ts:33`. | RULE-ANALYTICS-001 |
 | REQ-ANALYTICS-002 | All analytics routes require authentication. | Must | `router.use(authMiddleware)` (`routes.ts:7`); missing/invalid token → 401. | RULE-ANALYTICS-001 |
-| REQ-ANALYTICS-003 | `GET /leaderboard` and `GET /leaderboard/by-hotel/:hotel_id` have no role or hotel-membership gate. | Must (as observed) | Any authenticated role (WORKER/CHECKER/MANAGER/ADMIN) receives 200 for any `hotel_id` path segment. | RULE-ANALYTICS-002 |
+| REQ-ANALYTICS-003 | `GET /leaderboard` requires admin/manager; `GET /leaderboard/by-hotel/:hotel_id` additionally requires hotel access. | Must | WORKER/CHECKER → 403 on both routes; ADMIN/MANAGER → 200; `checkHotelAccess()` gates the by-hotel route (subject to its own admin/manager/checker bypass, `SIR-AUTH-003`/`OQ-ANALYTICS-12`). | RULE-ANALYTICS-002 |
 | REQ-ANALYTICS-004 | `GET /stats` is restricted to admin/manager. | Must | Actor with role outside `{admin,manager}` → 403 `ForbiddenError`, before the service runs. | RULE-ANALYTICS-002 |
 | REQ-ANALYTICS-005 | `GET /hotel-summary/:hotel_id` is restricted to admin/manager. | Must | Actor with role outside `{admin,manager}` → 403 `ForbiddenError`, before the service runs. | RULE-ANALYTICS-002 |
 | REQ-ANALYTICS-006 | The leaderboard returns the top 50 workers by overall average, optionally scoped to one hotel's active workers. | Must | `workerOverallRating.findMany` `orderBy average_score desc`, `take 50`; when `hotelId` supplied, filter to workers with an ACTIVE `HotelWorker` row at that hotel. | RULE-ANALYTICS-003 |
@@ -170,7 +170,7 @@ does not promote new canonical terminology.
 | Rule | Preconditions | Outcome/invariant | Exceptions/precedence | Owner/source |
 |---|---|---|---|---|
 | RULE-ANALYTICS-001 | Any analytics request | All routes require `authMiddleware`. Responses use the shared envelope; NO pagination. No audit log is written for any read. | Missing/invalid auth → 401. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/routes.ts:6-24`; `analytics/controller.ts` |
-| RULE-ANALYTICS-002 | Route-level authorization | `/leaderboard` and `/leaderboard/by-hotel/:hotel_id` add NO further gate beyond authentication. `/stats` and `/hotel-summary/:hotel_id` additionally require `requireRole(['admin','manager'])`. NEITHER leaderboard route applies `checkHotelAccess()`. | Any authenticated role reads any hotel's leaderboard; `/stats` and `/hotel-summary` reject WORKER/CHECKER with 403. This asymmetry is a genuine open question (OQ-ANALYTICS-01), not resolved here. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/routes.ts:9-24` |
+| RULE-ANALYTICS-002 | Route-level authorization | All four routes require `requireRole(['admin','manager'])` (fixed on the leaderboard routes 2026-07-17, S0-5); `/leaderboard/by-hotel/:hotel_id` additionally requires `checkHotelAccess()`. `/leaderboard` (global) and `/stats` carry no hotel-membership dimension by design (global/platform-wide scope). | WORKER/CHECKER rejected with 403 on all four routes. `checkHotelAccess()`'s own admin/manager/checker bypass (`SIR-AUTH-003`) means a manager can still read another hotel's `by-hotel` leaderboard and `hotel-summary.top_workers` — tracked as `OQ-ANALYTICS-12` (Low), not this rule's own defect. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/routes.ts:9-27` |
 | RULE-ANALYTICS-003 | `getLeaderboard(hotelId?)` | Ordered strictly by `WorkerOverallRating.average_score desc`, unpaginated `take 50`; hotel scope (when supplied) filters to workers with an ACTIVE `HotelWorker` row at that hotel via a relation filter, never a direct `hotel_id` column on the aggregate itself. Query shape mirrors `quality/service.ts:214-223` by design (REQ-ANALYTICS-007) but is a separately maintained implementation. | No tie-break rule beyond Prisma's stable-ish ordering; not specified further. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/service.ts:26-57` |
 | RULE-ANALYTICS-004 | `getDashboardStats`/`getHotelSummary` aggregate computation | All counts/groupBy/aggregate calls for one response run inside a single `Promise.all` (not a DB transaction — no atomicity guarantee across the parallel reads); `_avg.score` of `null` (no rows) is surfaced as `null`, not `0`, in `quality.average_score`/`ratings.average_score`. Rate fields (`on_time_rate`, `pass_rate`) are `0` (not `null`) when the denominator is `0`. | Because reads are NOT transactional, `getDashboardStats`/`getHotelSummary` can observe a torn snapshot across concurrent writes from other modules — recorded as an observed characteristic, not remediated here. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/service.ts:59-172,174-256` |
 | RULE-ANALYTICS-005 | `getHotelSummary` | Internally calls `this.getLeaderboard(hotelId)` (a second, independent query already covered by RULE-ANALYTICS-003) and slices the first 5 rows as `top_workers`; `today_attendance` is scoped by `created_at` in `[startOfDay, startOfDay+1day)`, not by the attendance record's own shift/work date. | If `Attendance.created_at` diverges from the shift date it reports for (e.g. backfilled rows), `today_attendance` reflects row-creation time, not shift date — observed characteristic, not remediated here. | `unassigned (OQ-ANALYTICS-06/SYNC-001)`; `analytics/service.ts:174-256` |
@@ -208,9 +208,10 @@ edges recorded here).
   `edge-analytics-reads-worker-overall-rating` (`:252-258`).
 - `state-hotel-worker` (owner `backend-hotel-workers`, via `HotelWorker` relation filter,
   `schema.prisma:206`) — read only via the `worker.hotel_workers.some(...)` relation filter in
-  `getLeaderboard` (`analytics/service.ts:29-33`). No dedicated `edge-analytics-reads-hotel-worker`
-  entry exists in `DEPENDENCY_GRAPH.yaml` today; dependency review (FIND-DEP-001) confirmed this IS
-  a genuine missing edge — see the required "Proposed Knowledge Deltas" addition below.
+  `getLeaderboard` (`analytics/service.ts:29-33`). `edge-analytics-reads-hotel-worker`
+  (`DEPENDENCY_GRAPH.yaml:284-289`) and the `backend-analytics` entry in `state-hotel-worker.readers`
+  (`DEPENDENCY_GRAPH.yaml:476`) are already applied — originally flagged as a missing edge
+  (dependency review, FIND-DEP-001), since applied by an earlier repository-synchronization pass.
 
 All six read edges are recorded `compatibility: not-applicable`, `kind: reads-state`,
 `status: observed` (`DEPENDENCY_GRAPH.yaml:217-258`).
@@ -252,8 +253,8 @@ their compatibility posture is recorded as **baseline/UNKNOWN**.
 
 | Contract ID/version | Direction | Input | Output | Errors | Auth | Compatibility |
 |---|---|---|---|---|---|---|
-| `GET /analytics/leaderboard` (unversioned) | inbound | none (no pagination params); optional `?hotel_id=` query supported by the controller but unused by this route in practice | 200 `LeaderboardEntry[]` (top 50, `average_score desc`) | none typed (falls to centralized handler) | `authMiddleware` only — NO role gate, NO `checkHotelAccess` | baseline/UNKNOWN |
-| `GET /analytics/leaderboard/by-hotel/:hotel_id` (unversioned) | inbound | path `hotel_id` | 200 `LeaderboardEntry[]` (top 50 within hotel, `average_score desc`) | none typed | `authMiddleware` only — NO role gate, NO `checkHotelAccess` (REQ-ANALYTICS-003) | baseline/UNKNOWN |
+| `GET /analytics/leaderboard` (unversioned) | inbound | none (no pagination params); optional `?hotel_id=` query supported by the controller but unused by this route in practice | 200 `LeaderboardEntry[]` (top 50, `average_score desc`) | none typed (falls to centralized handler) | `authMiddleware` + `requireRole(['admin','manager'])` (fixed 2026-07-17, `SIR-ANLY-001`) | baseline/UNKNOWN |
+| `GET /analytics/leaderboard/by-hotel/:hotel_id` (unversioned) | inbound | path `hotel_id` | 200 `LeaderboardEntry[]` (top 50 within hotel, `average_score desc`) | none typed | `authMiddleware` + `requireRole(['admin','manager'])` + `checkHotelAccess()` (fixed 2026-07-17, `SIR-ANLY-001`; `checkHotelAccess()` itself bypasses admin/manager/checker, `OQ-ANALYTICS-12`) | baseline/UNKNOWN |
 | `GET /analytics/stats` (unversioned) | inbound | optional `?hotel_id=` query (path variant not routed) | 200 `DashboardStats` | none typed | `authMiddleware` + `requireRole(['admin','manager'])` | baseline/UNKNOWN |
 | `GET /analytics/hotel-summary/:hotel_id` (unversioned) | inbound | path `hotel_id` (required — not optional at the service signature) | 200 `HotelSummary` | none typed (invalid/absent hotel yields a zeroed summary, not 404 — `getHotelSummary` performs no existence check on the hotel itself) | `authMiddleware` + `requireRole(['admin','manager'])` | baseline/UNKNOWN |
 
@@ -333,40 +334,46 @@ or a summary with zeroed counts (`getHotelSummary` performs no existence check o
 querying). This is an observed characteristic (silent zero-result on bad input), not remediated
 here.
 
-**Trust boundaries/authorization:** `[CURRENT]` route RBAC is INCONSISTENT across the module's own
-three endpoint groups:
-- `[CRITICAL — BLOCKING]` OQ-ANALYTICS-01 — `GET /analytics/leaderboard` and
-  `GET /analytics/leaderboard/by-hotel/:hotel_id` require only `authMiddleware`: no `requireRole`
-  and no `checkHotelAccess`/tenant-boundary check (`analytics/routes.ts:9-14`), while `/stats`
-  (`:15-19`) and `/hotel-summary/:hotel_id` (`:20-24`) both require `requireRole(['admin','manager'])`.
-  Any authenticated user — including a self-signup-obtainable WORKER, who holds no quality/analytics
-  permission elsewhere in the system — can view worker names and performance ratings for ANY hotel
-  by passing its `hotel_id`, with no verification of hotel membership. This is the SAME data
-  (`WorkerOverallRating`) that the sibling `GET /quality/leaderboard/by-hotel/:hotel_id` gates with
-  BOTH `requirePermission('quality:read')` AND `checkHotelAccess()` (`quality/routes.ts:18`) —
-  i.e. one module protects this exact data and the other does not. Independent security review
-  classified this **Critical (Confidence High)**, not a routine open question: it is a live
-  cross-tenant personal-data disclosure in already-deployed code. Given the Germany-only,
-  GDPR-governed operating context (CONFIRMED §33), it is also a plausible confidentiality /
-  purpose-limitation concern requiring DPO/legal determination, beyond a pure access-control read.
-  Residual risk is LIVE and UNASSIGNED (owner `unassigned`, OQ-ANALYTICS-06/SYNC-001 blocks even
-  accountable acceptance of the risk, let alone remediation). **This finding BLOCKS G2 freeze** per
-  Constitution §12: it cannot be resolved by this specification (fixing the route guard is a code
-  change, out of scope here) and must be either fixed in code or formally accepted via an
-  authorized, time-bounded Risk Assessment before this module can be frozen. It MUST NOT be treated
-  as a routine "OPEN" item awaiting convenience.
+**Trust boundaries/authorization:** `[CURRENT]` route RBAC is now consistent across the module's
+own endpoint groups:
+- `[RESOLVED — was CRITICAL/BLOCKING]` OQ-ANALYTICS-01 — at v0.1.1 (repository revision `ef25dae6`),
+  `GET /analytics/leaderboard` and `GET /analytics/leaderboard/by-hotel/:hotel_id` required only
+  `authMiddleware`, with no `requireRole` and no `checkHotelAccess`/tenant-boundary check
+  (`analytics/routes.ts:9-14` at that revision), while `/stats` and `/hotel-summary/:hotel_id`
+  required `requireRole(['admin','manager'])` — any authenticated user, including a
+  self-signup-obtainable WORKER, could view worker names and performance ratings for ANY hotel.
+  Independent security review classified this **Critical (Confidence High)**: a live cross-tenant
+  personal-data disclosure in already-deployed code, also a plausible GDPR confidentiality/
+  purpose-limitation concern (CONFIRMED §33). **RESOLVED in code on 2026-07-17 by Sprint 0 item
+  S0-5 (`SIR-ANLY-001`):** both leaderboard routes now enforce `requireRole(['admin','manager'])`,
+  and `/by-hotel/:hotel_id` additionally enforces `checkHotelAccess()` (`analytics/routes.ts:9-19`
+  at current HEAD `5ddf1de`), matching this module's own `/stats`/`/hotel-summary` and the sibling
+  `quality/routes.ts:18`. A regression test (`analytics-leaderboard-authz.test.ts`, S0-6) exercises
+  both guarded routes end-to-end and fails if either guard is removed. Independently re-verified in
+  this pass by direct inspection of `routes.ts` — the fix is live. This finding no longer blocks G2
+  freeze.
+- `[OPEN — Low, non-blocking]` OQ-ANALYTICS-12 (new, this pass; corresponds to `SIR-ANLY-014`) — the
+  S0-5 fix's `checkHotelAccess()` guard on `/by-hotel/:hotel_id` inherits that middleware's own
+  admin/manager/checker bypass (`SIR-AUTH-003`, `permissions.ts:105-108`): a hotel-A manager can
+  still read hotel-B's `by-hotel` leaderboard, and `getHotelSummary`'s embedded `top_workers` slice
+  (gated only by `requireRole`, no `checkHotelAccess()` at all) carries the same disclosure. This is
+  the identical, already-tracked `checkHotelAccess` bypass class flagged across Auth/Attendance/
+  Quality/CRM — not a new defect, and non-blocking for this module's own freeze, matching the
+  `OQ-CRM-17`/`SPEC-CRM-001` precedent for the structurally identical finding.
 - The `/stats` and `/hotel-summary` admin/manager gate has a downstream consequence recorded in
   OQ-ANALYTICS-02: it makes `/stats` categorically unreachable for the WORKER role that the mobile
   worker app calls it for.
 
 **Data classification/retention:** Leaderboard responses disclose worker first/last name
-(`analytics/service.ts:40,50`) plus a computed rating/task-count to any authenticated actor,
-cross-hotel, per OQ-ANALYTICS-01 — worker-performance data, though notably NOT the worker's email
-(unlike `/quality/leaderboard`, which does return email — `quality/service.ts:216-219` — a
-narrower PII footprint here, recorded as an observation, not a mitigation). `/stats` and
-`/hotel-summary` expose only aggregate counts, not individual worker identities (aside from the
-embedded `top_workers` leaderboard slice in `/hotel-summary`, which carries the same disclosure as
-the leaderboard endpoints but is at least gated to admin/manager there).
+(`analytics/service.ts:40,50`) plus a computed rating/task-count to admin/manager actors only
+(post-S0-5 fix); cross-hotel exposure is now limited to the residual `checkHotelAccess()` bypass for
+admin/manager/checker (`OQ-ANALYTICS-12`), not to any authenticated actor as at v0.1.1 — worker-performance
+data, though notably NOT the worker's email (unlike `/quality/leaderboard`, which does return email —
+`quality/service.ts:216-219` — a narrower PII footprint here, recorded as an observation, not a
+mitigation). `/stats` and `/hotel-summary` expose only aggregate counts, not individual worker
+identities (aside from the embedded `top_workers` leaderboard slice in `/hotel-summary`, which
+carries the same disclosure as the leaderboard endpoints, gated to admin/manager but without its
+own `checkHotelAccess()` call — see `OQ-ANALYTICS-12`).
 
 **Performance budgets/workload:** No explicit budgets or SLOs are defined in code or authority
 docs (`[OPEN DECISION]` OQ-ANALYTICS-10; blocked on ownership `SYNC-001`). Observations:
@@ -407,8 +414,9 @@ any of the above.
 
 **Observability/audit:** NO audit-log writes occur (REQ-ANALYTICS-010) — consistent with a
 read-only module, but also means there is no record of who viewed which hotel's leaderboard or
-stats. Security review flagged this as a **severity multiplier for OQ-ANALYTICS-01 (Critical)**,
-not a neutral characteristic: the absence of any audit trail removes the one mitigating factor —
+stats. Security review flagged this as a **severity multiplier for the (now-resolved) OQ-ANALYTICS-01
+Critical**, historically relevant, not a neutral characteristic: the absence of any audit trail
+removed the one mitigating factor —
 detectability — that might otherwise partially offset the missing access control on
 `/analytics/leaderboard`(`/by-hotel/:hotel_id`). There is no way to determine, after the fact,
 which actors read which hotel's worker-performance data through the unguarded leaderboard routes.
@@ -467,7 +475,7 @@ observed or proposed here. **Removal criteria:** none — CONFIRMED §34 explici
 |---|---|---|---|
 | REQ-ANALYTICS-004 `/stats` RBAC gating (RULE-ANALYTICS-002) | Unit (middleware) | `analytics.test.ts:36,48,54` | Deny worker; allow admin; allow manager |
 | REQ-ANALYTICS-005 `/hotel-summary` RBAC gating (RULE-ANALYTICS-002) | Unit (middleware) | `analytics.test.ts:42` | Deny worker |
-| REQ-ANALYTICS-003 `/leaderboard`(`/by-hotel`) absence of role/hotel-scope restriction (RULE-ANALYTICS-002) | — | — | **UNTESTED** — no test exercises that any role, including worker, is currently ALLOWED through the leaderboard routes |
+| REQ-ANALYTICS-003 `/leaderboard`(`/by-hotel`) role/hotel-scope gating (RULE-ANALYTICS-002) | Integration (supertest) | `analytics-leaderboard-authz.test.ts` | TESTED (S0-6) — WORKER/CHECKER → 403 on both routes; ADMIN/MANAGER → 200; `by-hotel` role-denies before hotel scoping |
 | REQ-ANALYTICS-006 `getLeaderboard` ordering/filter/hotel-scope math (RULE-ANALYTICS-003) | — | — | **UNTESTED** — no test exercises the service aggregation logic |
 | REQ-ANALYTICS-008 `getDashboardStats` field mapping/math (RULE-ANALYTICS-004) | — | — | **UNTESTED** |
 | REQ-ANALYTICS-009 `getHotelSummary` field mapping/math incl. `top_workers` slice (RULE-ANALYTICS-004/005) | — | — | **UNTESTED** |
@@ -486,7 +494,8 @@ Genuine remaining human-authority items (status OPEN). These are NOT resolved he
 
 | ID | Type | Description | Evidence/impact | Owner | Resolution/status |
 |---|---|---|---|---|---|
-| OQ-ANALYTICS-01 | **security defect — CRITICAL** | `GET /analytics/leaderboard`(`/by-hotel/:hotel_id`) has NO `requireRole` and NO `checkHotelAccess`/tenant-boundary check (`analytics/routes.ts:9-14`) — any authenticated user of any role, including a self-signup-obtainable WORKER, can read any OTHER hotel's worker names + performance ratings by passing an arbitrary `hotel_id`, unlike this module's own `/stats`/`/hotel-summary` (both `requireRole(['admin','manager'])`, `:15-24`) and unlike the sibling `GET /quality/leaderboard/by-hotel/:hotel_id`, which gates the byte-identical `WorkerOverallRating` query with BOTH `requirePermission('quality:read')` AND `checkHotelAccess()` (`quality/routes.ts:18`) — i.e. the SAME underlying data is protected in one module and unprotected in the other. Classified **Critical** by independent security review (Confidence High). Given the Germany-only, GDPR-governed operating context (CONFIRMED §33), this is also a plausible personal-data confidentiality / purpose-limitation concern requiring DPO/legal determination, not merely an access-control question. Residual risk is LIVE, in already-deployed code, and UNASSIGNED — no one is accountable for accepting or remediating it. This finding is **BLOCKING for G2 freeze**: per Constitution §12 a Critical finding blocks merge/freeze until it is either fixed in code (out of scope for this specification — this document only represents and dispositions the finding, it does not implement the fix) or formally accepted via an authorized, time-bounded Risk Assessment. This item MUST NOT be treated as a routine open item pending convenience. | `analytics/routes.ts:9-14` vs `:15-24`; `quality/routes.ts:18` | human — **blocking, unassigned, Critical** | **OPEN — BLOCKING (Critical); requires code fix or human-authorized Risk Assessment per Constitution §12 before G2 freeze** |
+| OQ-ANALYTICS-01 | **security defect — RESOLVED (was Critical)** | At v0.1.1 (repository revision `ef25dae6`), `GET /analytics/leaderboard`(`/by-hotel/:hotel_id`) had NO `requireRole` and NO `checkHotelAccess`/tenant-boundary check — any authenticated user of any role, including a self-signup-obtainable WORKER, could read any OTHER hotel's worker names + performance ratings. Classified **Critical** by independent security review (Confidence High); also a plausible GDPR confidentiality/purpose-limitation concern (CONFIRMED §33). **RESOLVED in code 2026-07-17 by Sprint 0 item S0-5 (`SIR-ANLY-001`):** both routes now enforce `requireRole(['admin','manager'])`; `/by-hotel/:hotel_id` additionally enforces `checkHotelAccess()`, matching `/stats`/`/hotel-summary` and the sibling `quality/routes.ts:18`. Regression test `analytics-leaderboard-authz.test.ts` (S0-6) guards against reintroduction. Independently re-verified against current `routes.ts` (HEAD `5ddf1de`) in this pass. | `analytics/routes.ts:9-19` (current, post-fix); `quality/routes.ts:18`; `analytics-leaderboard-authz.test.ts` | — (code fix; no human decision required) | **Resolved** — closed by S0-5 (2026-07-17); no longer blocks G2 freeze |
+| OQ-ANALYTICS-12 | risk (new, this pass) | Residual cross-tenant visibility after the S0-5 fix: `checkHotelAccess()` bypasses admin/manager/checker (`SIR-AUTH-003`), so a hotel-A manager can still read hotel-B's `/analytics/leaderboard/by-hotel/:hotel_id`, and `getHotelSummary`'s embedded `top_workers` slice (`requireRole` only, no `checkHotelAccess()`) carries the same disclosure. Non-blocking; identical to the already-tracked `checkHotelAccess` bypass class (`SIR-AUTH-003`) and the sibling `SPEC-CRM-001` `OQ-CRM-17` finding. | `permissions.ts:105-108`; `analytics/routes.ts:14-19,25-29`; `analytics/service.ts:216,254` (line numbers approximate, current file) | human/security | **OPEN — non-blocking; downstream of `SIR-AUTH-003`** |
 | OQ-ANALYTICS-02 | risk | `mobile/worker-app/src/app/(app)/index.tsx:36` (`DashboardScreen`) calls `api.analytics.stats()` (`GET /analytics/stats`) unconditionally for every logged-in user, but that route requires `role in [admin,manager]` (`analytics/routes.ts:15-19`); a WORKER-role user's stats call always resolves as a rejected promise (403), silently swallowed by `Promise.allSettled` (`index.tsx:34-42`), so the worker dashboard's stat cards permanently render empty for every worker. ADDITIONALLY (evidence found during authoring, not requested but material): even if the RBAC mismatch were fixed, the mobile client's own `DashboardStats` type (`mobile/worker-app/src/types/api.ts:110-116`: `total_shifts`/`completed_shifts`/`upcoming_shifts`/`average_rating`/`pending_applications`) has NO field-name overlap with the backend's actual `DashboardStats` shape (`analytics/types.ts:10-42`: `work_requests`/`assignments`/`attendance`/`quality`/`ratings`) — a second, independent contract mismatch on the same call. Both are current-state observations, not target-state requirement gaps. | `mobile/worker-app/src/app/(app)/index.tsx:34-42`; `analytics/routes.ts:15-19`; `mobile/worker-app/src/types/api.ts:110-116`; `analytics/types.ts:10-42` | human | **OPEN** |
 | OQ-ANALYTICS-03 | decision | Target metric "rooms completed per worker" (PIVOT §14 Appendix, line 490) is undefined/contradictory against the confirmed no-room-level-task-layer decision (CONFIRMED §33, line 387: "Task" and "Work Request" do NOT need separating; full-day employment model). The metric itself is sourced to PIVOT §4.9 (line 131, "Manager logs rooms completed per worker"); this spec INFERS (not cites) that such data would land on the target `ReceptionData` model given §4.9's description, but §9.3 (line 397) describes `ReceptionData` only as "Manager-entered checkout / long-stay data" — no rooms-completed field is listed there, and `ReceptionData` is itself unbuilt target state — so this spec cannot decide the metric's definition. | CONFIRMED §33 (line 387) vs PIVOT §14 Appendix (line 490), §4.9 (line 131); §9.3 (line 397, does not itself mention rooms-completed) | human/product | **OPEN — blocking, headline** |
 | OQ-ANALYTICS-04 | risk | (a) Current-state analytics queries against `WorkRequest`/`WorkerAssignment` status enums will need re-validation once those owning modules pivot (`WorkRequest`→broadcast `JobRequest` per PIVOT §9.1 line 377; `WorkerAssignment` creation path changes per PIVOT §9.1 line 378), even if table names persist. (b) PIVOT §9.1 (line 377) states `WorkRequest` IS repurposed as `JobRequest`, while PIVOT §9.3 (line 394) lists `JobRequest` as a NEWLY ADDED model — an internal inconsistency in the source document this spec cannot resolve. | PIVOT §9.1 (lines 377-378), §9.3 (line 394); `analytics/service.ts:75,76,81,82,189,197` | human/architecture | **OPEN** |
@@ -509,30 +518,19 @@ Assumptions:
 
 Proposed only — NOT applied. Application requires the appropriate synchronization gate.
 
-- **MODULE_REGISTRY.yaml:** set `specification` for `backend-analytics` from `UNKNOWN` →
-  `SPEC-ANALYTICS-001@0.1.1 (REVIEW)` (`MODULE_REGISTRY.yaml:161-171`, field at line 170). Do NOT
+- **MODULE_REGISTRY.yaml:** set `specification` for `backend-analytics` to
+  `SPEC-ANALYTICS-001@0.2.0 (FROZEN)` (`MODULE_REGISTRY.yaml:161-171`, field at line 170). Do NOT
   alter `owner` (remains `unassigned`, OQ-ANALYTICS-06 / SYNC-001).
-- **DEPENDENCY_GRAPH.yaml:** **REQUIRED current-state delta (dependency review, FIND-DEP-001 —
-  adjudicated, not merely candidate):** the `HotelWorker` relation-filter read inside
-  `getLeaderboard` (`analytics/service.ts:29-33`, `worker.hotel_workers.some({hotel_id, status:ACTIVE})`)
-  IS a genuine missing edge — dependency review confirmed it is the same class of coupling as three
-  existing `*-reads-hotel-worker` edges already present in the graph. **ADD**
-  `edge-analytics-reads-hotel-worker` (source `backend-analytics`, target `state-hotel-worker`, kind
-  `reads-state`, compatibility `not-applicable`, status `observed`, evidence
-  `analytics/service.ts:29-33`) **AND** add `backend-analytics` to `state-hotel-worker.readers`, at
-  the next dependency-synchronization pass. Housekeeping note (informational only, FIND-DEP-003 —
-  confirmed immaterial by empty diff): `DEPENDENCY_GRAPH.yaml` `observed_revision` is currently
-  stamped `5b16be4` (line 3), which predates this spec's cited revision `ef25dae6`; a restamp is a
-  synchronization-owner decision, not applied here, and dependency review confirmed the stale stamp
-  produces no actual discrepancy for this module's edges. All six pre-existing `edge-analytics-reads-*`
-  edges and `edge-mobile-worker-analytics` were verified against `ef25dae6` during authoring and
-  accurately reflect current reality — no correction needed to those seven edges. Note
-  (FIND-DEP-002, informational, not this spec's problem): dependency review separately observed that
-  `backend-quality` has the identical undiscovered `HotelWorker` relation-filter gap in its own
-  leaderboard query — out of scope for `SPEC-ANALYTICS-001`. Note (FIND-DEP-004): the
-  `edge-quality-reads-attendance` precedent cited above (the pattern this new edge mirrors) is
-  itself still unapplied to `DEPENDENCY_GRAPH.yaml` as of this writing — i.e. it too is pending the
-  same synchronization pass, not yet a graph edge.
+- **DEPENDENCY_GRAPH.yaml:** the `HotelWorker` relation-filter read inside `getLeaderboard`
+  (`analytics/service.ts:29-33`), originally flagged as a genuine MISSING edge (dependency review,
+  FIND-DEP-001), is **already applied** — `edge-analytics-reads-hotel-worker` exists
+  (`DEPENDENCY_GRAPH.yaml:284-289`) and `state-hotel-worker.readers` already includes
+  `backend-analytics` (`DEPENDENCY_GRAPH.yaml:476`), applied by an earlier repository-synchronization
+  pass (Package A step 5, AUDIT-M3) not previously reflected back into this document. All other
+  pre-existing `edge-analytics-reads-*` edges and `edge-mobile-worker-analytics` remain accurate.
+  Note (FIND-DEP-002, informational, not this spec's problem): `backend-quality` has the identical
+  `HotelWorker` relation-filter gap in its own leaderboard query — out of scope for
+  `SPEC-ANALYTICS-001`.
 - **TERMINOLOGY.md:** no new canonical terms are promoted by this spec. "Leaderboard entry",
   "Dashboard stats", "Hotel summary", and "Basic analytics" remain local/target-state terms
   (per this document's Actors and Terminology section) pending a promotion decision by
@@ -550,3 +548,4 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 |---|---|---|---|---|
 | 0.1.0 | 2026-07-07 | Initial reverse-specification authored from repository evidence and cross-checked against CONFIRMED_REQUIREMENTS_REGISTER.md/PIVOT_DESIGN_DOCUMENT.md. Current-state reverse spec: REQ-ANALYTICS-001..010, RULE-ANALYTICS-001..005 at `ef25dae6`. Target layer from confirmed authorities: REQ-ANALYTICS-011..016, RULE-ANALYTICS-006 (CONFIRMED §21/§34; PIVOT §3/§4.11/§9-§10/§12/§14 Appendix). Migration-gap enumeration MIG-GAP-ANALYTICS-01..04. Recorded open decisions/risks OQ-ANALYTICS-01 (leaderboard RBAC/hotel-scope asymmetry), OQ-ANALYTICS-02 (mobile-worker `/stats` RBAC 403 + independent type-shape mismatch), OQ-ANALYTICS-03 (rooms-completed-per-worker contradicts no-room-layer decision, blocking), OQ-ANALYTICS-04 (WorkRequest/JobRequest re-validation risk + §9.1/§9.3 source-document inconsistency), OQ-ANALYTICS-05 (PIVOT §4.11 dangling "Section 7" cross-reference), OQ-ANALYTICS-06 (owner unassigned / SYNC-001), OQ-ANALYTICS-07 (sick/vacation blocked on Calendar/M2), OQ-ANALYTICS-08 (rating/warning counts gap), OQ-ANALYTICS-09 (active-workers/day derivation undecided), OQ-ANALYTICS-10 (no SLO / unpaginated + non-transactional fan-out). Flagged UNTESTED criteria: leaderboard role/hotel-scope absence, leaderboard aggregation math, dashboard-stats field mapping, hotel-summary field mapping, envelope/no-audit-write assertion. | None — REVIEW, not approved. | None — status REVIEW, G2 freeze reserved to human. |
 | 0.1.1 | 2026-07-08 | Applied merged dispositions from five independent G4 reviews (architecture, dependency, consistency, performance — all `PASS_WITH_ACTIONS`; security — `FAIL`, 1 Critical + 1 Medium). No REQ/RULE/MIG-GAP ids renumbered; one new open item added (OQ-ANALYTICS-11). **FIND-01 (security, Critical):** rewrote OQ-ANALYTICS-01 and the "Trust boundaries/authorization" subsection to state the finding is Critical (not a routine open item), cites the `quality/routes.ts:18` comparison showing quality gates the identical `WorkerOverallRating` data while analytics does not, adds the GDPR/personal-data angle (CONFIRMED §33 Germany-only context), and states this is BLOCKING for G2 freeze pending a code fix (out of scope for this specification) or a human-authorized Risk Assessment per Constitution §12. **FIND-02 (security, Medium):** reframed "Observability/audit" to state the absence of audit-log writes acts as a severity multiplier for OQ-ANALYTICS-01 by removing the only mitigating factor (detectability). **FIND-ARCH-001 (architecture, Medium, non-blocking):** added `OQ-ANALYTICS-11` recording the no-owned-state / 100%-cross-module-reads / no-governing-ADR finding verbatim, with required outcome a platform-wide Decision Record owned by the Lead Architect — not resolved here. **FIND-DEP-001 (dependency, Medium):** rewrote the "Proposed Knowledge Deltas" `DEPENDENCY_GRAPH.yaml` bullet from a deferred candidate to a definitive, dependency-review-adjudicated required addition (`edge-analytics-reads-hotel-worker` + `state-hotel-worker.readers`); updated the corresponding "Ownership and Boundaries" `state-hotel-worker` bullet to match. **FIND-DEP-002/003/004 (dependency, informational):** noted the quality-module's identical undiscovered gap is out of scope here; confirmed the stale `observed_revision` stamp produces no discrepancy for this module; noted the `edge-quality-reads-attendance` precedent citation is itself still pending application to the graph. **FIND-001 (consistency, Medium):** added a hedge-disclosure paragraph to "Evidence and Traceability" noting CONFIRMED §21 line 293 itself hedges the four basic-analytics metrics as "proposed" and that this spec relies on PIVOT §14 Appendix (line 490) as the concrete resolution. **FIND-002 (consistency, Medium):** corrected the PIVOT §9.3 line 397 mis-citation in MIG-GAP-ANALYTICS-02 and OQ-ANALYTICS-03 — line 397 does not itself mention rooms-completed data; reworded the `ReceptionData` connection as this spec's own inference, citing PIVOT §4.9 (line 131) as the actual metric source. **FIND-003 (consistency, Medium):** reworded OQ-ANALYTICS-06's description to state `SYNC-001` is a single shared platform-level token this spec references (per `quality/MODULE_SPEC.md:520`, `attendance/MODULE_SPEC.md:461`), not independently defines; no new namespaced ID invented. **FIND-004 (consistency, Low):** corrected the PIVOT §7 line range (261-292 → 261-298) in both the "Evidence and Traceability" dangling-cross-reference paragraph and OQ-ANALYTICS-05. **FIND-005 (consistency, informational):** no action — corpus-wide ID-prefixing drift not attributable to this candidate. **Performance FIND-01 (Low):** broadened the index-coverage disclosure in "Performance budgets/workload" to list all six indexed fields verified by performance review (`WorkRequest.status`, `WorkerAssignment.status`, `Attendance.status`, `QualityVerification.hotel_id`/`.status`, `Rating.hotel_id`), not just `average_score`. **Performance FIND-02 (Medium):** added the unfiltered/unbounded `getDashboardStats` aggregation observation (empty `where` when `hotelId` omitted) to "Performance budgets/workload" and cross-referenced it from OQ-ANALYTICS-10. **Performance FIND-03 (Low):** quantified `getHotelSummary`'s nested `getLeaderboard()` call as a 10x over-fetch ratio in "Performance budgets/workload". **Performance FIND-04 (Low):** added the missing `Attendance.created_at`/`[hotel_id, created_at]` index observation to "Performance budgets/workload". Document Control bumped to `0.1.1`; Authors/reviewers row updated to record all five gate results, including the unresolved Security `FAIL`. Status remains `REVIEW` — NOT frozen; no owner invented; OQ-ANALYTICS-03 and all other open product/architecture decisions remain unresolved; the underlying Critical security code defect is NOT fixed by this document. | FIND-ARCH-001, FIND-DEP-001, FIND-DEP-002, FIND-DEP-003, FIND-DEP-004, FIND-001, FIND-002, FIND-003, FIND-004, FIND-005, FIND-01 (security), FIND-02 (security), FIND-01 (performance), FIND-02 (performance), FIND-03 (performance), FIND-04 (performance). | None — status REVIEW, not approved; Security gate remains FAIL/blocking pending code fix or authorized Risk Assessment; G2 freeze reserved to human. |
+| 0.2.0 | 2026-07-20 | **G2 Specification Freeze,** preceded by a current-state re-verification and correction pass. Since v0.1.1 (repository revision `ef25dae6`), live code changed: Sprint 0 item S0-5 (`SIR-ANLY-001`, 2026-07-17) fixed the Critical `OQ-ANALYTICS-01` finding — both leaderboard routes now enforce `requireRole(['admin','manager'])`, and `/by-hotel/:hotel_id` additionally enforces `checkHotelAccess()` — and S0-6 added a regression test (`analytics-leaderboard-authz.test.ts`). Independently re-verified against current `routes.ts` (HEAD `5ddf1de`) in this pass, not merely trusted from the register. Corrected to match: `REQ-ANALYTICS-003`, `RULE-ANALYTICS-002`, the Interfaces table's auth column for both leaderboard routes, the "Trust boundaries/authorization" `OQ-ANALYTICS-01` disclosure (now RESOLVED), the "Observability/audit" and "Data classification/retention" paragraphs, and the Validation Plan's `REQ-ANALYTICS-003` row (now TESTED). Added `OQ-ANALYTICS-12` (Low, new) recording the residual `checkHotelAccess()` admin/manager/checker bypass on `/by-hotel/:hotel_id` and `getHotelSummary.top_workers` — the identical already-tracked bypass class (`SIR-AUTH-003`), non-blocking, matching the `SPEC-CRM-001` `OQ-CRM-17` precedent. Separately corrected a second documentation-accuracy gap: the Proposed Knowledge Deltas' `edge-analytics-reads-hotel-worker` delta, recorded as REQUIRED at v0.1.1, was already applied to `DEPENDENCY_GRAPH.yaml` by an earlier repository-synchronization pass (Package A step 5, AUDIT-M3) — corrected the Proposed Knowledge Deltas bullet and the Ownership-and-Boundaries `state-hotel-worker` note to state it's applied, not proposed. No requirement/rule identifier renumbered beyond the two new items. Security gate upgraded `FAIL` (1 Critical, 1 Medium) → `PASS_WITH_ACTIONS` (Critical resolved; Medium `OQ-ANALYTICS-11` and new Low `OQ-ANALYTICS-12` non-blocking). Frozen at G2 by the commissioning human (standing session authorization), reusing the existing Architecture/Dependency/Consistency/Performance evidence unchanged (all `PASS_WITH_ACTIONS`, zero Critical/High). `OQ-ANALYTICS-03..11` (unresolved product/architecture decisions), the new `OQ-ANALYTICS-12`, and owner assignment (`OQ-ANALYTICS-06`/`SYNC-001`) are implementation/release prerequisites reviewed by G8, not freeze blockers. Knowledge synchronized in the same pass: `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml` (→ `SPEC-ANALYTICS-001@0.2.0 (FROZEN)`), `MODULE_MEMORY.yaml` (`ART-MEM-backend-analytics` produced), `SYNC_STATE.yaml`, and the Specification Issues Register. | `OQ-ANALYTICS-01` (RESOLVED, `SIR-ANLY-001`); documentation-accuracy correction (`edge-analytics-reads-hotel-worker` already-applied); `OQ-ANALYTICS-12` (new, non-blocking). | Commissioning human (2026-07-20, G2) |
