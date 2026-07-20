@@ -192,11 +192,11 @@ modules:
     path: backend/src/modules/calendar
     owner: unassigned
     lifecycle: active
-    implementation_status: active-no-tests  # registered and implemented; no dedicated test file in backend/src/__tests__/
+    implementation_status: stub  # route-registered but all CalendarService methods throw NotImplementedError (backend/src/modules/calendar/service.ts:5-11); reconciled from the prior mislabel active-no-tests per OD-CAL-05 / ADR-021 re-author (2026-07-19)
     dependencies: []
-    published_events: none-observed
+    published_events: none-observed  # current code; target (ADR-021): publishes EVT-CAL-SickVacationMarked
     consumed_events: none-observed
-    specification: SPEC-CALENDAR-001@0.1.0 (REVIEW)  # docs/03-modules/calendar/MODULE_SPEC.md; freeze candidate; G2 Specification Freeze pending (human authority)
+    specification: SPEC-CALENDAR-001@0.2.0 (REVIEW)  # docs/03-modules/calendar/MODULE_SPEC.md; re-authored to the accepted ADR-021 boundary (narrow Calendar: owns state-calendar-absence + availability read-model; Job Dispatch retains WorkerAssignment/CalendarEntry/exclusivity). G4 Dependency/Consistency/Performance re-run then G2 freeze. See SYNC_STATE.yaml SYNC-042; DECISION_INDEX ADR-021 (Accepted)
     evidence: backend/src/routes/v1/index.ts:34
 
   - id: backend-chatbot
