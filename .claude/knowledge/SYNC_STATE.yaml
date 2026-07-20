@@ -1806,6 +1806,45 @@ known_drift:
     authority_needed: none  # G2 authorization was provided by the commissioning human this session, conditional on the Security re-verification outcome; this record documents the freeze
     next_step: none -- draft PR opened per explicit instruction; session stops here
 
+  - id: SYNC-046
+    type: specification-freeze
+    status: resolved
+    description: >-
+      SPEC-CRM-001 (backend-crm) FROZEN at G2 on 2026-07-20 by the commissioning human, per the
+      standing instruction ("when a spec is freezed automatically move to the next highest
+      priority spec and continue the process") issued immediately after SPEC-EMP-001's freeze
+      (SYNC-045). Selected as next-highest-priority: G4 already complete with zero Critical/High
+      across all five dimensions (unlike backend-quality/notifications/analytics/chatbot/geo,
+      none of which were checked this pass -- selection was not a repository-wide comparison,
+      just the strongest immediately-evident candidate: live code, clean G4 gate, and direct
+      continuity with ADR-023 via OD-CRM-01, the literal CRM-side twin of OD-EMP-05). v0.1.1 ->
+      v0.1.2 consumed ADR-023 to partially resolve OD-CRM-01: HotelGroup decided as a first-class
+      entity owned by backend-crm (Hotel.hotel_group_id many-to-one; one Regional Manager per
+      group, may manage several) -- Owned state, REQ-CRM-007/RULE-CRM-08, Ownership-challenge,
+      Interfaces, Migration Gaps, Dependencies, and Evidence table updated. OD-CRM-01 split into
+      two facets: Hotel Group/Regional Manager RESOLVED; the separate dedicated-Hotel-Manager-
+      per-hotel facet (REQ-CRM-006/RULE-CRM-07), which ADR-023 does not cover, remains open.
+      OD-CRM-05 narrowed: design decided (discriminated JWT scope claim, RM/HM scope resolution),
+      UserRole enum + JWT-issuance code remain an implementation gap (same disposition as
+      SPEC-EMP-001's equivalent finding). No targeted re-review was needed (unlike SPEC-EMP-001):
+      the Security gate was already PASS_WITH_ACTIONS with zero Critical/High at v0.1.1 (OD-CRM-17,
+      the same checkHotelAccess-bypass finding class, was independently assessed low-severity
+      given no PII on the Hotel record) -- no FAIL to resolve. v0.1.2 -> v0.2.0 G2 freeze, reusing
+      all five G4 dimensions unchanged. Remaining open decisions (OD-CRM-01's dedicated-manager
+      facet, OD-CRM-02/03/04/05(implementation)/06..17) and owner assignment (OD-CRM-11/SYNC-001)
+      are implementation/release prerequisites reviewed by G8, NOT freeze blockers, per the
+      SPEC-AUTH-001/SPEC-ATT-001/SPEC-USERS-001/SPEC-CALENDAR-001/SPEC-EMP-001 precedent.
+      Knowledge synchronized: DECISION_INDEX.md (OD-CRM-01 pending-decision-record row updated to
+      Resolved-partial; OD-CRM-05 narrowed), SPECIFICATION_INDEX.yaml, MODULE_REGISTRY.yaml (->
+      SPEC-CRM-001@0.2.0 FROZEN), MODULE_MEMORY.yaml (ART-MEM-backend-crm produced).
+    authority_needed: none  # standing authorization ("automatically move to the next highest priority spec and continue the process") covers this freeze
+    next_step: >-
+      Open the draft PR for this freeze, then continue the standing auto-continue instruction:
+      evaluate the next REVIEW-status spec (backend-quality/SPEC-QUAL-001, backend-notifications/
+      SPEC-NOTIF-001, backend-analytics/SPEC-ANALYTICS-001 are the remaining live-code, G4-complete
+      candidates; backend-chatbot/SPEC-CHATBOT-001 and backend-geo/SPEC-GEO-001 are unimplemented
+      stubs).
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -1826,7 +1865,7 @@ cache_state:
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users, backend-calendar, backend-hr], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); entries for the 2026-07-15 freezes remain a known backfill gap" }
+  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); entries for the 2026-07-15 freezes remain a known backfill gap" }
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
     mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`

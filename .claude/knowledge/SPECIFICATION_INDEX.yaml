@@ -82,10 +82,10 @@ specifications:
     note: all G4 dimensions resolved/PASS_WITH_ACTIONS from the first round, zero open Critical/High; consistency FAIL (SIR-USERS-010) and security FAIL (SIR-GLOB-012, HOTFIX-AUTH-001) both closed at v0.1.1; frozen with no content change beyond Document Control + change-log row; ART-MEM-backend-users produced (SYNC-041)
   - module: backend-crm
     spec: SPEC-CRM-001
-    version: 0.1.1
-    status: REVIEW
+    version: 0.2.0
+    status: FROZEN
     path: docs/03-modules/crm/MODULE_SPEC.md
-    note: G4 all PASS_WITH_ACTIONS, zero Critical/High; NOT frozen (G2 human) -- pending disposition of OD-CRM-01/02/05/10/11 plus OD-CRM-14..17 (SYNC-014)
+    note: FROZEN at G2 2026-07-20 (commissioning human). G4 all PASS_WITH_ACTIONS, zero Critical/High, reused unchanged. OD-CRM-01's Hotel Group facet RESOLVED by ADR-023; remaining open decisions and owner assignment (SYNC-001) are G8 release prerequisites. ART-MEM-backend-crm produced.
   - module: backend-hotel-workers
     spec: none
     status: RETIRED (ADR-022)

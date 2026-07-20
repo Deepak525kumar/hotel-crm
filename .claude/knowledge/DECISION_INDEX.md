@@ -32,13 +32,13 @@ Decision records belong in the project’s authoritative decision directory and 
 
 ## Pending Decision Records (SPEC-CRM-001)
 
-Decisions surfaced by `docs/03-modules/crm/MODULE_SPEC.md` (SPEC-CRM-001, v0.1.1) requiring a Decision Record before target-state implementation or G2 freeze. No ADR yet exists for any of these; recorded here as pending per the Proposed Knowledge Deltas of that specification.
+Decisions surfaced by `docs/03-modules/crm/MODULE_SPEC.md` (SPEC-CRM-001, v0.2.0, FROZEN) requiring a Decision Record before target-state implementation. `OD-CRM-01`'s Hotel Group facet is RESOLVED by `ADR-023`; recorded here as pending per the Proposed Knowledge Deltas of that specification for the rest.
 
 | Candidate | Summary | Evidence | Required action |
 |---|---|---|---|
-| `OD-CRM-01` | Hotel Group / Organization data-model ownership unproven — CRR §11 requires it, PDD §9.3 names no entity | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-01` | Human/architecture decision on data-model home before `REQ-CRM-006/007` implementation |
+| `OD-CRM-01` | **Resolved (partial) by `ADR-023`.** Hotel Group data-model ownership — RESOLVED: `HotelGroup` is a first-class entity owned by `backend-crm`. The separate dedicated-Hotel-Manager-per-hotel association (`REQ-CRM-006`/`RULE-CRM-07`), which `ADR-023` does not cover, remains open. | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-01`; `ADR-023` | None outstanding for the Hotel Group facet — closed by `ADR-023`. Human/product decision remains for the dedicated-Hotel-Manager association mechanism. |
 | `OD-CRM-02` | Manager hotel-write authority contradiction — route role gate includes `manager`, permission map does not | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-02` | Human decision: reconcile route/permission-map, or accept current Admin-only behavior |
-| `OD-CRM-05` | Scope + Regional Manager role absent from current enum/token model | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-05` | Human/architecture decision, coordinated with `SPEC-AUTH-001`'s own scope/role proposal |
+| `OD-CRM-05` | Scope + Regional Manager role — design now decided by `ADR-023` (discriminated JWT `scope` claim, RM/HM scope resolution); `UserRole` enum addition and JWT-issuance code remain unbuilt | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-05`; `ADR-023` | Implementation only — design decision closed; coordinate the enum/JWT build with `ADR-022`'s prerequisite sequencing |
 | `OD-CRM-07` | List-endpoint role gate vs. permission map disagree on WORKER/CHECKER read access | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-07` | Human decision on intended list-audience |
 | `OD-CRM-10` | Shared-billing ownership for a Hotel Group undefined | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-10` | Product/architecture decision before `REQ-CRM-007` implementation |
 | `OD-CRM-12` | Interface/event contract versioning scheme undefined for this module | `docs/03-modules/crm/MODULE_SPEC.md` `OD-CRM-12` | Architecture decision, platform-wide event/versioning policy |
