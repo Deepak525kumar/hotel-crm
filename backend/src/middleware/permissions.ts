@@ -93,6 +93,49 @@ export function requireRole(roles: string | string[]) {
   };
 }
 
+export type HotelAccessDecision =
+  // `viaBypass: true` = admin/manager/checker role bypass (PATCH-04 §4c), no DB
+  // query performed. `viaBypass: false` = allowed via an ACTIVE HotelWorker
+  // membership row. Callers use this to reproduce the pre-refactor log
+  // behavior exactly (the bypass path never logged a scope-check line).
+  | { allowed: true; viaBypass: boolean }
+  | { allowed: false; reason: 'missing_hotel_id' | 'no_membership' };
+
+// Single role->scope resolution seam for hotel-level access (Epic 3 / Execution
+// Plan §2 "Shared authorization centralization seam"). Every consumer of
+// checkHotelAccess() goes through this one function, so a future scope-model
+// change (Epic 5's authz flip, ADR-023) has exactly one place to change
+// allow/deny behavior instead of nine call sites. This extraction changes no
+// allow/deny outcome — see the characterization suite in
+// `__tests__/rbac.test.ts`, which locks current behavior for every role.
+export async function resolveHotelAccess(
+  role: string,
+  userId: string,
+  hotelId: string | undefined,
+): Promise<HotelAccessDecision> {
+  // Admins, managers, and checkers bypass hotel membership check (PATCH-04 §4c).
+  // Checkers are quality staff that operate across hotels and are not on the worker roster.
+  if (role === 'admin' || role === 'manager' || role === 'checker') {
+    return { allowed: true, viaBypass: true };
+  }
+
+  if (!hotelId) {
+    return { allowed: false, reason: 'missing_hotel_id' };
+  }
+
+  const prisma = getPrisma();
+  const membership = await prisma.hotelWorker.findFirst({
+    where: {
+      hotel_id: hotelId,
+      worker_id: userId,
+      status: HotelWorkerStatus.ACTIVE,
+    },
+    select: { id: true },
+  });
+
+  return membership ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
+}
+
 export function checkHotelAccess() {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
     if (!req.auth) {
@@ -100,37 +143,22 @@ export function checkHotelAccess() {
       return;
     }
 
-    // Admins, managers, and checkers bypass hotel membership check (PATCH-04 §4c).
-    // Checkers are quality staff that operate across hotels and are not on the worker roster.
-    if (req.auth.role === 'admin' || req.auth.role === 'manager' || req.auth.role === 'checker') {
-      next();
-      return;
-    }
-
-    const hotelId = req.params.hotel_id || req.query.hotel_id || req.body?.hotel_id;
-
-    if (!hotelId) {
-      logger.warn('Hotel scope check: no hotel_id provided', {
-        userId: req.auth.userId,
-        role: req.auth.role,
-        requestId: req.requestId,
-      });
-      next(new ForbiddenError('Hotel ID is required'));
-      return;
-    }
+    const hotelId = (req.params.hotel_id || req.query.hotel_id || req.body?.hotel_id) as string | undefined;
 
     try {
-      const prisma = getPrisma();
-      const membership = await prisma.hotelWorker.findFirst({
-        where: {
-          hotel_id: hotelId as string,
-          worker_id: req.auth.userId,
-          status: HotelWorkerStatus.ACTIVE,
-        },
-        select: { id: true },
-      });
+      const decision = await resolveHotelAccess(req.auth.role, req.auth.userId, hotelId);
 
-      if (!membership) {
+      if (!decision.allowed) {
+        if (decision.reason === 'missing_hotel_id') {
+          logger.warn('Hotel scope check: no hotel_id provided', {
+            userId: req.auth.userId,
+            role: req.auth.role,
+            requestId: req.requestId,
+          });
+          next(new ForbiddenError('Hotel ID is required'));
+          return;
+        }
+
         logger.warn('Hotel scope check denied', {
           userId: req.auth.userId,
           role: req.auth.role,
@@ -141,12 +169,14 @@ export function checkHotelAccess() {
         return;
       }
 
-      logger.debug('Hotel scope check allowed', {
-        userId: req.auth.userId,
-        role: req.auth.role,
-        hotelId,
-        requestId: req.requestId,
-      });
+      if (!decision.viaBypass) {
+        logger.debug('Hotel scope check allowed', {
+          userId: req.auth.userId,
+          role: req.auth.role,
+          hotelId,
+          requestId: req.requestId,
+        });
+      }
 
       next();
     } catch (err) {
