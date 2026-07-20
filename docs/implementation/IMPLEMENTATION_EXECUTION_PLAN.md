@@ -50,6 +50,11 @@ human. This plan does not choose it.
 
 ---
 
+**Numbering note (2026-07-20):** Epic 4 was superseded as a no-op by implementation verification
+(see §2). Epic IDs are stable identifiers assigned at planning time, not sequence positions —
+Epic 4's slot is retired in place and Epic 5/6/7 keep their original numbers rather than shifting
+down. Do not renumber.
+
 ## 1. Epic order (dependency-ordered)
 
 | # | Epic | Resolves (spec / finding IDs) | Blocked by | Notes |
@@ -57,7 +62,7 @@ human. This plan does not choose it.
 | 1 | Critical: guard `PATCH /assignments/:id` | SPEC-JOB-DISPATCH-001 FIND-SEC-001 / OQ-01 | none | Ship first. In-service guard, no shared-file touch. |
 | 2 | Auth self-contained High findings | SPEC-AUTH-001 OQ-AUTH-04, OQ-AUTH-15 | none | Parallel with Epic 1. No HotelGroup dependency. |
 | 3 | Shared authorization centralization seam | (closes nothing yet) precondition for OQ-AUTH-06 & siblings | none | Pure refactor + characterization tests. No allow/deny change. Optional but de-risks Epic 5's flip. |
-| 4 | Attendance worker-side hotel-scoping (partial) | SPEC-ATT-001 OQ-02 (worker/read half only) | none for the enforceable half | Manager-side half + OQ-03 deferred (see below). |
+| 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** |
 | 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. |
 | 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) need a Decision Record first | Only sequence items not gated on an open Decision Record. |
 | 7 | Notifications G8 cleanup | SPEC-NOTIF-001 OQ-NOTIF-02..09 (non-blocked) | OQ-NOTIF-01 Decision Record blocks push-channel (TREQ-002/TREQ-012) | Fully independent of the auth epics; parallelizable throughout. |
@@ -119,12 +124,42 @@ Deferred / not sequenced here (blocked on human authority, correctly excluded):
   the `permissions-middleware` consumer list) keeps identical behavior. This PR closes no
   finding; it creates the single injection point the Epic 5 flip needs.
 
-### Epic 4 — Attendance worker-side hotel-scoping (partial)
-- **PR 4.1** — Enforce deny-by-default read/verify scoping for the *worker* half of OQ-02, using
-  existing `hotelWorker` ACTIVE membership (same primitive as Epic 1). Files:
-  `backend/src/modules/attendance/service.ts`. Test: `attendance-scoping-authz.test.ts`.
-  - The *manager/cross-tenant* half of OQ-02 is data-blocked → deferred to Epic 5's flip. State
-    this explicitly in the PR so OQ-02 is not marked fully closed here.
+### Epic 4 — ~~Attendance worker-side hotel-scoping (partial)~~ SUPERSEDED (no-op)
+
+**Status: SUPERSEDED by implementation verification, 2026-07-20.** This epic is not implemented
+and is not carried forward with a renumbered successor — Epic 4's slot is retired in place; Epic
+5 keeps its own number as a stable identifier (see §1 note).
+
+This epic's premise — that a non-data-blocked "worker half" of OQ-02 exists and is closable today
+via the `hotelWorker` ACTIVE-membership primitive (mirroring Epic 1) — does not hold up against
+the authoritative sources it claims to resolve:
+
+- **`SIR-ATT-002`** (`.claude/governance/SPECIFICATION_ISSUES_REGISTER.md:121`) and **`RULE-008`**
+  (`docs/03-modules/attendance/MODULE_SPEC.md:185`) both describe OQ-02 as a single-dimension
+  finding: **admin/manager/checker have no hotel-scoping on management actions** (verify,
+  status/minutes override, list). Neither names a worker-role gap.
+- Live code (`backend/src/modules/attendance/service.ts:85-89,111-115,129-134`, confirmed
+  unchanged since `SPEC-ATT-001`'s repository-revision citation) already forces every non-management
+  actor to `worker_id === actor.userId` in `list()`, `getById()`, and `update()` — strictly
+  *tighter* than hotel-scoping, with no bypass. There is no worker-side defect to close.
+- Of OQ-02's three named roles: **admin** stays global by design (not a defect); **checker** is
+  confirmed cross-hotel by design (`docs/03-modules/attendance/MODULE_SPEC.md`'s own framing,
+  consistent with this plan's Epic 5 note that "checker per its confirmed cross-hotel disposition"
+  is a design decision, not a bug); **manager** is the one genuinely open case, and it is
+  data-blocked on the same missing scope-claim data as the auth-wide `checkHotelAccess()` finding
+  (see §0) — deferred to Epic 5 PR 5.5, not enforceable today.
+
+No non-data-blocked, non-by-design slice of OQ-02 remains for a standalone PR 4.1 to close.
+Implementing hotel-membership scoping on the worker path anyway would add a restriction no open
+finding requires, while leaving the actual High-severity, G2-blocking gap (admin/manager/checker
+management-action scoping) untouched — inventing a requirement rather than resolving one
+(Constitution §12: "never convert an assumption into a requirement").
+
+**Disposition:** OQ-02 remains OPEN in the Specification Issues Register, unchanged by this
+correction — closure still requires Epic 5 PR 5.5 (the scope-claim-gated authz flip). No code was
+written or merged for this epic; no regression test file (`attendance-scoping-authz.test.ts`) was
+created. This section is retained (struck through, not deleted) per the register's append-only,
+never-delete-history convention.
 
 ### Epic 5 — Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023)
 Ordered PRs (each independently reviewable; schema PRs isolated):
@@ -175,8 +210,9 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 ```
 Epic 1 (PR 1.1) ──────────────┐  (independent; ships first)
 Epic 2 (PR 2.1, PR 2.2) ──────┤  (independent; parallel with Epic 1)
-Epic 3 (PR 3.1) ──────────────┼──> Epic 5 PR 5.5 (seam is the injection point for the flip)
-Epic 4 (PR 4.1) ──────────────┘        │
+Epic 3 (PR 3.1) ──────────────┘──> Epic 5 PR 5.5 (seam is the injection point for the flip)
+Epic 4 — SUPERSEDED (no-op, see §2): no edge into Epic 5; nothing to schedule.
+                                       │
                                        ▼
 Epic 5:  PR 5.1 ─> PR 5.2 ─> PR 5.3 ─> PR 5.4 ─> PR 5.5 (authz flip: closes OQ-AUTH-06,
                                                           ATT OQ-02 mgr-half, QUAL OQ-03/09,
@@ -213,7 +249,7 @@ Concurrent-safe tracks (verified disjoint file sets):
   (`notifications/*`). No overlap.
 - **Epic 3** (`middleware/permissions.ts`) can run alongside Epic 1 and Epic 2 (different files),
   but **serializes before** Epic 5 PR 5.5.
-- **Epic 4** (`attendance/service.ts`) ∥ Epic 1/2/7 — disjoint.
+- ~~Epic 4~~ SUPERSEDED (no-op, see §2) — nothing to schedule.
 - **Epic 6 and Epic 7** are mutually parallel and parallel to the entire auth track (Epics 1-3),
   provided their own Decision-Record-gated items are excluded.
 
@@ -260,8 +296,9 @@ A PR is Done only when all apply:
    SIR-ANLY-001). Removing the guard must fail the suite.
 3. **Spec acceptance criteria met, cited by section.** The PR references the frozen spec section /
    RULE-* / REQ-* it satisfies — e.g. Epic 1 cites SPEC-JOB-DISPATCH-001 RULE-set governing
-   assignment-status transitions and FIND-SEC-001/OQ-01; Epic 4 cites SPEC-ATT-001 RULE-004/007/008
-   and OQ-02; Epic 5 PR 5.5 cites ADR-023 §5/§6 scope semantics and each closed sibling OQ.
+   assignment-status transitions and FIND-SEC-001/OQ-01; Epic 5 PR 5.5 cites ADR-023 §5/§6 scope
+   semantics, SPEC-ATT-001 RULE-008/OQ-02, and each closed sibling OQ (Epic 4 superseded, see §2 —
+   its OQ-02 closure folds entirely into PR 5.5, there being no separate worker-side sub-part).
 4. **No net-new repository-integrity findings.** No new unresolved item introduced into the
    Specification Issues Register; register synchronized (append/resolve, never delete) as a
    Documentation/Post-flight exit condition.
@@ -272,9 +309,11 @@ A PR is Done only when all apply:
    PR contains no refactor (Epic 1), a seam PR changes no allow/deny set (Epic 3).
 7. **Rollback documented** in the PR body per §8 (especially any `schema.prisma` PR).
 
-Partial-closure honesty rule: a PR that closes only part of a multi-part finding (Epic 4 vs OQ-02
-manager-half; Epic 1 as interim-vs-ADR-023-target) must state which sub-part remains open and
-where it is sequenced, so no finding is marked fully closed prematurely.
+Partial-closure honesty rule: a PR that closes only part of a multi-part finding (Epic 1 as
+interim-vs-ADR-023-target) must state which sub-part remains open and where it is sequenced, so no
+finding is marked fully closed prematurely. (OQ-02 itself turned out not to be multi-part — see
+Epic 4's supersession note in §2 — so it closes in full at Epic 5 PR 5.5, not partially at an
+earlier epic.)
 
 ---
 
@@ -300,7 +339,8 @@ Per-epic test structure:
   (at-rest digest). Cite OQ-AUTH-04 / OQ-AUTH-15.
 - **Epic 3** → characterization tests over `checkHotelAccess()` locking *current* allow/deny for
   each role before the refactor; the refactor must keep them green (proves no behavior change).
-- **Epic 4** → `attendance-scoping-authz.test.ts`, cite OQ-02 (worker half).
+- ~~Epic 4~~ SUPERSEDED (no-op, see §2) — no test file authored; ATT OQ-02 test coverage moves
+  entirely to Epic 5 PR 5.5 below.
 - **Epic 5 PR 5.5** → one authz regression test per affected consumer module
   (`<module>-scope-authz.test.ts`) each citing its closed OQ (OQ-AUTH-06, ATT OQ-02, QUAL
   OQ-03/09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12), asserting manager is now scope-denied
