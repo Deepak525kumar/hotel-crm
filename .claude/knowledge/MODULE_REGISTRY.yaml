@@ -160,7 +160,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-EMP-001@0.1.1 (REVIEW)  # docs/03-modules/employee-management/MODULE_SPEC.md; G4 independent review not yet run; NOT frozen (G2 human). Registry pointer was stale (UNKNOWN) despite the spec existing since 1796c37.
     evidence: backend/src/routes/v1/index.ts:31
 
   - id: backend-notifications
