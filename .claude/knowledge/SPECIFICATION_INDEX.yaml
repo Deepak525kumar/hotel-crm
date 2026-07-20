@@ -28,23 +28,24 @@ specifications:
     release_prerequisites: 4 High security findings OPEN in code (OQ-AUTH-04/06/15, absent MFA); Critical already fixed by HOTFIX-AUTH-002; review by G8 -- NOT freeze blockers per human ruling
   - module: backend-work-requests
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
     frozen_at: 2026-07-15 (G2 Approval Workflow); architecture BLOCKED cleared by ADR-018 (coupling superseded-by-pivot)
     release_prerequisites: security FAIL (1 Critical PATCH /assignments/:id + 2 High) OPEN in code; Critical warrants immediate remediation; review by G8 -- NOT freeze blockers per human ruling
+    amended: 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021 -- CalendarEntry narrowed to assignment-kind only, TREQ-009/TRULE-008 auto-cancel converted from atomic transaction to consuming EVT-CAL-SickVacationMarked, sick/vacation manager notification ceded to Calendar; FROZEN status retained (narrow reconciliation, not a re-open); see SYNC_STATE.yaml SYNC-042
   - module: backend-work-applications
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    note: one bounded capability shared with work-requests + assignments; FROZEN 2026-07-15 (G2 Approval Workflow)
+    note: one bounded capability shared with work-requests + assignments; FROZEN 2026-07-15 (G2 Approval Workflow); amended 0.3.0->0.3.1 (2026-07-19) per ADR-021, see backend-work-requests row
   - module: backend-assignments
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.0
+    version: 0.3.1
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
-    note: FROZEN 2026-07-15 (G2 Approval Workflow)
+    note: FROZEN 2026-07-15 (G2 Approval Workflow); amended 0.3.0->0.3.1 (2026-07-19) per ADR-021 -- this module now consumes EVT-CAL-SickVacationMarked to cancel same-day assignments (TREQ-009/TRULE-008), see backend-work-requests row
   - module: backend-notifications
     spec: SPEC-NOTIF-001
     version: 0.1.1
@@ -93,10 +94,12 @@ specifications:
     status: UNKNOWN
   - module: backend-calendar
     spec: SPEC-CALENDAR-001
-    version: 0.1.0
-    status: REVIEW
+    version: 0.3.0
+    status: FROZEN
     path: docs/03-modules/calendar/MODULE_SPEC.md
-    note: freeze candidate; G2 Specification Freeze pending (human authority)
+    frozen_at: 2026-07-19 (G2 Specification Freeze, commissioning human); re-authored to the ADR-021 boundary (narrow Calendar; OD-CAL-01/02/03 RESOLVED); FROZEN SPEC-JOB-DISPATCH-001 amended 0.3.0->0.3.1 (Correction) to reconcile the contradiction Dependency's re-run surfaced; all five G4 dimensions PASS_WITH_ACTIONS or better, zero open Critical/High
+    release_prerequisites: open decisions OD-CAL-04/06/07/08/10/11 + owner assignment OD-CAL-09/SYNC-001 remain implementation/release prerequisites reviewed by G8 -- NOT freeze blockers per human ruling; security FIND-SEC-CAL-001/002/004 (target-design hotel/self-scoping gaps) carry forward as release prerequisites, same precedent as SPEC-AUTH-001/SPEC-ATT-001/SPEC-USERS-001
+    note: state-calendar-absence (sick/vacation) newly owned by backend-calendar; availability read-model owned by backend-calendar; WorkerAssignment/CalendarEntry/assignment creation/daily-exclusivity enforcement remain owned by Job Dispatch/assignments (ADR-021); ART-MEM-backend-calendar produced (SYNC-044)
   - module: backend-chatbot
     spec: SPEC-CHATBOT-001@0.1.3
     status: REVIEW  # G4 round complete, zero Critical/High findings anywhere; NOT FROZEN -- G2 blocked on OD-CHAT-005/006/013 (SYNC-029)
