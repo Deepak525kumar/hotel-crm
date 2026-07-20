@@ -1977,6 +1977,27 @@ known_drift:
       decisions already tracked (owner assignment SYNC-001; OD-HR-01a/OD-EMP-10 joint disposition;
       the various per-module G8 release prerequisites). Do not freeze SPEC-CHATBOT-001/SPEC-GEO-001
       or author new specifications absent explicit instruction.
+  - id: SYNC-051
+    type: phase-transition
+    status: resolved
+    description: >-
+      Commissioning human ended the documentation-authoring loop and directed the repository into
+      Implementation Mode (2026-07-20), following PR #176's merge (backend-hr discoverability
+      cross-refs + Module Memory backfill -- the last open documentation-synchronization gap).
+      Recorded at PROJECT_PROFILE.md's new "Repository Phase" section: documentation authoring/
+      freezing/ADR-creation/repository-wide audits are no longer to be initiated proactively;
+      only corrections discovered as a byproduct of implementation work are in scope going
+      forward. Sequencing authority moves to docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md
+      (drafted via the implementation-planner agent, model Opus, per the human's explicit
+      per-task model guidance for this one-time planning artifact). First implementation target,
+      human-confirmed: SPEC-JOB-DISPATCH-001's unguarded PATCH /assignments/:id (OQ-01/
+      FIND-SEC-001, Critical).
+    authority_needed: none  # explicit human instruction, already given
+    next_step: >-
+      Write docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md once the planning agent returns;
+      then begin Sprint 1 implementation (Epic 1: PATCH /assignments/:id authz fix) via
+      backend-engineer, Sonnet, per the human's model table. Do not re-enter documentation-audit
+      mode absent explicit instruction.
 
 context_invalidators:
   - repository revision changes
