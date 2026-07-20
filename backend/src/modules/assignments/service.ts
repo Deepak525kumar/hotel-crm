@@ -89,6 +89,19 @@ export class AssignmentService extends BaseService {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
+    if (actorRole !== 'admin' && actorRole !== 'manager') {
+      if (assignment.worker_id !== actorId) {
+        const membership = await this.prisma.hotelWorker.findFirst({
+          where: {
+            hotel_id: assignment.hotel_id,
+            worker_id: actorId,
+            status: HotelWorkerStatus.ACTIVE,
+          },
+        });
+        if (!membership) throw new ForbiddenError('Cannot access this assignment');
+      }
+    }
+
     if (!input.status || input.status === assignment.status) {
       throw new ConflictError('No valid status change requested');
     }
