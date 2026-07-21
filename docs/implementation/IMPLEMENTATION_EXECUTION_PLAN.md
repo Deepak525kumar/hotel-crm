@@ -186,12 +186,16 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 - **PR 5.7** — Dual-write / cutover from `backend-hotel-workers` to `backend-hr`.
 - **PR 5.8** — Retire `backend-hotel-workers` (physical removal), gated on PR 5.6/5.7 verified.
 
-> **Open architecture question for Epic 5 (flag, do not decide):** ADR-022/023 define the target
-> state and P2 prerequisites but do **not** prescribe the cutover *mechanism* — specifically
-> whether PR 5.7 is a synchronous dual-write, a read-through shim, or a flag-gated hard cutover,
-> and whether the authz flip (PR 5.5) must land before or after the roster cutover (PR 5.7).
-> Both touch manager scoping. This is a genuine open sequencing decision not answered by
-> ADR-022/023 — escalate for a Decision Record before PR 5.5/5.7 are authored.
+> **Cutover mechanism & ordering — RESOLVED by ADR-024 (Proposed, 2026-07-20).** ADR-022/023
+> define the target state and P2 prerequisites but did not prescribe the cutover *mechanism*.
+> ADR-024 decides: **PR 5.5 lands before PR 5.7**; PR 5.7 is a **flag-gated cutover** over the
+> retained `HotelWorker` compatibility layer (not a synchronous dual-write); **two independent
+> additive feature flags** (both-off = current behavior) gate the authz and roster tracks
+> separately; `HotelWorker` physical removal (PR 5.8) is gated on **no authz reader and no roster
+> reader remaining**, with the JWT scope claim live before the membership branch is removed.
+> Operational execution policy (parallel-run, rollback, snapshot, checkpoints) is §8 below, not the
+> ADR. **Residual open item surfaced by ADR-024:** the Hotel-Manager→hotel association source for
+> the scope claim is not fixed by ADR-023 (`OD-CRM-01` residual / `OD-CRM-05`) — see §9.
 
 ### Epic 6 — Quality / CRM / Analytics remaining G8 items
 - Sequence only items not gated on an open Decision Record. Author QUAL OQ-01 (1-5 vs 0-100) and
@@ -218,7 +222,7 @@ Epic 5:  PR 5.1 ─> PR 5.2 ─> PR 5.3 ─> PR 5.4 ─> PR 5.5 (authz flip: clo
                                                           ATT OQ-02 mgr-half, QUAL OQ-03/09,
                                                           CRM OQ-CRM-17, ANLY OQ-12)
          PR 5.1 ─> PR 5.6 ─> PR 5.7 ─> PR 5.8 (hotel-workers retirement)
-         [PR 5.5 vs PR 5.7 relative order = OPEN — see Epic 5 escalation]
+         [PR 5.5 before PR 5.7 — decided by ADR-024]
 
 Epic 6, Epic 7: no edge into 1–5; gated only on their own module Decision Records.
 ```
@@ -386,7 +390,8 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | Item | Why it blocks | Reserved to |
 |------|---------------|-------------|
 | OQ-AUTH-06 interim mitigation vs wait-for-Epic-5 | Correct fix data-blocked; exploitable now | Human risk acceptance |
-| Epic 5 cutover mechanism + PR 5.5-vs-5.7 order | Not prescribed by ADR-022/023 | Architecture Decision Record |
+| ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Proposed, 2026-07-20):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
+| Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5) | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | Human/product decision (existing `OD-CRM-01`/`OD-CRM-05`) |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
 | QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | Decision Record |
 | ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record |
