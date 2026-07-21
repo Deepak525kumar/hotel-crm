@@ -149,6 +149,8 @@ model User {
   created_work_requests     WorkRequest[]           @relation("request_creator")
   audit_logs                AuditLog[]
   password_reset_tokens     PasswordResetToken[]
+  managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
+  managed_hotels            Hotel[]                 @relation("hotel_manager")
 
   @@index([role])
   @@index([is_active])
@@ -189,6 +191,26 @@ model PasswordResetToken {
 // HOTEL MODULE
 // =============================================================================
 
+// HotelGroup: ADR-023 — first-class entity aggregating hotels under one Regional
+// Manager with shared billing. Owned by backend-crm. Additive only in this
+// migration — no reader/writer consumes it yet (Epic 5 PR 5.1; CRUD lands in
+// PR 5.2). One Regional Manager per HotelGroup; a Regional Manager may manage
+// several groups (ADR-023 §1), hence the FK lives on HotelGroup, not User.
+model HotelGroup {
+  id                       String   @id @default(cuid())
+  name                     String
+  billing_info             String?
+  regional_manager_user_id String
+  regional_manager         User     @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
+  created_at               DateTime @default(now())
+  updated_at               DateTime @updatedAt
+
+  // Relations
+  hotels Hotel[]
+
+  @@index([regional_manager_user_id])
+}
+
 model Hotel {
   id            String   @id @default(cuid())
   name          String
@@ -203,6 +225,14 @@ model Hotel {
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
 
+  // ADR-023: nullable until assigned ("after a hotel is created, it is assigned" — CRR §11).
+  // ADR-025: nullable — dedicated Hotel Manager assigned after hotel creation (CRR §11).
+  // Both additive only in this migration — no reader consumes either field yet (Epic 5 PR 5.1).
+  hotel_group_id  String?
+  hotel_group     HotelGroup? @relation(fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  manager_user_id String?
+  manager         User?       @relation("hotel_manager", fields: [manager_user_id], references: [id], onDelete: SetNull)
+
   // Relations
   hotel_workers    HotelWorker[]
   work_requests    WorkRequest[]
@@ -215,6 +245,8 @@ model Hotel {
   @@index([country])
   @@index([is_active])
   @@index([city, country])
+  @@index([hotel_group_id])
+  @@index([manager_user_id])
 }
 
 // HotelWorker: roster — which workers are affiliated with a hotel and at what rate.
