@@ -163,17 +163,19 @@ never-delete-history convention.
 
 ### Epic 5 — Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023)
 Ordered PRs (each independently reviewable; schema PRs isolated):
-- **PR 5.1** — Schema: add `HotelGroup {id,name,billing_info,regional_manager_user_id}` and
-  `Hotel.hotel_group_id` (nullable first) to `schema.prisma` + Prisma migration. Additive only,
-  no backfill, no reads. (Isolation minimizes rollback blast radius — see §8.)
+- **PR 5.1** — Schema: add `HotelGroup {id,name,billing_info,regional_manager_user_id}`,
+  `Hotel.hotel_group_id` (nullable first), and `Hotel.manager_user_id` (nullable, per `ADR-025`)
+  to `schema.prisma` + Prisma migration. Additive only, no backfill, no reads. (Isolation
+  minimizes rollback blast radius — see §8.)
 - **PR 5.2** — CRM: HotelGroup CRUD + RM assignment (`backend-crm` owns the entity per ADR-023
   §2). Files: `backend/src/modules/crm/*`.
 - **PR 5.3** — Data backfill: assign existing hotels to groups; make `hotel_group_id` required
   after backfill verified. Separate reversible migration + a dry-run/verification script.
 - **PR 5.4** — Auth scope-claim issuance: `backend-auth` computes the discriminated
   `{type:hotel|hotel_group|global}` claim at token issuance (read-only over HotelGroup /
-  Hotel.hotel_group_id / manager assignment, ADR-023 §6). Files: `backend/src/modules/auth/*`,
-  `schema.prisma` (User/Session scope field if the claim is persisted).
+  Hotel.hotel_group_id / Hotel.manager_user_id, ADR-023 §6 + ADR-025). Files:
+  `backend/src/modules/auth/*`, `schema.prisma` (User/Session scope field if the claim is
+  persisted).
 - **PR 5.5 — the authz flip (closes the shared findings).** Change `checkHotelAccess()` (via the
   Epic 3 seam) from blanket admin/manager/checker bypass to: admin=global; manager=scope-bound
   via the PR 5.4 claim; checker per its confirmed cross-hotel disposition. Closes OQ-AUTH-06,
@@ -194,8 +196,10 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 > separately; `HotelWorker` physical removal (PR 5.8) is gated on **no authz reader and no roster
 > reader remaining**, with the JWT scope claim live before the membership branch is removed.
 > Operational execution policy (parallel-run, rollback, snapshot, checkpoints) is §8 below, not the
-> ADR. **Residual open item surfaced by ADR-024:** the Hotel-Manager→hotel association source for
-> the scope claim is not fixed by ADR-023 (`OD-CRM-01` residual / `OD-CRM-05`) — see §9.
+> ADR. **Residual item surfaced by ADR-024 — RESOLVED by ADR-025 (Proposed, 2026-07-21):** the
+> Hotel-Manager→hotel association source for the scope claim (not fixed by `ADR-023`) is
+> `Hotel.manager_user_id`, a nullable FK owned by `backend-crm`, read-only by `backend-auth` at
+> claim issuance — see §9.
 
 ### Epic 6 — Quality / CRM / Analytics remaining G8 items
 - Sequence only items not gated on an open Decision Record. Author QUAL OQ-01 (1-5 vs 0-100) and
@@ -391,7 +395,7 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 |------|---------------|-------------|
 | OQ-AUTH-06 interim mitigation vs wait-for-Epic-5 | Correct fix data-blocked; exploitable now | Human risk acceptance |
 | ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Proposed, 2026-07-20):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
-| Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5) | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | Human/product decision (existing `OD-CRM-01`/`OD-CRM-05`) |
+| ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Proposed, 2026-07-21):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
 | QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | Decision Record |
 | ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record |
