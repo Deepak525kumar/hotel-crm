@@ -2,6 +2,9 @@ import { Prisma, Attendance, AttendanceStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isHotelInScope } from '../../middleware/permissions.js';
+import type { UserScope } from '../../lib/jwt.js';
 import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
 
 export class AttendanceService extends BaseService {
@@ -73,7 +76,7 @@ export class AttendanceService extends BaseService {
 
   async list(
     query: ListAttendanceQuery,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<{ data: AttendanceDto[]; total: number }> {
     const where: Prisma.AttendanceWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
@@ -86,6 +89,22 @@ export class AttendanceService extends BaseService {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
+    }
+
+    // Epic 5 PR 5.5 (ADR-024): when scope-authz is enabled, a manager's list is
+    // constrained to the hotels in their PR 5.4 `scope` claim. Admin and checker
+    // remain cross-hotel (unchanged); worker is already own-worker-scoped above.
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        // No scope claim -> deny everything (empty-in matches no rows).
+        where.hotel_id = { in: [] };
+      } else if (scope.type === 'hotel') {
+        where.hotel_id = scope.hotel_id;
+      } else if (scope.type === 'hotel_group') {
+        where.hotel = { hotel_group_id: scope.hotel_group_id };
+      }
+      // scope.type === 'global' -> no added restriction.
     }
 
     const [records, total] = await Promise.all([
@@ -121,10 +140,21 @@ export class AttendanceService extends BaseService {
     id: string,
     input: UpdateAttendanceInput,
     actorId: string,
-    actorRole: string
+    actorRole: string,
+    actorScope: UserScope | null = null
   ): Promise<AttendanceDto> {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
+
+    // Epic 5 PR 5.5 (ADR-024): a manager may only mutate attendance for hotels
+    // in their scope claim when scope-authz is enabled. Checked before any
+    // mutation. Admin/checker/worker branches below are unchanged.
+    if (isScopeAuthzEnabled() && actorRole === 'manager') {
+      const inScope = await isHotelInScope(actorScope, record.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot access this attendance record');
+      }
+    }
 
     const isWorker = actorRole !== 'admin' && actorRole !== 'manager' && actorRole !== 'checker';
 

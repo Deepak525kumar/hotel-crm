@@ -25,6 +25,7 @@ export async function authMiddleware(
       email: payload.email,
       role: payload.role,
       permissions: payload.permissions || [],
+      scope: payload.scope ?? null,
     };
 
     next();
@@ -54,6 +55,7 @@ export function optionalAuthMiddleware(
           email: payload.email,
           role: payload.role,
           permissions: payload.permissions || [],
+          scope: payload.scope ?? null,
         };
       }
     }

@@ -25,6 +25,7 @@ router.get(
 router.get(
   '/hotel-summary/:hotel_id',
   requireRole(['admin', 'manager']),
+  checkHotelAccess(),
   (req, res, next) => analyticsController.getHotelSummary(req, res, next)
 );
 

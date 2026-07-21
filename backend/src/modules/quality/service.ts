@@ -2,11 +2,15 @@ import { AssignmentStatus, AttendanceStatus, HotelWorkerStatus, Prisma, Verifica
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isHotelInScope } from '../../middleware/permissions.js';
+import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
 
 interface Actor {
   userId: string;
   role: string;
+  scope?: UserScope | null;
 }
 
 export class QualityService extends BaseService {
@@ -20,6 +24,15 @@ export class QualityService extends BaseService {
       where: { id: assignment_id },
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
+
+    // Epic 5 PR 5.5 (ADR-024): a manager may only verify attendance for hotels
+    // in their scope claim when scope-authz is enabled. Admin/checker unchanged.
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot verify attendance for this hotel');
+      }
+    }
 
     const existing = await this.prisma.qualityVerification.findUnique({
       where: { assignment_id },
@@ -106,6 +119,15 @@ export class QualityService extends BaseService {
       }
       if (assignment.worker_id !== worker_id) {
         throw new ForbiddenError('worker_id does not match the assignment worker');
+      }
+
+      // Epic 5 PR 5.5 (ADR-024): a manager may only rate for hotels in their
+      // scope claim when scope-authz is enabled. Admin/checker unchanged.
+      if (isScopeAuthzEnabled() && actor.role === 'manager') {
+        const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+        if (!inScope) {
+          throw new ForbiddenError('Cannot rate for this hotel');
+        }
       }
 
       let created;

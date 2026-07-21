@@ -63,6 +63,12 @@ const envSchema = z.object({
   // legacy marketplace (worker applications) and the new direct-dispatch
   // (broadcast/assignment) flow. See docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md.
   PIVOT_MODE: z.enum(['marketplace', 'direct_dispatch']).default('marketplace'),
+
+  // Scope-based authorization cutover flag (Epic 5 PR 5.5, ADR-024 D3).
+  // Defaults TRUE: the manager scope-authz fix is active on merge. Setting it
+  // OFF is the rollback path, which reproduces the pre-fix behavior (manager
+  // hotel-access bypass) — the ADR-024 D3 "both-off = current behavior" guarantee.
+  FEATURE_SCOPE_AUTHZ: z.coerce.boolean().default(true),
 });
 
 type Env = z.infer<typeof envSchema>;
