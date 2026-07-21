@@ -84,6 +84,10 @@ export class CrmService extends BaseService {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
     if (!hotel) throw new NotFoundError('Hotel not found');
 
+    if (data.hotel_group_id !== undefined) {
+      await this.assertHotelGroupExists(data.hotel_group_id);
+    }
+
     const updated = await this.prisma.hotel.update({
       where: { id: hotelId },
       data: {
@@ -93,11 +97,25 @@ export class CrmService extends BaseService {
         address: data.address ?? hotel.address,
         timezone: data.timezone ?? hotel.timezone,
         is_active: data.is_active ?? hotel.is_active,
+        hotel_group_id: data.hotel_group_id ?? hotel.hotel_group_id,
       },
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { fields: Object.keys(data) }, ip);
     return updated;
+  }
+
+  // Epic 5 PR 5.3 (ADR-023): validates a hotel-group assignment references an
+  // existing group before writing, mirroring assertRegionalManagerExists
+  // below. HotelGroup has no soft-delete field (ADR-023's decided shape), so
+  // existence is the only check needed.
+  private async assertHotelGroupExists(hotelGroupId: string): Promise<void> {
+    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!hotelGroup) {
+      throw new ValidationError('hotel_group_id does not reference an existing hotel group', [
+        { field: 'hotel_group_id', message: 'Hotel group not found' },
+      ]);
+    }
   }
 
   async deleteHotel(hotelId: string, actorId: string, actorRole: string, ip?: string) {

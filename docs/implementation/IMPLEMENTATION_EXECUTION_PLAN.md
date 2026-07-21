@@ -169,8 +169,23 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
   minimizes rollback blast radius — see §8.)
 - **PR 5.2** — CRM: HotelGroup CRUD + RM assignment (`backend-crm` owns the entity per ADR-023
   §2). Files: `backend/src/modules/crm/*`.
-- **PR 5.3** — Data backfill: assign existing hotels to groups; make `hotel_group_id` required
-  after backfill verified. Separate reversible migration + a dry-run/verification script.
+- **PR 5.3** — Data backfill: assign existing hotels to groups via `PATCH /crm/hotels/:hotel_id
+  {"hotel_group_id": ...}` (update-only — CRR §11: "after a hotel is created, it is assigned"),
+  validated against an existing `HotelGroup`, plus a `findUngroupedHotels()` backfill-status
+  tool (`npm run hotel-group:backfill-status`) that reports which hotels still lack a group
+  (including soft-deleted ones) without inventing an assignment.
+  > **Scope note (2026-07-21):** the `NOT NULL` flip this bullet originally named is
+  > **deferred pending completion of the hotel-creation workflow** (a way to always have an
+  > assignable group at hotel-creation time, without the fresh-deployment bootstrapping problem
+  > of zero `HotelGroup` rows), **not shipped in PR 5.3, and not abandoned.**
+  > `hotel_group_id`'s current nullability is a **temporary migration/sequencing state, not a
+  > permanent domain property** — `ADR-023` §3's "nullable **until** assigned" (distinct from a
+  > plain-optional field like `billing_info`) and its CRR citation ("after a hotel is created,
+  > it is assigned") describe assignment as an expected, not optional, step. **The target
+  > architecture is unchanged: one `HotelGroup` per `Hotel`, eventually mandatory.** Only the
+  > *sequencing* changed — PR 5.3 ships the write path and backfill-status tooling now; the
+  > `NOT NULL` migration itself, and whether hotel creation should then require a group, is
+  > deferred to a follow-up PR, tracked as an open item in §9 (not a design reversal).
 - **PR 5.4** — Auth scope-claim issuance: `backend-auth` computes the discriminated
   `{type:hotel|hotel_group|global}` claim at token issuance (read-only over HotelGroup /
   Hotel.hotel_group_id / Hotel.manager_user_id, ADR-023 §6 + ADR-025). Files:
@@ -352,8 +367,10 @@ Per-epic test structure:
 - **Epic 5 PR 5.5** → one authz regression test per affected consumer module
   (`<module>-scope-authz.test.ts`) each citing its closed OQ (OQ-AUTH-06, ATT OQ-02, QUAL
   OQ-03/09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12), asserting manager is now scope-denied
-  cross-tenant and admin remains global. PR 5.1-5.3 need migration up/down tests and a backfill
-  verification script.
+  cross-tenant and admin remains global. PR 5.1 needs migration up/down tests (shipped, via
+  `migrate-harness.sh verify`); PR 5.3 ships `findUngroupedHotels()` unit tests and an
+  `updateHotel` regression suite instead of a migration test, since its `NOT NULL` flip is
+  deferred (see §2) — no new migration was authored in PR 5.3.
 - **Epics 6/7** → one behavior test per finding PR, named for the module + finding.
 
 ---
@@ -374,10 +391,15 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
   - PR 5.1 (additive, nullable `hotel_group_id` + new table): reversible via a down-migration
     dropping the column/table *provided no PR that reads it has shipped*. Keep additive and
     unread until 5.2+.
-  - PR 5.3 (backfill + NOT NULL): the dangerous step. Require (a) a dry-run/verification script
-    proving every hotel maps to a group before flipping NOT NULL, (b) a down-migration that
-    re-nullables and preserves data, (c) a DB snapshot/backup taken immediately before apply.
-    Never destructive.
+  - PR 5.3 (backfill write path): **the NOT NULL flip is deferred pending the hotel-creation
+    workflow, not abandoned** (see §2 scope note — target remains one `HotelGroup` per `Hotel`,
+    only the sequencing changed). PR 5.3 shipped only the `hotel_group_id` write path
+    (`updateHotel`) and a status/verification tool (`findUngroupedHotels()`), no migration.
+    Code-only revert, no schema risk. **The follow-up PR that flips NOT NULL must still
+    satisfy:** (a) the `findUngroupedHotels()` check
+    proving every hotel (including soft-deleted) has a group before flipping NOT NULL, (b) a
+    down-migration that re-nullables and preserves data, (c) a DB snapshot/backup taken
+    immediately before apply. Never destructive.
   - PR 5.5 (authz flip): code-only revert, but reverting re-opens OQ-AUTH-06 & siblings — treat
     revert as a security-incident path, not a routine rollback; prefer roll-forward.
   - PR 5.7/5.8 (cutover + hotel-workers retirement): do **not** physically remove
@@ -401,6 +423,7 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record |
 | NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | Decision Record |
 | SYNC-001 owner assignment | Platform-wide | Human authority |
+| `Hotel.hotel_group_id` NOT NULL flip — **sequencing deferral, not a target-architecture change.** Target remains one `HotelGroup` per `Hotel` (`ADR-023` §3: "nullable **until** assigned", not permanently optional like `billing_info`); current nullability is temporary migration/sequencing state | Blocked on the hotel-creation workflow (a way to always have an assignable group at creation time, without the fresh-deployment bootstrapping problem of zero `HotelGroup` rows) — not blocked on a design question | Human/product decision on *when/how* the workflow lands; the *whether* is already decided by `ADR-023` |
 
 Every G2 acceptance criterion for the in-scope findings is mapped to a PR in §2; every criterion
 gated on an unresolved decision is listed above rather than silently assigned.

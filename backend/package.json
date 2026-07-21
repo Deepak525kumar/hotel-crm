@@ -16,6 +16,7 @@
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
+    "hotel-group:backfill-status": "tsx src/scripts/run-hotel-group-backfill-status.ts",
     "test": "jest --forceExit",
     "test:coverage": "jest --coverage --forceExit"
   },
