@@ -2,11 +2,17 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { getEnv } from '../config/env.js';
 import { logger } from './logger.js';
 
+export type UserScope =
+  | { type: 'hotel'; hotel_id: string }
+  | { type: 'hotel_group'; hotel_group_id: string }
+  | { type: 'global' };
+
 export interface AccessTokenPayload {
   sub: string;
   email: string;
   role: string;
   permissions: string[];
+  scope: UserScope | null;
   iat: number;
   exp: number;
 }

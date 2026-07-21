@@ -26,6 +26,16 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // PR 5.4: AuthService.resolveScope reads these (read-only) during
+  // login/signup/refreshToken to compute the JWT scope claim. Default
+  // (unmocked) resolution returns undefined→null scope, which leaves this
+  // suite's refresh-token-hash assertions unaffected.
+  hotelGroup: {
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  hotel: {
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
 };
 
 jest.mock('../lib/db.js', () => ({
