@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { BaseService } from '../../lib/base-service.js';
-import { signTokens, verifyRefreshToken } from '../../lib/jwt.js';
+import { signTokens, verifyRefreshToken, UserScope } from '../../lib/jwt.js';
 import {
   ConflictError,
   UnauthorizedError,
@@ -19,6 +19,35 @@ export class AuthService extends BaseService {
   // attacker can replay against POST /auth/refresh or /auth/logout.
   private hashRefreshToken(token: string): string {
     return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  // PR 5.4 (ADR-023 §6 / ADR-025 §4): resolves the JWT scope claim from
+  // read-only manager-association lookups. backend-auth never writes
+  // Hotel/HotelGroup rows or manager assignments — this method only reads
+  // them. Precedence: admin (global, no DB read) > regional manager
+  // (hotel_group, broader scope wins) > hotel manager (hotel) > null.
+  private async resolveScope(userId: string, role: string): Promise<UserScope | null> {
+    if (role.toLowerCase() === 'admin') {
+      return { type: 'global' };
+    }
+
+    const group = await this.prisma.hotelGroup.findFirst({
+      where: { regional_manager_user_id: userId },
+      select: { id: true },
+    });
+    if (group) {
+      return { type: 'hotel_group', hotel_group_id: group.id };
+    }
+
+    const hotel = await this.prisma.hotel.findFirst({
+      where: { manager_user_id: userId },
+      select: { id: true },
+    });
+    if (hotel) {
+      return { type: 'hotel', hotel_id: hotel.id };
+    }
+
+    return null;
   }
 
   async signup(data: SignupRequest, ip?: string): Promise<AuthResponse> {
@@ -47,11 +76,13 @@ export class AuthService extends BaseService {
       },
     });
 
+    const scope = await this.resolveScope(user.id, user.role);
     const tokens = signTokens({
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
       permissions: user.permissions,
+      scope,
     });
 
     await this.prisma.session.create({
@@ -98,11 +129,13 @@ export class AuthService extends BaseService {
       throw new UnauthorizedError('Invalid credentials');
     }
 
+    const scope = await this.resolveScope(user.id, user.role);
     const tokens = signTokens({
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
       permissions: user.permissions,
+      scope,
     });
 
     await this.prisma.session.create({
@@ -153,11 +186,13 @@ export class AuthService extends BaseService {
       throw new UnauthorizedError('User not found or inactive');
     }
 
+    const scope = await this.resolveScope(user.id, user.role);
     const tokens = signTokens({
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
       permissions: user.permissions,
+      scope,
     });
 
     await this.prisma.session.update({

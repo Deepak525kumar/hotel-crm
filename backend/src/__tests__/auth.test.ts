@@ -23,6 +23,16 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // PR 5.4 (ADR-023 §6 / ADR-025 §4): AuthService.resolveScope reads these
+  // read-only association tables when issuing an access token. Default to
+  // "no association" (null) so existing tests that don't care about scope
+  // are unaffected; dedicated coverage lives in auth-scope-claim.test.ts.
+  hotelGroup: {
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  hotel: {
+    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
