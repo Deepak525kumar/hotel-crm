@@ -7,11 +7,21 @@ jest.mock('../lib/logger.js', () => ({
 }));
 
 const mockHotelWorkerFindFirst = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     hotelWorker: { findFirst: mockHotelWorkerFindFirst },
+    hotel: { findUnique: mockHotelFindUnique },
   }),
+}));
+
+// Epic 5 PR 5.5 (ADR-024 D3): the manager scope-authz cutover is gated by
+// isScopeAuthzEnabled(). A mutable flag lets individual cases assert both the
+// flip-ON behavior (default) and the OFF compatibility guarantee.
+let scopeAuthzEnabled = true;
+jest.mock('../config/feature-flags.js', () => ({
+  isScopeAuthzEnabled: () => scopeAuthzEnabled,
 }));
 
 function makeReq(auth?: Partial<{ userId: string; role: string; hotel_ids: string[]; permissions: string[]; email: string }>): Request {
@@ -89,6 +99,12 @@ describe('requirePermission middleware', () => {
 });
 
 describe('checkHotelAccess middleware', () => {
+  beforeEach(() => {
+    scopeAuthzEnabled = true;
+    mockHotelWorkerFindFirst.mockReset();
+    mockHotelFindUnique.mockReset();
+  });
+
   it('allows admins to access any hotel (PATCH-04 §4c bypass)', async () => {
     const req = makeReq({ userId: 'u1', role: 'admin', hotel_ids: [], permissions: [] });
     (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
@@ -97,13 +113,47 @@ describe('checkHotelAccess middleware', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
-  it('allows managers unconditionally (PATCH-04 §4c bypass — no DB query)', async () => {
+  it('allows a manager with a matching hotel scope (Epic 5 PR 5.5, flag ON)', async () => {
+    scopeAuthzEnabled = true;
     const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['auth'] = {
+      userId: 'u1',
+      role: 'manager',
+      permissions: [],
+      scope: { type: 'hotel', hotel_id: 'h1' },
+    };
     (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
     await checkHotelAccess()(req, makeRes(), next);
     expect(next).toHaveBeenCalledWith();
     expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('denies a manager whose hotel scope does not match (out_of_scope 403, flag ON)', async () => {
+    scopeAuthzEnabled = true;
+    const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['auth'] = {
+      userId: 'u1',
+      role: 'manager',
+      permissions: [],
+      scope: { type: 'hotel', hotel_id: 'h_other' },
+    };
+    (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    await checkHotelAccess()(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
+  });
+
+  it('allows a manager unconditionally when the flag is OFF (ADR-024 D3 compatibility)', async () => {
+    scopeAuthzEnabled = false;
+    const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['auth'] = { userId: 'u1', role: 'manager', permissions: [], scope: null };
+    (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    await checkHotelAccess()(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+    scopeAuthzEnabled = true;
   });
 
   it('allows checkers unconditionally (PATCH-04 §4c bypass — no DB query)', async () => {
@@ -152,13 +202,36 @@ describe('checkHotelAccess middleware', () => {
 // documented baseline to diverge from deliberately, not accidentally.
 describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
   beforeEach(() => {
+    scopeAuthzEnabled = true;
     mockHotelWorkerFindFirst.mockReset();
+    mockHotelFindUnique.mockReset();
   });
 
-  it.each(['admin', 'manager', 'checker'])('allows %s via bypass, with no DB query', async (role) => {
+  // admin and checker keep the unconditional cross-hotel bypass (unchanged).
+  it.each(['admin', 'checker'])('allows %s via bypass, with no DB query', async (role) => {
     const decision = await resolveHotelAccess(role, 'u1', 'h1');
     expect(decision).toEqual({ allowed: true, viaBypass: true });
     expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+  });
+
+  // Epic 5 PR 5.5: the manager role is now scope-bound when the flag is ON.
+  it('allows a manager whose hotel scope matches the target (viaBypass:false)', async () => {
+    const decision = await resolveHotelAccess('manager', 'u1', 'h1', { type: 'hotel', hotel_id: 'h1' });
+    expect(decision).toEqual({ allowed: true, viaBypass: false });
+    expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+  });
+
+  it('denies a manager whose hotel scope does not match (out_of_scope)', async () => {
+    const decision = await resolveHotelAccess('manager', 'u1', 'h1', { type: 'hotel', hotel_id: 'h_other' });
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('reverts a manager to bypass when the flag is OFF (ADR-024 D3 compatibility)', async () => {
+    scopeAuthzEnabled = false;
+    const decision = await resolveHotelAccess('manager', 'u1', 'h1', null);
+    expect(decision).toEqual({ allowed: true, viaBypass: true });
+    expect(mockHotelWorkerFindFirst).not.toHaveBeenCalled();
+    scopeAuthzEnabled = true;
   });
 
   it('allows a worker with an ACTIVE HotelWorker membership row', async () => {

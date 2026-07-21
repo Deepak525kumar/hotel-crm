@@ -1,8 +1,11 @@
+import type { UserScope } from './jwt.js';
+
 export interface AuthContext {
   userId: string;
   email: string;
   role: string;
   permissions: string[];
+  scope?: UserScope | null;
 }
 
 export interface ApiResponse<T = unknown> {

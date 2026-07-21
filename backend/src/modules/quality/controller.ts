@@ -9,7 +9,11 @@ export class QualityController {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = CreateQualityVerificationSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
-      const result = await qualityService.createVerification(parsed.data, req.auth);
+      const result = await qualityService.createVerification(parsed.data, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
       res.status(201).json({
         status: 'success',
         data: result,
@@ -28,6 +32,7 @@ export class QualityController {
       const result = await qualityService.createRating(parsed.data, {
         userId: req.auth.userId,
         role: req.auth.role,
+        scope: req.auth.scope ?? null,
       });
       res.status(201).json({
         status: 'success',

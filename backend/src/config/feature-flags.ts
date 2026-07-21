@@ -11,3 +11,14 @@ export function getPivotMode(): PivotMode {
 export function isDirectDispatchMode(): boolean {
   return getPivotMode() === 'direct_dispatch';
 }
+
+/**
+ * Scope-based authorization cutover flag (Epic 5 PR 5.5, ADR-024 D3).
+ * When enabled, the `manager` role is scope-bound via the PR 5.4 JWT `scope`
+ * claim instead of bypassing hotel access. When disabled (rollback), manager
+ * reverts to the pre-fix bypass — the "both-off reproduces current behavior"
+ * compatibility guarantee.
+ */
+export function isScopeAuthzEnabled(): boolean {
+  return getEnv().FEATURE_SCOPE_AUTHZ;
+}

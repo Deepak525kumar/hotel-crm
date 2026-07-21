@@ -39,6 +39,7 @@ export async function listAttendance(req: Request, res: Response, next: NextFunc
     const { data, total } = await attendanceService.list(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     const { page, per_page } = parsed.data;
     res.status(200).json({
@@ -86,7 +87,8 @@ export async function updateAttendance(req: Request, res: Response, next: NextFu
       req.params.id,
       parsed.data,
       req.auth!.userId,
-      req.auth!.role
+      req.auth!.role,
+      req.auth!.scope ?? null
     );
     res.status(200).json({
       status: 'success',
