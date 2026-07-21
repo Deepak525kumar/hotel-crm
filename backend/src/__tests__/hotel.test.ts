@@ -8,6 +8,9 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  hotelGroup: {
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
 };
 
@@ -68,6 +71,45 @@ describe('CrmService - Hotels', () => {
 
       expect(result.name).toBe('Test Hotel');
       expect(mockPrisma.hotel.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('updateHotel', () => {
+    it('assigns hotel_group_id when it references an existing hotel group (Epic 5 PR 5.3)', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, hotel_group_id: null };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+      mockPrisma.hotel.update.mockResolvedValue({ ...hotel, hotel_group_id: 'hg_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateHotel('h1', { hotel_group_id: 'hg_1' }, 'admin_1', 'admin');
+
+      expect(result.hotel_group_id).toBe('hg_1');
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { hotel_group_id: string } }>;
+      expect(updateCall[0]?.data.hotel_group_id).toBe('hg_1');
+    });
+
+    it('rejects assignment to a nonexistent hotel group without writing', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Hotel X', hotel_group_id: null });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateHotel('h1', { hotel_group_id: 'nonexistent' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+    });
+
+    it('leaves hotel_group_id unchanged when not provided in the update', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, hotel_group_id: 'hg_existing' };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotel.update.mockResolvedValue(hotel);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotel('h1', { name: 'Renamed Hotel' }, 'admin_1', 'admin');
+
+      expect(mockPrisma.hotelGroup.findUnique).not.toHaveBeenCalled();
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { hotel_group_id: string } }>;
+      expect(updateCall[0]?.data.hotel_group_id).toBe('hg_existing');
     });
   });
 
