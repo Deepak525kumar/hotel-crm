@@ -1,8 +1,10 @@
 import { BaseService } from '../../lib/base-service.js';
-import { NotFoundError } from '../../lib/errors.js';
+import { NotFoundError, ValidationError } from '../../lib/errors.js';
 import {
   CreateHotelRequest, UpdateHotelRequest,
   ListHotelsQuery,
+  CreateHotelGroupRequest, UpdateHotelGroupRequest,
+  ListHotelGroupsQuery,
 } from './types.js';
 
 export class CrmService extends BaseService {
@@ -105,6 +107,99 @@ export class CrmService extends BaseService {
     // Soft-delete: deactivate and record deletion timestamp
     await this.prisma.hotel.update({ where: { id: hotelId }, data: { is_active: false, deleted_at: new Date() } });
     await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip);
+  }
+
+  // ── Hotel Groups (Epic 5 PR 5.2, ADR-023) ───────────────────────────────────
+  // Additive alongside Hotel CRUD above. Nothing in the request pipeline reads
+  // hotel_group_id/manager_user_id for authorization scoping yet — that lands
+  // at PR 5.4 (scope-claim issuance) / PR 5.5 (authz flip), per ADR-024.
+
+  private async assertRegionalManagerExists(regionalManagerUserId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: regionalManagerUserId } });
+    if (!user || user.deleted_at) {
+      throw new ValidationError('regional_manager_user_id does not reference an existing user', [
+        { field: 'regional_manager_user_id', message: 'User not found' },
+      ]);
+    }
+  }
+
+  async listHotelGroups(query: ListHotelGroupsQuery) {
+    const { page, limit } = query;
+    const skip = (page - 1) * limit;
+
+    const [hotelGroups, total] = await Promise.all([
+      this.prisma.hotelGroup.findMany({
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.hotelGroup.count(),
+    ]);
+
+    return {
+      hotelGroups,
+      pagination: {
+        page, per_page: limit, total,
+        total_pages: Math.ceil(total / limit),
+        has_next: page * limit < total,
+        has_prev: page > 1,
+      },
+    };
+  }
+
+  async getHotelGroup(hotelGroupId: string, actorId: string, actorRole: string, ip?: string) {
+    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+    await this.logAudit(actorId, actorRole, 'VIEW', 'HOTEL_GROUP', hotelGroupId, {}, ip);
+    return hotelGroup;
+  }
+
+  async createHotelGroup(data: CreateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
+    await this.assertRegionalManagerExists(data.regional_manager_user_id);
+
+    const hotelGroup = await this.prisma.hotelGroup.create({
+      data: {
+        name: data.name,
+        billing_info: data.billing_info,
+        regional_manager_user_id: data.regional_manager_user_id,
+      },
+    });
+
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroup.id, { action: 'create', name: hotelGroup.name }, ip);
+    return hotelGroup;
+  }
+
+  async updateHotelGroup(hotelGroupId: string, data: UpdateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
+    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+    if (data.regional_manager_user_id !== undefined) {
+      await this.assertRegionalManagerExists(data.regional_manager_user_id);
+    }
+
+    const updated = await this.prisma.hotelGroup.update({
+      where: { id: hotelGroupId },
+      data: {
+        name: data.name ?? hotelGroup.name,
+        billing_info: data.billing_info ?? hotelGroup.billing_info,
+        regional_manager_user_id: data.regional_manager_user_id ?? hotelGroup.regional_manager_user_id,
+      },
+    });
+
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
+    return updated;
+  }
+
+  async deleteHotelGroup(hotelGroupId: string, actorId: string, actorRole: string, ip?: string) {
+    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+    // Hard delete: HotelGroup carries no soft-delete field in ADR-023's decided
+    // shape. Hotel.hotel_group_id is onDelete: SetNull, so member hotels are
+    // safely detached, not cascaded.
+    await this.prisma.hotelGroup.delete({ where: { id: hotelGroupId } });
+    await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL_GROUP', hotelGroupId, { name: hotelGroup.name }, ip);
   }
 }
 

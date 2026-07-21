@@ -3,6 +3,8 @@ import { crmService } from './service.js';
 import {
   CreateHotelSchema, UpdateHotelSchema,
   ListHotelsQuerySchema,
+  CreateHotelGroupSchema, UpdateHotelGroupSchema,
+  ListHotelGroupsQuerySchema,
 } from './types.js';
 import { validateBody, validateQuery } from '../../middleware/validation.js';
 import { UnauthorizedError } from '../../lib/errors.js';
@@ -78,6 +80,84 @@ export class CrmController {
     try {
       if (!req.auth) throw new UnauthorizedError();
       await crmService.deleteHotel(req.params['hotel_id']!, req.auth.userId, req.auth.role, req.ip);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ── Hotel Groups (Epic 5 PR 5.2) ────────────────────────────────────────────
+
+  listHotelGroups = [
+    validateQuery(ListHotelGroupsQuerySchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await crmService.listHotelGroups(req.query as never);
+        res.status(200).json({
+          status: 'success',
+          data: result.hotelGroups,
+          pagination: result.pagination,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  async getHotelGroup(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const hotelGroup = await crmService.getHotelGroup(req.params['hotel_group_id']!, req.auth.userId, req.auth.role, req.ip);
+      res.status(200).json({
+        status: 'success',
+        data: hotelGroup,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  createHotelGroup = [
+    validateBody(CreateHotelGroupSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const hotelGroup = await crmService.createHotelGroup(req.body, req.auth.userId, req.auth.role, req.ip);
+        res.status(201).json({
+          status: 'success',
+          data: hotelGroup,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  updateHotelGroup = [
+    validateBody(UpdateHotelGroupSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const hotelGroup = await crmService.updateHotelGroup(req.params['hotel_group_id']!, req.body, req.auth.userId, req.auth.role, req.ip);
+        res.status(200).json({
+          status: 'success',
+          data: hotelGroup,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  async deleteHotelGroup(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      await crmService.deleteHotelGroup(req.params['hotel_group_id']!, req.auth.userId, req.auth.role, req.ip);
       res.status(204).send();
     } catch (error) {
       next(error);
