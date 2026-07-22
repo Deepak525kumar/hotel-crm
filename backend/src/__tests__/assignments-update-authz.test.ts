@@ -10,8 +10,8 @@ import type { Request, Response, NextFunction } from 'express';
  * (CONFIRMED -> IN_PROGRESS -> COMPLETED/CANCELLED) for any worker at any
  * hotel. `update()` now applies the same deny-by-default guard already used
  * by `getById()`: admin/manager may act on any assignment; a worker may act
- * only on their own assignment (worker_id match) or one at a hotel where
- * they hold an ACTIVE hotelWorker membership.
+ * only on their own assignment (worker_id match) or one at a hotel in their
+ * ACTIVE EmploymentRecord's hotel group.
  *
  * These tests exercise the real assignments router stack end-to-end via
  * supertest, asserting the guard is enforced. Removing it re-opens the
@@ -20,7 +20,8 @@ import type { Request, Response, NextFunction } from 'express';
 
 // Test-controlled auth context injected by the mocked authMiddleware.
 let testAuth: { userId: string; role: string } | null = null;
-// Active memberships the mocked hotelWorker.findFirst lookup will find.
+// Hotels the actor is eligible at, via the mocked EmploymentRecord/hotel
+// group-scope lookup (lib/roster-scope.ts).
 let membershipHotelIds: string[] = [];
 
 const makeAssignment = (overrides: Record<string, unknown> = {}) => ({
@@ -69,11 +70,15 @@ jest.mock('../lib/db.js', () => ({
       findUnique: async () => currentAssignment,
       update: async ({ data }: any) => ({ ...currentAssignment, ...data }),
     },
-    hotelWorker: {
-      findFirst: async ({ where }: any) =>
-        membershipHotelIds.includes(where.hotel_id) && where.worker_id === testAuth?.userId
-          ? { id: 'hw_test' }
+    employmentRecord: {
+      findUnique: async ({ where }: any) =>
+        membershipHotelIds.length > 0 && where.user_id === testAuth?.userId
+          ? { status: 'ACTIVE', hotel_group_id: 'g1' }
           : null,
+    },
+    hotel: {
+      findUnique: async ({ where }: any) =>
+        membershipHotelIds.includes(where.id) ? { hotel_group_id: 'g1' } : { hotel_group_id: 'g2' },
     },
     auditLog: { create: async () => ({}) },
   }),

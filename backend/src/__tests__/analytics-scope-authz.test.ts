@@ -17,7 +17,6 @@ let testAuth:
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
-  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({
@@ -31,7 +30,6 @@ jest.mock('../lib/logger.js', () => ({
 
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
-    hotelWorker: { findFirst: async () => null },
     hotel: {
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
     },
