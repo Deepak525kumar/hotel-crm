@@ -1,8 +1,7 @@
-import { Prisma, WorkRequest, WorkRequestStatus, HotelWorkerStatus } from '@prisma/client';
+import { Prisma, WorkRequest, WorkRequestStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import {
-  isRosterCutoverEnabled,
   isWorkerEligibleForHotel,
   listEligibleHotelIds,
   listEligibleWorkerIds,
@@ -104,16 +103,7 @@ export class WorkRequestService extends BaseService {
     // PATCH-04: non-management roles only see requests for hotels where they
     // hold an ACTIVE roster membership.
     if (actor.role !== 'admin' && actor.role !== 'manager') {
-      let hotelIds: string[];
-      if (isRosterCutoverEnabled()) {
-        hotelIds = await listEligibleHotelIds(actor.userId);
-      } else {
-        const memberships = await this.prisma.hotelWorker.findMany({
-          where: { worker_id: actor.userId, status: HotelWorkerStatus.ACTIVE },
-          select: { hotel_id: true },
-        });
-        hotelIds = memberships.map((m) => m.hotel_id);
-      }
+      const hotelIds = await listEligibleHotelIds(actor.userId);
       if (hotelIds.length === 0) return { data: [], total: 0 };
       where.hotel_id = query.hotel_id
         ? hotelIds.includes(query.hotel_id)
@@ -143,20 +133,8 @@ export class WorkRequestService extends BaseService {
     if (!wr) throw new NotFoundError('Work request not found');
 
     if (actor.role !== 'admin' && actor.role !== 'manager') {
-      if (isRosterCutoverEnabled()) {
-        const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
-        if (!eligible) throw new ForbiddenError('Cannot access this work request');
-      } else {
-        const membership = await this.prisma.hotelWorker.findFirst({
-          where: {
-            hotel_id: wr.hotel_id,
-            worker_id: actor.userId,
-            status: HotelWorkerStatus.ACTIVE,
-          },
-          select: { id: true },
-        });
-        if (!membership) throw new ForbiddenError('Cannot access this work request');
-      }
+      const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
+      if (!eligible) throw new ForbiddenError('Cannot access this work request');
     }
 
     const dto = this.toDto(wr);
@@ -246,16 +224,7 @@ export class WorkRequestService extends BaseService {
   // hotel roster. Fire-and-forget per recipient, matching the notification
   // pattern used elsewhere; a delivery failure never rolls back the publish.
   private async notifyRosterPublished(wr: WorkRequest): Promise<void> {
-    let workerIds: string[];
-    if (isRosterCutoverEnabled()) {
-      workerIds = await listEligibleWorkerIds(wr.hotel_id);
-    } else {
-      const roster = await this.prisma.hotelWorker.findMany({
-        where: { hotel_id: wr.hotel_id, status: HotelWorkerStatus.ACTIVE },
-        select: { worker_id: true },
-      });
-      workerIds = roster.map((r: { worker_id: string }) => r.worker_id);
-    }
+    const workerIds = await listEligibleWorkerIds(wr.hotel_id);
 
     await Promise.all(
       workerIds.map((workerId) =>

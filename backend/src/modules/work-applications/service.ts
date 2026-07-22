@@ -4,12 +4,11 @@ import {
   ApplicationStatus,
   AssignmentStatus,
   AttendanceStatus,
-  HotelWorkerStatus,
   WorkRequestStatus,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
-import { isRosterCutoverEnabled, isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
+import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { notificationService } from '../notifications/service.js';
 import {
   ApplyWorkRequestInput,
@@ -48,15 +47,8 @@ export class WorkApplicationService extends BaseService {
     }
 
     // Worker must be ACTIVE on this hotel's roster
-    if (isRosterCutoverEnabled()) {
-      const eligible = await isWorkerEligibleForHotel(actorId, wr.hotel_id);
-      if (!eligible) throw new ForbiddenError('Worker is not on the active roster for this hotel');
-    } else {
-      const membership = await this.prisma.hotelWorker.findFirst({
-        where: { hotel_id: wr.hotel_id, worker_id: actorId, status: HotelWorkerStatus.ACTIVE },
-      });
-      if (!membership) throw new ForbiddenError('Worker is not on the active roster for this hotel');
-    }
+    const eligible = await isWorkerEligibleForHotel(actorId, wr.hotel_id);
+    if (!eligible) throw new ForbiddenError('Worker is not on the active roster for this hotel');
 
     // Check for duplicate application
     const existing = await this.prisma.workApplication.findUnique({

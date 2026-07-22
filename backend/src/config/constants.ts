@@ -90,7 +90,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'admin:*',
     'users:read', 'users:write', 'users:delete',
     'hotels:read', 'hotels:write', 'hotels:delete',
-    'hotel_workers:read', 'hotel_workers:write',
     'rooms:read', 'rooms:write',
     'tasks:read', 'tasks:write',
     'quality:read', 'quality:write',
@@ -104,7 +103,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   MANAGER: [
     'hotels:read',
-    'hotel_workers:read', 'hotel_workers:write',
     'rooms:read', 'rooms:write',
     'tasks:read', 'tasks:write',
     'quality:read',
@@ -120,7 +118,6 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
   CHECKER: [
     'hotels:read',
-    'hotel_workers:read',
     'rooms:read',
     'tasks:read',
     'quality:read', 'quality:write',

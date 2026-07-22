@@ -31,10 +31,7 @@
 import { EmploymentStatus } from '@prisma/client';
 import { getPrisma } from './db.js';
 import { isHotelInScope } from './scope.js';
-import { isRosterCutoverEnabled } from '../config/feature-flags.js';
 import type { UserScope } from './jwt.js';
-
-export { isRosterCutoverEnabled };
 
 /**
  * Resolves a worker's group-grain scope from their PR 5.6 EmploymentRecord.

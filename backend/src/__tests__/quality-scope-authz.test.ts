@@ -25,7 +25,6 @@ const assignments: Record<string, { id: string; hotel_id: string; worker_id: str
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
-  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({
@@ -70,7 +69,6 @@ jest.mock('../lib/db.js', () => ({
     hotel: {
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
     },
-    hotelWorker: { findFirst: async () => null },
     auditLog: { create: async () => undefined },
     $transaction: async (cb: any) => cb(txStub),
   }),

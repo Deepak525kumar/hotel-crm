@@ -7,7 +7,6 @@ import { isEmploymentRecordEnabled } from '../../config/feature-flags.js';
 import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
 import crmRoutes from '../../modules/crm/routes.js';
-import hotelWorkerRoutes from '../../modules/hotel-workers/routes.js';
 import workRequestRoutes from '../../modules/work-requests/routes.js';
 import workApplicationRoutes from '../../modules/work-applications/routes.js';
 import assignmentRoutes from '../../modules/assignments/routes.js';
@@ -26,7 +25,6 @@ router.use(optionalAuthMiddleware);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/crm', crmRoutes);
-router.use('/crm/hotels/:hotel_id/workers', hotelWorkerRoutes);
 router.use('/work-requests', workRequestRoutes);
 router.use('/work-requests/:id/applications', workApplicationRoutes);
 router.use('/assignments', assignmentRoutes);
@@ -75,7 +73,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'hotel-workers', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality', 'employee-management'],
+      modules: ['auth', 'users', 'crm', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality', 'employee-management'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {
