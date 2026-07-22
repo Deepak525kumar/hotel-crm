@@ -77,11 +77,15 @@ enum VerificationStatus {
   NEEDS_REWORK
 }
 
+// ADR-027 (2026-07-22, OQ-NOTIF-01): the canonical channel set is exactly these five
+// members. Provider-specific integrations (WhatsApp, Slack, etc.) are a transport
+// detail under one of these channels (e.g. WEBHOOK), never a new enum member.
 enum NotificationChannel {
   IN_APP
   EMAIL
   PUSH
   SMS
+  WEBHOOK
 }
 
 // SP-8: Notification.type promoted from String to NotificationType enum.
