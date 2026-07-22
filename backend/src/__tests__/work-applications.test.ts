@@ -22,10 +22,6 @@ const mockAttendance = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
-const mockHotelWorker = {
-  findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
-};
-
 const mockWorkerOverallRating = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -43,7 +39,6 @@ const mockPrisma = {
   workRequest: mockWorkRequest,
   workerAssignment: mockWorkerAssignment,
   attendance: mockAttendance,
-  hotelWorker: mockHotelWorker,
   workerOverallRating: mockWorkerOverallRating,
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
@@ -52,14 +47,6 @@ const mockPrisma = {
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
-
-// Epic 5 PR 5.7 (ADR-024 D1/D2/D4, site #4): roster cutover flag for
-// apply()'s worker-roster membership check. Defaults OFF so the existing
-// characterization tests below stay untouched.
-let rosterCutoverEnabled = false;
-jest.mock('../config/feature-flags.js', () => ({
-  isRosterCutoverEnabled: () => rosterCutoverEnabled,
-}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -105,7 +92,6 @@ describe('WorkApplicationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    rosterCutoverEnabled = false;
     service = new WorkApplicationService();
   });
 
@@ -124,53 +110,9 @@ describe('WorkApplicationService', () => {
       });
     });
 
-    it('throws ForbiddenError when worker not on active roster', async () => {
-      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
-      mockHotelWorker.findFirst.mockResolvedValue(null);
-      await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
-        name: 'ForbiddenError',
-      });
-    });
-
-    it('throws ConflictError on duplicate PENDING application', async () => {
-      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
-      mockHotelWorker.findFirst.mockResolvedValue({ id: 'hw1' });
-      mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'PENDING' }));
-      await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
-        name: 'ConflictError',
-      });
-    });
-
-    it('creates application and sets rating snapshot', async () => {
-      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
-      mockHotelWorker.findFirst.mockResolvedValue({ id: 'hw1' });
-      mockWorkApplication.findUnique.mockResolvedValue(null);
-      mockWorkerOverallRating.findUnique.mockResolvedValue({ average_score: 4.5 });
-      mockWorkApplication.create.mockResolvedValue(makeApp({ worker_rating_snapshot: 4.5 }));
-      const dto = await service.apply('wr1', { cover_note: 'hi' }, 'w1', 'worker');
-      expect(dto.worker_rating_snapshot).toBe(4.5);
-      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
-    });
-
-    it('re-applies after withdrawal by updating existing row', async () => {
-      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
-      mockHotelWorker.findFirst.mockResolvedValue({ id: 'hw1' });
-      mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'WITHDRAWN' }));
-      mockWorkerOverallRating.findUnique.mockResolvedValue(null);
-      mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'PENDING' }));
-      const dto = await service.apply('wr1', {}, 'w1', 'worker');
-      expect(dto.status).toBe('PENDING');
-      expect(mockWorkApplication.update).toHaveBeenCalled();
-      expect(mockWorkApplication.create).not.toHaveBeenCalled();
-    });
-
-    // Epic 5 PR 5.7 (ADR-024 D1/D2, site #4): roster cutover ON reads the
-    // EmploymentRecord group scope instead of HotelWorker, deny-by-default.
-    describe('roster cutover (flag ON, site #4)', () => {
-      beforeEach(() => {
-        rosterCutoverEnabled = true;
-      });
-
+    // Worker roster access: reads the EmploymentRecord group scope,
+    // deny-by-default.
+    describe('worker roster access', () => {
       it('allows a worker whose EmploymentRecord group matches the work request hotel group', async () => {
         mockWorkRequest.findUnique.mockResolvedValue(makeWr());
         mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
@@ -180,7 +122,6 @@ describe('WorkApplicationService', () => {
         mockWorkApplication.create.mockResolvedValue(makeApp());
         const dto = await service.apply('wr1', {}, 'w1', 'worker');
         expect(dto.id).toBe('app1');
-        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
       });
 
       it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
@@ -189,7 +130,6 @@ describe('WorkApplicationService', () => {
         await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
           name: 'ForbiddenError',
         });
-        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
       });
 
       it('denies a worker whose EmploymentRecord group does not match the work request hotel group', async () => {
@@ -200,6 +140,41 @@ describe('WorkApplicationService', () => {
           name: 'ForbiddenError',
         });
       });
+    });
+
+    it('throws ConflictError on duplicate PENDING application', async () => {
+      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'PENDING' }));
+      await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+    });
+
+    it('creates application and sets rating snapshot', async () => {
+      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockWorkApplication.findUnique.mockResolvedValue(null);
+      mockWorkerOverallRating.findUnique.mockResolvedValue({ average_score: 4.5 });
+      mockWorkApplication.create.mockResolvedValue(makeApp({ worker_rating_snapshot: 4.5 }));
+      const dto = await service.apply('wr1', { cover_note: 'hi' }, 'w1', 'worker');
+      expect(dto.worker_rating_snapshot).toBe(4.5);
+      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+
+    it('re-applies after withdrawal by updating existing row', async () => {
+      mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'WITHDRAWN' }));
+      mockWorkerOverallRating.findUnique.mockResolvedValue(null);
+      mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'PENDING' }));
+      const dto = await service.apply('wr1', {}, 'w1', 'worker');
+      expect(dto.status).toBe('PENDING');
+      expect(mockWorkApplication.update).toHaveBeenCalled();
+      expect(mockWorkApplication.create).not.toHaveBeenCalled();
     });
   });
 

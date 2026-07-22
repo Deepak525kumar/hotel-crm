@@ -81,13 +81,13 @@ modules:
     type: backend-module
     path: backend/src/modules/hotel-workers
     owner: unassigned
-    lifecycle: deprecated  # ADR-022 (Accepted, ratified by merge of PR #166, 2026-07-20): not part of the target architecture; retained as an implementation compatibility layer pending migration prerequisites (EMP employment record on backend-hr, Hotel-Group model OD-EMP-05, role x scope JWT authz TREQ-008/REQ-USERS-022..024). Physical removal is separately gated.
-    implementation_status: active
+    lifecycle: removed  # Epic 5 PR 5.8 (ADR-022 roadmap step 6, ADR-024 D5): both removal conditions held (PR 5.5+5.7 complete — no authz reader, no roster reader of HotelWorker remained) so the module (routes/controller/service/types) and its route mount were physically deleted. CODE-ONLY retirement per explicit human decision (2026-07-22): the underlying `HotelWorker`/`HotelWorkerStatus` schema is deliberately left untouched in schema.prisma (no migration, no DROP TABLE) — ADR-022's Data Migration Plan states "No DROP TABLE" for its original in-place-repurposing design, and no backfill of HotelWorker rows into EmploymentRecord has ever been built or run. The table is dormant: unread by any application code except the new read-only `employment-record:backfill-status` reporting tool (backend/src/scripts/employment-record-backfill-status.ts), which exists solely to inform a future human decision on the table's fate.
+    implementation_status: removed
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: RETIRED (ADR-022)  # was UNKNOWN; no SPEC-HOTELWORKERS-001 will be authored/frozen. Employment-record ownership moves to SPEC-EMP-001/backend-hr.
-    evidence: backend/src/routes/v1/index.ts:25
+    specification: RETIRED (ADR-022)  # module removed; state-hotel-worker itself remains schema-only, dormant (see state-hotel-worker note below).
+    evidence: git history (removed by Epic 5 PR 5.8); backend/prisma/schema.prisma (HotelWorker model, dormant, unchanged)
 
   - id: backend-work-requests
     type: backend-module

@@ -15,15 +15,14 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 let scopeAuthzEnabled = true;
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => scopeAuthzEnabled,
-  isRosterCutoverEnabled: () => false,
 }));
 
-const mockHotelWorkerFindFirst = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
-    hotelWorker: { findFirst: mockHotelWorkerFindFirst },
+    employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotel: { findUnique: mockHotelFindUnique },
   }),
 }));
@@ -42,7 +41,7 @@ import { resolveHotelAccess } from '../middleware/permissions.js';
 describe('resolveHotelAccess scope-authz (OQ-AUTH-06 / SIR-AUTH-003)', () => {
   beforeEach(() => {
     scopeAuthzEnabled = true;
-    mockHotelWorkerFindFirst.mockReset();
+    mockEmploymentRecordFindUnique.mockReset();
     mockHotelFindUnique.mockReset();
   });
 
@@ -114,14 +113,15 @@ describe('resolveHotelAccess scope-authz (OQ-AUTH-06 / SIR-AUTH-003)', () => {
       expect(d).toEqual({ allowed: true, viaBypass: true });
     });
 
-    it('allows a worker with an ACTIVE membership', async () => {
-      mockHotelWorkerFindFirst.mockResolvedValue({ id: 'hw1' });
+    it('allows a worker with an ACTIVE employment record in the hotel group', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
       const d = await resolveHotelAccess('worker', 'w1', 'h1', null);
       expect(d).toEqual({ allowed: true, viaBypass: false });
     });
 
-    it('denies a worker without a membership', async () => {
-      mockHotelWorkerFindFirst.mockResolvedValue(null);
+    it('denies a worker without an employment record', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue(null);
       const d = await resolveHotelAccess('worker', 'w1', 'h1', null);
       expect(d).toEqual({ allowed: false, reason: 'no_membership' });
     });

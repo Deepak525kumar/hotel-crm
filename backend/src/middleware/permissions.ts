@@ -1,10 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
-import { HotelWorkerStatus } from '@prisma/client';
 import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { getPrisma } from '../lib/db.js';
 import { isScopeAuthzEnabled } from '../config/feature-flags.js';
-import { isRosterCutoverEnabled, isWorkerEligibleForHotel } from '../lib/roster-scope.js';
+import { isWorkerEligibleForHotel } from '../lib/roster-scope.js';
 import { isHotelInScope } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
@@ -101,7 +99,7 @@ export type HotelAccessDecision =
   // `viaBypass: true` = admin/checker role bypass (PATCH-04 §4c), or manager
   // bypass while the scope-authz flag is OFF (ADR-024 D3 rollback); no DB
   // query is performed for the scope decision. `viaBypass: false` = allowed
-  // either via an ACTIVE HotelWorker membership row (worker) or via a matching
+  // either via a group-scope-eligible worker or via a matching
   // manager scope claim (Epic 5 PR 5.5 authz flip). Callers use this to
   // reproduce the pre-refactor log behavior exactly (the bypass path never
   // logged a scope-check line).
@@ -153,26 +151,10 @@ export async function resolveHotelAccess(
     return { allowed: false, reason: 'missing_hotel_id' };
   }
 
-  // Roster cutover (Epic 5 PR 5.7, ADR-024 D1/D2): flag-gated, not a
-  // per-request fallback blend. OFF reproduces the pre-PR-5.7 HotelWorker
-  // query byte-for-byte (ADR-024 D4 compatibility guarantee); ON reads the
-  // PR 5.6 EmploymentRecord group-grain scope via `lib/roster-scope.ts`.
-  if (isRosterCutoverEnabled()) {
-    const eligible = await isWorkerEligibleForHotel(userId, hotelId);
-    return eligible ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
-  }
-
-  const prisma = getPrisma();
-  const membership = await prisma.hotelWorker.findFirst({
-    where: {
-      hotel_id: hotelId,
-      worker_id: userId,
-      status: HotelWorkerStatus.ACTIVE,
-    },
-    select: { id: true },
-  });
-
-  return membership ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
+  // Worker roster access (Epic 5 PR 5.7/5.8, ADR-022/024): reads the PR 5.6
+  // EmploymentRecord group-grain scope via `lib/roster-scope.ts`.
+  const eligible = await isWorkerEligibleForHotel(userId, hotelId);
+  return eligible ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
 }
 
 export function checkHotelAccess() {

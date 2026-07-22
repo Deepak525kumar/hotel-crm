@@ -27,29 +27,3 @@ describe('Pivot cutover feature flag (S0-4)', () => {
     expect(isDirectDispatchMode()).toBe(true);
   });
 });
-
-describe('Roster cutover feature flag (Epic 5 PR 5.7, ADR-024 D1/D2/D4)', () => {
-  afterEach(() => {
-    jest.resetModules();
-  });
-
-  it('defaults to disabled when FEATURE_ROSTER_CUTOVER is unset (ADR-024 D4 compatibility)', async () => {
-    jest.doMock('../config/env.js', () => ({
-      getEnv: () => ({ FEATURE_ROSTER_CUTOVER: false }),
-    }));
-
-    const { isRosterCutoverEnabled } = await import('../config/feature-flags.js');
-
-    expect(isRosterCutoverEnabled()).toBe(false);
-  });
-
-  it('reports enabled once toggled on', async () => {
-    jest.doMock('../config/env.js', () => ({
-      getEnv: () => ({ FEATURE_ROSTER_CUTOVER: true }),
-    }));
-
-    const { isRosterCutoverEnabled } = await import('../config/feature-flags.js');
-
-    expect(isRosterCutoverEnabled()).toBe(true);
-  });
-});

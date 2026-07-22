@@ -25,7 +25,10 @@ nodes:
   - { id: backend-auth, kind: module, owner: unassigned, source: backend/src/modules/auth }
   - { id: backend-users, kind: module, owner: unassigned, source: backend/src/modules/users }
   - { id: backend-crm, kind: module, owner: unassigned, source: backend/src/modules/crm }
-  - { id: backend-hotel-workers, kind: module, owner: unassigned, source: backend/src/modules/hotel-workers }
+  # backend-hotel-workers module REMOVED by Epic 5 PR 5.8 (ADR-022 roadmap step
+  # 6, ADR-024 D5) — physically deleted from backend/src/modules/hotel-workers.
+  # No node entry remains; see state-hotel-worker's own note below and git
+  # history for the historical relationship record.
   - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
   - { id: backend-work-applications, kind: module, owner: unassigned, source: backend/src/modules/work-applications }
   - { id: backend-assignments, kind: module, owner: unassigned, source: backend/src/modules/assignments }
@@ -83,7 +86,7 @@ nodes:
   - { id: state-user, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:117 (model User)" }
   - { id: state-session, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma:157 (model Session)" }
   - { id: state-hotel, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:175 (model Hotel)" }
-  - { id: state-hotel-worker, kind: state-domain, owner: backend-hotel-workers, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }
+  - { id: state-hotel-worker, kind: state-domain, owner: none, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }  # owner backend-hotel-workers removed by Epic 5 PR 5.8; see state_domains note below
   - { id: state-work-request, kind: state-domain, owner: backend-work-requests, source: "backend/prisma/schema.prisma:236 (model WorkRequest)" }
   - { id: state-work-application, kind: state-domain, owner: backend-work-applications, source: "backend/prisma/schema.prisma:279 (model WorkApplication)" }
   - { id: state-worker-assignment, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma:314 (model WorkerAssignment)" }
@@ -193,73 +196,63 @@ edges:
     kind: reads-state
     compatibility: not-applicable
     status: observed
-  # Epic 5 PR 5.7 (ADR-022 §Dependency-order step 4, ADR-024 D1/D2/D5(i)): each
-  # of these six edges is FLAG-CONDITIONAL, gated by FEATURE_ROSTER_CUTOVER
-  # (default off). Flag off: the read is via the pre-existing
-  # edge-*-reads-hotel-worker edges (unchanged, still true). Flag on: the
-  # module reads state-employment-record instead, via lib/roster-scope.ts's
-  # group-grain mapping (ADR-023 formula worker.hotel_group_id ==
-  # target_hotel.hotel_group_id). Both edges are real and coexist — which one
-  # is live at runtime depends on the flag, not on repository state. Physical
-  # removal of the state-hotel-worker edges is PR 5.8, gated on this cutover
-  # plus no roster reader remaining (ADR-024 D5(ii)).
+    evidence: "backend/src/modules/employee-management/service.ts (this.prisma.rating.findMany — profile-and-history)"
+  # Epic 5 PR 5.7 introduced these six edges as FLAG-CONDITIONAL (gated by
+  # FEATURE_ROSTER_CUTOVER, coexisting with the edge-*-reads-hotel-worker
+  # edges below). Epic 5 PR 5.8 (ADR-022 roadmap step 6, ADR-024 D5) retired
+  # the flag and the HotelWorker-reading branches entirely — these are now the
+  # SOLE, unconditional read path (ADR-023 formula worker.hotel_group_id ==
+  # target_hotel.hotel_group_id, via lib/roster-scope.ts). The corresponding
+  # edge-*-reads-hotel-worker edges below are marked historical/removed.
   - id: edge-permissions-middleware-reads-employment-record
     source: permissions-middleware
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/middleware/permissions.ts resolveHotelAccess() worker branch, via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/middleware/permissions.ts resolveHotelAccess() worker branch, via lib/roster-scope.ts"
   - id: edge-assignments-reads-employment-record
     source: backend-assignments
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts"
   - id: edge-work-applications-reads-employment-record
     source: backend-work-applications
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/work-applications/service.ts apply(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/modules/work-applications/service.ts apply(), via lib/roster-scope.ts"
   - id: edge-work-requests-reads-employment-record
     source: backend-work-requests
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/work-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/modules/work-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts"
   - id: edge-users-reads-employment-record
     source: backend-users
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/users/service.ts listUsers() hotel_id filter, gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/modules/users/service.ts listUsers() hotel_id filter"
   - id: edge-quality-reads-employment-record
     source: backend-quality
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
+    compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/quality/service.ts getLeaderboard(), gated by FEATURE_ROSTER_CUTOVER"
+    evidence: "backend/src/modules/quality/service.ts getLeaderboard()"
   - id: edge-analytics-reads-employment-record
     source: backend-analytics
     target: state-employment-record
     kind: reads-state
-    compatibility: conditional
-    status: observed
-    evidence: "backend/src/modules/analytics/service.ts getLeaderboard(), gated by FEATURE_ROSTER_CUTOVER"
-    evidence: "backend/src/modules/employee-management/service.ts (this.prisma.rating.findMany — profile-and-history)"
-  - id: edge-work-requests-reads-hotel-worker
-    source: backend-work-requests
-    target: state-hotel-worker
-    kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/work-requests/service.ts:101,135,233 (this.prisma.hotelWorker)"
+    evidence: "backend/src/modules/analytics/service.ts getLeaderboard()"
   - id: edge-work-requests-reads-work-application
     source: backend-work-requests
     target: state-work-application
@@ -274,13 +267,6 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/work-applications/service.ts:43,118,211,276 (this.prisma.workRequest)"
-  - id: edge-work-applications-reads-hotel-worker
-    source: backend-work-applications
-    target: state-hotel-worker
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:50 (this.prisma.hotelWorker.findFirst)"
   - id: edge-work-applications-reads-worker-overall-rating
     source: backend-work-applications
     target: state-worker-overall-rating
@@ -288,13 +274,6 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/work-applications/service.ts:64 (this.prisma.workerOverallRating.findUnique)"
-  - id: edge-assignments-reads-hotel-worker
-    source: backend-assignments
-    target: state-hotel-worker
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/assignments/service.ts:69 (this.prisma.hotelWorker.findFirst)"
   - id: edge-attendance-reads-worker-assignment
     source: backend-attendance
     target: state-worker-assignment
@@ -316,29 +295,6 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/quality/service.ts:147-149 (tx.attendance.count, status PRESENT, on_time_rate recompute)"
-  - id: edge-users-reads-hotel-worker
-    source: backend-users
-    target: state-hotel-worker
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/users/service.ts:16 (listUsers hotel_id filter: where['hotel_workers'] = { some: { hotel_id, status: 'ACTIVE' } })"
-    note: "Proposed by SPEC-USERS-001's dependency review (SIR-USERS-016), applied by SYNC-020 (repository-synchronization session)."
-    note: "Added by SPEC-QUAL-001 dependency review (FIND-DEP-001/FIND-ARCH-003); previously a genuine missing edge."
-  - id: edge-hotel-workers-reads-hotel
-    source: backend-hotel-workers
-    target: state-hotel
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/hotel-workers/service.ts:37,87 (this.prisma.hotel.findUnique)"
-  - id: edge-hotel-workers-reads-user
-    source: backend-hotel-workers
-    target: state-user
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/hotel-workers/service.ts:40 (this.prisma.user.findUnique)"
   # analytics is a read-only aggregator across many owned state domains.
   - id: edge-analytics-reads-work-request
     source: backend-analytics
@@ -382,15 +338,6 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/analytics/service.ts:37 (this.prisma.workerOverallRating.findMany)"
-  - id: edge-analytics-reads-hotel-worker
-    source: backend-analytics
-    target: state-hotel-worker
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/analytics/service.ts:26-35 (getLeaderboard HotelWorker relation filter)"
-    note: "Applied by repository-synchronization pass (Package A step 5, AUDIT-M3); previously a confirmed-missing edge (SYNC-010/FIND-DEP-001), proposed by SPEC-ANALYTICS-001's own dependency review, left unapplied pending this synchronization pass."
-
   # --- Client -> backend API consumption (consumes-api) ---
   # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
   - { id: edge-frontend-auth, source: frontend-web, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:171,177,180 (/auth/login,/auth/me,/auth/logout)" }
@@ -430,7 +377,7 @@ runtime:
     - { module: backend-auth, mount: "/api/v1/auth", evidence: "backend/src/routes/v1/index.ts:22" }
     - { module: backend-users, mount: "/api/v1/users", evidence: "backend/src/routes/v1/index.ts:23" }
     - { module: backend-crm, mount: "/api/v1/crm", evidence: "backend/src/routes/v1/index.ts:24" }
-    - { module: backend-hotel-workers, mount: "/api/v1/crm/hotels/:hotel_id/workers", nested_under: backend-crm, evidence: "backend/src/routes/v1/index.ts:25" }
+    # backend-hotel-workers mount REMOVED by Epic 5 PR 5.8 (route + module deleted).
     - { module: backend-work-requests, mount: "/api/v1/work-requests", evidence: "backend/src/routes/v1/index.ts:26" }
     - { module: backend-work-applications, mount: "/api/v1/work-requests/:id/applications", nested_under: backend-work-requests, evidence: "backend/src/routes/v1/index.ts:27" }
     - { module: backend-assignments, mount: "/api/v1/assignments", evidence: "backend/src/routes/v1/index.ts:28" }
@@ -468,7 +415,6 @@ contracts:
       - backend-auth
       - backend-users
       - backend-crm
-      - backend-hotel-workers
       - backend-work-requests
       - backend-work-applications
       - backend-assignments
@@ -485,7 +431,6 @@ contracts:
       - backend-auth
       - backend-users
       - backend-crm
-      - backend-hotel-workers
       - backend-work-requests
       - backend-work-applications
       - backend-assignments
@@ -503,7 +448,6 @@ contracts:
     consumers:
       - backend-users
       - backend-crm
-      - backend-hotel-workers
       - backend-work-requests
       - backend-work-applications
       - backend-assignments
@@ -522,7 +466,6 @@ contracts:
     consumers:
       - backend-users
       - backend-crm
-      - backend-hotel-workers
       - backend-work-requests
       - backend-work-applications
       - backend-attendance
@@ -555,9 +498,9 @@ state_domains:
     model: User
     authoritative_writer: backend-auth
     writers: [backend-auth, backend-users]
-    readers: [backend-hotel-workers]
-    evidence: "auth writes: backend/src/modules/auth/service.ts:25,205,218; users writes: backend/src/modules/users/service.ts:93,132,164; hotel-workers reads: backend/src/modules/hotel-workers/service.ts:40"
-    note: "authoritative_writer resolved backend-auth by ADR-017 (Accepted, 2026-07-15); backend-users is a bounded profile writer/reader (non-security profile fields only), not a co-authoritative writer -- role/permission/credential/account writes are exclusively backend-auth. Existing call sites unchanged by this record -- closes SYNC-005/SIR-GLOB-006's state-user half (state-audit-log half already closed by ADR-016). Node-level accountable owner (SYNC-001) remains unassigned; this record settles the authoritative-writer boundary only, mirroring the state-audit-log/ADR-016 precedent."
+    readers: []
+    evidence: "auth writes: backend/src/modules/auth/service.ts:25,205,218; users writes: backend/src/modules/users/service.ts:93,132,164"
+    note: "authoritative_writer resolved backend-auth by ADR-017 (Accepted, 2026-07-15); backend-users is a bounded profile writer/reader (non-security profile fields only), not a co-authoritative writer -- role/permission/credential/account writes are exclusively backend-auth. Existing call sites unchanged by this record -- closes SYNC-005/SIR-GLOB-006's state-user half (state-audit-log half already closed by ADR-016). Node-level accountable owner (SYNC-001) remains unassigned; this record settles the authoritative-writer boundary only, mirroring the state-audit-log/ADR-016 precedent. backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted)."
   - id: state-session
     model: Session
     authoritative_writer: backend-auth
@@ -568,15 +511,16 @@ state_domains:
     model: Hotel
     authoritative_writer: backend-crm
     writers: [backend-crm]
-    readers: [backend-work-requests, backend-hotel-workers]
-    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/work-requests/service.ts:53, backend/src/modules/hotel-workers/service.ts:37,87"
+    readers: [backend-work-requests]
+    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/work-requests/service.ts:53"
+    note: "backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted)."
   - id: state-hotel-worker
     model: HotelWorker
-    authoritative_writer: backend-hotel-workers
-    writers: [backend-hotel-workers]
-    readers: [backend-work-requests, backend-work-applications, backend-assignments, backend-users, backend-analytics]
-    evidence: "hotel-workers writes: backend/src/modules/hotel-workers/service.ts:51,133,163; reads: backend/src/modules/work-requests/service.ts:101,135,233, backend/src/modules/work-applications/service.ts:50, backend/src/modules/assignments/service.ts:69, backend/src/modules/users/service.ts:16, backend/src/modules/analytics/service.ts:26-35; backend/src/modules/quality/service.ts (reads via checkHotelAccess-gated routes, missing edge below); backend/src/middleware/*.ts checkHotelAccess() (ACTIVE-membership authorization read, missing edge below)"
-    note: "edge-analytics-reads-hotel-worker applied by repository-synchronization pass (Package A step 5, AUDIT-M3); reader count re-derived from graph edges to 5 (AUDIT-L2 -- the prior 'true reader count is 8' caveat was itself unreconstructable from the graph's own edges and is withdrawn, not carried forward). ADR-022 (Accepted, ratified by merge of PR #166, 2026-07-20): state-hotel-worker is repurpose-pending -> state-owner moves to backend-hr/SPEC-EMP-001 (employment record, per-employee, Hotel-Group-scoped) once EMP's employment-record build, the Hotel-Group model (OD-EMP-05), and role x scope JWT authz (TREQ-008/REQ-USERS-022..024) land; backend-hotel-workers is retained only as an implementation compatibility layer in the interim -- no writer/reader edge below is changed by this annotation, it is forward-looking only. Two previously-missing reader edges are also flagged (FIND-DEP-HW-001, G4 review of the now-reverted SPEC-HOTELWORKERS-001 draft): backend-quality reads state-hotel-worker indirectly via checkHotelAccess()-gated routes, and the checkHotelAccess() authorization middleware itself reads ACTIVE-membership rows platform-wide (the very coupling ADR-022's authz migration replaces with role x scope JWT) -- both recorded here as evidence, not yet promoted to formal edge_schema entries pending a dedicated repository-synchronization pass."
+    authoritative_writer: none  # backend-hotel-workers (the sole writer) was physically removed by Epic 5 PR 5.8; no module writes this table anymore.
+    writers: []
+    readers: []
+    evidence: "backend/prisma/schema.prisma:206 (model HotelWorker) — schema-only, dormant. Read by exactly one place: backend/src/scripts/employment-record-backfill-status.ts (a read-only reporting tool, not an application consumer)."
+    note: "DORMANT since Epic 5 PR 5.8 (ADR-022 roadmap step 6, ADR-024 D5). Both removal conditions held: (i) no authz reader — PR 5.5 + PR 5.7 repointed checkHotelAccess()'s worker branch off HotelWorker; (ii) no roster reader — PR 5.7 repointed all six consumer modules (backend-work-requests, backend-work-applications, backend-assignments, backend-users, backend-quality, backend-analytics) to state-employment-record via lib/roster-scope.ts, and PR 5.8 removed the FEATURE_ROSTER_CUTOVER flag entirely, making that the sole path. backend-hotel-workers (the CRUD module and sole writer) was physically deleted in the same PR. CODE-ONLY retirement per explicit human decision (2026-07-22): the table/model itself is deliberately untouched in schema.prisma — no migration, no DROP TABLE, no data loss — because ADR-022's Data Migration Plan states 'No DROP TABLE' for its original in-place-repurposing design (superseded by the PR 5.6 human decision to build a separate EmploymentRecord module instead), and no backfill of HotelWorker rows into EmploymentRecord has ever been built or run. `npm run employment-record:backfill-status` (backend/src/scripts/employment-record-backfill-status.ts) reports any ACTIVE HotelWorker rows with no corresponding EmploymentRecord, read-only, for a future human decision on the table's ultimate fate. All edge-*-reads-hotel-worker and edge-hotel-workers-reads-* entries previously recorded here have been removed (not merely deprecated) since they no longer describe a repository-observed relationship; see git history for the historical record."
   - id: state-work-request
     model: WorkRequest
     authoritative_writer: backend-work-requests

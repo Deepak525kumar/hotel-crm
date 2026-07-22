@@ -55,7 +55,6 @@ const auditCalls: any[] = [];
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
-  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({
@@ -81,7 +80,6 @@ jest.mock('../lib/db.js', () => ({
       findFirst: async () => null,
     },
     hotelGroup: { findFirst: async () => null },
-    hotelWorker: { findFirst: async () => null },
     attendance: { findMany: async () => [] },
     rating: { findMany: async () => [] },
     auditLog: {
