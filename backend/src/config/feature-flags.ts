@@ -31,3 +31,16 @@ export function isScopeAuthzEnabled(): boolean {
 export function isEmploymentRecordEnabled(): boolean {
   return getEnv().FEATURE_EMPLOYMENT_RECORD;
 }
+
+/**
+ * Roster cutover flag (Epic 5 PR 5.7, ADR-022/023/024 D1/D2/D5(i)).
+ * Independent of and additive to isEmploymentRecordEnabled(). When disabled
+ * (default), checkHotelAccess() and its consumers keep reading the legacy
+ * per-hotel HotelWorker ACTIVE membership rows, byte-for-byte the pre-PR-5.7
+ * behavior (ADR-024 D4 "both-off = current behavior"). When enabled, the same
+ * call sites read the PR 5.6 EmploymentRecord (per-employee, group-grain)
+ * instead, via `lib/roster-scope.ts`.
+ */
+export function isRosterCutoverEnabled(): boolean {
+  return getEnv().FEATURE_ROSTER_CUTOVER;
+}

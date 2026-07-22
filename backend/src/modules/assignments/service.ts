@@ -1,6 +1,7 @@
 import { Prisma, WorkerAssignment, AssignmentStatus, HotelWorkerStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
+import { isRosterCutoverEnabled, isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { AssignmentDto, ListAssignmentsQuery, UpdateAssignmentInput } from './types.js';
 
 const ALLOWED_TRANSITIONS: Partial<Record<AssignmentStatus, AssignmentStatus[]>> = {
@@ -66,14 +67,19 @@ export class AssignmentService extends BaseService {
 
     if (actor.role !== 'admin' && actor.role !== 'manager') {
       if (assignment.worker_id !== actor.userId) {
-        const membership = await this.prisma.hotelWorker.findFirst({
-          where: {
-            hotel_id: assignment.hotel_id,
-            worker_id: actor.userId,
-            status: HotelWorkerStatus.ACTIVE,
-          },
-        });
-        if (!membership) throw new ForbiddenError('Cannot access this assignment');
+        if (isRosterCutoverEnabled()) {
+          const eligible = await isWorkerEligibleForHotel(actor.userId, assignment.hotel_id);
+          if (!eligible) throw new ForbiddenError('Cannot access this assignment');
+        } else {
+          const membership = await this.prisma.hotelWorker.findFirst({
+            where: {
+              hotel_id: assignment.hotel_id,
+              worker_id: actor.userId,
+              status: HotelWorkerStatus.ACTIVE,
+            },
+          });
+          if (!membership) throw new ForbiddenError('Cannot access this assignment');
+        }
       }
     }
 
@@ -91,14 +97,19 @@ export class AssignmentService extends BaseService {
 
     if (actorRole !== 'admin' && actorRole !== 'manager') {
       if (assignment.worker_id !== actorId) {
-        const membership = await this.prisma.hotelWorker.findFirst({
-          where: {
-            hotel_id: assignment.hotel_id,
-            worker_id: actorId,
-            status: HotelWorkerStatus.ACTIVE,
-          },
-        });
-        if (!membership) throw new ForbiddenError('Cannot access this assignment');
+        if (isRosterCutoverEnabled()) {
+          const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
+          if (!eligible) throw new ForbiddenError('Cannot access this assignment');
+        } else {
+          const membership = await this.prisma.hotelWorker.findFirst({
+            where: {
+              hotel_id: assignment.hotel_id,
+              worker_id: actorId,
+              status: HotelWorkerStatus.ACTIVE,
+            },
+          });
+          if (!membership) throw new ForbiddenError('Cannot access this assignment');
+        }
       }
     }
 

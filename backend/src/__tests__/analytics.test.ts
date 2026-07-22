@@ -11,7 +11,20 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
-jest.mock('../lib/db.js', () => ({ getPrisma: () => ({}) }));
+const mockWorkerOverallRating = {
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockPrisma = {
+  workerOverallRating: mockWorkerOverallRating,
+  hotel: mockHotel,
+};
+
+jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -21,6 +34,16 @@ jest.mock('../config/env.js', () => ({
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
+
+// Epic 5 PR 5.7 (ADR-024 D1/D2/D4, site #10): roster cutover flag for
+// getLeaderboard()'s hotel_id filter. Defaults OFF so the existing
+// characterization tests below stay untouched.
+let rosterCutoverEnabled = false;
+jest.mock('../config/feature-flags.js', () => ({
+  isRosterCutoverEnabled: () => rosterCutoverEnabled,
+}));
+
+import { AnalyticsService } from '../modules/analytics/service.js';
 
 function makeReq(role: string): Request {
   return {

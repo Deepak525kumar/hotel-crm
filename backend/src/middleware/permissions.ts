@@ -4,6 +4,7 @@ import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { getPrisma } from '../lib/db.js';
 import { isScopeAuthzEnabled } from '../config/feature-flags.js';
+import { isRosterCutoverEnabled, isWorkerEligibleForHotel } from '../lib/roster-scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
 export function requirePermission(permissions: string | string[]) {
@@ -160,6 +161,15 @@ export async function resolveHotelAccess(
 
   if (!hotelId) {
     return { allowed: false, reason: 'missing_hotel_id' };
+  }
+
+  // Roster cutover (Epic 5 PR 5.7, ADR-024 D1/D2): flag-gated, not a
+  // per-request fallback blend. OFF reproduces the pre-PR-5.7 HotelWorker
+  // query byte-for-byte (ADR-024 D4 compatibility guarantee); ON reads the
+  // PR 5.6 EmploymentRecord group-grain scope via `lib/roster-scope.ts`.
+  if (isRosterCutoverEnabled()) {
+    const eligible = await isWorkerEligibleForHotel(userId, hotelId);
+    return eligible ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
   }
 
   const prisma = getPrisma();

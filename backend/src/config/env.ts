@@ -74,6 +74,15 @@ const envSchema = z.object({
   // Defaults FALSE: the new employee-management routes 404 until explicitly
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
   FEATURE_EMPLOYMENT_RECORD: z.coerce.boolean().default(false),
+
+  // Roster cutover flag (Epic 5 PR 5.7, ADR-022/023/024). Independent of and
+  // additive to FEATURE_EMPLOYMENT_RECORD. Defaults FALSE: checkHotelAccess()
+  // and its consumers keep reading the legacy per-hotel HotelWorker ACTIVE
+  // membership rows until explicitly enabled, per ADR-024 D4's "both-off =
+  // current behavior" compatibility guarantee. When ON, the same 10 call
+  // sites read the PR 5.6 EmploymentRecord (per-employee, group-grain) via
+  // `lib/roster-scope.ts` instead.
+  FEATURE_ROSTER_CUTOVER: z.coerce.boolean().default(false),
 });
 
 type Env = z.infer<typeof envSchema>;

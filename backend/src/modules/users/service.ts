@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
+import { isRosterCutoverEnabled } from '../../config/feature-flags.js';
 import { CreateUserRequest, UpdateUserRequest, ListUsersQuery } from './types.js';
 
 export class UserService extends BaseService {
@@ -13,7 +14,17 @@ export class UserService extends BaseService {
 
     if (role) where['role'] = role.toUpperCase();
     if (is_active !== undefined) where['is_active'] = is_active === 'true';
-    if (hotel_id) where['hotel_workers'] = { some: { hotel_id, status: 'ACTIVE' } };
+    if (hotel_id) {
+      if (isRosterCutoverEnabled()) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: hotel_id },
+          select: { hotel_group_id: true },
+        });
+        where['employment_record'] = { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' };
+      } else {
+        where['hotel_workers'] = { some: { hotel_id, status: 'ACTIVE' } };
+      }
+    }
     if (search) {
       where['OR'] = [
         { first_name: { contains: search, mode: 'insensitive' } },

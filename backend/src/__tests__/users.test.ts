@@ -1,5 +1,9 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -8,10 +12,19 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+
+// Epic 5 PR 5.7 (ADR-024 D1/D2/D4, site #8): roster cutover flag for
+// listUsers()'s hotel_id filter. Defaults OFF so the existing
+// characterization tests below stay untouched.
+let rosterCutoverEnabled = false;
+jest.mock('../config/feature-flags.js', () => ({
+  isRosterCutoverEnabled: () => rosterCutoverEnabled,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -29,6 +42,7 @@ describe('UserService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rosterCutoverEnabled = false;
     service = new UserService();
   });
 
@@ -54,6 +68,48 @@ describe('UserService', () => {
 
       const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { role?: string } }>;
       expect(call[0]?.where.role).toBe('MANAGER');
+    });
+
+    it('filters by hotel_id via the HotelWorker relation (flag OFF, characterization)', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      await service.listUsers({ page: 1, limit: 20, role: undefined, hotel_id: 'h1', search: undefined, is_active: undefined });
+
+      const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: Record<string, unknown> }>;
+      expect(call[0]?.where['hotel_workers']).toEqual({ some: { hotel_id: 'h1', status: 'ACTIVE' } });
+      expect(mockHotel.findUnique).not.toHaveBeenCalled();
+    });
+
+    // Epic 5 PR 5.7 (ADR-024 D1/D2, site #8): roster cutover ON filters via
+    // the EmploymentRecord relation at group grain instead of HotelWorker.
+    describe('roster cutover (flag ON, site #8)', () => {
+      beforeEach(() => {
+        rosterCutoverEnabled = true;
+      });
+
+      it('filters by the resolved hotel group via the employment_record relation', async () => {
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers({ page: 1, limit: 20, role: undefined, hotel_id: 'h1', search: undefined, is_active: undefined });
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: Record<string, unknown> }>;
+        expect(call[0]?.where['employment_record']).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        expect(call[0]?.where['hotel_workers']).toBeUndefined();
+      });
+
+      it('filters out every user when the hotel has no hotel_group_id (deny-by-default)', async () => {
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: null });
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers({ page: 1, limit: 20, role: undefined, hotel_id: 'h1', search: undefined, is_active: undefined });
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: Record<string, unknown> }>;
+        expect(call[0]?.where['employment_record']).toEqual({ hotel_group_id: '__none__', status: 'ACTIVE' });
+      });
     });
   });
 

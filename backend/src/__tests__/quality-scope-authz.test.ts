@@ -25,6 +25,7 @@ const assignments: Record<string, { id: string; hotel_id: string; worker_id: str
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
+  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

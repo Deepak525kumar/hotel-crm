@@ -11,13 +11,31 @@ const mockHotelWorker = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockEmploymentRecord = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   hotelWorker: mockHotelWorker,
+  employmentRecord: mockEmploymentRecord,
+  hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+
+// Epic 5 PR 5.7 (ADR-024 D1/D2/D4): roster cutover flag for sites #2/#3
+// (getById/update worker branches). Defaults OFF so the existing
+// characterization tests below stay untouched; individual cases flip it ON.
+let rosterCutoverEnabled = false;
+jest.mock('../config/feature-flags.js', () => ({
+  isRosterCutoverEnabled: () => rosterCutoverEnabled,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -53,6 +71,7 @@ describe('AssignmentService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rosterCutoverEnabled = false;
     service = new AssignmentService();
   });
 
@@ -138,6 +157,68 @@ describe('AssignmentService', () => {
       await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
         name: 'ForbiddenError',
       });
+    });
+
+    // Epic 5 PR 5.7 (ADR-024 D1/D2, site #2): roster cutover ON reads the
+    // EmploymentRecord group scope instead of HotelWorker, deny-by-default.
+    describe('roster cutover (flag ON, site #2)', () => {
+      beforeEach(() => {
+        rosterCutoverEnabled = true;
+      });
+
+      it('allows a worker whose EmploymentRecord group matches the assignment hotel group', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        const dto = await service.getById('a1', { userId: 'w1', role: 'worker' });
+        expect(dto.id).toBe('a1');
+        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue(null);
+        await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('denies a worker whose EmploymentRecord group does not match the assignment hotel group', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+        await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
+    });
+  });
+
+  // Epic 5 PR 5.7 (ADR-024 D1/D2, site #3): mirrors site #2 for update()'s
+  // worker-branch membership check.
+  describe('update — roster cutover (flag ON, site #3)', () => {
+    beforeEach(() => {
+      rosterCutoverEnabled = true;
+    });
+
+    it('allows a worker whose EmploymentRecord group matches the assignment hotel group', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'IN_PROGRESS' }));
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const dto = await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      expect(dto.status).toBe('IN_PROGRESS');
+      expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
+      mockEmploymentRecord.findUnique.mockResolvedValue(null);
+      await expect(
+        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
     });
   });
 });

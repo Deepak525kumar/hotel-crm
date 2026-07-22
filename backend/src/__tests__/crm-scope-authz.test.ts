@@ -16,6 +16,7 @@ let testAuth:
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
+  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

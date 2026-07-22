@@ -2,7 +2,7 @@ import { AssignmentStatus, AttendanceStatus, HotelWorkerStatus, Prisma, Verifica
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isScopeAuthzEnabled, isRosterCutoverEnabled } from '../../config/feature-flags.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
@@ -223,15 +223,28 @@ export class QualityService extends BaseService {
   }
 
   async getLeaderboard(hotelId: string) {
-    const where = hotelId
-      ? {
+    let where: Record<string, unknown> = {};
+    if (hotelId) {
+      if (isRosterCutoverEnabled()) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: hotelId },
+          select: { hotel_group_id: true },
+        });
+        where = {
+          worker: {
+            employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' },
+          },
+        };
+      } else {
+        where = {
           worker: {
             hotel_workers: {
               some: { hotel_id: hotelId, status: HotelWorkerStatus.ACTIVE },
             },
           },
-        }
-      : {};
+        };
+      }
+    }
 
     return this.prisma.workerOverallRating.findMany({
       where,

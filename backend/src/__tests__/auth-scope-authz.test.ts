@@ -15,6 +15,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 let scopeAuthzEnabled = true;
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => scopeAuthzEnabled,
+  isRosterCutoverEnabled: () => false,
 }));
 
 const mockHotelWorkerFindFirst = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
