@@ -30,7 +30,7 @@
  */
 import { EmploymentStatus } from '@prisma/client';
 import { getPrisma } from './db.js';
-import { isHotelInScope } from '../middleware/permissions.js';
+import { isHotelInScope } from './scope.js';
 import { isRosterCutoverEnabled } from '../config/feature-flags.js';
 import type { UserScope } from './jwt.js';
 

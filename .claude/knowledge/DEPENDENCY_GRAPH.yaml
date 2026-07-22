@@ -68,6 +68,15 @@ nodes:
   - { id: auth-middleware, kind: contract, owner: backend-auth, source: backend/src/middleware/auth.ts }
   - { id: permissions-middleware, kind: contract, owner: unassigned, source: backend/src/middleware/permissions.ts }
   - { id: validation-middleware, kind: contract, owner: unassigned, source: backend/src/middleware/validation.ts }
+  # Epic 5 PR 5.7 (ADR-024 D1/D2/D5(i)): scope.ts is a new leaf-level shared
+  # primitive extracted from permissions.ts (isHotelInScope) so permissions.ts
+  # and roster-scope.ts can both depend on it without a circular import.
+  # roster-scope.ts is the single centralized seam mapping a worker's
+  # EmploymentRecord to group-grain hotel eligibility, replacing the 10
+  # call-site-local HotelWorker ACTIVE-membership reads, flag-gated by
+  # FEATURE_ROSTER_CUTOVER (default off = unchanged HotelWorker behavior).
+  - { id: scope-lib, kind: contract, owner: unassigned, source: backend/src/lib/scope.ts }
+  - { id: roster-scope-lib, kind: contract, owner: unassigned, source: backend/src/lib/roster-scope.ts }
 
   # State domains (Prisma models). authoritative_writer is the module that
   # creates/updates the model; UNKNOWN where more than one module writes it.
@@ -184,6 +193,65 @@ edges:
     kind: reads-state
     compatibility: not-applicable
     status: observed
+  # Epic 5 PR 5.7 (ADR-022 §Dependency-order step 4, ADR-024 D1/D2/D5(i)): each
+  # of these six edges is FLAG-CONDITIONAL, gated by FEATURE_ROSTER_CUTOVER
+  # (default off). Flag off: the read is via the pre-existing
+  # edge-*-reads-hotel-worker edges (unchanged, still true). Flag on: the
+  # module reads state-employment-record instead, via lib/roster-scope.ts's
+  # group-grain mapping (ADR-023 formula worker.hotel_group_id ==
+  # target_hotel.hotel_group_id). Both edges are real and coexist — which one
+  # is live at runtime depends on the flag, not on repository state. Physical
+  # removal of the state-hotel-worker edges is PR 5.8, gated on this cutover
+  # plus no roster reader remaining (ADR-024 D5(ii)).
+  - id: edge-permissions-middleware-reads-employment-record
+    source: permissions-middleware
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/middleware/permissions.ts resolveHotelAccess() worker branch, via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-assignments-reads-employment-record
+    source: backend-assignments
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-work-applications-reads-employment-record
+    source: backend-work-applications
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/work-applications/service.ts apply(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-work-requests-reads-employment-record
+    source: backend-work-requests
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/work-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts, gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-users-reads-employment-record
+    source: backend-users
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/users/service.ts listUsers() hotel_id filter, gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-quality-reads-employment-record
+    source: backend-quality
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/quality/service.ts getLeaderboard(), gated by FEATURE_ROSTER_CUTOVER"
+  - id: edge-analytics-reads-employment-record
+    source: backend-analytics
+    target: state-employment-record
+    kind: reads-state
+    compatibility: conditional
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts getLeaderboard(), gated by FEATURE_ROSTER_CUTOVER"
     evidence: "backend/src/modules/employee-management/service.ts (this.prisma.rating.findMany — profile-and-history)"
   - id: edge-work-requests-reads-hotel-worker
     source: backend-work-requests
