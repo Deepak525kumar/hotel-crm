@@ -69,6 +69,11 @@ const envSchema = z.object({
   // OFF is the rollback path, which reproduces the pre-fix behavior (manager
   // hotel-access bypass) — the ADR-024 D3 "both-off = current behavior" guarantee.
   FEATURE_SCOPE_AUTHZ: z.coerce.boolean().default(true),
+
+  // Employment-record module cutover flag (Epic 5 PR 5.6, SPEC-EMP-001).
+  // Defaults FALSE: the new employee-management routes 404 until explicitly
+  // enabled, per ADR-024 D3's "both-off = current behavior" posture.
+  FEATURE_EMPLOYMENT_RECORD: z.coerce.boolean().default(false),
 });
 
 type Env = z.infer<typeof envSchema>;

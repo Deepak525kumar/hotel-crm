@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { optionalAuthMiddleware } from '../../middleware/auth.js';
 import { checkReadiness } from '../../lib/health.js';
 import { HTTP_STATUS } from '../../config/constants.js';
+import { isEmploymentRecordEnabled } from '../../config/feature-flags.js';
 
 import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
@@ -16,6 +17,7 @@ import hrRoutes from '../../modules/hr/routes.js';
 import notificationRoutes from '../../modules/notifications/routes.js';
 import analyticsRoutes from '../../modules/analytics/routes.js';
 import calendarRoutes from '../../modules/calendar/routes.js';
+import employeeManagementRoutes from '../../modules/employee-management/routes.js';
 
 const router = Router();
 
@@ -34,6 +36,18 @@ router.use('/hr', hrRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/calendar', calendarRoutes);
+
+// Employee-management routes (Epic 5 PR 5.6, SPEC-EMP-001) — gated by
+// FEATURE_EMPLOYMENT_RECORD (default OFF). While disabled, requests fall
+// through to the 404 handler at the bottom of the middleware chain, matching
+// the "both-off = current behavior" posture (ADR-024 D3).
+router.use('/employees', (req, res, next) => {
+  if (!isEmploymentRecordEnabled()) {
+    next();
+    return;
+  }
+  employeeManagementRoutes(req, res, next);
+});
 
 // Liveness endpoint used by deploy scripts and GitHub Actions health checks:
 // answers "is the process up" without touching dependencies.
@@ -61,7 +75,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'hotel-workers', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality'],
+      modules: ['auth', 'users', 'crm', 'hotel-workers', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality', 'employee-management'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {

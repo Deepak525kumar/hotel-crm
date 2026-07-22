@@ -22,3 +22,12 @@ export function isDirectDispatchMode(): boolean {
 export function isScopeAuthzEnabled(): boolean {
   return getEnv().FEATURE_SCOPE_AUTHZ;
 }
+
+/**
+ * Employment-record module cutover flag (Epic 5 PR 5.6, SPEC-EMP-001).
+ * When disabled (default), the `/employees` routes are unmounted (404),
+ * matching the "both-off = current behavior" posture (ADR-024 D3).
+ */
+export function isEmploymentRecordEnabled(): boolean {
+  return getEnv().FEATURE_EMPLOYMENT_RECORD;
+}

@@ -110,6 +110,26 @@ enum NotificationType {
   REWORK_REQUIRED            // to worker: verification failed, rework needed
 }
 
+// Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee
+// lifecycle status. No Suspended state; no rating/warning-driven automatic
+// transition (invariant, MODULE_SPEC.md "State and Lifecycle").
+enum EmploymentStatus {
+  INACTIVE
+  UNDER_REVIEW
+  ACTIVE
+  REJECTED
+  DEACTIVATED
+}
+
+// Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-003 / RULE-EMP-04): fixed confirmed
+// skill-tag set; no certifications, no expiring qualifications.
+enum SkillTag {
+  CLEANER
+  PUBLIC_SERVICE
+  KITCHEN_DISHWASHER
+  WAITER
+}
+
 // =============================================================================
 // AUTH MODULE
 // =============================================================================
@@ -151,6 +171,10 @@ model User {
   password_reset_tokens     PasswordResetToken[]
   managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
   managed_hotels            Hotel[]                 @relation("hotel_manager")
+  // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
+  // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
+  employment_record           EmploymentRecord?         @relation("employment_record")
+  blocklist_entries_authored  EmployeeBlocklistEntry[]  @relation("blocklist_author")
 
   @@index([role])
   @@index([is_active])
@@ -207,6 +231,8 @@ model HotelGroup {
 
   // Relations
   hotels Hotel[]
+  // Epic 5 PR 5.6 (ADR-023 §4): employment records associated with this group.
+  employment_records EmploymentRecord[] @relation("employment_group")
 
   @@index([regional_manager_user_id])
 }
@@ -241,6 +267,8 @@ model Hotel {
   verifications    QualityVerification[]
   ratings          Rating[]
   notifications    Notification[]
+  // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-005 / RULE-EMP-07): hotel blocklist entries.
+  blocklist_entries EmployeeBlocklistEntry[] @relation("hotel_blocklist")
 
   @@index([country])
   @@index([is_active])
@@ -275,6 +303,58 @@ model HotelWorker {
   @@index([worker_id])
   @@index([status])
   @@index([position])
+}
+
+// =============================================================================
+// EMPLOYEE MANAGEMENT MODULE (Epic 5 PR 5.6, SPEC-EMP-001 v0.2.0)
+// =============================================================================
+
+// EmploymentRecord: the single authoritative per-employee record (REQ-EMP-001).
+// ADR-023 §4: carries hotel_group_id (group-grain FK to backend-crm's
+// HotelGroup), nullable until hire-approval, set at Under Review -> Active.
+// ADR-025 Decision 3: deliberately hotel-tie-free — no per-hotel FK here.
+model EmploymentRecord {
+  id                String            @id @default(cuid())
+  user_id           String            @unique // account link (REQ-EMP-001: one record per account)
+  user              User              @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
+  employee_id       String            @unique // human-facing Employee ID
+  job_title         String                    // free text, provisional (OD-EMP-13)
+  start_date        DateTime
+  status            EmploymentStatus  @default(INACTIVE)
+  marked_suitable   Boolean           @default(false) // probation milestone flag, not a status
+  hotel_group_id    String?                           // ADR-023 §4, group-grain, nullable until hire-approval
+  hotel_group       HotelGroup?       @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  skills            SkillTag[]                        // fixed set (REQ-EMP-003)
+  personal_data     Json?                             // Personalfragebogen non-special data (REQ-EMP-011)
+  konfession        String?                           // special-category (RULE-EMP-09) — never on general profile
+  disability_status String?                           // special-category (RULE-EMP-09)
+  deleted_at        DateTime?                         // soft delete (REQ-EMP-010)
+  created_at        DateTime          @default(now())
+  updated_at        DateTime          @updatedAt
+
+  blocklist_entries EmployeeBlocklistEntry[] @relation("blocklist_of_employee")
+
+  @@index([hotel_group_id])
+  @@index([status])
+}
+
+// EmployeeBlocklistEntry: hotel-scoped block preventing a specific employee
+// from assignment at that hotel, with a mandatory logged reason (REQ-EMP-005 /
+// RULE-EMP-07).
+model EmployeeBlocklistEntry {
+  id                    String   @id @default(cuid())
+  hotel_id              String
+  hotel                 Hotel    @relation("hotel_blocklist", fields: [hotel_id], references: [id], onDelete: Cascade)
+  employment_record_id  String
+  employment_record     EmploymentRecord @relation("blocklist_of_employee", fields: [employment_record_id], references: [id], onDelete: Cascade)
+  reason                String   // REQUIRED (RULE-EMP-07)
+  created_by_id         String
+  created_by            User     @relation("blocklist_author", fields: [created_by_id], references: [id], onDelete: Restrict)
+  created_at            DateTime @default(now())
+
+  @@unique([hotel_id, employment_record_id])
+  @@index([hotel_id])
+  @@index([employment_record_id])
 }
 
 // =============================================================================
