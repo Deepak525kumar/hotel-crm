@@ -6,6 +6,7 @@ import {
   HotelWorkerStatus,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import { isRosterCutoverEnabled } from '../../config/feature-flags.js';
 import { DashboardStats, HotelSummary, LeaderboardEntry } from './types.js';
 
 interface OverallRatingRow {
@@ -24,15 +25,28 @@ export class AnalyticsService extends BaseService {
   // average_score ordering — as /quality/leaderboard, so the two surfaces can
   // never rank a worker differently.
   async getLeaderboard(hotelId?: string): Promise<LeaderboardEntry[]> {
-    const where = hotelId
-      ? {
+    let where: Record<string, unknown> = {};
+    if (hotelId) {
+      if (isRosterCutoverEnabled()) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: hotelId },
+          select: { hotel_group_id: true },
+        });
+        where = {
+          worker: {
+            employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' },
+          },
+        };
+      } else {
+        where = {
           worker: {
             hotel_workers: {
               some: { hotel_id: hotelId, status: HotelWorkerStatus.ACTIVE },
             },
           },
-        }
-      : {};
+        };
+      }
+    }
 
     const rows = (await this.prisma.workerOverallRating.findMany({
       where,

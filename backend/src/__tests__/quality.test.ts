@@ -27,18 +27,37 @@ const mockRating = {
 const mockNotification = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+const mockWorkerOverallRating = {
+  upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   qualityVerification: mockQualityVerification,
   workerAssignment: mockWorkerAssignment,
   rating: mockRating,
   attendance: { count: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
-  workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  workerOverallRating: mockWorkerOverallRating,
+  hotel: mockHotel,
   notification: mockNotification,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+
+// Epic 5 PR 5.7 (ADR-024 D1/D2/D4, site #9): roster cutover flag for
+// getLeaderboard()'s hotel_id filter. Defaults OFF so the existing
+// characterization tests below stay untouched.
+let rosterCutoverEnabled = false;
+jest.mock('../config/feature-flags.js', () => ({
+  isScopeAuthzEnabled: () => false,
+  isRosterCutoverEnabled: () => rosterCutoverEnabled,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -363,5 +382,53 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     const payload = mockNotification.create.mock.calls[0][0].data;
     expect(payload.user_id).toBe('w1');
     expect(payload.type).toBe('RATING_RECEIVED');
+  });
+});
+
+describe('Quality getLeaderboard — hotel_id filter (Epic 5 PR 5.7, site #9)', () => {
+  let service: QualityService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rosterCutoverEnabled = false;
+    service = new QualityService();
+    mockWorkerOverallRating.findMany.mockResolvedValue([]);
+  });
+
+  it('filters via the HotelWorker relation when hotelId is given (flag OFF, characterization)', async () => {
+    await service.getLeaderboard('h1');
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({ worker: { hotel_workers: { some: { hotel_id: 'h1', status: 'ACTIVE' } } } });
+    expect(mockHotel.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('applies no filter when hotelId is empty (flag OFF, characterization)', async () => {
+    await service.getLeaderboard('');
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({});
+  });
+
+  describe('roster cutover (flag ON, site #9)', () => {
+    beforeEach(() => {
+      rosterCutoverEnabled = true;
+    });
+
+    it('filters via the employment_record relation at the resolved hotel group', async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await service.getLeaderboard('h1');
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } },
+      });
+    });
+
+    it('filters out every worker when the hotel has no hotel_group_id (deny-by-default)', async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: null });
+      await service.getLeaderboard('h1');
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        worker: { employment_record: { hotel_group_id: '__none__', status: 'ACTIVE' } },
+      });
+    });
   });
 });

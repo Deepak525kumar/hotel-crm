@@ -47,6 +47,7 @@ function fullRecord(base: { id: string; hotel_id: string; worker_id: string }) {
 
 jest.mock('../config/feature-flags.js', () => ({
   isScopeAuthzEnabled: () => true,
+  isRosterCutoverEnabled: () => false,
 }));
 
 jest.mock('../config/env.js', () => ({

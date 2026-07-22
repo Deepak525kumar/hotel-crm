@@ -4,6 +4,8 @@ import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { getPrisma } from '../lib/db.js';
 import { isScopeAuthzEnabled } from '../config/feature-flags.js';
+import { isRosterCutoverEnabled, isWorkerEligibleForHotel } from '../lib/roster-scope.js';
+import { isHotelInScope } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
 export function requirePermission(permissions: string | string[]) {
@@ -106,22 +108,11 @@ export type HotelAccessDecision =
   | { allowed: true; viaBypass: boolean }
   | { allowed: false; reason: 'missing_hotel_id' | 'no_membership' | 'out_of_scope' };
 
-// Evaluates whether a manager's PR 5.4 JWT `scope` claim grants access to the
-// given hotel (Epic 5 PR 5.5, ADR-024). null scope denies; global allows; hotel
-// scope allows only the matching hotel; hotel_group scope allows any hotel whose
-// hotel_group_id matches (one findUnique to resolve the target hotel's group).
-export async function isHotelInScope(scope: UserScope | null, hotelId: string): Promise<boolean> {
-  if (!scope) return false;
-  if (scope.type === 'global') return true;
-  if (scope.type === 'hotel') return scope.hotel_id === hotelId;
-  // hotel_group
-  const prisma = getPrisma();
-  const hotel = await prisma.hotel.findUnique({
-    where: { id: hotelId },
-    select: { hotel_group_id: true },
-  });
-  return !!hotel && hotel.hotel_group_id === scope.hotel_group_id;
-}
+// Re-exported from `lib/scope.ts` (moved there in Epic 5 PR 5.7 to break a
+// circular import with `lib/roster-scope.ts`, which also needs this
+// primitive). Existing call sites (`attendance/service.ts`,
+// `quality/service.ts`) keep importing it from here unchanged.
+export { isHotelInScope } from '../lib/scope.js';
 
 // Single role->scope resolution seam for hotel-level access (Epic 3 / Execution
 // Plan §2 "Shared authorization centralization seam"). Every consumer of
@@ -160,6 +151,15 @@ export async function resolveHotelAccess(
 
   if (!hotelId) {
     return { allowed: false, reason: 'missing_hotel_id' };
+  }
+
+  // Roster cutover (Epic 5 PR 5.7, ADR-024 D1/D2): flag-gated, not a
+  // per-request fallback blend. OFF reproduces the pre-PR-5.7 HotelWorker
+  // query byte-for-byte (ADR-024 D4 compatibility guarantee); ON reads the
+  // PR 5.6 EmploymentRecord group-grain scope via `lib/roster-scope.ts`.
+  if (isRosterCutoverEnabled()) {
+    const eligible = await isWorkerEligibleForHotel(userId, hotelId);
+    return eligible ? { allowed: true, viaBypass: false } : { allowed: false, reason: 'no_membership' };
   }
 
   const prisma = getPrisma();

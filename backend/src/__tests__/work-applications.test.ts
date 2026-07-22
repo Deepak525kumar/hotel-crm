@@ -30,6 +30,14 @@ const mockWorkerOverallRating = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockEmploymentRecord = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workApplication: mockWorkApplication,
   workRequest: mockWorkRequest,
@@ -37,11 +45,21 @@ const mockPrisma = {
   attendance: mockAttendance,
   hotelWorker: mockHotelWorker,
   workerOverallRating: mockWorkerOverallRating,
+  employmentRecord: mockEmploymentRecord,
+  hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+
+// Epic 5 PR 5.7 (ADR-024 D1/D2/D4, site #4): roster cutover flag for
+// apply()'s worker-roster membership check. Defaults OFF so the existing
+// characterization tests below stay untouched.
+let rosterCutoverEnabled = false;
+jest.mock('../config/feature-flags.js', () => ({
+  isRosterCutoverEnabled: () => rosterCutoverEnabled,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -87,6 +105,7 @@ describe('WorkApplicationService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    rosterCutoverEnabled = false;
     service = new WorkApplicationService();
   });
 
@@ -143,6 +162,44 @@ describe('WorkApplicationService', () => {
       expect(dto.status).toBe('PENDING');
       expect(mockWorkApplication.update).toHaveBeenCalled();
       expect(mockWorkApplication.create).not.toHaveBeenCalled();
+    });
+
+    // Epic 5 PR 5.7 (ADR-024 D1/D2, site #4): roster cutover ON reads the
+    // EmploymentRecord group scope instead of HotelWorker, deny-by-default.
+    describe('roster cutover (flag ON, site #4)', () => {
+      beforeEach(() => {
+        rosterCutoverEnabled = true;
+      });
+
+      it('allows a worker whose EmploymentRecord group matches the work request hotel group', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockWorkApplication.findUnique.mockResolvedValue(null);
+        mockWorkerOverallRating.findUnique.mockResolvedValue(null);
+        mockWorkApplication.create.mockResolvedValue(makeApp());
+        const dto = await service.apply('wr1', {}, 'w1', 'worker');
+        expect(dto.id).toBe('app1');
+        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+        mockEmploymentRecord.findUnique.mockResolvedValue(null);
+        await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+        expect(mockHotelWorker.findFirst).not.toHaveBeenCalled();
+      });
+
+      it('denies a worker whose EmploymentRecord group does not match the work request hotel group', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeWr());
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+        await expect(service.apply('wr1', {}, 'w1', 'worker')).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
     });
   });
 
