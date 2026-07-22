@@ -73,6 +73,7 @@ export class AnalyticsService extends BaseService {
       totalQuality,
       ratingAgg,
       totalRatings,
+      roomsCompletedAgg,
     ] = await Promise.all([
       this.prisma.workRequest.count({ where: scope }),
       this.prisma.workRequest.groupBy({
@@ -105,6 +106,13 @@ export class AnalyticsService extends BaseService {
         _avg: { score: true },
       }),
       this.prisma.rating.count({ where: scope }),
+      // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker",
+      // derived from the manager-entered RoomsCompletedEntry.
+      this.prisma.roomsCompletedEntry.aggregate({
+        where: scope,
+        _sum: { rooms_completed: true },
+        _count: true,
+      }),
     ]);
 
     const reqMap = new Map(
@@ -170,6 +178,12 @@ export class AnalyticsService extends BaseService {
         total: totalRatings as number,
         average_score: ratingAvg !== null ? Math.round((ratingAvg ?? 0) * 100) / 100 : null,
       },
+      rooms_completed: {
+        total:
+          (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+            .rooms_completed ?? 0,
+        entries: (roomsCompletedAgg as { _count: number })._count,
+      },
     };
   }
 
@@ -186,6 +200,7 @@ export class AnalyticsService extends BaseService {
       qualityAgg,
       qualityPassed,
       totalQuality,
+      roomsCompletedAgg,
       topWorkers,
     ] = await Promise.all([
       this.prisma.workRequest.aggregate({
@@ -215,6 +230,13 @@ export class AnalyticsService extends BaseService {
         where: { hotel_id: hotelId, status: VerificationStatus.PASSED },
       }),
       this.prisma.qualityVerification.count({ where: { hotel_id: hotelId } }),
+      // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker"
+      // for this hotel, derived from the manager-entered RoomsCompletedEntry.
+      this.prisma.roomsCompletedEntry.aggregate({
+        where: { hotel_id: hotelId },
+        _sum: { rooms_completed: true },
+        _count: true,
+      }),
       this.getLeaderboard(hotelId),
     ]);
 
@@ -252,6 +274,12 @@ export class AnalyticsService extends BaseService {
           (totalQuality as number) > 0
             ? Math.round(((qualityPassed as number) / (totalQuality as number)) * 10000) / 100
             : 0,
+      },
+      rooms_completed: {
+        total:
+          (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+            .rooms_completed ?? 0,
+        entries: (roomsCompletedAgg as { _count: number })._count,
       },
       top_workers: topWorkers.slice(0, 5),
     };

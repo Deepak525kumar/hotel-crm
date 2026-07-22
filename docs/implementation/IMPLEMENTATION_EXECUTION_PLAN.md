@@ -64,7 +64,7 @@ down. Do not renumber.
 | 3 | Shared authorization centralization seam | (closes nothing yet) precondition for OQ-AUTH-06 & siblings | none | Pure refactor + characterization tests. No allow/deny change. Optional but de-risks Epic 5's flip. |
 | 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** |
 | 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. |
-| 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) need a Decision Record first | Only sequence items not gated on an open Decision Record. |
+| 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) — **both now RESOLVED** (`ADR-026`, `ADR-028`); no remaining Decision Record blocker for this epic's headline items | Only sequence items not gated on an open Decision Record. |
 | 7 | Notifications G8 cleanup | SPEC-NOTIF-001 OQ-NOTIF-02..09 (non-blocked) | OQ-NOTIF-01 Decision Record blocks push-channel (TREQ-002/TREQ-012) | Fully independent of the auth epics; parallelizable throughout. |
 
 Deferred / not sequenced here (blocked on human authority, correctly excluded):
@@ -79,10 +79,12 @@ Deferred / not sequenced here (blocked on human authority, correctly excluded):
   (rescaled to 0-100, matches TRULE-001/confirmed authority — corrected same session, see ADR-026's
   own Status section); NOTIF OQ-NOTIF-01 (channel enum) **RESOLVED 2026-07-22 by ADR-027**
   (IN_APP/EMAIL/PUSH/SMS/WEBHOOK). ANALYTICS OQ-ANALYTICS-03 (rooms-completed-per-worker metric
-  definition) **remains OPEN** — a 2026-07-22 decision-session input did not address this recorded
-  question (see SIR-ANLY-003 escalation note); still blocks its module's *implementation
-  planning* per its ART-MEM open_prerequisites; that dependent PR cannot be authored until the
-  Decision Record lands. Escalate, do not invent the decision.
+  definition) **RESOLVED 2026-07-22 by ADR-028** — retained, redefined as a manager-entered
+  `RoomsCompletedEntry` count (1-to-1 with the worker's full-day `WorkerAssignment`, owned by
+  `backend-assignments`), no room-level task layer, no `ReceptionData` field, "compared against
+  task start" explicitly dropped (see SIR-ANLY-003, ADR-028 Decision item 3). Implemented in the
+  same pass (schema/migration/service/route/analytics wiring); no dependent PR remains blocked on
+  this Decision Record.
 
 ---
 
@@ -225,9 +227,11 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
   (`ADR-026`, 2026-07-22, corrected same session) has landed — its dependent PR (rescale
   `Rating.score` to 0-100: schema/CHECK/data-migration/validation/spec forward-note, since the
   decision rescales the shipped 1-5 scale to match confirmed authority) may now be authored.
-  ANALYTICS OQ-ANALYTICS-03's
-  Decision Record has **not** landed (2026-07-22 input did not address the recorded question —
-  see SIR-ANLY-003); its dependent PR remains blocked, do not pre-build. One PR per finding, per
+  ANALYTICS OQ-ANALYTICS-03's Decision Record (`ADR-028`, 2026-07-22) has now landed and its
+  dependent implementation shipped in the same pass: `RoomsCompletedEntry` schema + migration,
+  `backend-assignments`' manager-entry write path (`POST /assignments/:id/rooms-completed`), and
+  the `backend-analytics` `rooms_completed` read-side aggregate on `getDashboardStats`/
+  `getHotelSummary`. No dependent PR remains blocked for this item. One PR per finding, per
   module, sized to a single acceptance criterion.
 
 ### Epic 7 — Notifications G8 cleanup
@@ -430,7 +434,7 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Accepted, 2026-07-22):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
 | QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | **RESOLVED 2026-07-22, ADR-026 — 0-100, matches TRULE-001 (corrected same session; earlier "1-5, override" framing was wrong, see ADR-026 Status)** |
-| ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record — **still OPEN**, see SIR-ANLY-003 |
+| ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | **RESOLVED 2026-07-22, ADR-028 — retained, redefined without a room-level task layer (manager-entered `RoomsCompletedEntry` count, 1-to-1 with the worker's full-day `WorkerAssignment`); implemented in the same pass, see SIR-ANLY-003** |
 | NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | **RESOLVED 2026-07-22, ADR-027** (dispatch-design question separately still open) |
 | SYNC-001 owner assignment | Platform-wide | Human authority |
 | `Hotel.hotel_group_id` NOT NULL flip — **sequencing deferral, not a target-architecture change.** Target remains one `HotelGroup` per `Hotel` (`ADR-023` §3: "nullable **until** assigned", not permanently optional like `billing_info`); current nullability is temporary migration/sequencing state | Blocked on the hotel-creation workflow (a way to always have an assignable group at creation time, without the fresh-deployment bootstrapping problem of zero `HotelGroup` rows) — not blocked on a design question | Human/product decision on *when/how* the workflow lands; the *whether* is already decided by `ADR-023` |

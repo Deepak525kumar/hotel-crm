@@ -94,6 +94,7 @@ nodes:
   - { id: state-quality-verification, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:395 (model QualityVerification)" }
   - { id: state-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:419 (model Rating)" }
   - { id: state-worker-overall-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:445 (model WorkerOverallRating)" }
+  - { id: state-rooms-completed-entry, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma (model RoomsCompletedEntry, added by ADR-028)" }
   - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
   - { id: state-audit-log, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
   - { id: state-password-reset-token, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma (model PasswordResetToken, added by HOTFIX-AUTH-002)" }
@@ -338,6 +339,24 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/analytics/service.ts:37 (this.prisma.workerOverallRating.findMany)"
+  # ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count, owned by
+  # backend-assignments (1-to-1 sibling of state-worker-assignment, same shape as
+  # backend-quality's state-rating/state-quality-verification), read by analytics
+  # for the basic-analytics "rooms completed per worker" metric.
+  - id: edge-assignments-writes-rooms-completed-entry
+    source: backend-assignments
+    target: state-rooms-completed-entry
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/assignments/service.ts (logRoomsCompleted -> this.prisma.roomsCompletedEntry.create)"
+  - id: edge-analytics-reads-rooms-completed-entry
+    source: backend-analytics
+    target: state-rooms-completed-entry
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/analytics/service.ts (getDashboardStats/getHotelSummary -> this.prisma.roomsCompletedEntry.aggregate)"
   # --- Client -> backend API consumption (consumes-api) ---
   # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
   - { id: edge-frontend-auth, source: frontend-web, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:171,177,180 (/auth/login,/auth/me,/auth/logout)" }
@@ -566,6 +585,13 @@ state_domains:
     writers: [backend-quality]
     readers: [backend-work-applications, backend-analytics]
     evidence: "quality writes: backend/src/modules/quality/service.ts:174; reads: backend/src/modules/work-applications/service.ts:64, backend/src/modules/analytics/service.ts:37"
+  - id: state-rooms-completed-entry
+    model: RoomsCompletedEntry
+    authoritative_writer: backend-assignments
+    writers: [backend-assignments]
+    readers: [backend-analytics]
+    evidence: "assignments writes: backend/src/modules/assignments/service.ts (logRoomsCompleted); analytics reads: backend/src/modules/analytics/service.ts (getDashboardStats/getHotelSummary roomsCompletedEntry.aggregate)"
+    note: "Added by ADR-028 (2026-07-22, OQ-ANALYTICS-03): manager-entered 'rooms completed' daily count, 1-to-1 with WorkerAssignment (the worker's full-day assignment) -- no room-level task layer, per CONFIRMED_REQUIREMENTS_REGISTER.md §33. Structurally mirrors the state-rating/state-quality-verification pattern (a 1-to-1 sibling table keyed on assignment_id, manager/checker-entered, denormalised hotel_id/worker_id); unlike those two (owned by a separate backend-quality module), this entry is owned by backend-assignments itself -- the authoritative writer of the parent state-worker-assignment domain -- since the write is a same-module extension of closing out the assignment (manager logs the count at/after completion), not a distinct verification/rating capability warranting a separate module. Deliberately not a field on ReceptionData (out of scope for that model per its own PIVOT §9.3 definition, and ReceptionData is itself unbuilt target state)."
   - id: state-notification
     model: Notification
     authoritative_writer: backend-notifications

@@ -179,6 +179,10 @@ model User {
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
   employment_record           EmploymentRecord?         @relation("employment_record")
   blocklist_entries_authored  EmployeeBlocklistEntry[]  @relation("blocklist_author")
+  // ADR-028: manager-entered "rooms completed" daily count, per worker's
+  // full-day WorkerAssignment — no room-level task layer implied.
+  rooms_completed_as_worker   RoomsCompletedEntry[]     @relation("rooms_completed_worker")
+  rooms_completed_entered     RoomsCompletedEntry[]     @relation("rooms_completed_entered_by")
 
   @@index([role])
   @@index([is_active])
@@ -273,6 +277,8 @@ model Hotel {
   notifications    Notification[]
   // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-005 / RULE-EMP-07): hotel blocklist entries.
   blocklist_entries EmployeeBlocklistEntry[] @relation("hotel_blocklist")
+  // ADR-028: manager-entered "rooms completed" daily counts for this hotel.
+  rooms_completed_entries RoomsCompletedEntry[]
 
   @@index([country])
   @@index([is_active])
@@ -469,10 +475,12 @@ model WorkerAssignment {
   reassignments          WorkerAssignment[] @relation("reassignment_chain")
   updated_at             DateTime           @updatedAt
 
-  // Relations — each assignment yields at most one attendance record, one QV, one rating
-  attendance           Attendance?
-  quality_verification QualityVerification?
-  rating               Rating?
+  // Relations — each assignment yields at most one attendance record, one QV, one rating,
+  // one rooms-completed entry (ADR-028)
+  attendance            Attendance?
+  quality_verification  QualityVerification?
+  rating                Rating?
+  rooms_completed_entry RoomsCompletedEntry?
 
   // SP-5: full unique constraint removed. Active-slot double-booking is enforced
   // by the partial unique index in the migration (status IN CONFIRMED, IN_PROGRESS).
@@ -589,6 +597,36 @@ model WorkerOverallRating {
 
   @@index([average_score])
   @@index([total_ratings])
+}
+
+// ADR-028 (OQ-ANALYTICS-03): "rooms completed per worker" is retained as a basic-
+// analytics metric (REQ-ANALYTICS-013), but is NOT a room-level task record — CONFIRMED
+// §33 rules out any room-level task layer ("Task"/"Work Request" do NOT need
+// separating; full-day employment model). Instead this is a manager-entered daily
+// count tied 1-to-1 to the worker's full-day WorkerAssignment, mirroring the
+// Attendance/QualityVerification/Rating precedent (denormalised hotel_id/worker_id,
+// one row per assignment, entered_by is the acting manager). Deliberately NOT added
+// to ReceptionData (PIVOT §9.3: "Manager-entered checkout / long-stay data" only,
+// out of scope for this field per its own definition).
+model RoomsCompletedEntry {
+  id              String           @id @default(cuid())
+  assignment_id   String           @unique // 1-to-1 with WorkerAssignment — the worker's full-day assignment
+  assignment      WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  hotel_id        String
+  hotel           Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  worker_id       String
+  worker          User             @relation("rooms_completed_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  entered_by_id   String
+  entered_by      User             @relation("rooms_completed_entered_by", fields: [entered_by_id], references: [id], onDelete: Restrict)
+  rooms_completed Int              // manager-entered count; CHECK >= 0 in migration
+  notes           String?
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
+
+  @@index([hotel_id])
+  @@index([worker_id])
+  @@index([entered_by_id])
+  @@index([created_at])
 }
 
 // =============================================================================
