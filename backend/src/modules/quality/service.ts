@@ -105,8 +105,8 @@ export class QualityService extends BaseService {
     if (!assignment_id || !worker_id) {
       throw new ValidationError('assignment_id and worker_id are required');
     }
-    if (!Number.isInteger(score) || score < 1 || score > 5) {
-      throw new ValidationError('score must be an integer between 1 and 5');
+    if (!Number.isInteger(score) || score < 0 || score > 100) {
+      throw new ValidationError('score must be an integer between 0 and 100');
     }
 
     const rating = await this.prisma.$transaction(async (tx) => {
@@ -214,7 +214,7 @@ export class QualityService extends BaseService {
       .sendNotification(worker_id, {
         type: 'RATING_RECEIVED',
         title: 'You Received a Rating',
-        message: `You received a rating of ${score} out of 5.`,
+        message: `You received a rating of ${score} out of 100.`,
         data: { rating_id: rating.id, assignment_id, score },
       })
       .catch(() => {});

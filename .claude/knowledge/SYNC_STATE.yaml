@@ -1999,6 +1999,44 @@ known_drift:
       backend-engineer, Sonnet, per the human's model table. Do not re-enter documentation-audit
       mode absent explicit instruction.
 
+  - id: SYNC-052
+    type: decision-record
+    status: resolved
+    description: >-
+      Human governance-decision session (project owner, 2026-07-22, branch
+      claude/epic-5-verification-next-u5tet9): recorded ADR-026 (SPEC-QUAL-001 OQ-01 --
+      Rating.score stays 1-5 canonical, analytics may derive percentages at read time)
+      and ADR-027 (SPEC-NOTIF-001 OQ-NOTIF-01 -- NotificationChannel enum settled at
+      IN_APP/EMAIL/PUSH/SMS/WEBHOOK, provider-specific integrations are a transport
+      detail, not new members). Flipped ADR-024/ADR-025 Proposed -> Accepted (their
+      described code was already shipped in Epic 5). Closed SIR-QUAL-001, SIR-NOTIF-001
+      (enum-shape half), and the quality clause of SIR-GLOB-003 in
+      SPECIFICATION_ISSUES_REGISTER.md. Updated IMPLEMENTATION_EXECUTION_PLAN.md ledger
+      rows accordingly. ANALYTICS OQ-ANALYTICS-03 explicitly NOT resolved -- the
+      decision supplied for it (raw-KPIs-as-source-of-truth / derived
+      Reliability-Quality-Productivity-Overall-Performance metrics) does not address
+      the recorded question (rooms-completed-per-worker vs. the confirmed no-room-
+      task-layer model); no ADR authored; SIR-ANLY-003 carries an explicit
+      re-escalation note instead. Immediately followed by Epic 7 implementation
+      (this same session): NotificationChannel.WEBHOOK added to
+      backend/prisma/schema.prisma + migration
+      20260722143000_epic7_notif_channel_webhook, with a pinning regression test
+      (backend/src/__tests__/notification-channel-enum.test.ts). Full backend test
+      suite (324/324), lint, tsc build, prisma validate, and
+      repository-integrity-check.js all clean (pre-existing WARN-only orphan-document
+      findings unchanged in kind, ADR files following the established pattern of
+      ADR-009/013-025).
+    authority_needed: none  # decisions already made by the project owner this session
+    next_step: >-
+      SPEC-QUAL-001/SPEC-NOTIF-001 FROZEN-text forward-notes for OQ-01/OQ-NOTIF-01 are
+      deferred Correction-class edits (ADR-025 precedent), not made by this entry.
+      ANALYTICS OQ-ANALYTICS-03 needs the project owner to either (a) confirm the
+      raw-KPIs decision targets a different, not-yet-registered analytics question, or
+      (b) supply the actual rooms-completed-per-worker disposition -- see SIR-ANLY-003.
+      Epic 7's remaining non-push OQ-NOTIF-02..09 items and the push/channel
+      *dispatch*-design question (TREQ-002/TREQ-012, not settled by ADR-027) remain for
+      future sessions.
+
 context_invalidators:
   - repository revision changes
   - default branch changes

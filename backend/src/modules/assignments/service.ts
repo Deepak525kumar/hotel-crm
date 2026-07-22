@@ -1,8 +1,17 @@
-import { Prisma, WorkerAssignment, AssignmentStatus } from '@prisma/client';
+import { Prisma, WorkerAssignment, AssignmentStatus, RoomsCompletedEntry } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
-import { AssignmentDto, ListAssignmentsQuery, UpdateAssignmentInput } from './types.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isHotelInScope } from '../../middleware/permissions.js';
+import type { UserScope } from '../../lib/jwt.js';
+import {
+  AssignmentDto,
+  ListAssignmentsQuery,
+  LogRoomsCompletedInput,
+  RoomsCompletedEntryDto,
+  UpdateAssignmentInput,
+} from './types.js';
 
 const ALLOWED_TRANSITIONS: Partial<Record<AssignmentStatus, AssignmentStatus[]>> = {
   [AssignmentStatus.CONFIRMED]: [AssignmentStatus.IN_PROGRESS, AssignmentStatus.CANCELLED],
@@ -117,6 +126,71 @@ export class AssignmentService extends BaseService {
     });
 
     return this.toDto(updated);
+  }
+
+  private toRoomsCompletedDto(r: RoomsCompletedEntry): RoomsCompletedEntryDto {
+    return {
+      id: r.id,
+      assignment_id: r.assignment_id,
+      hotel_id: r.hotel_id,
+      worker_id: r.worker_id,
+      entered_by_id: r.entered_by_id,
+      rooms_completed: r.rooms_completed,
+      notes: r.notes,
+      created_at: r.created_at.toISOString(),
+      updated_at: r.updated_at.toISOString(),
+    };
+  }
+
+  // ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count, one row
+  // per worker's full-day WorkerAssignment — not a per-task/per-room record, and
+  // not a comparison against any task-start time (CONFIRMED §33 rules out a
+  // room-level task layer). Mirrors quality/service.ts createRating's scope-authz
+  // shape (Epic 5 PR 5.5 / ADR-024): the manager is bound to the assignment's
+  // hotel via the PR 5.4 scope claim when the flag is on; admin is unrestricted.
+  async logRoomsCompleted(
+    assignmentId: string,
+    input: LogRoomsCompletedInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<RoomsCompletedEntryDto> {
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, hotel_id: true, worker_id: true },
+    });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot log rooms completed for this hotel');
+      }
+    }
+
+    let entry;
+    try {
+      entry = await this.prisma.roomsCompletedEntry.create({
+        data: {
+          assignment_id: assignmentId,
+          hotel_id: assignment.hotel_id,
+          worker_id: assignment.worker_id,
+          entered_by_id: actor.userId,
+          rooms_completed: input.rooms_completed,
+          notes: input.notes ?? null,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('Rooms-completed entry already exists for this assignment');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'LOG_ROOMS_COMPLETED', 'ROOMS_COMPLETED_ENTRY', entry.id, {
+      assignment_id: assignmentId,
+      rooms_completed: input.rooms_completed,
+    });
+
+    return this.toRoomsCompletedDto(entry);
   }
 }
 

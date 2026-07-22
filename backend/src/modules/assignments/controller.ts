@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../../lib/errors.js';
 import { assignmentService } from './service.js';
-import { ListAssignmentsQuerySchema, UpdateAssignmentSchema } from './types.js';
+import { ListAssignmentsQuerySchema, LogRoomsCompletedSchema, UpdateAssignmentSchema } from './types.js';
 
 function zodDetails(error: import('zod').ZodError) {
   return error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }));
@@ -79,6 +79,34 @@ export async function updateAssignment(
       req.auth!.role
     );
     res.status(200).json({
+      status: 'success',
+      data: result,
+      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ADR-028 (OQ-ANALYTICS-03): manager logs a "rooms completed" count for a
+// worker's full-day assignment.
+export async function logRoomsCompleted(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = LogRoomsCompletedSchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await assignmentService.logRoomsCompleted(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    res.status(201).json({
       status: 'success',
       data: result,
       meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

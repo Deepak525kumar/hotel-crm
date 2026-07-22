@@ -50,7 +50,7 @@ const txStub = {
   },
   rating: {
     create: async ({ data }: any) => ({ id: 'rat_1', ...data }),
-    aggregate: async () => ({ _avg: { score: 4 }, _count: 1 }),
+    aggregate: async () => ({ _avg: { score: 80 }, _count: 1 }),
   },
   attendance: { count: async () => 1 },
   workerOverallRating: { upsert: async () => undefined },
@@ -150,7 +150,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 4 });
+        .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80 });
       expect(res.status).toBe(201);
     });
 
@@ -158,7 +158,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 4 });
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80 });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
@@ -167,7 +167,7 @@ describe('Quality scope authorization', () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
       const res = await request(makeApp())
         .post('/quality/ratings')
-        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 4 });
+        .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80 });
       expect(res.status).toBe(201);
     });
   });

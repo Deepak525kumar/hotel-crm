@@ -39,6 +39,13 @@ export interface DashboardStats {
     total: number;
     average_score: number | null;
   };
+  // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker"
+  // metric, derived from RoomsCompletedEntry (manager-entered, one row per
+  // worker's full-day WorkerAssignment) — no room-level task layer implied.
+  rooms_completed: {
+    total: number;
+    entries: number;
+  };
 }
 
 export interface HotelSummary {
@@ -58,6 +65,12 @@ export interface HotelSummary {
   quality: {
     average_score: number | null;
     recent_pass_rate: number;
+  };
+  // ADR-028 (OQ-ANALYTICS-03): basic-analytics "rooms completed per worker"
+  // metric for this hotel, derived from RoomsCompletedEntry.
+  rooms_completed: {
+    total: number;
+    entries: number;
   };
   top_workers: LeaderboardEntry[];
 }

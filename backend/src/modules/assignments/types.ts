@@ -17,8 +17,28 @@ export const ListAssignmentsQuerySchema = z.object({
   per_page: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+// ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count for a
+// worker's full-day WorkerAssignment. Not a per-task/per-room record.
+export const LogRoomsCompletedSchema = z.object({
+  rooms_completed: z.number().int().min(0),
+  notes: z.string().max(1000).optional(),
+});
+
 export type UpdateAssignmentInput = z.infer<typeof UpdateAssignmentSchema>;
 export type ListAssignmentsQuery = z.infer<typeof ListAssignmentsQuerySchema>;
+export type LogRoomsCompletedInput = z.infer<typeof LogRoomsCompletedSchema>;
+
+export interface RoomsCompletedEntryDto {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  worker_id: string;
+  entered_by_id: string;
+  rooms_completed: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface AssignmentDto {
   id: string;
