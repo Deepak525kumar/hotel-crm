@@ -162,6 +162,18 @@ modules:
     related_specification: SPEC-HR-001@0.2.1 (REVIEW, architecture BLOCKED)  # DISCOVERABILITY CROSS-REFERENCE, added by Repository Synchronization Workflow 2026-07-20 -- not a second specification field, not an alternate mapping. docs/03-modules/hr/MODULE_SPEC.md targets this SAME registry id/code path (backend/src/modules/hr) for a DIFFERENT capability set (contract lifecycle/generation, payslip-request-to-fulfilment, contract-scan upload) than the FROZEN SPEC-EMP-001 above (employment record/lifecycle). The two specifications' boundary claims conflict with each other and with docs/03-modules/onboarding/MODULE_SPEC.md over contract generation/confirmation ownership -- disclosed, not resolved, at OD-HR-01a/OD-HR-01b (docs/03-modules/hr/MODULE_SPEC.md) and OD-EMP-10 (this module's own frozen spec, which itself states the docs<->code mapping to backend-hr is "proposed, not asserted"). This note does not change architecture, does not merge responsibilities, and does not resolve OD-HR-01a/OD-EMP-10 -- those remain reserved human/architecture decisions. It exists solely so a reader of this registry entry discovers that a second, non-frozen specification also claims this module id before starting implementation against it.
     evidence: backend/src/routes/v1/index.ts:31
 
+  - id: employee-management
+    type: backend-module
+    path: backend/src/modules/employee-management
+    owner: unassigned  # SYNC-001 still open; owner assignment is reserved human authority, unchanged by this build.
+    lifecycle: active
+    implementation_status: active
+    dependencies: []
+    published_events: none-observed  # OD-EMP-09: no event bus; EVT-EMP-* emitted as structured log lines only.
+    consumed_events: none-observed
+    specification: SPEC-EMP-001@0.2.0 (FROZEN)  # docs/03-modules/employee-management/MODULE_SPEC.md. Employment-record build (Epic 5 PR 5.6). OD-EMP-10 (docs<->code mapping, previously "proposed, not asserted" and reserved to human/SYNC-001) resolved by a human decision on 2026-07-22 to a DEDICATED module here (not backend-hr), keeping SPEC-EMP-001's employment-record capability physically separate from backend-hr's SPEC-HR-001 contracts/payroll surface. Owned state added additively (state-employment-record, state-employee-blocklist); HotelWorker retained untouched as the ADR-022 compatibility layer (consumer repointing and roster migration are PR 5.7/5.8, not this PR). Provisional-at-implementation items: OD-EMP-16 perf budget (conservative bounds applied, PERF-EMP-002), OD-EMP-08 importer roles (Admin-only), special-category audience (Admin-only pending the payslip-processor role). NOTE: backend-hr's own registry row above still records SPEC-EMP-001 as a historical mapping plus its SPEC-HR-001 collision disclosure; full reconciliation of that row and owner assignment remain a human/SYNC-001 follow-up.
+    evidence: backend/src/routes/v1/index.ts (/employees, FEATURE_EMPLOYMENT_RECORD-gated); backend/src/modules/employee-management/
+
   - id: backend-notifications
     type: backend-module
     path: backend/src/modules/notifications

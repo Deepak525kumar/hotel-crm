@@ -35,6 +35,9 @@ nodes:
   # throws NotImplementedError; they hold no business state (stub modules).
   - { id: backend-hr, kind: module, owner: unassigned, source: backend/src/modules/hr, lifecycle: stub }
   - { id: backend-notifications, kind: module, owner: unassigned, source: backend/src/modules/notifications }
+  # employee-management (Epic 5 PR 5.6, SPEC-EMP-001): dedicated module (OD-EMP-10
+  # resolved 2026-07-22, human decision, to a separate module — not backend-hr).
+  - { id: employee-management, kind: module, owner: unassigned, source: backend/src/modules/employee-management, lifecycle: active }
   - { id: backend-analytics, kind: module, owner: unassigned, source: backend/src/modules/analytics }
   - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: stub }
   # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
@@ -82,6 +85,11 @@ nodes:
   - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
   - { id: state-audit-log, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
   - { id: state-password-reset-token, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma (model PasswordResetToken, added by HOTFIX-AUTH-002)" }
+  # Epic 5 PR 5.6 (SPEC-EMP-001): the repurposed-per-employee employment record and its
+  # hotel blocklist, owned by the new employee-management module. hotel_group_id is a
+  # group-grain FK to state-hotel-group (ADR-023 §4); no per-hotel tie (ADR-025 D3).
+  - { id: state-employment-record, kind: state-domain, owner: employee-management, source: "backend/prisma/schema.prisma (model EmploymentRecord)" }
+  - { id: state-employee-blocklist, kind: state-domain, owner: employee-management, source: "backend/prisma/schema.prisma (model EmployeeBlocklistEntry)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -152,6 +160,31 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/work-requests/service.ts:53 (this.prisma.hotel.findUnique)"
+  # Epic 5 PR 5.6 (SPEC-EMP-001): employee-management read edges. Group-grain scope
+  # resolution + hire-approval group derivation read Hotel/HotelGroup (ADR-023 §4/§6);
+  # profile-and-history aggregation reads Attendance/Rating within provisional caps
+  # (OD-EMP-16/PERF-EMP-002). Read-only; no consumer repointing (that is PR 5.7).
+  - id: edge-employee-management-reads-hotel
+    source: employee-management
+    target: state-hotel
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/employee-management/service.ts (this.prisma.hotel.findUnique/findFirst — scope + approval group resolution)"
+  - id: edge-employee-management-reads-attendance
+    source: employee-management
+    target: state-attendance
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/employee-management/service.ts (this.prisma.attendance.findMany — profile-and-history)"
+  - id: edge-employee-management-reads-rating
+    source: employee-management
+    target: state-rating
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/employee-management/service.ts (this.prisma.rating.findMany — profile-and-history)"
   - id: edge-work-requests-reads-hotel-worker
     source: backend-work-requests
     target: state-hotel-worker

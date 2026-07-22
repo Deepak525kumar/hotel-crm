@@ -99,6 +99,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'notifications:read', 'notifications:write',
     'analytics:read',
     'audit:read',
+    // Epic 5 PR 5.6 (SPEC-EMP-001): employee-management permissions.
+    'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
   ],
   MANAGER: [
     'hotels:read',
@@ -111,6 +113,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'notifications:read',
     'analytics:read',
     'users:read',
+    // Epic 5 PR 5.6 (SPEC-EMP-001): permission matrix — Hotel/Regional
+    // Manager may view/blocklist within scope; creation stays Admin-only
+    // (enforced service-side, OD-EMP-08).
+    'employees:read', 'employees:write',
   ],
   CHECKER: [
     'hotels:read',
@@ -119,12 +125,17 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'tasks:read',
     'quality:read', 'quality:write',
     'notifications:read',
+    // Epic 5 PR 5.6 (SPEC-EMP-001): Checker views a worker's profile at their
+    // assigned hotel (permission matrix), read-only.
+    'employees:read',
   ],
   WORKER: [
     'hotels:read',
     'rooms:read',
     'tasks:read',
     'notifications:read',
+    // Epic 5 PR 5.6 (SPEC-EMP-001): a worker may view their own profile & history (self only).
+    'employees:read',
   ],
 };
 
