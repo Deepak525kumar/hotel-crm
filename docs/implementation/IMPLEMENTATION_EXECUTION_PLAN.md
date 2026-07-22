@@ -75,9 +75,12 @@ Deferred / not sequenced here (blocked on human authority, correctly excluded):
   current defect-remediation scope; flag if it enters scope.)
 - **SYNC-001** owner assignment (platform-wide) — reserved human authority, not implementation.
 - **SPEC-CHATBOT-001, SPEC-GEO-001** — REVIEW stubs, out of scope.
-- **Headline open decisions** (QUAL OQ-01 1-5 vs 0-100 rating; ANALYTICS OQ-ANALYTICS-03 metric
-  definition; NOTIF OQ-NOTIF-01 channel enum) — each blocks its module's *implementation
-  planning* per its ART-MEM open_prerequisites; the dependent PRs cannot be authored until the
+- **Headline open decisions:** QUAL OQ-01 (1-5 vs 0-100 rating) **RESOLVED 2026-07-22 by ADR-026**
+  (1-5 stays canonical); NOTIF OQ-NOTIF-01 (channel enum) **RESOLVED 2026-07-22 by ADR-027**
+  (IN_APP/EMAIL/PUSH/SMS/WEBHOOK). ANALYTICS OQ-ANALYTICS-03 (rooms-completed-per-worker metric
+  definition) **remains OPEN** — a 2026-07-22 decision-session input did not address this recorded
+  question (see SIR-ANLY-003 escalation note); still blocks its module's *implementation
+  planning* per its ART-MEM open_prerequisites; that dependent PR cannot be authored until the
   Decision Record lands. Escalate, do not invent the decision.
 
 ---
@@ -203,7 +206,7 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 - **PR 5.7** — Dual-write / cutover from `backend-hotel-workers` to `backend-hr`.
 - **PR 5.8** — Retire `backend-hotel-workers` (physical removal), gated on PR 5.6/5.7 verified.
 
-> **Cutover mechanism & ordering — RESOLVED by ADR-024 (Proposed, 2026-07-20).** ADR-022/023
+> **Cutover mechanism & ordering — RESOLVED by ADR-024 (Accepted, 2026-07-22).** ADR-022/023
 > define the target state and P2 prerequisites but did not prescribe the cutover *mechanism*.
 > ADR-024 decides: **PR 5.5 lands before PR 5.7**; PR 5.7 is a **flag-gated cutover** over the
 > retained `HotelWorker` compatibility layer (not a synchronous dual-write); **two independent
@@ -217,14 +220,18 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 > claim issuance — see §9.
 
 ### Epic 6 — Quality / CRM / Analytics remaining G8 items
-- Sequence only items not gated on an open Decision Record. Author QUAL OQ-01 (1-5 vs 0-100) and
-  ANALYTICS OQ-ANALYTICS-03 (metric definition) dependent PRs **after** their Decision Records
-  land — do not pre-build. One PR per finding, per module, sized to a single acceptance criterion.
+- Sequence only items not gated on an open Decision Record. QUAL OQ-01's Decision Record
+  (`ADR-026`, 2026-07-22) has landed — its dependent PR (spec forward-note; no code change, since
+  the decision retains the shipped 1-5 scale) may now be authored. ANALYTICS OQ-ANALYTICS-03's
+  Decision Record has **not** landed (2026-07-22 input did not address the recorded question —
+  see SIR-ANLY-003); its dependent PR remains blocked, do not pre-build. One PR per finding, per
+  module, sized to a single acceptance criterion.
 
 ### Epic 7 — Notifications G8 cleanup
-- Non-push items (OQ-NOTIF-02..09 not gated by OQ-NOTIF-01) each as their own small PR. Push /
-  channel work (TREQ-002, TREQ-012) is blocked on the OQ-NOTIF-01 Decision Record (Notification
-  channel enum shape) — do not author until it lands.
+- Non-push items (OQ-NOTIF-02..09 not gated by OQ-NOTIF-01) each as their own small PR. OQ-NOTIF-01's
+  Decision Record (`ADR-027`, 2026-07-22) has landed — the enum now includes WEBHOOK. Push /
+  channel *dispatch* work (TREQ-002, TREQ-012) still requires its own design (push-only vs. both
+  channels, ADR-027 does not settle that) before authoring.
 
 ---
 
@@ -416,12 +423,12 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | Item | Why it blocks | Reserved to |
 |------|---------------|-------------|
 | OQ-AUTH-06 interim mitigation vs wait-for-Epic-5 | Correct fix data-blocked; exploitable now | Human risk acceptance |
-| ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Proposed, 2026-07-20):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
-| ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Proposed, 2026-07-21):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
+| ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Accepted, 2026-07-22):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
+| ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Accepted, 2026-07-22):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
-| QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | Decision Record |
-| ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record |
-| NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | Decision Record |
+| QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | **RESOLVED 2026-07-22, ADR-026** |
+| ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record — **still OPEN**, see SIR-ANLY-003 |
+| NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | **RESOLVED 2026-07-22, ADR-027** (dispatch-design question separately still open) |
 | SYNC-001 owner assignment | Platform-wide | Human authority |
 | `Hotel.hotel_group_id` NOT NULL flip — **sequencing deferral, not a target-architecture change.** Target remains one `HotelGroup` per `Hotel` (`ADR-023` §3: "nullable **until** assigned", not permanently optional like `billing_info`); current nullability is temporary migration/sequencing state | Blocked on the hotel-creation workflow (a way to always have an assignable group at creation time, without the fresh-deployment bootstrapping problem of zero `HotelGroup` rows) — not blocked on a design question | Human/product decision on *when/how* the workflow lands; the *whether* is already decided by `ADR-023` |
 

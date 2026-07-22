@@ -1,6 +1,6 @@
 # ADR-025: Hotel Manager ↔ Hotel Association — `Hotel.manager_user_id`
 
-- **Status:** Proposed. Requires human ratification per Constitution §20, mirroring the ADR-022/ADR-023/ADR-024 ratification-by-merge precedent. This record authorizes **no** runtime change, schema migration, code, or specification edit.
+- **Status:** Accepted. Ratified directly by the project owner (human decision, recorded 2026-07-22, session `claude/epic-5-verification-next-u5tet9`) — the code this record describes (`Hotel.manager_user_id`, PR 5.1/5.4) is already implemented and merged as part of Epic 5. This record authorizes **no** runtime change, schema migration, code, or specification edit beyond what was already shipped.
 - **Date:** 2026-07-21
 - **Scope:** Data model / state ownership / authorization model — establishes the storage mechanism for the dedicated Hotel Manager ↔ Hotel association: a nullable `manager_user_id` foreign key on the existing `Hotel` entity, owned by `backend-crm`, read (never written) by `backend-auth` at JWT scope-claim issuance. Resolves the dedicated-Hotel-Manager facet of `OD-CRM-01` (left open by `ADR-023`, which resolved only the Hotel Group/Regional Manager facet) and completes `OD-CRM-05`'s design (the "manager assignment" read input `ADR-023` §6 named but did not define).
 - **Supersedes:** none (additive; completes a gap `ADR-023` explicitly left open, does not alter any `ADR-023` decision).
