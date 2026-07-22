@@ -45,6 +45,54 @@ jest.mock('../config/feature-flags.js', () => ({
 
 import { AnalyticsService } from '../modules/analytics/service.js';
 
+describe('Analytics getLeaderboard — hotel_id filter (Epic 5 PR 5.7, site #10)', () => {
+  let service: AnalyticsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rosterCutoverEnabled = false;
+    service = new AnalyticsService();
+    mockWorkerOverallRating.findMany.mockResolvedValue([]);
+  });
+
+  it('filters via the HotelWorker relation when hotelId is given (flag OFF, characterization)', async () => {
+    await service.getLeaderboard('h1');
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({ worker: { hotel_workers: { some: { hotel_id: 'h1', status: 'ACTIVE' } } } });
+    expect(mockHotel.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('applies no filter when hotelId is undefined (flag OFF, characterization)', async () => {
+    await service.getLeaderboard(undefined);
+    const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+    expect(where).toEqual({});
+  });
+
+  describe('roster cutover (flag ON, site #10)', () => {
+    beforeEach(() => {
+      rosterCutoverEnabled = true;
+    });
+
+    it('filters via the employment_record relation at the resolved hotel group', async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await service.getLeaderboard('h1');
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } },
+      });
+    });
+
+    it('filters out every worker when the hotel has no hotel_group_id (deny-by-default)', async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: null });
+      await service.getLeaderboard('h1');
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({
+        worker: { employment_record: { hotel_group_id: '__none__', status: 'ACTIVE' } },
+      });
+    });
+  });
+});
+
 function makeReq(role: string): Request {
   return {
     auth: { userId: 'u1', role, hotel_ids: [], permissions: [] },
