@@ -165,7 +165,7 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 4 });
+    const req = makeReq({ assignment_id: 'a1', score: 80 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -175,8 +175,8 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('rejects score out of range (>5) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 6 });
+  it('rejects score out of range (>100) with ValidationError', async () => {
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -187,7 +187,7 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 3.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -264,7 +264,7 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects missing worker_id with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', score: 4 });
+    const req = makeReq({ assignment_id: 'a1', score: 80 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -274,8 +274,8 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('rejects score out of range (>5) with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 6 });
+  it('rejects score out of range (>100) with ValidationError', async () => {
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 101 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -286,7 +286,7 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
   });
 
   it('rejects non-integer score with ValidationError', async () => {
-    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 3.5 });
+    const req = makeReq({ assignment_id: 'a1', worker_id: 'w1', score: 85.5 });
     const res = makeRes();
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
 
@@ -296,14 +296,34 @@ describe('Quality Zod validation — createRating (P2-03)', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('rejects score below range (boundary score = 0) at the schema level', () => {
+  it('rejects score below range (boundary score = -1) at the schema level', () => {
+    const result = CreateRatingSchema.safeParse({
+      assignment_id: 'a1',
+      worker_id: 'w1',
+      score: -1,
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts score at the boundary (score = 0) at the schema level', () => {
     const result = CreateRatingSchema.safeParse({
       assignment_id: 'a1',
       worker_id: 'w1',
       score: 0,
     });
 
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts score at the boundary (score = 100) at the schema level', () => {
+    const result = CreateRatingSchema.safeParse({
+      assignment_id: 'a1',
+      worker_id: 'w1',
+      score: 100,
+    });
+
+    expect(result.success).toBe(true);
   });
 });
 
@@ -330,7 +350,7 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
 
     await expect(
       service.createRating(
-        { assignment_id: 'a1', worker_id: 'w1', score: 4 } as any,
+        { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
         { userId: 'u1', role: 'manager' }
       )
     ).rejects.toMatchObject({
@@ -355,7 +375,7 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
     mockWorkerAssignment.findFirst.mockResolvedValue(null);
     mockAttendance_count();
     mockRating.create.mockResolvedValue({ id: 'r1' });
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 1 });
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 80 }, _count: 1 });
     mockPrisma.workerOverallRating.upsert.mockResolvedValue({});
     mockNotification.create.mockResolvedValue({ id: 'n1' });
   });
@@ -366,7 +386,7 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
 
   it('emits RATING_RECEIVED to the rated worker after a successful rating', async () => {
     await service.createRating(
-      { assignment_id: 'a1', worker_id: 'w1', score: 4 } as any,
+      { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
       { userId: 'u1', role: 'manager' }
     );
 

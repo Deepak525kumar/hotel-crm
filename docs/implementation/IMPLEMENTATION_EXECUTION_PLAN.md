@@ -76,7 +76,8 @@ Deferred / not sequenced here (blocked on human authority, correctly excluded):
 - **SYNC-001** owner assignment (platform-wide) — reserved human authority, not implementation.
 - **SPEC-CHATBOT-001, SPEC-GEO-001** — REVIEW stubs, out of scope.
 - **Headline open decisions:** QUAL OQ-01 (1-5 vs 0-100 rating) **RESOLVED 2026-07-22 by ADR-026**
-  (1-5 stays canonical); NOTIF OQ-NOTIF-01 (channel enum) **RESOLVED 2026-07-22 by ADR-027**
+  (rescaled to 0-100, matches TRULE-001/confirmed authority — corrected same session, see ADR-026's
+  own Status section); NOTIF OQ-NOTIF-01 (channel enum) **RESOLVED 2026-07-22 by ADR-027**
   (IN_APP/EMAIL/PUSH/SMS/WEBHOOK). ANALYTICS OQ-ANALYTICS-03 (rooms-completed-per-worker metric
   definition) **remains OPEN** — a 2026-07-22 decision-session input did not address this recorded
   question (see SIR-ANLY-003 escalation note); still blocks its module's *implementation
@@ -221,8 +222,10 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
 
 ### Epic 6 — Quality / CRM / Analytics remaining G8 items
 - Sequence only items not gated on an open Decision Record. QUAL OQ-01's Decision Record
-  (`ADR-026`, 2026-07-22) has landed — its dependent PR (spec forward-note; no code change, since
-  the decision retains the shipped 1-5 scale) may now be authored. ANALYTICS OQ-ANALYTICS-03's
+  (`ADR-026`, 2026-07-22, corrected same session) has landed — its dependent PR (rescale
+  `Rating.score` to 0-100: schema/CHECK/data-migration/validation/spec forward-note, since the
+  decision rescales the shipped 1-5 scale to match confirmed authority) may now be authored.
+  ANALYTICS OQ-ANALYTICS-03's
   Decision Record has **not** landed (2026-07-22 input did not address the recorded question —
   see SIR-ANLY-003); its dependent PR remains blocked, do not pre-build. One PR per finding, per
   module, sized to a single acceptance criterion.
@@ -426,7 +429,7 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Accepted, 2026-07-22):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
 | ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Accepted, 2026-07-22):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
-| QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | **RESOLVED 2026-07-22, ADR-026** |
+| QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | **RESOLVED 2026-07-22, ADR-026 — 0-100, matches TRULE-001 (corrected same session; earlier "1-5, override" framing was wrong, see ADR-026 Status)** |
 | ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | Decision Record — **still OPEN**, see SIR-ANLY-003 |
 | NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | **RESOLVED 2026-07-22, ADR-027** (dispatch-design question separately still open) |
 | SYNC-001 owner assignment | Platform-wide | Human authority |

@@ -559,7 +559,7 @@ model Rating {
   worker        User             @relation("rated_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   rated_by_id   String
   rated_by      User             @relation("rater", fields: [rated_by_id], references: [id], onDelete: Restrict)
-  score         Int              // 1–5 stars; CHECK constraint in migration
+  score         Int              // 0–100; rescaled from 1–5 stars by ADR-026; CHECK constraint in migration
   comment       String?
   // Structured sub-scores; schema: { punctuality: Int, quality: Int, attitude: Int }
   criteria_scores Json?
