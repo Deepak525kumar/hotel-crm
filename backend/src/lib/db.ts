@@ -1,5 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { logger } from './logger.js';
+
+// ADR-029 (2026-07-23, GD-01): alias so callers depend on a repository-owned
+// name rather than importing `Prisma.TransactionClient` directly at every call
+// site — Prisma stays an implementation detail of this module, not something
+// that leaks through every service's transaction-accepting method signature.
+export type DatabaseTransaction = Prisma.TransactionClient;
 
 let prisma: PrismaClient | null = null;
 
