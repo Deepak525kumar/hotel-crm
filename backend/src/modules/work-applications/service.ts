@@ -10,12 +10,21 @@ import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { notificationService } from '../notifications/service.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isHotelInScope } from '../../middleware/permissions.js';
+import type { UserScope } from '../../lib/jwt.js';
 import {
   ApplyWorkRequestInput,
   ListApplicationsQuery,
   UpdateApplicationInput,
   WorkApplicationDto,
 } from './types.js';
+
+interface Actor {
+  userId: string;
+  role: string;
+  scope?: UserScope | null;
+}
 
 export class WorkApplicationService extends BaseService {
   private toDto(app: WorkApplication): WorkApplicationDto {
@@ -149,8 +158,7 @@ export class WorkApplicationService extends BaseService {
     workRequestId: string,
     applicationId: string,
     input: UpdateApplicationInput,
-    actorId: string,
-    actorRole: string
+    actor: Actor
   ): Promise<WorkApplicationDto> {
     const app = await this.prisma.workApplication.findUnique({
       where: { id: applicationId },
@@ -162,28 +170,41 @@ export class WorkApplicationService extends BaseService {
       throw new ConflictError(`Application is already ${app.status}`);
     }
 
-    const isWorker = actorRole !== 'admin' && actorRole !== 'manager';
+    const isWorker = actor.role !== 'admin' && actor.role !== 'manager';
 
     if (isWorker) {
       // Workers may only withdraw their own application
-      if (app.worker_id !== actorId) throw new ForbiddenError('Cannot modify another worker\'s application');
+      if (app.worker_id !== actor.userId) throw new ForbiddenError('Cannot modify another worker\'s application');
       if (input.status !== 'WITHDRAWN') throw new ForbiddenError('Workers may only withdraw applications');
     }
 
     if (input.status === 'ACCEPTED') {
-      return this.approve(app, actorId, actorRole);
+      return this.approve(app, actor);
+    }
+
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-003): a manager may only reject
+    // applications belonging to a work request in their scope claim when
+    // scope-authz is enabled. Admin keeps unconditional cross-hotel access
+    // (unchanged); workers only reach here via WITHDRAWN and are unaffected.
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const wr = await this.prisma.workRequest.findUnique({ where: { id: workRequestId } });
+      if (!wr) throw new NotFoundError('Work request not found');
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot modify this application');
+      }
     }
 
     const data: Prisma.WorkApplicationUpdateInput = {
       status: input.status as ApplicationStatus,
       reviewed_at: new Date(),
-      reviewed_by: isWorker ? { disconnect: true } : { connect: { id: actorId } },
+      reviewed_by: isWorker ? { disconnect: true } : { connect: { id: actor.userId } },
       ...(input.status === 'REJECTED' ? { rejection_reason: input.rejection_reason ?? null } : {}),
     };
 
     const updated = await this.prisma.workApplication.update({ where: { id: applicationId }, data });
 
-    await this.logAudit(actorId, actorRole, `APPLICATION_${input.status}`, 'WORK_APPLICATION', applicationId, {
+    await this.logAudit(actor.userId, actor.role, `APPLICATION_${input.status}`, 'WORK_APPLICATION', applicationId, {
       work_request_id: workRequestId,
       worker_id: app.worker_id,
     });
@@ -203,11 +224,21 @@ export class WorkApplicationService extends BaseService {
   // Approve path — 7-step transaction
   private async approve(
     app: WorkApplication,
-    actorId: string,
-    actorRole: string
+    actor: Actor
   ): Promise<WorkApplicationDto> {
     const wr = await this.prisma.workRequest.findUnique({ where: { id: app.work_request_id } });
     if (!wr) throw new NotFoundError('Work request not found');
+
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-003): a manager may only approve
+    // applications for work requests in their scope claim when scope-authz is
+    // enabled. Admin keeps unconditional cross-hotel access (unchanged).
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot approve applications for this hotel');
+      }
+    }
+
     if (wr.status !== WorkRequestStatus.OPEN && wr.status !== WorkRequestStatus.PARTIALLY_FILLED) {
       throw new ConflictError('Work request is no longer accepting approvals');
     }
@@ -232,7 +263,7 @@ export class WorkApplicationService extends BaseService {
         where: { id: app.id },
         data: {
           status: ApplicationStatus.ACCEPTED,
-          reviewed_by_id: actorId,
+          reviewed_by_id: actor.userId,
           reviewed_at: new Date(),
         },
       });
@@ -243,7 +274,7 @@ export class WorkApplicationService extends BaseService {
           work_request_id: wr.id,
           worker_id: app.worker_id,
           hotel_id: wr.hotel_id,
-          assigned_by_id: actorId,
+          assigned_by_id: actor.userId,
           application_id: app.id,
           status: AssignmentStatus.CONFIRMED,
           confirmed_at: new Date(),
@@ -289,7 +320,7 @@ export class WorkApplicationService extends BaseService {
 
     const { acceptedApp, assignment: createdAssignment } = txResult;
 
-    await this.logAudit(actorId, actorRole, 'APPLICATION_ACCEPTED', 'WORK_APPLICATION', app.id, {
+    await this.logAudit(actor.userId, actor.role, 'APPLICATION_ACCEPTED', 'WORK_APPLICATION', app.id, {
       work_request_id: app.work_request_id,
       worker_id: app.worker_id,
     });

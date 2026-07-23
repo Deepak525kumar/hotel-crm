@@ -22,11 +22,11 @@ export async function createWorkRequest(
       next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
       return;
     }
-    const result = await workRequestService.create(
-      parsed.data,
-      req.auth!.userId,
-      req.auth!.role
-    );
+    const result = await workRequestService.create(parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
     res.status(201).json({
       status: 'success',
       data: result,
@@ -102,12 +102,11 @@ export async function updateWorkRequest(
       next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
       return;
     }
-    const result = await workRequestService.update(
-      req.params.id,
-      parsed.data,
-      req.auth!.userId,
-      req.auth!.role
-    );
+    const result = await workRequestService.update(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
     res.status(200).json({
       status: 'success',
       data: result,

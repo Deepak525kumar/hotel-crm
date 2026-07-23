@@ -96,7 +96,7 @@ describe('WorkRequestService', () => {
   describe('create', () => {
     it('throws NotFoundError when hotel does not exist', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue(null);
-      await expect(service.create(baseInput, 'mgr1', 'manager')).rejects.toMatchObject({
+      await expect(service.create(baseInput, { userId: 'mgr1', role: 'manager' })).rejects.toMatchObject({
         name: 'NotFoundError',
       });
     });
@@ -104,7 +104,7 @@ describe('WorkRequestService', () => {
     it('creates a DRAFT request without publishing', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null });
       mockWorkRequest.create.mockResolvedValue(makeRow());
-      const dto = await service.create(baseInput, 'mgr1', 'manager');
+      const dto = await service.create(baseInput, { userId: 'mgr1', role: 'manager' });
       expect(dto.status).toBe('DRAFT');
       expect(dto.shift_date).toBe('2026-07-01');
       const data = mockWorkRequest.create.mock.calls[0][0].data;
@@ -116,7 +116,7 @@ describe('WorkRequestService', () => {
     it('sets published_at when created directly as OPEN', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null });
       mockWorkRequest.create.mockResolvedValue(makeRow({ status: 'OPEN', published_at: new Date() }));
-      await service.create({ ...baseInput, status: 'OPEN' }, 'mgr1', 'manager');
+      await service.create({ ...baseInput, status: 'OPEN' }, { userId: 'mgr1', role: 'manager' });
       const data = mockWorkRequest.create.mock.calls[0][0].data;
       expect(data.status).toBe('OPEN');
       expect(data.published_at).toBeInstanceOf(Date);
@@ -127,7 +127,7 @@ describe('WorkRequestService', () => {
     it('rejects an illegal status transition', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
       await expect(
-        service.update('wr1', { status: 'DRAFT' }, 'mgr1', 'manager')
+        service.update('wr1', { status: 'DRAFT' }, { userId: 'mgr1', role: 'manager' })
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
 
@@ -136,7 +136,7 @@ describe('WorkRequestService', () => {
       mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'OPEN' }));
       mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
       mockEmploymentRecord.findMany.mockResolvedValue([]);
-      await service.update('wr1', { status: 'OPEN' }, 'mgr1', 'manager');
+      await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'manager' });
       const data = mockWorkRequest.update.mock.calls[0][0].data;
       expect(data.status).toBe('OPEN');
       expect(data.published_at).toBeInstanceOf(Date);
@@ -146,7 +146,7 @@ describe('WorkRequestService', () => {
     it('does not notify on a non-publish PATCH (e.g. cancellation)', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
       mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
-      await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'x' }, 'mgr1', 'manager');
+      await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'x' }, { userId: 'mgr1', role: 'manager' });
       expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
       expect(mockNotification.create).not.toHaveBeenCalled();
     });
@@ -154,7 +154,7 @@ describe('WorkRequestService', () => {
     it('cancels with a reason', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
       mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
-      await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'no demand' }, 'mgr1', 'manager');
+      await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'no demand' }, { userId: 'mgr1', role: 'manager' });
       const data = mockWorkRequest.update.mock.calls[0][0].data;
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
@@ -164,7 +164,7 @@ describe('WorkRequestService', () => {
     it('does not edit terms once the request is OPEN', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
       mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'OPEN' }));
-      await service.update('wr1', { position: 'supervisor' }, 'mgr1', 'manager');
+      await service.update('wr1', { position: 'supervisor' }, { userId: 'mgr1', role: 'manager' });
       const data = mockWorkRequest.update.mock.calls[0][0].data;
       expect(data.position).toBeUndefined();
     });
@@ -179,7 +179,7 @@ describe('WorkRequestService', () => {
         mockEmploymentRecord.findMany.mockResolvedValue([{ user_id: 'w1' }, { user_id: 'w2' }]);
         mockNotification.create.mockResolvedValue({ id: 'n1' });
 
-        await service.update('wr1', { status: 'OPEN' }, 'mgr1', 'manager');
+        await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'manager' });
 
         expect(mockEmploymentRecord.findMany).toHaveBeenCalledWith(
           expect.objectContaining({ where: { hotel_group_id: 'g1', status: 'ACTIVE' } })
@@ -196,7 +196,7 @@ describe('WorkRequestService', () => {
         mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'OPEN' }));
         mockHotel.findUnique.mockResolvedValue({ hotel_group_id: null });
 
-        await service.update('wr1', { status: 'OPEN' }, 'mgr1', 'manager');
+        await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'manager' });
 
         expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
         expect(mockNotification.create).not.toHaveBeenCalled();

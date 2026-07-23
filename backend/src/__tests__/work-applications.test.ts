@@ -181,14 +181,14 @@ describe('WorkApplicationService', () => {
   describe('update', () => {
     it('throws NotFoundError for unknown application', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(null);
-      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, 'mgr1', 'manager')).rejects.toMatchObject({
+      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'manager' })).rejects.toMatchObject({
         name: 'NotFoundError',
       });
     });
 
     it('throws ConflictError when application is already resolved', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'ACCEPTED' }));
-      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, 'mgr1', 'manager')).rejects.toMatchObject({
+      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'manager' })).rejects.toMatchObject({
         name: 'ConflictError',
       });
     });
@@ -196,7 +196,7 @@ describe('WorkApplicationService', () => {
     it('rejects with reason', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp());
       mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'REJECTED', rejection_reason: 'not qualified' }));
-      const dto = await service.update('wr1', 'app1', { status: 'REJECTED', rejection_reason: 'not qualified' }, 'mgr1', 'manager');
+      const dto = await service.update('wr1', 'app1', { status: 'REJECTED', rejection_reason: 'not qualified' }, { userId: 'mgr1', role: 'manager' });
       expect(dto.status).toBe('REJECTED');
       expect(dto.rejection_reason).toBe('not qualified');
     });
@@ -204,21 +204,21 @@ describe('WorkApplicationService', () => {
     it('prevents worker from approving application', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp({ worker_id: 'w1' }));
       await expect(
-        service.update('wr1', 'app1', { status: 'ACCEPTED' }, 'w1', 'worker')
+        service.update('wr1', 'app1', { status: 'ACCEPTED' }, { userId: 'w1', role: 'worker' })
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
     it('prevents worker from modifying another worker\'s application', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp({ worker_id: 'w2' }));
       await expect(
-        service.update('wr1', 'app1', { status: 'WITHDRAWN' }, 'w1', 'worker')
+        service.update('wr1', 'app1', { status: 'WITHDRAWN' }, { userId: 'w1', role: 'worker' })
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
     it('allows worker to withdraw own application', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp({ worker_id: 'w1' }));
       mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'WITHDRAWN' }));
-      const dto = await service.update('wr1', 'app1', { status: 'WITHDRAWN' }, 'w1', 'worker');
+      const dto = await service.update('wr1', 'app1', { status: 'WITHDRAWN' }, { userId: 'w1', role: 'worker' });
       expect(dto.status).toBe('WITHDRAWN');
     });
   });

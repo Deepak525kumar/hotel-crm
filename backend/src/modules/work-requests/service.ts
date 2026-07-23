@@ -7,12 +7,21 @@ import {
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
 import { notificationService } from '../notifications/service.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { isHotelInScope } from '../../middleware/permissions.js';
+import type { UserScope } from '../../lib/jwt.js';
 import {
   CreateWorkRequestInput,
   ListWorkRequestsQuery,
   UpdateWorkRequestInput,
   WorkRequestDto,
 } from './types.js';
+
+interface Actor {
+  userId: string;
+  role: string;
+  scope?: UserScope | null;
+}
 
 // Allowed status transitions for a WorkRequest. PARTIALLY_FILLED/FILLED are
 // driven by the assignment pipeline (later PR) — managers may only move a
@@ -52,18 +61,27 @@ export class WorkRequestService extends BaseService {
 
   async create(
     input: CreateWorkRequestInput,
-    actorId: string,
-    actorRole: string
+    actor: Actor
   ): Promise<WorkRequestDto> {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: input.hotel_id } });
     if (!hotel || hotel.deleted_at) throw new NotFoundError('Hotel not found');
+
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only create work
+    // requests for hotels in their scope claim when scope-authz is enabled.
+    // Admin keeps unconditional cross-hotel access (unchanged, by design).
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot create a work request for this hotel');
+      }
+    }
 
     const publishing = input.status === 'OPEN';
 
     const wr = await this.prisma.workRequest.create({
       data: {
         hotel_id: input.hotel_id,
-        created_by_id: actorId,
+        created_by_id: actor.userId,
         position: input.position,
         workers_needed: input.workers_needed,
         shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
@@ -79,7 +97,7 @@ export class WorkRequestService extends BaseService {
       },
     });
 
-    await this.logAudit(actorId, actorRole, 'CREATE', 'WORK_REQUEST', wr.id, {
+    await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', wr.id, {
       hotel_id: wr.hotel_id,
       status: wr.status,
     });
@@ -156,11 +174,20 @@ export class WorkRequestService extends BaseService {
   async update(
     id: string,
     input: UpdateWorkRequestInput,
-    actorId: string,
-    actorRole: string
+    actor: Actor
   ): Promise<WorkRequestDto> {
     const wr = await this.prisma.workRequest.findUnique({ where: { id } });
     if (!wr) throw new NotFoundError('Work request not found');
+
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only patch work
+    // requests belonging to a hotel in their scope claim when scope-authz is
+    // enabled. Admin keeps unconditional cross-hotel access (unchanged).
+    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot modify this work request');
+      }
+    }
 
     const data: Prisma.WorkRequestUpdateInput = {};
     let statusChanged = false;
@@ -206,7 +233,7 @@ export class WorkRequestService extends BaseService {
 
     const updated = await this.prisma.workRequest.update({ where: { id }, data });
 
-    await this.logAudit(actorId, actorRole, 'UPDATE', 'WORK_REQUEST', id, {
+    await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
       from_status: wr.status,
       to_status: updated.status,
     });
