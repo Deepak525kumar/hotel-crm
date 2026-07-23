@@ -73,7 +73,8 @@ mobile screens) and assume the decision is made first — the decision itself is
 > at-least-once + idempotent (`event_id`) delivery, hosts scheduled reminder/escalation jobs, and is
 > the canonical producer for the future Event Bus (GD-12). Resolves `OQ-NOTIF-01` (dispatch half),
 > `OQ-NOTIF-04/06/07/08/09` and the delivery half of `OQ-AUTH-01`. Build sequenced as Epic 7 PRs
-> 7.1–7.6 in `IMPLEMENTATION_EXECUTION_PLAN.md`. Remaining NOTIF opens: `OQ-NOTIF-02` (retention/GD-09,
+> 7.1–7.7 in `IMPLEMENTATION_EXECUTION_PLAN.md` (mobile push registration split out as its own PR, 7.7,
+> per reviewer feedback). Remaining NOTIF opens: `OQ-NOTIF-02` (retention/GD-09,
 > now also covering `OutboxEvent`), `OQ-NOTIF-03`, `OQ-NOTIF-05`.
 
 - **Why a decision is required:** `NotificationChannel` values were fixed by ADR-027, but *how* email/push

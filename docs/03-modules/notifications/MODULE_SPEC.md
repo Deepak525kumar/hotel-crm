@@ -47,12 +47,18 @@
    request-path `notification-service` only *enqueues*, preserving this module's "pure sink" boundary.
 4. **Transport abstraction.** `OutboxTransport` = `EMAIL`/`PUSH`/`WEBHOOK`/`SMS`; EMAIL + PUSH
    implemented first, WEBHOOK/SMS reserved. Consistent with `ADR-027`'s five-member `NotificationChannel`.
+   PUSH ships backend-only (transport handler + `PushToken` schema/endpoint); mobile push-token
+   registration is a separate, independently-revertible follow-on PR per app (Epic 7 PR 7.7).
 5. **Lifecycle** `OutboxStatus` = `PENDING`/`PROCESSING`/`DELIVERED`/`FAILED`/`DEAD_LETTER`.
 6. **Retry** configurable exponential backoff, default 1m/5m/15m/1h → `DEAD_LETTER`.
 7. **Idempotency** every `OutboxEvent` has a globally-unique `event_id`; at-least-once + no duplicate
    delivery via `SELECT … FOR UPDATE SKIP LOCKED` claim (a PostgreSQL feature — **not** an external queue).
 8. **No external queue** (no Kafka/RabbitMQ/SQS/BullMQ/Redis queue); modular monolith preserved.
-9. **Future compat** the outbox is the canonical producer for the future Event Bus (GD-12).
+9. **Ownership, versioning, observability.** `state-outbox` is owned exclusively by
+   `backend-notifications` — every producer writes only through `notificationService.enqueue()`. Every
+   `OutboxEvent` carries `payload_version` (starts `1`) and `processed_at`, supporting the minimum
+   observability surface (per-status counts, `retry_count`, `delivery_latency`) without a later migration.
+10. **Future compat** the outbox is the canonical producer for the future Event Bus (GD-12).
 
 **Resolves:** the dispatch-design half of `OQ-NOTIF-01`, plus `OQ-NOTIF-04`, `OQ-NOTIF-06`,
 `OQ-NOTIF-07`, `OQ-NOTIF-08`, `OQ-NOTIF-09`; and the delivery-mechanism half of `SPEC-AUTH-001`'s

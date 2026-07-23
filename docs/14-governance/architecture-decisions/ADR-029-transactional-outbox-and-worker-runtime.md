@@ -32,6 +32,8 @@ This left the following open decisions blocking implementation: `OQ-NOTIF-01` (d
 | Authority | Existing REST API (`GET /notifications`, `POST /:id/read`) remains authoritative and unchanged | Never exposed directly to any client |
 | Owner | `backend-notifications` (`state-notification`) | `backend-notifications` (new `state-outbox`) |
 
+**Ownership is exclusive and explicit:** `OutboxEvent` belongs to `backend-notifications`. No other module writes to `state-outbox` directly — every producer creates outbox rows exclusively through `notificationService.enqueue()`, mirroring the existing `state-notification` single-writer pattern (`DEPENDENCY_GRAPH.yaml:602`).
+
 This resolves the **dispatch-design half of `OQ-NOTIF-01`** (push-only §18 vs. "in-app inbox AND push" §14): every notification continues to persist its `IN_APP` `Notification` row (the durable inbox all three clients already depend on), *and*, when an external dispatch transport applies, one or more `OutboxEvent` rows carry the EMAIL/PUSH delivery. "Push-only" (CONFIRMED §18) means: of the **external dispatch transports**, push is the one built for device delivery; the in-app inbox row is always written, exactly as it is today (`REQ-001`). `EMAIL`/`SMS` remain valid, reserved transports (not dead values), consistent with `ADR-027`.
 
 ### 2. Transactional write
@@ -72,11 +74,21 @@ Every `OutboxEvent` carries a globally unique `event_id` (UUID). The Worker guar
 
 ### 8. Polling
 
-The Worker polls every **5 seconds by default**; the interval is **configurable**.
+**Poll interval is configuration-driven; the initial deployment default is 5 seconds.** This wording is deliberate — it states the policy (configurable) before the current value, so a future change to the default is a configuration change, not an architecture change.
 
-### 9. Future compatibility (GD-12)
+### 9. Retry metadata & observability fields
 
-The `OutboxEvent` envelope (`event_id`, `event_type`, `payload`, `aggregate` reference, `created_at`) is shaped to serve **both** notification delivery **and** future domain-event publication. The Transactional Outbox becomes the **canonical producer for the future Event Bus (GD-12)**; no redesign of the outbox is expected when the event bus is introduced — an event-publishing transport/consumer is added alongside the delivery transports.
+Beyond the lifecycle fields already listed (§5, §6), `OutboxEvent` carries `attempts`, `next_attempt_at`, `last_error`, and **`processed_at`** (timestamp of the terminal `DELIVERED`/`DEAD_LETTER` transition). `processed_at` is cheap to add now and is the basis for delivery-latency metrics (`processed_at - created_at`) without a later migration.
+
+**Minimum observability surface** (owned by the Worker, exposed however the platform's existing observability convention dictates — no new convention introduced here): counts by status (`queued`/`processing`/`delivered`/`failed`/`dead_letter`), `retry_count` per event, and `delivery_latency` (`processed_at - created_at`) for delivered events. This is the minimum metric set the Worker must make derivable from `OutboxEvent` state; it does not mandate a specific metrics backend.
+
+### 10. Event payload versioning
+
+`OutboxEvent` carries a `payload_version` integer field, starting at `1` for every event produced today. This costs nothing now and avoids a schema migration the first time a payload shape needs to change under active consumers (the Worker's own delivery handlers, and, later, the Event Bus's consumers per §11).
+
+### 11. Future compatibility (GD-12)
+
+The `OutboxEvent` envelope (`event_id`, `event_type`, `payload`, `payload_version`, `aggregate` reference, `created_at`) is shaped to serve **both** notification delivery **and** future domain-event publication. The Transactional Outbox becomes the **canonical producer for the future Event Bus (GD-12)**; no redesign of the outbox is expected when the event bus is introduced — an event-publishing transport/consumer is added alongside the delivery transports.
 
 ## Constraints (codified by this decision)
 
@@ -111,11 +123,11 @@ No blocking contradiction found against any other checked authority.
 
 ## Consequences
 
-- New Prisma models/enums: `OutboxEvent` (with `event_id`, `event_type`, `transport`, `status`, `payload`, `attempts`, `next_attempt_at`, `last_error`, timestamps), `OutboxStatus`, `OutboxTransport`; plus a push-token model for PUSH. Migrations are additive.
+- New Prisma models/enums: `OutboxEvent` (with `event_id`, `event_type`, `transport`, `status`, `payload`, `payload_version`, `attempts`, `next_attempt_at`, `last_error`, `processed_at`, timestamps), `OutboxStatus`, `OutboxTransport`; plus a `PushToken` model for PUSH. Migrations are additive.
 - A new Worker process is added to the deployment topology (`ecosystem.config.js`/`docker-compose`), sharing the backend image.
 - `notification-service` gains a transactional `enqueue` operation; the four current producers migrate from `.catch(() => {})` to transactional enqueue (delivery failures become observable via `OutboxEvent.status`/`DEAD_LETTER`).
 - SMTP (EMAIL) and APNs/FCM (PUSH) client libraries are introduced behind transport handlers; the existing `APNS_*`/`FIREBASE_PROJECT_ID`/new SMTP env fields are consumed under explicit secret-storage/rotation/least-privilege handling (carrying forward `MIG-GAP-11`'s security requirement).
-- Mobile apps gain push-token registration + OS-permission flow.
+- **Backend and mobile ship as separate PRs.** The `PushToken` schema, its registration endpoint, and the PUSH transport handler are a backend-only PR (no Expo/client changes) — mobile push-token registration + OS-permission flow (worker-app, checker-app) is a distinct follow-on PR per app, reviewable and revertible independently of the backend transport. See `IMPLEMENTATION_EXECUTION_PLAN.md` Epic 7 for the exact PR split.
 - `OutboxEvent` retention tier is a new required-before-G8 disposition folded into `SIR-NOTIF-002`/GD-09.
 - `DECISION_INDEX.md` gains this row (`ADR-029`, Accepted) in the same governance pass.
 - Implementation is sequenced as reviewable PRs in `IMPLEMENTATION_EXECUTION_PLAN.md` Epic 7; no code is authorized by this record itself — it authorizes the plan.
