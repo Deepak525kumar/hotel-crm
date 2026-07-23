@@ -48,10 +48,10 @@ specifications:
     note: FROZEN 2026-07-15 (G2 Approval Workflow); amended 0.3.0->0.3.1 (2026-07-19) per ADR-021 -- this module now consumes EVT-CAL-SickVacationMarked to cancel same-day assignments (TREQ-009/TRULE-008), see backend-work-requests row
   - module: backend-notifications
     spec: SPEC-NOTIF-001
-    version: 0.2.0
+    version: 0.3.0
     status: FROZEN
     path: docs/03-modules/notifications/MODULE_SPEC.md
-    note: FROZEN at G2 2026-07-20 (commissioning human). G4 all PASS_WITH_ACTIONS, zero Critical/High, reused unchanged (see SYNC-009 for the original G4-complete record). OQ-NOTIF-01..09 and owner assignment (SYNC-001) are G8 release prerequisites. ART-MEM-backend-notifications produced.
+    note: FROZEN at G2 2026-07-20 (commissioning human). Amended 0.2.0->0.3.0 (Decision-Integration) 2026-07-23 by ADR-029 (GD-01) -- Transactional Outbox + dedicated Worker runtime; resolves OQ-NOTIF-01(dispatch)/-04/-06/-07/-08/-09 and the delivery half of OQ-AUTH-01 (SIR-AUTH-005). G4 all PASS_WITH_ACTIONS reused unchanged. Remaining G8 prerequisites: OQ-NOTIF-02 (retention/GD-09, now also OutboxEvent), OQ-NOTIF-03, OQ-NOTIF-05, owner assignment (SYNC-001).
   - module: backend-analytics
     spec: SPEC-ANALYTICS-001
     version: 0.2.0

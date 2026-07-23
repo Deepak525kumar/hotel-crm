@@ -63,6 +63,17 @@ nodes:
 
   # Infrastructure
   - { id: operations, kind: infrastructure, owner: unassigned, source: "." }
+  # worker: canonical asynchronous execution runtime added by ADR-029 (GD-01, 2026-07-23).
+  # A second Node entrypoint over the SAME modular-monolith codebase + Prisma client,
+  # deployed as a separate OS process. Drains state-outbox (poll default 5s, configurable),
+  # delivers via transport handlers (EMAIL/PUSH first; WEBHOOK/SMS reserved), runs the
+  # OutboxStatus lifecycle with configurable exponential-backoff retry, hosts scheduled
+  # reminder/escalation jobs, and is the canonical producer for the future Event Bus (GD-12).
+  # lifecycle: planned -- authorized by ADR-029, not yet code; becomes an observed node when
+  # the Worker-runtime PR lands (this graph records repository-observed relationships, so the
+  # node is carried here as ADR-authorized/planned, mirroring how backend-chatbot's
+  # deltas are deferred until code exists).
+  - { id: worker, kind: infrastructure, owner: unassigned, source: backend/worker, lifecycle: planned }
 
   # Shared contracts (repository-derived; consumed cross-module)
   - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
@@ -599,7 +610,20 @@ state_domains:
     writers: [backend-notifications]
     readers: [backend-notifications]
     evidence: "backend/src/modules/notifications/service.ts:8,20,28,34"
-    note: "Only notifications writes/reads directly; other modules produce notifications through the notification-service `calls` contract, not by touching this state."
+    note: "Only notifications writes/reads directly; other modules produce notifications through the notification-service `calls` contract, not by touching this state. ADR-029 (GD-01, 2026-07-23) adds a transactional `enqueue` path on notification-service: a producer's transaction persists its domain change + the Notification inbox row + an OutboxEvent (state-outbox) in one commit; the in-app REST surface (GET /notifications, POST /:id/read) is unchanged."
+  # state-outbox: internal delivery queue, added by ADR-029 (GD-01, 2026-07-23). Distinct
+  # from state-notification (the user-facing inbox): never client-exposed. Written by the
+  # request-path notification-service enqueue (in the producer's transaction) and by the
+  # Worker runtime (status lifecycle transitions + retry bookkeeping); read only by the
+  # Worker. lifecycle: planned -- ADR-authorized, becomes observed when the schema/enqueue PR lands.
+  - id: state-outbox
+    model: OutboxEvent
+    lifecycle: planned
+    authoritative_writer: backend-notifications
+    writers: [backend-notifications, worker]
+    readers: [worker]
+    evidence: "ADR-029 (docs/14-governance/architecture-decisions/ADR-029-transactional-outbox-and-worker-runtime.md); model/enums not yet in backend/prisma/schema.prisma"
+    note: "OutboxEvent {event_id (globally-unique, idempotency key), event_type, transport (OutboxTransport: EMAIL/PUSH/WEBHOOK/SMS), status (OutboxStatus: PENDING/PROCESSING/DELIVERED/FAILED/DEAD_LETTER), payload, attempts, next_attempt_at, last_error, timestamps}. backend-notifications enqueues in the producer transaction; the Worker claims rows via SELECT ... FOR UPDATE SKIP LOCKED (a PostgreSQL feature, not an external queue), transitions status, and retries with configurable exponential backoff. Retention tier pending (SIR-NOTIF-002 / GD-09). Shaped to also carry future domain events (GD-12)."
   - id: state-audit-log
     model: AuditLog
     authoritative_writer: backend-auth

@@ -78,10 +78,12 @@ independently found stale on one row — see note under Epic 1).
   `OPEN` with `Authority needed: human/architecture` or `human/product`, i.e. still genuinely
   gated on an unmade Decision Record, exactly as originally scoped. Re-verified row-by-row this
   pass, not re-derived from the register's own summary prose.
-- **Epic 7 headline item (NOTIF OQ-NOTIF-01) is COMPLETE**: `WEBHOOK` is in
-  `NotificationChannel` (`95b1364`). The push/dispatch design question (`TREQ-002`/`TREQ-012`)
-  remains open pending its own design, as already scoped — not implementable without that design
-  decision.
+- **Epic 7 dispatch design is now DECIDED**: `OQ-NOTIF-01`'s enum-shape half was closed by `ADR-027`
+  (`WEBHOOK` in `NotificationChannel`, `95b1364`); its **dispatch/delivery half, plus `OQ-NOTIF-04/06/07/08/09`,
+  are RESOLVED 2026-07-23 by `ADR-029`** (GD-01, Transactional Outbox + dedicated Worker runtime). The
+  Epic 7 build (`TREQ-002`/`TREQ-012` and the shared dispatch infrastructure) is now sequenced as PRs
+  7.1–7.6 below — no longer blocked on an undecided transport/runtime. Remaining NOTIF opens
+  (`OQ-NOTIF-02` retention, `OQ-NOTIF-03`, `OQ-NOTIF-05`) each ship under their own decision.
 - **New finding, not covered by any existing epic: `SIR-JOBD-002` / `FIND-SEC-002`/`FIND-SEC-003`
   (High) was never picked up by Epics 1–7** despite being a sibling finding to Epic 1's Critical
   in the same spec section. `DEPENDENCY_GRAPH.yaml`'s `permissions-middleware` consumer list
@@ -158,7 +160,7 @@ down. Do not renumber.
 | 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** | SUPERSEDED (no-op) |
 | 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. | **COMPLETE** (PR 5.1–5.8, all merged) |
 | 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) — **both now RESOLVED** (`ADR-026`, `ADR-028`); no remaining Decision Record blocker for this epic's headline items | Only sequence items not gated on an open Decision Record. | **Headline items COMPLETE**; all remaining sub-items OPEN, genuinely `human`-gated (re-verified 2026-07-23) |
-| 7 | Notifications G8 cleanup | SPEC-NOTIF-001 OQ-NOTIF-02..09 (non-blocked) | OQ-NOTIF-01 Decision Record blocks push-channel (TREQ-002/TREQ-012) | Fully independent of the auth epics; parallelizable throughout. | **Headline item COMPLETE** (`ADR-027`/`95b1364`); remaining items OPEN, `human`-gated |
+| 7 | Notification dispatch & delivery (Transactional Outbox + Worker, `ADR-029`) | SPEC-NOTIF-001 dispatch build: PRs 7.1–7.6 (outbox model, worker runtime, EMAIL, PUSH, producer migration, observability) | none — `ADR-029` (GD-01) resolves `OQ-NOTIF-01` dispatch half + `OQ-NOTIF-04/06/07/08/09` | Fully independent of the auth epics; parallelizable throughout. `OQ-NOTIF-02/03/05` ship under their own decisions, outside this epic. | **DESIGN DECIDED 2026-07-23 (`ADR-029`)**; build PRs 7.1–7.6 sequenced, awaiting implementation authorization |
 | 8 | Work-request / work-application hotel-scoping | SPEC-JOB-DISPATCH-001 FIND-SEC-002/003 / SIR-JOBD-002; MIG-GAP-07; target TREQ-008/TRULE-007 | none — Epic 5's scope model (PR 5.4/5.5) is the only prerequisite and is already merged | **New, identified by this pass.** Sibling High finding to Epic 1's Critical; never sequenced by the original plan. Same remediate-not-accept-risk precedent as Epics 1 and 5 PR 5.5. | **COMPLETE** (this session; 367/367 backend tests green, typecheck clean) |
 
 Deferred / not sequenced here (blocked on human authority, correctly excluded):
@@ -328,11 +330,30 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
   `getHotelSummary`. No dependent PR remains blocked for this item. One PR per finding, per
   module, sized to a single acceptance criterion.
 
-### Epic 7 — Notifications G8 cleanup
-- Non-push items (OQ-NOTIF-02..09 not gated by OQ-NOTIF-01) each as their own small PR. OQ-NOTIF-01's
-  Decision Record (`ADR-027`, 2026-07-22) has landed — the enum now includes WEBHOOK. Push /
-  channel *dispatch* work (TREQ-002, TREQ-012) still requires its own design (push-only vs. both
-  channels, ADR-027 does not settle that) before authoring.
+### Epic 7 — Notification dispatch & delivery (Transactional Outbox + Worker runtime, `ADR-029`/GD-01)
+
+`ADR-029` (2026-07-23) resolves the dispatch/delivery/scheduled-job-host design (`OQ-NOTIF-01` dispatch
+half, `OQ-NOTIF-04/06/07/08/09`, and the delivery half of `OQ-AUTH-01`). The build is sequenced as the
+following dependency-ordered, individually-reviewable, backward-compatible PRs. Each is independently
+testable and reversible (additive schema, new process, no removal of the existing `Notification` REST
+surface). Remaining `human`-gated items (`OQ-NOTIF-02` retention/GD-09, `OQ-NOTIF-03` `FEATURE_*`,
+`OQ-NOTIF-05` cross-module send-authz) are **not** in Epic 7 and each ships under its own decision.
+
+| PR | Title | Scope | DB | Depends on |
+|----|-------|-------|----|-----------|
+| **7.1** | Outbox data model + transactional enqueue | `OutboxEvent` model + `OutboxStatus`/`OutboxTransport` enums (Prisma) + migration; `notification-service.enqueue()` persisting `Notification` + `OutboxEvent` in one transaction; `event_id` (UUID) idempotency key. No delivery yet — events accumulate `PENDING`. | +1 migration (outbox table + 2 enums) | — |
+| **7.2** | Worker runtime | Dedicated `backend/worker` entrypoint (shared monolith codebase/Prisma); poll loop (default 5s, configurable); atomic claim (`PENDING→PROCESSING` via `FOR UPDATE SKIP LOCKED`); `DELIVERED`/`FAILED`/`DEAD_LETTER` lifecycle; configurable exponential backoff (1m/5m/15m/1h); transport-handler dispatch interface (no-op/log handler only); scheduled-job registration mechanism (no domain job yet); deploy topology (ecosystem/compose worker process). | — | 7.1 |
+| **7.3** | EMAIL transport | SMTP client behind the `EMAIL` transport handler; env-driven config with explicit secret-storage/rotation/least-privilege (carries `MIG-GAP-11`); mocked-SMTP tests. Unblocks auth email-reset / failed-login delivery (wiring auth is a follow-on producer change, tracked with `SIR-AUTH-005`). | — | 7.2 |
+| **7.4** | PUSH transport | APNs/FCM clients behind the `PUSH` transport handler; push-token model + registration endpoint; mobile push-token registration + OS-permission flow (worker + checker apps); mocked-provider tests. | +1 migration (push-token table) | 7.2 |
+| **7.5** | Migrate existing producers to the outbox | Convert the four current producers (`work-requests`, `work-applications`, `attendance`, `quality`) from `.catch(() => {})` fire-and-forget to transactional `enqueue`; delivery failures become observable via `OutboxEvent.status`. Closes `OQ-NOTIF-04`/`OQ-NOTIF-09` in code. Per-producer tests. | — | 7.1 (7.3/7.4 for live delivery) |
+| **7.6** | Delivery observability + dead-letter operability | Failure/audit logging for delivery (addresses the `AuditLog` gap RULE-005 for security-relevant sends), dead-letter listing/requeue for operators, metrics; runbook/docs. | — | 7.2, 7.5 |
+
+Per-trigger notification *features* (`TREQ-001` failed-login, `TREQ-003` rework escalation, `TREQ-004`
+rating warnings, `TREQ-006` sick/vacation, `TREQ-007` contract-expiry, `TREQ-008/009/010` broadcast)
+remain owned by their respective epics (auth, quality, calendar, hr, job-dispatch); after Epic 7 they
+each become "produce an `OutboxEvent`" changes rather than blocked-on-undecided-transport work.
+
+`OutboxEvent` retention tier is a required-before-G8 disposition folded into `SIR-NOTIF-002` / GD-09.
 
 ### Epic 8 — Work-request / work-application hotel-scoping (new, 2026-07-23)
 Closes `SIR-JOBD-002` / `FIND-SEC-002`/`FIND-SEC-003`: work-request create/patch and application
@@ -567,7 +588,8 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |
 | QUAL OQ-01 (1-5 vs 0-100 rating) | Blocks QUAL implementation planning | **RESOLVED 2026-07-22, ADR-026 — 0-100, matches TRULE-001 (corrected same session; earlier "1-5, override" framing was wrong, see ADR-026 Status)** |
 | ANALYTICS OQ-ANALYTICS-03 (metric definition) | Blocks ANALYTICS implementation planning | **RESOLVED 2026-07-22, ADR-028 — retained, redefined without a room-level task layer (manager-entered `RoomsCompletedEntry` count, 1-to-1 with the worker's full-day `WorkerAssignment`); implemented in the same pass, see SIR-ANLY-003** |
-| NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | **RESOLVED 2026-07-22, ADR-027** (dispatch-design question separately still open) |
+| NOTIF OQ-NOTIF-01 (channel enum shape) | Blocks TREQ-002/TREQ-012 | **RESOLVED** — enum shape 2026-07-22 (ADR-027); **dispatch-design half RESOLVED 2026-07-23, ADR-029** (Transactional Outbox + Worker runtime; GD-01) |
+| NOTIF OQ-NOTIF-04/06/07/08/09 (failure control / push milestone / sendEmail fate / scheduled-job host / fan-out latency) | Blocked Epic 7 dispatch build | **RESOLVED 2026-07-23, ADR-029** (GD-01). Delivery half of AUTH OQ-AUTH-01 (SIR-AUTH-005) likewise unblocked (email-reset/failed-login delivery). Remaining NOTIF opens: OQ-NOTIF-02 (retention/GD-09, now also OutboxEvent), OQ-NOTIF-03, OQ-NOTIF-05 |
 | SYNC-001 owner assignment | Platform-wide | Human authority |
 | `Hotel.hotel_group_id` NOT NULL flip — **sequencing deferral, not a target-architecture change.** Target remains one `HotelGroup` per `Hotel` (`ADR-023` §3: "nullable **until** assigned", not permanently optional like `billing_info`); current nullability is temporary migration/sequencing state | Blocked on the hotel-creation workflow (a way to always have an assignable group at creation time, without the fresh-deployment bootstrapping problem of zero `HotelGroup` rows) — not blocked on a design question | Human/product decision on *when/how* the workflow lands; the *whether* is already decided by `ADR-023` |
 
