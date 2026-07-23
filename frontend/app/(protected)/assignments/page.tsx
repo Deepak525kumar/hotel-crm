@@ -1,23 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useAssignments } from "@/hooks/useAssignments";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { formatDate } from "@/lib/format";
 import {
-  Button,
   Card,
   CardContent,
+  EmptyState,
+  Pager,
+  PageHeader,
+  Select,
   Table,
   THead,
   TBody,
+  TableSkeleton,
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { AssignmentStatus } from "@/lib/types";
 
-const STATUS_FILTERS: Array<{ value: AssignmentStatus | ""; label: string }> = [
+const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
   { value: "CONFIRMED", label: "Confirmed" },
   { value: "IN_PROGRESS", label: "In progress" },
@@ -28,6 +33,7 @@ const STATUS_FILTERS: Array<{ value: AssignmentStatus | ""; label: string }> = [
 ];
 
 const PER_PAGE = 20;
+const COLUMNS = 4;
 
 export default function AssignmentsPage() {
   const [status, setStatus] = useState<AssignmentStatus | "">("");
@@ -39,7 +45,6 @@ export default function AssignmentsPage() {
     per_page: PER_PAGE,
   });
 
-  // Reset to the first page whenever the status filter changes.
   const onStatusChange = (next: AssignmentStatus | "") => {
     setStatus(next);
     setPage(1);
@@ -47,31 +52,20 @@ export default function AssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Assignments</h1>
-        <p className="text-sm text-gray-500">
-          Confirmed workers and the shifts they are staffed on.
-        </p>
-      </div>
+      <PageHeader
+        title="Assignments"
+        description="Confirmed workers and the shifts they are staffed on."
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium text-gray-700" htmlFor="status">
-          Status
-        </label>
-        <select
-          id="status"
-          value={status}
-          onChange={(e) =>
-            onStatusChange(e.target.value as AssignmentStatus | "")
-          }
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-48">
+          <Select
+            label="Status"
+            value={status}
+            onChange={(e) => onStatusChange(e.target.value as AssignmentStatus | "")}
+            options={STATUS_FILTERS}
+          />
+        </div>
       </div>
 
       <Card>
@@ -80,16 +74,8 @@ export default function AssignmentsPage() {
             <div className="px-6 py-10 text-center text-sm text-red-600">
               Failed to load assignments. Please try again.
             </div>
-          ) : isLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              Loading…
-            </div>
-          ) : assignments.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              No assignments found.
-            </div>
           ) : (
-            <Table>
+            <Table aria-label="Assignments">
               <THead>
                 <tr>
                   <TH>Worker</TH>
@@ -98,56 +84,61 @@ export default function AssignmentsPage() {
                   <TH>Status</TH>
                 </tr>
               </THead>
-              <TBody>
-                {assignments.map((a) => (
-                  <TR key={a.id} className="cursor-pointer">
-                    <TD className="font-medium">
-                      <Link
-                        href={`/assignments/${a.id}`}
-                        className="block text-blue-700 hover:underline"
-                      >
-                        {a.worker_id}
-                      </Link>
+              {isLoading ? (
+                <TableSkeleton columns={COLUMNS} />
+              ) : assignments.length === 0 ? (
+                <TBody>
+                  <tr>
+                    <TD colSpan={COLUMNS} className="p-0">
+                      <EmptyState
+                        title="No assignments found"
+                        description={
+                          status
+                            ? "Try adjusting your filters."
+                            : "Assignments appear once applications are accepted."
+                        }
+                      />
                     </TD>
-                    <TD>
-                      <Link
-                        href={`/requests/${a.work_request_id}`}
-                        className="text-blue-700 hover:underline"
-                      >
-                        {a.work_request_id}
-                      </Link>
-                    </TD>
-                    <TD>{new Date(a.confirmed_at).toLocaleDateString()}</TD>
-                    <TD>
-                      <AssignmentStatusBadge status={a.status} />
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
+                  </tr>
+                </TBody>
+              ) : (
+                <TBody>
+                  {assignments.map((a) => (
+                    <TR key={a.id}>
+                      <TD className="font-medium">
+                        <TextLink
+                          href={`/assignments/${a.id}`}
+                          className="block"
+                        >
+                          {a.worker_id}
+                        </TextLink>
+                      </TD>
+                      <TD>
+                        <TextLink
+                          href={`/requests/${a.work_request_id}`}
+                        >
+                          {a.work_request_id}
+                        </TextLink>
+                      </TD>
+                      <TD>{formatDate(a.confirmed_at)}</TD>
+                      <TD>
+                        <AssignmentStatusBadge status={a.status} />
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              )}
             </Table>
           )}
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1 || isLoading}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-gray-500">Page {page}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!hasNext || isLoading}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      <Pager
+        page={page}
+        hasNext={hasNext}
+        onPageChange={setPage}
+        disabled={isLoading}
+      />
     </div>
   );
 }

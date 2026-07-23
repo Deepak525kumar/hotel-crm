@@ -6,11 +6,21 @@ import type {
   Attendance,
   AuthUser,
   CheckInInput,
+  CreateHotelGroupInput,
+  CreateHotelInput,
+  CreateUserInput,
   CreateWorkRequestInput,
-  HotelSummary,
+  DashboardStats,
+  HotelAnalyticsSummary,
+  LeaderboardEntry,
+  Hotel,
+  HotelGroup,
   ListApplicationsQuery,
   ListAssignmentsQuery,
   ListAttendanceQuery,
+  ListHotelGroupsQuery,
+  ListHotelsQuery,
+  ListUsersQuery,
   ListWorkRequestsQuery,
   LoginResponse,
   Notification,
@@ -18,7 +28,12 @@ import type {
   UpdateApplicationInput,
   UpdateAssignmentInput,
   UpdateAttendanceInput,
+  UpdateHotelGroupInput,
+  UpdateHotelInput,
+  UpdateUserInput,
   UpdateWorkRequestInput,
+  UserDetail,
+  UserSummary,
   WorkApplication,
   WorkRequest,
 } from "@/lib/types";
@@ -328,7 +343,76 @@ export const notificationsApi = {
     apiFetch<Notification>(`/notifications/${id}/read`, { method: "POST" }),
 };
 
-/** Hotels API — only the read used by the work-request create form. */
+/** Hotels API matching the backend `/crm/hotels/*` routes. */
 export const hotelsApi = {
-  list: () => apiFetch<HotelSummary[]>("/crm/hotels?per_page=100"),
+  list: (query: ListHotelsQuery = {}) =>
+    apiFetch<Hotel[]>(`/crm/hotels${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<Hotel>(`/crm/hotels/${id}`),
+
+  create: (input: CreateHotelInput) =>
+    apiFetch<Hotel>("/crm/hotels", { method: "POST", body: input }),
+
+  update: (id: string, input: UpdateHotelInput) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}`, { method: "PATCH", body: input }),
+
+  /** Soft-delete (deactivate) a hotel. Admin-only backend-side; returns 204. */
+  remove: (id: string) =>
+    apiFetch<void>(`/crm/hotels/${id}`, { method: "DELETE" }),
+};
+
+/** Hotel Groups API matching the backend `/crm/hotel-groups/*` routes. */
+export const hotelGroupsApi = {
+  list: (query: ListHotelGroupsQuery = {}) =>
+    apiFetch<HotelGroup[]>(`/crm/hotel-groups${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<HotelGroup>(`/crm/hotel-groups/${id}`),
+
+  create: (input: CreateHotelGroupInput) =>
+    apiFetch<HotelGroup>("/crm/hotel-groups", { method: "POST", body: input }),
+
+  update: (id: string, input: UpdateHotelGroupInput) =>
+    apiFetch<HotelGroup>(`/crm/hotel-groups/${id}`, {
+      method: "PATCH",
+      body: input,
+    }),
+
+  remove: (id: string) =>
+    apiFetch<void>(`/crm/hotel-groups/${id}`, { method: "DELETE" }),
+};
+
+/** Analytics API matching the backend `/analytics/*` routes (manager/admin). */
+export const analyticsApi = {
+  /** Aggregate stats, optionally scoped to a single hotel. */
+  stats: (hotelId?: string) =>
+    apiFetch<DashboardStats>(`/analytics/stats${toQuery({ hotel_id: hotelId })}`),
+
+  /** Worker leaderboard, optionally scoped to a single hotel. */
+  leaderboard: (hotelId?: string) =>
+    apiFetch<LeaderboardEntry[]>(
+      `/analytics/leaderboard${toQuery({ hotel_id: hotelId })}`,
+    ),
+
+  /** Operational summary for a single hotel. */
+  hotelSummary: (hotelId: string) =>
+    apiFetch<HotelAnalyticsSummary>(`/analytics/hotel-summary/${hotelId}`),
+};
+
+/** Users API matching the backend `/users/*` routes. */
+export const usersApi = {
+  list: (query: ListUsersQuery = {}) =>
+    apiFetch<UserSummary[]>(`/users${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<UserDetail>(`/users/${id}`),
+
+  create: (input: CreateUserInput) =>
+    apiFetch<UserDetail>("/users", { method: "POST", body: input }),
+
+  /** Update a user. The backend route is a PUT, not a PATCH. */
+  update: (id: string, input: UpdateUserInput) =>
+    apiFetch<UserDetail>(`/users/${id}`, { method: "PUT", body: input }),
+
+  /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
+  remove: (id: string) =>
+    apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
 };

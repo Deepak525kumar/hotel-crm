@@ -1,34 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
-import { assignmentsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, assignmentsApi } from "@/lib/api";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
+  FormError,
   Modal,
+  PageHeader,
+  Skeleton,
+  Textarea,
+  TextLink,
 } from "@/components/ui";
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
 
 export default function AssignmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -36,75 +29,48 @@ export default function AssignmentDetailPage() {
 
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const action = useAsyncAction();
 
-  const busy = starting || completing || cancelling;
+  const start = () =>
+    action.run(() => assignmentsApi.start(id), {
+      key: "start",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to start assignment. Please try again.",
+    });
 
-  const start = async () => {
-    setActionError(null);
-    setStarting(true);
-    try {
-      const updated = await assignmentsApi.start(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to start assignment. Please try again.",
-      );
-    } finally {
-      setStarting(false);
-    }
-  };
+  const complete = () =>
+    action.run(() => assignmentsApi.complete(id), {
+      key: "complete",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to complete assignment. Please try again.",
+    });
 
-  const complete = async () => {
-    setActionError(null);
-    setCompleting(true);
-    try {
-      const updated = await assignmentsApi.complete(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to complete assignment. Please try again.",
-      );
-    } finally {
-      setCompleting(false);
-    }
-  };
-
-  const cancel = async () => {
-    setActionError(null);
-    setCancelling(true);
-    try {
-      const updated = await assignmentsApi.cancel(
-        id,
-        cancelReason.trim() || undefined,
-      );
-      await mutate(updated, { revalidate: false });
-      setCancelOpen(false);
-      setCancelReason("");
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to cancel assignment. Please try again.",
-      );
-    } finally {
-      setCancelling(false);
-    }
-  };
+  const cancel = () =>
+    action.run(
+      () => assignmentsApi.cancel(id, cancelReason.trim() || undefined),
+      {
+        key: "cancel",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setCancelOpen(false);
+          setCancelReason("");
+        },
+        errorMessage: "Failed to cancel assignment. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -112,12 +78,12 @@ export default function AssignmentDetailPage() {
   if (error || !assignment) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/assignments"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to assignments
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -139,65 +105,71 @@ export default function AssignmentDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/assignments"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to assignments
-        </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">Assignment</h1>
-          <AssignmentStatusBadge status={assignment.status} />
-        </div>
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Assignment
+              <AssignmentStatusBadge status={assignment.status} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Worker" value={assignment.worker_id} />
-          <DetailRow
-            label="Work request"
-            value={
-              <Link
-                href={`/requests/${assignment.work_request_id}`}
-                className="text-blue-700 hover:underline"
-              >
-                {assignment.work_request_id}
-              </Link>
-            }
-          />
-          <DetailRow label="Hotel" value={assignment.hotel_id} />
-          <DetailRow label="Assigned by" value={assignment.assigned_by_id} />
-          <DetailRow
-            label="Confirmed"
-            value={new Date(assignment.confirmed_at).toLocaleString()}
-          />
-          {assignment.started_at && (
-            <DetailRow
-              label="Started"
-              value={new Date(assignment.started_at).toLocaleString()}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Worker" value={assignment.worker_id} />
+            <DataRow
+              label="Work request"
+              value={
+                <TextLink
+                  href={`/requests/${assignment.work_request_id}`}
+                >
+                  {assignment.work_request_id}
+                </TextLink>
+              }
             />
-          )}
-          {assignment.completed_at && (
-            <DetailRow
-              label="Completed"
-              value={new Date(assignment.completed_at).toLocaleString()}
+            <DataRow label="Hotel" value={assignment.hotel_id} />
+            <DataRow label="Assigned by" value={assignment.assigned_by_id} />
+            <DataRow
+              label="Confirmed"
+              value={formatDateTime(assignment.confirmed_at)}
             />
-          )}
-          {assignment.cancelled_at && (
-            <DetailRow
-              label="Cancelled"
-              value={new Date(assignment.cancelled_at).toLocaleString()}
-            />
-          )}
-          {assignment.cancellation_reason && (
-            <DetailRow
-              label="Cancellation reason"
-              value={assignment.cancellation_reason}
-            />
-          )}
+            {assignment.started_at && (
+              <DataRow
+                label="Started"
+                value={formatDateTime(assignment.started_at)}
+              />
+            )}
+            {assignment.completed_at && (
+              <DataRow
+                label="Completed"
+                value={formatDateTime(assignment.completed_at)}
+              />
+            )}
+            {assignment.cancelled_at && (
+              <DataRow
+                label="Cancelled"
+                value={formatDateTime(assignment.cancelled_at)}
+              />
+            )}
+            {assignment.cancellation_reason && (
+              <DataRow
+                label="Cancellation reason"
+                value={assignment.cancellation_reason}
+              />
+            )}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -213,21 +185,25 @@ export default function AssignmentDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => setCancelOpen(true)}
-                  disabled={busy}
+                  disabled={action.pending}
                 >
                   Cancel
                 </Button>
               )}
               {canStart && (
-                <Button onClick={start} loading={starting} disabled={cancelling}>
+                <Button
+                  onClick={start}
+                  loading={action.isPending("start")}
+                  disabled={action.isPending("cancel")}
+                >
                   Start shift
                 </Button>
               )}
               {canComplete && (
                 <Button
                   onClick={complete}
-                  loading={completing}
-                  disabled={cancelling}
+                  loading={action.isPending("complete")}
+                  disabled={action.isPending("cancel")}
                 >
                   Complete
                 </Button>
@@ -237,12 +213,12 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{action.error}</FormError>
 
       <Modal
         open={cancelOpen}
         onClose={() => {
-          if (!cancelling) setCancelOpen(false);
+          if (!action.isPending("cancel")) setCancelOpen(false);
         }}
         title="Cancel assignment"
         footer={
@@ -250,33 +226,28 @@ export default function AssignmentDetailPage() {
             <Button
               variant="outline"
               onClick={() => setCancelOpen(false)}
-              disabled={cancelling}
+              disabled={action.isPending("cancel")}
             >
               Keep assignment
             </Button>
-            <Button variant="danger" onClick={cancel} loading={cancelling}>
+            <Button
+              variant="danger"
+              onClick={cancel}
+              loading={action.isPending("cancel")}
+            >
               Cancel assignment
             </Button>
           </>
         }
       >
-        <div className="space-y-2">
-          <label
-            htmlFor="cancellation-reason"
-            className="text-sm font-medium text-gray-700"
-          >
-            Reason (optional)
-          </label>
-          <textarea
-            id="cancellation-reason"
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            maxLength={500}
-            rows={4}
-            placeholder="Share why this assignment was cancelled."
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <Textarea
+          label="Reason (optional)"
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          maxLength={500}
+          rows={4}
+          placeholder="Share why this assignment was cancelled."
+        />
       </Modal>
     </div>
   );

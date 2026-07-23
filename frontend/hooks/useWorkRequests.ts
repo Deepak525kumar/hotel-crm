@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { hotelsApi, workRequestsApi } from "@/lib/api";
 import type { ListWorkRequestsQuery } from "@/lib/types";
 
@@ -14,16 +15,13 @@ import type { ListWorkRequestsQuery } from "@/lib/types";
  */
 export function useWorkRequests(query: ListWorkRequestsQuery = {}) {
   const perPage = query.per_page ?? 20;
-  // A stable, serialisable key so SWR dedupes/caches per filter combination.
-  const key = ["work-requests", { ...query, per_page: perPage }] as const;
-
-  const swr = useSWR(key, ([, q]) => workRequestsApi.list(q));
-
-  return {
-    ...swr,
-    requests: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= perPage,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    // A stable, serialisable key so SWR dedupes/caches per filter combination.
+    ["work-requests", { ...query, per_page: perPage }],
+    () => workRequestsApi.list({ ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, requests: items, hasNext };
 }
 
 /** Fetches a single work request by id. */
@@ -34,8 +32,14 @@ export function useWorkRequest(id: string | null | undefined) {
   );
 }
 
-/** Lists hotels for the create form's hotel selector. */
-export function useHotels() {
-  const swr = useSWR("hotels", () => hotelsApi.list());
+/**
+ * Lists active hotels for the create form's hotel selector. Requests the
+ * backend page cap (100) so the selector isn't silently truncated to the
+ * default page size.
+ */
+export function useHotelOptions() {
+  const swr = useSWR(["hotel-options"], () =>
+    hotelsApi.list({ is_active: "true", limit: 100 }),
+  );
   return { ...swr, hotels: swr.data ?? [] };
 }

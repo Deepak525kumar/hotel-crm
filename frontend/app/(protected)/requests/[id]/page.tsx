@@ -1,59 +1,51 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
-import { workRequestsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, workRequestsApi } from "@/lib/api";
 import { ManagerAdminGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
+  FormError,
+  PageHeader,
+  Skeleton,
+  TextLink,
 } from "@/components/ui";
-
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
 
 export default function WorkRequestDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
+  const publish = useAsyncAction();
 
-  const publish = async () => {
-    setPublishError(null);
-    setPublishing(true);
-    try {
-      const updated = await workRequestsApi.publish(id);
+  const onPublish = () =>
+    publish.run(() => workRequestsApi.publish(id), {
       // Optimistically replace the cached value with the server response.
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setPublishError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to publish. Please try again.",
-      );
-    } finally {
-      setPublishing(false);
-    }
-  };
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to publish. Please try again.",
+    });
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-40" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -61,9 +53,9 @@ export default function WorkRequestDetailPage() {
   if (error || !request) {
     return (
       <div className="space-y-4">
-        <Link href="/requests" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/requests" className="text-sm">
           ← Back to work requests
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -78,59 +70,61 @@ export default function WorkRequestDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/requests" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/requests" className="text-sm">
           ← Back to work requests
-        </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {request.position}
-          </h1>
-          <WorkRequestStatusBadge status={request.status} />
-        </div>
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              {request.position}
+              <WorkRequestStatusBadge status={request.status} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Shift details</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Shift date" value={request.shift_date} />
-          <DetailRow
-            label="Time"
-            value={`${request.shift_start_time}–${request.shift_end_time}`}
-          />
-          <DetailRow
-            label="Staffing"
-            value={`${request.workers_confirmed}/${request.workers_needed} confirmed`}
-          />
-          <DetailRow
-            label="Hourly rate"
-            value={
-              request.hourly_rate != null
-                ? `${request.hourly_rate} ${request.currency}`
-                : "—"
-            }
-          />
-          <DetailRow
-            label="Published"
-            value={
-              request.published_at
-                ? new Date(request.published_at).toLocaleString()
-                : "Not published"
-            }
-          />
-          {request.expires_at && (
-            <DetailRow
-              label="Expires"
-              value={new Date(request.expires_at).toLocaleString()}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Shift date" value={request.shift_date} />
+            <DataRow
+              label="Time"
+              value={`${request.shift_start_time}–${request.shift_end_time}`}
             />
-          )}
-          {request.cancellation_reason && (
-            <DetailRow
-              label="Cancellation reason"
-              value={request.cancellation_reason}
+            <DataRow
+              label="Staffing"
+              value={`${request.workers_confirmed}/${request.workers_needed} confirmed`}
             />
-          )}
+            <DataRow
+              label="Hourly rate"
+              value={
+                request.hourly_rate != null
+                  ? `${request.hourly_rate} ${request.currency}`
+                  : "—"
+              }
+            />
+            <DataRow
+              label="Published"
+              value={
+                request.published_at
+                  ? formatDateTime(request.published_at)
+                  : "Not published"
+              }
+            />
+            {request.expires_at && (
+              <DataRow label="Expires" value={formatDateTime(request.expires_at)} />
+            )}
+            {request.cancellation_reason && (
+              <DataRow
+                label="Cancellation reason"
+                value={request.cancellation_reason}
+              />
+            )}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -178,7 +172,7 @@ export default function WorkRequestDetailPage() {
               <div className="text-sm text-gray-600">
                 This request is a draft. Publish it to open it for staffing.
               </div>
-              <Button onClick={publish} loading={publishing}>
+              <Button onClick={onPublish} loading={publish.pending}>
                 Publish
               </Button>
             </CardContent>
@@ -186,7 +180,7 @@ export default function WorkRequestDetailPage() {
         )}
       </ManagerAdminGate>
 
-      {publishError && <p className="text-sm text-red-600">{publishError}</p>}
+      <FormError>{publish.error}</FormError>
     </div>
   );
 }

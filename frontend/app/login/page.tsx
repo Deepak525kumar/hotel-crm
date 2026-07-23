@@ -10,6 +10,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  FormError,
   Input,
 } from "@/components/ui";
 
@@ -68,11 +69,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
-            {error && (
-              <p role="alert" className="text-sm text-red-600">
-                {error}
-              </p>
-            )}
+            <FormError>{error}</FormError>
             <Button type="submit" loading={submitting} className="w-full">
               Sign in
             </Button>

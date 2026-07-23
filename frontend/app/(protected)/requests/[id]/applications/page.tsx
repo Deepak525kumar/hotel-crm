@@ -1,24 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkApplications } from "@/hooks/useWorkApplications";
 import { ApplicationStatusBadge } from "@/components/work-applications/ApplicationStatusBadge";
+import { formatDate, formatScore } from "@/lib/format";
 import {
-  Button,
   Card,
   CardContent,
+  EmptyState,
+  Pager,
+  PageHeader,
+  Select,
   Table,
   THead,
   TBody,
+  TableSkeleton,
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { ApplicationStatus } from "@/lib/types";
 
-const STATUS_FILTERS: Array<{ value: ApplicationStatus | ""; label: string }> = [
+const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
   { value: "PENDING", label: "Pending" },
   { value: "ACCEPTED", label: "Accepted" },
@@ -28,6 +33,7 @@ const STATUS_FILTERS: Array<{ value: ApplicationStatus | ""; label: string }> = 
 ];
 
 const PER_PAGE = 20;
+const COLUMNS = 4;
 
 export default function WorkRequestApplicationsPage() {
   const params = useParams<{ id: string }>();
@@ -50,38 +56,28 @@ export default function WorkRequestApplicationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link
+        <TextLink
           href={`/requests/${id}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to work request
-        </Link>
-        <h1 className="mt-2 text-xl font-semibold text-gray-900">
-          Applications
-        </h1>
-        <p className="text-sm text-gray-500">
-          Workers who have applied to this shift.
-        </p>
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title="Applications"
+          description="Workers who have applied to this shift."
+        />
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium text-gray-700" htmlFor="status">
-          Status
-        </label>
-        <select
-          id="status"
-          value={status}
-          onChange={(e) =>
-            onStatusChange(e.target.value as ApplicationStatus | "")
-          }
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-48">
+          <Select
+            label="Status"
+            value={status}
+            onChange={(e) => onStatusChange(e.target.value as ApplicationStatus | "")}
+            options={STATUS_FILTERS}
+          />
+        </div>
       </div>
 
       <Card>
@@ -90,16 +86,8 @@ export default function WorkRequestApplicationsPage() {
             <div className="px-6 py-10 text-center text-sm text-red-600">
               Failed to load applications. Please try again.
             </div>
-          ) : isLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              Loading…
-            </div>
-          ) : applications.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              No applications found.
-            </div>
           ) : (
-            <Table>
+            <Table aria-label="Applications">
               <THead>
                 <tr>
                   <TH>Worker</TH>
@@ -108,53 +96,55 @@ export default function WorkRequestApplicationsPage() {
                   <TH>Status</TH>
                 </tr>
               </THead>
-              <TBody>
-                {applications.map((app) => (
-                  <TR key={app.id} className="cursor-pointer">
-                    <TD className="font-medium">
-                      <Link
-                        href={`/requests/${id}/applications/${app.id}`}
-                        className="block text-blue-700 hover:underline"
-                      >
-                        {app.worker_id}
-                      </Link>
+              {isLoading ? (
+                <TableSkeleton columns={COLUMNS} />
+              ) : applications.length === 0 ? (
+                <TBody>
+                  <tr>
+                    <TD colSpan={COLUMNS} className="p-0">
+                      <EmptyState
+                        title="No applications found"
+                        description={
+                          status
+                            ? "Try adjusting your filters."
+                            : "Applications appear here once workers apply to this shift."
+                        }
+                      />
                     </TD>
-                    <TD>
-                      {app.worker_rating_snapshot != null
-                        ? app.worker_rating_snapshot.toFixed(1)
-                        : "—"}
-                    </TD>
-                    <TD>{new Date(app.applied_at).toLocaleDateString()}</TD>
-                    <TD>
-                      <ApplicationStatusBadge status={app.status} />
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
+                  </tr>
+                </TBody>
+              ) : (
+                <TBody>
+                  {applications.map((app) => (
+                    <TR key={app.id}>
+                      <TD className="font-medium">
+                        <TextLink
+                          href={`/requests/${id}/applications/${app.id}`}
+                          className="block"
+                        >
+                          {app.worker_id}
+                        </TextLink>
+                      </TD>
+                      <TD>{formatScore(app.worker_rating_snapshot)}</TD>
+                      <TD>{formatDate(app.applied_at)}</TD>
+                      <TD>
+                        <ApplicationStatusBadge status={app.status} />
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              )}
             </Table>
           )}
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1 || isLoading}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-gray-500">Page {page}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!hasNext || isLoading}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      <Pager
+        page={page}
+        hasNext={hasNext}
+        onPageChange={setPage}
+        disabled={isLoading}
+      />
     </div>
   );
 }

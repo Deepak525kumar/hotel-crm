@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useNotification } from "@/hooks/useNotifications";
-import { notificationsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notificationsApi } from "@/lib/api";
 import {
   NotificationTypeBadge,
   notificationTypeLabel,
 } from "@/components/notifications/NotificationTypeBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Badge,
   Button,
@@ -16,26 +16,13 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
+  FormError,
+  PageHeader,
+  Skeleton,
+  TextLink,
 } from "@/components/ui";
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function formatTime(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "—";
-}
 
 export default function NotificationDetailPage() {
   const params = useParams<{ id: string }>();
@@ -43,30 +30,24 @@ export default function NotificationDetailPage() {
 
   const { notification, isLoading, error, mutate } = useNotification(id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [marking, setMarking] = useState(false);
+  const mark = useAsyncAction();
 
-  const markRead = async () => {
-    setActionError(null);
-    setMarking(true);
-    try {
-      await notificationsApi.markAsRead(id);
-      await mutate();
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to mark as read. Please try again.",
-      );
-    } finally {
-      setMarking(false);
-    }
-  };
+  const markRead = () =>
+    mark.run(() => notificationsApi.markAsRead(id), {
+      onSuccess: () => mutate(),
+      errorMessage: "Failed to mark as read. Please try again.",
+    });
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-24 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -74,12 +55,12 @@ export default function NotificationDetailPage() {
   if (error || !notification) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/notifications"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to notifications
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             This notification was not found or could not be loaded.
@@ -97,25 +78,26 @@ export default function NotificationDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/notifications"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to notifications
-        </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">
-            {notification.title}
-          </h1>
-          <div className="flex items-center gap-2">
-            <NotificationTypeBadge type={notification.type} />
-            {notification.is_read ? (
-              <Badge tone="neutral">Read</Badge>
-            ) : (
-              <Badge tone="info">Unread</Badge>
-            )}
-          </div>
-        </div>
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title={notification.title}
+          actions={
+            <div className="flex items-center gap-2">
+              <NotificationTypeBadge type={notification.type} />
+              {notification.is_read ? (
+                <Badge tone="neutral">Read</Badge>
+              ) : (
+                <Badge tone="info">Unread</Badge>
+              )}
+            </div>
+          }
+        />
       </div>
 
       <Card>
@@ -133,24 +115,26 @@ export default function NotificationDetailPage() {
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow
-            label="Type"
-            value={notificationTypeLabel(notification.type)}
-          />
-          <DetailRow label="Channel" value={notification.channel} />
-          <DetailRow
-            label="Received"
-            value={formatTime(notification.created_at)}
-          />
-          <DetailRow label="Read at" value={formatTime(notification.read_at)} />
-          {dataEntries.map(([key, value]) => (
-            <DetailRow key={key} label={key} value={String(value)} />
-          ))}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow
+              label="Type"
+              value={notificationTypeLabel(notification.type)}
+            />
+            <DataRow label="Channel" value={notification.channel} />
+            <DataRow
+              label="Received"
+              value={formatDateTime(notification.created_at)}
+            />
+            <DataRow label="Read at" value={formatDateTime(notification.read_at)} />
+            {dataEntries.map(([key, value]) => (
+              <DataRow key={key} label={key} value={String(value)} />
+            ))}
+          </DataList>
         </CardContent>
       </Card>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{mark.error}</FormError>
 
       {!notification.is_read && (
         <Card>
@@ -158,7 +142,7 @@ export default function NotificationDetailPage() {
             <div className="text-sm text-gray-600">
               Mark this notification as read once you&apos;ve seen it.
             </div>
-            <Button onClick={markRead} loading={marking} className="shrink-0">
+            <Button onClick={markRead} loading={mark.pending} className="shrink-0">
               Mark as read
             </Button>
           </CardContent>

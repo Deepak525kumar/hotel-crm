@@ -80,7 +80,3 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
-
-/** Convenience selector for the four role gate / display fields. */
-export const selectIsManagerOrAdmin = (state: AuthState): boolean =>
-  state.user?.role === "manager" || state.user?.role === "admin";

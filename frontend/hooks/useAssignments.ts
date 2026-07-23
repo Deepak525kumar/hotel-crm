@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { assignmentsApi } from "@/lib/api";
 import type { ListAssignmentsQuery } from "@/lib/types";
 
@@ -17,16 +18,13 @@ import type { ListAssignmentsQuery } from "@/lib/types";
  */
 export function useAssignments(query: ListAssignmentsQuery = {}) {
   const perPage = query.per_page ?? 20;
-  // A stable, serialisable key so SWR dedupes/caches per filter combination.
-  const key = ["assignments", { ...query, per_page: perPage }] as const;
-
-  const swr = useSWR(key, ([, q]) => assignmentsApi.list(q));
-
-  return {
-    ...swr,
-    assignments: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= perPage,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    // A stable, serialisable key so SWR dedupes/caches per filter combination.
+    ["assignments", { ...query, per_page: perPage }],
+    () => assignmentsApi.list({ ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, assignments: items, hasNext };
 }
 
 /** Fetches a single assignment by id. */

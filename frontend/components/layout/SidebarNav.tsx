@@ -1,0 +1,70 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/cn";
+import { useAuth } from "@/hooks/useAuth";
+import { useNotifications } from "@/hooks/useNotifications";
+import { Badge } from "@/components/ui";
+import type { Role } from "@/lib/types";
+
+export interface NavItem {
+  href: string;
+  label: string;
+  /** When set, the item only shows for these roles. */
+  roles?: Role[];
+}
+
+// Feature routes are added here as modules land under app/(protected)/.
+export const NAV: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/requests", label: "Work requests" },
+  { href: "/assignments", label: "Assignments" },
+  { href: "/attendance", label: "Attendance" },
+  { href: "/analytics", label: "Analytics", roles: ["manager", "admin"] },
+  { href: "/hotels", label: "Hotels", roles: ["manager", "admin"] },
+  { href: "/hotel-groups", label: "Hotel groups", roles: ["manager", "admin"] },
+  { href: "/users", label: "Users", roles: ["admin"] },
+  { href: "/notifications", label: "Notifications" },
+];
+
+/**
+ * The navigation link list, shared by the desktop sidebar and the mobile
+ * drawer. `onNavigate` lets the mobile drawer close itself on selection.
+ */
+export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const { user } = useAuth();
+  const { unreadCount } = useNotifications();
+
+  return (
+    <nav className="flex-1 space-y-1 p-3">
+      {NAV.filter(
+        (item) => !item.roles || (user && item.roles.includes(user.role)),
+      ).map((item) => {
+        const active =
+          pathname === item.href || pathname.startsWith(`${item.href}/`);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
+              active
+                ? "bg-blue-50 text-blue-700"
+                : "text-gray-700 hover:bg-gray-100",
+            )}
+          >
+            <span>{item.label}</span>
+            {item.href === "/notifications" && unreadCount > 0 && (
+              <Badge tone="info">{unreadCount}</Badge>
+            )}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}

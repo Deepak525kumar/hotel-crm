@@ -1,50 +1,40 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAttendanceRecord } from "@/hooks/useAttendance";
-import { attendanceApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, attendanceApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  Checkbox,
+  DataList,
+  DataRow,
+  FormError,
   Modal,
+  PageHeader,
+  Select,
+  Skeleton,
+  TextLink,
 } from "@/components/ui";
 import type { AttendanceReviewStatus } from "@/lib/types";
 
-const REVIEW_STATUSES: Array<{ value: AttendanceReviewStatus; label: string }> = [
+const REVIEW_STATUSES = [
   { value: "PRESENT", label: "Present" },
   { value: "LATE", label: "Late" },
   { value: "PARTIAL", label: "Partial" },
   { value: "ABSENT", label: "Absent" },
   { value: "EXCUSED", label: "Excused" },
 ];
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function formatTime(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "—";
-}
 
 export default function AttendanceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -53,56 +43,46 @@ export default function AttendanceDetailPage() {
   const { data: record, isLoading, error, mutate } = useAttendanceRecord(id);
   const currentUserId = useAuthStore((s) => s.user?.id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewStatus, setReviewStatus] =
     useState<AttendanceReviewStatus>("PRESENT");
   const [markVerified, setMarkVerified] = useState(true);
+  const action = useAsyncAction();
 
-  const checkOut = async () => {
-    setActionError(null);
-    setCheckingOut(true);
-    try {
-      const updated = await attendanceApi.checkOut(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to check out. Please try again.",
-      );
-    } finally {
-      setCheckingOut(false);
-    }
-  };
+  const checkOut = () =>
+    action.run(() => attendanceApi.checkOut(id), {
+      key: "checkOut",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to check out. Please try again.",
+    });
 
-  const submitReview = async () => {
-    setActionError(null);
-    setVerifying(true);
-    try {
-      const updated = await attendanceApi.update(id, {
-        status: reviewStatus,
-        ...(markVerified ? { is_verified: true } : {}),
-      });
-      await mutate(updated, { revalidate: false });
-      setReviewOpen(false);
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to verify attendance. Please try again.",
-      );
-    } finally {
-      setVerifying(false);
-    }
-  };
+  const submitReview = () =>
+    action.run(
+      () =>
+        attendanceApi.update(id, {
+          status: reviewStatus,
+          ...(markVerified ? { is_verified: true } : {}),
+        }),
+      {
+        key: "verify",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setReviewOpen(false);
+        },
+        errorMessage: "Failed to verify attendance. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -110,12 +90,12 @@ export default function AttendanceDetailPage() {
   if (error || !record) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/attendance"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to attendance
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -135,47 +115,49 @@ export default function AttendanceDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/attendance"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to attendance
-        </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">Attendance</h1>
-          <div className="flex items-center gap-2">
-            <AttendanceStatusBadge status={record.status} />
-            <VerificationBadge verified={record.is_verified} />
-          </div>
-        </div>
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Attendance
+              <AttendanceStatusBadge status={record.status} />
+              <VerificationBadge verified={record.is_verified} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Check-in / Check-out</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Checked in" value={formatTime(record.check_in_at)} />
-          <DetailRow
-            label="Checked out"
-            value={formatTime(record.check_out_at)}
-          />
-          <DetailRow
-            label="Expected start"
-            value={formatTime(record.expected_start)}
-          />
-          <DetailRow
-            label="Expected end"
-            value={formatTime(record.expected_end)}
-          />
-          <DetailRow
-            label="Minutes late"
-            value={record.minutes_late ?? "—"}
-          />
-          <DetailRow
-            label="Minutes worked"
-            value={record.minutes_worked ?? "—"}
-          />
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Checked in" value={formatDateTime(record.check_in_at)} />
+            <DataRow
+              label="Checked out"
+              value={formatDateTime(record.check_out_at)}
+            />
+            <DataRow
+              label="Expected start"
+              value={formatDateTime(record.expected_start)}
+            />
+            <DataRow
+              label="Expected end"
+              value={formatDateTime(record.expected_end)}
+            />
+            <DataRow label="Minutes late" value={record.minutes_late ?? "—"} />
+            <DataRow
+              label="Minutes worked"
+              value={record.minutes_worked ?? "—"}
+            />
+          </DataList>
         </CardContent>
       </Card>
 
@@ -183,30 +165,31 @@ export default function AttendanceDetailPage() {
         <CardHeader>
           <CardTitle>Record</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Worker" value={record.worker_id} />
-          <DetailRow
-            label="Assignment"
-            value={
-              <Link
-                href={`/assignments/${record.assignment_id}`}
-                className="text-blue-700 hover:underline"
-              >
-                {record.assignment_id}
-              </Link>
-            }
-          />
-          <DetailRow label="Hotel" value={record.hotel_id} />
-          {record.verified_by_id && (
-            <DetailRow label="Verified by" value={record.verified_by_id} />
-          )}
-          {record.verified_at && (
-            <DetailRow
-              label="Verified at"
-              value={formatTime(record.verified_at)}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Worker" value={record.worker_id} />
+            <DataRow
+              label="Assignment"
+              value={
+                <TextLink
+                  href={`/assignments/${record.assignment_id}`}
+                >
+                  {record.assignment_id}
+                </TextLink>
+              }
             />
-          )}
-          {record.notes && <DetailRow label="Notes" value={record.notes} />}
+            <DataRow label="Hotel" value={record.hotel_id} />
+            {record.verified_by_id && (
+              <DataRow label="Verified by" value={record.verified_by_id} />
+            )}
+            {record.verified_at && (
+              <DataRow
+                label="Verified at"
+                value={formatDateTime(record.verified_at)}
+              />
+            )}
+            {record.notes && <DataRow label="Notes" value={record.notes} />}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -218,7 +201,7 @@ export default function AttendanceDetailPage() {
             </div>
             <Button
               onClick={checkOut}
-              loading={checkingOut}
+              loading={action.isPending("checkOut")}
               className="shrink-0"
             >
               Check out
@@ -251,12 +234,12 @@ export default function AttendanceDetailPage() {
         </Card>
       </RoleGate>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{action.error}</FormError>
 
       <Modal
         open={reviewOpen}
         onClose={() => {
-          if (!verifying) setReviewOpen(false);
+          if (!action.isPending("verify")) setReviewOpen(false);
         }}
         title="Review attendance"
         footer={
@@ -264,49 +247,31 @@ export default function AttendanceDetailPage() {
             <Button
               variant="outline"
               onClick={() => setReviewOpen(false)}
-              disabled={verifying}
+              disabled={action.isPending("verify")}
             >
               Cancel
             </Button>
-            <Button onClick={submitReview} loading={verifying}>
+            <Button onClick={submitReview} loading={action.isPending("verify")}>
               Save review
             </Button>
           </>
         }
       >
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label
-              htmlFor="review-status"
-              className="text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-            <select
-              id="review-status"
-              value={reviewStatus}
-              onChange={(e) =>
-                setReviewStatus(e.target.value as AttendanceReviewStatus)
-              }
-              className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {REVIEW_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Status"
+            value={reviewStatus}
+            onChange={(e) =>
+              setReviewStatus(e.target.value as AttendanceReviewStatus)
+            }
+            options={REVIEW_STATUSES}
+          />
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={markVerified}
-              onChange={(e) => setMarkVerified(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            Mark as verified
-          </label>
+          <Checkbox
+            label="Mark as verified"
+            checked={markVerified}
+            onChange={(e) => setMarkVerified(e.target.checked)}
+          />
         </div>
       </Modal>
     </div>

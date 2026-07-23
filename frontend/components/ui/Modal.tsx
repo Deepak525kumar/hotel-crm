@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -13,6 +13,9 @@ export interface ModalProps {
   className?: string;
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
+
 export function Modal({
   open,
   onClose,
@@ -21,18 +24,57 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
-  // Close on Escape and lock body scroll while open.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+
+  // Close on Escape, lock body scroll, manage focus (trap + restore).
   useEffect(() => {
     if (!open) return;
+
+    // Remember what was focused so we can restore it on close.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+      // Trap Tab within the dialog.
+      const panel = panelRef.current;
+      if (!panel) return;
+      const items = panel.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (items.length === 0) {
+        e.preventDefault();
+        panel.focus();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || active === panel)) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener("keydown", onKey);
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    // Move focus into the dialog (first focusable, else the panel itself).
+    const panel = panelRef.current;
+    const firstFocusable = panel?.querySelector<HTMLElement>(FOCUSABLE);
+    (firstFocusable ?? panel)?.focus();
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
+      // Restore focus to whatever opened the dialog.
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 
@@ -43,6 +85,7 @@ export function Modal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
+      aria-labelledby={title ? titleId : undefined}
     >
       <div
         className="absolute inset-0 bg-black/50"
@@ -50,19 +93,23 @@ export function Modal({
         aria-hidden
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl",
+          "relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl outline-none",
           className,
         )}
       >
         {title && (
           <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-            <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+            <h2 id={titleId} className="text-base font-semibold text-gray-900">
+              {title}
+            </h2>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
             >
               <svg
                 width="20"

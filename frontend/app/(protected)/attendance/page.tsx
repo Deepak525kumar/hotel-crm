@@ -1,24 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useAttendance } from "@/hooks/useAttendance";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
+import { formatDateTime } from "@/lib/format";
 import {
-  Button,
   Card,
   CardContent,
+  EmptyState,
+  Pager,
+  PageHeader,
+  Select,
   Table,
   THead,
   TBody,
+  TableSkeleton,
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { AttendanceStatus } from "@/lib/types";
 
-const STATUS_FILTERS: Array<{ value: AttendanceStatus | ""; label: string }> = [
+const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
   { value: "EXPECTED", label: "Expected" },
   { value: "PRESENT", label: "Present" },
@@ -28,17 +33,14 @@ const STATUS_FILTERS: Array<{ value: AttendanceStatus | ""; label: string }> = [
   { value: "EXCUSED", label: "Excused" },
 ];
 
-const VERIFIED_FILTERS: Array<{ value: "" | "true" | "false"; label: string }> = [
+const VERIFIED_FILTERS = [
   { value: "", label: "Any" },
   { value: "true", label: "Verified" },
   { value: "false", label: "Unverified" },
 ];
 
 const PER_PAGE = 20;
-
-function formatTime(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "—";
-}
+const COLUMNS = 5;
 
 export default function AttendancePage() {
   const [status, setStatus] = useState<AttendanceStatus | "">("");
@@ -64,49 +66,30 @@ export default function AttendancePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Attendance</h1>
-        <p className="text-sm text-gray-500">
-          Check-in, check-out and verification status for staffed shifts.
-        </p>
-      </div>
+      <PageHeader
+        title="Attendance"
+        description="Check-in, check-out and verification status for staffed shifts."
+      />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium text-gray-700" htmlFor="status">
-          Status
-        </label>
-        <select
-          id="status"
-          value={status}
-          onChange={(e) =>
-            onStatusChange(e.target.value as AttendanceStatus | "")
-          }
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {STATUS_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-
-        <label className="text-sm font-medium text-gray-700" htmlFor="verified">
-          Verification
-        </label>
-        <select
-          id="verified"
-          value={verified}
-          onChange={(e) =>
-            onVerifiedChange(e.target.value as "" | "true" | "false")
-          }
-          className="h-9 rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
-          {VERIFIED_FILTERS.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <div className="w-full sm:w-48">
+          <Select
+            label="Status"
+            value={status}
+            onChange={(e) => onStatusChange(e.target.value as AttendanceStatus | "")}
+            options={STATUS_FILTERS}
+          />
+        </div>
+        <div className="w-full sm:w-48">
+          <Select
+            label="Verification"
+            value={verified}
+            onChange={(e) =>
+              onVerifiedChange(e.target.value as "" | "true" | "false")
+            }
+            options={VERIFIED_FILTERS}
+          />
+        </div>
       </div>
 
       <Card>
@@ -115,16 +98,8 @@ export default function AttendancePage() {
             <div className="px-6 py-10 text-center text-sm text-red-600">
               Failed to load attendance. Please try again.
             </div>
-          ) : isLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              Loading…
-            </div>
-          ) : records.length === 0 ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">
-              No attendance records found.
-            </div>
           ) : (
-            <Table>
+            <Table aria-label="Attendance records">
               <THead>
                 <tr>
                   <TH>Worker</TH>
@@ -134,52 +109,58 @@ export default function AttendancePage() {
                   <TH>Verification</TH>
                 </tr>
               </THead>
-              <TBody>
-                {records.map((r) => (
-                  <TR key={r.id} className="cursor-pointer">
-                    <TD className="font-medium">
-                      <Link
-                        href={`/attendance/${r.id}`}
-                        className="block text-blue-700 hover:underline"
-                      >
-                        {r.worker_id}
-                      </Link>
+              {isLoading ? (
+                <TableSkeleton columns={COLUMNS} />
+              ) : records.length === 0 ? (
+                <TBody>
+                  <tr>
+                    <TD colSpan={COLUMNS} className="p-0">
+                      <EmptyState
+                        title="No attendance records found"
+                        description={
+                          status || verified
+                            ? "Try adjusting your filters."
+                            : "Records appear once workers check in to their shifts."
+                        }
+                      />
                     </TD>
-                    <TD>
-                      <AttendanceStatusBadge status={r.status} />
-                    </TD>
-                    <TD>{formatTime(r.check_in_at)}</TD>
-                    <TD>{formatTime(r.check_out_at)}</TD>
-                    <TD>
-                      <VerificationBadge verified={r.is_verified} />
-                    </TD>
-                  </TR>
-                ))}
-              </TBody>
+                  </tr>
+                </TBody>
+              ) : (
+                <TBody>
+                  {records.map((r) => (
+                    <TR key={r.id}>
+                      <TD className="font-medium">
+                        <TextLink
+                          href={`/attendance/${r.id}`}
+                          className="block"
+                        >
+                          {r.worker_id}
+                        </TextLink>
+                      </TD>
+                      <TD>
+                        <AttendanceStatusBadge status={r.status} />
+                      </TD>
+                      <TD>{formatDateTime(r.check_in_at)}</TD>
+                      <TD>{formatDateTime(r.check_out_at)}</TD>
+                      <TD>
+                        <VerificationBadge verified={r.is_verified} />
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              )}
             </Table>
           )}
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1 || isLoading}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-gray-500">Page {page}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!hasNext || isLoading}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      <Pager
+        page={page}
+        hasNext={hasNext}
+        onPageChange={setPage}
+        disabled={isLoading}
+      />
     </div>
   );
 }
