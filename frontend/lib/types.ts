@@ -227,6 +227,88 @@ export interface ListHotelGroupsQuery {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Analytics (manager/admin)                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** A worker leaderboard row from `GET /analytics/leaderboard`. */
+export interface LeaderboardEntry {
+  worker_id: string;
+  name: string;
+  total_tasks: number;
+  completed_tasks: number;
+  average_rating: number;
+  position: number;
+}
+
+/**
+ * Aggregate platform (or per-hotel) statistics from `GET /analytics/stats`.
+ * Mirrors the backend `DashboardStats` shape exactly.
+ */
+export interface DashboardStats {
+  work_requests: {
+    total: number;
+    open: number;
+    partially_filled: number;
+    filled: number;
+    cancelled: number;
+    expired: number;
+  };
+  assignments: {
+    total: number;
+    completed: number;
+    in_progress: number;
+    no_show: number;
+    cancelled: number;
+  };
+  attendance: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+    on_time_rate: number;
+  };
+  quality: {
+    total_verifications: number;
+    average_score: number | null;
+    pass_rate: number;
+  };
+  ratings: {
+    total: number;
+    average_score: number | null;
+  };
+  rooms_completed: {
+    total: number;
+    entries: number;
+  };
+}
+
+/** Per-hotel operational summary from `GET /analytics/hotel-summary/:id`. */
+export interface HotelAnalyticsSummary {
+  hotel_id: string;
+  open_requests: {
+    count: number;
+    workers_needed: number;
+    workers_confirmed: number;
+  };
+  active_assignments: number;
+  today_attendance: {
+    expected: number;
+    present: number;
+    late: number;
+    absent: number;
+  };
+  quality: {
+    average_score: number | null;
+    recent_pass_rate: number;
+  };
+  rooms_completed: {
+    total: number;
+    entries: number;
+  };
+  top_workers: LeaderboardEntry[];
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Work Requests                                                             */
 /* -------------------------------------------------------------------------- */
 

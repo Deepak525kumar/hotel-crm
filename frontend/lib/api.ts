@@ -10,6 +10,9 @@ import type {
   CreateHotelInput,
   CreateUserInput,
   CreateWorkRequestInput,
+  DashboardStats,
+  HotelAnalyticsSummary,
+  LeaderboardEntry,
   Hotel,
   HotelGroup,
   ListApplicationsQuery,
@@ -376,6 +379,23 @@ export const hotelGroupsApi = {
 
   remove: (id: string) =>
     apiFetch<void>(`/crm/hotel-groups/${id}`, { method: "DELETE" }),
+};
+
+/** Analytics API matching the backend `/analytics/*` routes (manager/admin). */
+export const analyticsApi = {
+  /** Aggregate stats, optionally scoped to a single hotel. */
+  stats: (hotelId?: string) =>
+    apiFetch<DashboardStats>(`/analytics/stats${toQuery({ hotel_id: hotelId })}`),
+
+  /** Worker leaderboard, optionally scoped to a single hotel. */
+  leaderboard: (hotelId?: string) =>
+    apiFetch<LeaderboardEntry[]>(
+      `/analytics/leaderboard${toQuery({ hotel_id: hotelId })}`,
+    ),
+
+  /** Operational summary for a single hotel. */
+  hotelSummary: (hotelId: string) =>
+    apiFetch<HotelAnalyticsSummary>(`/analytics/hotel-summary/${hotelId}`),
 };
 
 /** Users API matching the backend `/users/*` routes. */

@@ -1,51 +1,153 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
+import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
 import { ManagerAdminGate } from "@/components/auth/RoleGate";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
+import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
+import { RoleBadge } from "@/components/users/RoleBadge";
+import { formatPercent, formatScore } from "@/lib/format";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  PageHeader,
+  Skeleton,
+  StatTile,
+} from "@/components/ui";
+
+/** Quick links surfaced to every user. */
+const QUICK_LINKS = [
+  { href: "/requests", label: "Work requests" },
+  { href: "/assignments", label: "My assignments" },
+  { href: "/attendance", label: "Attendance" },
+  { href: "/notifications", label: "Notifications" },
+];
+
+function ManagerOverview() {
+  const { data: stats, isLoading, error } = useDashboardStats();
+  const { entries, isLoading: leaderboardLoading, error: leaderboardError } =
+    useLeaderboard();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-gray-900">
+          Platform overview
+        </h2>
+        <Link
+          href="/analytics"
+          className="text-sm text-blue-700 hover:underline"
+        >
+          View analytics →
+        </Link>
+      </div>
+
+      {error ? (
+        <Card>
+          <CardContent className="py-8 text-center text-sm text-red-600">
+            Couldn’t load platform stats.
+          </CardContent>
+        </Card>
+      ) : isLoading || !stats ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-24 w-full" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatTile
+            label="Open requests"
+            value={stats.work_requests.open}
+            hint={`${stats.work_requests.total} total`}
+          />
+          <StatTile
+            label="On-time rate"
+            value={formatPercent(stats.attendance.on_time_rate)}
+          />
+          <StatTile
+            label="Quality pass rate"
+            value={formatPercent(stats.quality.pass_rate)}
+          />
+          <StatTile
+            label="Avg rating"
+            value={formatScore(stats.ratings.average_score, 2)}
+          />
+        </div>
+      )}
+
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle>Top workers</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <LeaderboardTable
+            entries={entries}
+            isLoading={leaderboardLoading}
+            error={leaderboardError}
+            limit={5}
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500">
-          Welcome back{user ? `, ${user.first_name}` : ""}.
-        </p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description={`Welcome back${user ? `, ${user.first_name}` : ""}.`}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Your account</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1 text-sm text-gray-700">
-            <p>Email: {user?.email}</p>
-            <p>Role: {user?.role}</p>
+          <CardContent className="space-y-2 text-sm text-gray-700">
+            <p>{user?.email}</p>
+            {user && <RoleBadge role={user.role} />}
+            <p>
+              <Link
+                href="/profile"
+                className="text-blue-700 hover:underline"
+              >
+                View profile →
+              </Link>
+            </p>
           </CardContent>
         </Card>
 
-        <ManagerAdminGate
-          fallback={
-            <Card>
-              <CardContent className="text-sm text-gray-500">
-                Management tools are available to managers and admins.
-              </CardContent>
-            </Card>
-          }
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle>Management</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-gray-700">
-              This section is visible only to managers and admins.
-            </CardContent>
-          </Card>
-        </ManagerAdminGate>
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick links</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid grid-cols-2 gap-2 text-sm">
+              {QUICK_LINKS.map((l) => (
+                <li key={l.href}>
+                  <Link
+                    href={l.href}
+                    className="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50"
+                  >
+                    {l.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
+
+      <ManagerAdminGate>
+        <ManagerOverview />
+      </ManagerAdminGate>
     </div>
   );
 }

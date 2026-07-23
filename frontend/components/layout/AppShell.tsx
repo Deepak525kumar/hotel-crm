@@ -22,6 +22,7 @@ const NAV: NavItem[] = [
   { href: "/requests", label: "Work requests" },
   { href: "/assignments", label: "Assignments" },
   { href: "/attendance", label: "Attendance" },
+  { href: "/analytics", label: "Analytics", roles: ["manager", "admin"] },
   { href: "/hotels", label: "Hotels", roles: ["manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", roles: ["manager", "admin"] },
   { href: "/users", label: "Users", roles: ["admin"] },
@@ -77,12 +78,15 @@ export function AppShell({ children }: { children: ReactNode }) {
           <span className="text-sm text-gray-500 md:hidden">Hotel CRM</span>
           <div className="ml-auto flex items-center gap-3">
             {user && (
-              <div className="flex items-center gap-2 text-sm">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100"
+              >
                 <span className="text-gray-700">
                   {user.first_name} {user.last_name}
                 </span>
                 <Badge tone="info">{user.role}</Badge>
-              </div>
+              </Link>
             )}
             <button
               type="button"
