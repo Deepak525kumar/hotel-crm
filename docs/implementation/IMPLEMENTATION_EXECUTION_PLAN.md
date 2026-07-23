@@ -1,13 +1,69 @@
 # Implementation Execution Plan
 
 Scope: sequencing only. All behavior, architecture, and requirements are frozen elsewhere
-(ten G2 specs, ADR-001..023). This document assumes the reader already holds them and does
+(ten G2 specs, ADR-001..028). This document assumes the reader already holds them and does
 not restate spec content, ADR rationale, or requirements. It sequences implementation of the
 already-decided defects and target-state builds.
 
 Baseline: `main` @ `b16cc33` (working HEAD `446e82d`). Framework `.claude/` 1.2.0.
 Evidence base: `.claude/knowledge/MODULE_MEMORY.yaml`, `MODULE_REGISTRY.yaml`,
 `DEPENDENCY_GRAPH.yaml`; live code in `backend/src/`.
+
+---
+
+## Verification pass (2026-07-23, repository-wide re-planning)
+
+Re-verified against `main` @ `ea7be36` (current `HEAD`), framework `.claude/` 1.5.0. Method:
+`git log --oneline` cross-checked against each epic's stated PR set, plus a direct read of the
+current `backend/src/` code for every epic below (not just the governance register, which was
+independently found stale on one row — see note under Epic 1).
+
+- **Epics 1, 2, 3, 5 are COMPLETE**, verified in code, not just by commit message:
+  - Epic 1: `backend/src/modules/assignments/service.ts::update()` carries the deny-by-default
+    guard (PR #178, `9495c5b`/`58f88d7`). **Governance-register drift found and corrected**:
+    `SPECIFICATION_ISSUES_REGISTER.md` `SIR-JOBD-001` still read `OPEN — CRITICAL` despite the
+    fix shipping well before this session's baseline; corrected to `RESOLVED` in this pass.
+  - Epic 2: `backend/src/modules/auth/*` has no refresh-secret fallback and hashes
+    `Session.refresh_token` at rest (`be1c4fd`).
+  - Epic 3: `resolveHotelAccess()` is the single seam in `backend/src/middleware/permissions.ts`
+    (`4c7437e`).
+  - Epic 5: PR 5.1–5.8 all merged (`3cca62d`/`4cf91f2`/`914d6cd`/`c32d4fc`/`643d5fc`/`eaf17d0`/
+    `04b2137`/`0fc7ab8`); `backend-hotel-workers` retired; JWT `scope` claim live; manager
+    authz flip live (flag `FEATURE_SCOPE_AUTHZ`, default on).
+- **Epic 4** stays SUPERSEDED (no-op) — unchanged from the 2026-07-20 correction, still accurate.
+- **Epic 6 headline item (QUAL OQ-01) is COMPLETE**: `Rating.score` is 0–100 in
+  `backend/prisma/schema.prisma:570`, migration `20260722180000_rescale_rating_score_to_0_100`
+  applied with a paired `down.sql`. The Analytics headline item (OQ-ANALYTICS-03) is also
+  COMPLETE: `RoomsCompletedEntry` shipped (`084e77e`, migration
+  `20260723000000_add_rooms_completed_entry`, paired `down.sql` added by `d3389de`). **No other
+  Epic 6 sub-item (QUAL OQ-02/04/05/07/08; CRM OD-CRM-*; ANALYTICS OQ-02/04-12) is
+  implementable** — every one of those rows in `SPECIFICATION_ISSUES_REGISTER.md` is still
+  `OPEN` with `Authority needed: human/architecture` or `human/product`, i.e. still genuinely
+  gated on an unmade Decision Record, exactly as originally scoped. Re-verified row-by-row this
+  pass, not re-derived from the register's own summary prose.
+- **Epic 7 headline item (NOTIF OQ-NOTIF-01) is COMPLETE**: `WEBHOOK` is in
+  `NotificationChannel` (`95b1364`). The push/dispatch design question (`TREQ-002`/`TREQ-012`)
+  remains open pending its own design, as already scoped — not implementable without that design
+  decision.
+- **New finding, not covered by any existing epic: `SIR-JOBD-002` / `FIND-SEC-002`/`FIND-SEC-003`
+  (High) was never picked up by Epics 1–7** despite being a sibling finding to Epic 1's Critical
+  in the same spec section. `DEPENDENCY_GRAPH.yaml`'s `permissions-middleware` consumer list
+  correctly lists `backend-work-requests`/`backend-work-applications` as consumers (both import
+  `requireRole` from that file) — but verified in code, neither module's `routes.ts` or
+  `service.ts` imports `checkHotelAccess`/`resolveHotelAccess`/`isHotelInScope`, so they were
+  never routed through the seam Epic 3/5 built and Epic 5 PR 5.5 had nothing to flip for them;
+  this is new scope-authz to add, not a missed flip. This is scheduled
+  below as **Epic 8**, now unblocked (see that section for why the finding's own "remediate vs.
+  accept risk pre-pivot" framing resolves itself once Epic 5's scope model is live, which it now
+  is — this is a remediation decision, not a risk-acceptance decision, and does not require
+  additional human sign-off under Constitution §11/§12; only accepting the risk would).
+  **Epic 8 shipped this session** — see its §2 section for the PR content; `SIR-JOBD-002` is
+  now `RESOLVED` in the governance register.
+- No open item anywhere in the register maps to an unblocked, spec-traceable implementation task
+  other than Epic 8. Every other open row is `decision-required`/`architecture`/`ownership` with
+  `Authority needed: human*`, deferred-by-design pending another module (Calendar M2), or is
+  `SYNC-001` (owner assignment, reserved human authority, unchanged since 2026-07-04 and not a
+  new blocker introduced by this pass).
 
 ---
 
@@ -57,15 +113,16 @@ down. Do not renumber.
 
 ## 1. Epic order (dependency-ordered)
 
-| # | Epic | Resolves (spec / finding IDs) | Blocked by | Notes |
-|---|------|-------------------------------|-----------|-------|
-| 1 | Critical: guard `PATCH /assignments/:id` | SPEC-JOB-DISPATCH-001 FIND-SEC-001 / OQ-01 | none | Ship first. In-service guard, no shared-file touch. |
-| 2 | Auth self-contained High findings | SPEC-AUTH-001 OQ-AUTH-04, OQ-AUTH-15 | none | Parallel with Epic 1. No HotelGroup dependency. |
-| 3 | Shared authorization centralization seam | (closes nothing yet) precondition for OQ-AUTH-06 & siblings | none | Pure refactor + characterization tests. No allow/deny change. Optional but de-risks Epic 5's flip. |
-| 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** |
-| 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. |
-| 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) — **both now RESOLVED** (`ADR-026`, `ADR-028`); no remaining Decision Record blocker for this epic's headline items | Only sequence items not gated on an open Decision Record. |
-| 7 | Notifications G8 cleanup | SPEC-NOTIF-001 OQ-NOTIF-02..09 (non-blocked) | OQ-NOTIF-01 Decision Record blocks push-channel (TREQ-002/TREQ-012) | Fully independent of the auth epics; parallelizable throughout. |
+| # | Epic | Resolves (spec / finding IDs) | Blocked by | Notes | Status (2026-07-23) |
+|---|------|-------------------------------|-----------|-------|-------|
+| 1 | Critical: guard `PATCH /assignments/:id` | SPEC-JOB-DISPATCH-001 FIND-SEC-001 / OQ-01 | none | Ship first. In-service guard, no shared-file touch. | **COMPLETE** (PR #178) |
+| 2 | Auth self-contained High findings | SPEC-AUTH-001 OQ-AUTH-04, OQ-AUTH-15 | none | Parallel with Epic 1. No HotelGroup dependency. | **COMPLETE** (`be1c4fd`) |
+| 3 | Shared authorization centralization seam | (closes nothing yet) precondition for OQ-AUTH-06 & siblings | none | Pure refactor + characterization tests. No allow/deny change. Optional but de-risks Epic 5's flip. | **COMPLETE** (`4c7437e`) |
+| 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** | SUPERSEDED (no-op) |
+| 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. | **COMPLETE** (PR 5.1–5.8, all merged) |
+| 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) — **both now RESOLVED** (`ADR-026`, `ADR-028`); no remaining Decision Record blocker for this epic's headline items | Only sequence items not gated on an open Decision Record. | **Headline items COMPLETE**; all remaining sub-items OPEN, genuinely `human`-gated (re-verified 2026-07-23) |
+| 7 | Notifications G8 cleanup | SPEC-NOTIF-001 OQ-NOTIF-02..09 (non-blocked) | OQ-NOTIF-01 Decision Record blocks push-channel (TREQ-002/TREQ-012) | Fully independent of the auth epics; parallelizable throughout. | **Headline item COMPLETE** (`ADR-027`/`95b1364`); remaining items OPEN, `human`-gated |
+| 8 | Work-request / work-application hotel-scoping | SPEC-JOB-DISPATCH-001 FIND-SEC-002/003 / SIR-JOBD-002; MIG-GAP-07; target TREQ-008/TRULE-007 | none — Epic 5's scope model (PR 5.4/5.5) is the only prerequisite and is already merged | **New, identified by this pass.** Sibling High finding to Epic 1's Critical; never sequenced by the original plan. Same remediate-not-accept-risk precedent as Epics 1 and 5 PR 5.5. | **COMPLETE** (this session; 367/367 backend tests green, typecheck clean) |
 
 Deferred / not sequenced here (blocked on human authority, correctly excluded):
 - **ATT OQ-03** — cross-owner EXPECTED-row seed. Architecture BLOCKED; needs a Decision Record
@@ -240,6 +297,40 @@ Ordered PRs (each independently reviewable; schema PRs isolated):
   channel *dispatch* work (TREQ-002, TREQ-012) still requires its own design (push-only vs. both
   channels, ADR-027 does not settle that) before authoring.
 
+### Epic 8 — Work-request / work-application hotel-scoping (new, 2026-07-23)
+Closes `SIR-JOBD-002` / `FIND-SEC-002`/`FIND-SEC-003`: work-request create/patch and application
+approve/reject are role-guarded (`admin`/`manager`) but not hotel-scoped — a manager at hotel A
+can create, patch, approve, or reject requests/applications belonging to hotel B. Target is
+`TREQ-008`/`TRULE-007` (role × scope, deny-by-default); `MIG-GAP-07` records the gap.
+
+- **PR 8.1** — Mirror the exact pattern Epic 5 PR 5.5 already established for `backend-quality`
+  and `backend-attendance` (in-service check, not route middleware, since the target hotel_id is
+  either in the create body or must be looked up from the existing record before a PATCH):
+  - Files: `backend/src/modules/work-requests/service.ts` (`create()`, `update()`),
+    `backend/src/modules/work-requests/controller.ts` (thread `req.auth.scope` through),
+    `backend/src/modules/work-applications/service.ts` (`update()`/`approve()`),
+    `backend/src/modules/work-applications/controller.ts` (thread `req.auth.scope` through).
+  - Pattern (verbatim from `quality/service.ts:28-35`): `if (isScopeAuthzEnabled() &&
+    actor.role === 'manager') { const inScope = await isHotelInScope(actor.scope ?? null,
+    target.hotel_id); if (!inScope) throw new ForbiddenError(...); }`. Admin keeps its
+    cross-hotel bypass (unchanged, by-design). Flag-gated `FEATURE_SCOPE_AUTHZ`, default on —
+    off reverts to the current cross-hotel-permitted behavior (ADR-024 D3 compatibility
+    guarantee, same as every other Epic 5 PR 5.5 consumer).
+  - Scope discipline: this PR touches only the four actions the finding names (work-request
+    create, work-request patch, application approve, application reject/withdraw-review path).
+    It does not add manager scoping to `list()`/`getById()` (a separate, not-yet-raised
+    question; `RULE-011a`'s `[TARGET]` note already flags that as deferred, out of this finding).
+  - Test: `backend/src/__tests__/work-requests-scope-authz.test.ts` and
+    `work-applications-scope-authz.test.ts` (or one combined file, mirroring
+    `quality-scope-authz.test.ts`'s supertest-over-real-router scaffolding), citing
+    `SIR-JOBD-002`/`FIND-SEC-002`/`FIND-SEC-003`. Cases: manager in-scope → 200/201; manager
+    out-of-scope → 403; admin cross-hotel → unchanged (200/201).
+  - No schema change, no migration. Code-only, low rollback risk — `git revert`.
+- Knowledge sync: extend `DEPENDENCY_GRAPH.yaml`'s `permissions-middleware` note to record that
+  `backend-work-requests`/`backend-work-applications` now also import `isHotelInScope()`
+  in-service (same shared primitive as `backend-attendance`/`backend-quality`), as part of this
+  PR.
+
 ---
 
 ## 3. Dependency graph (epics / PRs)
@@ -386,6 +477,9 @@ Per-epic test structure:
   `updateHotel` regression suite instead of a migration test, since its `NOT NULL` flip is
   deferred (see §2) — no new migration was authored in PR 5.3.
 - **Epics 6/7** → one behavior test per finding PR, named for the module + finding.
+- **Epic 8** → `work-requests-scope-authz.test.ts` / `work-applications-scope-authz.test.ts`,
+  citing `SIR-JOBD-002`/`FIND-SEC-002`/`FIND-SEC-003`. Same supertest-over-real-router pattern as
+  `quality-scope-authz.test.ts`.
 
 ---
 
@@ -394,9 +488,9 @@ Per-epic test structure:
 This is a live modular monolith on a shared PrismaClient / single PostgreSQL (BaseService,
 `lib/db.ts`). Code-only PRs are low-risk; schema PRs are the high-risk case.
 
-- **Epic 1, 2 (code path 2.1), 3, 4, 6, 7 — code-only.** Rollback = `git revert` the PR / redeploy
-  prior artifact. No data migration, no state shape change. Safe and immediate. Epic 3 is a pure
-  refactor so revert is fully behavior-neutral.
+- **Epic 1, 2 (code path 2.1), 3, 4, 6, 7, 8 — code-only.** Rollback = `git revert` the PR /
+  redeploy prior artifact. No data migration, no state shape change. Safe and immediate. Epic 3
+  is a pure refactor so revert is fully behavior-neutral.
 - **Epic 2 PR 2.2 (hash refresh token) — mixed.** If it changes the `Session.refresh_token` column
   format, rollback must handle in-flight sessions: prefer an additive column + dual-read window,
   or accept forced re-login on revert (document which). Do not do an irreversible in-place column
@@ -429,7 +523,8 @@ This is a live modular monolith on a shared PrismaClient / single PostgreSQL (Ba
 
 | Item | Why it blocks | Reserved to |
 |------|---------------|-------------|
-| OQ-AUTH-06 interim mitigation vs wait-for-Epic-5 | Correct fix data-blocked; exploitable now | Human risk acceptance |
+| ~~OQ-AUTH-06 interim mitigation vs wait-for-Epic-5~~ | Correct fix data-blocked; exploitable now | **RESOLVED 2026-07-21, Epic 5 PR 5.5** — the manager authz flip is the correct fix, not an interim mitigation; no risk-acceptance decision was needed once the scope model landed. See `SIR-GLOB-004`. |
+| SIR-JOBD-002 / FIND-SEC-002/003 (work-request/application hotel-scoping) | Not blocked — listed here only to record that it is **not** an escalation. Sibling of the now-resolved OQ-AUTH-06: the finding's own "remediate vs. accept risk" framing predates Epic 5; now that the scope model is live, remediation is the safe default and does not require a fresh Risk Assessment. | None — scheduled as Epic 8, in progress this session. |
 | ~~Epic 5 cutover mechanism + PR 5.5-vs-5.7 order~~ | Not prescribed by ADR-022/023 | **RESOLVED by ADR-024 (Accepted, 2026-07-22):** PR 5.5 before PR 5.7; flag-gated cutover (not dual-write) over the retained `HotelWorker` layer; two independent additive flags; removal gated on no authz/roster reader remaining. Hotel-Manager scope source remains open — see new row below. |
 | ~~Hotel-Manager→hotel association source for the scope claim (PR 5.4/5.5)~~ | `ADR-023` fixes Regional-Manager/Admin scope but not the dedicated-Hotel-Manager-per-hotel association (`OD-CRM-01` residual `REQ-CRM-006`/`RULE-CRM-07`) or the `UserRole` RM distinction (`OD-CRM-05`); surfaced by ADR-024 | **RESOLVED by ADR-025 (Accepted, 2026-07-22):** `Hotel.manager_user_id` (nullable FK, `backend-crm`-owned, `backend-auth` read-only at claim issuance). Consumed at PR 5.1 (schema)/PR 5.4 (claim). `UserRole` enum split (`OD-CRM-05`'s remaining implementation gap) is unaffected — still a PR 5.4 build task, not a design question. |
 | ATT OQ-03 cross-owner EXPECTED-seed | Architecture BLOCKED | Decision Record |

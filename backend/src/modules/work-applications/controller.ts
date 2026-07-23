@@ -88,8 +88,11 @@ export async function updateApplication(
       req.params.id,
       req.params.applicationId,
       parsed.data,
-      req.auth!.userId,
-      req.auth!.role
+      {
+        userId: req.auth!.userId,
+        role: req.auth!.role,
+        scope: req.auth!.scope ?? null,
+      }
     );
     res.status(200).json({
       status: 'success',
