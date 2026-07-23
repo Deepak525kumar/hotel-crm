@@ -7,9 +7,9 @@ import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup } from "@/hooks/useHotels";
 import { ApiError, hotelsApi } from "@/lib/api";
 import { RoleGate, ManagerAdminGate } from "@/components/auth/RoleGate";
-import { ActiveBadge } from "@/components/hotels/ActiveBadge";
 import { formatDateTime } from "@/lib/format";
 import {
+  ActiveBadge,
   Button,
   Card,
   CardContent,

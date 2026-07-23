@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui";
+import { Badge } from "./Badge";
 
 /** Active/inactive pill for hotels (and any other soft-deletable entity). */
 export function ActiveBadge({ active }: { active: boolean }) {

@@ -94,6 +94,31 @@ export interface UserSummary {
   updated_at?: string;
 }
 
+/** A user with permissions, as returned by `GET /users/:id`. */
+export interface UserDetail extends UserSummary {
+  permissions: string[];
+}
+
+/** Body of `POST /users` (admin/manager). */
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  phone?: string;
+  /** Defaults to "worker" backend-side. */
+  role?: Role;
+}
+
+/** Body of `PUT /users/:id` (admin/manager). */
+export interface UpdateUserInput {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  role?: Role;
+  is_active?: boolean;
+}
+
 /** Query params accepted by `GET /users`. */
 export interface ListUsersQuery {
   role?: Role;

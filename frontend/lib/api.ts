@@ -8,6 +8,7 @@ import type {
   CheckInInput,
   CreateHotelGroupInput,
   CreateHotelInput,
+  CreateUserInput,
   CreateWorkRequestInput,
   Hotel,
   HotelGroup,
@@ -26,7 +27,9 @@ import type {
   UpdateAttendanceInput,
   UpdateHotelGroupInput,
   UpdateHotelInput,
+  UpdateUserInput,
   UpdateWorkRequestInput,
+  UserDetail,
   UserSummary,
   WorkApplication,
   WorkRequest,
@@ -375,8 +378,21 @@ export const hotelGroupsApi = {
     apiFetch<void>(`/crm/hotel-groups/${id}`, { method: "DELETE" }),
 };
 
-/** Users API — the directory read used by manager/regional-manager selectors. */
+/** Users API matching the backend `/users/*` routes. */
 export const usersApi = {
   list: (query: ListUsersQuery = {}) =>
     apiFetch<UserSummary[]>(`/users${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<UserDetail>(`/users/${id}`),
+
+  create: (input: CreateUserInput) =>
+    apiFetch<UserDetail>("/users", { method: "POST", body: input }),
+
+  /** Update a user. The backend route is a PUT, not a PATCH. */
+  update: (id: string, input: UpdateUserInput) =>
+    apiFetch<UserDetail>(`/users/${id}`, { method: "PUT", body: input }),
+
+  /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
+  remove: (id: string) =>
+    apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
 };

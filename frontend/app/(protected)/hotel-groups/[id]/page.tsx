@@ -9,9 +9,9 @@ import {
   useUserOptions,
 } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
-import { ActiveBadge } from "@/components/hotels/ActiveBadge";
 import { formatDateTime } from "@/lib/format";
 import {
+  ActiveBadge,
   Button,
   Card,
   CardContent,
