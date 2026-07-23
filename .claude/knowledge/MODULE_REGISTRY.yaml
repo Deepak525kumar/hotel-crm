@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: backend-calendar.specification set to SPEC-CALENDAR-001@0.1.0 REVIEW, AUDIT-L1; backend-compliance/backend-retention zero-code-deferral rationale added to unresolved:, AUDIT-M1; edge-analytics-reads-hotel-worker unresolved: note updated to APPLIED, AUDIT-M3) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16
+observed_revision: 9ca0eed45dec34aa4ce3739da4bc8e4c117f6c3f  # rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: backend-calendar.specification set to SPEC-CALENDAR-001@0.1.0 REVIEW, AUDIT-L1; backend-compliance/backend-retention zero-code-deferral rationale added to unresolved:, AUDIT-M1; edge-analytics-reads-hotel-worker unresolved: note updated to APPLIED, AUDIT-M3) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16
 status: verified-inventory
 
 # Inventory is verified against the worktree at the observed revision.

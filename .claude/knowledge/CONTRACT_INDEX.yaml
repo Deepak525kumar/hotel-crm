@@ -9,7 +9,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 2886267a449b5ec5c3213417e7d4598b803a1c4c  # rebound by governance audit (governance-audit-recalc, 2026-07-22) after Epic 5 verification PR #192 merged to main; backend-hotel-workers removed from all consumer lists below -- module physically deleted by Epic 5 PR 5.8 (ADR-022/ADR-024), consistent with MODULE_REGISTRY.yaml (lifecycle: removed) and DEPENDENCY_GRAPH.yaml (readers repointed by PR 5.7, notes at state-hotel-worker/permissions-middleware entries)
+observed_revision: 9ca0eed45dec34aa4ce3739da4bc8e4c117f6c3f  # rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 2886267..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by governance audit (governance-audit-recalc, 2026-07-22) after Epic 5 verification PR #192 merged to main; backend-hotel-workers removed from all consumer lists below -- module physically deleted by Epic 5 PR 5.8 (ADR-022/ADR-024), consistent with MODULE_REGISTRY.yaml (lifecycle: removed) and DEPENDENCY_GRAPH.yaml (readers repointed by PR 5.7, notes at state-hotel-worker/permissions-middleware entries)
 
 contracts:
   - id: notification-service

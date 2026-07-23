@@ -11,6 +11,43 @@ Evidence base: `.claude/knowledge/MODULE_MEMORY.yaml`, `MODULE_REGISTRY.yaml`,
 
 ---
 
+## Post-#194 re-verification & planning conclusion (2026-07-23, HEAD `9ca0eed`)
+
+PR #194 (Epic 8) is merged into `main`. This pass re-verified the whole epic surface
+**against `backend/src/` code at HEAD `9ca0eed`, not commit history**, recalculated the
+dependency graph, and re-planned. Recorded as `SYNC-053`.
+
+- **Code-verified complete:** Epics **1, 2, 3, 5, 8** and the **headline items of Epics 6
+  and 7**. Spot checks: `assignments/service.ts` deny-by-default guard; `auth/service.ts`
+  `hashRefreshToken` + refresh-secret fail-closed; `middleware/permissions.ts`
+  `resolveHotelAccess()` seam + `FEATURE_SCOPE_AUTHZ`; `schema.prisma` `HotelGroup` /
+  `Hotel.hotel_group_id` / `manager_user_id` / JWT `scope`; `Rating.score`/`Verification.score`
+  `0–100`; `RoomsCompletedEntry`; `NotificationChannel.WEBHOOK`; `work-requests` +
+  `work-applications` `service.ts` importing and calling `isHotelInScope()`. **Epic 4**
+  remains SUPERSEDED (no-op).
+- **Health gates at HEAD:** backend **367/367 tests** (39 suites) green; `tsc --noEmit`
+  clean; `context-loader.js --validate` Errors:0; `repository-integrity-check.js` exit 0
+  (0 new blocking; 56 pre-existing WARN orphan/link findings, unchanged in kind).
+- **Dependency graph recalculated:** the Epic 8 consumer relationship
+  (`backend-work-requests` / `backend-work-applications` → `isHotelInScope` shared scope
+  primitive) is recorded in `DEPENDENCY_GRAPH.yaml`'s `permissions-middleware` note; all
+  index `observed_revision` stamps rebound `09e0b16`/`2886267` → `9ca0eed` (SYNC-053),
+  content re-verified coherent.
+- **Planning conclusion — no autonomous implementation available.** After Epic 8, **no
+  unblocked, spec-traceable application-code epic remains.** Of 210 open/blocked
+  `SPECIFICATION_ISSUES_REGISTER.md` rows, 209 need `human` / `human/architecture` /
+  `human/product` authority and 1 needs `architecture/human` (`SIR-EMP-014`). The only
+  non-`human` rows (`SIR-HR-018`, `SIR-HR-019`, `SIR-USERS-017`) are documentation /
+  knowledge-graph spec-revision items **locked under Implementation Mode**, not
+  application epics. Every remaining epic (Epic 6 non-headline QUAL/CRM/ANALYTICS items;
+  Epic 7 push/dispatch design + `OQ-NOTIF-02..09`; the `hr`/`calendar`/`chatbot`/`geo`
+  module builds) is gated on a **Constitution-reserved governance decision** or a
+  REVIEW-status spec. Per the task's own stop condition, this pass **stops at the
+  governance gate** rather than inventing a requirement (Constitution §12).
+- **Fresh baseline:** see `docs/implementation/COMPLETION_REPORT_2026-07-23.md`.
+
+---
+
 ## Verification pass (2026-07-23, repository-wide re-planning)
 
 Re-verified against `main` @ `ea7be36` (current `HEAD`), framework `.claude/` 1.5.0. Method:
