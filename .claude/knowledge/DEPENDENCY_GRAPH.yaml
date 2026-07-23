@@ -86,6 +86,7 @@ nodes:
   - { id: state-user, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:117 (model User)" }
   - { id: state-session, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma:157 (model Session)" }
   - { id: state-hotel, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:175 (model Hotel)" }
+  - { id: state-hotel-group, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:231 (model HotelGroup, added by ADR-023)" }  # added during governance audit (governance-audit-recalc, 2026-07-22); was previously missing from this list despite Hotel.hotel_group_id FK (state-hotel note below) and MODULE_REGISTRY.yaml backend-crm entry already referencing ADR-023's HotelGroup ownership
   - { id: state-hotel-worker, kind: state-domain, owner: none, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }  # owner backend-hotel-workers removed by Epic 5 PR 5.8; see state_domains note below
   - { id: state-work-request, kind: state-domain, owner: backend-work-requests, source: "backend/prisma/schema.prisma:236 (model WorkRequest)" }
   - { id: state-work-application, kind: state-domain, owner: backend-work-applications, source: "backend/prisma/schema.prisma:279 (model WorkApplication)" }

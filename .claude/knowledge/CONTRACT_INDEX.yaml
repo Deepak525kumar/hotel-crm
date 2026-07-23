@@ -9,7 +9,7 @@ purpose: >-
 scope: project-runtime
 derived_from: [.claude/knowledge/DEPENDENCY_GRAPH.yaml]
 version_source: .claude/VERSION.yaml
-observed_revision: 09e0b162297162c8a93975ce55ccd3c406218606  # rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; content verified unchanged 39fc1f5..09e0b16
+observed_revision: 2886267a449b5ec5c3213417e7d4598b803a1c4c  # rebound by governance audit (governance-audit-recalc, 2026-07-22) after Epic 5 verification PR #192 merged to main; backend-hotel-workers removed from all consumer lists below -- module physically deleted by Epic 5 PR 5.8 (ADR-022/ADR-024), consistent with MODULE_REGISTRY.yaml (lifecycle: removed) and DEPENDENCY_GRAPH.yaml (readers repointed by PR 5.7, notes at state-hotel-worker/permissions-middleware entries)
 
 contracts:
   - id: notification-service
@@ -23,26 +23,26 @@ contracts:
     version: unversioned
     source: backend/prisma/schema.prisma
     interface: "@prisma/client types + shared PrismaClient (central shared data contract)"
-    consumers: [backend-auth, backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics]
+    consumers: [backend-auth, backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics]
   - id: base-service
     owner_module: unassigned
     version: unversioned
     source: backend/src/lib/base-service.ts
     interface: "abstract BaseService: PrismaClient access + logAudit (writes state-audit-log)"
-    consumers: [backend-auth, backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics, backend-hr, backend-calendar]
+    consumers: [backend-auth, backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics, backend-hr, backend-calendar]
   - id: auth-middleware
     owner_module: backend-auth
     version: unversioned
     source: backend/src/middleware/auth.ts
     interface: "authMiddleware / optionalAuthMiddleware (global on v1 router + per-module)"
-    consumers: [backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-hr, backend-notifications, backend-analytics, backend-calendar, backend-auth]
+    consumers: [backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-hr, backend-notifications, backend-analytics, backend-calendar, backend-auth]
   - id: permissions-middleware
     owner_module: unassigned  # OQ-AUTH-07 reassignment pending (SYNC-011)
     version: unversioned
     source: backend/src/middleware/permissions.ts
     interface: "requireRole / requirePermission / checkHotelAccess authorization guards"
-    consumers: [backend-users, backend-crm, backend-hotel-workers, backend-work-requests, backend-work-applications, backend-attendance, backend-quality, backend-hr, backend-analytics, backend-calendar]
-    note: backend-assignments removed 2026-07-08 (SPEC-AUTH-001 FIND-001, arch-confirmed); routes.ts imports only authMiddleware.
+    consumers: [backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-attendance, backend-quality, backend-hr, backend-analytics, backend-calendar]
+    note: backend-assignments removed 2026-07-08 (SPEC-AUTH-001 FIND-001, arch-confirmed); backend-hotel-workers removed by Epic 5 PR 5.8 (module physically deleted; ADR-022/ADR-024); routes.ts imports only authMiddleware.
   - id: validation-middleware
     owner_module: unassigned
     version: unversioned

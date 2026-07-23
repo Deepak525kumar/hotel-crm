@@ -18,7 +18,9 @@ apis:
   - { mount: /api/v1/auth, module: backend-auth, evidence: routes/v1/index.ts:22, clients: [frontend-web, mobile-worker, mobile-checker] }
   - { mount: /api/v1/users, module: backend-users, evidence: routes/v1/index.ts:23, clients: [] }
   - { mount: /api/v1/crm, module: backend-crm, evidence: routes/v1/index.ts:24, clients: [frontend-web] }
-  - { mount: "/api/v1/crm/hotels/:hotel_id/workers", module: backend-hotel-workers, nested_under: backend-crm, evidence: routes/v1/index.ts:25, clients: [] }
+  # /api/v1/crm/hotels/:hotel_id/workers (backend-hotel-workers) mount REMOVED by Epic 5 PR 5.8
+  # (ADR-022 roadmap step 6, ADR-024 D5) -- route + module physically deleted; see MODULE_REGISTRY.yaml
+  # (lifecycle: removed) and DEPENDENCY_GRAPH.yaml:400.
   - { mount: /api/v1/work-requests, module: backend-work-requests, evidence: routes/v1/index.ts:26, clients: [frontend-web, mobile-worker] }
   - { mount: "/api/v1/work-requests/:id/applications", module: backend-work-applications, nested_under: backend-work-requests, evidence: routes/v1/index.ts:27, clients: [frontend-web, mobile-worker] }
   - { mount: /api/v1/assignments, module: backend-assignments, evidence: routes/v1/index.ts:28, clients: [frontend-web, mobile-worker] }
