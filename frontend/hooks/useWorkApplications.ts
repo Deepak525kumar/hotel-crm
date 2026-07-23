@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { workApplicationsApi } from "@/lib/api";
 import type { ListApplicationsQuery } from "@/lib/types";
 
@@ -20,17 +21,14 @@ export function useWorkApplications(
   query: ListApplicationsQuery = {},
 ) {
   const perPage = query.per_page ?? 20;
-  const key = workRequestId
-    ? (["work-applications", workRequestId, { ...query, per_page: perPage }] as const)
-    : null;
-
-  const swr = useSWR(key, ([, id, q]) => workApplicationsApi.list(id, q));
-
-  return {
-    ...swr,
-    applications: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= perPage,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    workRequestId
+      ? ["work-applications", workRequestId, { ...query, per_page: perPage }]
+      : null,
+    () => workApplicationsApi.list(workRequestId!, { ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, applications: items, hasNext };
 }
 
 /**

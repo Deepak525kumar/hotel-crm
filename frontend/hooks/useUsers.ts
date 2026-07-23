@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { usersApi } from "@/lib/api";
 import type { ListUsersQuery } from "@/lib/types";
 
@@ -11,14 +12,12 @@ import type { ListUsersQuery } from "@/lib/types";
  */
 export function useUsers(query: ListUsersQuery = {}) {
   const limit = query.limit ?? 20;
-  const key = ["users", { ...query, limit }] as const;
-  const swr = useSWR(key, ([, q]) => usersApi.list(q));
-
-  return {
-    ...swr,
-    users: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= limit,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    ["users", { ...query, limit }],
+    () => usersApi.list({ ...query, limit }),
+    limit,
+  );
+  return { ...swr, users: items, hasNext };
 }
 
 /** Fetches a single user by id (detail endpoint — includes permissions). */

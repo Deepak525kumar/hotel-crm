@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { attendanceApi } from "@/lib/api";
 import type { ListAttendanceQuery } from "@/lib/types";
 
@@ -17,16 +18,13 @@ import type { ListAttendanceQuery } from "@/lib/types";
  */
 export function useAttendance(query: ListAttendanceQuery = {}) {
   const perPage = query.per_page ?? 20;
-  // A stable, serialisable key so SWR dedupes/caches per filter combination.
-  const key = ["attendance", { ...query, per_page: perPage }] as const;
-
-  const swr = useSWR(key, ([, q]) => attendanceApi.list(q));
-
-  return {
-    ...swr,
-    records: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= perPage,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    // A stable, serialisable key so SWR dedupes/caches per filter combination.
+    ["attendance", { ...query, per_page: perPage }],
+    () => attendanceApi.list({ ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, records: items, hasNext };
 }
 
 /** Fetches a single attendance record by id. */

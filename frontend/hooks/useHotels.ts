@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { hotelGroupsApi, hotelsApi, usersApi } from "@/lib/api";
 import type {
   ListHotelGroupsQuery,
@@ -18,14 +19,12 @@ import type {
  */
 export function useHotels(query: ListHotelsQuery = {}) {
   const limit = query.limit ?? 20;
-  const key = ["hotels", { ...query, limit }] as const;
-  const swr = useSWR(key, ([, q]) => hotelsApi.list(q));
-
-  return {
-    ...swr,
-    hotels: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= limit,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    ["hotels", { ...query, limit }],
+    () => hotelsApi.list({ ...query, limit }),
+    limit,
+  );
+  return { ...swr, hotels: items, hasNext };
 }
 
 /** Fetches a single hotel by id (detail endpoint — full field set). */
@@ -39,14 +38,12 @@ export function useHotel(id: string | null | undefined) {
 /** Lists hotel groups for the CRM directory. */
 export function useHotelGroups(query: ListHotelGroupsQuery = {}) {
   const limit = query.limit ?? 20;
-  const key = ["hotel-groups", { ...query, limit }] as const;
-  const swr = useSWR(key, ([, q]) => hotelGroupsApi.list(q));
-
-  return {
-    ...swr,
-    groups: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= limit,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    ["hotel-groups", { ...query, limit }],
+    () => hotelGroupsApi.list({ ...query, limit }),
+    limit,
+  );
+  return { ...swr, groups: items, hasNext };
 }
 
 /** Fetches a single hotel group by id. */

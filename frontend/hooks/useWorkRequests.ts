@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { hotelsApi, workRequestsApi } from "@/lib/api";
 import type { ListWorkRequestsQuery } from "@/lib/types";
 
@@ -14,16 +15,13 @@ import type { ListWorkRequestsQuery } from "@/lib/types";
  */
 export function useWorkRequests(query: ListWorkRequestsQuery = {}) {
   const perPage = query.per_page ?? 20;
-  // A stable, serialisable key so SWR dedupes/caches per filter combination.
-  const key = ["work-requests", { ...query, per_page: perPage }] as const;
-
-  const swr = useSWR(key, ([, q]) => workRequestsApi.list(q));
-
-  return {
-    ...swr,
-    requests: swr.data ?? [],
-    hasNext: (swr.data?.length ?? 0) >= perPage,
-  };
+  const { items, hasNext, ...swr } = usePaginatedList(
+    // A stable, serialisable key so SWR dedupes/caches per filter combination.
+    ["work-requests", { ...query, per_page: perPage }],
+    () => workRequestsApi.list({ ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, requests: items, hasNext };
 }
 
 /** Fetches a single work request by id. */
