@@ -188,6 +188,21 @@ describe('NotificationService', () => {
       expect(mockNotification.create.mock.calls[0][0].data.hotel_id).toBeNull();
     });
 
+    it('propagates an OutboxEvent write failure uncaught, so the transaction rolls back (no swallowing)', async () => {
+      const dbError = new Error('simulated OutboxEvent write failure');
+      mockOutboxEvent.create.mockRejectedValueOnce(dbError);
+
+      await expect(
+        service.enqueue({ ...baseInput, transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH] })
+      ).rejects.toBe(dbError);
+
+      // The failure happened inside the $transaction callback — Prisma's real
+      // $transaction rolls back everything written in that callback (including
+      // the already-executed notification.create) when the callback rejects.
+      // Nothing in enqueue()/enqueueWithin() catches this to prevent that.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
     it('joins a caller-supplied transaction instead of opening its own', async () => {
       const mockTxNotification = {
         create: jest.fn(async () => makeNotification({ id: 'tx-notif' })) as jest.MockedFunction<
