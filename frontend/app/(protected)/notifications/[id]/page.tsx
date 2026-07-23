@@ -19,6 +19,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   PageHeader,
   Skeleton,
 } from "@/components/ui";
@@ -145,7 +146,7 @@ export default function NotificationDetailPage() {
         </CardContent>
       </Card>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{actionError}</FormError>
 
       {!notification.is_read && (
         <Card>

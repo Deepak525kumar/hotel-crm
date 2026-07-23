@@ -15,6 +15,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   Modal,
   PageHeader,
   Skeleton,
@@ -241,7 +242,7 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{actionError}</FormError>
 
       <Modal
         open={cancelOpen}

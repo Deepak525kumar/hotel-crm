@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  FormError,
   Input,
   Select,
   Textarea,
@@ -100,7 +101,7 @@ export function HotelGroupForm({
             placeholder="Invoicing address, VAT id, cost center…"
           />
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <FormError>{error}</FormError>
 
           <div className="flex justify-end gap-3 pt-2">
             {onCancel && (

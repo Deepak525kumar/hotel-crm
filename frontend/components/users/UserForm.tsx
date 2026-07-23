@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   Checkbox,
+  FormError,
   Input,
   Select,
 } from "@/components/ui";
@@ -147,7 +148,7 @@ export function UserForm({
             />
           )}
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          <FormError>{error}</FormError>
 
           <div className="flex justify-end gap-3 pt-2">
             {onCancel && (

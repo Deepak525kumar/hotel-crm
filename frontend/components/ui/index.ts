@@ -20,6 +20,8 @@ export { Textarea } from "./Textarea";
 export type { TextareaProps } from "./Textarea";
 export { Checkbox } from "./Checkbox";
 export type { CheckboxProps } from "./Checkbox";
+export { FormError } from "./FormError";
+export type { FormErrorProps } from "./FormError";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 export { EmptyState } from "./EmptyState";

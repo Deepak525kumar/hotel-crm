@@ -16,6 +16,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   Modal,
   PageHeader,
   Skeleton,
@@ -200,7 +201,7 @@ export default function ApplicationReviewPage() {
         )}
       </ManagerAdminGate>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{actionError}</FormError>
 
       <Modal
         open={rejectOpen}

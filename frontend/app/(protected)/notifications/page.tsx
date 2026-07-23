@@ -12,6 +12,7 @@ import {
   Card,
   CardContent,
   EmptyState,
+  FormError,
   PageHeader,
   Select,
   Table,
@@ -96,7 +97,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{actionError}</FormError>
 
       <Card>
         <CardContent className="p-0">

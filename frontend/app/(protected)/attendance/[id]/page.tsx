@@ -19,6 +19,7 @@ import {
   Checkbox,
   DataList,
   DataRow,
+  FormError,
   Modal,
   PageHeader,
   Select,
@@ -249,7 +250,7 @@ export default function AttendanceDetailPage() {
         </Card>
       </RoleGate>
 
-      {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+      <FormError>{actionError}</FormError>
 
       <Modal
         open={reviewOpen}

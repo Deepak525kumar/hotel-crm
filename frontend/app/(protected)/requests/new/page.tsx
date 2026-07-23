@@ -13,6 +13,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  FormError,
   Input,
   PageHeader,
   Select,
@@ -217,7 +218,7 @@ function NewWorkRequestForm() {
               onChange={(e) => set("requirements", e.target.value)}
             />
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            <FormError>{error}</FormError>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button

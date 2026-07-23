@@ -19,6 +19,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   Modal,
   PageHeader,
   Skeleton,
@@ -183,7 +184,7 @@ function UserDetail() {
           </span>
           . You can reactivate the account from the edit screen.
         </p>
-        {actionError && <p className="mt-3 text-sm text-red-600">{actionError}</p>}
+        <FormError className="mt-3">{actionError}</FormError>
       </Modal>
     </div>
   );

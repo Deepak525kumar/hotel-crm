@@ -16,6 +16,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   PageHeader,
   Skeleton,
 } from "@/components/ui";
@@ -190,7 +191,7 @@ export default function WorkRequestDetailPage() {
         )}
       </ManagerAdminGate>
 
-      {publishError && <p className="text-sm text-red-600">{publishError}</p>}
+      <FormError>{publishError}</FormError>
     </div>
   );
 }

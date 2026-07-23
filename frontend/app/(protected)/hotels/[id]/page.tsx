@@ -17,6 +17,7 @@ import {
   CardTitle,
   DataList,
   DataRow,
+  FormError,
   Modal,
   PageHeader,
   Skeleton,
@@ -173,9 +174,7 @@ export default function HotelDetailPage() {
           This deactivates <span className="font-medium">{hotel?.name}</span>. You
           can reactivate it later from the edit screen.
         </p>
-        {actionError && (
-          <p className="mt-3 text-sm text-red-600">{actionError}</p>
-        )}
+        <FormError className="mt-3">{actionError}</FormError>
       </Modal>
     </div>
   );
