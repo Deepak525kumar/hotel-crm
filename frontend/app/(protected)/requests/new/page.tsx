@@ -14,6 +14,9 @@ import {
   CardHeader,
   CardTitle,
   Input,
+  PageHeader,
+  Select,
+  Textarea,
 } from "@/components/ui";
 import type { CreateWorkRequestInput } from "@/lib/types";
 
@@ -110,12 +113,11 @@ function NewWorkRequestForm() {
         <Link href="/requests" className="text-sm text-blue-700 hover:underline">
           ← Back to work requests
         </Link>
-        <h1 className="mt-2 text-xl font-semibold text-gray-900">
-          New work request
-        </h1>
-        <p className="text-sm text-gray-500">
-          Save as a draft, or publish it straight away to open it for staffing.
-        </p>
+        <PageHeader
+          className="mt-2"
+          title="New work request"
+          description="Save as a draft, or publish it straight away to open it for staffing."
+        />
       </div>
 
       <Card>
@@ -124,30 +126,19 @@ function NewWorkRequestForm() {
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="hotel_id"
-                className="text-sm font-medium text-gray-700"
-              >
-                Hotel
-              </label>
-              <select
-                id="hotel_id"
-                required
-                value={form.hotel_id}
-                onChange={(e) => set("hotel_id", e.target.value)}
-                className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="" disabled>
-                  {hotelsLoading ? "Loading hotels…" : "Select a hotel"}
+            <Select
+              label="Hotel"
+              required
+              value={form.hotel_id}
+              onChange={(e) => set("hotel_id", e.target.value)}
+              placeholder={hotelsLoading ? "Loading hotels…" : "Select a hotel"}
+            >
+              {hotels.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} — {h.city}, {h.country}
                 </option>
-                {hotels.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {h.name} — {h.city}, {h.country}
-                  </option>
-                ))}
-              </select>
-            </div>
+              ))}
+            </Select>
 
             <Input
               label="Position"
@@ -212,37 +203,19 @@ function NewWorkRequestForm() {
               />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="description"
-                className="text-sm font-medium text-gray-700"
-              >
-                Description (optional)
-              </label>
-              <textarea
-                id="description"
-                rows={3}
-                value={form.description}
-                onChange={(e) => set("description", e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <Textarea
+              label="Description (optional)"
+              rows={3}
+              value={form.description}
+              onChange={(e) => set("description", e.target.value)}
+            />
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="requirements"
-                className="text-sm font-medium text-gray-700"
-              >
-                Requirements (optional)
-              </label>
-              <textarea
-                id="requirements"
-                rows={3}
-                value={form.requirements}
-                onChange={(e) => set("requirements", e.target.value)}
-                className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+            <Textarea
+              label="Requirements (optional)"
+              rows={3}
+              value={form.requirements}
+              onChange={(e) => set("requirements", e.target.value)}
+            />
 
             {error && <p className="text-sm text-red-600">{error}</p>}
 

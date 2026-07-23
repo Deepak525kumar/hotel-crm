@@ -9,6 +9,7 @@ import {
   Card,
   CardContent,
   EmptyState,
+  Pager,
   PageHeader,
   Table,
   TBody,
@@ -99,25 +100,12 @@ export default function HotelGroupsPage() {
         </CardContent>
       </Card>
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={page <= 1 || isLoading}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          Previous
-        </Button>
-        <span className="text-sm text-gray-500">Page {page}</span>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={!hasNext || isLoading}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          Next
-        </Button>
-      </div>
+      <Pager
+        page={page}
+        hasNext={hasNext}
+        onPageChange={setPage}
+        disabled={isLoading}
+      />
     </div>
   );
 }

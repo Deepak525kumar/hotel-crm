@@ -9,42 +9,29 @@ import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
   Modal,
+  PageHeader,
+  Select,
+  Skeleton,
 } from "@/components/ui";
 import type { AttendanceReviewStatus } from "@/lib/types";
 
-const REVIEW_STATUSES: Array<{ value: AttendanceReviewStatus; label: string }> = [
+const REVIEW_STATUSES = [
   { value: "PRESENT", label: "Present" },
   { value: "LATE", label: "Late" },
   { value: "PARTIAL", label: "Partial" },
   { value: "ABSENT", label: "Absent" },
   { value: "EXCUSED", label: "Excused" },
 ];
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function formatTime(value: string | null): string {
-  return value ? new Date(value).toLocaleString() : "—";
-}
 
 export default function AttendanceDetailPage() {
   const params = useParams<{ id: string }>();
@@ -101,8 +88,14 @@ export default function AttendanceDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -141,41 +134,43 @@ export default function AttendanceDetailPage() {
         >
           ← Back to attendance
         </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">Attendance</h1>
-          <div className="flex items-center gap-2">
-            <AttendanceStatusBadge status={record.status} />
-            <VerificationBadge verified={record.is_verified} />
-          </div>
-        </div>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Attendance
+              <AttendanceStatusBadge status={record.status} />
+              <VerificationBadge verified={record.is_verified} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Check-in / Check-out</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Checked in" value={formatTime(record.check_in_at)} />
-          <DetailRow
-            label="Checked out"
-            value={formatTime(record.check_out_at)}
-          />
-          <DetailRow
-            label="Expected start"
-            value={formatTime(record.expected_start)}
-          />
-          <DetailRow
-            label="Expected end"
-            value={formatTime(record.expected_end)}
-          />
-          <DetailRow
-            label="Minutes late"
-            value={record.minutes_late ?? "—"}
-          />
-          <DetailRow
-            label="Minutes worked"
-            value={record.minutes_worked ?? "—"}
-          />
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Checked in" value={formatDateTime(record.check_in_at)} />
+            <DataRow
+              label="Checked out"
+              value={formatDateTime(record.check_out_at)}
+            />
+            <DataRow
+              label="Expected start"
+              value={formatDateTime(record.expected_start)}
+            />
+            <DataRow
+              label="Expected end"
+              value={formatDateTime(record.expected_end)}
+            />
+            <DataRow label="Minutes late" value={record.minutes_late ?? "—"} />
+            <DataRow
+              label="Minutes worked"
+              value={record.minutes_worked ?? "—"}
+            />
+          </DataList>
         </CardContent>
       </Card>
 
@@ -183,30 +178,32 @@ export default function AttendanceDetailPage() {
         <CardHeader>
           <CardTitle>Record</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Worker" value={record.worker_id} />
-          <DetailRow
-            label="Assignment"
-            value={
-              <Link
-                href={`/assignments/${record.assignment_id}`}
-                className="text-blue-700 hover:underline"
-              >
-                {record.assignment_id}
-              </Link>
-            }
-          />
-          <DetailRow label="Hotel" value={record.hotel_id} />
-          {record.verified_by_id && (
-            <DetailRow label="Verified by" value={record.verified_by_id} />
-          )}
-          {record.verified_at && (
-            <DetailRow
-              label="Verified at"
-              value={formatTime(record.verified_at)}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Worker" value={record.worker_id} />
+            <DataRow
+              label="Assignment"
+              value={
+                <Link
+                  href={`/assignments/${record.assignment_id}`}
+                  className="text-blue-700 hover:underline"
+                >
+                  {record.assignment_id}
+                </Link>
+              }
             />
-          )}
-          {record.notes && <DetailRow label="Notes" value={record.notes} />}
+            <DataRow label="Hotel" value={record.hotel_id} />
+            {record.verified_by_id && (
+              <DataRow label="Verified by" value={record.verified_by_id} />
+            )}
+            {record.verified_at && (
+              <DataRow
+                label="Verified at"
+                value={formatDateTime(record.verified_at)}
+              />
+            )}
+            {record.notes && <DataRow label="Notes" value={record.notes} />}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -275,28 +272,14 @@ export default function AttendanceDetailPage() {
         }
       >
         <div className="space-y-4">
-          <div className="space-y-2">
-            <label
-              htmlFor="review-status"
-              className="text-sm font-medium text-gray-700"
-            >
-              Status
-            </label>
-            <select
-              id="review-status"
-              value={reviewStatus}
-              onChange={(e) =>
-                setReviewStatus(e.target.value as AttendanceReviewStatus)
-              }
-              className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {REVIEW_STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select
+            label="Status"
+            value={reviewStatus}
+            onChange={(e) =>
+              setReviewStatus(e.target.value as AttendanceReviewStatus)
+            }
+            options={REVIEW_STATUSES}
+          />
 
           <label className="flex items-center gap-2 text-sm text-gray-700">
             <input

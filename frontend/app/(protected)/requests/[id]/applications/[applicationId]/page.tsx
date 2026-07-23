@@ -7,29 +7,20 @@ import { useWorkApplication } from "@/hooks/useWorkApplications";
 import { workApplicationsApi, ApiError } from "@/lib/api";
 import { ManagerAdminGate } from "@/components/auth/RoleGate";
 import { ApplicationStatusBadge } from "@/components/work-applications/ApplicationStatusBadge";
+import { formatDateTime, formatScore } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
   Modal,
+  PageHeader,
+  Skeleton,
+  Textarea,
 } from "@/components/ui";
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
 
 export default function ApplicationReviewPage() {
   const params = useParams<{ id: string; applicationId: string }>();
@@ -88,8 +79,14 @@ export default function ApplicationReviewPage() {
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-40" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -125,44 +122,45 @@ export default function ApplicationReviewPage() {
         >
           ← Back to applications
         </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">
-            Application review
-          </h1>
-          <ApplicationStatusBadge status={application.status} />
-        </div>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Application review
+              <ApplicationStatusBadge status={application.status} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Applicant</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Worker" value={application.worker_id} />
-          <DetailRow
-            label="Rating at apply time"
-            value={
-              application.worker_rating_snapshot != null
-                ? application.worker_rating_snapshot.toFixed(1)
-                : "—"
-            }
-          />
-          <DetailRow
-            label="Applied"
-            value={new Date(application.applied_at).toLocaleString()}
-          />
-          {application.reviewed_at && (
-            <DetailRow
-              label="Reviewed"
-              value={new Date(application.reviewed_at).toLocaleString()}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Worker" value={application.worker_id} />
+            <DataRow
+              label="Rating at apply time"
+              value={formatScore(application.worker_rating_snapshot)}
             />
-          )}
-          {application.rejection_reason && (
-            <DetailRow
-              label="Rejection reason"
-              value={application.rejection_reason}
+            <DataRow
+              label="Applied"
+              value={formatDateTime(application.applied_at)}
             />
-          )}
+            {application.reviewed_at && (
+              <DataRow
+                label="Reviewed"
+                value={formatDateTime(application.reviewed_at)}
+              />
+            )}
+            {application.rejection_reason && (
+              <DataRow
+                label="Rejection reason"
+                value={application.rejection_reason}
+              />
+            )}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -225,23 +223,14 @@ export default function ApplicationReviewPage() {
           </>
         }
       >
-        <div className="space-y-2">
-          <label
-            htmlFor="rejection-reason"
-            className="text-sm font-medium text-gray-700"
-          >
-            Reason (optional)
-          </label>
-          <textarea
-            id="rejection-reason"
-            value={rejectReason}
-            onChange={(e) => setRejectReason(e.target.value)}
-            maxLength={500}
-            rows={4}
-            placeholder="Share why this application was rejected."
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <Textarea
+          label="Reason (optional)"
+          value={rejectReason}
+          onChange={(e) => setRejectReason(e.target.value)}
+          maxLength={500}
+          rows={4}
+          placeholder="Share why this application was rejected."
+        />
       </Modal>
     </div>
   );

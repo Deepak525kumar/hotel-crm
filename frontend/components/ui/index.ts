@@ -27,3 +27,5 @@ export { DataList, DataRow } from "./DescriptionList";
 export { ActiveBadge } from "./ActiveBadge";
 export { StatTile } from "./StatTile";
 export type { StatTileProps } from "./StatTile";
+export { Pager } from "./Pager";
+export type { PagerProps } from "./Pager";

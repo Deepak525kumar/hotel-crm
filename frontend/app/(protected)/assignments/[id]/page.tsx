@@ -6,29 +6,20 @@ import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
 import { assignmentsApi, ApiError } from "@/lib/api";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { formatDateTime } from "@/lib/format";
 import {
   Button,
   Card,
   CardContent,
   CardHeader,
   CardTitle,
+  DataList,
+  DataRow,
   Modal,
+  PageHeader,
+  Skeleton,
+  Textarea,
 } from "@/components/ui";
-
-function DetailRow({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
-  return (
-    <div className="flex justify-between gap-4 py-2 text-sm">
-      <span className="text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
 
 export default function AssignmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -103,8 +94,14 @@ export default function AssignmentDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-gray-500">
-        Loading…
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -145,59 +142,66 @@ export default function AssignmentDetailPage() {
         >
           ← Back to assignments
         </Link>
-        <div className="mt-2 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-semibold text-gray-900">Assignment</h1>
-          <AssignmentStatusBadge status={assignment.status} />
-        </div>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Assignment
+              <AssignmentStatusBadge status={assignment.status} />
+            </span>
+          }
+        />
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
         </CardHeader>
-        <CardContent className="divide-y divide-gray-100">
-          <DetailRow label="Worker" value={assignment.worker_id} />
-          <DetailRow
-            label="Work request"
-            value={
-              <Link
-                href={`/requests/${assignment.work_request_id}`}
-                className="text-blue-700 hover:underline"
-              >
-                {assignment.work_request_id}
-              </Link>
-            }
-          />
-          <DetailRow label="Hotel" value={assignment.hotel_id} />
-          <DetailRow label="Assigned by" value={assignment.assigned_by_id} />
-          <DetailRow
-            label="Confirmed"
-            value={new Date(assignment.confirmed_at).toLocaleString()}
-          />
-          {assignment.started_at && (
-            <DetailRow
-              label="Started"
-              value={new Date(assignment.started_at).toLocaleString()}
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Worker" value={assignment.worker_id} />
+            <DataRow
+              label="Work request"
+              value={
+                <Link
+                  href={`/requests/${assignment.work_request_id}`}
+                  className="text-blue-700 hover:underline"
+                >
+                  {assignment.work_request_id}
+                </Link>
+              }
             />
-          )}
-          {assignment.completed_at && (
-            <DetailRow
-              label="Completed"
-              value={new Date(assignment.completed_at).toLocaleString()}
+            <DataRow label="Hotel" value={assignment.hotel_id} />
+            <DataRow label="Assigned by" value={assignment.assigned_by_id} />
+            <DataRow
+              label="Confirmed"
+              value={formatDateTime(assignment.confirmed_at)}
             />
-          )}
-          {assignment.cancelled_at && (
-            <DetailRow
-              label="Cancelled"
-              value={new Date(assignment.cancelled_at).toLocaleString()}
-            />
-          )}
-          {assignment.cancellation_reason && (
-            <DetailRow
-              label="Cancellation reason"
-              value={assignment.cancellation_reason}
-            />
-          )}
+            {assignment.started_at && (
+              <DataRow
+                label="Started"
+                value={formatDateTime(assignment.started_at)}
+              />
+            )}
+            {assignment.completed_at && (
+              <DataRow
+                label="Completed"
+                value={formatDateTime(assignment.completed_at)}
+              />
+            )}
+            {assignment.cancelled_at && (
+              <DataRow
+                label="Cancelled"
+                value={formatDateTime(assignment.cancelled_at)}
+              />
+            )}
+            {assignment.cancellation_reason && (
+              <DataRow
+                label="Cancellation reason"
+                value={assignment.cancellation_reason}
+              />
+            )}
+          </DataList>
         </CardContent>
       </Card>
 
@@ -260,23 +264,14 @@ export default function AssignmentDetailPage() {
           </>
         }
       >
-        <div className="space-y-2">
-          <label
-            htmlFor="cancellation-reason"
-            className="text-sm font-medium text-gray-700"
-          >
-            Reason (optional)
-          </label>
-          <textarea
-            id="cancellation-reason"
-            value={cancelReason}
-            onChange={(e) => setCancelReason(e.target.value)}
-            maxLength={500}
-            rows={4}
-            placeholder="Share why this assignment was cancelled."
-            className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <Textarea
+          label="Reason (optional)"
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          maxLength={500}
+          rows={4}
+          placeholder="Share why this assignment was cancelled."
+        />
       </Modal>
     </div>
   );
