@@ -6,7 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
-import { ApiError, usersApi } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { formatDateTime } from "@/lib/format";
@@ -35,31 +36,26 @@ function UserDetail() {
   const { data: user, isLoading, error } = useUser(id);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [deactivating, setDeactivating] = useState(false);
+  const deactivate = useAsyncAction();
 
   const isSelf = currentUser?.id === id;
 
-  const deactivate = async () => {
-    setActionError(null);
-    setDeactivating(true);
-    try {
-      await usersApi.remove(id);
-      await Promise.all([
-        globalMutate(["user", id]),
-        globalMutate((key) => Array.isArray(key) && key[0] === "users"),
-      ]);
-      setConfirmOpen(false);
-      router.push("/users");
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong. Please try again.",
-      );
-      setDeactivating(false);
-    }
-  };
+  const onDeactivate = () =>
+    deactivate.run(
+      async () => {
+        await usersApi.remove(id);
+        await Promise.all([
+          globalMutate(["user", id]),
+          globalMutate((key) => Array.isArray(key) && key[0] === "users"),
+        ]);
+      },
+      {
+        onSuccess: () => {
+          setConfirmOpen(false);
+          router.push("/users");
+        },
+      },
+    );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -161,18 +157,18 @@ function UserDetail() {
 
       <Modal
         open={confirmOpen}
-        onClose={() => !deactivating && setConfirmOpen(false)}
+        onClose={() => !deactivate.pending && setConfirmOpen(false)}
         title="Deactivate account"
         footer={
           <>
             <Button
               variant="outline"
               onClick={() => setConfirmOpen(false)}
-              disabled={deactivating}
+              disabled={deactivate.pending}
             >
               Cancel
             </Button>
-            <Button variant="danger" onClick={deactivate} loading={deactivating}>
+            <Button variant="danger" onClick={onDeactivate} loading={deactivate.pending}>
               Deactivate
             </Button>
           </>
@@ -185,7 +181,7 @@ function UserDetail() {
           </span>
           . You can reactivate the account from the edit screen.
         </p>
-        <FormError className="mt-3">{actionError}</FormError>
+        <FormError className="mt-3">{deactivate.error}</FormError>
       </Modal>
     </div>
   );

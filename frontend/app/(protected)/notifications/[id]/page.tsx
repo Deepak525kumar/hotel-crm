@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useNotification } from "@/hooks/useNotifications";
-import { notificationsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notificationsApi } from "@/lib/api";
 import {
   NotificationTypeBadge,
   notificationTypeLabel,
@@ -30,25 +30,13 @@ export default function NotificationDetailPage() {
 
   const { notification, isLoading, error, mutate } = useNotification(id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [marking, setMarking] = useState(false);
+  const mark = useAsyncAction();
 
-  const markRead = async () => {
-    setActionError(null);
-    setMarking(true);
-    try {
-      await notificationsApi.markAsRead(id);
-      await mutate();
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to mark as read. Please try again.",
-      );
-    } finally {
-      setMarking(false);
-    }
-  };
+  const markRead = () =>
+    mark.run(() => notificationsApi.markAsRead(id), {
+      onSuccess: () => mutate(),
+      errorMessage: "Failed to mark as read. Please try again.",
+    });
 
   if (isLoading) {
     return (
@@ -146,7 +134,7 @@ export default function NotificationDetailPage() {
         </CardContent>
       </Card>
 
-      <FormError>{actionError}</FormError>
+      <FormError>{mark.error}</FormError>
 
       {!notification.is_read && (
         <Card>
@@ -154,7 +142,7 @@ export default function NotificationDetailPage() {
             <div className="text-sm text-gray-600">
               Mark this notification as read once you&apos;ve seen it.
             </div>
-            <Button onClick={markRead} loading={marking} className="shrink-0">
+            <Button onClick={markRead} loading={mark.pending} className="shrink-0">
               Mark as read
             </Button>
           </CardContent>

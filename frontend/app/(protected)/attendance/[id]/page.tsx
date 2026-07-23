@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useAttendanceRecord } from "@/hooks/useAttendance";
-import { attendanceApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, attendanceApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
@@ -42,51 +43,35 @@ export default function AttendanceDetailPage() {
   const { data: record, isLoading, error, mutate } = useAttendanceRecord(id);
   const currentUserId = useAuthStore((s) => s.user?.id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [checkingOut, setCheckingOut] = useState(false);
-  const [verifying, setVerifying] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewStatus, setReviewStatus] =
     useState<AttendanceReviewStatus>("PRESENT");
   const [markVerified, setMarkVerified] = useState(true);
+  const action = useAsyncAction();
 
-  const checkOut = async () => {
-    setActionError(null);
-    setCheckingOut(true);
-    try {
-      const updated = await attendanceApi.checkOut(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to check out. Please try again.",
-      );
-    } finally {
-      setCheckingOut(false);
-    }
-  };
+  const checkOut = () =>
+    action.run(() => attendanceApi.checkOut(id), {
+      key: "checkOut",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to check out. Please try again.",
+    });
 
-  const submitReview = async () => {
-    setActionError(null);
-    setVerifying(true);
-    try {
-      const updated = await attendanceApi.update(id, {
-        status: reviewStatus,
-        ...(markVerified ? { is_verified: true } : {}),
-      });
-      await mutate(updated, { revalidate: false });
-      setReviewOpen(false);
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to verify attendance. Please try again.",
-      );
-    } finally {
-      setVerifying(false);
-    }
-  };
+  const submitReview = () =>
+    action.run(
+      () =>
+        attendanceApi.update(id, {
+          status: reviewStatus,
+          ...(markVerified ? { is_verified: true } : {}),
+        }),
+      {
+        key: "verify",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setReviewOpen(false);
+        },
+        errorMessage: "Failed to verify attendance. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
@@ -216,7 +201,7 @@ export default function AttendanceDetailPage() {
             </div>
             <Button
               onClick={checkOut}
-              loading={checkingOut}
+              loading={action.isPending("checkOut")}
               className="shrink-0"
             >
               Check out
@@ -249,12 +234,12 @@ export default function AttendanceDetailPage() {
         </Card>
       </RoleGate>
 
-      <FormError>{actionError}</FormError>
+      <FormError>{action.error}</FormError>
 
       <Modal
         open={reviewOpen}
         onClose={() => {
-          if (!verifying) setReviewOpen(false);
+          if (!action.isPending("verify")) setReviewOpen(false);
         }}
         title="Review attendance"
         footer={
@@ -262,11 +247,11 @@ export default function AttendanceDetailPage() {
             <Button
               variant="outline"
               onClick={() => setReviewOpen(false)}
-              disabled={verifying}
+              disabled={action.isPending("verify")}
             >
               Cancel
             </Button>
-            <Button onClick={submitReview} loading={verifying}>
+            <Button onClick={submitReview} loading={action.isPending("verify")}>
               Save review
             </Button>
           </>

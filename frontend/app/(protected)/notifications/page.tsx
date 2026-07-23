@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { notificationsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { notificationsApi } from "@/lib/api";
 import { NotificationTypeBadge } from "@/components/notifications/NotificationTypeBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -38,30 +39,22 @@ export default function NotificationsPage() {
     useNotifications();
 
   const [filter, setFilter] = useState<"" | "unread" | "read">("");
-  const [markingAll, setMarkingAll] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const markAll = useAsyncAction();
 
   const visible: Notification[] = notifications.filter((n) =>
     filter === "" ? true : filter === "unread" ? !n.is_read : n.is_read,
   );
 
-  const markAllRead = async () => {
+  const markAllRead = () => {
     const unread = notifications.filter((n) => !n.is_read);
     if (unread.length === 0) return;
-    setActionError(null);
-    setMarkingAll(true);
-    try {
-      await Promise.all(unread.map((n) => notificationsApi.markAsRead(n.id)));
-      await mutate();
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to mark all as read. Please try again.",
-      );
-    } finally {
-      setMarkingAll(false);
-    }
+    return markAll.run(
+      () => Promise.all(unread.map((n) => notificationsApi.markAsRead(n.id))),
+      {
+        onSuccess: () => mutate(),
+        errorMessage: "Failed to mark all as read. Please try again.",
+      },
+    );
   };
 
   return (
@@ -78,7 +71,7 @@ export default function NotificationsPage() {
             variant="outline"
             size="sm"
             onClick={markAllRead}
-            loading={markingAll}
+            loading={markAll.pending}
             disabled={unreadCount === 0}
           >
             Mark all as read
@@ -97,7 +90,7 @@ export default function NotificationsPage() {
         </div>
       </div>
 
-      <FormError>{actionError}</FormError>
+      <FormError>{markAll.error}</FormError>
 
       <Card>
         <CardContent className="p-0">

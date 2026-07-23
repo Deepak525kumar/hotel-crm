@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkApplication } from "@/hooks/useWorkApplications";
-import { workApplicationsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, workApplicationsApi } from "@/lib/api";
 import { ManagerAdminGate } from "@/components/auth/RoleGate";
 import { ApplicationStatusBadge } from "@/components/work-applications/ApplicationStatusBadge";
 import { formatDateTime, formatScore } from "@/lib/format";
@@ -32,51 +33,35 @@ export default function ApplicationReviewPage() {
     applicationId,
   );
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [accepting, setAccepting] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
+  const action = useAsyncAction();
 
-  const accept = async () => {
-    setActionError(null);
-    setAccepting(true);
-    try {
-      const updated = await workApplicationsApi.accept(id, applicationId);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to accept application. Please try again.",
-      );
-    } finally {
-      setAccepting(false);
-    }
-  };
+  const accept = () =>
+    action.run(() => workApplicationsApi.accept(id, applicationId), {
+      key: "accept",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to accept application. Please try again.",
+    });
 
-  const reject = async () => {
-    setActionError(null);
-    setRejecting(true);
-    try {
-      const updated = await workApplicationsApi.reject(
-        id,
-        applicationId,
-        rejectReason.trim() || undefined,
-      );
-      await mutate(updated, { revalidate: false });
-      setRejectOpen(false);
-      setRejectReason("");
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to reject application. Please try again.",
-      );
-    } finally {
-      setRejecting(false);
-    }
-  };
+  const reject = () =>
+    action.run(
+      () =>
+        workApplicationsApi.reject(
+          id,
+          applicationId,
+          rejectReason.trim() || undefined,
+        ),
+      {
+        key: "reject",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setRejectOpen(false);
+          setRejectReason("");
+        },
+        errorMessage: "Failed to reject application. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
@@ -188,11 +173,15 @@ export default function ApplicationReviewPage() {
                 <Button
                   variant="outline"
                   onClick={() => setRejectOpen(true)}
-                  disabled={accepting || rejecting}
+                  disabled={action.pending}
                 >
                   Reject
                 </Button>
-                <Button onClick={accept} loading={accepting} disabled={rejecting}>
+                <Button
+                  onClick={accept}
+                  loading={action.isPending("accept")}
+                  disabled={action.isPending("reject")}
+                >
                   Accept
                 </Button>
               </div>
@@ -201,12 +190,12 @@ export default function ApplicationReviewPage() {
         )}
       </ManagerAdminGate>
 
-      <FormError>{actionError}</FormError>
+      <FormError>{action.error}</FormError>
 
       <Modal
         open={rejectOpen}
         onClose={() => {
-          if (!rejecting) setRejectOpen(false);
+          if (!action.isPending("reject")) setRejectOpen(false);
         }}
         title="Reject application"
         footer={
@@ -214,11 +203,15 @@ export default function ApplicationReviewPage() {
             <Button
               variant="outline"
               onClick={() => setRejectOpen(false)}
-              disabled={rejecting}
+              disabled={action.isPending("reject")}
             >
               Cancel
             </Button>
-            <Button variant="danger" onClick={reject} loading={rejecting}>
+            <Button
+              variant="danger"
+              onClick={reject}
+              loading={action.isPending("reject")}
+            >
               Reject application
             </Button>
           </>

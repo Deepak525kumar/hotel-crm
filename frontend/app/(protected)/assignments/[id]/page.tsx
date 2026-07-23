@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
-import { assignmentsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, assignmentsApi } from "@/lib/api";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -28,70 +29,37 @@ export default function AssignmentDetailPage() {
 
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
 
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [starting, setStarting] = useState(false);
-  const [completing, setCompleting] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const action = useAsyncAction();
 
-  const busy = starting || completing || cancelling;
+  const start = () =>
+    action.run(() => assignmentsApi.start(id), {
+      key: "start",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to start assignment. Please try again.",
+    });
 
-  const start = async () => {
-    setActionError(null);
-    setStarting(true);
-    try {
-      const updated = await assignmentsApi.start(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to start assignment. Please try again.",
-      );
-    } finally {
-      setStarting(false);
-    }
-  };
+  const complete = () =>
+    action.run(() => assignmentsApi.complete(id), {
+      key: "complete",
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to complete assignment. Please try again.",
+    });
 
-  const complete = async () => {
-    setActionError(null);
-    setCompleting(true);
-    try {
-      const updated = await assignmentsApi.complete(id);
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to complete assignment. Please try again.",
-      );
-    } finally {
-      setCompleting(false);
-    }
-  };
-
-  const cancel = async () => {
-    setActionError(null);
-    setCancelling(true);
-    try {
-      const updated = await assignmentsApi.cancel(
-        id,
-        cancelReason.trim() || undefined,
-      );
-      await mutate(updated, { revalidate: false });
-      setCancelOpen(false);
-      setCancelReason("");
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to cancel assignment. Please try again.",
-      );
-    } finally {
-      setCancelling(false);
-    }
-  };
+  const cancel = () =>
+    action.run(
+      () => assignmentsApi.cancel(id, cancelReason.trim() || undefined),
+      {
+        key: "cancel",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setCancelOpen(false);
+          setCancelReason("");
+        },
+        errorMessage: "Failed to cancel assignment. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
@@ -217,21 +185,25 @@ export default function AssignmentDetailPage() {
                 <Button
                   variant="outline"
                   onClick={() => setCancelOpen(true)}
-                  disabled={busy}
+                  disabled={action.pending}
                 >
                   Cancel
                 </Button>
               )}
               {canStart && (
-                <Button onClick={start} loading={starting} disabled={cancelling}>
+                <Button
+                  onClick={start}
+                  loading={action.isPending("start")}
+                  disabled={action.isPending("cancel")}
+                >
                   Start shift
                 </Button>
               )}
               {canComplete && (
                 <Button
                   onClick={complete}
-                  loading={completing}
-                  disabled={cancelling}
+                  loading={action.isPending("complete")}
+                  disabled={action.isPending("cancel")}
                 >
                   Complete
                 </Button>
@@ -241,12 +213,12 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
-      <FormError>{actionError}</FormError>
+      <FormError>{action.error}</FormError>
 
       <Modal
         open={cancelOpen}
         onClose={() => {
-          if (!cancelling) setCancelOpen(false);
+          if (!action.isPending("cancel")) setCancelOpen(false);
         }}
         title="Cancel assignment"
         footer={
@@ -254,11 +226,15 @@ export default function AssignmentDetailPage() {
             <Button
               variant="outline"
               onClick={() => setCancelOpen(false)}
-              disabled={cancelling}
+              disabled={action.isPending("cancel")}
             >
               Keep assignment
             </Button>
-            <Button variant="danger" onClick={cancel} loading={cancelling}>
+            <Button
+              variant="danger"
+              onClick={cancel}
+              loading={action.isPending("cancel")}
+            >
               Cancel assignment
             </Button>
           </>

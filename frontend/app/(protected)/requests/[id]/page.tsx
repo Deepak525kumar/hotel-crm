@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
-import { workRequestsApi, ApiError } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, workRequestsApi } from "@/lib/api";
 import { ManagerAdminGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import { formatDateTime } from "@/lib/format";
@@ -27,26 +27,14 @@ export default function WorkRequestDetailPage() {
   const id = params.id;
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [publishing, setPublishing] = useState(false);
+  const publish = useAsyncAction();
 
-  const publish = async () => {
-    setPublishError(null);
-    setPublishing(true);
-    try {
-      const updated = await workRequestsApi.publish(id);
+  const onPublish = () =>
+    publish.run(() => workRequestsApi.publish(id), {
       // Optimistically replace the cached value with the server response.
-      await mutate(updated, { revalidate: false });
-    } catch (err) {
-      setPublishError(
-        err instanceof ApiError
-          ? err.message
-          : "Failed to publish. Please try again.",
-      );
-    } finally {
-      setPublishing(false);
-    }
-  };
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to publish. Please try again.",
+    });
 
   if (isLoading) {
     return (
@@ -184,7 +172,7 @@ export default function WorkRequestDetailPage() {
               <div className="text-sm text-gray-600">
                 This request is a draft. Publish it to open it for staffing.
               </div>
-              <Button onClick={publish} loading={publishing}>
+              <Button onClick={onPublish} loading={publish.pending}>
                 Publish
               </Button>
             </CardContent>
@@ -192,7 +180,7 @@ export default function WorkRequestDetailPage() {
         )}
       </ManagerAdminGate>
 
-      <FormError>{publishError}</FormError>
+      <FormError>{publish.error}</FormError>
     </div>
   );
 }

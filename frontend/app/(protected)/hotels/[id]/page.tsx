@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup } from "@/hooks/useHotels";
-import { ApiError, hotelsApi } from "@/lib/api";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { hotelsApi } from "@/lib/api";
 import { RoleGate, ManagerAdminGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -33,29 +34,24 @@ export default function HotelDetailPage() {
   const { data: group } = useHotelGroup(hotel?.hotel_group_id);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [deactivating, setDeactivating] = useState(false);
+  const deactivate = useAsyncAction();
 
-  const deactivate = async () => {
-    setActionError(null);
-    setDeactivating(true);
-    try {
-      await hotelsApi.remove(id);
-      await Promise.all([
-        globalMutate(["hotel", id]),
-        globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
-      ]);
-      setConfirmOpen(false);
-      router.push("/hotels");
-    } catch (err) {
-      setActionError(
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong. Please try again.",
-      );
-      setDeactivating(false);
-    }
-  };
+  const onDeactivate = () =>
+    deactivate.run(
+      async () => {
+        await hotelsApi.remove(id);
+        await Promise.all([
+          globalMutate(["hotel", id]),
+          globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
+        ]);
+      },
+      {
+        onSuccess: () => {
+          setConfirmOpen(false);
+          router.push("/hotels");
+        },
+      },
+    );
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -153,18 +149,18 @@ export default function HotelDetailPage() {
 
       <Modal
         open={confirmOpen}
-        onClose={() => !deactivating && setConfirmOpen(false)}
+        onClose={() => !deactivate.pending && setConfirmOpen(false)}
         title="Deactivate hotel"
         footer={
           <>
             <Button
               variant="outline"
               onClick={() => setConfirmOpen(false)}
-              disabled={deactivating}
+              disabled={deactivate.pending}
             >
               Cancel
             </Button>
-            <Button variant="danger" onClick={deactivate} loading={deactivating}>
+            <Button variant="danger" onClick={onDeactivate} loading={deactivate.pending}>
               Deactivate
             </Button>
           </>
@@ -174,7 +170,7 @@ export default function HotelDetailPage() {
           This deactivates <span className="font-medium">{hotel?.name}</span>. You
           can reactivate it later from the edit screen.
         </p>
-        <FormError className="mt-3">{actionError}</FormError>
+        <FormError className="mt-3">{deactivate.error}</FormError>
       </Modal>
     </div>
   );
