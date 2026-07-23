@@ -2036,6 +2036,51 @@ known_drift:
       Epic 7's remaining non-push OQ-NOTIF-02..09 items and the push/channel
       *dispatch*-design question (TREQ-002/TREQ-012, not settled by ADR-027) remain for
       future sessions.
+  - id: SYNC-053
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Post-#194 Repository Synchronization + repository-wide implementation-planning
+      pass (2026-07-23, branch claude/post-merge-sync-planning-s7gale). Triggered by the
+      merge of PR #194 (Epic 8, work-requests/work-applications hotel-scoping) into main
+      (HEAD 9ca0eed). Scope: (a) verify current implementation state against
+      backend/src/ code, not commit history; (b) recalculate/re-verify the dependency
+      graph; (c) rebind lagging cache stamps; (d) re-plan the remaining epic surface.
+      Findings, all independently code-verified this pass:
+      Epics 1, 2, 3, 5, 8 COMPLETE and Epic 6/7 HEADLINE items COMPLETE --
+      Epic 1 assignments PATCH guard (service.ts update/getById deny-by-default);
+      Epic 2 auth refresh-secret fail-closed + SHA-256 Session.refresh_token at rest;
+      Epic 3 resolveHotelAccess() seam in middleware/permissions.ts;
+      Epic 5 HotelGroup/Hotel.hotel_group_id/manager_user_id schema + JWT scope claim +
+      manager authz flip + backend-hotel-workers physically retired + employment-record
+      module; Epic 6 Rating.score 0-100 (ADR-026) + RoomsCompletedEntry (ADR-028);
+      Epic 7 NotificationChannel.WEBHOOK (ADR-027); Epic 8 isHotelInScope() in-service
+      on work-requests/work-applications. Epic 4 remains SUPERSEDED (no-op). Health
+      gates at HEAD: 367/367 backend tests (39 suites) green, tsc --noEmit clean,
+      context-loader.js --validate Errors:0, repository-integrity-check.js exit 0 (0 new
+      blocking; 56 pre-existing WARN orphan/link findings, incl. ADR-022..028 indexed as
+      code-path cells rather than []() links). Rebound all 10 project-runtime index
+      observed_revision stamps + this block's baseline_revision + SESSION_STATE.yaml from
+      09e0b16 (CONTRACT_INDEX from its later 2886267) to HEAD 9ca0eed; content was already
+      written by prior sessions, this pass advances the lagging stamps and re-verifies
+      coherence (see cache_state.note). Planning conclusion: NO unblocked, spec-traceable
+      implementation (application-code) epic remains. Of 210 open/blocked register rows,
+      209 need `human`/`human/architecture`/`human/product` authority and 1 needs
+      `architecture/human` (SIR-EMP-014 perf budget); the only non-human rows
+      (SIR-HR-018, SIR-HR-019, SIR-USERS-017) are documentation/knowledge-graph
+      spec-revision items locked under Implementation Mode, not application epics.
+      Fresh completion-report baseline recorded at
+      docs/implementation/COMPLETION_REPORT_2026-07-23.md.
+    authority_needed: none  # synchronization + planning only; no new decision made or required by this pass
+    next_step: >-
+      No autonomous implementation is available: every remaining epic (Epic 6 QUAL
+      OQ-02/04/05/07/08 + CRM OD-CRM-* + ANALYTICS OQ-02/04-12; Epic 7 push/dispatch
+      design TREQ-002/012 + OQ-NOTIF-02..09; HR/calendar/chatbot/geo module builds) is
+      gated on a Constitution-reserved governance decision (human/product or
+      human/architecture) or on a REVIEW-status spec, per the SPECIFICATION_ISSUES_REGISTER.
+      The commissioning human must supply the next Decision Record (or lift Implementation
+      Mode for the spec-revision items) before further implementation can begin. SYNC-001
+      owner assignment remains reserved human authority, unchanged.
 
 context_invalidators:
   - repository revision changes
@@ -2052,22 +2097,30 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 09e0b162297162c8a93975ce55ccd3c406218606
+  baseline_revision: 9ca0eed45dec34aa4ce3739da4bc8e4c117f6c3f  # rebound to HEAD 9ca0eed by SYNC-053 (post-#194 sync/planning pass, 2026-07-23); prior 09e0b16, content verified coherent through the pass
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics, backend-auth, backend-work-requests, backend-attendance], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); ART-MEM-backend-auth/backend-work-requests/backend-attendance backfilled by SYNC-050 (Repository Synchronization Workflow, 2026-07-20) for the three specs frozen 2026-07-15 that had never received one -- all ten FROZEN modules now have a Module Memory entry, no backfill gap remains" }
   note: >-
-    Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
-    mode), advancing from SYNC-036's `39fc1f5` bind. `39fc1f5..09e0b16`
-    comprises Package A's own merge (`4b58a42`) and the Fast Documentation
-    Workflow's Package B commit + merge (`9ba8944`/`09e0b16`); verified `git
-    diff 4b58a42..09e0b16 -- .claude/knowledge/` is empty (Package B touched
-    only `docs/03-modules/*.md`). This session performed a pure stamp-only
-    rebind (see SYNC-037 above): all nine project-runtime indexes plus this
-    block and `SESSION_STATE.yaml` advanced from `39fc1f5` to `09e0b16`; zero
-    content, governance, or specification change accompanies it. On any
-    doubt about validity, an artifact is treated as stale and reproduced
-    (CONTEXT_ARTIFACTS.md §1 invariant 5); the next repository-revision
-    change re-opens this block.
+    Rebound by SYNC-053 (post-#194 Repository Synchronization + implementation-planning
+    pass, 2026-07-23), advancing from `09e0b16` to HEAD `9ca0eed` (merge of PR #194,
+    Epic 8). Unlike SYNC-037's pure stamp-only rebind, the `09e0b16..9ca0eed` span is
+    NOT content-empty: it comprises Epic 5 PR 5.6/5.7/5.8 (employment-record build,
+    roster cutover, hotel-workers retirement), the ADR-024/025 ratification and
+    ADR-026/027/028 governance decisions, Epic 6/7 headline items (Rating rescale to
+    0-100, RoomsCompletedEntry, NotificationChannel.WEBHOOK), and Epic 8
+    (work-requests/work-applications in-service hotel-scoping). Those content changes
+    were already written into the knowledge indexes by their own sessions (SYNC-046..052
+    + the Epic 8 commit `353df1a`); this pass advances the stamps that lagged behind that
+    content and independently re-verifies coherence at HEAD: every completed epic checked
+    in `backend/src/` (not commit message), 367/367 backend tests green, `tsc --noEmit`
+    clean, `context-loader.js --validate` Errors:0, and `repository-integrity-check.js`
+    exit 0 (56 pre-existing WARN-only orphan/link findings unchanged in kind, 0 new
+    blocking). CONTRACT_INDEX advanced from its own later `2886267` stamp in the same
+    pass. Prior bind (retained for history): SYNC-037 rebound `39fc1f5..09e0b16` as a
+    pure stamp-only advance (Package A merge `4b58a42` + Fast-Documentation Package B
+    `9ba8944`/`09e0b16`, which touched only `docs/03-modules/*.md`). On any doubt about
+    validity, an artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1
+    invariant 5); the next repository-revision change re-opens this block.
