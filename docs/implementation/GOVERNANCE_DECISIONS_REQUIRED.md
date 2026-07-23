@@ -36,7 +36,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 
 | # | Decision | Priority | MVP? | Unlocks (est. PRs) |
 |---|---|---|---|---|
-| GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 |
+| GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ RESOLVED 2026-07-23 → `ADR-029` (Option B: Transactional Outbox + Worker runtime)** |
 | GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 |
 | GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 |
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
@@ -63,6 +63,19 @@ mobile screens) and assume the decision is made first — the decision itself is
 ---
 
 ## GD-01 — Notification dispatch & delivery model
+
+> **✅ RESOLVED 2026-07-23 by the project owner → `ADR-029` (Transactional Outbox + dedicated Worker
+> runtime), Option (b).** Producers persist domain change + in-app `Notification` + `OutboxEvent` in one
+> transaction; a dedicated Worker runtime (separate process over the same monolith, no external queue)
+> polls the outbox (5s, configurable), delivers via transport handlers (`OutboxTransport`
+> EMAIL/PUSH/WEBHOOK/SMS; EMAIL+PUSH first), runs the `OutboxStatus` PENDING→PROCESSING→DELIVERED/
+> FAILED/DEAD_LETTER lifecycle with configurable exponential backoff (1m/5m/15m/1h), guarantees
+> at-least-once + idempotent (`event_id`) delivery, hosts scheduled reminder/escalation jobs, and is
+> the canonical producer for the future Event Bus (GD-12). Resolves `OQ-NOTIF-01` (dispatch half),
+> `OQ-NOTIF-04/06/07/08/09` and the delivery half of `OQ-AUTH-01`. Build sequenced as Epic 7 PRs
+> 7.1–7.7 in `IMPLEMENTATION_EXECUTION_PLAN.md` (mobile push registration split out as its own PR, 7.7,
+> per reviewer feedback). Remaining NOTIF opens: `OQ-NOTIF-02` (retention/GD-09,
+> now also covering `OutboxEvent`), `OQ-NOTIF-03`, `OQ-NOTIF-05`.
 
 - **Why a decision is required:** `NotificationChannel` values were fixed by ADR-027, but *how* email/push
   are actually delivered, how send-failures are handled, and which runtime hosts scheduled reminders were
