@@ -114,6 +114,59 @@ enum NotificationType {
   REWORK_REQUIRED            // to worker: verification failed, rework needed
 }
 
+// ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
+// internal delivery/queue record — distinct from Notification (the user-facing
+// inbox, unchanged by this ADR) and never exposed to any client. Domain-event
+// naming is past-tense, matching future non-notification event types
+// (e.g. CONTRACT_EXPIRED, WORK_REQUEST_CREATED) this enum is expected to grow to.
+enum OutboxEventType {
+  NOTIFICATION_CREATED
+}
+
+// What kind of domain aggregate this event is about. NOTIFICATION today; grows
+// additively (ALTER TYPE ... ADD VALUE) as non-notification producers adopt the
+// outbox as the future Event Bus producer (ADR-029 §11 / GD-12).
+enum OutboxAggregateType {
+  NOTIFICATION
+}
+
+// Which bounded-context module produced this event — a stable identity, unlike
+// producer_service (a class name, kept as a plain String; see OutboxEvent.producer_service).
+// Seeded with the four current notification producers (SPEC-NOTIF-001 ASM-NOTIF-01);
+// grows additively as new producers are migrated (Epic 7 PR 7.3 migrates these four
+// to notificationService.enqueue(); this enum value existing does not itself mean the
+// producer has been migrated).
+enum OutboxSourceModule {
+  WORK_REQUESTS
+  WORK_APPLICATIONS
+  ATTENDANCE
+  QUALITY
+}
+
+// Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
+// (SELECT ... FOR UPDATE SKIP LOCKED, ADR-029 §7); PROCESSING -> DELIVERED on success;
+// PROCESSING -> FAILED -> (retry) PENDING on a retryable failure; FAILED -> DEAD_LETTER
+// once the configurable backoff schedule (default 1m/5m/15m/1h, ADR-029 §6) is exhausted.
+// No transitions are performed by this PR — the Platform Worker (PR 7.2) owns them.
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  DELIVERED
+  FAILED
+  DEAD_LETTER
+}
+
+// External dispatch transport. Deliberately excludes IN_APP — that is the
+// Notification row's own channel (NotificationChannel), not an outbox transport;
+// see ADR-029 §1. Only EMAIL/PUSH are implemented (PR 7.4/7.5); WEBHOOK/SMS are
+// reserved (ADR-029 §4) and are valid enum values with no handler yet.
+enum OutboxTransport {
+  EMAIL
+  PUSH
+  WEBHOOK
+  SMS
+}
+
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee
 // lifecycle status. No Suspended state; no rating/warning-driven automatic
 // transition (invariant, MODULE_SPEC.md "State and Lifecycle").
@@ -656,6 +709,42 @@ model Notification {
   @@index([type])
   @@index([created_at])
   @@index([user_id, is_read]) // hot path: unread notification badge count
+}
+
+// ADR-029 (2026-07-23, GD-01: Transactional Outbox + Platform Worker). Internal
+// delivery/queue record, owned exclusively by backend-notifications — no other
+// module writes this table directly; every producer goes through
+// notificationService.enqueue() (single-writer discipline, same as Notification
+// above). Never exposed to any client. PR 7.1 scope: model + transactional
+// enqueue() only — no reads/transitions by a Platform Worker (that is PR 7.2,
+// which does not exist yet). Deliberately no foreign keys (ADR-029; an internal
+// ledger, not a relation the domain model needs to join through) — additive,
+// reversible migration (drop table + 5 enums).
+model OutboxEvent {
+  id               String              @id @default(cuid())
+  event_id         String              @unique @default(uuid()) // per-row idempotency key (ADR-029 §7); provider-side dedup key where the transport supports one
+  correlation_id   String              @default(uuid())         // shared across every OutboxEvent row produced by one enqueue() call (one logical notification, N transports)
+  event_type       OutboxEventType
+  aggregate_type   OutboxAggregateType
+  aggregate_id     String                                       // canonical reference (e.g. the sibling Notification.id) — the Platform Worker resolves the aggregate from this column, never from payload
+  source_module    OutboxSourceModule
+  producer_service String                                       // e.g. "AttendanceService" — a class-name identity, not an enum (churns on refactor; source_module is the stable identity)
+  transport        OutboxTransport
+  status           OutboxStatus        @default(PENDING)
+  payload          Json                                         // domain body ONLY — metadata (event_id, correlation_id, aggregate_*, etc.) is column-sourced, never duplicated into this JSON (ADR-029 §9)
+  payload_version  Int                 @default(1)
+  scheduled_for    DateTime            @default(now())          // producer intent: when this event should first become eligible; immutable after creation
+  next_attempt_at  DateTime            @default(now())          // live retry clock the Platform Worker claims against; initialized to scheduled_for, advanced by backoff on retry (PR 7.2)
+  attempts         Int                 @default(0)
+  last_error       String?
+  processed_at     DateTime?                                    // set on the terminal DELIVERED/DEAD_LETTER transition (PR 7.2); basis for delivery_latency = processed_at - created_at
+  created_at       DateTime            @default(now())
+  updated_at       DateTime            @updatedAt
+
+  @@index([status, next_attempt_at]) // Platform Worker claim hot path (PR 7.2)
+  @@index([correlation_id])
+  @@index([aggregate_type, aggregate_id])
+  @@index([created_at])
 }
 
 // =============================================================================
