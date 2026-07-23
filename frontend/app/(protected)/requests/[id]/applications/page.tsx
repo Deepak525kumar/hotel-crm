@@ -87,7 +87,7 @@ export default function WorkRequestApplicationsPage() {
               Failed to load applications. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Applications">
               <THead>
                 <tr>
                   <TH>Worker</TH>

@@ -120,7 +120,7 @@ function UsersDirectory() {
               Failed to load users. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Users">
               <THead>
                 <tr>
                   <TH>Name</TH>

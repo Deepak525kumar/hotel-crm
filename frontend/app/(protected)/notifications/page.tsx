@@ -99,7 +99,7 @@ export default function NotificationsPage() {
               Failed to load notifications. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Notifications">
               <THead>
                 <tr>
                   <TH>Title</TH>

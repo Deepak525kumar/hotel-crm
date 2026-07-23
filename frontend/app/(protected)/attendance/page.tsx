@@ -99,7 +99,7 @@ export default function AttendancePage() {
               Failed to load attendance. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Attendance records">
               <THead>
                 <tr>
                   <TH>Worker</TH>

@@ -124,7 +124,7 @@ export default function HotelGroupDetailPage() {
                   description="Assign hotels to this group from a hotel's edit screen."
                 />
               ) : (
-                <Table>
+                <Table aria-label="Hotels in this group">
                   <THead>
                     <tr>
                       <TH>Name</TH>

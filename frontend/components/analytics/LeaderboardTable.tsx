@@ -38,7 +38,7 @@ export function LeaderboardTable({
   }
 
   return (
-    <Table>
+    <Table aria-label="Worker leaderboard">
       <THead>
         <tr>
           <TH className="w-12">#</TH>

@@ -75,7 +75,7 @@ export default function AssignmentsPage() {
               Failed to load assignments. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Assignments">
               <THead>
                 <tr>
                   <TH>Worker</TH>

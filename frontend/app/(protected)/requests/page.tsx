@@ -84,7 +84,7 @@ export default function WorkRequestsPage() {
               Failed to load work requests. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Work requests">
               <THead>
                 <tr>
                   <TH>Position</TH>

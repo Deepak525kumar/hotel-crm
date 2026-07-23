@@ -59,7 +59,7 @@ export default function HotelGroupsPage() {
               Failed to load hotel groups. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Hotel groups">
               <THead>
                 <tr>
                   <TH>Name</TH>

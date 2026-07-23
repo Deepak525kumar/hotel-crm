@@ -99,7 +99,7 @@ export default function HotelsPage() {
               Failed to load hotels. Please try again.
             </div>
           ) : (
-            <Table>
+            <Table aria-label="Hotels">
               <THead>
                 <tr>
                   <TH>Name</TH>
