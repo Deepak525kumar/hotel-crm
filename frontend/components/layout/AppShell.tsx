@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui";
@@ -18,19 +18,48 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const drawerRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Lock body scroll while the drawer is open; close it on Escape.
+  // While the drawer is open: lock body scroll, close on Escape, move focus
+  // into the drawer, trap Tab within it, and restore focus to the trigger.
   useEffect(() => {
     if (!mobileNavOpen) return;
+    const focusable =
+      'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMobileNavOpen(false);
+      if (e.key === "Escape") {
+        setMobileNavOpen(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const panel = drawerRef.current;
+      if (!panel) return;
+      const items = panel.querySelectorAll<HTMLElement>(focusable);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    drawerRef.current?.querySelector<HTMLElement>(focusable)?.focus();
+    // Capture the trigger now so cleanup restores focus to the right element.
+    const trigger = menuButtonRef.current;
+
     return () => {
       document.removeEventListener("keydown", onKey);
       document.body.style.overflow = prev;
+      trigger?.focus();
     };
   }, [mobileNavOpen]);
 
@@ -49,13 +78,21 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile drawer */}
       {mobileNavOpen && (
-        <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 md:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Navigation"
+        >
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
-          <aside className="relative z-10 flex h-full w-64 max-w-[80%] flex-col bg-white shadow-xl">
+          <aside
+            ref={drawerRef}
+            className="relative z-10 flex h-full w-64 max-w-[80%] flex-col bg-white shadow-xl"
+          >
             <BrandMark />
             <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
           </aside>
@@ -65,11 +102,12 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 sm:px-6">
           <button
+            ref={menuButtonRef}
             type="button"
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation"
             aria-expanded={mobileNavOpen}
-            className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 md:hidden"
+            className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 md:hidden"
           >
             <svg
               width="20"
@@ -92,7 +130,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {user && (
               <Link
                 href="/profile"
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100"
+                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
               >
                 <span className="hidden text-gray-700 sm:inline">
                   {user.first_name} {user.last_name}
@@ -103,7 +141,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
             >
               Log out
             </button>

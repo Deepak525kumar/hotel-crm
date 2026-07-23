@@ -103,7 +103,7 @@ export default function HotelGroupDetailPage() {
                   label="Billing info"
                   value={
                     group.billing_info || (
-                      <span className="text-gray-400">Not set</span>
+                      <span className="text-gray-500">Not set</span>
                     )
                   }
                 />

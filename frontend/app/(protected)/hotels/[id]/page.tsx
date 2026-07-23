@@ -112,7 +112,7 @@ export default function HotelDetailPage() {
                         {group?.name ?? "View group"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-400">Unassigned</span>
+                      <span className="text-gray-500">Unassigned</span>
                     )
                   }
                 />

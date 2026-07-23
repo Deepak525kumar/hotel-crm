@@ -52,6 +52,7 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center justify-between rounded-md px-3 py-2 text-sm font-medium",
+              "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
               active
                 ? "bg-blue-50 text-blue-700"
                 : "text-gray-700 hover:bg-gray-100",

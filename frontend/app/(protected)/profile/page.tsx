@@ -81,7 +81,7 @@ export default function ProfilePage() {
       )}
 
       {isLoading && (
-        <p className="text-center text-xs text-gray-400">Refreshing…</p>
+        <p className="text-center text-xs text-gray-500">Refreshing…</p>
       )}
     </div>
   );
