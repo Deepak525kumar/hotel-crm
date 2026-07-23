@@ -6,11 +6,17 @@ import type {
   Attendance,
   AuthUser,
   CheckInInput,
+  CreateHotelGroupInput,
+  CreateHotelInput,
   CreateWorkRequestInput,
-  HotelSummary,
+  Hotel,
+  HotelGroup,
   ListApplicationsQuery,
   ListAssignmentsQuery,
   ListAttendanceQuery,
+  ListHotelGroupsQuery,
+  ListHotelsQuery,
+  ListUsersQuery,
   ListWorkRequestsQuery,
   LoginResponse,
   Notification,
@@ -18,7 +24,10 @@ import type {
   UpdateApplicationInput,
   UpdateAssignmentInput,
   UpdateAttendanceInput,
+  UpdateHotelGroupInput,
+  UpdateHotelInput,
   UpdateWorkRequestInput,
+  UserSummary,
   WorkApplication,
   WorkRequest,
 } from "@/lib/types";
@@ -328,7 +337,46 @@ export const notificationsApi = {
     apiFetch<Notification>(`/notifications/${id}/read`, { method: "POST" }),
 };
 
-/** Hotels API — only the read used by the work-request create form. */
+/** Hotels API matching the backend `/crm/hotels/*` routes. */
 export const hotelsApi = {
-  list: () => apiFetch<HotelSummary[]>("/crm/hotels?per_page=100"),
+  list: (query: ListHotelsQuery = {}) =>
+    apiFetch<Hotel[]>(`/crm/hotels${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<Hotel>(`/crm/hotels/${id}`),
+
+  create: (input: CreateHotelInput) =>
+    apiFetch<Hotel>("/crm/hotels", { method: "POST", body: input }),
+
+  update: (id: string, input: UpdateHotelInput) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}`, { method: "PATCH", body: input }),
+
+  /** Soft-delete (deactivate) a hotel. Admin-only backend-side; returns 204. */
+  remove: (id: string) =>
+    apiFetch<void>(`/crm/hotels/${id}`, { method: "DELETE" }),
+};
+
+/** Hotel Groups API matching the backend `/crm/hotel-groups/*` routes. */
+export const hotelGroupsApi = {
+  list: (query: ListHotelGroupsQuery = {}) =>
+    apiFetch<HotelGroup[]>(`/crm/hotel-groups${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<HotelGroup>(`/crm/hotel-groups/${id}`),
+
+  create: (input: CreateHotelGroupInput) =>
+    apiFetch<HotelGroup>("/crm/hotel-groups", { method: "POST", body: input }),
+
+  update: (id: string, input: UpdateHotelGroupInput) =>
+    apiFetch<HotelGroup>(`/crm/hotel-groups/${id}`, {
+      method: "PATCH",
+      body: input,
+    }),
+
+  remove: (id: string) =>
+    apiFetch<void>(`/crm/hotel-groups/${id}`, { method: "DELETE" }),
+};
+
+/** Users API — the directory read used by manager/regional-manager selectors. */
+export const usersApi = {
+  list: (query: ListUsersQuery = {}) =>
+    apiFetch<UserSummary[]>(`/users${toQuery({ ...query })}`),
 };

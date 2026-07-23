@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useHotels } from "@/hooks/useWorkRequests";
+import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -45,7 +45,7 @@ const INITIAL: FormState = {
 
 function NewWorkRequestForm() {
   const router = useRouter();
-  const { hotels, isLoading: hotelsLoading } = useHotels();
+  const { hotels, isLoading: hotelsLoading } = useHotelOptions();
 
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);

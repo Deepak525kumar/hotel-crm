@@ -22,6 +22,8 @@ const NAV: NavItem[] = [
   { href: "/requests", label: "Work requests" },
   { href: "/assignments", label: "Assignments" },
   { href: "/attendance", label: "Attendance" },
+  { href: "/hotels", label: "Hotels", roles: ["manager", "admin"] },
+  { href: "/hotel-groups", label: "Hotel groups", roles: ["manager", "admin"] },
   { href: "/notifications", label: "Notifications" },
 ];
 

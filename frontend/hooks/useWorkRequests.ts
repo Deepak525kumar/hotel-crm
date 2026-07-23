@@ -34,8 +34,14 @@ export function useWorkRequest(id: string | null | undefined) {
   );
 }
 
-/** Lists hotels for the create form's hotel selector. */
-export function useHotels() {
-  const swr = useSWR("hotels", () => hotelsApi.list());
+/**
+ * Lists active hotels for the create form's hotel selector. Requests the
+ * backend page cap (100) so the selector isn't silently truncated to the
+ * default page size.
+ */
+export function useHotelOptions() {
+  const swr = useSWR(["hotel-options"], () =>
+    hotelsApi.list({ is_active: "true", limit: 100 }),
+  );
   return { ...swr, hotels: swr.data ?? [] };
 }
