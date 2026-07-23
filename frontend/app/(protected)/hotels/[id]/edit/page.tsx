@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroups } from "@/hooks/useHotels";
@@ -9,7 +8,7 @@ import { ApiError, hotelsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
-import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateHotelInput } from "@/lib/types";
 
 function EditHotel() {
@@ -59,12 +58,12 @@ function EditHotel() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href={`/hotels/${id}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to hotel
-        </Link>
+        </TextLink>
         <PageHeader className="mt-2" title="Edit hotel" />
       </div>
 

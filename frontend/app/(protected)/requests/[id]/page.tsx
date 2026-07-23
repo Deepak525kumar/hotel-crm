@@ -19,6 +19,7 @@ import {
   FormError,
   PageHeader,
   Skeleton,
+  TextLink,
 } from "@/components/ui";
 
 export default function WorkRequestDetailPage() {
@@ -64,9 +65,9 @@ export default function WorkRequestDetailPage() {
   if (error || !request) {
     return (
       <div className="space-y-4">
-        <Link href="/requests" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/requests" className="text-sm">
           ← Back to work requests
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -81,9 +82,9 @@ export default function WorkRequestDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/requests" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/requests" className="text-sm">
           ← Back to work requests
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title={

@@ -22,6 +22,7 @@ import {
   TH,
   THead,
   TR,
+  TextLink,
 } from "@/components/ui";
 
 const ACTIVE_FILTERS = [
@@ -129,12 +130,12 @@ export default function HotelsPage() {
                   {hotels.map((h) => (
                     <TR key={h.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/hotels/${h.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {h.name}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>
                         {h.city}, {h.country}

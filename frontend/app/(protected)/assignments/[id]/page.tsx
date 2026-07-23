@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
 import { assignmentsApi, ApiError } from "@/lib/api";
@@ -20,6 +19,7 @@ import {
   PageHeader,
   Skeleton,
   Textarea,
+  TextLink,
 } from "@/components/ui";
 
 export default function AssignmentDetailPage() {
@@ -110,12 +110,12 @@ export default function AssignmentDetailPage() {
   if (error || !assignment) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/assignments"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to assignments
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -137,12 +137,12 @@ export default function AssignmentDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/assignments"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to assignments
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title={
@@ -164,12 +164,11 @@ export default function AssignmentDetailPage() {
             <DataRow
               label="Work request"
               value={
-                <Link
+                <TextLink
                   href={`/requests/${assignment.work_request_id}`}
-                  className="text-blue-700 hover:underline"
                 >
                   {assignment.work_request_id}
-                </Link>
+                </TextLink>
               }
             />
             <DataRow label="Hotel" value={assignment.hotel_id} />

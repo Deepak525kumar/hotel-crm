@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useNotification } from "@/hooks/useNotifications";
 import { notificationsApi, ApiError } from "@/lib/api";
@@ -22,6 +21,7 @@ import {
   FormError,
   PageHeader,
   Skeleton,
+  TextLink,
 } from "@/components/ui";
 
 export default function NotificationDetailPage() {
@@ -67,12 +67,12 @@ export default function NotificationDetailPage() {
   if (error || !notification) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/notifications"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to notifications
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             This notification was not found or could not be loaded.
@@ -90,12 +90,12 @@ export default function NotificationDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/notifications"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to notifications
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title={notification.title}

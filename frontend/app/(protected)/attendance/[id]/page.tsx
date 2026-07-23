@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAttendanceRecord } from "@/hooks/useAttendance";
 import { attendanceApi, ApiError } from "@/lib/api";
@@ -24,6 +23,7 @@ import {
   PageHeader,
   Select,
   Skeleton,
+  TextLink,
 } from "@/components/ui";
 import type { AttendanceReviewStatus } from "@/lib/types";
 
@@ -105,12 +105,12 @@ export default function AttendanceDetailPage() {
   if (error || !record) {
     return (
       <div className="space-y-4">
-        <Link
+        <TextLink
           href="/attendance"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to attendance
-        </Link>
+        </TextLink>
         <Card>
           <CardContent className="text-sm text-red-600">
             {error instanceof ApiError && error.status === 404
@@ -130,12 +130,12 @@ export default function AttendanceDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href="/attendance"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to attendance
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title={
@@ -186,12 +186,11 @@ export default function AttendanceDetailPage() {
             <DataRow
               label="Assignment"
               value={
-                <Link
+                <TextLink
                   href={`/assignments/${record.assignment_id}`}
-                  className="text-blue-700 hover:underline"
                 >
                   {record.assignment_id}
-                </Link>
+                </TextLink>
               }
             />
             <DataRow label="Hotel" value={record.hotel_id} />

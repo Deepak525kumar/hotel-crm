@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useNotifications } from "@/hooks/useNotifications";
 import { notificationsApi, ApiError } from "@/lib/api";
 import { NotificationTypeBadge } from "@/components/notifications/NotificationTypeBadge";
@@ -22,6 +21,7 @@ import {
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { Notification } from "@/lib/types";
 
@@ -137,12 +137,12 @@ export default function NotificationsPage() {
                   {visible.map((n) => (
                     <TR key={n.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/notifications/${n.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {n.title}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>
                         <NotificationTypeBadge type={n.type} />

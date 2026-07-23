@@ -21,6 +21,7 @@ import {
   Modal,
   PageHeader,
   Skeleton,
+  TextLink,
 } from "@/components/ui";
 
 export default function HotelDetailPage() {
@@ -58,9 +59,9 @@ export default function HotelDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link href="/hotels" className="text-sm text-blue-700 hover:underline">
+      <TextLink href="/hotels" className="text-sm">
         ← Back to hotels
-      </Link>
+      </TextLink>
 
       {error ? (
         <Card>
@@ -109,12 +110,11 @@ export default function HotelDetailPage() {
                   label="Hotel group"
                   value={
                     hotel.hotel_group_id ? (
-                      <Link
+                      <TextLink
                         href={`/hotel-groups/${hotel.hotel_group_id}`}
-                        className="text-blue-700 hover:underline"
                       >
                         {group?.name ?? "View group"}
-                      </Link>
+                      </TextLink>
                     ) : (
                       <span className="text-gray-400">Unassigned</span>
                     )

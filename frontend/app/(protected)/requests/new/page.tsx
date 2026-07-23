@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -18,6 +17,7 @@ import {
   PageHeader,
   Select,
   Textarea,
+  TextLink,
 } from "@/components/ui";
 import type { CreateWorkRequestInput } from "@/lib/types";
 
@@ -111,9 +111,9 @@ function NewWorkRequestForm() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/requests" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/requests" className="text-sm">
           ← Back to work requests
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title="New work request"

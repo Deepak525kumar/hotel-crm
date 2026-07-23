@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { ApiError, hotelsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
-import { Card, CardContent, PageHeader } from "@/components/ui";
+import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateHotelInput } from "@/lib/types";
 
 function NewHotel() {
@@ -44,9 +43,9 @@ function NewHotel() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/hotels" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/hotels" className="text-sm">
           ← Back to hotels
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title="New hotel"

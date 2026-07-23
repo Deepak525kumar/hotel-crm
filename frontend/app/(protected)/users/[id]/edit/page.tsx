@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
@@ -9,7 +8,7 @@ import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
 import type { UserFormValues } from "@/components/users/UserForm";
-import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateUserInput } from "@/lib/types";
 
 function EditUser() {
@@ -52,12 +51,12 @@ function EditUser() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href={`/users/${id}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to user
-        </Link>
+        </TextLink>
         <PageHeader className="mt-2" title="Edit user" />
       </div>
 

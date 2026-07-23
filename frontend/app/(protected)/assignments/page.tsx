@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useAssignments } from "@/hooks/useAssignments";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
 import { formatDate } from "@/lib/format";
@@ -19,6 +18,7 @@ import {
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { AssignmentStatus } from "@/lib/types";
 
@@ -106,20 +106,19 @@ export default function AssignmentsPage() {
                   {assignments.map((a) => (
                     <TR key={a.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/assignments/${a.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {a.worker_id}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>
-                        <Link
+                        <TextLink
                           href={`/requests/${a.work_request_id}`}
-                          className="text-blue-700 hover:underline"
                         >
                           {a.work_request_id}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>{formatDate(a.confirmed_at)}</TD>
                       <TD>

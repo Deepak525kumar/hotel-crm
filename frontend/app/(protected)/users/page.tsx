@@ -23,6 +23,7 @@ import {
   TH,
   THead,
   TR,
+  TextLink,
 } from "@/components/ui";
 import type { Role } from "@/lib/types";
 
@@ -150,12 +151,12 @@ function UsersDirectory() {
                   {users.map((u) => (
                     <TR key={u.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/users/${u.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {u.first_name} {u.last_name}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD className="text-gray-500">{u.email}</TD>
                       <TD>

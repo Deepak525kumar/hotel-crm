@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useAttendance } from "@/hooks/useAttendance";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
@@ -20,6 +19,7 @@ import {
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { AttendanceStatus } from "@/lib/types";
 
@@ -131,12 +131,12 @@ export default function AttendancePage() {
                   {records.map((r) => (
                     <TR key={r.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/attendance/${r.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {r.worker_id}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>
                         <AttendanceStatusBadge status={r.status} />

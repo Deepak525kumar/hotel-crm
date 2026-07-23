@@ -15,6 +15,7 @@ import {
   PageHeader,
   Skeleton,
   StatTile,
+  TextLink,
 } from "@/components/ui";
 
 /** Quick links surfaced to every user. */
@@ -36,12 +37,12 @@ function ManagerOverview() {
         <h2 className="text-sm font-semibold text-gray-900">
           Platform overview
         </h2>
-        <Link
+        <TextLink
           href="/analytics"
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           View analytics →
-        </Link>
+        </TextLink>
       </div>
 
       {error ? (
@@ -114,12 +115,11 @@ export default function DashboardPage() {
             <p>{user?.email}</p>
             {user && <RoleBadge role={user.role} />}
             <p>
-              <Link
+              <TextLink
                 href="/profile"
-                className="text-blue-700 hover:underline"
               >
                 View profile →
-              </Link>
+              </TextLink>
             </p>
           </CardContent>
         </Card>

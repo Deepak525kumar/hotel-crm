@@ -23,6 +23,7 @@ import {
   Modal,
   PageHeader,
   Skeleton,
+  TextLink,
 } from "@/components/ui";
 
 function UserDetail() {
@@ -62,9 +63,9 @@ function UserDetail() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link href="/users" className="text-sm text-blue-700 hover:underline">
+      <TextLink href="/users" className="text-sm">
         ← Back to users
-      </Link>
+      </TextLink>
 
       {error ? (
         <Card>

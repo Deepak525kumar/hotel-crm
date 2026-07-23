@@ -18,6 +18,7 @@ import {
   TH,
   THead,
   TR,
+  TextLink,
 } from "@/components/ui";
 
 const PER_PAGE = 20;
@@ -83,12 +84,12 @@ export default function HotelGroupsPage() {
                   {groups.map((g) => (
                     <TR key={g.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/hotel-groups/${g.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {g.name}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>{managerName(g.regional_manager_user_id)}</TD>
                     </TR>

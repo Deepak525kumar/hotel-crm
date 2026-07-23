@@ -22,6 +22,8 @@ export { Checkbox } from "./Checkbox";
 export type { CheckboxProps } from "./Checkbox";
 export { FormError } from "./FormError";
 export type { FormErrorProps } from "./FormError";
+export { TextLink } from "./TextLink";
+export type { TextLinkProps } from "./TextLink";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 export { EmptyState } from "./EmptyState";

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotelGroup, useUserOptions } from "@/hooks/useHotels";
@@ -9,7 +8,7 @@ import { ApiError, hotelGroupsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
 import type { HotelGroupFormValues } from "@/components/hotels/HotelGroupForm";
-import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateHotelGroupInput } from "@/lib/types";
 
 function EditHotelGroup() {
@@ -53,12 +52,12 @@ function EditHotelGroup() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link
+        <TextLink
           href={`/hotel-groups/${id}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to hotel group
-        </Link>
+        </TextLink>
         <PageHeader className="mt-2" title="Edit hotel group" />
       </div>
 

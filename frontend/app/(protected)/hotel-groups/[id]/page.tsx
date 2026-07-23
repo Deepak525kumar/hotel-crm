@@ -28,6 +28,7 @@ import {
   TH,
   THead,
   TR,
+  TextLink,
 } from "@/components/ui";
 
 export default function HotelGroupDetailPage() {
@@ -51,12 +52,12 @@ export default function HotelGroupDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <Link
+      <TextLink
         href="/hotel-groups"
-        className="text-sm text-blue-700 hover:underline"
+        className="text-sm"
       >
         ← Back to hotel groups
-      </Link>
+      </TextLink>
 
       {error ? (
         <Card>
@@ -135,12 +136,12 @@ export default function HotelGroupDetailPage() {
                     {groupHotels.map((h) => (
                       <TR key={h.id}>
                         <TD className="font-medium">
-                          <Link
+                          <TextLink
                             href={`/hotels/${h.id}`}
-                            className="block text-blue-700 hover:underline"
+                            className="block"
                           >
                             {h.name}
-                          </Link>
+                          </TextLink>
                         </TD>
                         <TD>
                           {h.city}, {h.country}

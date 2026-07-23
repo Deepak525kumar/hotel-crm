@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
 import type { UserFormValues } from "@/components/users/UserForm";
-import { Card, CardContent, PageHeader } from "@/components/ui";
+import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateUserInput } from "@/lib/types";
 
 function NewUser() {
@@ -44,9 +43,9 @@ function NewUser() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <Link href="/users" className="text-sm text-blue-700 hover:underline">
+        <TextLink href="/users" className="text-sm">
           ← Back to users
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title="New user"

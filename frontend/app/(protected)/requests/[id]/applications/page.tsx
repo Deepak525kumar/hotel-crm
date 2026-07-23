@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkApplications } from "@/hooks/useWorkApplications";
 import { ApplicationStatusBadge } from "@/components/work-applications/ApplicationStatusBadge";
@@ -20,6 +19,7 @@ import {
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { ApplicationStatus } from "@/lib/types";
 
@@ -56,12 +56,12 @@ export default function WorkRequestApplicationsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <Link
+        <TextLink
           href={`/requests/${id}`}
-          className="text-sm text-blue-700 hover:underline"
+          className="text-sm"
         >
           ← Back to work request
-        </Link>
+        </TextLink>
         <PageHeader
           className="mt-2"
           title="Applications"
@@ -118,12 +118,12 @@ export default function WorkRequestApplicationsPage() {
                   {applications.map((app) => (
                     <TR key={app.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/requests/${id}/applications/${app.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {app.worker_id}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>{formatScore(app.worker_rating_snapshot)}</TD>
                       <TD>{formatDate(app.applied_at)}</TD>

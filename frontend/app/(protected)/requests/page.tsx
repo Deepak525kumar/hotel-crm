@@ -20,6 +20,7 @@ import {
   TR,
   TH,
   TD,
+  TextLink,
 } from "@/components/ui";
 import type { WorkRequestStatus } from "@/lib/types";
 
@@ -115,12 +116,12 @@ export default function WorkRequestsPage() {
                   {requests.map((wr) => (
                     <TR key={wr.id}>
                       <TD className="font-medium">
-                        <Link
+                        <TextLink
                           href={`/requests/${wr.id}`}
-                          className="block text-blue-700 hover:underline"
+                          className="block"
                         >
                           {wr.position}
-                        </Link>
+                        </TextLink>
                       </TD>
                       <TD>{wr.shift_date}</TD>
                       <TD>
