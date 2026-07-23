@@ -22,6 +22,8 @@ This left the following open decisions blocking implementation: `OQ-NOTIF-01` (d
 
 **Adopt the Transactional Outbox pattern, drained by a dedicated Worker runtime that is the canonical asynchronous execution runtime for the modular monolith.**
 
+**Naming:** this runtime is canonically named the **Platform Worker** throughout this record, the dependency graph, and the implementation plan — not just "the worker" or "a worker process" — since §11 makes it the future home of domain-event publishing (GD-12) as well as notification delivery and scheduled jobs, not a notification-specific component. A future ADR extending its responsibilities should continue to refer to it as the Platform Worker rather than introducing a second name for the same runtime.
+
 ### 1. Two separate concepts — `Notification` and `OutboxEvent`
 
 `Notification` and `OutboxEvent` are distinct models with distinct purposes:
@@ -46,19 +48,19 @@ A producer's business transaction persists, in a **single commit**:
 
 Atomicity guarantees the delivery intent can never be lost after a committed domain change, nor created for an aborted one. This replaces the current fire-and-forget `.catch(() => {})` pattern (resolves **`OQ-NOTIF-04`**) and removes the synchronous cross-module network round-trip from producer request paths (resolves **`OQ-NOTIF-09`**: the `work-requests` roster fan-out becomes O(roster) cheap DB inserts, never O(roster) synchronous APNs/FCM calls).
 
-### 3. The Worker runtime
+### 3. The Platform Worker
 
-A dedicated **Worker runtime** — a second Node entrypoint into the *same* modular-monolith codebase (shared Prisma client and models; deployed as a separate OS process, e.g. an added `ecosystem.config.js` app / `docker-compose` service) — is the canonical asynchronous execution runtime. It:
+A dedicated **Platform Worker** — a second Node entrypoint into the *same* modular-monolith codebase (shared Prisma client and models; deployed as a separate OS process, e.g. an added `ecosystem.config.js` app / `docker-compose` service) — is the canonical asynchronous execution runtime. It:
 
 - polls `OutboxEvent` and delivers EMAIL/PUSH,
 - hosts scheduled reminder/escalation jobs (rework 20-minute escalation `TREQ-003`, contract-expiry reminder `TREQ-007`, broadcast auto-close `TREQ-010`), and
-- owns future domain-event publishing (see §7 / GD-12).
+- owns future domain-event publishing (see §11 / GD-12).
 
-This resolves **`OQ-NOTIF-08`** (scheduled-job host) **without contradicting** `backend-notifications`'s "pure sink" boundary: the Worker is a *separate runtime*, not the request-path `notification-service`. The request-path service only *enqueues*; the Worker decides *when* jobs fire and performs delivery.
+This resolves **`OQ-NOTIF-08`** (scheduled-job host) **without contradicting** `backend-notifications`'s "pure sink" boundary: the Platform Worker is a *separate runtime*, not the request-path `notification-service`. The request-path service only *enqueues*; the Platform Worker decides *when* jobs fire and performs delivery.
 
 ### 4. Generic transport abstraction
 
-A new `OutboxTransport` enum classifies delivery medium: **`EMAIL`, `PUSH`, `WEBHOOK`, `SMS`**. Only **`EMAIL` and `PUSH` are implemented initially**; `WEBHOOK` and `SMS` are reserved for future use (an `OutboxEvent` with a reserved transport is a valid row the initial worker leaves `PENDING`/routes to a not-yet-registered handler, never an error). The Worker dispatches by a transport-handler interface keyed on this enum; adding a transport = registering a handler, no schema change. This resolves **`OQ-NOTIF-06`** (push lands once, early, as a transport handler — not incrementally per-trigger) and **`OQ-NOTIF-07`** (`sendEmail`'s successor is the `EMAIL` transport handler in the Worker; the stub is superseded, not left as dead code).
+A new `OutboxTransport` enum classifies delivery medium: **`EMAIL`, `PUSH`, `WEBHOOK`, `SMS`**. Only **`EMAIL` and `PUSH` are implemented initially**; `WEBHOOK` and `SMS` are reserved for future use (an `OutboxEvent` with a reserved transport is a valid row the Platform Worker leaves `PENDING`/routes to a not-yet-registered handler, never an error). The Platform Worker dispatches by a transport-handler interface keyed on this enum; adding a transport = registering a handler, no schema change. This resolves **`OQ-NOTIF-06`** (push lands once, early, as a transport handler — not incrementally per-trigger) and **`OQ-NOTIF-07`** (`sendEmail`'s successor is the `EMAIL` transport handler in the Platform Worker; the stub is superseded, not left as dead code).
 
 ### 5. Delivery lifecycle
 
@@ -70,7 +72,9 @@ Exponential backoff, **configurable**. Default schedule: **1 minute → 5 minute
 
 ### 7. Idempotency & at-least-once
 
-Every `OutboxEvent` carries a globally unique `event_id` (UUID). The Worker guarantees **at-least-once** processing without duplicate delivery: rows are claimed by an atomic `PENDING → PROCESSING` transition (PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED`, a database feature — **not** an external queue), so concurrent worker instances never double-claim; the `event_id` is used as the provider-side idempotency key where the transport supports it. Retries re-deliver at-least-once by design; duplicate *effect* is prevented by the claim + idempotency key.
+Every `OutboxEvent` carries a globally unique `event_id` (UUID). The Platform Worker guarantees **at-least-once** processing without duplicate delivery: rows are claimed by an atomic `PENDING → PROCESSING` transition (PostgreSQL `SELECT … FOR UPDATE SKIP LOCKED`, a database feature — **not** an external queue), so concurrent Platform Worker instances never double-claim; the `event_id` is used as the provider-side idempotency key where the transport supports it. Retries re-deliver at-least-once by design; duplicate *effect* is prevented by the claim + idempotency key.
+
+**Transport handlers must themselves be idempotent.** The claim mechanism prevents two Platform Worker instances from processing the same row concurrently, but it does not by itself prevent a *retried* delivery (e.g. after a `FAILED` transition whose underlying send actually succeeded, or a crash between send and status-update) from reaching the provider twice. `event_id` is the canonical idempotency key supplied to each provider where it supports one (e.g. as an SMTP `Message-ID`/idempotency header, an APNs/FCM collapse or dedup key); a handler for a provider that does not support one must implement its own dedup discipline. This is a responsibility of each transport handler, not a guarantee the outbox/claim mechanism provides on its own.
 
 ### 8. Polling
 
@@ -80,11 +84,13 @@ Every `OutboxEvent` carries a globally unique `event_id` (UUID). The Worker guar
 
 Beyond the lifecycle fields already listed (§5, §6), `OutboxEvent` carries `attempts`, `next_attempt_at`, `last_error`, and **`processed_at`** (timestamp of the terminal `DELIVERED`/`DEAD_LETTER` transition). `processed_at` is cheap to add now and is the basis for delivery-latency metrics (`processed_at - created_at`) without a later migration.
 
-**Minimum observability surface** (owned by the Worker, exposed however the platform's existing observability convention dictates — no new convention introduced here): counts by status (`queued`/`processing`/`delivered`/`failed`/`dead_letter`), `retry_count` per event, and `delivery_latency` (`processed_at - created_at`) for delivered events. This is the minimum metric set the Worker must make derivable from `OutboxEvent` state; it does not mandate a specific metrics backend.
+**Minimum observability surface** (owned by the Platform Worker, exposed however the platform's existing observability convention dictates — no new convention introduced here): counts by status (`queued`/`processing`/`delivered`/`failed`/`dead_letter`), `retry_count` per event, and `delivery_latency` (`processed_at - created_at`) for delivered events. This is the minimum metric set the Platform Worker must make derivable from `OutboxEvent` state; it does not mandate a specific metrics backend.
 
 ### 10. Event payload versioning
 
-`OutboxEvent` carries a `payload_version` integer field, starting at `1` for every event produced today. This costs nothing now and avoids a schema migration the first time a payload shape needs to change under active consumers (the Worker's own delivery handlers, and, later, the Event Bus's consumers per §11).
+`OutboxEvent` carries a `payload_version` integer field, starting at `1` for every event produced today. This costs nothing now and avoids a schema migration the first time a payload shape needs to change under active consumers (the Platform Worker's own delivery handlers, and, later, the Event Bus's consumers per §11).
+
+**The `payload` contract itself is not fixed by this ADR** — deliberately: the shape (e.g. `{event_type, aggregate_type, aggregate_id, payload}` vs. `{type, recipient_id, data}`) is an implementation-PR concern, not an architecture one. But it **must be defined once, explicitly, in PR 7.1** (see `IMPLEMENTATION_EXECUTION_PLAN.md` Epic 7) before any producer enqueues an event — every producer uses the same shape from the start; no producer invents its own ad hoc payload structure.
 
 ### 11. Future compatibility (GD-12)
 
@@ -92,8 +98,8 @@ The `OutboxEvent` envelope (`event_id`, `event_type`, `payload`, `payload_versio
 
 ## Constraints (codified by this decision)
 
-- **No external queue infrastructure.** Kafka, RabbitMQ, SQS, BullMQ, Redis-backed queues, and equivalents are **not** introduced. The outbox is a PostgreSQL table; the Worker is an in-process poller using standard SQL row-locking. (This is the explicit amendment to the prior "Redis-backed BullMQ" assumption noted above.)
-- **Modular monolith preserved** (`ADR-003`). The Worker shares the monolith codebase and Prisma client; it is a deployment topology addition (a second process), not a service extraction.
+- **No external queue infrastructure.** Kafka, RabbitMQ, SQS, BullMQ, Redis-backed queues, and equivalents are **not** introduced. The outbox is a PostgreSQL table; the Platform Worker is an in-process poller using standard SQL row-locking. (This is the explicit amendment to the prior "Redis-backed BullMQ" assumption noted above.)
+- **Modular monolith preserved** (`ADR-003`). The Platform Worker shares the monolith codebase and Prisma client; it is a deployment topology addition (a second process), not a service extraction.
 - **Backward compatibility maintained.** The `Notification` model, `GET /notifications`, and `POST /notifications/:id/read` are unchanged. `NotificationType`/`NotificationChannel` grow only additively. Producers keep persisting the in-app row; the outbox row is additive.
 
 ## Grounding facts (verified against repository authority at HEAD)
@@ -103,7 +109,7 @@ The `OutboxEvent` envelope (`event_id`, `event_type`, `payload`, `payload_versio
 - No scheduler runtime: grep for `node-cron|setInterval|BullMQ|agenda|cron` over `backend/src` → no matches.
 - `SHIFT_REMINDER`/`CHECK_IN_REMINDER` declared (`schema.prisma:106-107`), never fired.
 - `NotificationChannel` five-member enum settled by `ADR-027`.
-- Modular monolith (`ADR-003`), Prisma 5 (`ADR-004`), PostgreSQL (`ADR-005`) — the outbox + worker fit these unchanged.
+- Modular monolith (`ADR-003`), Prisma 5 (`ADR-004`), PostgreSQL (`ADR-005`) — the outbox + Platform Worker fit these unchanged.
 
 ## Compatibility
 
@@ -115,7 +121,7 @@ The `OutboxEvent` envelope (`event_id`, `event_type`, `payload`, `payload_versio
 | `SIR-AUTH-001` (RESOLVED hotfix) | Its noted gap — "actual delivery of the raw [password-reset] token to the user's inbox remains out of scope (no email-transport capability exists anywhere yet)" — is unblocked by the EMAIL transport; wiring auth to enqueue is a follow-on producer change, not part of this record. |
 | `OQ-NOTIF-02` (`SIR-NOTIF-002`, retention) | **Not resolved** (GD-09 territory). This record *adds a new record type* — `OutboxEvent` — that must also be assigned a GDPR retention tier before G8; recorded as a new sub-item under `SIR-NOTIF-002`. |
 | `OQ-NOTIF-03` (`SIR-NOTIF-003`, `FEATURE_*` flag), `OQ-NOTIF-05` (`SIR-NOTIF-005`, cross-module send-authz) | **Not resolved** by this record; remain OPEN. |
-| `.claude/knowledge/DEPENDENCY_GRAPH.yaml` | Adds `state-outbox` (owner `backend-notifications`) and a `worker` infrastructure node in the same governance pass; `notification-service` contract gains an `enqueue` operation. |
+| `.claude/knowledge/DEPENDENCY_GRAPH.yaml` | Adds `state-outbox` (owner `backend-notifications`) and a `worker` infrastructure node (canonical name **Platform Worker**) in the same governance pass; `notification-service` contract gains an `enqueue` operation. |
 | `docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md` §9 ledger | `OQ-NOTIF-01` dispatch-design row, and `OQ-NOTIF-04/06/07/08/09`, updated to "Resolved — `ADR-029`"; Epic 7 dispatch build sequenced. |
 | `docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md` | `GD-01` marked resolved by this record. |
 
@@ -124,8 +130,9 @@ No blocking contradiction found against any other checked authority.
 ## Consequences
 
 - New Prisma models/enums: `OutboxEvent` (with `event_id`, `event_type`, `transport`, `status`, `payload`, `payload_version`, `attempts`, `next_attempt_at`, `last_error`, `processed_at`, timestamps), `OutboxStatus`, `OutboxTransport`; plus a `PushToken` model for PUSH. Migrations are additive.
-- A new Worker process is added to the deployment topology (`ecosystem.config.js`/`docker-compose`), sharing the backend image.
+- A new Platform Worker process is added to the deployment topology (`ecosystem.config.js`/`docker-compose`), sharing the backend image.
 - `notification-service` gains a transactional `enqueue` operation; the four current producers migrate from `.catch(() => {})` to transactional enqueue (delivery failures become observable via `OutboxEvent.status`/`DEAD_LETTER`).
+- The `OutboxEvent.payload` contract (shape only, not enforced by this ADR) must be defined once in PR 7.1 before any producer enqueues, so no producer invents its own ad hoc structure.
 - SMTP (EMAIL) and APNs/FCM (PUSH) client libraries are introduced behind transport handlers; the existing `APNS_*`/`FIREBASE_PROJECT_ID`/new SMTP env fields are consumed under explicit secret-storage/rotation/least-privilege handling (carrying forward `MIG-GAP-11`'s security requirement).
 - **Backend and mobile ship as separate PRs.** The `PushToken` schema, its registration endpoint, and the PUSH transport handler are a backend-only PR (no Expo/client changes) — mobile push-token registration + OS-permission flow (worker-app, checker-app) is a distinct follow-on PR per app, reviewable and revertible independently of the backend transport. See `IMPLEMENTATION_EXECUTION_PLAN.md` Epic 7 for the exact PR split.
 - `OutboxEvent` retention tier is a new required-before-G8 disposition folded into `SIR-NOTIF-002`/GD-09.

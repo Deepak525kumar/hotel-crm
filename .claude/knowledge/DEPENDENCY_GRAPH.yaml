@@ -63,17 +63,20 @@ nodes:
 
   # Infrastructure
   - { id: operations, kind: infrastructure, owner: unassigned, source: "." }
-  # worker: canonical asynchronous execution runtime added by ADR-029 (GD-01, 2026-07-23).
-  # A second Node entrypoint over the SAME modular-monolith codebase + Prisma client,
-  # deployed as a separate OS process. Drains state-outbox (poll default 5s, configurable),
-  # delivers via transport handlers (EMAIL/PUSH first; WEBHOOK/SMS reserved), runs the
-  # OutboxStatus lifecycle with configurable exponential-backoff retry, hosts scheduled
+  # worker: canonically named "Platform Worker" by ADR-029 (GD-01, 2026-07-23) -- not just
+  # "a worker process", since it is the future home of domain-event publishing (GD-12) as
+  # well as notification delivery and scheduled jobs. A second Node entrypoint over the SAME
+  # modular-monolith codebase + Prisma client, deployed as a separate OS process. Drains
+  # state-outbox (poll interval configuration-driven, initial deployment default 5s),
+  # delivers via transport handlers (EMAIL/PUSH first; WEBHOOK/SMS reserved -- handlers must
+  # themselves be idempotent, event_id is the canonical provider-side idempotency key), runs
+  # the OutboxStatus lifecycle with configurable exponential-backoff retry, hosts scheduled
   # reminder/escalation jobs, and is the canonical producer for the future Event Bus (GD-12).
   # lifecycle: planned -- authorized by ADR-029, not yet code; becomes an observed node when
-  # the Worker-runtime PR lands (this graph records repository-observed relationships, so the
-  # node is carried here as ADR-authorized/planned, mirroring how backend-chatbot's
+  # the Platform-Worker-runtime PR lands (this graph records repository-observed relationships,
+  # so the node is carried here as ADR-authorized/planned, mirroring how backend-chatbot's
   # deltas are deferred until code exists).
-  - { id: worker, kind: infrastructure, owner: unassigned, source: backend/worker, lifecycle: planned }
+  - { id: worker, kind: infrastructure, owner: unassigned, source: backend/worker, name: "Platform Worker", lifecycle: planned }
 
   # Shared contracts (repository-derived; consumed cross-module)
   - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
