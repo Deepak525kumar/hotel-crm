@@ -18,6 +18,8 @@ export { Select } from "./Select";
 export type { SelectProps, SelectOption } from "./Select";
 export { Textarea } from "./Textarea";
 export type { TextareaProps } from "./Textarea";
+export { Checkbox } from "./Checkbox";
+export type { CheckboxProps } from "./Checkbox";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
 export { EmptyState } from "./EmptyState";

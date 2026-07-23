@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Input,
   Select,
 } from "@/components/ui";
@@ -139,15 +140,11 @@ export function UserForm({
           </div>
 
           {mode === "edit" && (
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => set("is_active", e.target.checked)}
-                className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              Active (can sign in and be assigned work)
-            </label>
+            <Checkbox
+              label="Active (can sign in and be assigned work)"
+              checked={form.is_active}
+              onChange={(e) => set("is_active", e.target.checked)}
+            />
           )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}

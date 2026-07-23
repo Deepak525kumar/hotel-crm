@@ -16,6 +16,7 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Checkbox,
   DataList,
   DataRow,
   Modal,
@@ -281,15 +282,11 @@ export default function AttendanceDetailPage() {
             options={REVIEW_STATUSES}
           />
 
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              checked={markVerified}
-              onChange={(e) => setMarkVerified(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            Mark as verified
-          </label>
+          <Checkbox
+            label="Mark as verified"
+            checked={markVerified}
+            onChange={(e) => setMarkVerified(e.target.checked)}
+          />
         </div>
       </Modal>
     </div>
