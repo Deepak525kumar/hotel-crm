@@ -82,10 +82,17 @@ nodes:
   # DELIVERED | FAILED-with-backoff | DEAD_LETTER, plus stale-PROCESSING reclaim for
   # at-least-once), and hosts scheduled jobs via lib/scheduler.ts (mechanism only, no domain job
   # registered yet).
-  # lifecycle: observed as of Epic 7 PR 7.5 (2026-07-24) -- runtime, claim/lifecycle, backoff,
-  # dispatch interface, scheduler mechanism, and both real transport handlers (EMAIL, PUSH)
-  # landed in code (backend/src/worker.ts,
-  # modules/notifications/outbox-{worker,repository,transport,backoff}.ts,
+  # PR 7.8: PUSH's single ApnsProviderClient now resolves its `apns-topic` PER DELIVERY
+  # from the token's PushToken.app (WORKER/CHECKER), not from one shared bundle ID --
+  # worker-app and checker-app have distinct bundle IDs and manager/admin may hold a
+  # token for both, so one topic could never be correct for both apps. Config:
+  # APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER (replaces the former single
+  # APNS_BUNDLE_ID). Still one client, one team-scoped cached JWT for both apps.
+  # lifecycle: observed as of Epic 7 PR 7.8 (2026-07-24) -- runtime, claim/lifecycle, backoff,
+  # dispatch interface, scheduler mechanism, both real transport handlers (EMAIL, PUSH), the
+  # observability/dead-letter operator surface (PR 7.6), and multi-app APNs topic selection
+  # (PR 7.8) landed in code (backend/src/worker.ts,
+  # modules/notifications/outbox-{worker,repository,transport,backoff,admin-service}.ts,
   # modules/notifications/{email,push}-provider.ts, lib/scheduler.ts).
   - { id: worker, kind: infrastructure, owner: unassigned, source: backend/src/worker.ts, name: "Platform Worker", lifecycle: observed }
 
@@ -449,7 +456,7 @@ contracts:
     version: unversioned
     owner_module: backend-notifications
     source: backend/src/modules/notifications/service.ts
-    interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead; enqueue(EnqueueNotificationInput, tx?) -- added Epic 7 PR 7.1 (ADR-029): the sole write path for state-outbox, joins a caller-supplied DatabaseTransaction or opens its own; registerPushToken(userId, token, platform) -- added Epic 7 PR 7.5 (ADR-029 §4): the sole write path for state-push-token, upsert keyed by token (POST /notifications/push-tokens)"
+    interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead; enqueue(EnqueueNotificationInput, tx?) -- added Epic 7 PR 7.1 (ADR-029): the sole write path for state-outbox, joins a caller-supplied DatabaseTransaction or opens its own; registerPushToken(userId, token, platform, app) -- added Epic 7 PR 7.5 (ADR-029 §4), `app` param added PR 7.8: the sole write path for state-push-token, upsert keyed by token (POST /notifications/push-tokens); `app` (PushApp WORKER|CHECKER) is required, selects the APNs topic at delivery time"
     payload_contract: "backend/src/modules/notifications/types.ts (NotificationPayload); backend/src/modules/notifications/outbox.types.ts (EnqueueNotificationInput, OutboxEnvelope, NotificationCreatedPayloadV1)"
     consumers:
       - backend-work-requests
@@ -659,6 +666,22 @@ state_domains:
   # row the moment its provider confirms the token permanently invalid -- APNs
   # 410/BadDeviceToken, FCM UNREGISTERED); read by the Platform Worker's PUSH fan-out
   # (all tokens for a Notification's recipient).
+  #
+  # Epic 7 PR 7.8 (backend-only architecture fix, found while scoping PR 7.7):
+  # PushToken gained `app` (PushApp: WORKER|CHECKER), NOT NULL, no default --
+  # additive (the table carried zero rows in every environment) and no impossible
+  # null state to handle. Reason: APNs requires the `apns-topic` header to equal
+  # the bundle ID of the app that minted the token (com.hotelcrm.workerapp vs.
+  # com.hotelcrm.checkerapp), and manager/admin may use BOTH apps, so `platform`
+  # alone could not select the correct topic -- every iOS send under the old
+  # single APNS_BUNDLE_ID would have been correct for at most one app. `app` is
+  # deliberately the APPLICATION, not the bundle ID: bundle IDs stay deployment
+  # configuration (APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER), so a client
+  # can never influence an APNs header, and changing a bundle ID never requires a
+  # data migration. Still ONE ApnsProviderClient / one cached JWT for both apps
+  # -- an APNs auth key is team-scoped, not app-scoped -- with the topic resolved
+  # per delivery from PushToken.app. FCM/Android is unaffected: an FCM
+  # registration token is self-identifying, so there is no equivalent header.
   - id: state-push-token
     model: PushToken
     lifecycle: observed

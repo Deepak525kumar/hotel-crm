@@ -59,19 +59,20 @@ describe('POST /notifications/push-tokens (Epic 7 PR 7.5, ADR-029 §4)', () => {
       id: 'pt1',
       token: 'device-token-abc',
       platform: 'IOS',
+      app: 'WORKER',
       user_id: 'user1',
     });
 
     const res = await request(makeApp())
       .post('/notifications/push-tokens')
-      .send({ token: 'device-token-abc', platform: 'IOS' });
+      .send({ token: 'device-token-abc', platform: 'IOS', app: 'WORKER' });
 
     expect(res.status).toBe(201);
-    expect(res.body.data).toMatchObject({ token: 'device-token-abc', platform: 'IOS', user_id: 'user1' });
+    expect(res.body.data).toMatchObject({ token: 'device-token-abc', platform: 'IOS', app: 'WORKER', user_id: 'user1' });
     expect(mockUpsert).toHaveBeenCalledWith({
       where: { token: 'device-token-abc' },
-      update: { user_id: 'user1', platform: 'IOS' },
-      create: { token: 'device-token-abc', platform: 'IOS', user_id: 'user1' },
+      update: { user_id: 'user1', platform: 'IOS', app: 'WORKER' },
+      create: { token: 'device-token-abc', platform: 'IOS', app: 'WORKER', user_id: 'user1' },
     });
   });
 
@@ -81,25 +82,26 @@ describe('POST /notifications/push-tokens (Epic 7 PR 7.5, ADR-029 §4)', () => {
       id: 'pt1',
       token: 'device-token-abc',
       platform: 'IOS',
+      app: 'WORKER',
       user_id: 'user2',
     });
 
     const res = await request(makeApp())
       .post('/notifications/push-tokens')
-      .send({ token: 'device-token-abc', platform: 'IOS' });
+      .send({ token: 'device-token-abc', platform: 'IOS', app: 'WORKER' });
 
     expect(res.status).toBe(201);
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { token: 'device-token-abc' },
-        update: { user_id: 'user2', platform: 'IOS' },
+        update: { user_id: 'user2', platform: 'IOS', app: 'WORKER' },
       })
     );
     expect(res.body.data.user_id).toBe('user2');
   });
 
   it('returns 422 for a missing token', async () => {
-    const res = await request(makeApp()).post('/notifications/push-tokens').send({ platform: 'IOS' });
+    const res = await request(makeApp()).post('/notifications/push-tokens').send({ platform: 'IOS', app: 'WORKER' });
     expect(res.status).toBe(422);
     expect(mockUpsert).not.toHaveBeenCalled();
   });
@@ -107,7 +109,24 @@ describe('POST /notifications/push-tokens (Epic 7 PR 7.5, ADR-029 §4)', () => {
   it('returns 422 for an invalid platform', async () => {
     const res = await request(makeApp())
       .post('/notifications/push-tokens')
-      .send({ token: 'device-token-abc', platform: 'WINDOWS_PHONE' });
+      .send({ token: 'device-token-abc', platform: 'WINDOWS_PHONE', app: 'WORKER' });
+    expect(res.status).toBe(422);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  // Epic 7 PR 7.8: app is required — the transport assumes every row has it.
+  it('returns 422 for a missing app', async () => {
+    const res = await request(makeApp())
+      .post('/notifications/push-tokens')
+      .send({ token: 'device-token-abc', platform: 'IOS' });
+    expect(res.status).toBe(422);
+    expect(mockUpsert).not.toHaveBeenCalled();
+  });
+
+  it('returns 422 for an invalid app', async () => {
+    const res = await request(makeApp())
+      .post('/notifications/push-tokens')
+      .send({ token: 'device-token-abc', platform: 'IOS', app: 'ADMIN_PORTAL' });
     expect(res.status).toBe(422);
     expect(mockUpsert).not.toHaveBeenCalled();
   });
@@ -116,7 +135,7 @@ describe('POST /notifications/push-tokens (Epic 7 PR 7.5, ADR-029 §4)', () => {
     testAuth = null;
     const res = await request(makeApp())
       .post('/notifications/push-tokens')
-      .send({ token: 'device-token-abc', platform: 'IOS' });
+      .send({ token: 'device-token-abc', platform: 'IOS', app: 'WORKER' });
     expect(res.status).toBe(401);
     expect(mockUpsert).not.toHaveBeenCalled();
   });

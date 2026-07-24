@@ -25,8 +25,22 @@
 import http2 from 'node:http2';
 import crypto from 'node:crypto';
 
+export interface PushSendInput {
+  token: string;
+  title: string;
+  body: string;
+  /**
+   * APNs only (Epic 7 PR 7.8): the `apns-topic` header, i.e. the bundle ID of
+   * the app that minted this device token. Required by ApnsProviderClient and
+   * supplied per delivery, because one client serves both mobile apps.
+   * FcmProviderClient ignores it — an FCM registration token is
+   * self-identifying, so Android has no equivalent per-send constraint.
+   */
+  topic?: string;
+}
+
 export interface PushProviderClient {
-  send(input: { token: string; title: string; body: string }): Promise<void>;
+  send(input: PushSendInput): Promise<void>;
 }
 
 /**
@@ -71,6 +85,12 @@ function signJwt(
  * APNs provider (token-based HTTP/2 API). `authority` defaults to Apple's
  * production endpoint; overridable so tests can point it at a local
  * plaintext (h2c) server.
+ *
+ * The topic (bundle ID) is NOT held here — it is supplied per send (Epic 7
+ * PR 7.8), because a single instance serves both mobile apps. That works
+ * because an APNs auth key is *team*-scoped: the ES256 JWT carries only the
+ * team ID (`iss`), never a bundle ID, so one cached JWT is valid for every
+ * topic in the team.
  */
 export class ApnsProviderClient implements PushProviderClient {
   private cachedJwt: { token: string; issuedAt: number } | null = null;
@@ -79,7 +99,6 @@ export class ApnsProviderClient implements PushProviderClient {
     private readonly privateKeyBase64: string,
     private readonly keyId: string,
     private readonly teamId: string,
-    private readonly bundleId: string,
     private readonly authority: string = 'https://api.push.apple.com'
   ) {}
 
@@ -95,7 +114,13 @@ export class ApnsProviderClient implements PushProviderClient {
     return token;
   }
 
-  async send(input: { token: string; title: string; body: string }): Promise<void> {
+  async send(input: PushSendInput): Promise<void> {
+    if (!input.topic) {
+      // Programming error, not a delivery failure: PushTransportHandler always
+      // resolves a topic before dispatching, and APNs rejects a topic-less send.
+      throw new Error('ApnsProviderClient: topic (apns-topic) is required');
+    }
+
     const jwt = this.getJwt();
     let session: http2.ClientHttp2Session | undefined;
     try {
@@ -107,7 +132,7 @@ export class ApnsProviderClient implements PushProviderClient {
           ':method': 'POST',
           ':path': `/3/device/${input.token}`,
           authorization: `bearer ${jwt}`,
-          'apns-topic': this.bundleId,
+          'apns-topic': input.topic,
           'apns-push-type': 'alert',
           'content-type': 'application/json',
         });
@@ -197,7 +222,9 @@ export class FcmProviderClient implements PushProviderClient {
     return data.access_token;
   }
 
-  async send(input: { token: string; title: string; body: string }): Promise<void> {
+  async send(input: PushSendInput): Promise<void> {
+    // `input.topic` is intentionally unused: FCM registration tokens are
+    // self-identifying, so there is no per-app header to set (PR 7.8).
     const accessToken = await this.getAccessToken();
     const res = await fetch(`https://fcm.googleapis.com/v1/projects/${this.projectId}/messages:send`, {
       method: 'POST',

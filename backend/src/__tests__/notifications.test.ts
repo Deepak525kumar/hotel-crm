@@ -34,7 +34,7 @@ jest.mock('../config/env.js', () => ({
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
-import { OutboxSourceModule, OutboxTransport, PushPlatform } from '@prisma/client';
+import { OutboxSourceModule, OutboxTransport, PushApp, PushPlatform } from '@prisma/client';
 import { NotificationService } from '../modules/notifications/service.js';
 
 const makeNotification = (overrides: Record<string, unknown> = {}) => ({
@@ -239,15 +239,16 @@ describe('NotificationService', () => {
         id: 'pt1',
         token: 'device-token-abc',
         platform: PushPlatform.IOS,
+        app: PushApp.WORKER,
         user_id: 'u1',
       });
 
-      const result = await service.registerPushToken('u1', 'device-token-abc', PushPlatform.IOS);
+      const result = await service.registerPushToken('u1', 'device-token-abc', PushPlatform.IOS, PushApp.WORKER);
 
       expect(mockPushToken.upsert).toHaveBeenCalledWith({
         where: { token: 'device-token-abc' },
-        update: { user_id: 'u1', platform: PushPlatform.IOS },
-        create: { token: 'device-token-abc', platform: PushPlatform.IOS, user_id: 'u1' },
+        update: { user_id: 'u1', platform: PushPlatform.IOS, app: PushApp.WORKER },
+        create: { token: 'device-token-abc', platform: PushPlatform.IOS, app: PushApp.WORKER, user_id: 'u1' },
       });
       expect(result.user_id).toBe('u1');
     });
@@ -257,10 +258,11 @@ describe('NotificationService', () => {
         id: 'pt1',
         token: 'device-token-abc',
         platform: PushPlatform.ANDROID,
+        app: PushApp.CHECKER,
         user_id: 'u2',
       });
 
-      const result = await service.registerPushToken('u2', 'device-token-abc', PushPlatform.ANDROID);
+      const result = await service.registerPushToken('u2', 'device-token-abc', PushPlatform.ANDROID, PushApp.CHECKER);
 
       const args = mockPushToken.upsert.mock.calls[0][0] as any;
       expect(args.update.user_id).toBe('u2');

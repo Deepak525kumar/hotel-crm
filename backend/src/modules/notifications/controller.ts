@@ -44,7 +44,8 @@ export class NotificationController {
       const result = await notificationService.registerPushToken(
         req.auth.userId,
         parsed.data.token,
-        parsed.data.platform
+        parsed.data.platform,
+        parsed.data.app
       );
       res.status(201).json({
         status: 'success',
