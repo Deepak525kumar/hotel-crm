@@ -1,4 +1,3 @@
-import { OutboxTransport } from '@prisma/client';
 import { loadEnv, getEnv } from './config/env.js';
 import { connectDb, disconnectDb, getPrisma } from './lib/db.js';
 import { logger } from './lib/logger.js';
@@ -7,8 +6,8 @@ import { Scheduler } from './lib/scheduler.js';
 import { OutboxRepository } from './modules/notifications/outbox-repository.js';
 import { OutboxWorker } from './modules/notifications/outbox-worker.js';
 import {
-  LoggingNoopTransportHandler,
   resolveEmailTransportHandler,
+  resolvePushTransportHandler,
   TransportRegistry,
 } from './modules/notifications/outbox-transport.js';
 
@@ -18,11 +17,13 @@ import {
  * (server.ts), deployed as a separate OS process (see ecosystem.config.js). It
  * drains the transactional outbox and hosts scheduled jobs; it never serves HTTP.
  *
- * PR 7.4 wiring: EMAIL registers a real handler (SendGrid/Resend, selected by
- * EMAIL_SERVICE) once configured, falling back to the PR-7.2 no-op/log handler
- * otherwise (resolveEmailTransportHandler). PUSH still registers the no-op
- * handler (real handler lands in PR 7.5). WEBHOOK and SMS are intentionally
- * left unregistered (reserved, ADR-029 §4) so their rows are never claimed. No
+ * PR 7.4/7.5 wiring: EMAIL registers a real handler (SendGrid/Resend, selected
+ * by EMAIL_SERVICE) once configured, falling back to the PR-7.2 no-op/log
+ * handler otherwise (resolveEmailTransportHandler). PUSH registers a real
+ * handler (APNs/FCM, each configured independently) once at least one
+ * platform is configured, falling back to the same no-op handler otherwise
+ * (resolvePushTransportHandler). WEBHOOK and SMS are intentionally left
+ * unregistered (reserved, ADR-029 §4) so their rows are never claimed. No
  * scheduled job is registered yet.
  */
 async function main() {
@@ -42,7 +43,16 @@ async function main() {
           fromAddress: env.EMAIL_FROM_ADDRESS,
         })
       )
-      .register(new LoggingNoopTransportHandler(OutboxTransport.PUSH));
+      .register(
+        resolvePushTransportHandler(prisma, {
+          apnsPrivateKeyBase64: env.APNS_PRIVATE_KEY_BASE64,
+          apnsKeyId: env.APNS_KEY_ID,
+          apnsTeamId: env.APNS_TEAM_ID,
+          apnsBundleId: env.APNS_BUNDLE_ID,
+          firebaseProjectId: env.FIREBASE_PROJECT_ID,
+          firebaseServiceAccountKeyBase64: env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
+        })
+      );
 
     const worker = new OutboxWorker(
       new OutboxRepository(prisma),
