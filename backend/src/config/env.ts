@@ -43,10 +43,16 @@ const envSchema = z.object({
   AWS_ACCESS_KEY_ID: z.string().optional(),
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
 
-  // Email
+  // Email (Epic 7 PR 7.4, ADR-029: EMAIL transport, carries forward
+  // MIG-GAP-11's secret-storage/least-privilege requirement). Provider API
+  // keys are plain env vars, matching the existing JWT_SECRET/
+  // APNS_PRIVATE_KEY_BASE64 precedent -- no secrets-manager mechanism exists
+  // in this repo to reuse or invent. Scope each key to mail-send only at the
+  // provider; never log a key value.
   EMAIL_SERVICE: z.enum(['sendgrid', 'resend']).optional(),
   SENDGRID_API_KEY: z.string().optional(),
   RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM_ADDRESS: z.string().email().optional(),
 
   // Notifications
   APNS_KEY_ID: z.string().optional(),
