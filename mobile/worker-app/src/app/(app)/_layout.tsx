@@ -14,6 +14,13 @@ export default function AppLayout() {
   // intentional: device tokens rotate, and the backend upsert is keyed by
   // token, so re-registration is idempotent and reassigns ownership if a
   // different user has since signed in on this device.
+  //
+  // This effect does NOT re-fire on tab navigation: this component is the
+  // Tabs navigator itself, which React Navigation mounts once per (app)-group
+  // entry and keeps alive across tab switches (no `key` prop forces a
+  // remount, and this app does not use StrictMode, so there's no dev-only
+  // double-invoke either). The one real remount path is logout -> login,
+  // which is the intended re-registration case above, not a bug.
   useEffect(() => {
     void registerForPushNotificationsAsync();
   }, []);
