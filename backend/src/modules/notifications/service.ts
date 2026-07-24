@@ -5,6 +5,7 @@ import {
   OutboxEvent,
   OutboxEventType,
   Prisma,
+  PushApp,
   PushPlatform,
   PushToken,
 } from '@prisma/client';
@@ -128,11 +129,16 @@ export class NotificationService extends BaseService {
    * security-correctness requirement: a stale token must stop delivering to
    * a previous user the moment a new one registers it.
    */
-  async registerPushToken(userId: string, token: string, platform: PushPlatform): Promise<PushToken> {
+  async registerPushToken(
+    userId: string,
+    token: string,
+    platform: PushPlatform,
+    app: PushApp
+  ): Promise<PushToken> {
     return this.prisma.pushToken.upsert({
       where: { token },
-      update: { user_id: userId, platform },
-      create: { token, platform, user_id: userId },
+      update: { user_id: userId, platform, app },
+      create: { token, platform, app, user_id: userId },
     });
   }
 
