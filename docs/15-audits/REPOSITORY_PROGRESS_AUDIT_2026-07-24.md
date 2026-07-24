@@ -26,7 +26,7 @@ The hotel-crm platform is **mid-pivot, not greenfield**. Phase 0 (Foundation & E
 **Evidence Sources:**
 - [IMPLEMENTATION_TRACKER.md](../05-execution/IMPLEMENTATION_TRACKER.md) — phase/epic status (authoritative)
 - [CURRENT_SPRINT.md](../05-execution/CURRENT_SPRINT.md) — Sprint 0 items (6/7 done)
-- [Specification freeze status](../03-modules/*/MODULE_SPEC.md) — 10 FROZEN, 7 REVIEW, 2 NO_SPEC, 1 UNKNOWN
+- [Specification freeze status](../../.claude/knowledge/SPECIFICATION_INDEX.yaml) — 10 FROZEN, 7 REVIEW, 2 NO_SPEC, 1 UNKNOWN
 - Merged PRs (206 total, recent work on ADR-029 notifications, frontend bootstrap, governance)
 - Codebase inventory (16 backend modules, 35 frontend components, 24+23 mobile screens, 51 test files)
 
