@@ -2,6 +2,7 @@ import { z } from 'zod';
 import dotenv from 'dotenv';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { parseBackoffScheduleMs } from '../modules/notifications/outbox-backoff.js';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
@@ -74,6 +75,41 @@ const envSchema = z.object({
   // Defaults FALSE: the new employee-management routes 404 until explicitly
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
   FEATURE_EMPLOYMENT_RECORD: z.coerce.boolean().default(false),
+
+  // ---------------------------------------------------------------------------
+  // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).
+  // Config-driven per ADR-029 §6/§8: the values below are the initial
+  // deployment defaults, changeable without a code change.
+  // ---------------------------------------------------------------------------
+  // Poll interval for the outbox drain loop (ADR-029 §8: default 5s).
+  OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(5000),
+  // Max OutboxEvent rows claimed per batch by a single FOR UPDATE SKIP LOCKED claim.
+  OUTBOX_CLAIM_BATCH_SIZE: z.coerce.number().int().positive().default(20),
+  // Exponential-backoff schedule as a comma-separated list of millisecond delays
+  // (ADR-029 §6 default: 1m, 5m, 15m, 1h). Its length also sets the retry count:
+  // once a row has failed more times than there are entries here, it is
+  // dead-lettered. Parsed into a positive-int array; an empty/invalid entry fails
+  // startup validation (fail-closed) rather than silently dropping retries.
+  OUTBOX_BACKOFF_SCHEDULE_MS: z
+    .string()
+    .default('60000,300000,900000,3600000')
+    .transform((raw, ctx) => {
+      try {
+        return parseBackoffScheduleMs(raw);
+      } catch (error) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: error instanceof Error ? error.message : 'invalid backoff schedule',
+        });
+        return z.NEVER;
+      }
+    }),
+  // How long a row may sit in PROCESSING before the worker treats it as
+  // abandoned (a worker crashed mid-delivery) and reclaims it — the visibility
+  // timeout that preserves at-least-once delivery (ADR-029 §7). Must exceed a
+  // realistic single-delivery duration; handlers are idempotent so an occasional
+  // reclaim-and-retry of an already-sent row is safe.
+  OUTBOX_PROCESSING_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
 });
 
 type Env = z.infer<typeof envSchema>;
