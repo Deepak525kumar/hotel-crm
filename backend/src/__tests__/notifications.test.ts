@@ -11,9 +11,14 @@ const mockOutboxEvent = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockPushToken = {
+  upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
+  pushToken: mockPushToken,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -29,7 +34,7 @@ jest.mock('../config/env.js', () => ({
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
-import { OutboxSourceModule, OutboxTransport } from '@prisma/client';
+import { OutboxSourceModule, OutboxTransport, PushPlatform } from '@prisma/client';
 import { NotificationService } from '../modules/notifications/service.js';
 
 const makeNotification = (overrides: Record<string, unknown> = {}) => ({
@@ -225,6 +230,41 @@ describe('NotificationService', () => {
       expect(mockTxOutboxEvent.create).toHaveBeenCalledTimes(1);
       expect(result.notification.id).toBe('tx-notif');
       expect(result.outboxEvents[0].aggregate_id).toBe('tx-notif');
+    });
+  });
+
+  describe('registerPushToken (Epic 7 PR 7.5, ADR-029 §4)', () => {
+    it('upserts keyed by token, assigning it to the calling user', async () => {
+      mockPushToken.upsert.mockResolvedValue({
+        id: 'pt1',
+        token: 'device-token-abc',
+        platform: PushPlatform.IOS,
+        user_id: 'u1',
+      });
+
+      const result = await service.registerPushToken('u1', 'device-token-abc', PushPlatform.IOS);
+
+      expect(mockPushToken.upsert).toHaveBeenCalledWith({
+        where: { token: 'device-token-abc' },
+        update: { user_id: 'u1', platform: PushPlatform.IOS },
+        create: { token: 'device-token-abc', platform: PushPlatform.IOS, user_id: 'u1' },
+      });
+      expect(result.user_id).toBe('u1');
+    });
+
+    it('re-registering an existing token under a different user reassigns ownership (security-correctness)', async () => {
+      mockPushToken.upsert.mockResolvedValue({
+        id: 'pt1',
+        token: 'device-token-abc',
+        platform: PushPlatform.ANDROID,
+        user_id: 'u2',
+      });
+
+      const result = await service.registerPushToken('u2', 'device-token-abc', PushPlatform.ANDROID);
+
+      const args = mockPushToken.upsert.mock.calls[0][0] as any;
+      expect(args.update.user_id).toBe('u2');
+      expect(result.user_id).toBe('u2');
     });
   });
 });
