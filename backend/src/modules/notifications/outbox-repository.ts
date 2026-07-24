@@ -116,4 +116,129 @@ export class OutboxRepository {
     });
     return OutboxStatus.FAILED;
   }
+
+  // ---------------------------------------------------------------------------
+  // Observability + dead-letter operability (Epic 7 PR 7.6, ADR-029 §9).
+  //
+  // ADR-029 §9 requires a *minimum derivable* metric surface, not a specific
+  // metrics backend: counts by status, retry_count per event (the `attempts`
+  // column, surfaced on each dead-letter row), and delivery_latency
+  // (processed_at - created_at) for delivered events. These reads are the
+  // canonical derivation of that surface from state-outbox.
+  // ---------------------------------------------------------------------------
+
+  /** Row counts per OutboxStatus. Every status is present, zero-filled. */
+  async getStatusCounts(): Promise<Record<OutboxStatus, number>> {
+    const grouped = await this.prisma.outboxEvent.groupBy({
+      by: ['status'],
+      _count: { _all: true },
+    });
+
+    const counts = Object.fromEntries(
+      Object.values(OutboxStatus).map((status) => [status, 0])
+    ) as Record<OutboxStatus, number>;
+    for (const row of grouped) {
+      counts[row.status] = row._count._all;
+    }
+    return counts;
+  }
+
+  /**
+   * Backlog depth and the age of the oldest event still awaiting a terminal
+   * outcome (PENDING/PROCESSING/FAILED). This is the health signal a status
+   * histogram alone cannot give: a steady `pending` count looks identical
+   * whether the queue is flowing or wedged, but a growing oldest-age does not.
+   */
+  async getBacklog(now: Date = new Date()): Promise<{ backlogCount: number; oldestPendingAgeMs: number | null }> {
+    const result = await this.prisma.outboxEvent.aggregate({
+      where: {
+        status: { in: [OutboxStatus.PENDING, OutboxStatus.PROCESSING, OutboxStatus.FAILED] },
+      },
+      _count: { _all: true },
+      _min: { created_at: true },
+    });
+
+    const oldest = result._min.created_at;
+    return {
+      backlogCount: result._count._all,
+      oldestPendingAgeMs: oldest ? now.getTime() - oldest.getTime() : null,
+    };
+  }
+
+  /**
+   * Average delivery latency (processed_at - created_at) over DELIVERED rows.
+   * Raw SQL because the interval arithmetic has no Prisma aggregate equivalent;
+   * averaging in the database avoids loading every delivered row to compute it.
+   */
+  async getDeliveryLatency(): Promise<{ averageMs: number | null; sampleSize: number }> {
+    const rows = await this.prisma.$queryRaw<{ avg_ms: number | null; sample_size: bigint }[]>(Prisma.sql`
+      SELECT
+        AVG(EXTRACT(EPOCH FROM ("processed_at" - "created_at")) * 1000)::float8 AS avg_ms,
+        COUNT(*) AS sample_size
+      FROM "OutboxEvent"
+      WHERE "status" = 'DELIVERED' AND "processed_at" IS NOT NULL
+    `);
+
+    const row = rows[0];
+    if (!row) return { averageMs: null, sampleSize: 0 };
+    return { averageMs: row.avg_ms ?? null, sampleSize: Number(row.sample_size) };
+  }
+
+  /** Dead-lettered rows, newest terminal transition first, for operator triage. */
+  async listDeadLetters(params: { skip: number; take: number }): Promise<{ rows: OutboxEvent[]; total: number }> {
+    const where = { status: OutboxStatus.DEAD_LETTER };
+    const [rows, total] = await Promise.all([
+      this.prisma.outboxEvent.findMany({
+        where,
+        orderBy: { processed_at: 'desc' },
+        skip: params.skip,
+        take: params.take,
+      }),
+      this.prisma.outboxEvent.count({ where }),
+    ]);
+    return { rows, total };
+  }
+
+  /**
+   * Operator requeue: DEAD_LETTER → PENDING, due immediately.
+   *
+   * `attempts` and `last_error` are deliberately preserved rather than reset —
+   * they are the event's failure history, and losing them would erase why an
+   * operator intervened in the first place. A requeued row therefore re-enters
+   * the backoff schedule at its existing attempt count, so an event whose
+   * schedule is already exhausted dead-letters again after its next failure
+   * rather than looping forever.
+   *
+   * Returns the pre-requeue snapshot (for the caller's audit record), or null
+   * if the row is absent or no longer DEAD_LETTER (lost a concurrent race).
+   */
+  async requeue(id: string, now: Date = new Date()): Promise<OutboxEvent | null> {
+    const row = await this.prisma.outboxEvent.findUnique({ where: { id } });
+    if (!row || row.status !== OutboxStatus.DEAD_LETTER) return null;
+
+    const { count } = await this.prisma.outboxEvent.updateMany({
+      where: { id, status: OutboxStatus.DEAD_LETTER },
+      data: { status: OutboxStatus.PENDING, next_attempt_at: now, processed_at: null },
+    });
+    return count === 1 ? row : null;
+  }
+
+  /**
+   * Operator discard: permanently drop a dead-lettered event the operator has
+   * judged undeliverable. The row is deleted; the caller's AuditLog entry is
+   * the durable record of what was dropped and by whom, which is why this
+   * returns the pre-delete snapshot.
+   *
+   * Returns null if the row is absent or no longer DEAD_LETTER — only a
+   * terminal row may be discarded, never one still in flight.
+   */
+  async discard(id: string): Promise<OutboxEvent | null> {
+    const row = await this.prisma.outboxEvent.findUnique({ where: { id } });
+    if (!row || row.status !== OutboxStatus.DEAD_LETTER) return null;
+
+    const { count } = await this.prisma.outboxEvent.deleteMany({
+      where: { id, status: OutboxStatus.DEAD_LETTER },
+    });
+    return count === 1 ? row : null;
+  }
 }
