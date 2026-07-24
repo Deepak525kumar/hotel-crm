@@ -1,4 +1,4 @@
-import { OutboxAggregateType, OutboxEvent, OutboxTransport, PrismaClient, PushPlatform } from '@prisma/client';
+import { OutboxAggregateType, OutboxEvent, OutboxTransport, PrismaClient, PushApp, PushPlatform } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
 import {
   EmailProviderClient,
@@ -189,6 +189,10 @@ export function resolveEmailTransportHandler(
  * this delivery attempt. An invalidated token is not a delivery failure —
  * there is nothing left to retry for that device — so it never by itself
  * causes the event to be retried.
+ *
+ * Epic 7 PR 7.8: iOS deliveries additionally resolve an `apns-topic` from the
+ * token's own `app`, since APNs rejects a token sent under another app's topic
+ * and both mobile apps share this one handler and one provider client.
  */
 export class PushTransportHandler implements TransportHandler {
   readonly transport = OutboxTransport.PUSH;
@@ -196,11 +200,22 @@ export class PushTransportHandler implements TransportHandler {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly apnsClient?: PushProviderClient,
-    private readonly fcmClient?: PushProviderClient
+    private readonly fcmClient?: PushProviderClient,
+    /** Per-app APNs topics (bundle IDs), deployment configuration — never persisted. */
+    private readonly apnsTopics: Partial<Record<PushApp, string>> = {}
   ) {}
 
   private clientFor(platform: PushPlatform): PushProviderClient | undefined {
     return platform === PushPlatform.IOS ? this.apnsClient : this.fcmClient;
+  }
+
+  /**
+   * The `apns-topic` for a token, or undefined when this deployment has no
+   * bundle ID configured for that app. Android needs no topic at all — an FCM
+   * registration token is self-identifying.
+   */
+  private topicFor(pushToken: { platform: PushPlatform; app: PushApp }): string | undefined {
+    return pushToken.platform === PushPlatform.IOS ? this.apnsTopics[pushToken.app] : undefined;
   }
 
   async deliver(event: OutboxEvent): Promise<void> {
@@ -247,8 +262,27 @@ export class PushTransportHandler implements TransportHandler {
         continue;
       }
 
+      const topic = this.topicFor(pushToken);
+      if (pushToken.platform === PushPlatform.IOS && !topic) {
+        // No bundle ID configured for this app. Skipped exactly like an
+        // unconfigured platform above: not counted as a success, and NOT
+        // treated as transient — retrying could never resolve a missing
+        // deployment config, it would only burn the backoff schedule and
+        // dead-letter an otherwise healthy event.
+        logger.warn('PushTransportHandler: no APNs topic configured for app, skipping device', {
+          event_id: event.event_id,
+          app: pushToken.app,
+        });
+        continue;
+      }
+
       try {
-        await client.send({ token: pushToken.token, title: notification.title, body: notification.message });
+        await client.send({
+          token: pushToken.token,
+          title: notification.title,
+          body: notification.message,
+          topic,
+        });
         successCount += 1;
       } catch (error) {
         if (error instanceof InvalidTokenError) {
@@ -307,17 +341,35 @@ export function resolvePushTransportHandler(
     apnsPrivateKeyBase64?: string;
     apnsKeyId?: string;
     apnsTeamId?: string;
-    apnsBundleId?: string;
+    apnsBundleIdWorker?: string;
+    apnsBundleIdChecker?: string;
     firebaseProjectId?: string;
     firebaseServiceAccountKeyBase64?: string;
   }
 ): TransportHandler {
-  const { apnsPrivateKeyBase64, apnsKeyId, apnsTeamId, apnsBundleId, firebaseProjectId, firebaseServiceAccountKeyBase64 } =
-    config;
+  const {
+    apnsPrivateKeyBase64,
+    apnsKeyId,
+    apnsTeamId,
+    apnsBundleIdWorker,
+    apnsBundleIdChecker,
+    firebaseProjectId,
+    firebaseServiceAccountKeyBase64,
+  } = config;
 
+  // Per-app topics (Epic 7 PR 7.8). Each app is configured independently, in
+  // the same spirit as each platform: a deployment with only one app's bundle
+  // ID still delivers to that app rather than failing closed for both.
+  const apnsTopics: Partial<Record<PushApp, string>> = {};
+  if (apnsBundleIdWorker) apnsTopics[PushApp.WORKER] = apnsBundleIdWorker;
+  if (apnsBundleIdChecker) apnsTopics[PushApp.CHECKER] = apnsBundleIdChecker;
+
+  // One client, one team-scoped signing key, one cached JWT — the topic is
+  // supplied per delivery, so a second client per app would only duplicate the
+  // JWT cache for no benefit.
   const apnsClient =
-    apnsPrivateKeyBase64 && apnsKeyId && apnsTeamId && apnsBundleId
-      ? new ApnsProviderClient(apnsPrivateKeyBase64, apnsKeyId, apnsTeamId, apnsBundleId)
+    apnsPrivateKeyBase64 && apnsKeyId && apnsTeamId && Object.keys(apnsTopics).length > 0
+      ? new ApnsProviderClient(apnsPrivateKeyBase64, apnsKeyId, apnsTeamId)
       : undefined;
   const fcmClient =
     firebaseServiceAccountKeyBase64 && firebaseProjectId
@@ -326,17 +378,24 @@ export function resolvePushTransportHandler(
 
   if (!apnsClient && !fcmClient) {
     logger.warn(
-      'PUSH transport not configured (APNs: APNS_PRIVATE_KEY_BASE64/APNS_KEY_ID/APNS_TEAM_ID/APNS_BUNDLE_ID; FCM: FIREBASE_SERVICE_ACCOUNT_KEY_BASE64/FIREBASE_PROJECT_ID) — falling back to the no-op handler'
+      'PUSH transport not configured (APNs: APNS_PRIVATE_KEY_BASE64/APNS_KEY_ID/APNS_TEAM_ID/at least one of APNS_BUNDLE_ID_WORKER|APNS_BUNDLE_ID_CHECKER; FCM: FIREBASE_SERVICE_ACCOUNT_KEY_BASE64/FIREBASE_PROJECT_ID) — falling back to the no-op handler'
     );
     return new LoggingNoopTransportHandler(OutboxTransport.PUSH);
   }
 
   if (!apnsClient) {
     logger.warn('PUSH transport: APNs not configured — iOS devices will be skipped, not delivered');
+  } else {
+    if (!apnsTopics[PushApp.WORKER]) {
+      logger.warn('PUSH transport: APNS_BUNDLE_ID_WORKER unset — worker-app iOS devices will be skipped');
+    }
+    if (!apnsTopics[PushApp.CHECKER]) {
+      logger.warn('PUSH transport: APNS_BUNDLE_ID_CHECKER unset — checker-app iOS devices will be skipped');
+    }
   }
   if (!fcmClient) {
     logger.warn('PUSH transport: FCM not configured — Android devices will be skipped, not delivered');
   }
 
-  return new PushTransportHandler(prisma, apnsClient, fcmClient);
+  return new PushTransportHandler(prisma, apnsClient, fcmClient, apnsTopics);
 }

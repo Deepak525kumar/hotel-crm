@@ -48,7 +48,8 @@ async function main() {
           apnsPrivateKeyBase64: env.APNS_PRIVATE_KEY_BASE64,
           apnsKeyId: env.APNS_KEY_ID,
           apnsTeamId: env.APNS_TEAM_ID,
-          apnsBundleId: env.APNS_BUNDLE_ID,
+          apnsBundleIdWorker: env.APNS_BUNDLE_ID_WORKER,
+          apnsBundleIdChecker: env.APNS_BUNDLE_ID_CHECKER,
           firebaseProjectId: env.FIREBASE_PROJECT_ID,
           firebaseServiceAccountKeyBase64: env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
         })

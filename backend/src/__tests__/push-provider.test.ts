@@ -50,13 +50,13 @@ describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   it('sends a real HTTP/2 request with a valid ES256 JWT and the expected headers/path', async () => {
     nextResponse = { status: 200, body: '' };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await client.send({ token: 'device-token-abc', title: 'Hi', body: 'You have a new shift' });
+    await client.send({ token: 'device-token-abc', title: 'Hi', body: 'You have a new shift', topic: 'com.hotelcrm.workerapp' });
 
     expect(lastRequest).not.toBeNull();
     expect(lastRequest!.path).toBe('/3/device/device-token-abc');
-    expect(lastRequest!.headers['apns-topic']).toBe('com.hotelcrm.app');
+    expect(lastRequest!.headers['apns-topic']).toBe('com.hotelcrm.workerapp');
     expect(lastRequest!.headers['apns-push-type']).toBe('alert');
     const authHeader = lastRequest!.headers.authorization as string;
     expect(authHeader).toMatch(/^bearer /);
@@ -69,45 +69,69 @@ describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   it('throws InvalidTokenError on a 410 (Unregistered) response', async () => {
     nextResponse = { status: 410, body: JSON.stringify({ reason: 'Unregistered' }) };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.toThrow(InvalidTokenError);
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.toThrow(InvalidTokenError);
   });
 
   it('throws InvalidTokenError on a 400 BadDeviceToken response', async () => {
     nextResponse = { status: 400, body: JSON.stringify({ reason: 'BadDeviceToken' }) };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.toThrow(InvalidTokenError);
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.toThrow(InvalidTokenError);
   });
 
   it('throws a plain Error (not InvalidTokenError) on other non-200 responses', async () => {
     nextResponse = { status: 500, body: JSON.stringify({ reason: 'InternalServerError' }) };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.toThrow(/500/);
-    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.not.toThrow(InvalidTokenError);
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.toThrow(/500/);
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.not.toThrow(InvalidTokenError);
   });
 
   it('never leaks the private key in a thrown error message', async () => {
     nextResponse = { status: 500, body: 'boom' };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.not.toThrow(
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.not.toThrow(
       new RegExp(privateKeyBase64)
     );
   });
 
   it('caches the JWT across sends instead of re-signing every call', async () => {
     nextResponse = { status: 200, body: '' };
-    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', 'com.hotelcrm.app', baseUrl);
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
-    await client.send({ token: 't1', title: 'Hi', body: 'B' });
+    await client.send({ token: 't1', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' });
     const firstAuth = lastRequest!.headers.authorization;
-    await client.send({ token: 't2', title: 'Hi', body: 'B' });
+    await client.send({ token: 't2', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' });
     const secondAuth = lastRequest!.headers.authorization;
 
     expect(firstAuth).toBe(secondAuth);
+  });
+
+  // Epic 7 PR 7.8: one client, one team-scoped JWT, topic selected per send.
+
+  it('throws when no topic is supplied — a programming error, not a delivery failure', async () => {
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await expect(client.send({ token: 't', title: 'Hi', body: 'B' })).rejects.toThrow(/topic/i);
+  });
+
+  it('sends different topics to different requests from the SAME client, reusing one cached JWT', async () => {
+    nextResponse = { status: 200, body: '' };
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await client.send({ token: 'worker-token', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' });
+    expect(lastRequest!.headers['apns-topic']).toBe('com.hotelcrm.workerapp');
+    const workerAuth = lastRequest!.headers.authorization;
+
+    await client.send({ token: 'checker-token', title: 'Hi', body: 'B', topic: 'com.hotelcrm.checkerapp' });
+    expect(lastRequest!.headers['apns-topic']).toBe('com.hotelcrm.checkerapp');
+    const checkerAuth = lastRequest!.headers.authorization;
+
+    // Same JWT for both — proves the team-scoped key/cache is unaffected by topic.
+    expect(workerAuth).toBe(checkerAuth);
   });
 });
 
@@ -169,6 +193,23 @@ describe('FcmProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
       token: 'device-token-abc',
       notification: { title: 'Hi', body: 'You have a new shift' },
     });
+  });
+
+  // Epic 7 PR 7.8: FCM has no apns-topic equivalent — a registration token is
+  // already scoped to its originating app, so a supplied topic is a no-op.
+  it('ignores a supplied topic (Android has no per-app header, unlike APNs)', async () => {
+    const fetchMock = mockFetchSequence([
+      { ok: true, json: { access_token: 'access-token-xyz', expires_in: 3600 } },
+      { ok: true, json: {} },
+    ]);
+    const client = new FcmProviderClient(serviceAccountKeyBase64, 'hotelcrm-app');
+
+    await client.send({ token: 'device-token-abc', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' });
+
+    const [, sendInit] = (fetchMock as jest.Mock).mock.calls[1] as [string, RequestInit];
+    const sendBody = JSON.parse(sendInit.body as string);
+    expect(sendBody).not.toHaveProperty('topic');
+    expect(JSON.stringify(sendBody)).not.toContain('com.hotelcrm.workerapp');
   });
 
   it('caches the access token across sends instead of re-exchanging every call', async () => {

@@ -208,18 +208,21 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   const notification = { id: 'notif1', user_id: 'user1', title: 'New Shift', message: 'You have a new shift' };
 
+  // Epic 7 PR 7.8: both apps configured, matching a deployment with both bundle IDs set.
+  const BOTH_TOPICS = { WORKER: 'com.hotelcrm.workerapp', CHECKER: 'com.hotelcrm.checkerapp' };
+
   beforeEach(() => {
     jest.clearAllMocks();
     mockNotificationFindUnique.mockResolvedValue(notification);
   });
 
   it('is registered under the PUSH transport', () => {
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
     expect(handler.transport).toBe('PUSH');
   });
 
   it('skips (does not query) an unsupported aggregate_type', async () => {
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
     const event = { ...makeEvent(OutboxTransport.PUSH), aggregate_type: 'SOME_FUTURE_TYPE' };
 
     await expect(handler.deliver(event)).resolves.toBeUndefined();
@@ -228,7 +231,7 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   it('is a benign no-op when the referenced Notification no longer exists', async () => {
     mockNotificationFindUnique.mockResolvedValue(null);
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
     expect(mockPushTokenFindMany).not.toHaveBeenCalled();
@@ -236,45 +239,81 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   it('is a benign no-op when the recipient has no registered devices', async () => {
     mockPushTokenFindMany.mockResolvedValue([]);
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
     expect(mockApnsClient.send).not.toHaveBeenCalled();
     expect(mockFcmClient.send).not.toHaveBeenCalled();
   });
 
-  it('fans out to every registered device, routed to the platform-correct client', async () => {
+  it('fans out to every registered device, routed to the platform-correct client, iOS carrying its app topic', async () => {
     mockPushTokenFindMany.mockResolvedValue([
-      { id: 'pt1', token: 'ios-token', platform: 'IOS', user_id: 'user1' },
-      { id: 'pt2', token: 'android-token', platform: 'ANDROID', user_id: 'user1' },
+      { id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' },
+      { id: 'pt2', token: 'android-token', platform: 'ANDROID', app: 'WORKER', user_id: 'user1' },
     ]);
     mockApnsClient.send.mockResolvedValue(undefined);
     mockFcmClient.send.mockResolvedValue(undefined);
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
     expect(mockPushTokenFindMany).toHaveBeenCalledWith({ where: { user_id: 'user1' } });
-    expect(mockApnsClient.send).toHaveBeenCalledWith({ token: 'ios-token', title: 'New Shift', body: 'You have a new shift' });
+    expect(mockApnsClient.send).toHaveBeenCalledWith({
+      token: 'ios-token',
+      title: 'New Shift',
+      body: 'You have a new shift',
+      topic: 'com.hotelcrm.workerapp',
+    });
+    // Android is untouched by PR 7.8: no topic field reaches the FCM client at all.
     expect(mockFcmClient.send).toHaveBeenCalledWith({ token: 'android-token', title: 'New Shift', body: 'You have a new shift' });
+  });
+
+  // Epic 7 PR 7.8: the core scenario this PR exists for — one user, two apps, two iOS tokens.
+  it('sends the correct distinct APNs topic for each app when one user holds tokens for both', async () => {
+    mockPushTokenFindMany.mockResolvedValue([
+      { id: 'pt1', token: 'worker-ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' },
+      { id: 'pt2', token: 'checker-ios-token', platform: 'IOS', app: 'CHECKER', user_id: 'user1' },
+    ]);
+    mockApnsClient.send.mockResolvedValue(undefined);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+    await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+    expect(mockApnsClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'worker-ios-token', topic: 'com.hotelcrm.workerapp' })
+    );
+    expect(mockApnsClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ token: 'checker-ios-token', topic: 'com.hotelcrm.checkerapp' })
+    );
+    // Same client instance for both — one JWT cache, not one client per app.
+    expect(mockApnsClient.send).toHaveBeenCalledTimes(2);
+  });
+
+  it('skips an iOS device whose app has no configured topic — not a transient failure', async () => {
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'CHECKER', user_id: 'user1' }]);
+    // Only WORKER configured — mirrors a deployment missing APNS_BUNDLE_ID_CHECKER.
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, { WORKER: 'com.hotelcrm.workerapp' } as any);
+
+    await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
+    expect(mockApnsClient.send).not.toHaveBeenCalled();
   });
 
   it('is considered delivered as soon as at least one device accepts, even if another fails transiently', async () => {
     mockPushTokenFindMany.mockResolvedValue([
-      { id: 'pt1', token: 'ios-token', platform: 'IOS', user_id: 'user1' },
-      { id: 'pt2', token: 'android-token', platform: 'ANDROID', user_id: 'user1' },
+      { id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' },
+      { id: 'pt2', token: 'android-token', platform: 'ANDROID', app: 'WORKER', user_id: 'user1' },
     ]);
     mockApnsClient.send.mockResolvedValue(undefined);
     mockFcmClient.send.mockRejectedValue(new Error('FCM outage'));
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
   });
 
   it('throws (so the worker retries) when every device fails transiently', async () => {
-    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', user_id: 'user1' }]);
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
     mockApnsClient.send.mockRejectedValue(new Error('APNs outage'));
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).rejects.toThrow(
       'PushTransportHandler: delivery failed on every registered device'
@@ -282,10 +321,10 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
   });
 
   it('deletes a token on InvalidTokenError and does not treat it as a transient failure', async () => {
-    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', user_id: 'user1' }]);
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
     mockApnsClient.send.mockRejectedValue(new InvalidTokenError('APNs reported the token invalid: 410 Unregistered'));
     mockPushTokenDelete.mockResolvedValue(undefined);
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     // No successes, but the only failure was permanent invalidity — nothing to retry.
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
@@ -293,17 +332,17 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
   });
 
   it('does not let a failed token-delete block delivery or bubble up', async () => {
-    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', user_id: 'user1' }]);
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
     mockApnsClient.send.mockRejectedValue(new InvalidTokenError('invalid'));
     mockPushTokenDelete.mockRejectedValue(new Error('row already gone'));
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
   });
 
   it('skips (and does not fail on) a device whose platform has no configured client', async () => {
-    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'android-token', platform: 'ANDROID', user_id: 'user1' }]);
-    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, undefined);
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'android-token', platform: 'ANDROID', app: 'WORKER', user_id: 'user1' }]);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, undefined, BOTH_TOPICS as any);
 
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
     expect(mockApnsClient.send).not.toHaveBeenCalled();
@@ -317,12 +356,12 @@ describe('resolvePushTransportHandler (Epic 7 PR 7.5)', () => {
     jest.clearAllMocks();
   });
 
-  it('returns a real PushTransportHandler when APNs alone is fully configured', () => {
+  it('returns a real PushTransportHandler when APNs alone is fully configured (one app)', () => {
     const handler = resolvePushTransportHandler(mockPrisma, {
       apnsPrivateKeyBase64: 'key',
       apnsKeyId: 'kid',
       apnsTeamId: 'team',
-      apnsBundleId: 'com.hotelcrm.app',
+      apnsBundleIdWorker: 'com.hotelcrm.workerapp',
     });
     expect(handler).toBeInstanceOf(PushTransportHandler);
     expect(handler.transport).toBe('PUSH');
@@ -342,7 +381,8 @@ describe('resolvePushTransportHandler (Epic 7 PR 7.5)', () => {
       apnsPrivateKeyBase64: 'key',
       apnsKeyId: 'kid',
       apnsTeamId: 'team',
-      apnsBundleId: 'com.hotelcrm.app',
+      apnsBundleIdWorker: 'com.hotelcrm.workerapp',
+      apnsBundleIdChecker: 'com.hotelcrm.checkerapp',
       firebaseProjectId: 'hotelcrm-app',
       firebaseServiceAccountKeyBase64: 'svc-key',
     });
@@ -355,8 +395,46 @@ describe('resolvePushTransportHandler (Epic 7 PR 7.5)', () => {
     expect(handler.transport).toBe('PUSH');
   });
 
-  it('falls back to the no-op handler when APNs is only partially configured and FCM is unset', () => {
-    const handler = resolvePushTransportHandler(mockPrisma, { apnsPrivateKeyBase64: 'key', apnsKeyId: 'kid' });
+  it('falls back to the no-op handler when APNs key material is set but no app bundle ID is', () => {
+    const handler = resolvePushTransportHandler(mockPrisma, { apnsPrivateKeyBase64: 'key', apnsKeyId: 'kid', apnsTeamId: 'team' });
     expect(handler).toBeInstanceOf(LoggingNoopTransportHandler);
+  });
+
+  it('falls back to the no-op handler when APNs is only partially configured (missing team id) and FCM is unset', () => {
+    const handler = resolvePushTransportHandler(mockPrisma, {
+      apnsPrivateKeyBase64: 'key',
+      apnsKeyId: 'kid',
+      apnsBundleIdWorker: 'com.hotelcrm.workerapp',
+    });
+    expect(handler).toBeInstanceOf(LoggingNoopTransportHandler);
+  });
+
+  // Epic 7 PR 7.8: per-app configuration, not all-or-nothing across the two apps.
+  it('configures only the worker-app topic when only APNS_BUNDLE_ID_WORKER is set, and constructs one APNs client', () => {
+    const handler = resolvePushTransportHandler(mockPrisma, {
+      apnsPrivateKeyBase64: 'key',
+      apnsKeyId: 'kid',
+      apnsTeamId: 'team',
+      apnsBundleIdWorker: 'com.hotelcrm.workerapp',
+      // apnsBundleIdChecker intentionally unset
+    }) as any;
+    expect(handler).toBeInstanceOf(PushTransportHandler);
+    expect(handler['apnsTopics']).toEqual({ WORKER: 'com.hotelcrm.workerapp' });
+    // One client instance for the whole handler, not one per app.
+    expect(handler['apnsClient']).toBeDefined();
+  });
+
+  it('configures both app topics on one shared APNs client when both bundle IDs are set', () => {
+    const handler = resolvePushTransportHandler(mockPrisma, {
+      apnsPrivateKeyBase64: 'key',
+      apnsKeyId: 'kid',
+      apnsTeamId: 'team',
+      apnsBundleIdWorker: 'com.hotelcrm.workerapp',
+      apnsBundleIdChecker: 'com.hotelcrm.checkerapp',
+    }) as any;
+    expect(handler['apnsTopics']).toEqual({
+      WORKER: 'com.hotelcrm.workerapp',
+      CHECKER: 'com.hotelcrm.checkerapp',
+    });
   });
 });
