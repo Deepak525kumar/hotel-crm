@@ -98,6 +98,25 @@ export interface Notification {
   created_at: string;
 }
 
+// Epic 7 PR 7.7: device push-token registration. Mirrors the backend's
+// PushPlatform/PushApp enums (backend/prisma/schema.prisma). `app` identifies
+// which mobile application minted the token — the Platform Worker needs it to
+// pick the correct APNs topic, since the two apps have distinct bundle IDs
+// (PR 7.8). Android ignores it; it is sent unconditionally so the backend row
+// is complete regardless of platform.
+export type PushPlatform = 'IOS' | 'ANDROID';
+export type PushApp = 'WORKER' | 'CHECKER';
+
+export interface PushToken {
+  id: string;
+  token: string;
+  platform: PushPlatform;
+  app: PushApp;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   worker_id: string;

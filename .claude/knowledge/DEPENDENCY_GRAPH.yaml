@@ -412,12 +412,12 @@ edges:
   - { id: edge-mobile-worker-attendance, source: mobile-worker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/attendance)" }
   - { id: edge-mobile-worker-analytics, source: mobile-worker, target: backend-analytics, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/analytics)" }
   - { id: edge-mobile-worker-hr, source: mobile-worker, target: backend-hr, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/hr)" }
-  - { id: edge-mobile-worker-notifications, source: mobile-worker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/notifications)" }
+  - { id: edge-mobile-worker-notifications, source: mobile-worker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts (notifications.list, notifications.markRead, notifications.registerPushToken -- POST /notifications/push-tokens, added Epic 7 PR 7.7); mobile/worker-app/src/lib/push-notifications.ts (registerForPushNotificationsAsync, called from app/(app)/_layout.tsx on every authenticated launch); mobile/worker-app/src/constants/app-config.ts (PUSH_APP='WORKER')" }
   # mobile-checker (Expo) via mobile/checker-app/src/lib/api.ts
   - { id: edge-mobile-checker-auth, source: mobile-checker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src/lib/api.ts:59 (/auth); mobile/checker-app/src (/auth)" }
   - { id: edge-mobile-checker-attendance, source: mobile-checker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/attendance)" }
   - { id: edge-mobile-checker-quality, source: mobile-checker, target: backend-quality, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/quality)" }
-  - { id: edge-mobile-checker-notifications, source: mobile-checker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src (/notifications)" }
+  - { id: edge-mobile-checker-notifications, source: mobile-checker, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/checker-app/src/lib/api.ts (notifications.list, notifications.markAsRead, notifications.registerPushToken -- POST /notifications/push-tokens, added Epic 7 PR 7.7); mobile/checker-app/src/lib/push-notifications.ts (registerForPushNotificationsAsync, called from app/(app)/_layout.tsx on every authenticated launch); mobile/checker-app/src/constants/app-config.ts (PUSH_APP='CHECKER')" }
 
   # --- Deployment (operations packages and deploys the runtime units) ---
   - { id: edge-operations-deploys-backend, source: operations, target: backend-auth, kind: deploys-to, compatibility: not-applicable, status: observed, evidence: "ecosystem.config.js; docker-compose.yml; docker-compose.prod.yml (backend service = all backend modules)" }
@@ -682,6 +682,12 @@ state_domains:
   # -- an APNs auth key is team-scoped, not app-scoped -- with the topic resolved
   # per delivery from PushToken.app. FCM/Android is unaffected: an FCM
   # registration token is self-identifying, so there is no equivalent header.
+  #
+  # Epic 7 PR 7.7: the registration endpoint gains its first real callers --
+  # mobile-worker and mobile-checker each call registerForPushNotificationsAsync()
+  # once per authenticated launch (see the edge-mobile-*-notifications evidence
+  # above), sending their own PUSH_APP constant as `app`. Until this PR the
+  # endpoint had zero client callers in the repository.
   - id: state-push-token
     model: PushToken
     lifecycle: observed
