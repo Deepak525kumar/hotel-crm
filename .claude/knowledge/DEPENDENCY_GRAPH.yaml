@@ -72,16 +72,21 @@ nodes:
   # deployment default 5s), delivers via transport handlers (EMAIL: real handler as of PR 7.4
   # -- SendGrid/Resend selected by EMAIL_SERVICE via a provider-client abstraction
   # (modules/notifications/email-provider.ts), falling back to the PR-7.2 no-op/log handler
-  # when unconfigured, resolveEmailTransportHandler(); PUSH still the PR-7.2 no-op/log handler,
-  # real handler lands PR 7.5; WEBHOOK/SMS reserved and unregistered so their rows are never
-  # claimed -- ADR-029 §4; handlers must be idempotent, event_id is the canonical provider-side
-  # idempotency key), runs the OutboxStatus lifecycle (claim PENDING/FAILED via FOR UPDATE SKIP
-  # LOCKED -> DELIVERED | FAILED-with-backoff | DEAD_LETTER, plus stale-PROCESSING reclaim for
+  # when unconfigured, resolveEmailTransportHandler(); PUSH: real handler as of PR 7.5 --
+  # APNs (HTTP/2 + ES256 JWT) and FCM (OAuth2 RS256 JWT exchange + HTTP v1), each configured
+  # independently via modules/notifications/push-provider.ts, falling back to the PR-7.2
+  # no-op/log handler only when neither platform is configured, resolvePushTransportHandler();
+  # WEBHOOK/SMS reserved and unregistered so their rows are never claimed -- ADR-029 §4;
+  # handlers must be idempotent, event_id is the canonical provider-side idempotency key),
+  # runs the OutboxStatus lifecycle (claim PENDING/FAILED via FOR UPDATE SKIP LOCKED ->
+  # DELIVERED | FAILED-with-backoff | DEAD_LETTER, plus stale-PROCESSING reclaim for
   # at-least-once), and hosts scheduled jobs via lib/scheduler.ts (mechanism only, no domain job
   # registered yet).
-  # lifecycle: observed as of Epic 7 PR 7.2 (2026-07-24) -- runtime, claim/lifecycle, backoff,
-  # dispatch interface, and scheduler mechanism landed in code (backend/src/worker.ts,
-  # modules/notifications/outbox-{worker,repository,transport,backoff}.ts, lib/scheduler.ts).
+  # lifecycle: observed as of Epic 7 PR 7.5 (2026-07-24) -- runtime, claim/lifecycle, backoff,
+  # dispatch interface, scheduler mechanism, and both real transport handlers (EMAIL, PUSH)
+  # landed in code (backend/src/worker.ts,
+  # modules/notifications/outbox-{worker,repository,transport,backoff}.ts,
+  # modules/notifications/{email,push}-provider.ts, lib/scheduler.ts).
   - { id: worker, kind: infrastructure, owner: unassigned, source: backend/src/worker.ts, name: "Platform Worker", lifecycle: observed }
 
   # Shared contracts (repository-derived; consumed cross-module)
@@ -124,6 +129,11 @@ nodes:
   # group-grain FK to state-hotel-group (ADR-023 §4); no per-hotel tie (ADR-025 D3).
   - { id: state-employment-record, kind: state-domain, owner: employee-management, source: "backend/prisma/schema.prisma (model EmploymentRecord)" }
   - { id: state-employee-blocklist, kind: state-domain, owner: employee-management, source: "backend/prisma/schema.prisma (model EmployeeBlocklistEntry)" }
+  # Epic 7 PR 7.5 (ADR-029 §4): registered device push tokens (APNs/FCM). Written by
+  # notification-service.registerPushToken (POST /notifications/push-tokens) and by the
+  # Platform Worker (PushTransportHandler deletes a token on provider-confirmed permanent
+  # invalidity); read by the Platform Worker's PUSH fan-out.
+  - { id: state-push-token, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma (model PushToken, added by Epic 7 PR 7.5)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -439,7 +449,7 @@ contracts:
     version: unversioned
     owner_module: backend-notifications
     source: backend/src/modules/notifications/service.ts
-    interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead; enqueue(EnqueueNotificationInput, tx?) -- added Epic 7 PR 7.1 (ADR-029): the sole write path for state-outbox, joins a caller-supplied DatabaseTransaction or opens its own"
+    interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead; enqueue(EnqueueNotificationInput, tx?) -- added Epic 7 PR 7.1 (ADR-029): the sole write path for state-outbox, joins a caller-supplied DatabaseTransaction or opens its own; registerPushToken(userId, token, platform) -- added Epic 7 PR 7.5 (ADR-029 §4): the sole write path for state-push-token, upsert keyed by token (POST /notifications/push-tokens)"
     payload_contract: "backend/src/modules/notifications/types.ts (NotificationPayload); backend/src/modules/notifications/outbox.types.ts (EnqueueNotificationInput, OutboxEnvelope, NotificationCreatedPayloadV1)"
     consumers:
       - backend-work-requests
@@ -640,6 +650,23 @@ state_domains:
     readers: [worker]
     evidence: "backend/prisma/schema.prisma (model OutboxEvent + 5 enums); backend/prisma/migrations/20260723210000_add_outbox_event/migration.sql; enqueue writer: backend/src/modules/notifications/service.ts (enqueue/enqueueWithin); worker reader/transition writer: backend/src/modules/notifications/outbox-repository.ts (claimBatch FOR UPDATE SKIP LOCKED, markDelivered, recordFailure) driven by outbox-worker.ts."
     note: "OutboxEvent {event_id (globally-unique, idempotency key), event_type, transport (OutboxTransport: EMAIL/PUSH/WEBHOOK/SMS), status (OutboxStatus: PENDING/PROCESSING/DELIVERED/FAILED/DEAD_LETTER), payload, payload_version (starts 1), attempts, next_attempt_at, last_error, processed_at, timestamps}. Owned exclusively by backend-notifications -- no other module writes state-outbox directly, every producer goes through notificationService.enqueue() (same single-writer discipline as state-notification, see that entry's note). backend-notifications enqueues in the producer transaction; the Worker claims rows via SELECT ... FOR UPDATE SKIP LOCKED (a PostgreSQL feature, not an external queue), transitions status, and retries with configurable exponential backoff (default 1m/5m/15m/1h). processed_at + attempts/retry-count support the minimum observability surface (queued/processing/delivered/failed/dead_letter counts, retry_count, delivery_latency = processed_at - created_at). Retention tier pending (SIR-NOTIF-002 / GD-09). Shaped (incl. payload_version) to also carry future domain events (GD-12)."
+  # state-push-token: registered device push tokens, added by Epic 7 PR 7.5 (ADR-029 §4).
+  # `token` (not user_id+token) carries the unique constraint -- a device token is
+  # device-specific, so re-registering it under a different user reassigns ownership
+  # (security-correctness: a stale token must stop delivering to a previous user the
+  # moment a new one registers it). Written by notification-service.registerPushToken
+  # (upsert keyed by token) and by the Platform Worker (PushTransportHandler deletes a
+  # row the moment its provider confirms the token permanently invalid -- APNs
+  # 410/BadDeviceToken, FCM UNREGISTERED); read by the Platform Worker's PUSH fan-out
+  # (all tokens for a Notification's recipient).
+  - id: state-push-token
+    model: PushToken
+    lifecycle: observed
+    authoritative_writer: backend-notifications
+    writers: [backend-notifications, worker]
+    readers: [worker]
+    evidence: "backend/prisma/schema.prisma (model PushToken + PushPlatform enum); backend/prisma/migrations/20260724120000_add_push_token/migration.sql; registration writer: backend/src/modules/notifications/service.ts (registerPushToken); worker reader/delete writer: backend/src/modules/notifications/outbox-transport.ts (PushTransportHandler.deliver)."
+    note: "Delivery semantics: an OutboxEvent (state-outbox, transport PUSH) is DELIVERED as soon as at least one of a recipient's registered devices accepts the notification; per-device delivery tracking is out of scope. A token confirmed permanently invalid is deleted best-effort and does not by itself cause a retry -- only an all-devices transient failure does."
   - id: state-audit-log
     model: AuditLog
     authoritative_writer: backend-auth

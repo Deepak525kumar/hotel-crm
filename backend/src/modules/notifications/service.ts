@@ -1,4 +1,13 @@
-import { Notification, NotificationType, OutboxAggregateType, OutboxEvent, OutboxEventType, Prisma } from '@prisma/client';
+import {
+  Notification,
+  NotificationType,
+  OutboxAggregateType,
+  OutboxEvent,
+  OutboxEventType,
+  Prisma,
+  PushPlatform,
+  PushToken,
+} from '@prisma/client';
 import crypto from 'node:crypto';
 import { BaseService } from '../../lib/base-service.js';
 import { DatabaseTransaction } from '../../lib/db.js';
@@ -107,6 +116,23 @@ export class NotificationService extends BaseService {
     return this.prisma.notification.update({
       where: { id: notificationId },
       data: { is_read: true, read_at: new Date() },
+    });
+  }
+
+  /**
+   * Registers (or re-registers) a device push token. Epic 7 PR 7.5,
+   * ADR-029 §4: `token` carries the unique constraint, not `user_id`+`token`
+   * — a device token is device-specific, so re-registering it under a
+   * different user (e.g. a shared device, or a re-login after logout)
+   * reassigns ownership rather than creating a second row. This is a
+   * security-correctness requirement: a stale token must stop delivering to
+   * a previous user the moment a new one registers it.
+   */
+  async registerPushToken(userId: string, token: string, platform: PushPlatform): Promise<PushToken> {
+    return this.prisma.pushToken.upsert({
+      where: { token },
+      update: { user_id: userId, platform },
+      create: { token, platform, user_id: userId },
     });
   }
 

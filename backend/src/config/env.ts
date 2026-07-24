@@ -54,11 +54,20 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM_ADDRESS: z.string().email().optional(),
 
-  // Notifications
+  // Notifications: APNs (ES256 JWT provider auth) + FCM (Epic 7 PR 7.5,
+  // ADR-029 §4). Same secret-storage/least-privilege posture as the email
+  // config above (MIG-GAP-11 carryover): plain env vars, never logged, keys
+  // scoped to push-send only at the provider.
   APNS_KEY_ID: z.string().optional(),
   APNS_TEAM_ID: z.string().optional(),
   APNS_BUNDLE_ID: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional(),
+  // Base64-encoded Firebase service-account JSON key. Required for FCM HTTP
+  // v1 (the only current, non-deprecated FCM API): sends use a short-lived
+  // OAuth2 access token obtained by exchanging a self-signed JWT for this
+  // service account, not a static server key. FIREBASE_PROJECT_ID alone is
+  // insufficient for v1 auth.
+  FIREBASE_SERVICE_ACCOUNT_KEY_BASE64: z.string().optional(),
 
   // Sentry (error tracking)
   SENTRY_DSN: z.string().optional(),

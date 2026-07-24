@@ -1,10 +1,11 @@
-import { OutboxAggregateType, OutboxEvent, OutboxTransport, PrismaClient } from '@prisma/client';
+import { OutboxAggregateType, OutboxEvent, OutboxTransport, PrismaClient, PushPlatform } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
 import {
   EmailProviderClient,
   ResendProviderClient,
   SendgridProviderClient,
 } from './email-provider.js';
+import { ApnsProviderClient, FcmProviderClient, InvalidTokenError, PushProviderClient } from './push-provider.js';
 
 /**
  * A transport handler delivers one claimed OutboxEvent over a specific medium
@@ -164,4 +165,178 @@ export function resolveEmailTransportHandler(
     { email_service: emailService ?? null }
   );
   return new LoggingNoopTransportHandler(OutboxTransport.EMAIL);
+}
+
+/**
+ * PUSH transport handler (Epic 7 PR 7.5, ADR-029 §4). Resolves the
+ * notification the same way EmailTransportHandler does (via
+ * `event.aggregate_id`), then fans out to every `PushToken` registered for
+ * that notification's recipient — a user may have multiple devices.
+ *
+ * Delivery semantics (explicit product decision, not a default): an
+ * OutboxEvent is considered DELIVERED as soon as at least one registered
+ * device accepts the notification. Per-device delivery tracking is out of
+ * scope for this PR — the worker has no per-recipient-fan-out concept, only
+ * per-event success/failure, so a partial failure across a user's devices is
+ * not reported anywhere beyond a log line. If every device fails with a
+ * transient error (network/provider outage — not a permanently invalid
+ * token), the event is retried via the normal outbox backoff, which resends
+ * to all of that user's devices again.
+ *
+ * A token confirmed permanently invalid by the provider (APNs
+ * 410/BadDeviceToken, FCM UNREGISTERED — surfaced as InvalidTokenError) is
+ * deleted immediately, best-effort: the delete itself is not allowed to fail
+ * this delivery attempt. An invalidated token is not a delivery failure —
+ * there is nothing left to retry for that device — so it never by itself
+ * causes the event to be retried.
+ */
+export class PushTransportHandler implements TransportHandler {
+  readonly transport = OutboxTransport.PUSH;
+
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly apnsClient?: PushProviderClient,
+    private readonly fcmClient?: PushProviderClient
+  ) {}
+
+  private clientFor(platform: PushPlatform): PushProviderClient | undefined {
+    return platform === PushPlatform.IOS ? this.apnsClient : this.fcmClient;
+  }
+
+  async deliver(event: OutboxEvent): Promise<void> {
+    if (event.aggregate_type !== OutboxAggregateType.NOTIFICATION) {
+      logger.warn('PushTransportHandler: unsupported aggregate_type, skipping', {
+        event_id: event.event_id,
+        aggregate_type: event.aggregate_type,
+      });
+      return;
+    }
+
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: event.aggregate_id },
+    });
+
+    if (!notification) {
+      logger.info('PushTransportHandler: referenced Notification no longer exists, skipping', {
+        event_id: event.event_id,
+        aggregate_id: event.aggregate_id,
+      });
+      return;
+    }
+
+    const tokens = await this.prisma.pushToken.findMany({ where: { user_id: notification.user_id } });
+
+    if (tokens.length === 0) {
+      logger.info('PushTransportHandler: recipient has no registered devices, skipping', {
+        event_id: event.event_id,
+        aggregate_id: event.aggregate_id,
+      });
+      return;
+    }
+
+    let successCount = 0;
+    let transientFailure = false;
+
+    for (const pushToken of tokens) {
+      const client = this.clientFor(pushToken.platform);
+      if (!client) {
+        logger.warn('PushTransportHandler: no provider configured for platform, skipping device', {
+          event_id: event.event_id,
+          platform: pushToken.platform,
+        });
+        continue;
+      }
+
+      try {
+        await client.send({ token: pushToken.token, title: notification.title, body: notification.message });
+        successCount += 1;
+      } catch (error) {
+        if (error instanceof InvalidTokenError) {
+          logger.info('PushTransportHandler: device token permanently invalid, deleting', {
+            event_id: event.event_id,
+            push_token_id: pushToken.id,
+            platform: pushToken.platform,
+          });
+          try {
+            await this.prisma.pushToken.delete({ where: { id: pushToken.id } });
+          } catch (deleteError) {
+            // Best-effort: a delete failure (e.g. already removed by a concurrent
+            // request) must not fail this delivery attempt.
+            logger.warn('PushTransportHandler: failed to delete invalid push token', {
+              push_token_id: pushToken.id,
+              error: deleteError instanceof Error ? deleteError.message : String(deleteError),
+            });
+          }
+          continue;
+        }
+
+        transientFailure = true;
+        logger.warn('PushTransportHandler: send failed for device', {
+          event_id: event.event_id,
+          push_token_id: pushToken.id,
+          platform: pushToken.platform,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    if (successCount > 0) return;
+
+    if (transientFailure) {
+      throw new Error('PushTransportHandler: delivery failed on every registered device');
+    }
+
+    // No successes, but nothing transient either (all devices were invalid and
+    // have been removed, or none had a configured provider) — nothing to retry.
+  }
+}
+
+/**
+ * Selects the PUSH handler worker.ts registers. Each platform is configured
+ * independently (a deployment may have APNs but not FCM, or vice versa) —
+ * unlike EMAIL's single-provider selection, this is not all-or-nothing:
+ * PushTransportHandler is returned whenever at least one platform is fully
+ * configured, and simply skips (with a log line) any token whose platform
+ * has no client. Falls back to the no-op handler only when neither platform
+ * is configured at all, so an unconfigured environment behaves exactly as it
+ * did before this PR.
+ */
+export function resolvePushTransportHandler(
+  prisma: PrismaClient,
+  config: {
+    apnsPrivateKeyBase64?: string;
+    apnsKeyId?: string;
+    apnsTeamId?: string;
+    apnsBundleId?: string;
+    firebaseProjectId?: string;
+    firebaseServiceAccountKeyBase64?: string;
+  }
+): TransportHandler {
+  const { apnsPrivateKeyBase64, apnsKeyId, apnsTeamId, apnsBundleId, firebaseProjectId, firebaseServiceAccountKeyBase64 } =
+    config;
+
+  const apnsClient =
+    apnsPrivateKeyBase64 && apnsKeyId && apnsTeamId && apnsBundleId
+      ? new ApnsProviderClient(apnsPrivateKeyBase64, apnsKeyId, apnsTeamId, apnsBundleId)
+      : undefined;
+  const fcmClient =
+    firebaseServiceAccountKeyBase64 && firebaseProjectId
+      ? new FcmProviderClient(firebaseServiceAccountKeyBase64, firebaseProjectId)
+      : undefined;
+
+  if (!apnsClient && !fcmClient) {
+    logger.warn(
+      'PUSH transport not configured (APNs: APNS_PRIVATE_KEY_BASE64/APNS_KEY_ID/APNS_TEAM_ID/APNS_BUNDLE_ID; FCM: FIREBASE_SERVICE_ACCOUNT_KEY_BASE64/FIREBASE_PROJECT_ID) — falling back to the no-op handler'
+    );
+    return new LoggingNoopTransportHandler(OutboxTransport.PUSH);
+  }
+
+  if (!apnsClient) {
+    logger.warn('PUSH transport: APNs not configured — iOS devices will be skipped, not delivered');
+  }
+  if (!fcmClient) {
+    logger.warn('PUSH transport: FCM not configured — Android devices will be skipped, not delivered');
+  }
+
+  return new PushTransportHandler(prisma, apnsClient, fcmClient);
 }

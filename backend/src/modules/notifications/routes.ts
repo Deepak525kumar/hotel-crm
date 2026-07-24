@@ -9,5 +9,6 @@ router.get('/', (req, res, next) => notificationController.getNotifications(req,
 router.post('/:notification_id/read', (req, res, next) =>
   notificationController.markAsRead(req, res, next)
 );
+router.post('/push-tokens', (req, res, next) => notificationController.registerPushToken(req, res, next));
 
 export default router;
