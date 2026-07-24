@@ -1,4 +1,4 @@
-import { Prisma, Attendance, AttendanceStatus } from '@prisma/client';
+import { Attendance, AttendanceStatus, OutboxSourceModule, OutboxTransport, Prisma } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
@@ -206,37 +206,58 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    const updated = await this.prisma.attendance.update({ where: { id }, data });
+    // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the attendance write
+    // and its (manager-only) notification enqueue.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.attendance.update({ where: { id }, data });
+
+      if (!isWorker) {
+        if (input.is_verified === true) {
+          await notificationService.enqueue(
+            {
+              recipientId: record.worker_id,
+              type: 'ATTENDANCE_VERIFIED',
+              title: 'Attendance Verified',
+              message: 'Your attendance has been verified by a manager.',
+              data: { attendance_id: id, assignment_id: record.assignment_id },
+              hotelId: record.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.ATTENDANCE,
+              producerService: 'AttendanceService',
+            },
+            tx
+          );
+        } else if (input.status === 'ABSENT') {
+          // WORKER_NO_SHOW is manager-facing per schema intent — notify the assignment manager
+          const assignment = await tx.workerAssignment.findUnique({
+            where: { id: record.assignment_id },
+            select: { assigned_by_id: true },
+          });
+          if (assignment) {
+            await notificationService.enqueue(
+              {
+                recipientId: assignment.assigned_by_id,
+                type: 'WORKER_NO_SHOW',
+                title: 'Worker No-Show',
+                message: 'A worker did not attend their assigned shift.',
+                data: { attendance_id: id, assignment_id: record.assignment_id, worker_id: record.worker_id },
+                hotelId: record.hotel_id,
+                transports: [OutboxTransport.PUSH],
+                sourceModule: OutboxSourceModule.ATTENDANCE,
+                producerService: 'AttendanceService',
+              },
+              tx
+            );
+          }
+        }
+      }
+
+      return u;
+    });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ATTENDANCE', 'ATTENDANCE', id, {
       worker_id: record.worker_id,
     });
-
-    if (!isWorker) {
-      if (input.is_verified === true) {
-        void notificationService.sendNotification(record.worker_id, {
-          type: 'ATTENDANCE_VERIFIED',
-          title: 'Attendance Verified',
-          message: 'Your attendance has been verified by a manager.',
-          data: { attendance_id: id, assignment_id: record.assignment_id },
-        }).catch(() => {});
-      } else if (input.status === 'ABSENT') {
-        // WORKER_NO_SHOW is manager-facing per schema intent — notify the assignment manager
-        this.prisma.workerAssignment.findUnique({
-          where: { id: record.assignment_id },
-          select: { assigned_by_id: true },
-        }).then((assignment) => {
-          if (assignment) {
-            void notificationService.sendNotification(assignment.assigned_by_id, {
-              type: 'WORKER_NO_SHOW',
-              title: 'Worker No-Show',
-              message: 'A worker did not attend their assigned shift.',
-              data: { attendance_id: id, assignment_id: record.assignment_id, worker_id: record.worker_id },
-            }).catch(() => {});
-          }
-        }).catch(() => {});
-      }
-    }
 
     return this.toDto(updated);
   }

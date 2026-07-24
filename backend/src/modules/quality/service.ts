@@ -1,4 +1,11 @@
-import { AssignmentStatus, AttendanceStatus, Prisma, VerificationStatus } from '@prisma/client';
+import {
+  AssignmentStatus,
+  AttendanceStatus,
+  OutboxSourceModule,
+  OutboxTransport,
+  Prisma,
+  VerificationStatus,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
@@ -47,31 +54,59 @@ export class QualityService extends BaseService {
         ? VerificationStatus.NEEDS_REWORK
         : VerificationStatus.FAILED;
 
-    let verification;
-    try {
-      verification = await this.prisma.qualityVerification.create({
-        data: {
-          assignment_id,
-          hotel_id: assignment.hotel_id,
-          verified_by_id: actor.userId,
-          score: numScore,
-          status: derivedStatus,
-          notes: notes ?? null,
-        },
-      });
-    } catch (err) {
-      // assignment_id is unique. Concurrent duplicate requests can pass the
-      // findUnique pre-check above and both reach create(), causing a P2002
-      // unique-constraint violation. Translate it to the same 409 the
-      // pre-check returns so concurrent duplicates never surface as a 500.
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
-        throw new ConflictError('Verification already exists for this assignment');
+    const isPassed = derivedStatus === 'PASSED';
+    const isNeedsRework = derivedStatus === 'NEEDS_REWORK';
+
+    // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the verification
+    // write and its notification enqueue.
+    const verification = await this.prisma.$transaction(async (tx) => {
+      let created;
+      try {
+        created = await tx.qualityVerification.create({
+          data: {
+            assignment_id,
+            hotel_id: assignment.hotel_id,
+            verified_by_id: actor.userId,
+            score: numScore,
+            status: derivedStatus,
+            notes: notes ?? null,
+          },
+        });
+      } catch (err) {
+        // assignment_id is unique. Concurrent duplicate requests can pass the
+        // findUnique pre-check above and both reach create(), causing a P2002
+        // unique-constraint violation. Translate it to the same 409 the
+        // pre-check returns so concurrent duplicates never surface as a 500.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new ConflictError('Verification already exists for this assignment');
+        }
+        throw err;
       }
-      throw err;
-    }
+
+      await notificationService.enqueue(
+        {
+          recipientId: assignment.worker_id,
+          type: isPassed ? 'QUALITY_VERIFICATION_SUBMITTED' : isNeedsRework ? 'REWORK_REQUIRED' : 'QUALITY_VERIFICATION_SUBMITTED',
+          title: isPassed ? 'Quality Check Passed' : isNeedsRework ? 'Rework Required' : 'Quality Check Failed',
+          message: isPassed
+            ? `Your work quality has been verified with a score of ${numScore}.`
+            : isNeedsRework
+            ? `Your work requires rework. Score: ${numScore}.`
+            : `Your work did not meet quality standards. Score: ${numScore}.`,
+          data: { verification_id: created.id, assignment_id, score: numScore, status: derivedStatus },
+          hotelId: assignment.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        },
+        tx
+      );
+
+      return created;
+    });
 
     await this.logAudit(
       actor.userId,
@@ -81,20 +116,6 @@ export class QualityService extends BaseService {
       verification.id,
       { assignment_id }
     );
-
-    const isPassed = derivedStatus === 'PASSED';
-    const isNeedsRework = derivedStatus === 'NEEDS_REWORK';
-
-    void notificationService.sendNotification(assignment.worker_id, {
-      type: isPassed ? 'QUALITY_VERIFICATION_SUBMITTED' : isNeedsRework ? 'REWORK_REQUIRED' : 'QUALITY_VERIFICATION_SUBMITTED',
-      title: isPassed ? 'Quality Check Passed' : isNeedsRework ? 'Rework Required' : 'Quality Check Failed',
-      message: isPassed
-        ? `Your work quality has been verified with a score of ${numScore}.`
-        : isNeedsRework
-        ? `Your work requires rework. Score: ${numScore}.`
-        : `Your work did not meet quality standards. Score: ${numScore}.`,
-      data: { verification_id: verification.id, assignment_id, score: numScore, status: derivedStatus },
-    }).catch(() => {});
 
     return verification;
   }
@@ -199,6 +220,23 @@ export class QualityService extends BaseService {
         update: aggregateData,
       });
 
+      // ADR-029 (GD-01, Epic 7 PR 7.3): joins the same transaction as the
+      // rating write and aggregate refresh — single commit.
+      await notificationService.enqueue(
+        {
+          recipientId: worker_id,
+          type: 'RATING_RECEIVED',
+          title: 'You Received a Rating',
+          message: `You received a rating of ${score} out of 100.`,
+          data: { rating_id: created.id, assignment_id, score },
+          hotelId: assignment.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        },
+        tx
+      );
+
       return created;
     });
 
@@ -207,17 +245,6 @@ export class QualityService extends BaseService {
       worker_id,
       score,
     });
-
-    // Emit only after the rating transaction has committed. Fire-and-forget,
-    // mirroring the pattern used by createVerification above.
-    void notificationService
-      .sendNotification(worker_id, {
-        type: 'RATING_RECEIVED',
-        title: 'You Received a Rating',
-        message: `You received a rating of ${score} out of 100.`,
-        data: { rating_id: rating.id, assignment_id, score },
-      })
-      .catch(() => {});
 
     return rating;
   }
