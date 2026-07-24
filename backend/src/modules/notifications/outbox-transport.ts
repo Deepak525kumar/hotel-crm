@@ -7,7 +7,27 @@ import {
 } from './email-provider.js';
 import { ApnsProviderClient, FcmProviderClient, InvalidTokenError, PushProviderClient } from './push-provider.js';
 
-/** Compile-time exhaustiveness check: a call site only type-checks if `value` is narrowed to `never`. */
+/**
+ * Compile-time exhaustiveness check: a call site only type-checks if `value`
+ * is narrowed to `never`. Reachable only if the generated Prisma enum drifts
+ * from this switch, which today requires a code change to even become
+ * possible (assertNever's `never` parameter type and the exhaustive switch
+ * that calls it are compiled from the same PushApp enum) — practically
+ * unreachable at runtime, not merely improbable.
+ *
+ * This throws a plain Error, so PushTransportHandler's existing catch treats
+ * it as a transient failure and lets it ride the normal backoff/retry
+ * schedule to DEAD_LETTER. That is imprecise: an unrecognized PushApp value
+ * is a deploy-time code/data mismatch, not a transient provider hiccup, and
+ * will fail identically on every retry until new code ships — the retry
+ * budget buys nothing here. A future, more precise treatment would be a
+ * dedicated internal-invariant error class that PushTransportHandler
+ * recognizes and dead-letters (or fails fast on) immediately, bypassing the
+ * backoff schedule entirely. Not done here: it would need a policy decision
+ * on how the worker treats "invariant violation" as a category distinct from
+ * "delivery failure" across every transport, not just this one call site —
+ * out of scope for this PR.
+ */
 function assertNever(value: never): never {
   throw new Error(`Unhandled PushApp case: ${String(value)}`);
 }
