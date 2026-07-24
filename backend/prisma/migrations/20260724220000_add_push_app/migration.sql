@@ -12,11 +12,14 @@
 --
 -- Additive: new enum type + new column on PushToken. No existing column,
 -- constraint, or index is altered or dropped. The column is NOT NULL with no
--- default, which is safe here because PushToken carries zero rows in every
--- environment (introduced by PR 7.5; its registration endpoint has no client
--- yet -- mobile registration is PR 7.7, still unbuilt). A NOT NULL column
--- avoids an impossible null state that every future delivery path would
--- otherwise have to handle.
+-- default -- safe AT THE TIME THIS MIGRATION WAS INTRODUCED (2026-07-24)
+-- because PushToken contained zero rows in every deployed environment: its
+-- registration endpoint (PR 7.5) had no caller yet, mobile registration
+-- (PR 7.7) had not shipped. This is a point-in-time fact about the deploy
+-- history at authoring time, not a standing guarantee -- do not assume it
+-- still holds when reading this file later. A NOT NULL column avoids an
+-- impossible null state that every future delivery path would otherwise
+-- have to handle.
 
 -- CreateEnum
 CREATE TYPE "PushApp" AS ENUM ('WORKER', 'CHECKER');

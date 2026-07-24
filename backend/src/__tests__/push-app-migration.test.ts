@@ -1,6 +1,7 @@
 import { describe, it, expect } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { PushApp } from '@prisma/client';
 
 // Epic 7 PR 7.8: multi-app APNs topic support. Migration-shape coverage
 // without requiring a live DB, mirroring push-token-migration.test.ts. Live
@@ -20,6 +21,18 @@ describe('PushApp migration (Epic 7 PR 7.8)', () => {
     expect(sql).not.toMatch(/ALTER TABLE "Notification"/);
     expect(sql).not.toMatch(/DROP TABLE/i);
     expect(sql).not.toMatch(/DROP COLUMN/i);
+  });
+
+  // Invariant, not a migration-shape check: pins PushApp to exactly the two
+  // known applications. PushTransportHandler.topicFor() switches on PushApp
+  // exhaustively (a `default: assertNever(...)` branch), so adding a member
+  // here (e.g. a future kiosk build) without also wiring its APNs topic and
+  // env var is a TypeScript compile error at that switch -- this test exists
+  // so the same fact is caught immediately by `npm test` too, not only by a
+  // full `tsc` pass, and so a reviewer sees a failing assertion that names
+  // exactly what changed rather than a generic type error.
+  it('PushApp has exactly the two known applications, in this order', () => {
+    expect(Object.values(PushApp)).toEqual(['WORKER', 'CHECKER']);
   });
 
   it('the new column is NOT NULL with no default (safe only because PushToken is empty in every environment)', () => {

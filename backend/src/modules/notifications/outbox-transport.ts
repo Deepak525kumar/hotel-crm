@@ -7,6 +7,11 @@ import {
 } from './email-provider.js';
 import { ApnsProviderClient, FcmProviderClient, InvalidTokenError, PushProviderClient } from './push-provider.js';
 
+/** Compile-time exhaustiveness check: a call site only type-checks if `value` is narrowed to `never`. */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled PushApp case: ${String(value)}`);
+}
+
 /**
  * A transport handler delivers one claimed OutboxEvent over a specific medium
  * (EMAIL, PUSH, ...). ADR-029 §7: handlers MUST be idempotent — the worker
@@ -213,9 +218,26 @@ export class PushTransportHandler implements TransportHandler {
    * The `apns-topic` for a token, or undefined when this deployment has no
    * bundle ID configured for that app. Android needs no topic at all — an FCM
    * registration token is self-identifying.
+   *
+   * Exhaustive `switch` rather than a bare `apnsTopics[pushToken.app]` lookup:
+   * a map read silently returns undefined for an app that was never
+   * anticipated, so a future third app (e.g. a kiosk build) would be routed
+   * through the same "no topic configured, skip" path as a merely
+   * unconfigured deployment — indistinguishable from a real config gap. The
+   * `default: assertNever(...)` branch makes that a compile error instead:
+   * adding a PushApp member without wiring it here fails the build.
    */
   private topicFor(pushToken: { platform: PushPlatform; app: PushApp }): string | undefined {
-    return pushToken.platform === PushPlatform.IOS ? this.apnsTopics[pushToken.app] : undefined;
+    if (pushToken.platform !== PushPlatform.IOS) return undefined;
+
+    switch (pushToken.app) {
+      case PushApp.WORKER:
+        return this.apnsTopics[PushApp.WORKER];
+      case PushApp.CHECKER:
+        return this.apnsTopics[PushApp.CHECKER];
+      default:
+        return assertNever(pushToken.app);
+    }
   }
 
   async deliver(event: OutboxEvent): Promise<void> {
@@ -257,6 +279,8 @@ export class PushTransportHandler implements TransportHandler {
       if (!client) {
         logger.warn('PushTransportHandler: no provider configured for platform, skipping device', {
           event_id: event.event_id,
+          push_token_id: pushToken.id,
+          user_id: notification.user_id,
           platform: pushToken.platform,
         });
         continue;
@@ -271,6 +295,8 @@ export class PushTransportHandler implements TransportHandler {
         // dead-letter an otherwise healthy event.
         logger.warn('PushTransportHandler: no APNs topic configured for app, skipping device', {
           event_id: event.event_id,
+          push_token_id: pushToken.id,
+          user_id: notification.user_id,
           app: pushToken.app,
         });
         continue;
@@ -386,6 +412,13 @@ export function resolvePushTransportHandler(
   if (!apnsClient) {
     logger.warn('PUSH transport: APNs not configured — iOS devices will be skipped, not delivered');
   } else {
+    // One line summarizing per-app configuration at startup, so a deployment
+    // gap (e.g. forgetting APNS_BUNDLE_ID_CHECKER) is visible in the boot log
+    // rather than only discoverable from a later per-delivery warning.
+    logger.info('PUSH transport: APNs configured for', {
+      worker: apnsTopics[PushApp.WORKER] ? 'configured' : 'MISSING (APNS_BUNDLE_ID_WORKER unset)',
+      checker: apnsTopics[PushApp.CHECKER] ? 'configured' : 'MISSING (APNS_BUNDLE_ID_CHECKER unset)',
+    });
     if (!apnsTopics[PushApp.WORKER]) {
       logger.warn('PUSH transport: APNS_BUNDLE_ID_WORKER unset — worker-app iOS devices will be skipped');
     }

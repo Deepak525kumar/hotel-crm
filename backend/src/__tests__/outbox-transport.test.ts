@@ -347,6 +347,23 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
     expect(mockApnsClient.send).not.toHaveBeenCalled();
   });
+
+  // Epic 7 PR 7.8: topicFor() switches on PushApp exhaustively rather than
+  // doing a bare map lookup, specifically so an app value TypeScript didn't
+  // anticipate is a hard failure, not a silent skip indistinguishable from
+  // "deployment just isn't configured for this app yet". `as any` bypasses
+  // the compile-time guard the switch normally provides, to prove the runtime
+  // fallback (assertNever) actually throws rather than only being a type-level
+  // promise.
+  it('throws (does not silently skip) an iOS token whose app is not a recognized PushApp value', async () => {
+    mockPushTokenFindMany.mockResolvedValue([
+      { id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'KIOSK', user_id: 'user1' },
+    ]);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+    await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).rejects.toThrow(/Unhandled PushApp/);
+    expect(mockApnsClient.send).not.toHaveBeenCalled();
+  });
 });
 
 describe('resolvePushTransportHandler (Epic 7 PR 7.5)', () => {
