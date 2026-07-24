@@ -39,6 +39,7 @@ jest.mock('../lib/logger.js', () => ({
 jest.mock('../modules/notifications/service.js', () => ({
   notificationService: {
     sendNotification: async () => undefined,
+    enqueue: async () => ({ notification: { id: 'notif-stub' }, outboxEvents: [] }),
   },
 }));
 
@@ -54,6 +55,11 @@ const txStub = {
   },
   attendance: { count: async () => 1 },
   workerOverallRating: { upsert: async () => undefined },
+  // ADR-029 (GD-01, Epic 7 PR 7.3): createVerification() now wraps its write
+  // + notification enqueue in $transaction too.
+  qualityVerification: {
+    create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
+  },
 };
 
 jest.mock('../lib/db.js', () => ({

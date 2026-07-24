@@ -27,6 +27,9 @@ const mockRating = {
 const mockNotification = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
 const mockWorkerOverallRating = {
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -44,9 +47,18 @@ const mockPrisma = {
   workerOverallRating: mockWorkerOverallRating,
   hotel: mockHotel,
   notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
+
+// Default resolved values so NotificationService.enqueue() (called inside every
+// $transaction above, ADR-029 GD-01 Epic 7 PR 7.3) has something to read
+// `.id` off of; jest.clearAllMocks() in nested describes' beforeEach clears
+// call history but not these implementations, so this default holds unless a
+// specific test overrides it.
+mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 
@@ -255,6 +267,61 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
   });
 });
 
+describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Epic 7 PR 7.3)', () => {
+  let service: QualityService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new QualityService();
+    mockWorkerAssignment.findUnique.mockResolvedValue({
+      id: 'a1',
+      hotel_id: 'h1',
+      worker_id: 'w1',
+    });
+    mockQualityVerification.findUnique.mockResolvedValue(null);
+    mockNotification.create.mockResolvedValue({ id: 'n1' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'o1' });
+  });
+
+  it('joins the verification write and QUALITY_VERIFICATION_SUBMITTED enqueue in one transaction (PASSED)', async () => {
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv1', status: 'PASSED' });
+
+    await service.createVerification(
+      { assignment_id: 'a1', score: 80 } as any,
+      { userId: 'u1', role: 'manager' }
+    );
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('QUALITY');
+    const notifData = mockNotification.create.mock.calls[0][0].data;
+    expect(notifData.type).toBe('QUALITY_VERIFICATION_SUBMITTED');
+    expect(notifData.user_id).toBe('w1');
+  });
+
+  it('emits REWORK_REQUIRED when the score lands in the needs-rework band', async () => {
+    mockQualityVerification.create.mockResolvedValue({ id: 'qv2', status: 'NEEDS_REWORK' });
+
+    await service.createVerification(
+      { assignment_id: 'a1', score: 50 } as any,
+      { userId: 'u1', role: 'manager' }
+    );
+
+    const notifData = mockNotification.create.mock.calls[0][0].data;
+    expect(notifData.type).toBe('REWORK_REQUIRED');
+  });
+
+  it('does not enqueue when create() fails (transaction rolls back)', async () => {
+    mockQualityVerification.create.mockRejectedValue(new Error('db down'));
+
+    await expect(
+      service.createVerification({ assignment_id: 'a1', score: 80 } as any, { userId: 'u1', role: 'manager' })
+    ).rejects.toThrow('db down');
+
+    expect(mockOutboxEvent.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('Quality Zod validation — createRating (P2-03)', () => {
   let controller: QualityController;
 
@@ -390,13 +457,17 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
       { userId: 'u1', role: 'manager' }
     );
 
-    // allow the fire-and-forget notification microtask to settle
-    await new Promise((r) => setImmediate(r));
-
     expect(mockNotification.create).toHaveBeenCalledTimes(1);
     const payload = mockNotification.create.mock.calls[0][0].data;
     expect(payload.user_id).toBe('w1');
     expect(payload.type).toBe('RATING_RECEIVED');
+
+    // ADR-029 (GD-01, Epic 7 PR 7.3): the enqueue joins the same
+    // transaction as the rating write and aggregate refresh — no more
+    // fire-and-forget microtask to wait on.
+    expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+    expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('QUALITY');
+    expect(mockOutboxEvent.create.mock.calls[0][0].data.transport).toBe('PUSH');
   });
 });
 

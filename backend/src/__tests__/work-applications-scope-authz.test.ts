@@ -93,6 +93,7 @@ jest.mock('../lib/logger.js', () => ({
 jest.mock('../modules/notifications/service.js', () => ({
   notificationService: {
     sendNotification: async () => undefined,
+    enqueue: async () => ({ notification: { id: 'notif-stub' }, outboxEvents: [] }),
   },
 }));
 
