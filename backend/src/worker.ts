@@ -8,6 +8,7 @@ import { OutboxRepository } from './modules/notifications/outbox-repository.js';
 import { OutboxWorker } from './modules/notifications/outbox-worker.js';
 import {
   LoggingNoopTransportHandler,
+  resolveEmailTransportHandler,
   TransportRegistry,
 } from './modules/notifications/outbox-transport.js';
 
@@ -17,9 +18,11 @@ import {
  * (server.ts), deployed as a separate OS process (see ecosystem.config.js). It
  * drains the transactional outbox and hosts scheduled jobs; it never serves HTTP.
  *
- * PR 7.2 wiring: EMAIL and PUSH are registered with the no-op/log handler (real
- * handlers land in PR 7.4/7.5); WEBHOOK and SMS are intentionally left
- * unregistered (reserved, ADR-029 §4) so their rows are never claimed. No
+ * PR 7.4 wiring: EMAIL registers a real handler (SendGrid/Resend, selected by
+ * EMAIL_SERVICE) once configured, falling back to the PR-7.2 no-op/log handler
+ * otherwise (resolveEmailTransportHandler). PUSH still registers the no-op
+ * handler (real handler lands in PR 7.5). WEBHOOK and SMS are intentionally
+ * left unregistered (reserved, ADR-029 §4) so their rows are never claimed. No
  * scheduled job is registered yet.
  */
 async function main() {
@@ -28,13 +31,21 @@ async function main() {
     const env = getEnv();
 
     await connectDb();
+    const prisma = getPrisma();
 
     const transports = new TransportRegistry()
-      .register(new LoggingNoopTransportHandler(OutboxTransport.EMAIL))
+      .register(
+        resolveEmailTransportHandler(prisma, {
+          emailService: env.EMAIL_SERVICE,
+          sendgridApiKey: env.SENDGRID_API_KEY,
+          resendApiKey: env.RESEND_API_KEY,
+          fromAddress: env.EMAIL_FROM_ADDRESS,
+        })
+      )
       .register(new LoggingNoopTransportHandler(OutboxTransport.PUSH));
 
     const worker = new OutboxWorker(
-      new OutboxRepository(getPrisma()),
+      new OutboxRepository(prisma),
       transports,
       new Scheduler(),
       {

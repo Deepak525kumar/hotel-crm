@@ -1,5 +1,10 @@
-import { OutboxEvent, OutboxTransport } from '@prisma/client';
+import { OutboxAggregateType, OutboxEvent, OutboxTransport, PrismaClient } from '@prisma/client';
 import { logger } from '../../lib/logger.js';
+import {
+  EmailProviderClient,
+  ResendProviderClient,
+  SendgridProviderClient,
+} from './email-provider.js';
 
 /**
  * A transport handler delivers one claimed OutboxEvent over a specific medium
@@ -42,12 +47,14 @@ export class TransportRegistry {
 
 /**
  * PR 7.2 placeholder handler: logs the intended delivery and returns success,
- * without contacting any provider. It stands in for the real EMAIL/PUSH handlers
- * that land in PR 7.4/7.5, letting the full claim → dispatch → DELIVERED
- * lifecycle be exercised now. It is idempotent by construction (it does nothing
- * external). Logged at WARN so its placeholder nature is unmistakable — a row it
- * "delivers" is marked DELIVERED without anything actually being sent, which is
- * only acceptable until a real handler replaces it for that transport.
+ * without contacting any provider. Originally stood in for both EMAIL and
+ * PUSH; EMAIL now has a real handler (EmailTransportHandler, PR 7.4) — this
+ * remains PUSH's handler (PR 7.5) and the fallback worker.ts registers for
+ * EMAIL when no provider is configured. It is idempotent by construction (it
+ * does nothing external). Logged at WARN so its placeholder nature is
+ * unmistakable — a row it "delivers" is marked DELIVERED without anything
+ * actually being sent, which is only acceptable until a real handler
+ * replaces it for that transport.
  */
 export class LoggingNoopTransportHandler implements TransportHandler {
   constructor(public readonly transport: OutboxTransport) {}
@@ -61,4 +68,100 @@ export class LoggingNoopTransportHandler implements TransportHandler {
       aggregate_id: event.aggregate_id,
     });
   }
+}
+
+/**
+ * EMAIL transport handler (Epic 7 PR 7.4, ADR-029 §4). Depends only on
+ * `EmailProviderClient` — every provider-specific detail (endpoint, auth,
+ * payload shape) lives in the provider client, never here.
+ *
+ * Resolves the notification content by reading the sibling `Notification`
+ * row via `event.aggregate_id` (ADR-029 §9: the outbox payload carries no
+ * duplicated content — aggregate_id is the canonical reference) and the
+ * recipient's email via that row's `User` relation. Both lookups are
+ * benign-no-op on miss, not a failure: a `Notification`/`User` can be
+ * legitimately gone by delivery time (e.g. account deletion cascades), and
+ * that is not a reason to retry or dead-letter this event.
+ */
+export class EmailTransportHandler implements TransportHandler {
+  readonly transport = OutboxTransport.EMAIL;
+
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly providerClient: EmailProviderClient,
+    private readonly fromAddress: string
+  ) {}
+
+  async deliver(event: OutboxEvent): Promise<void> {
+    if (event.aggregate_type !== OutboxAggregateType.NOTIFICATION) {
+      // No other aggregate type exists yet (ADR-029 §9); defensive guard
+      // against a future aggregate type reaching this handler unexpectedly.
+      logger.warn('EmailTransportHandler: unsupported aggregate_type, skipping', {
+        event_id: event.event_id,
+        aggregate_type: event.aggregate_type,
+      });
+      return;
+    }
+
+    const notification = await this.prisma.notification.findUnique({
+      where: { id: event.aggregate_id },
+      include: { user: { select: { email: true } } },
+    });
+
+    if (!notification) {
+      logger.info('EmailTransportHandler: referenced Notification no longer exists, skipping', {
+        event_id: event.event_id,
+        aggregate_id: event.aggregate_id,
+      });
+      return;
+    }
+
+    if (!notification.user.email) {
+      logger.info('EmailTransportHandler: recipient has no email on file, skipping', {
+        event_id: event.event_id,
+        aggregate_id: event.aggregate_id,
+      });
+      return;
+    }
+
+    await this.providerClient.send({
+      to: notification.user.email,
+      from: this.fromAddress,
+      subject: notification.title,
+      text: notification.message,
+    });
+  }
+}
+
+/**
+ * Selects the EMAIL handler worker.ts registers: a real `EmailTransportHandler`
+ * once `EMAIL_SERVICE`, its matching API key, and `EMAIL_FROM_ADDRESS` are all
+ * configured; otherwise the same no-op fallback PR 7.2 always registered (so
+ * an unconfigured environment — dev, CI, a fresh deploy — behaves exactly as
+ * it did before this PR, never crashes at startup). Kept here (not inline in
+ * worker.ts) so this selection logic is independently unit-testable.
+ */
+export function resolveEmailTransportHandler(
+  prisma: PrismaClient,
+  config: {
+    emailService?: 'sendgrid' | 'resend';
+    sendgridApiKey?: string;
+    resendApiKey?: string;
+    fromAddress?: string;
+  }
+): TransportHandler {
+  const { emailService, sendgridApiKey, resendApiKey, fromAddress } = config;
+
+  if (emailService === 'sendgrid' && sendgridApiKey && fromAddress) {
+    return new EmailTransportHandler(prisma, new SendgridProviderClient(sendgridApiKey), fromAddress);
+  }
+  if (emailService === 'resend' && resendApiKey && fromAddress) {
+    return new EmailTransportHandler(prisma, new ResendProviderClient(resendApiKey), fromAddress);
+  }
+
+  logger.warn(
+    'EMAIL transport not fully configured (EMAIL_SERVICE / matching API key / EMAIL_FROM_ADDRESS) — falling back to the no-op handler',
+    { email_service: emailService ?? null }
+  );
+  return new LoggingNoopTransportHandler(OutboxTransport.EMAIL);
 }
