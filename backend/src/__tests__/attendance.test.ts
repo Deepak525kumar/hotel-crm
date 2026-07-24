@@ -11,11 +11,27 @@ const mockWorkerAssignment = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   attendance: mockAttendance,
   workerAssignment: mockWorkerAssignment,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
+
+// ADR-029 (GD-01, Epic 7 PR 7.3): default resolved values so enqueue() inside
+// update()'s transaction has something to read `.id` off of.
+mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
@@ -155,6 +171,39 @@ describe('AttendanceService', () => {
       expect(data.is_verified).toBe(true);
       expect(data.verified_by).toEqual({ connect: { id: 'mgr1' } });
       expect(data.verified_at).toBeInstanceOf(Date);
+
+      // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the attendance
+      // write and the ATTENDANCE_VERIFIED enqueue.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('ATTENDANCE');
+      const notifData = mockNotification.create.mock.calls[0][0].data;
+      expect(notifData.type).toBe('ATTENDANCE_VERIFIED');
+      expect(notifData.user_id).toBe('w1'); // record.worker_id
+    });
+
+    it('enqueues WORKER_NO_SHOW to the assignment manager when marked ABSENT', async () => {
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'ABSENT' }));
+      mockWorkerAssignment.findUnique.mockResolvedValue({ assigned_by_id: 'mgr1' });
+
+      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'manager');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+      const notifData = mockNotification.create.mock.calls[0][0].data;
+      expect(notifData.type).toBe('WORKER_NO_SHOW');
+      expect(notifData.user_id).toBe('mgr1'); // assignment.assigned_by_id
+    });
+
+    it('does not enqueue WORKER_NO_SHOW when the assignment lookup finds nothing', async () => {
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'ABSENT' }));
+      mockWorkerAssignment.findUnique.mockResolvedValue(null);
+
+      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'manager');
+
+      expect(mockOutboxEvent.create).not.toHaveBeenCalled();
     });
   });
 

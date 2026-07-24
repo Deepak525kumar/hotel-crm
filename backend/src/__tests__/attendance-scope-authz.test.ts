@@ -70,29 +70,37 @@ jest.mock('../lib/logger.js', () => ({
 jest.mock('../modules/notifications/service.js', () => ({
   notificationService: {
     sendNotification: async () => undefined,
+    enqueue: async () => ({ notification: { id: 'notif-stub' }, outboxEvents: [] }),
   },
 }));
 
+const dbMock = {
+  attendance: {
+    findUnique: async ({ where }: any) => {
+      const r = records[where.id];
+      return r ? fullRecord(r) : null;
+    },
+    findMany: async ({ where }: any) => {
+      capturedListWhere = where;
+      return [];
+    },
+    count: async () => 0,
+    update: async ({ where }: any) => fullRecord(records[where.id] ?? records.att_h1),
+  },
+  hotel: {
+    findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
+  },
+  auditLog: { create: async () => undefined },
+  workerAssignment: { findUnique: async () => ({ assigned_by_id: 'mgr_1' }) },
+  // ADR-029 (GD-01, Epic 7 PR 7.3): AttendanceService.update() now wraps its
+  // write + notification enqueue in $transaction; hand the same mock object
+  // back as `tx` so tx.attendance.update / tx.workerAssignment.findUnique hit
+  // the mocks above.
+  $transaction: async (cb: any) => cb(dbMock),
+};
+
 jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
-    attendance: {
-      findUnique: async ({ where }: any) => {
-        const r = records[where.id];
-        return r ? fullRecord(r) : null;
-      },
-      findMany: async ({ where }: any) => {
-        capturedListWhere = where;
-        return [];
-      },
-      count: async () => 0,
-      update: async ({ where }: any) => fullRecord(records[where.id] ?? records.att_h1),
-    },
-    hotel: {
-      findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
-    },
-    auditLog: { create: async () => undefined },
-    workerAssignment: { findUnique: async () => ({ assigned_by_id: 'mgr_1' }) },
-  }),
+  getPrisma: () => dbMock,
 }));
 
 jest.mock('../middleware/auth.js', () => ({

@@ -1,5 +1,6 @@
-import { Prisma, WorkRequest, WorkRequestStatus } from '@prisma/client';
+import { OutboxSourceModule, OutboxTransport, Prisma, WorkRequest, WorkRequestStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import {
   isWorkerEligibleForHotel,
@@ -231,40 +232,56 @@ export class WorkRequestService extends BaseService {
 
     if (statusChanged) data.version = { increment: 1 };
 
-    const updated = await this.prisma.workRequest.update({ where: { id }, data });
+    // ADR-029 (GD-01, Epic 7 PR 7.3): the publish write and the roster
+    // fan-out enqueue join one transaction, so the outbox rows can never be
+    // created for an update that didn't commit (or be lost for one that
+    // did). This is also the fan-out latency fix OQ-NOTIF-09 flagged: each
+    // enqueue is a cheap local insert, never a synchronous external
+    // network call — delivery happens later, out-of-band, via the Platform
+    // Worker.
+    let updated: WorkRequest;
+    if (isPublishing) {
+      const workerIds = await listEligibleWorkerIds(wr.hotel_id);
+      updated = await this.prisma.$transaction(async (tx) => {
+        const wrUpdated = await tx.workRequest.update({ where: { id }, data });
+        await this.enqueueRosterPublished(tx, wrUpdated, workerIds);
+        return wrUpdated;
+      });
+    } else {
+      updated = await this.prisma.workRequest.update({ where: { id }, data });
+    }
 
     await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
       from_status: wr.status,
       to_status: updated.status,
     });
 
-    // Notify the hotel's active roster once the publish has committed, so
-    // workers learn a new request is open without polling the marketplace.
-    if (isPublishing) {
-      await this.notifyRosterPublished(updated);
-    }
-
     return this.toDto(updated);
   }
 
-  // Fan-out a WORK_REQUEST_PUBLISHED notification to every active worker on the
-  // hotel roster. Fire-and-forget per recipient, matching the notification
-  // pattern used elsewhere; a delivery failure never rolls back the publish.
-  private async notifyRosterPublished(wr: WorkRequest): Promise<void> {
-    const workerIds = await listEligibleWorkerIds(wr.hotel_id);
-
-    await Promise.all(
-      workerIds.map((workerId) =>
-        notificationService
-          .sendNotification(workerId, {
-            type: 'WORK_REQUEST_PUBLISHED',
-            title: 'New Work Available',
-            message: `A new ${wr.position} shift is open for applications.`,
-            data: { work_request_id: wr.id, hotel_id: wr.hotel_id },
-          })
-          .catch(() => {})
-      )
-    );
+  // Enqueue a WORK_REQUEST_PUBLISHED notification for every active worker on
+  // the hotel roster, inside the caller's publish transaction (ADR-029 §2).
+  private async enqueueRosterPublished(
+    tx: DatabaseTransaction,
+    wr: WorkRequest,
+    workerIds: string[]
+  ): Promise<void> {
+    for (const workerId of workerIds) {
+      await notificationService.enqueue(
+        {
+          recipientId: workerId,
+          type: 'WORK_REQUEST_PUBLISHED',
+          title: 'New Work Available',
+          message: `A new ${wr.position} shift is open for applications.`,
+          data: { work_request_id: wr.id, hotel_id: wr.hotel_id },
+          hotelId: wr.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.WORK_REQUESTS,
+          producerService: 'WorkRequestService',
+        },
+        tx
+      );
+    }
   }
 }
 

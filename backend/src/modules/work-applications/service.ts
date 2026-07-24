@@ -1,4 +1,6 @@
 import {
+  OutboxSourceModule,
+  OutboxTransport,
   Prisma,
   WorkApplication,
   ApplicationStatus,
@@ -73,46 +75,61 @@ export class WorkApplicationService extends BaseService {
       select: { average_score: true },
     });
 
-    let app: WorkApplication;
-    if (existing) {
-      // Re-apply after withdrawal
-      app = await this.prisma.workApplication.update({
-        where: { id: existing.id },
-        data: {
-          status: ApplicationStatus.PENDING,
-          cover_note: input.cover_note ?? null,
-          worker_rating_snapshot: overallRating?.average_score
-            ? Number(overallRating.average_score)
-            : null,
-          reviewed_by_id: null,
-          reviewed_at: null,
-          rejection_reason: null,
+    // ADR-029 (GD-01, Epic 7 PR 7.3): the application write and the
+    // APPLICATION_RECEIVED enqueue join one transaction (single commit,
+    // ADR-029 §2).
+    const app = await this.prisma.$transaction(async (tx) => {
+      let created: WorkApplication;
+      if (existing) {
+        // Re-apply after withdrawal
+        created = await tx.workApplication.update({
+          where: { id: existing.id },
+          data: {
+            status: ApplicationStatus.PENDING,
+            cover_note: input.cover_note ?? null,
+            worker_rating_snapshot: overallRating?.average_score
+              ? Number(overallRating.average_score)
+              : null,
+            reviewed_by_id: null,
+            reviewed_at: null,
+            rejection_reason: null,
+          },
+        });
+      } else {
+        created = await tx.workApplication.create({
+          data: {
+            work_request_id: workRequestId,
+            worker_id: actorId,
+            status: ApplicationStatus.PENDING,
+            cover_note: input.cover_note ?? null,
+            worker_rating_snapshot: overallRating?.average_score
+              ? Number(overallRating.average_score)
+              : null,
+          },
+        });
+      }
+
+      await notificationService.enqueue(
+        {
+          recipientId: wr.created_by_id,
+          type: 'APPLICATION_RECEIVED',
+          title: 'New Application Received',
+          message: 'A worker has submitted an application for your work request.',
+          data: { application_id: created.id, work_request_id: workRequestId },
+          hotelId: wr.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.WORK_APPLICATIONS,
+          producerService: 'WorkApplicationService',
         },
-      });
-    } else {
-      app = await this.prisma.workApplication.create({
-        data: {
-          work_request_id: workRequestId,
-          worker_id: actorId,
-          status: ApplicationStatus.PENDING,
-          cover_note: input.cover_note ?? null,
-          worker_rating_snapshot: overallRating?.average_score
-            ? Number(overallRating.average_score)
-            : null,
-        },
-      });
-    }
+        tx
+      );
+
+      return created;
+    });
 
     await this.logAudit(actorId, actorRole, 'APPLY', 'WORK_APPLICATION', app.id, {
       work_request_id: workRequestId,
     });
-
-    void notificationService.sendNotification(wr.created_by_id, {
-      type: 'APPLICATION_RECEIVED',
-      title: 'New Application Received',
-      message: 'A worker has submitted an application for your work request.',
-      data: { application_id: app.id, work_request_id: workRequestId },
-    }).catch(() => {});
 
     return this.toDto(app);
   }
@@ -202,21 +219,36 @@ export class WorkApplicationService extends BaseService {
       ...(input.status === 'REJECTED' ? { rejection_reason: input.rejection_reason ?? null } : {}),
     };
 
-    const updated = await this.prisma.workApplication.update({ where: { id: applicationId }, data });
+    // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the status write and
+    // (on rejection) the APPLICATION_REJECTED enqueue.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.workApplication.update({ where: { id: applicationId }, data });
+      if (input.status === 'REJECTED') {
+        await notificationService.enqueue(
+          {
+            recipientId: app.worker_id,
+            type: 'APPLICATION_REJECTED',
+            title: 'Application Rejected',
+            message: 'Your application has been rejected.',
+            data: {
+              application_id: applicationId,
+              work_request_id: workRequestId,
+              rejection_reason: input.rejection_reason ?? null,
+            },
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.WORK_APPLICATIONS,
+            producerService: 'WorkApplicationService',
+          },
+          tx
+        );
+      }
+      return u;
+    });
 
     await this.logAudit(actor.userId, actor.role, `APPLICATION_${input.status}`, 'WORK_APPLICATION', applicationId, {
       work_request_id: workRequestId,
       worker_id: app.worker_id,
     });
-
-    if (input.status === 'REJECTED') {
-      void notificationService.sendNotification(app.worker_id, {
-        type: 'APPLICATION_REJECTED',
-        title: 'Application Rejected',
-        message: 'Your application has been rejected.',
-        data: { application_id: applicationId, work_request_id: workRequestId, rejection_reason: input.rejection_reason ?? null },
-      }).catch(() => {});
-    }
 
     return this.toDto(updated);
   }
@@ -315,29 +347,47 @@ export class WorkApplicationService extends BaseService {
         });
       }
 
+      // ADR-029 (GD-01, Epic 7 PR 7.3): both post-approval notifications join
+      // this same transaction — single commit alongside the slot claim,
+      // application accept, assignment create, and attendance pre-create.
+      await notificationService.enqueue(
+        {
+          recipientId: app.worker_id,
+          type: 'APPLICATION_ACCEPTED',
+          title: 'Application Approved',
+          message: 'Your application has been approved.',
+          data: { application_id: app.id, work_request_id: app.work_request_id },
+          hotelId: wr.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.WORK_APPLICATIONS,
+          producerService: 'WorkApplicationService',
+        },
+        tx
+      );
+      await notificationService.enqueue(
+        {
+          recipientId: app.worker_id,
+          type: 'ASSIGNMENT_CONFIRMED',
+          title: 'Assignment Confirmed',
+          message: 'You have been assigned to a shift.',
+          data: { assignment_id: assignment.id, work_request_id: app.work_request_id },
+          hotelId: wr.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.WORK_APPLICATIONS,
+          producerService: 'WorkApplicationService',
+        },
+        tx
+      );
+
       return { acceptedApp, assignment };
     });
 
-    const { acceptedApp, assignment: createdAssignment } = txResult;
+    const { acceptedApp } = txResult;
 
     await this.logAudit(actor.userId, actor.role, 'APPLICATION_ACCEPTED', 'WORK_APPLICATION', app.id, {
       work_request_id: app.work_request_id,
       worker_id: app.worker_id,
     });
-
-    void notificationService.sendNotification(app.worker_id, {
-      type: 'APPLICATION_ACCEPTED',
-      title: 'Application Approved',
-      message: 'Your application has been approved.',
-      data: { application_id: app.id, work_request_id: app.work_request_id },
-    }).catch(() => {});
-
-    void notificationService.sendNotification(app.worker_id, {
-      type: 'ASSIGNMENT_CONFIRMED',
-      title: 'Assignment Confirmed',
-      message: 'You have been assigned to a shift.',
-      data: { assignment_id: createdAssignment.id, work_request_id: app.work_request_id },
-    }).catch(() => {});
 
     return this.toDto(acceptedApp);
   }

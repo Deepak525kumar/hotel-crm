@@ -12,6 +12,10 @@ const mockNotification = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockEmploymentRecord = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -32,8 +36,15 @@ const mockPrisma = {
   employmentRecord: mockEmploymentRecord,
   workApplication: mockWorkApplication,
   notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
+
+// ADR-029 (GD-01, Epic 7 PR 7.3): default resolved values so enqueue() inside
+// the publish transaction has something to read `.id` off of.
+mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
@@ -189,6 +200,23 @@ describe('WorkRequestService', () => {
         expect(types).toEqual(['WORK_REQUEST_PUBLISHED', 'WORK_REQUEST_PUBLISHED']);
         const recipients = mockNotification.create.mock.calls.map((c) => c[0].data.user_id);
         expect(recipients).toEqual(['w1', 'w2']);
+
+        // ADR-029 (GD-01, Epic 7 PR 7.3): the fan-out now enqueues an
+        // OutboxEvent per recipient, inside the same publish transaction.
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(mockOutboxEvent.create).toHaveBeenCalledTimes(2);
+        const sourceModules = mockOutboxEvent.create.mock.calls.map((c) => c[0].data.source_module);
+        expect(sourceModules).toEqual(['WORK_REQUESTS', 'WORK_REQUESTS']);
+        const transports = mockOutboxEvent.create.mock.calls.map((c) => c[0].data.transport);
+        expect(transports).toEqual(['PUSH', 'PUSH']);
+        // Each recipient is its own logical notification event (ADR-029 §2:
+        // correlation_id ties together one enqueue() call's transport
+        // fan-out, not separate recipients) — so the two rows get distinct,
+        // well-formed correlation_ids.
+        const correlationIds = mockOutboxEvent.create.mock.calls.map((c) => c[0].data.correlation_id);
+        expect(correlationIds[0]).not.toBe(correlationIds[1]);
+        expect(correlationIds[0]).toMatch(/^[0-9a-f-]{36}$/);
+        expect(correlationIds[1]).toMatch(/^[0-9a-f-]{36}$/);
       });
 
       it('notifies nobody when the hotel has no hotel_group_id (deny-by-default)', async () => {
@@ -200,6 +228,11 @@ describe('WorkRequestService', () => {
 
         expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
         expect(mockNotification.create).not.toHaveBeenCalled();
+        // Zero eligible recipients -> the publish transaction still runs (the
+        // WorkRequest write itself is unconditional on isPublishing), it just
+        // enqueues nothing.
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(mockOutboxEvent.create).not.toHaveBeenCalled();
       });
     });
   });

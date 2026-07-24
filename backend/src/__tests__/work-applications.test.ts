@@ -34,6 +34,14 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workApplication: mockWorkApplication,
   workRequest: mockWorkRequest,
@@ -42,9 +50,16 @@ const mockPrisma = {
   workerOverallRating: mockWorkerOverallRating,
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
-  $transaction: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
+
+// ADR-029 (GD-01, Epic 7 PR 7.3): default resolved values so enqueue() inside
+// apply()/update()/approve()'s transactions has something to read `.id` off of.
+mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
@@ -162,6 +177,16 @@ describe('WorkApplicationService', () => {
       const dto = await service.apply('wr1', { cover_note: 'hi' }, 'w1', 'worker');
       expect(dto.worker_rating_snapshot).toBe(4.5);
       expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+
+      // ADR-029 (GD-01, Epic 7 PR 7.3): the application write and the
+      // APPLICATION_RECEIVED enqueue join one transaction.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+      const outboxData = mockOutboxEvent.create.mock.calls[0][0].data;
+      expect(outboxData.source_module).toBe('WORK_APPLICATIONS');
+      expect(outboxData.transport).toBe('PUSH');
+      const notifData = mockNotification.create.mock.calls[0][0].data;
+      expect(notifData.type).toBe('APPLICATION_RECEIVED');
     });
 
     it('re-applies after withdrawal by updating existing row', async () => {
@@ -199,6 +224,20 @@ describe('WorkApplicationService', () => {
       const dto = await service.update('wr1', 'app1', { status: 'REJECTED', rejection_reason: 'not qualified' }, { userId: 'mgr1', role: 'manager' });
       expect(dto.status).toBe('REJECTED');
       expect(dto.rejection_reason).toBe('not qualified');
+
+      // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the status write
+      // and the APPLICATION_REJECTED enqueue.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create.mock.calls[0][0].data.source_module).toBe('WORK_APPLICATIONS');
+      expect(mockNotification.create.mock.calls[0][0].data.type).toBe('APPLICATION_REJECTED');
+    });
+
+    it('does not enqueue on withdrawal (worker-initiated, no notification target)', async () => {
+      mockWorkApplication.findUnique.mockResolvedValue(makeApp({ worker_id: 'w1' }));
+      mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'WITHDRAWN' }));
+      await service.update('wr1', 'app1', { status: 'WITHDRAWN' }, { userId: 'w1', role: 'worker' });
+      expect(mockOutboxEvent.create).not.toHaveBeenCalled();
     });
 
     it('prevents worker from approving application', async () => {
