@@ -8,6 +8,9 @@ import type {
   Notification,
   LeaderboardEntry,
   DashboardStats,
+  PushToken,
+  PushPlatform,
+  PushApp,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -219,6 +222,15 @@ export const api = {
     list: () => request<Notification[]>('/notifications'),
     markRead: (notificationId: string) =>
       request<Notification>(`/notifications/${notificationId}/read`, { method: 'POST' }),
+    // Epic 7 PR 7.7. Upsert-by-token on the backend, so calling this on every
+    // launch is idempotent — and re-registering a token that belonged to a
+    // different user reassigns ownership, which is what stops pushes reaching
+    // a previous account on a shared device.
+    registerPushToken: (input: { token: string; platform: PushPlatform; app: PushApp }) =>
+      request<PushToken>('/notifications/push-tokens', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
   analytics: {
     stats: () => request<DashboardStats>('/analytics/stats'),
