@@ -60,7 +60,15 @@ const envSchema = z.object({
   // scoped to push-send only at the provider.
   APNS_KEY_ID: z.string().optional(),
   APNS_TEAM_ID: z.string().optional(),
-  APNS_BUNDLE_ID: z.string().optional(),
+  // Per-app APNs topics (Epic 7 PR 7.8). APNs requires `apns-topic` to equal
+  // the bundle ID of the app that minted the device token, and the two mobile
+  // apps have distinct bundle IDs — so there is one topic per app, selected at
+  // delivery time from PushToken.app. These replace the former single
+  // APNS_BUNDLE_ID, which could only ever be correct for one of the two apps.
+  // The signing key itself stays shared: an APNs auth key is team-scoped, so
+  // one key and one cached JWT serve both topics.
+  APNS_BUNDLE_ID_WORKER: z.string().optional(),
+  APNS_BUNDLE_ID_CHECKER: z.string().optional(),
   FIREBASE_PROJECT_ID: z.string().optional(),
   // Base64-encoded Firebase service-account JSON key. Required for FCM HTTP
   // v1 (the only current, non-deprecated FCM API): sends use a short-lived

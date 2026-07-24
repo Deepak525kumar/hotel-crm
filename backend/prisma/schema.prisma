@@ -175,6 +175,24 @@ enum PushPlatform {
   ANDROID
 }
 
+// Epic 7 PR 7.8: which mobile application a device token was registered from.
+// APNs requires the `apns-topic` header to equal the *originating app's* bundle
+// ID; a token minted by one app and sent with another's topic is rejected
+// (DeviceTokenNotForTopic). The two apps have distinct bundle IDs
+// (com.hotelcrm.workerapp / com.hotelcrm.checkerapp) and `manager`/`admin` may
+// use BOTH, so one user can legitimately hold two IOS tokens needing different
+// topics — `platform` alone cannot disambiguate them.
+//
+// Deliberately stores the *application*, not the bundle ID: the bundle ID is
+// deployment configuration (APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER), so
+// changing one never requires a data migration, and a client can never
+// influence an APNs header. FCM ignores this entirely — registration tokens are
+// self-identifying, so Android has no equivalent constraint.
+enum PushApp {
+  WORKER
+  CHECKER
+}
+
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee
 // lifecycle status. No Suspended state; no rating/warning-driven automatic
 // transition (invariant, MODULE_SPEC.md "State and Lifecycle").
@@ -769,6 +787,11 @@ model PushToken {
   id         String       @id @default(cuid())
   token      String       @unique
   platform   PushPlatform
+  // Epic 7 PR 7.8: the originating app, used to select the correct APNs topic
+  // at delivery time (see the PushApp enum). NOT NULL and no default —
+  // registration always supplies it, so the transport may assume it exists
+  // rather than every future code path handling an impossible null state.
+  app        PushApp
   user_id    String
   user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
   created_at DateTime     @default(now())
