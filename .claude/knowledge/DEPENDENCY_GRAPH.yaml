@@ -69,13 +69,16 @@ nodes:
   # (backend/src/worker.ts -> dist/worker.js) over the SAME modular-monolith codebase +
   # Prisma client, deployed as a separate OS process (ecosystem.config.js app
   # `hotel-crm-worker`). Drains state-outbox (poll interval configuration-driven, initial
-  # deployment default 5s), delivers via transport handlers (EMAIL/PUSH registered with the
-  # no-op/log handler in PR 7.2; real handlers land PR 7.4/7.5; WEBHOOK/SMS reserved and
-  # unregistered so their rows are never claimed -- ADR-029 §4; handlers must be idempotent,
-  # event_id is the canonical provider-side idempotency key), runs the OutboxStatus lifecycle
-  # (claim PENDING/FAILED via FOR UPDATE SKIP LOCKED -> DELIVERED | FAILED-with-backoff |
-  # DEAD_LETTER, plus stale-PROCESSING reclaim for at-least-once), and hosts scheduled jobs
-  # via lib/scheduler.ts (mechanism only in PR 7.2, no domain job registered yet).
+  # deployment default 5s), delivers via transport handlers (EMAIL: real handler as of PR 7.4
+  # -- SendGrid/Resend selected by EMAIL_SERVICE via a provider-client abstraction
+  # (modules/notifications/email-provider.ts), falling back to the PR-7.2 no-op/log handler
+  # when unconfigured, resolveEmailTransportHandler(); PUSH still the PR-7.2 no-op/log handler,
+  # real handler lands PR 7.5; WEBHOOK/SMS reserved and unregistered so their rows are never
+  # claimed -- ADR-029 §4; handlers must be idempotent, event_id is the canonical provider-side
+  # idempotency key), runs the OutboxStatus lifecycle (claim PENDING/FAILED via FOR UPDATE SKIP
+  # LOCKED -> DELIVERED | FAILED-with-backoff | DEAD_LETTER, plus stale-PROCESSING reclaim for
+  # at-least-once), and hosts scheduled jobs via lib/scheduler.ts (mechanism only, no domain job
+  # registered yet).
   # lifecycle: observed as of Epic 7 PR 7.2 (2026-07-24) -- runtime, claim/lifecycle, backoff,
   # dispatch interface, and scheduler mechanism landed in code (backend/src/worker.ts,
   # modules/notifications/outbox-{worker,repository,transport,backoff}.ts, lib/scheduler.ts).
