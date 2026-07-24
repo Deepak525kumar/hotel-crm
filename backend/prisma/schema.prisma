@@ -167,6 +167,14 @@ enum OutboxTransport {
   SMS
 }
 
+// Epic 7 PR 7.5 (ADR-029): which push provider a registered device token
+// belongs to — APNs (iOS) or FCM (Android). Drives PushTransportHandler's
+// per-token provider-client routing.
+enum PushPlatform {
+  IOS
+  ANDROID
+}
+
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee
 // lifecycle status. No Suspended state; no rating/warning-driven automatic
 // transition (invariant, MODULE_SPEC.md "State and Lifecycle").
@@ -223,6 +231,7 @@ model User {
   ratings_given             Rating[]                @relation("rater")
   overall_rating            WorkerOverallRating?
   notifications             Notification[]
+  push_tokens               PushToken[]
   created_work_requests     WorkRequest[]           @relation("request_creator")
   audit_logs                AuditLog[]
   password_reset_tokens     PasswordResetToken[]
@@ -745,6 +754,27 @@ model OutboxEvent {
   @@index([correlation_id])
   @@index([aggregate_type, aggregate_id])
   @@index([created_at])
+}
+
+// Epic 7 PR 7.5 (ADR-029 §4, Consequences: "a PushToken model for PUSH").
+// One row per registered device. `token` is the unique key (not
+// user_id+token, deliberately): a device token is device-specific, so
+// re-registering the SAME token under a different user reassigns ownership
+// (upsert-by-token in NotificationService.registerPushToken) — the correct
+// behavior when a different user logs into an already-registered device,
+// avoiding delivering pushes to the wrong account. Owned exclusively by
+// backend-notifications, same single-writer discipline as Notification/
+// OutboxEvent above. Cascade-deletes with its User (mirrors Notification).
+model PushToken {
+  id         String       @id @default(cuid())
+  token      String       @unique
+  platform   PushPlatform
+  user_id    String
+  user       User         @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  created_at DateTime     @default(now())
+  updated_at DateTime     @updatedAt
+
+  @@index([user_id])
 }
 
 // =============================================================================
