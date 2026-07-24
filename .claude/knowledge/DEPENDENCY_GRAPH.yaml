@@ -65,18 +65,21 @@ nodes:
   - { id: operations, kind: infrastructure, owner: unassigned, source: "." }
   # worker: canonically named "Platform Worker" by ADR-029 (GD-01, 2026-07-23) -- not just
   # "a worker process", since it is the future home of domain-event publishing (GD-12) as
-  # well as notification delivery and scheduled jobs. A second Node entrypoint over the SAME
-  # modular-monolith codebase + Prisma client, deployed as a separate OS process. Drains
-  # state-outbox (poll interval configuration-driven, initial deployment default 5s),
-  # delivers via transport handlers (EMAIL/PUSH first; WEBHOOK/SMS reserved -- handlers must
-  # themselves be idempotent, event_id is the canonical provider-side idempotency key), runs
-  # the OutboxStatus lifecycle with configurable exponential-backoff retry, hosts scheduled
-  # reminder/escalation jobs, and is the canonical producer for the future Event Bus (GD-12).
-  # lifecycle: planned -- authorized by ADR-029, not yet code; becomes an observed node when
-  # the Platform-Worker-runtime PR lands (this graph records repository-observed relationships,
-  # so the node is carried here as ADR-authorized/planned, mirroring how backend-chatbot's
-  # deltas are deferred until code exists).
-  - { id: worker, kind: infrastructure, owner: unassigned, source: backend/worker, name: "Platform Worker", lifecycle: planned }
+  # well as notification delivery and scheduled jobs. A second Node entrypoint
+  # (backend/src/worker.ts -> dist/worker.js) over the SAME modular-monolith codebase +
+  # Prisma client, deployed as a separate OS process (ecosystem.config.js app
+  # `hotel-crm-worker`). Drains state-outbox (poll interval configuration-driven, initial
+  # deployment default 5s), delivers via transport handlers (EMAIL/PUSH registered with the
+  # no-op/log handler in PR 7.2; real handlers land PR 7.4/7.5; WEBHOOK/SMS reserved and
+  # unregistered so their rows are never claimed -- ADR-029 §4; handlers must be idempotent,
+  # event_id is the canonical provider-side idempotency key), runs the OutboxStatus lifecycle
+  # (claim PENDING/FAILED via FOR UPDATE SKIP LOCKED -> DELIVERED | FAILED-with-backoff |
+  # DEAD_LETTER, plus stale-PROCESSING reclaim for at-least-once), and hosts scheduled jobs
+  # via lib/scheduler.ts (mechanism only in PR 7.2, no domain job registered yet).
+  # lifecycle: observed as of Epic 7 PR 7.2 (2026-07-24) -- runtime, claim/lifecycle, backoff,
+  # dispatch interface, and scheduler mechanism landed in code (backend/src/worker.ts,
+  # modules/notifications/outbox-{worker,repository,transport,backoff}.ts, lib/scheduler.ts).
+  - { id: worker, kind: infrastructure, owner: unassigned, source: backend/src/worker.ts, name: "Platform Worker", lifecycle: observed }
 
   # Shared contracts (repository-derived; consumed cross-module)
   - { id: prisma-schema, kind: contract, owner: unassigned, source: backend/prisma/schema.prisma }
@@ -619,12 +622,12 @@ state_domains:
     note: "Only notifications writes/reads directly; other modules produce notifications through the notification-service `calls` contract, not by touching this state. ADR-029 (GD-01, 2026-07-23) adds a transactional `enqueue` path on notification-service: a producer's transaction persists its domain change + the Notification inbox row + an OutboxEvent (state-outbox) in one commit; the in-app REST surface (GET /notifications, POST /:id/read) is unchanged."
   # state-outbox: internal delivery queue, added by ADR-029 (GD-01, 2026-07-23). Distinct
   # from state-notification (the user-facing inbox): never client-exposed. Written by the
-  # request-path notification-service enqueue (in the producer's transaction); the Platform
-  # Worker (status lifecycle transitions + retry bookkeeping) is PR 7.2, not yet built --
-  # writers/readers below list it as the design's eventual actor, not an observed one yet.
-  # lifecycle: observed as of Epic 7 PR 7.1 (2026-07-23) -- model, enums, migration, and
-  # NotificationService.enqueue() landed in code (schema.prisma, notifications/service.ts).
-  # No producer has been migrated to call enqueue() yet (PR 7.3); the four current
+  # request-path notification-service enqueue (in the producer's transaction) AND by the
+  # Platform Worker (claim -> PROCESSING, and the DELIVERED/FAILED/DEAD_LETTER transitions);
+  # read by the Platform Worker's claim. Both actors are now observed in code.
+  # lifecycle: observed -- Epic 7 PR 7.1 (2026-07-23) added the model/enums/migration and the
+  # enqueue() writer; Epic 7 PR 7.2 (2026-07-24) added the Platform Worker reader/transition
+  # writer. No producer has been migrated to call enqueue() yet (PR 7.3); the four current
   # producers' fire-and-forget notificationService.sendNotification() calls are unchanged.
   - id: state-outbox
     model: OutboxEvent
@@ -632,7 +635,7 @@ state_domains:
     authoritative_writer: backend-notifications
     writers: [backend-notifications, worker]
     readers: [worker]
-    evidence: "backend/prisma/schema.prisma (model OutboxEvent + 5 enums); backend/prisma/migrations/20260723210000_add_outbox_event/migration.sql; backend/src/modules/notifications/service.ts (enqueue/enqueueWithin); backend/src/modules/notifications/outbox.types.ts. `worker` in writers/readers is the ADR-029-designed future actor (PR 7.2, not yet built), not an observed relationship."
+    evidence: "backend/prisma/schema.prisma (model OutboxEvent + 5 enums); backend/prisma/migrations/20260723210000_add_outbox_event/migration.sql; enqueue writer: backend/src/modules/notifications/service.ts (enqueue/enqueueWithin); worker reader/transition writer: backend/src/modules/notifications/outbox-repository.ts (claimBatch FOR UPDATE SKIP LOCKED, markDelivered, recordFailure) driven by outbox-worker.ts."
     note: "OutboxEvent {event_id (globally-unique, idempotency key), event_type, transport (OutboxTransport: EMAIL/PUSH/WEBHOOK/SMS), status (OutboxStatus: PENDING/PROCESSING/DELIVERED/FAILED/DEAD_LETTER), payload, payload_version (starts 1), attempts, next_attempt_at, last_error, processed_at, timestamps}. Owned exclusively by backend-notifications -- no other module writes state-outbox directly, every producer goes through notificationService.enqueue() (same single-writer discipline as state-notification, see that entry's note). backend-notifications enqueues in the producer transaction; the Worker claims rows via SELECT ... FOR UPDATE SKIP LOCKED (a PostgreSQL feature, not an external queue), transitions status, and retries with configurable exponential backoff (default 1m/5m/15m/1h). processed_at + attempts/retry-count support the minimum observability surface (queued/processing/delivered/failed/dead_letter counts, retry_count, delivery_latency = processed_at - created_at). Retention tier pending (SIR-NOTIF-002 / GD-09). Shaped (incl. payload_version) to also carry future domain events (GD-12)."
   - id: state-audit-log
     model: AuditLog
