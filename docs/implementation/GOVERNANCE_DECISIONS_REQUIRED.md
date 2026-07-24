@@ -36,7 +36,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 
 | # | Decision | Priority | MVP? | Unlocks (est. PRs) |
 |---|---|---|---|---|
-| GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ RESOLVED 2026-07-23 → `ADR-029` (Option B: Transactional Outbox + Worker runtime)** |
+| GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ IMPLEMENTED 2026-07-24 → `ADR-029` decided 2026-07-23 (Option B: Transactional Outbox + Worker runtime); built and merged as Epic 7, PRs 7.1–7.8** |
 | GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 |
 | GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 |
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
@@ -76,6 +76,12 @@ mobile screens) and assume the decision is made first — the decision itself is
 > 7.1–7.7 in `IMPLEMENTATION_EXECUTION_PLAN.md` (mobile push registration split out as its own PR, 7.7,
 > per reviewer feedback). Remaining NOTIF opens: `OQ-NOTIF-02` (retention/GD-09,
 > now also covering `OutboxEvent`), `OQ-NOTIF-03`, `OQ-NOTIF-05`.
+>
+> **BUILT 2026-07-24:** all 8 PRs (7.1–7.8; a ninth, multi-app APNs topic support, was added as 7.8
+> after 7.7 was already planned — see `IMPLEMENTATION_EXECUTION_PLAN.md`) are merged into `main`
+> (`4079a0f`). `sendEmail`/`sendPushNotification` are superseded by the Worker's transport handlers,
+> not left as dead stubs; backend suite 523/523 green, both mobile apps 37/37. This decision entry
+> now records a shipped capability, not an open blocker — see `docs/15-audits/REPOSITORY_AUDIT_2026-07-24.md`.
 
 - **Why a decision is required:** `NotificationChannel` values were fixed by ADR-027, but *how* email/push
   are actually delivered, how send-failures are handled, and which runtime hosts scheduled reminders were
@@ -572,8 +578,11 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 
 ## ROI ranking (engineering unlocked per single decision, highest first)
 
-1. **GD-01 Notification dispatch** — one decision unblocks notifications completion, two auth flows, calendar
-   & attendance jobs, and shares infra with the event-bus. Widest fan-out.
+~~1. **GD-01 Notification dispatch**~~ — **IMPLEMENTED, not just decided** (Epic 7, PRs 7.1–7.8 merged
+   2026-07-24; struck through rather than removed, per append-only convention — see the 2026-07-24 sync
+   note above). Ranking below renumbered to reflect only open decisions.
+1. **GD-02 Manager write authority** — tiny decision, immediately unblocks CRM/Users write paths. Now the
+   cheapest open item on the board.
 2. **GD-03 5-role / Regional Manager** — unblocks RM features across CRM, Calendar, Analytics, and EMP
    org-chart in one call.
 3. **GD-09 Retention tiers** — a single mapping decision clears the G8 Release-Readiness blocker for seven
@@ -581,11 +590,10 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 4. **GD-12 Event-bus** — zero code itself, yet unblocks the HR/EMP/Calendar/Consent builds.
 5. **GD-04 Quality rating model** — unblocks quality M3 plus the downstream analytics warning metric.
 6. **GD-16 Documents RBAC** — unblocks its own freeze *and* HR contract-scan + onboarding.
-7. **GD-02 Manager write authority** — tiny decision, immediately unblocks CRM/Users write paths.
-8. **GD-07 Session revocation & rate-limiting** — one decision closes several production-security gaps.
-9. **GD-14 Geofencing**, **GD-15 HR/EMP**, **GD-05 pause-jobs**, **GD-06 analytics** — sizeable but more
+7. **GD-07 Session revocation & rate-limiting** — one decision closes several production-security gaps.
+8. **GD-14 Geofencing**, **GD-15 HR/EMP**, **GD-05 pause-jobs**, **GD-06 analytics** — sizeable but more
    self-contained.
-10. Remainder (GD-08, GD-10, GD-11, GD-13, GD-17..23) — narrower or explicitly deferrable.
+9. Remainder (GD-08, GD-10, GD-11, GD-13, GD-17..23) — narrower or explicitly deferrable.
 
 ---
 
@@ -594,16 +602,26 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 - **Total remaining unique governance decisions: 23** (collapsed from 264 open/blocked register rows;
   owner-assignment, documentation-only, knowledge-sync, and already-implemented items excluded per scope).
 
+> **Sync note (2026-07-24):** `GD-01` is no longer an open decision to make — it was decided
+> 2026-07-23 (`ADR-029`) **and has since been fully built and merged** (Epic 7, PRs 7.1–7.8, `main`
+> @ `4079a0f`; see `docs/15-audits/REPOSITORY_AUDIT_2026-07-24.md`). It is removed from the
+> "highest-leverage" and "blocking MVP" lists below, which now reflect only genuinely open items.
+> The "Total remaining unique governance decisions" count is unchanged at 23 in the historical
+> per-item sections below (each `GD-*` section is append-only, per governance protocol), but with
+> `GD-01` implemented, **22 remain open**.
+
 - **Highest-leverage decisions (make these first):**
-  1. **GD-01 Notification dispatch & delivery** — widest fan-out; unblocks the most engineering.
+  1. **GD-02 Manager write-permission authority** — smallest, highest ROI-per-effort remaining item;
+     removes a live authorization contradiction on CRM/Users.
   2. **GD-03 5-role & Regional-Manager authority** — unblocks RM features across four modules.
   3. **GD-09 GDPR retention tiers** — clears G8 for seven modules; has external (tax-advisor) lead time.
   4. **GD-12 Event-bus transport** — zero-code decision that gates four module builds.
 
 - **Decisions blocking MVP** (the core staffing loop + its web/mobile surfaces):
-  GD-01, GD-02, GD-03, GD-04, GD-05, GD-06. (The core loop already runs; these finish notifications, resolve
-  the manager/role authorization contradictions, complete the quality rating surface, ship the confirmed
-  pause-jobs toggle, and fix the worker analytics 403.)
+  GD-02, GD-03, GD-04, GD-05, GD-06. (`GD-01` is IMPLEMENTED, not just decided — see sync note above.
+  The core loop already runs; these remaining items resolve the manager/role authorization
+  contradictions, complete the quality rating surface, ship the confirmed pause-jobs toggle, and fix
+  the worker analytics 403.)
 
 - **Decisions blocking Production** (on top of MVP):
   GD-07 (session revocation + rate-limiting), GD-08 (MFA, if in scope), GD-09 (retention/compliance — **long
@@ -618,7 +636,8 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 
 - **Bottom line:** the project is **decision-bound, not implementation-bound.** No unblocked application-code
   epic remains (post-Epic-8); the remaining engineering is well-scoped but almost every item waits on one of
-  the 23 decisions above. Making the four highest-leverage decisions (GD-01, GD-03, GD-09, GD-12) unblocks the
+  the 22 still-open decisions (23 total minus the now-implemented GD-01). Making the four highest-leverage
+  remaining decisions (GD-02, GD-03, GD-09, GD-12) unblocks the
   large majority of the remaining roadmap.
 
 ---

@@ -106,6 +106,41 @@ independently found stale on one row — see note under Epic 1).
 
 ---
 
+## Verification pass (2026-07-24, Epic 7 build-completion sync)
+
+Re-verified against `main` @ `4079a0f` (merge of PR #208, Epic 7 PR 7.7 — mobile push-token
+registration), the last commit in the Epic 7 chain. Method: `git log --oneline` cross-checked
+against every Epic 7 PR (7.1–7.8) named in §2 below, plus a direct read of the corresponding
+`backend/src/modules/notifications/`, `backend/worker/`, `mobile/*/src/` code and each PR's test
+suite — not the register's own prior "awaiting implementation authorization" status, which this
+pass found stale and corrects.
+
+- **Epic 7 is COMPLETE, all 8 PRs merged and verified in code:** `OutboxEvent` model +
+  transactional `enqueue()` (7.1, commits `1e9dad5`/`29f8a0b`); Platform Worker poll/claim/backoff/
+  dead-letter runtime (7.2, `b59d352`); all 4 legacy producers (work-requests, work-applications,
+  attendance, quality) migrated off `.catch(() => {})` onto `enqueue()` (7.3, `9f96a1b`); EMAIL
+  transport via SendGrid/Resend provider abstraction (7.4, `1711c68`); `PushToken` schema + APNs/FCM
+  clients + registration endpoint (7.5, `e58e280`/`a5c10b5`/`bb40648`/`b530a5e`); dead-letter
+  observability + runbook (7.6, `861bcd2`/`dcf41d7`); multi-app APNs topic support via
+  `PushToken.app`/`PushApp` enum (7.8, `efe3ddb`/`3572638`/`0bf74ce`); mobile push-token registration
+  + OS permission flow in both Expo apps (7.7, `7c115f1`/`3e4a5b6`). Backend suite green at
+  **523/523 tests, 51 suites** (up from 367/39 pre-Epic-7); mobile worker-app and checker-app each
+  37/37; `tsc --noEmit` clean; `repository-integrity-check.js` exit 0, 0 blocking findings.
+- **The §1 epic table's Epic 7 row and §2's Epic 7 PR table (below) are corrected in place** from
+  "DESIGN DECIDED ... awaiting implementation authorization" to **COMPLETE** — that status was
+  accurate at the 2026-07-23 write time but is now stale; implementation authorization was granted
+  and executed in full between 2026-07-23 and 2026-07-24.
+- **Governance register synchronized:** `SIR-NOTIF-004/006/007/008/009` already carried `RESOLVED —
+  2026-07-23, ADR-029` dispositions naming the not-yet-merged Epic 7 PRs as the implementation
+  vehicle; those PRs are now confirmed merged, so no further register edit is required — the prior
+  entries were forward-looking and are now simply corroborated, not corrected.
+  `docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md`'s GD-01 entry and MVP-blocking list are
+  synchronized in the same pass (see that file's own dated marker).
+- **No new epic identified.** Epic 8 (from the 2026-07-23 pass) remains the last-numbered epic; no
+  Epic 9 is opened by this pass. Full audit trail: `docs/15-audits/REPOSITORY_AUDIT_2026-07-24.md`.
+
+---
+
 ## 0. Sequencing challenge to the proposed framing (read first)
 
 The commissioning brief proposed: Epic 1 = Critical PATCH fix; Epic 2 = shared
@@ -160,7 +195,7 @@ down. Do not renumber.
 | 4 | ~~Attendance worker-side hotel-scoping (partial)~~ | SPEC-ATT-001 OQ-02 | — | **SUPERSEDED by implementation verification (2026-07-20) — no-op, see §2.** | SUPERSEDED (no-op) |
 | 5 | Hotel-Group / EMP / CRM migration (ADR-022 + ADR-023) | OD-EMP-05; ADR-022 retirement; **behavior-flip closure of** OQ-AUTH-06, ATT OQ-02 (manager half), QUAL OQ-03/OQ-09, CRM OQ-CRM-17, ANALYTICS OQ-ANALYTICS-12 | Epic 3 (seam) recommended; ADR-022/023 (ratified) | The large epic. Schema migration = highest rollback risk. | **COMPLETE** (PR 5.1–5.8, all merged) |
 | 6 | Quality / CRM / Analytics remaining G8 mediums/lows | QUAL OQ-01/02/04/05/07/08; CRM OD-CRM-02..17 (non-blocked); ANALYTICS OQ-ANALYTICS-02..11 (non-blocked) | headline OQs (QUAL OQ-01, ANALYTICS OQ-ANALYTICS-03) — **both now RESOLVED** (`ADR-026`, `ADR-028`); no remaining Decision Record blocker for this epic's headline items | Only sequence items not gated on an open Decision Record. | **Headline items COMPLETE**; all remaining sub-items OPEN, genuinely `human`-gated (re-verified 2026-07-23) |
-| 7 | Notification dispatch & delivery (Transactional Outbox + Worker, `ADR-029`) | SPEC-NOTIF-001 dispatch build: PRs 7.1–7.7 (outbox model, worker runtime, producer migration, EMAIL, PUSH-backend, observability, mobile push registration) | none — `ADR-029` (GD-01) resolves `OQ-NOTIF-01` dispatch half + `OQ-NOTIF-04/06/07/08/09` | Fully independent of the auth epics; parallelizable throughout. `OQ-NOTIF-02/03/05` ship under their own decisions, outside this epic. 7.7 (mobile) is independently reviewable/revertible from 7.5 (backend push transport). | **DESIGN DECIDED 2026-07-23 (`ADR-029`)**; build PRs 7.1–7.7 sequenced, awaiting implementation authorization |
+| 7 | Notification dispatch & delivery (Transactional Outbox + Worker, `ADR-029`) | SPEC-NOTIF-001 dispatch build: PRs 7.1–7.8 (outbox model, worker runtime, producer migration, EMAIL, PUSH-backend, observability, multi-app APNs, mobile push registration) | none — `ADR-029` (GD-01) resolves `OQ-NOTIF-01` dispatch half + `OQ-NOTIF-04/06/07/08/09` | Fully independent of the auth epics; parallelizable throughout. `OQ-NOTIF-02/03/05` ship under their own decisions, outside this epic. 7.7 (mobile) is independently reviewable/revertible from 7.5 (backend push transport). | **COMPLETE** (PRs 7.1–7.8 all merged as of PR #208, 2026-07-24; 523/523 backend tests green) |
 | 8 | Work-request / work-application hotel-scoping | SPEC-JOB-DISPATCH-001 FIND-SEC-002/003 / SIR-JOBD-002; MIG-GAP-07; target TREQ-008/TRULE-007 | none — Epic 5's scope model (PR 5.4/5.5) is the only prerequisite and is already merged | **New, identified by this pass.** Sibling High finding to Epic 1's Critical; never sequenced by the original plan. Same remediate-not-accept-risk precedent as Epics 1 and 5 PR 5.5. | **COMPLETE** (this session; 367/367 backend tests green, typecheck clean) |
 
 Deferred / not sequenced here (blocked on human authority, correctly excluded):
@@ -338,6 +373,10 @@ following dependency-ordered, individually-reviewable, backward-compatible PRs. 
 testable and reversible (additive schema, new process, no removal of the existing `Notification` REST
 surface). Remaining `human`-gated items (`OQ-NOTIF-02` retention/GD-09, `OQ-NOTIF-03` `FEATURE_*`,
 `OQ-NOTIF-05` cross-module send-authz) are **not** in Epic 7 and each ships under its own decision.
+
+**All 8 PRs below are MERGED as of 2026-07-24** (verified against `main` @ `4079a0f`; see the
+"Verification pass (2026-07-24, Epic 7 build-completion sync)" section above) — the table is
+retained for its sequencing/scope record, not as an open work list.
 
 | PR | Title | Scope | DB | Depends on |
 |----|-------|-------|----|-----------|
