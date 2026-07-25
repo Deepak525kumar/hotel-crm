@@ -37,8 +37,8 @@ mobile screens) and assume the decision is made first — the decision itself is
 | # | Decision | Priority | MVP? | Unlocks (est. PRs) |
 |---|---|---|---|---|
 | GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ IMPLEMENTED 2026-07-24 → `ADR-029` decided 2026-07-23 (Option B: Transactional Outbox + Worker runtime); built and merged as Epic 7, PRs 7.1–7.8** |
-| GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 |
-| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 |
+| GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 | **✅ DECIDED 2026-07-25 → `ADR-030` (capability-based model: hotel/group writes Admin-only; scoped `users:write`; manager/RM employee authority action-only, never field-level). PR-1 (security hardening) merged 2026-07-25; PR-2–PR-8 (matrix flip, `REGIONAL_MANAGER` enum) not yet built. `ADR-030` status remains `Proposed` pending explicit owner ratification.** |
+| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ PERMISSION SET DECIDED 2026-07-25 → `ADR-030` D-5 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) remains open — this decision resolves the permission set only. Code migration (enum + scope-claim issuance) pending `ADR-030` PR-2.** |
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
 | GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 |
 | GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 |
@@ -108,6 +108,22 @@ mobile screens) and assume the decision is made first — the decision itself is
 
 ## GD-02 — Manager write-permission authority
 
+> **✅ DECIDED 2026-07-25 by the project owner → `ADR-030` (capability-based permission model), reversing
+> this row's own Option (a) recommendation for hotels.** Hotel and hotel-group writes narrow to
+> `requireRole('admin')` — `MANAGER` is **not** granted `hotels:write` (CRR:429/§11:180 authority, plus the
+> owner's explicit "manager may not add, edit or delete a hotel" directive). `MANAGER`/`REGIONAL_MANAGER` do
+> gain scoped `users:write` (Option (a) as recommended, for users only), with role assignment, account
+> creation, and deletion excluded, and a mandatory DTO/route split (`ADR-030` D-4a) so the grant cannot
+> implicitly include role editing. Manager/RM authority over **employee records** (a separate question
+> raised during ratification, not originally scoped by this row) is decided as action-only, never
+> field-level — see `ADR-030` D-4b/D-4c. `PR-1` (HR/calendar authorization hardening, phantom-role removal,
+> elevation-guard fix — all correct regardless of this decision) merged 2026-07-25. `PR-2`–`PR-8` (the
+> capability-matrix flip itself) are not yet built. `ADR-030`'s status remains `Proposed` pending an explicit
+> owner ratification statement (Constitution §20).
+>
+> Resolves `OQ-USERS-09` (`users:delete` — deleted as a token rather than wired up, since the route is
+> role-gated only) in addition to the findings below.
+
 - **Why a decision is required:** A direct repository contradiction: route role-gates admit `manager`, but
   the permission map denies the corresponding `*:write`, so writes are net Admin-only. Resolving it either
   way changes the effective authorization set — a product call, not a bug to silently "fix."
@@ -128,6 +144,25 @@ mobile screens) and assume the decision is made first — the decision itself is
 - **Priority:** **P0 (small, unblocks CRM/Users write paths).** **Owner:** Product Owner.
 
 ## GD-03 — 5-role model & Regional-Manager authority
+
+> **✅ PERMISSION SET DECIDED 2026-07-25 by the project owner → `ADR-030` D-5 (`OQ-030-B`), Option (a) as
+> recommended.** `REGIONAL_MANAGER` is added to `UserRole`, holding `MANAGER`'s capability set evaluated at
+> `hotel_group` scope (all Hotel-Manager operational actions across every hotel in the group — employee
+> operations, scheduling, attendance, onboarding approvals, quality, notifications, analytics) plus
+> org-chart read. It holds **no master-data capability**: it may not create, delete, rename, re-parent, or
+> otherwise modify hotel groups or hotel master data, and may not appoint managers — the explicit
+> operational-authority/master-data-authority split CRR §11:180 and PDD §5.4 both require. This is
+> behaviour-preserving, not a new grant: `backend/src/modules/auth/service.ts`'s `resolveScope()` already
+> resolves an RM to `hotel_group` scope with documented "broader scope wins" precedence.
+>
+> **This row's org-chart/reporting-model half is NOT resolved by this decision** — `OD-EMP-12` (the
+> underlying reporting-relationship model) and `OQ-AUTH-08`'s data-model half remain open; only the RM
+> *permission* (who may view an org chart) is settled. `OD-CAL-07` (RM scheduling scope) is settled in
+> substance (RM inherits the Hotel-Manager scheduling capability at group scope) but not built.
+>
+> Code migration (enum addition, JWT scope-claim issuance, promoting existing RM users from `MANAGER`) is
+> `ADR-030` PR-2, not yet built. `SIR-USERS-012/020` and `SIR-AUTH-013` updated in the Specification Issues
+> Register to reflect the decision (implementation still pending).
 
 - **Why a decision is required:** CRR §1 / PDD §4.1 confirm **five** roles including a Regional Manager, but
   `UserRole` has only four tokens (`WORKER/CHECKER/MANAGER/ADMIN` — verified in `schema.prisma:22`). Epic 5
