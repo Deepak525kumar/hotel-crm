@@ -48,6 +48,16 @@ This split is the reconciliation of the owner's directive ("a manager should not
 - account creation and deletion remain Admin-only.
 A manager may edit the profile fields of a user within their scope. Nothing more.
 
+**D-4a — Split DTO/route, not a service-level `if`.** Today `PUT /users/:id` accepts a single `UpdateUserSchema` (`backend/src/modules/users/types.ts:12-18`) carrying `first_name`/`last_name`/`phone`/`is_active` **and** `role` in one object, enforced only by an incoming-value elevation guard inside `updateUser` (`service.ts:136-138`). That shape is the C-15 defect: whether a caller may touch `role` is decided by an `if` buried in a handler that also handles profile edits, not by the route or the schema. Extending `users:write` to a scoped role over that same DTO would make `users:write` **implicitly include role editing** for every manager, which is the opposite of what D-4 grants.
+
+Required before `users:write` is extended to any scoped role (binds PR-5, not deferred to implementation discretion):
+1. **Split the schema.** `UpdateUserProfileSchema` (`first_name`/`last_name`/`phone`/`is_active`) is the only body `MANAGER`/`REGIONAL_MANAGER` may submit to `PUT /users/:id`. `role` moves to its own schema and its own route (e.g. `PUT /users/:id/role`), gated `requireRole('admin')` only — no scoped role ever reaches a handler that can write `User.role`.
+2. **The service method mirrors the split**, not just the schema: `updateUserProfile(...)` takes no `role` parameter at all — there is no field for an elevation guard to police, because the code path cannot express a role change. `updateUserRole(...)` remains a distinct, Admin-only method retaining the C-15 fix (target's-current-role check, PR-1).
+3. **`permissions` and `scope` are never client-writable fields on any User DTO** — `permissions` is server-derived from `role` (`service.ts:147`) and `scope` is resolved at JWT issuance from `Hotel.manager_user_id`/`HotelGroup.regional_manager_user_id`, never a settable `User` column. No schema work needed here; recorded so the split above doesn't get "completed" by only handling `role` and missing an equivalent gap if one is later added.
+4. **Test:** a dedicated case asserts `MANAGER`/`REGIONAL_MANAGER` calling `PUT /users/:id` with a `role` field present is rejected at the schema/route boundary (400/404 on the wrong route), not merely denied by service logic — the boundary itself must not parse the field for a scoped caller.
+
+This is DTO-splitting, not a naming change: two schemas, two service methods, two routes, so `users:write` and role-assignment are structurally incapable of sharing an enforcement path.
+
 **D-5 — `REGIONAL_MANAGER` is added to `UserRole`.** It holds `MANAGER`'s capability set at `hotel_group` scope, plus group read and org-chart read. It gains **no** MASTER capability: an RM may not create, delete, or re-parent hotel groups (CRR §11:180 is explicit), nor appoint managers.
 
 **D-6 — Approve together, implement separately.** `GD-02` and `GD-03` are decided in this one record because the permission sets are inseparable. Their *implementation* is not coupled: the enum lands in its own PR (§6, PR-2) and nothing reads it until PR-5.
@@ -179,7 +189,7 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 | **PR-2** | Add `REGIONAL_MANAGER` enum + scope-claim issuance, behind `FEATURE_RM_ROLE`. Nothing reads the token yet (D-6) | PR-1 | M-1, M-3 | flag off (enum value is not removable — accepted) | **S** |
 | **PR-3** | Mobile + frontend role-union widening to accept `regional_manager` | PR-2 | — | revert | — |
 | **PR-4** | Scope-bind the currently unscoped reads: `GET /users`, `GET /crm/hotel-groups*`, `GET /analytics/{stats,leaderboard}`. Filter, do not deny (D-7) | PR-2 | — | revert | **S** |
-| **PR-5** | Enact §3: narrow hotel writes to Admin (D-3); grant scoped `users:write` (D-4); add `hotel_groups:*`, `hotels:operate`, `org_chart:read`; delete `hotels:delete`/`users:delete` (D-8); retire `FEATURE_SCOPE_AUTHZ` (M-4). Behind `FEATURE_GD02_MATRIX` | PR-4 | M-2 | flag off | **S**, **A** |
+| **PR-5** | Enact §3: narrow hotel writes to Admin (D-3); **split `PUT /users/:id` into a profile route/schema/service-method and an Admin-only `PUT /users/:id/role` (D-4a) before extending any grant**; grant scoped `users:write` on the profile path only (D-4); add `hotel_groups:*`, `hotels:operate`, `org_chart:read`; delete `hotels:delete`/`users:delete` (D-8); retire `FEATURE_SCOPE_AUTHZ` (M-4). Behind `FEATURE_GD02_MATRIX` | PR-4 | M-2 | flag off | **S**, **A** |
 | **PR-6** | Frontend capability gating: replace `ManagerAdminGate` with capability-named gates; hotel create/edit → admin only | PR-5 | — | revert | — |
 | **PR-7** | Permission-matrix invariant test (D-8) + the generated route × role integration matrix | PR-5 | — | revert | — |
 | **PR-8** | Documentation, register, and knowledge-graph synchronization; ratify this ADR's consequences into the affected specs | PR-7 | — | — | — |
@@ -188,6 +198,7 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 - **PR-1 before PR-5.** Granting `users:write` before the elevation-guard fix would let a manager demote or deactivate an Admin.
 - **PR-3 before PR-2's flag is enabled in production.** `ALLOWED_ROLES` in both mobile apps would otherwise lock out every Regional Manager.
 - **M-4 within PR-5, not after.** See §5.
+- **The DTO/route split (D-4a) lands before the `users:write` grant is enabled, not after.** Extending the grant over the current single-schema `PUT /users/:id` first and splitting later would open exactly the window this record exists to close.
 - **PR-1 may ship without ratifying this ADR.** It fixes defects that exist under either outcome.
 
 **Out of scope — deferred to `ADR-031`:** resolving permissions from the role at request time instead of from the stored `User.permissions` array and the JWT claim. That change touches auth, token issuance, middleware, caching, revocation (GD-07), audit, and every authorization check; it is an authorization-architecture decision, not a permission-matrix decision, and it must not ride inside this record's PR sequence. Until it lands, M-2 is re-run on every matrix change — an accepted, explicit cost.
