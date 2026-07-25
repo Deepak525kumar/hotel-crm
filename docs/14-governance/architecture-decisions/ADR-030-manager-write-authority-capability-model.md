@@ -1,6 +1,6 @@
 # ADR-030: Manager Write Authority — Capability-Based Permission Model
 
-- **Status:** **Proposed.** Authorizes no code, schema, specification edit, or migration until ratified by the project owner. Four items in §7 must be closed at ratification.
+- **Status:** **Proposed.** §7's four blockers are closed (2026-07-25, owner decision — see §7), and the record's substance is amended accordingly (D-4b/D-4c, D-5, §3, §8). Status remains `Proposed` pending an explicit ratification statement: per Constitution §20 item 3 and the repository's own convention (every `Accepted` ADR-021..029 records a specific ratification event — e.g. "Ratified directly by the project owner, recorded [date], session [id]" — `ADR-024/025/027/028/029`), a status flip to `Accepted` requires the owner's explicit sign-off, not an automatic transition on closing the open items. This authorizes no code, schema, or migration beyond what PR-1 already shipped, until that sign-off is recorded.
 - **Date:** 2026-07-25
 - **Scope:** Authorization model — resolves `GD-02` (Manager write-permission authority) and the permission-set half of `GD-03` (5-role model & Regional-Manager authority). Establishes **capability** as the unit of authorization design, sitting above the existing `resource:action` permission tokens.
 - **Supersedes:** none. Amends `ADR-024` D3/D5 (§5, M-4). Reverses the non-binding recommendation recorded against `GD-02` in `docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md` for the hotel half (§1, D-3).
@@ -48,6 +48,22 @@ This split is the reconciliation of the owner's directive ("a manager should not
 - account creation and deletion remain Admin-only.
 A manager may edit the profile fields of a user within their scope. Nothing more.
 
+**D-4b — `employees:write` confers no field-level edit right (ratified 2026-07-25, `OQ-030-A`).** `users:write` (D-4) governs the `User` *account* profile and is deliberately narrow. It must not be read across to the **employment record**, which is a different entity with a different owner (`backend-hr`/`SPEC-EMP-001`, `ADR-022`). Manager and Regional-Manager authority over an employment record is expressed **exclusively as discrete, named workflow transitions** — never as arbitrary field updates. The ratified transition set is:
+
+1. Approve / reject an employment application
+2. Mark a candidate suitable / unsuitable
+3. Confirm a signed contract
+4. Trigger onboarding / offboarding workflow where applicable
+
+Every employment-record **field** — identity, legal, payroll, tax, compensation, and employment terms — remains **Admin-owned**. No manager-editable field list exists, and none may be introduced by inference from `employees:write` or `users:write`: field-level ownership requires its own governance decision (GD-15 or a successor ADR), not an implicit widening of an existing permission token. See D-4c for why none of the four transitions is deliverable inside this record's PR sequence, and §8's invariant test, which makes this prohibition executable rather than advisory.
+
+**D-4c — the four transitions are owned elsewhere and are not in scope for this ADR.** Verified against the repository at `3f456c6`:
+
+- **F-1 — Transitions 1, 2 and 4** belong to **`backend-onboarding`**. `SPEC-ONBOARDING-001` §1/§6.6/§6.7 assigns pool/claim review, approve/reject, and probation-suitability decisioning to that module; Employee Management owns the record and *executes* the resulting transition. Its `lifecycleSignal` endpoint is the internal receiver of that decision and is correctly `requireRole('admin')`-gated with a service guard reading *"Lifecycle signals are internal-only"* — a manager never calls it directly. **`backend/src/modules/onboarding` does not exist**; there is no code module to extend.
+- **F-2 — Transition 3 (signed-contract confirmation) has an unbuilt route, not an ownership blocker.** `ADR-012` (Accepted, 2026-07-12) already settles the `OD-HR-01a`/`OD-HR-01b` ownership question this ADR's authoring pass initially (and incorrectly) treated as open: `backend-hr` owns contract generation, manager confirmation, and the full contract lifecycle; Onboarding is a **consumer** that coordinates/triggers, never an owner. `SPEC-HR-001`'s own Document Control text still reads architecture `BLOCKED` and `OD-HR-01a` "disclosed, not resolved" only because the spec predates `ADR-012` by 13 days and was never re-synchronized (a pre-existing documentation-sync gap, not created by this ADR — see §9's risk note). `IF-HR-ConfirmContractSigned` has no current route; it needs to be **built**, in `backend-hr`, not adjudicated.
+
+Consequently C-16 is `✗` for Manager and Regional Manager **at this revision** (§3) — this removes nothing, because no employment-record edit path has ever existed (zero of the module's ten routes are `PATCH`/`PUT`). The transitions are deferred to GD-15 and the Onboarding build.
+
 **D-4a — Split DTO/route, not a service-level `if`.** Today `PUT /users/:id` accepts a single `UpdateUserSchema` (`backend/src/modules/users/types.ts:12-18`) carrying `first_name`/`last_name`/`phone`/`is_active` **and** `role` in one object, enforced only by an incoming-value elevation guard inside `updateUser` (`service.ts:136-138`). That shape is the C-15 defect: whether a caller may touch `role` is decided by an `if` buried in a handler that also handles profile edits, not by the route or the schema. Extending `users:write` to a scoped role over that same DTO would make `users:write` **implicitly include role editing** for every manager, which is the opposite of what D-4 grants.
 
 Required before `users:write` is extended to any scoped role (binds PR-5, not deferred to implementation discretion):
@@ -58,7 +74,7 @@ Required before `users:write` is extended to any scoped role (binds PR-5, not de
 
 This is DTO-splitting, not a naming change: two schemas, two service methods, two routes, so `users:write` and role-assignment are structurally incapable of sharing an enforcement path.
 
-**D-5 — `REGIONAL_MANAGER` is added to `UserRole`.** It holds `MANAGER`'s capability set at `hotel_group` scope, plus group read and org-chart read. It gains **no** MASTER capability: an RM may not create, delete, or re-parent hotel groups (CRR §11:180 is explicit), nor appoint managers.
+**D-5 — `REGIONAL_MANAGER` is added to `UserRole`.** It holds `MANAGER`'s capability set at `hotel_group` scope, plus group read and org-chart read. It gains **no** MASTER capability: an RM may not create, delete, rename, re-parent, or otherwise modify hotel groups or hotel master data (CRR §11:180 is explicit), nor appoint managers. **Governing split, ratified 2026-07-25 (`OQ-030-B`): operational authority = Regional Manager, at group scope; master-data authority = Admin only.** The Regional Manager is an operational manager, not a hotel-group administrator — it inherits every operational capability a Hotel Manager holds (employee operations, scheduling, attendance, onboarding approvals, quality, notifications, analytics), evaluated across every hotel in its assigned group, and holds no administrative authority over the group entity itself. This is behaviour-preserving, not a new grant: `resolveScope()` (`backend/src/modules/auth/service.ts:29-51`) already resolves an RM to `{type:'hotel_group'}` with documented precedence *"regional manager (hotel_group, broader scope wins)"* — every operational `✓ᶜ` in §3's capability matrix already describes live behaviour.
 
 **D-6 — Approve together, implement separately.** `GD-02` and `GD-03` are decided in this one record because the permission sets are inseparable. Their *implementation* is not coupled: the enum lands in its own PR (§6, PR-2) and nothing reads it until PR-5.
 
@@ -84,6 +100,8 @@ This is DTO-splitting, not a naming change: two schemas, two service methods, tw
 `✓` = allowed · `✓ᶜ` = allowed within the actor's scope · `✗` = denied.
 Class: **M** = master data (D-2), **O** = operations.
 
+**Regional Manager column** — governed by D-5 (operational authority at group scope; no master-data capability). Every `✓ᶜ` below is an operational row; every RM `✗` below is a master-data row.
+
 | # | Capability | Class | Permission token(s) | Admin | Regional Mgr | Manager | Checker | Worker |
 |---|---|---|---|---|---|---|---|---|
 | C-01 | Create hotel | M | `hotels:write` | ✓ | ✗ | ✗ | ✗ | ✗ |
@@ -101,8 +119,8 @@ Class: **M** = master data (D-2), **O** = operations.
 | C-13 | Deactivate / delete user | M | — (role only) | ✓ | ✗ | ✗ | ✗ | ✗ |
 | C-14 | View users | O | `users:read` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ |
 | C-15 | Create / bulk-import employee | M | `employees:write` | ✓ | ✗ | ✗ | ✗ | ✗ |
-| C-16 | Employee operational transitions ¹ | O | `employees:write` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ |
-| C-17 | Edit employee identity / tax data | M | `employees:write` | ✓ | ✗ | ✗ | ✗ | ✗ (self at signup) |
+| C-16 | Employee operational transitions ¹ | O | — (no token; see D-4b) | ✓ | ✗ | ✗ | ✗ | ✗ |
+| C-17 | Edit employee record fields — identity, legal, payroll, tax, compensation, employment terms ² | M | `employees:write` | ✓ | ✗ | ✗ | ✗ | ✗ (self at signup) |
 | C-18 | Deactivate employee | M | `employees:delete` | ✓ | ✗ | ✗ | ✗ | ✗ |
 | C-19 | View employee profile | O | `employees:read` | ✓ | ✓ᶜ | ✓ᶜ | ✓ᶜ | ✓ self |
 | C-20 | Read special-category fields | M | `employees:special_category:read` | ✓ | ✗ | ✗ | ✗ | ✗ |
@@ -121,7 +139,9 @@ Class: **M** = master data (D-2), **O** = operations.
 | C-33 | View org chart | O | `org_chart:read` | ✓ | ✓ᶜ | ✗ | ✗ | ✗ |
 | C-34 | Administer notification outbox | M | — (role only) | ✓ | ✗ | ✗ | ✗ | ✗ |
 
-¹ C-16 is bounded to the two transitions with confirmed authority: application approve/reject and probation suitability (CRR §17:161-162), and signed-contract confirmation (CRR §14:134). The general field list is **OQ-030-A** (§7).
+¹ C-16 is `✗` at this revision, ratified 2026-07-25 (`OQ-030-A`, D-4b/D-4c): Manager/RM employee authority is action-only (application approve/reject and probation suitability — CRR §10:161-163; signed-contract confirmation — CRR §9:134 — corrected citation, drift D-1), never field-level, and none of the three actions is deliverable inside this ADR's PR sequence — two belong to the unbuilt `backend-onboarding` module (F-1); the third has no ownership blocker (`ADR-012` already settles it) but no route exists yet (F-2). Deferred to GD-15 / the Onboarding and HR builds.
+
+² No manager-editable employee field set exists or is introduced by this record (D-4b). Field-level ownership requires its own governance decision.
 
 ### Resulting `ROLE_PERMISSIONS`
 
@@ -154,7 +174,7 @@ WORKER:           unchanged
 | `User.role`, credentials, permissions | `backend-auth` | **No** | ADR-017, D-4 |
 | `User` profile fields | `backend-users` | Yes, in scope | ADR-017, D-4 |
 | `EmploymentRecord` — identity/tax | `backend-hr` | **No** | CRR §7:73, D-2 |
-| `EmploymentRecord` — lifecycle state | `backend-hr` | Yes, in scope (C-16) | CRR §17:161, §14:134 |
+| `EmploymentRecord` — lifecycle state | `backend-hr`/`backend-onboarding` (F-1, D-4c) | **No — action-only, deferred** (C-16, D-4b/D-4c) | CRR §10:161, §9:134 (corrected citation) |
 | `EmploymentRecord.hotel_group_id` | `backend-hr` | **No** | ADR-022, `REQ-EMP-012` |
 | `WorkerAssignment`, `WorkRequest`, `CalendarEntry` | owning module | Yes, in scope | PDD §5.4 |
 | `Attendance` | `backend-attendance` | Yes, in scope | PDD §5.4 |
@@ -187,7 +207,7 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 | **PR-0** | Characterization tests pinning today's net behaviour on the contradicted routes (manager denied on hotel and user writes) | — | — | revert | — |
 | **PR-1** | Security hardening that is correct under **either** GD-02 outcome: scope + role gates on `hr/routes.ts`; role gate on `calendar/routes.ts`; delete `super_admin` (D-10); fix the `updateUser` elevation guard to test the **target's current role**, not only the incoming value | PR-0 | — | revert per file | **S** |
 | **PR-2** | Add `REGIONAL_MANAGER` enum + scope-claim issuance, behind `FEATURE_RM_ROLE`. Nothing reads the token yet (D-6) | PR-1 | M-1, M-3 | flag off (enum value is not removable — accepted) | **S** |
-| **PR-3** | Mobile + frontend role-union widening to accept `regional_manager` | PR-2 | — | revert | — |
+| **PR-3** | Mobile + frontend role-union widening to accept `regional_manager`. **Also fixes F-3:** the hotel-group Regional Manager picker/display (`frontend/app/(protected)/hotel-groups/{new,[id]/edit,[id],page}.tsx`, 4 call sites) currently queries `useUserOptions({role:"manager"})` → `GET /users?role=manager`. After M-3 promotes existing RMs to `REGIONAL_MANAGER`, that query silently stops returning them — the picker and name-resolution views would show an incomplete/blank list for the exact users they exist to select. Fix: query `role=regional_manager` (or both roles during the transition) at all four sites. | PR-2 | — | revert | — |
 | **PR-4** | Scope-bind the currently unscoped reads: `GET /users`, `GET /crm/hotel-groups*`, `GET /analytics/{stats,leaderboard}`. Filter, do not deny (D-7) | PR-2 | — | revert | **S** |
 | **PR-5** | Enact §3: narrow hotel writes to Admin (D-3); **split `PUT /users/:id` into a profile route/schema/service-method and an Admin-only `PUT /users/:id/role` (D-4a) before extending any grant**; grant scoped `users:write` on the profile path only (D-4); add `hotel_groups:*`, `hotels:operate`, `org_chart:read`; delete `hotels:delete`/`users:delete` (D-8); retire `FEATURE_SCOPE_AUTHZ` (M-4). Behind `FEATURE_GD02_MATRIX` | PR-4 | M-2 | flag off | **S**, **A** |
 | **PR-6** | Frontend capability gating: replace `ManagerAdminGate` with capability-named gates; hotel create/edit → admin only | PR-5 | — | revert | — |
@@ -196,7 +216,7 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 
 **Ordering constraints that are not negotiable:**
 - **PR-1 before PR-5.** Granting `users:write` before the elevation-guard fix would let a manager demote or deactivate an Admin.
-- **PR-3 before PR-2's flag is enabled in production.** `ALLOWED_ROLES` in both mobile apps would otherwise lock out every Regional Manager.
+- **PR-3 before PR-2's flag is enabled in production.** `ALLOWED_ROLES` in both mobile apps would otherwise lock out every Regional Manager, and (F-3) the hotel-group RM picker would silently drop them from its list the moment M-3 runs.
 - **M-4 within PR-5, not after.** See §5.
 - **The DTO/route split (D-4a) lands before the `users:write` grant is enabled, not after.** Extending the grant over the current single-schema `PUT /users/:id` first and splitting later would open exactly the window this record exists to close.
 - **PR-1 may ship without ratifying this ADR.** It fixes defects that exist under either outcome.
@@ -205,18 +225,18 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 
 ---
 
-## 7. Open items — must be closed at ratification
+## 7. Open items — resolved by owner ratification, 2026-07-25
 
-This record cannot be ratified while these are open; none may be resolved by assumption (Constitution §6).
+All four items below were open at authoring time and are now closed. None was resolved by assumption (Constitution §6) — each was investigated against repository evidence, presented with options and a recommendation, and decided by the project owner. Full investigation and decision record: `ADR-030-S7-INVESTIGATION.md` / `ADR-030-S7-GOVERNANCE-REPORT.md` (session `claude/gd-02-manager-write-authority-b2g7rx`, 2026-07-25).
 
-| ID | Question | Effect if unresolved |
+| ID | Question | Resolution |
 |---|---|---|
-| **OQ-030-A** | Which employee fields may a scoped manager update (C-16)? No field-level authority exists in any specification. | C-16 stays bounded to the two CRR-confirmed transitions. |
-| **OQ-030-B** | Regional Manager: does the RM hold group-wide *operational* authority (CRR §1:20, assumed by §3), or is the RM purely a group administrator? The owner's directive ("RM should only manage hotel groups") is narrower than CRR §1:20 and, for group modification, the inverse of CRR §11:180. | §3 assumes the CRR §1:20 reading. If the narrower reading is intended, C-04, C-11, C-16, C-22–C-26, C-29–C-31 change from `✓ᶜ` to `✗` for RM. |
-| **OQ-030-C** | Does "invite worker" exist in the target model, given `REQ-EMP-012`'s no-hotel-tie rule? No endpoint exists; `HotelWorkerStatus.INVITED` survives only in the compatibility layer ADR-022 retires. | No capability row is created. Deferred to GD-15. |
-| **OQ-030-D** | Is there a manager-facing report export beyond the GDPR subject-rights export (C-32)? None is confirmed anywhere; CRR:439 places exports out of scope. | C-32 stays Admin-only. |
+| **OQ-030-A** | Which employee fields may a scoped manager update (C-16)? | **RESOLVED — none.** Manager/RM employee authority is action-only, never field-level (D-4b/D-4c). No field list is introduced; field-level ownership requires its own governance decision (GD-15 or successor). |
+| **OQ-030-B** | Does the RM hold group-wide *operational* authority, or is the RM purely a group administrator? | **RESOLVED — operational authority at group scope, no master-data authority** (D-5, amended). This is the PDD §5.4 reading; it is behaviour-preserving (`resolveScope()` already implements it) and does not conflict with CRR §11:180, which forbids only group/hotel master-data mutation. |
+| **OQ-030-C** | Does "invite worker" exist in the target model? | **RESOLVED — no.** Replaced by self-signup (CRR §6:73) + pool/claim manager approval (CRR §10). No invite capability, token, endpoint, or permission is introduced. The dormant `HotelWorkerStatus.INVITED`/`invited_at` remnants on the `ADR-022`-retired `HotelWorker` model are out of this ADR's scope — their removal is gated by `ADR-024` D5 and tracked as its own PR (§6 note), not folded in here. |
+| **OQ-030-D** | Is there a manager-facing report export beyond the GDPR subject-rights export (C-32)? | **RESOLVED — no.** Confirmed excluded three times independently (CRR §23:320, CRR:439, PDD §140). C-32 stays Admin-only. Any future export capability requires its own requirements decision, not inference from this ADR. |
 
-Two further conflicts are recorded rather than resolved, being outside this record's scope: `CHECKER` currently bypasses hotel scope entirely (`middleware/permissions.ts:131`), contradicting PDD §5.4; and worker analytics access is `GD-06`.
+Two further items are recorded rather than resolved, being genuinely outside this record's scope: `CHECKER` currently bypasses hotel scope entirely (`middleware/permissions.ts:131`), contradicting PDD §5.4; and worker analytics access is `GD-06`. Also outside scope: the org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) — `OQ-030-B` resolves the RM *permission*, not the org-chart *data model*, which remains open.
 
 ---
 
@@ -229,10 +249,12 @@ Two further conflicts are recorded rather than resolved, being outside this reco
 | `ADR-024` | **Amended.** D5's removal conditions for `FEATURE_SCOPE_AUTHZ` gain this record as a trigger (M-4). D1, D2, D4, D6 unaffected. |
 | `SPEC-CRM-001` (FROZEN) | `REQ-CRM-010` resolves **against** manager hotel-record writes and **for** scoped hotel operations (D-2/D-3). `OD-CRM-02`, `OD-CRM-07`, `OD-CRM-13` close. Correction-class forward-note at that spec's next revision — **not made by this record** (the ADR-023/ADR-025 precedent). |
 | `SPEC-USERS-001` (FROZEN) | `OQ-USERS-01` (5-role) and `OQ-USERS-02` (write authority) resolve. `SIR-AUTH-019` closes via PR-1. Forward-note at next revision. |
-| `SPEC-EMP-001` | `OD-EMP-08` resolves: creation stays Admin-only; the manager's operational transitions are bounded by OQ-030-A. |
-| `SPEC-AUTH-001` (FROZEN) | `TREQ-AUTH-002` gains the RM counterpart token. `OQ-AUTH-13` (RM code token) resolves. Forward-note at next revision. |
-| `GD-03` | Permission-set half resolved here. Org-chart model and reporting structure remain open in GD-03. |
-| `GD-05`, `GD-06`, `GD-07`, `GD-09` | Untouched. GD-07 (revocation) is the correct fix for the stale-token window this record accepts (§9). |
+| `SPEC-EMP-001` | `OD-EMP-08` resolves: creation stays Admin-only; manager/RM employee authority is action-only, never field-level (D-4b), and the three named actions belong to `backend-onboarding` (unbuilt, F-1) or `backend-hr` (route unbuilt, no ownership blocker — F-2) — not delivered by this record. `EVT-EMP-ProfileUpdated` (`[OPEN]`) stays open; no producing interface exists by this ratification. Correction-class forward-note at next revision. |
+| `SPEC-ONBOARDING-001` | Recorded, not amended by this ADR: owns transitions 1, 2 and 4 that D-4c defers (application approve/reject, probation suitability, onboarding/offboarding triggers). No PR in §6 builds this module (F-1). |
+| `SPEC-HR-001` (REVIEW) | Owns transition 3 (signed-contract confirmation, `IF-HR-ConfirmContractSigned`) once built — no ownership blocker; `ADR-012` (Accepted 2026-07-12) already settles `backend-hr` as owner, Onboarding as consumer. This ADR does not build the route (F-2). **Separately noted, not caused by this ADR:** `SPEC-HR-001`'s own Document Control still reads architecture `BLOCKED`/`OD-HR-01a` "disclosed, not resolved" because the spec predates `ADR-012` by 13 days and was never re-synchronized against it — a pre-existing documentation-sync gap (§9 risk note). |
+| `SPEC-AUTH-001` (FROZEN) | `TREQ-AUTH-002` gains the RM counterpart token. `OQ-AUTH-13` (RM code token) resolves. `OQ-AUTH-08` (org-chart visibility) resolves to the permission (RM+Admin); the org-chart data model stays open. Forward-note at next revision. |
+| `GD-03` | Permission-set half resolved here (D-5, ratified `OQ-030-B`). Org-chart reporting model (`OD-EMP-12`) and `OQ-AUTH-08`'s model half remain open in GD-03. |
+| `GD-05`, `GD-06`, `GD-07`, `GD-09`, `GD-15` | Untouched, except: `GD-15` (HR & Employee-Management build scope) now explicitly owns D-4c's three deferred employee-authority transitions. `GD-07` (revocation) is the correct fix for the stale-token window this record accepts (§9). |
 
 No blocking contradiction found against any checked authority.
 
@@ -246,6 +268,7 @@ No blocking contradiction found against any checked authority.
 - **Risk (Critical, mitigated by ordering):** granting `users:write` before PR-1's elevation-guard fix would permit manager→admin escalation.
 - **Risk (High, mitigated by PR-3 ordering):** Regional Managers locked out of both mobile apps by `ALLOWED_ROLES`.
 - **Risk (Medium):** `REQ-CRM-010` is a Confirmed requirement being narrowed by owner directive. This requires explicit ratification of D-2/D-3, not a silent specification edit.
+- **Pre-existing documentation-sync gap (not caused by this ADR):** `SPEC-HR-001`'s Document Control still records architecture `BLOCKED` and `OD-HR-01a`/`OD-HR-01b` "disclosed, not resolved," even though `ADR-012` (Accepted, 2026-07-12) settled that ownership question 13 days before the spec's last text update. F-2 (§2 D-4c) surfaced this while investigating whether contract confirmation was deliverable in this ADR's PR sequence. Recommend a documentation-workflow pass re-synchronize `SPEC-HR-001` against `ADR-012` — out of this ADR's scope, but worth flagging so it isn't mistaken for a live blocker in future sessions.
 - **Net effect on the current surface:** managers *lose* nothing they can exercise today (hotel and user writes are already denied in practice) and *gain* scoped user-profile editing plus explicitly bounded hotel operations. Five unscoped read surfaces close. Four security defects close in PR-1.
 
 ## 10. Scope note
