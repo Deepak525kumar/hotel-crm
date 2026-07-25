@@ -3,7 +3,7 @@ import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { isScopeAuthzEnabled } from '../config/feature-flags.js';
 import { isWorkerEligibleForHotel } from '../lib/roster-scope.js';
-import { isHotelInScope } from '../lib/scope.js';
+import { isHotelInScope, isWorkerInGroupScope } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
 export function requirePermission(permissions: string | string[]) {
@@ -16,8 +16,12 @@ export function requirePermission(permissions: string | string[]) {
     const requiredPermissions = Array.isArray(permissions) ? permissions : [permissions];
     const userPermissions = req.auth.permissions || [];
 
-    // Check if user has admin:* or super_admin role (implicit all permissions)
-    if (req.auth.role === 'super_admin' || userPermissions.includes('admin:*')) {
+    // Check if user has admin:* (implicit all permissions). ADR-030 C-14: a
+    // 'super_admin' role bypass previously lived here too, granting blanket
+    // permission-check bypass to a role string no enum, schema, or issuance
+    // path produces anywhere in the repository. Removed as dead code with no
+    // legitimate caller.
+    if (userPermissions.includes('admin:*')) {
       logger.info('Permission check allowed by role', {
         userId: req.auth.userId,
         role: req.auth.role,
@@ -204,6 +208,77 @@ export function checkHotelAccess() {
           hotelId,
           requestId: req.requestId,
         });
+      }
+
+      next();
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+
+export type WorkerAccessDecision =
+  | { allowed: true }
+  | { allowed: false; reason: 'missing_worker_id' | 'out_of_scope' };
+
+// Worker-id-keyed counterpart to resolveHotelAccess()/checkHotelAccess(), for
+// routes whose payload carries a worker_id rather than a hotel_id (ADR-030
+// PR-1, C-10 — HR contracts/payroll/documents). Admin bypasses; manager is
+// scope-bound via isWorkerInGroupScope() (group-grain, matching how the
+// employment record itself is scoped, REQ-EMP-012); every other role denies —
+// no role other than admin/manager currently holds any hr:* permission, so
+// this is defense-in-depth against a future grant, not a live restriction
+// today. Honors the same ADR-024 D3 compatibility guarantee every other
+// scoped module already does: flag off reproduces the pre-existing
+// (unscoped) manager behavior.
+export async function resolveWorkerScope(
+  role: string,
+  workerId: string | undefined,
+  scope: UserScope | null,
+): Promise<WorkerAccessDecision> {
+  if (role === 'admin') return { allowed: true };
+  if (!workerId) return { allowed: false, reason: 'missing_worker_id' };
+
+  if (role === 'manager') {
+    if (!isScopeAuthzEnabled()) return { allowed: true };
+    const inScope = await isWorkerInGroupScope(scope, workerId);
+    return inScope ? { allowed: true } : { allowed: false, reason: 'out_of_scope' };
+  }
+
+  return { allowed: false, reason: 'out_of_scope' };
+}
+
+export function checkWorkerScope() {
+  return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
+    if (!req.auth) {
+      next(new UnauthorizedError('Authentication required'));
+      return;
+    }
+
+    const workerId = (req.params.worker_id || req.body?.worker_id) as string | undefined;
+
+    try {
+      const decision = await resolveWorkerScope(req.auth.role, workerId, req.auth.scope ?? null);
+
+      if (!decision.allowed) {
+        if (decision.reason === 'missing_worker_id') {
+          logger.warn('Worker scope check: no worker_id provided', {
+            userId: req.auth.userId,
+            role: req.auth.role,
+            requestId: req.requestId,
+          });
+          next(new ForbiddenError('Worker ID is required'));
+          return;
+        }
+
+        logger.warn('Worker scope check denied', {
+          userId: req.auth.userId,
+          role: req.auth.role,
+          requestedWorker: workerId,
+          requestId: req.requestId,
+        });
+        next(new ForbiddenError(`Cannot access worker ${workerId}`));
+        return;
       }
 
       next();
