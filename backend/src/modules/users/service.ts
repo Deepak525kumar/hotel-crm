@@ -138,6 +138,15 @@ export class UserService extends BaseService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
+    // ADR-030 PR-1 (C-15 / SIR-AUTH-019): the pre-existing guard below only
+    // checked the incoming role, never the target's current one — a non-admin
+    // actor sending a payload with no `role` field at all sailed straight
+    // through against a user whose current role is already ADMIN. Non-admins
+    // may not modify an existing admin account at all, regardless of payload.
+    if (actorRole !== 'admin' && user.role === 'ADMIN') {
+      throw new ForbiddenError('Only admins can modify admin accounts');
+    }
+
     // Prevent non-admins from elevating to admin
     if (data.role === 'admin' && actorRole !== 'admin') {
       throw new ForbiddenError('Only admins can assign admin role');

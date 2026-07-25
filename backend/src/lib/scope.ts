@@ -28,3 +28,30 @@ export async function isHotelInScope(scope: UserScope | null, hotelId: string): 
   });
   return !!hotel && hotel.hotel_group_id === scope.hotel_group_id;
 }
+
+// Evaluates whether a manager's scope claim grants access to a worker's
+// employment record (ADR-030 PR-1, C-10). Employment records are group-grain,
+// never hotel-grain (REQ-EMP-012/ADR-022), so the compare is against
+// EmploymentRecord.hotel_group_id directly — the same comparison
+// employee-management's private isRecordInScope (service.ts) already performs,
+// made a shared primitive here since a second scoped-write consumer (HR) now
+// needs it. Deny-by-default: no scope, no employment record, or no group on
+// the record all deny.
+export async function isWorkerInGroupScope(scope: UserScope | null, workerId: string): Promise<boolean> {
+  if (!scope) return false;
+  const prisma = getPrisma();
+  const record = await prisma.employmentRecord.findUnique({
+    where: { user_id: workerId },
+    select: { hotel_group_id: true },
+  });
+  if (!record || !record.hotel_group_id) return false;
+  if (scope.type === 'global') return true;
+  if (scope.type === 'hotel_group') return scope.hotel_group_id === record.hotel_group_id;
+  // scope.type === 'hotel': resolve the hotel's group, mirroring isHotelInScope's
+  // own hotel_group-scope branch in the opposite direction.
+  const hotel = await prisma.hotel.findUnique({
+    where: { id: scope.hotel_id },
+    select: { hotel_group_id: true },
+  });
+  return !!hotel && hotel.hotel_group_id === record.hotel_group_id;
+}

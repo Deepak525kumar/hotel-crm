@@ -180,6 +180,71 @@ describe('UserService', () => {
     });
   });
 
+  // ADR-030 PR-1 (C-15 / SIR-AUTH-019): updateUser had zero test coverage
+  // before this PR. The pre-existing elevation guard checked only the
+  // incoming data.role, never the target user's current role — a non-admin
+  // actor sending a payload with no role field at all sailed through against
+  // an existing ADMIN account. Not reachable over HTTP today (MANAGER lacks
+  // users:write until GD-02), but this is the named prerequisite ADR-030
+  // requires before that grant can be made.
+  describe('updateUser', () => {
+    it('forbids a manager from modifying an existing admin account, even with a non-privileged payload', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_admin', role: 'ADMIN', first_name: 'Real', last_name: 'Admin',
+        phone: null, permissions: ['admin:*'], is_active: true, deleted_at: null,
+      });
+
+      await expect(
+        service.updateUser('u_admin', { first_name: 'Changed' }, 'manager_actor', 'manager')
+      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can modify admin accounts' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('forbids a manager from elevating an existing user to admin', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+
+      await expect(
+        service.updateUser('u_worker', { role: 'admin' }, 'manager_actor', 'manager')
+      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can assign admin role' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to modify an existing admin account (workflow preserved)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_admin', role: 'ADMIN', first_name: 'Real', last_name: 'Admin',
+        phone: null, permissions: ['admin:*'], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_admin', email: 'admin@test.com', first_name: 'Changed', last_name: 'Admin',
+        phone: null, role: 'ADMIN', permissions: ['admin:*'], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUser('u_admin', { first_name: 'Changed' }, 'admin_actor', 'admin');
+      expect(result.first_name).toBe('Changed');
+    });
+
+    it('allows a manager to modify a non-admin user\'s profile (workflow preserved)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUser('u_worker', { first_name: 'Changed' }, 'manager_actor', 'manager');
+      expect(result.first_name).toBe('Changed');
+    });
+  });
+
   describe('deleteUser', () => {
     it('prevents self-deletion', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'actor', deleted_at: null });

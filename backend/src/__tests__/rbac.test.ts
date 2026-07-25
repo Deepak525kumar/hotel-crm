@@ -1,6 +1,13 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
-import { requireRole, requirePermission, checkHotelAccess, resolveHotelAccess } from '../middleware/permissions.js';
+import {
+  requireRole,
+  requirePermission,
+  checkHotelAccess,
+  resolveHotelAccess,
+  checkWorkerScope,
+  resolveWorkerScope,
+} from '../middleware/permissions.js';
 
 jest.mock('../lib/logger.js', () => ({
   logger: { info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, warn: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, debug: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, error: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -95,6 +102,106 @@ describe('requirePermission middleware', () => {
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
     requirePermission('hotels:write')(req, makeRes(), next);
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
+  });
+
+  // ADR-030 C-14: 'super_admin' was a phantom role bypass — no enum value, no
+  // issuance path anywhere in the repository produces it. Removed as dead
+  // code; this pins that it no longer grants anything.
+  it('denies a super_admin role string (phantom role, no longer bypasses)', () => {
+    const req = makeReq({ userId: 'u1', role: 'super_admin', hotel_ids: [], permissions: [] });
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    requirePermission('hotels:write')(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
+  });
+});
+
+// ADR-030 PR-1 (C-10): worker-id-keyed counterpart to
+// resolveHotelAccess()/checkHotelAccess(), for routes whose payload carries a
+// worker_id rather than a hotel_id (HR contracts/payroll/documents).
+describe('resolveWorkerScope / checkWorkerScope (ADR-030 C-10)', () => {
+  beforeEach(() => {
+    scopeAuthzEnabled = true;
+    mockHotelFindUnique.mockReset();
+    mockEmploymentRecordFindUnique.mockReset();
+  });
+
+  it('allows admin unconditionally, with no DB query', async () => {
+    const decision = await resolveWorkerScope('admin', 'w1', null);
+    expect(decision).toEqual({ allowed: true });
+    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('denies when no worker_id is provided', async () => {
+    const decision = await resolveWorkerScope('manager', undefined, { type: 'hotel_group', hotel_group_id: 'g1' });
+    expect(decision).toEqual({ allowed: false, reason: 'missing_worker_id' });
+  });
+
+  it('allows a manager whose hotel_group scope matches the worker record directly', async () => {
+    mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    const decision = await resolveWorkerScope('manager', 'w1', { type: 'hotel_group', hotel_group_id: 'g1' });
+    expect(decision).toEqual({ allowed: true });
+    expect(mockHotelFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('allows a manager whose hotel scope resolves to the worker record\'s group', async () => {
+    mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    const decision = await resolveWorkerScope('manager', 'w1', { type: 'hotel', hotel_id: 'h1' });
+    expect(decision).toEqual({ allowed: true });
+  });
+
+  it('denies a manager whose scope does not match the worker record\'s group', async () => {
+    mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    const decision = await resolveWorkerScope('manager', 'w1', { type: 'hotel_group', hotel_group_id: 'g2' });
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('denies a manager with a null scope (deny-by-default)', async () => {
+    const decision = await resolveWorkerScope('manager', 'w1', null);
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('denies a manager when the worker has no EmploymentRecord', async () => {
+    mockEmploymentRecordFindUnique.mockResolvedValue(null);
+    const decision = await resolveWorkerScope('manager', 'w1', { type: 'global' });
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('allows a manager unconditionally when the flag is OFF (ADR-024 D3 compatibility)', async () => {
+    scopeAuthzEnabled = false;
+    const decision = await resolveWorkerScope('manager', 'w1', null);
+    expect(decision).toEqual({ allowed: true });
+    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    scopeAuthzEnabled = true;
+  });
+
+  it('denies any other role', async () => {
+    const decision = await resolveWorkerScope('checker', 'w1', null);
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('checkWorkerScope() middleware denies with ForbiddenError when out of scope', async () => {
+    mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['auth'] = {
+      userId: 'u1',
+      role: 'manager',
+      permissions: [],
+      scope: { type: 'hotel_group', hotel_group_id: 'g2' },
+    };
+    (req as unknown as Record<string, unknown>)['params'] = { worker_id: 'w1' };
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    await checkWorkerScope()(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
+  });
+
+  it('checkWorkerScope() middleware allows admin through unconditionally', async () => {
+    const req = makeReq({ userId: 'a1', role: 'admin', hotel_ids: [], permissions: [] });
+    (req as unknown as Record<string, unknown>)['params'] = {};
+    (req as unknown as Record<string, unknown>)['body'] = { worker_id: 'w1' };
+    const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
+    await checkWorkerScope()(req, makeRes(), next);
+    expect(next).toHaveBeenCalledWith();
   });
 });
 
