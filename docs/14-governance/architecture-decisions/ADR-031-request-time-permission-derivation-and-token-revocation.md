@@ -217,6 +217,23 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 - **PR-7 after a full-release soak, never in the same release as PR-5.** M-3 is the only irreversible step.
 - **PR-1 and PR-6 may ship independently of ratification.** Rate limiting and sweeping are correct under every option in §2, including (c).
 
+> **Owner amendment (2026-07-27):** the "full-release soak" precondition above was written
+> assuming transition into an operational deployment upon this ADR's completion. As of PR-7,
+> this repository has **no completed production deployment** — verified via the GitHub
+> Deployments API (192 sampled production-environment deploy attempts, 2026-06-14 through
+> 2026-07-26, 100% failure at the migration step on an unpopulated `DATABASE_URL` secret; zero
+> `release/*` tags) and first-party project record (`docs/legacy/infrastructure/AWS_DEPLOYMENT_EXECUTION_PLAN.md`,
+> 2026-06-20: *"no AWS resources provisioned, no deployment performed"*). The owner has decided:
+> PR-7 and PR-8 may proceed once PR-1 through PR-6 are fully implemented and gate-verified in the
+> repository, independent of whether a production environment has ever run this code. **The
+> production-soak precondition is not waived** — it is relocated from a repository-implementation
+> gate to an operational rollout gate, tracked in full at
+> `docs/implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md`, which must be satisfied before
+> either `FEATURE_DERIVED_PERMISSIONS` or `FEATURE_TOKEN_GENERATION_ENFORCEMENT` (or code at/after
+> PR-7, which removes them as toggles) ever runs against a real production database. Nothing in
+> D-1 through D-6 or C-1 through C-7 above is superseded by this amendment; only the *place* the
+> soak precondition is enforced changes.
+
 ---
 
 ## 8. Consequences
