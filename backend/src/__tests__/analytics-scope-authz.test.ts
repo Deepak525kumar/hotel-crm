@@ -90,6 +90,24 @@ describe('Analytics hotel access scope (OQ-ANALYTICS-12 / SIR-ANLY-014)', () => 
     const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h2');
     expect(res.status).toBe(200);
   });
+
+  // ADR-030 PR-7 review follow-up (FIND-1/FIND-2): resolveHotelAccess()
+  // previously had no regional_manager branch at all, so an RM fell through
+  // to the worker-roster check on these two checkHotelAccess()-gated routes
+  // instead of being scoped by their hotel_group claim like a manager. Pins
+  // that the fix (middleware/permissions.ts) actually enforces group scope.
+  it('allows a regional_manager to read a hotel within their group scope (200)', async () => {
+    testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h1');
+    expect(res.status).toBe(200);
+  });
+
+  it('denies a regional_manager reading a hotel outside their group scope (403)', async () => {
+    testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h2');
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ForbiddenError');
+  });
 });
 
 // OQ-ANALYTICS-12 also covers /analytics/hotel-summary/:hotel_id, whose
@@ -117,5 +135,20 @@ describe('Analytics hotel-summary scope (OQ-ANALYTICS-12 / SIR-ANLY-014)', () =>
     testAuth = { userId: 'adm_1', role: 'admin', permissions: ['admin:*'], scope: null };
     const res = await request(makeApp()).get('/analytics/hotel-summary/h2');
     expect(res.status).toBe(200);
+  });
+
+  // ADR-030 PR-7 review follow-up (FIND-1/FIND-2): see the leaderboard
+  // regional_manager cases above for the defect this pins.
+  it('allows a regional_manager to read a hotel summary within their group scope (200)', async () => {
+    testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    const res = await request(makeApp()).get('/analytics/hotel-summary/h1');
+    expect(res.status).toBe(200);
+  });
+
+  it('denies a regional_manager reading a hotel summary outside their group scope (403)', async () => {
+    testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    const res = await request(makeApp()).get('/analytics/hotel-summary/h2');
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ForbiddenError');
   });
 });
