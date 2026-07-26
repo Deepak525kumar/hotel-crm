@@ -146,7 +146,16 @@ function splitTopLevelArgs(argsInner: string): string[] {
   return parts;
 }
 
-/** Pulls every single/double-quoted string literal out of an argument fragment. */
+/**
+ * Pulls every single/double-quoted string literal out of an argument
+ * fragment. NOTE: this does not unescape backslash sequences — the captured
+ * text is the literal source between the quotes, backslash included, e.g.
+ * `'adm\'in'` yields `"adm\\'in"` (backslash retained), not `"adm'in"`. Only
+ * the closing-quote detection is escape-aware (an escaped quote is never
+ * mistaken for the terminator); no route or permission token in this
+ * codebase contains a quote character, so this is not a practical limitation
+ * today — see route-registry-parser.test.ts's escaped-quote case.
+ */
 function extractStringLiterals(fragment: string): string[] {
   const matches = fragment.match(/'([^'\\]|\\.)*'|"([^"\\]|\\.)*"/g) ?? [];
   return matches.map((m) => m.slice(1, -1));
@@ -203,7 +212,12 @@ function parseGates(chunk: string): { roles: string[] | null; permissions: strin
   return { roles, permissions };
 }
 
-function parseRouteFile(moduleName: string, source: string): ParsedRoute[] {
+// Exported for direct unit testing (route-registry-parser.test.ts) —
+// buildRouteRegistry() only exercises this indirectly via the real
+// modules/*/routes.ts files on disk, which doesn't pin the parser's
+// handling of tricky-but-currently-unused-in-practice source shapes
+// (multi-line calls, escaped quotes, etc.) against a fixed synthetic input.
+export function parseRouteFile(moduleName: string, source: string): ParsedRoute[] {
   const routes: ParsedRoute[] = [];
   const callRegex = /router\.(get|post|put|patch|delete)\(/g;
   let match: RegExpExecArray | null;
