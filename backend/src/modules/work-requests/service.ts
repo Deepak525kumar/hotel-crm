@@ -8,7 +8,6 @@ import {
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
 import { notificationService } from '../notifications/service.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
@@ -68,9 +67,9 @@ export class WorkRequestService extends BaseService {
     if (!hotel || hotel.deleted_at) throw new NotFoundError('Hotel not found');
 
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only create work
-    // requests for hotels in their scope claim when scope-authz is enabled.
+    // requests for hotels in their scope claim (retired M-4).
     // Admin keeps unconditional cross-hotel access (unchanged, by design).
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    if (actor.role === 'manager') {
       const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot create a work request for this hotel');
@@ -181,9 +180,9 @@ export class WorkRequestService extends BaseService {
     if (!wr) throw new NotFoundError('Work request not found');
 
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only patch work
-    // requests belonging to a hotel in their scope claim when scope-authz is
-    // enabled. Admin keeps unconditional cross-hotel access (unchanged).
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    // requests belonging to a hotel in their scope claim (retired M-4).
+    // Admin keeps unconditional cross-hotel access (unchanged).
+    if (actor.role === 'manager') {
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot modify this work request');

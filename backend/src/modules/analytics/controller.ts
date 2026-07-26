@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
 import { analyticsService } from './service.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 import type { UserScope } from '../../lib/jwt.js';
@@ -23,7 +22,6 @@ async function resolveScopedFilter(
   clientHotelId: string | undefined
 ): Promise<{ hotelId?: string; hotelGroupId?: string }> {
   if (pathHotelId) return { hotelId: pathHotelId };
-  if (!isScopeAuthzEnabled()) return { hotelId: clientHotelId };
   if (auth.role === 'admin') {
     // Admin: honor the client filter as before, including "no filter" =
     // every hotel/group.

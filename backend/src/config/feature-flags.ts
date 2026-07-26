@@ -13,17 +13,6 @@ export function isDirectDispatchMode(): boolean {
 }
 
 /**
- * Scope-based authorization cutover flag (Epic 5 PR 5.5, ADR-024 D3).
- * When enabled, the `manager` role is scope-bound via the PR 5.4 JWT `scope`
- * claim instead of bypassing hotel access. When disabled (rollback), manager
- * reverts to the pre-fix bypass — the "both-off reproduces current behavior"
- * compatibility guarantee.
- */
-export function isScopeAuthzEnabled(): boolean {
-  return getEnv().FEATURE_SCOPE_AUTHZ;
-}
-
-/**
  * Employment-record module cutover flag (Epic 5 PR 5.6, SPEC-EMP-001).
  * When disabled (default), the `/employees` routes are unmounted (404),
  * matching the "both-off = current behavior" posture (ADR-024 D3).
@@ -42,4 +31,18 @@ export function isEmploymentRecordEnabled(): boolean {
  */
 export function isRmRoleEnabled(): boolean {
   return getEnv().FEATURE_RM_ROLE;
+}
+
+/**
+ * GD-02/GD-03 capability-matrix cutover flag (ADR-030 §6 PR-5).
+ * When disabled (default), route gates keep requiring the legacy tokens
+ * (`hotels:read`/`hotels:write` on hotel-groups routes instead of the D-9
+ * split; `admin`+`manager` on hotel writes instead of D-3's admin-only) and
+ * `PUT /users/:id` keeps accepting the legacy combined profile+role body
+ * (not the D-4a split) — matching "both-off = current behavior", since
+ * `ROLE_PERMISSIONS` is a source constant with no effect on any existing
+ * account's stored permissions until M-2 backfills them.
+ */
+export function isGD02MatrixEnabled(): boolean {
+  return getEnv().FEATURE_GD02_MATRIX;
 }

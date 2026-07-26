@@ -13,6 +13,12 @@ jest.mock('../lib/logger.js', () => ({
   logger: { info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, warn: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, debug: jest.fn() as jest.MockedFunction<(...args: any[]) => any>, error: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
 }));
 
+// permissions.ts imports isGD02MatrixEnabled (ADR-030 PR-5) — mocked so this
+// suite never transitively loads the real env.ts under jest.
+jest.mock('../config/feature-flags.js', () => ({
+  isGD02MatrixEnabled: () => false,
+}));
+
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
@@ -21,14 +27,6 @@ jest.mock('../lib/db.js', () => ({
     hotel: { findUnique: mockHotelFindUnique },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
   }),
-}));
-
-// Epic 5 PR 5.5 (ADR-024 D3): the manager scope-authz cutover is gated by
-// isScopeAuthzEnabled(). A mutable flag lets individual cases assert both the
-// flip-ON behavior (default) and the OFF compatibility guarantee.
-let scopeAuthzEnabled = true;
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => scopeAuthzEnabled,
 }));
 
 function makeReq(auth?: Partial<{ userId: string; role: string; hotel_ids: string[]; permissions: string[]; email: string }>): Request {
@@ -120,7 +118,6 @@ describe('requirePermission middleware', () => {
 // worker_id rather than a hotel_id (HR contracts/payroll/documents).
 describe('resolveWorkerScope / checkWorkerScope (ADR-030 C-10)', () => {
   beforeEach(() => {
-    scopeAuthzEnabled = true;
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
   });
@@ -167,13 +164,6 @@ describe('resolveWorkerScope / checkWorkerScope (ADR-030 C-10)', () => {
     expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
   });
 
-  it('allows a manager unconditionally when the flag is OFF (ADR-024 D3 compatibility)', async () => {
-    scopeAuthzEnabled = false;
-    const decision = await resolveWorkerScope('manager', 'w1', null);
-    expect(decision).toEqual({ allowed: true });
-    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
-    scopeAuthzEnabled = true;
-  });
 
   it('denies any other role', async () => {
     const decision = await resolveWorkerScope('checker', 'w1', null);
@@ -207,7 +197,6 @@ describe('resolveWorkerScope / checkWorkerScope (ADR-030 C-10)', () => {
 
 describe('checkHotelAccess middleware', () => {
   beforeEach(() => {
-    scopeAuthzEnabled = true;
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
   });
@@ -220,8 +209,7 @@ describe('checkHotelAccess middleware', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
-  it('allows a manager with a matching hotel scope (Epic 5 PR 5.5, flag ON)', async () => {
-    scopeAuthzEnabled = true;
+  it('allows a manager with a matching hotel scope', async () => {
     const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
     (req as unknown as Record<string, unknown>)['auth'] = {
       userId: 'u1',
@@ -236,8 +224,7 @@ describe('checkHotelAccess middleware', () => {
     expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
   });
 
-  it('denies a manager whose hotel scope does not match (out_of_scope 403, flag ON)', async () => {
-    scopeAuthzEnabled = true;
+  it('denies a manager whose hotel scope does not match (out_of_scope 403)', async () => {
     const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
     (req as unknown as Record<string, unknown>)['auth'] = {
       userId: 'u1',
@@ -251,16 +238,13 @@ describe('checkHotelAccess middleware', () => {
     expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
   });
 
-  it('allows a manager unconditionally when the flag is OFF (ADR-024 D3 compatibility)', async () => {
-    scopeAuthzEnabled = false;
+  it('denies a manager with no scope claim (deny-by-default, M-4 retired the bypass)', async () => {
     const req = makeReq({ userId: 'u1', role: 'manager', hotel_ids: [], permissions: [] });
     (req as unknown as Record<string, unknown>)['auth'] = { userId: 'u1', role: 'manager', permissions: [], scope: null };
     (req as unknown as Record<string, unknown>)['params'] = { hotel_id: 'h1' };
     const next = jest.fn() as jest.MockedFunction<(...args: any[]) => any> as unknown as NextFunction;
     await checkHotelAccess()(req, makeRes(), next);
-    expect(next).toHaveBeenCalledWith();
-    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
-    scopeAuthzEnabled = true;
+    expect(next).toHaveBeenCalledWith(expect.objectContaining({ name: 'ForbiddenError' }));
   });
 
   it('allows checkers unconditionally (PATCH-04 §4c bypass — no DB query)', async () => {
@@ -331,7 +315,6 @@ describe('checkHotelAccess middleware', () => {
 // documented baseline to diverge from deliberately, not accidentally.
 describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
   beforeEach(() => {
-    scopeAuthzEnabled = true;
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
   });
@@ -343,7 +326,8 @@ describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
     expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
   });
 
-  // Epic 5 PR 5.5: the manager role is now scope-bound when the flag is ON.
+  // Epic 5 PR 5.5 (ADR-024, scope-authz retired unconditional M-4): the
+  // manager role is always scope-bound.
   it('allows a manager whose hotel scope matches the target (viaBypass:false)', async () => {
     const decision = await resolveHotelAccess('manager', 'u1', 'h1', { type: 'hotel', hotel_id: 'h1' });
     expect(decision).toEqual({ allowed: true, viaBypass: false });
@@ -355,12 +339,10 @@ describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
     expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
   });
 
-  it('reverts a manager to bypass when the flag is OFF (ADR-024 D3 compatibility)', async () => {
-    scopeAuthzEnabled = false;
+  it('denies a manager with a null scope claim (deny-by-default, M-4 retired the bypass)', async () => {
     const decision = await resolveHotelAccess('manager', 'u1', 'h1', null);
-    expect(decision).toEqual({ allowed: true, viaBypass: true });
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
     expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
-    scopeAuthzEnabled = true;
   });
 
   it('allows a worker whose EmploymentRecord group matches the target hotel group', async () => {

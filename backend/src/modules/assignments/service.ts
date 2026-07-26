@@ -2,7 +2,6 @@ import { Prisma, WorkerAssignment, AssignmentStatus, RoomsCompletedEntry } from 
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
@@ -159,7 +158,7 @@ export class AssignmentService extends BaseService {
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    if (actor.role === 'manager') {
       const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot log rooms completed for this hotel');

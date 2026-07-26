@@ -9,7 +9,6 @@ import {
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
@@ -32,9 +31,9 @@ export class QualityService extends BaseService {
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    // Epic 5 PR 5.5 (ADR-024): a manager may only verify attendance for hotels
-    // in their scope claim when scope-authz is enabled. Admin/checker unchanged.
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager may only verify
+    // attendance for hotels in their scope claim. Admin/checker unchanged.
+    if (actor.role === 'manager') {
       const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot verify attendance for this hotel');
@@ -142,9 +141,9 @@ export class QualityService extends BaseService {
         throw new ForbiddenError('worker_id does not match the assignment worker');
       }
 
-      // Epic 5 PR 5.5 (ADR-024): a manager may only rate for hotels in their
-      // scope claim when scope-authz is enabled. Admin/checker unchanged.
-      if (isScopeAuthzEnabled() && actor.role === 'manager') {
+      // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager may only rate for
+      // hotels in their scope claim. Admin/checker unchanged.
+      if (actor.role === 'manager') {
         const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
         if (!inScope) {
           throw new ForbiddenError('Cannot rate for this hotel');

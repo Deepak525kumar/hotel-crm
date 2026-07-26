@@ -206,14 +206,14 @@ describe('WorkApplicationService', () => {
   describe('update', () => {
     it('throws NotFoundError for unknown application', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(null);
-      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'manager' })).rejects.toMatchObject({
+      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'admin' })).rejects.toMatchObject({
         name: 'NotFoundError',
       });
     });
 
     it('throws ConflictError when application is already resolved', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp({ status: 'ACCEPTED' }));
-      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'manager' })).rejects.toMatchObject({
+      await expect(service.update('wr1', 'app1', { status: 'REJECTED' }, { userId: 'mgr1', role: 'admin' })).rejects.toMatchObject({
         name: 'ConflictError',
       });
     });
@@ -221,7 +221,7 @@ describe('WorkApplicationService', () => {
     it('rejects with reason', async () => {
       mockWorkApplication.findUnique.mockResolvedValue(makeApp());
       mockWorkApplication.update.mockResolvedValue(makeApp({ status: 'REJECTED', rejection_reason: 'not qualified' }));
-      const dto = await service.update('wr1', 'app1', { status: 'REJECTED', rejection_reason: 'not qualified' }, { userId: 'mgr1', role: 'manager' });
+      const dto = await service.update('wr1', 'app1', { status: 'REJECTED', rejection_reason: 'not qualified' }, { userId: 'mgr1', role: 'admin' });
       expect(dto.status).toBe('REJECTED');
       expect(dto.rejection_reason).toBe('not qualified');
 
@@ -266,7 +266,7 @@ describe('WorkApplicationService', () => {
     it('throws NotFoundError when work request does not exist', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(null);
       await expect(
-        service.list('wr1', { page: 1, per_page: 20 } as any, { userId: 'mgr1', role: 'manager' })
+        service.list('wr1', { page: 1, per_page: 20 } as any, { userId: 'mgr1', role: 'admin' })
       ).rejects.toMatchObject({ name: 'NotFoundError' });
     });
 
@@ -283,7 +283,7 @@ describe('WorkApplicationService', () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeWr());
       mockWorkApplication.findMany.mockResolvedValue([makeApp()]);
       mockWorkApplication.count.mockResolvedValue(1);
-      const res = await service.list('wr1', { page: 1, per_page: 20 } as any, { userId: 'mgr1', role: 'manager' });
+      const res = await service.list('wr1', { page: 1, per_page: 20 } as any, { userId: 'mgr1', role: 'admin' });
       expect(res.total).toBe(1);
     });
   });

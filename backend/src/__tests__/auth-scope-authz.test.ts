@@ -5,17 +5,13 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  *
  * Cites OQ-AUTH-06 / SIR-AUTH-003: the `manager` role must be constrained to
  * the hotels in its PR 5.4 JWT `scope` claim instead of bypassing hotel access.
+ * The cutover flag (FEATURE_SCOPE_AUTHZ) was retired in ADR-030 PR-5 (M-4):
+ * scope-binding is now unconditional, not a toggle.
  *
- * Exercises resolveHotelAccess() directly with the scope-authz flag ON. Removing
- * the manager-scope flip (i.e. restoring the old manager bypass) makes the
- * out-of-scope / null-scope deny cases below fail — this suite is the
- * removal-detector for that change.
+ * Exercises resolveHotelAccess() directly. Reintroducing the old manager
+ * bypass makes the out-of-scope / null-scope deny cases below fail — this
+ * suite is the removal-detector for that change.
  */
-
-let scopeAuthzEnabled = true;
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => scopeAuthzEnabled,
-}));
 
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -25,6 +21,12 @@ jest.mock('../lib/db.js', () => ({
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotel: { findUnique: mockHotelFindUnique },
   }),
+}));
+
+// permissions.ts imports isGD02MatrixEnabled (ADR-030 PR-5) — mocked so this
+// suite never transitively loads the real env.ts under jest.
+jest.mock('../config/feature-flags.js', () => ({
+  isGD02MatrixEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({
@@ -40,12 +42,11 @@ import { resolveHotelAccess } from '../middleware/permissions.js';
 
 describe('resolveHotelAccess scope-authz (OQ-AUTH-06 / SIR-AUTH-003)', () => {
   beforeEach(() => {
-    scopeAuthzEnabled = true;
     mockEmploymentRecordFindUnique.mockReset();
     mockHotelFindUnique.mockReset();
   });
 
-  describe('manager with flag ON', () => {
+  describe('manager', () => {
     it('allows when hotel scope matches the target hotel', async () => {
       const d = await resolveHotelAccess('manager', 'u1', 'h1', { type: 'hotel', hotel_id: 'h1' });
       expect(d).toEqual({ allowed: true, viaBypass: false });
@@ -90,15 +91,6 @@ describe('resolveHotelAccess scope-authz (OQ-AUTH-06 / SIR-AUTH-003)', () => {
     it('denies with missing_hotel_id when no hotel is provided', async () => {
       const d = await resolveHotelAccess('manager', 'u1', undefined, { type: 'global' });
       expect(d).toEqual({ allowed: false, reason: 'missing_hotel_id' });
-    });
-  });
-
-  describe('manager with flag OFF (ADR-024 D3 compatibility)', () => {
-    it('reverts to the pre-fix cross-hotel bypass', async () => {
-      scopeAuthzEnabled = false;
-      const d = await resolveHotelAccess('manager', 'u1', 'h1', null);
-      expect(d).toEqual({ allowed: true, viaBypass: true });
-      expect(mockHotelFindUnique).not.toHaveBeenCalled();
     });
   });
 

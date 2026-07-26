@@ -12,7 +12,6 @@ import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { notificationService } from '../notifications/service.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
@@ -200,10 +199,10 @@ export class WorkApplicationService extends BaseService {
     }
 
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-003): a manager may only reject
-    // applications belonging to a work request in their scope claim when
-    // scope-authz is enabled. Admin keeps unconditional cross-hotel access
-    // (unchanged); workers only reach here via WITHDRAWN and are unaffected.
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    // applications belonging to a work request in their scope claim (retired
+    // M-4). Admin keeps unconditional cross-hotel access (unchanged);
+    // workers only reach here via WITHDRAWN and are unaffected.
+    if (actor.role === 'manager') {
       const wr = await this.prisma.workRequest.findUnique({ where: { id: workRequestId } });
       if (!wr) throw new NotFoundError('Work request not found');
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
@@ -262,9 +261,9 @@ export class WorkApplicationService extends BaseService {
     if (!wr) throw new NotFoundError('Work request not found');
 
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-003): a manager may only approve
-    // applications for work requests in their scope claim when scope-authz is
-    // enabled. Admin keeps unconditional cross-hotel access (unchanged).
-    if (isScopeAuthzEnabled() && actor.role === 'manager') {
+    // applications for work requests in their scope claim (retired M-4).
+    // Admin keeps unconditional cross-hotel access (unchanged).
+    if (actor.role === 'manager') {
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot approve applications for this hotel');

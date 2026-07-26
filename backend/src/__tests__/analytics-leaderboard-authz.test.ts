@@ -137,10 +137,14 @@ describe('Analytics leaderboard authorization (S0-6 regression / OQ-ANALYTICS-01
       expect(res.status).toBe(200);
     });
 
-    it('allows a manager for any hotel (200)', async () => {
+    // Superseded by Epic 5 PR 5.5's scope-authz flip (now unconditional,
+    // ADR-030 PR-5 M-4): a manager with no scope claim denies, they don't
+    // bypass. See analytics-scope-authz.test.ts for the in-scope/out-of-scope
+    // matrix this test predates.
+    it('denies a manager with no scope claim for any hotel (403)', async () => {
       testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: [] };
       const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h_any');
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
     });
   });
 });

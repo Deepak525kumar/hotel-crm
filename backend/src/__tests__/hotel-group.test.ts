@@ -35,9 +35,6 @@ const mockPrisma = {
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
-}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',

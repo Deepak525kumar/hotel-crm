@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
-import { isScopeAuthzEnabled } from '../config/feature-flags.js';
+import { isGD02MatrixEnabled } from '../config/feature-flags.js';
 import { isWorkerEligibleForHotel } from '../lib/roster-scope.js';
 import { isHotelInScope, isWorkerInGroupScope } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
@@ -99,9 +99,30 @@ export function requireRole(roles: string | string[]) {
   };
 }
 
+// ADR-030 PR-5 (§6, "Behind FEATURE_GD02_MATRIX"): a handful of route gates
+// narrow or rename as part of enacting §3's capability matrix, but their
+// REQUIRED token/role must not simply flip in source — `ROLE_PERMISSIONS`
+// (a source constant) has no effect on any existing account's *stored*
+// permissions until M-2's backfill runs (permissions are stored, not
+// derived — §1 fact 2). These two wrappers read the flag fresh on every
+// request (not once at router setup) so the "both-off = current behavior"
+// guarantee holds until M-2 has actually run and the flag is flipped.
+export function requireRoleFlagged(oldRoles: string | string[], newRoles: string | string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const roles = isGD02MatrixEnabled() ? newRoles : oldRoles;
+    requireRole(roles)(req, res, next);
+  };
+}
+
+export function requirePermissionFlagged(oldToken: string | string[], newToken: string | string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    const token = isGD02MatrixEnabled() ? newToken : oldToken;
+    requirePermission(token)(req, res, next);
+  };
+}
+
 export type HotelAccessDecision =
-  // `viaBypass: true` = admin/checker role bypass (PATCH-04 §4c), or manager
-  // bypass while the scope-authz flag is OFF (ADR-024 D3 rollback); no DB
+  // `viaBypass: true` = admin/checker role bypass (PATCH-04 §4c); no DB
   // query is performed for the scope decision. `viaBypass: false` = allowed
   // either via a group-scope-eligible worker or via a matching
   // manager scope claim (Epic 5 PR 5.5 authz flip). Callers use this to
@@ -121,10 +142,9 @@ export { isHotelInScope } from '../lib/scope.js';
 // checkHotelAccess() goes through this one function, so the Epic 5 authz flip
 // (ADR-023 / ADR-024) has exactly one place to change allow/deny behavior
 // instead of nine call sites. Admin and checker keep their cross-hotel bypass
-// unchanged; the manager role is now scope-bound via the PR 5.4 `scope` claim
-// whenever the FEATURE_SCOPE_AUTHZ flag is enabled (default), and reverts to the
-// old bypass when it is off (ADR-024 D3 compatibility guarantee). See the
-// characterization suite in `__tests__/rbac.test.ts`.
+// unchanged; the manager role is unconditionally scope-bound via the PR 5.4
+// `scope` claim (the FEATURE_SCOPE_AUTHZ rollback flag was retired in
+// ADR-030 PR-5, M-4). See the characterization suite in `__tests__/rbac.test.ts`.
 export async function resolveHotelAccess(
   role: string,
   userId: string,
@@ -138,11 +158,6 @@ export async function resolveHotelAccess(
   }
 
   if (role === 'manager') {
-    // Compatibility guarantee (ADR-024 D3): with the scope-authz flag OFF the
-    // manager keeps the pre-fix cross-hotel bypass.
-    if (!isScopeAuthzEnabled()) {
-      return { allowed: true, viaBypass: true };
-    }
     if (!hotelId) {
       return { allowed: false, reason: 'missing_hotel_id' };
     }
@@ -228,9 +243,7 @@ export type WorkerAccessDecision =
 // employment record itself is scoped, REQ-EMP-012); every other role denies —
 // no role other than admin/manager currently holds any hr:* permission, so
 // this is defense-in-depth against a future grant, not a live restriction
-// today. Honors the same ADR-024 D3 compatibility guarantee every other
-// scoped module already does: flag off reproduces the pre-existing
-// (unscoped) manager behavior.
+// today.
 export async function resolveWorkerScope(
   role: string,
   workerId: string | undefined,
@@ -240,7 +253,6 @@ export async function resolveWorkerScope(
   if (!workerId) return { allowed: false, reason: 'missing_worker_id' };
 
   if (role === 'manager') {
-    if (!isScopeAuthzEnabled()) return { allowed: true };
     const inScope = await isWorkerInGroupScope(scope, workerId);
     return inScope ? { allowed: true } : { allowed: false, reason: 'out_of_scope' };
   }
