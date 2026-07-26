@@ -112,6 +112,14 @@ nodes:
   # FEATURE_ROSTER_CUTOVER (default off = unchanged HotelWorker behavior).
   - { id: scope-lib, kind: contract, owner: unassigned, source: backend/src/lib/scope.ts }
   - { id: roster-scope-lib, kind: contract, owner: unassigned, source: backend/src/lib/roster-scope.ts }
+  # ADR-031 D-1/PR-8 (2026-07-27): reclassified from an internal write-time constant of
+  # backend-users (consulted only by the now-retired role-permissions-backfill.ts) to a
+  # request-path shared contract node owned by backend-auth. Consulted unconditionally
+  # on every authenticated request by auth-middleware to derive req.auth.permissions
+  # from User.role (both feature flags gating this retired at PR-7); also read by
+  # backend-users/backend-auth to compute the permissions field on response bodies
+  # now that the underlying User.permissions column is dropped (ADR-031 M-3).
+  - { id: role-permissions, kind: contract, owner: backend-auth, source: backend/src/config/constants.ts }
 
   # State domains (Prisma models). authoritative_writer is the module that
   # creates/updates the model; UNKNOWN where more than one module writes it.
@@ -204,6 +212,19 @@ edges:
     evidence: "backend/src/modules/work-applications/service.ts:256 (tx.attendance.create)"
 
   # --- Cross-module state reads (a module reads a state domain it does not own) ---
+  # ADR-031 D-3/PR-8 (2026-07-27): backend-auth already owns state-user's writer role
+  # (ADR-017); this edge records the newly-live REQUEST-PATH read auth-middleware.ts
+  # added (ADR-031 D-3, unconditional as of PR-7) -- one indexed User row read on every
+  # authenticated request, to resolve is_active/deleted_at/role/token_generation for
+  # request-time permission derivation and token_generation revocation. Distinct from
+  # (additional to) the pre-existing write-path ownership edge.
+  - id: edge-auth-middleware-reads-user
+    source: backend-auth
+    target: state-user
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/middleware/auth.ts (resolveLiveAuth: prisma.user.findUnique, unconditional as of ADR-031 PR-7)"
   - id: edge-work-requests-reads-hotel
     source: backend-work-requests
     target: state-hotel

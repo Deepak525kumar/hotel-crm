@@ -42,7 +42,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
 | GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 |
 | GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 |
-| GD-07 | Session/token revocation & auth rate-limiting | **P1** | Prod | 3–5 |
+| GD-07 | Session/token revocation & auth rate-limiting | **P1** | Prod | 3–5 | **✅ DECIDED 2026-07-26 → `ADR-031` (Option (a): request-time permission derivation, `token_generation` revocation counter, Platform Worker session/reset-token sweep, Nginx-edge rate limiting per `TREQ-AUTH-008`). PR-0 through PR-8 (edge rate limiting, schema/claim, derivation+revocation cutover, write-path bumps, claim removal, client forced-re-auth, sweep job, flag retirement + `User.permissions` column drop, documentation/register/knowledge-graph sync) all merged 2026-07-26/27. `ADR-031` status: Accepted (ratified 2026-07-26). Rate-limiting resolved at the Nginx/Cloudflare edge, not in `backend/src`, per the Confirmed `TREQ-AUTH-008`/`TRULE-AUTH-002` requirement `ADR-031` consumes rather than amends. `FIND-004`/`SIR-AUTH-019` (admin-account-modification guard) was already resolved separately via `ADR-030` PR-1 and is not re-resolved here. `SIR-AUTH-017` (password-reset timing side-channel) remains explicitly OPEN — out of `ADR-031`'s scope (§9 Non-goals/§10 OI-1).** |
 | GD-08 | MFA design & data model | **P2** | Prod | 3–5 |
 | GD-09 | GDPR retention-tier assignment & Retention module | **P1** | Prod | 6–10 |
 | GD-10 | Platform concurrency / optimistic-locking pattern | **P2** | Prod | 3–4 |

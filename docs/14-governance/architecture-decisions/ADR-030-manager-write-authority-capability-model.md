@@ -203,6 +203,8 @@ Employment records remain group-grain with no per-hotel tie (`REQ-EMP-012`, ADR-
 
 **Operational envelope:** M-2 and M-3 are data-only and idempotent; both take a pre-migration snapshot of `(user_id, role, permissions)` to a backup table retained for one release. Rollback of the matrix decision itself is by feature flag (PR-5), not by reversing M-2 — reversing M-2 alone would leave roles and permissions inconsistent.
 
+> **Superseded note (`ADR-031` PR-8, 2026-07-27):** M-2's backfill treadmill this row describes ("re-runs on any later matrix change until `ADR-031` lands") ended when `ADR-031` landed. Permissions are now derived request-time from `ROLE_PERMISSIONS[role]` (`ADR-031` D-1) rather than stored on `User.permissions`; the column itself is dropped (`ADR-031` M-3, PR-7, `#233`). `role-permissions-backfill.ts` (the script that performed M-2) is retired — deleted, not merely disabled — since it read/wrote a column that no longer exists. This note does not rewrite M-2's history above (it was load-bearing and correct for `ADR-030`'s own PR sequence); it records that the condition under which M-2 would need to re-run no longer exists.
+
 ---
 
 ## 6. Final PR sequence
@@ -269,8 +271,8 @@ No blocking contradiction found against any checked authority.
 
 ## 9. Consequences and risks
 
-- **Accepted:** an access-token-TTL window during which a changed matrix is not yet reflected in live tokens. There is no revocation mechanism (GD-07). Bounded, documented, not fixed here.
-- **Accepted:** M-2 must re-run on every future matrix change until `ADR-031` lands.
+- **Accepted (superseded — `ADR-031` PR-8, 2026-07-27):** an access-token-TTL window during which a changed matrix is not yet reflected in live tokens. There is no revocation mechanism (GD-07). Bounded, documented, not fixed here. **`ADR-031` is that mechanism**: request-time derivation (D-1) plus the `token_generation` revocation counter (D-3/D-4) close this window — a role change, deactivation, or soft delete now takes effect on the demoted/deactivated user's very next request, not at TTL expiry. `GD-07` is resolved.
+- **Accepted (superseded — `ADR-031` PR-8, 2026-07-27):** M-2 must re-run on every future matrix change until `ADR-031` lands. **`ADR-031` has landed** (PR-1 through PR-8, `#225`-`#233`): permissions are derived request-time from `ROLE_PERMISSIONS[role]`, never stored, so a future matrix change is a source edit plus a test — no backfill, no per-user data change, no re-run of anything.
 - **Irreversible:** M-1 (enum value) and M-4 (flag retirement), both by design.
 - **Risk (Critical, mitigated by ordering):** granting `users:write` before PR-1's elevation-guard fix would permit manager→admin escalation.
 - **Risk (High, mitigated by PR-3 ordering):** Regional Managers locked out of both mobile apps by `ALLOWED_ROLES`.
