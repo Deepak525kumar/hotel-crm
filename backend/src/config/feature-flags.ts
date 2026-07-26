@@ -31,3 +31,15 @@ export function isScopeAuthzEnabled(): boolean {
 export function isEmploymentRecordEnabled(): boolean {
   return getEnv().FEATURE_EMPLOYMENT_RECORD;
 }
+
+/**
+ * Regional Manager role cutover flag (ADR-030 §6 PR-2, D-6).
+ * When disabled (default), M-3's promotion of existing group-associated
+ * managers to REGIONAL_MANAGER does not run and no route reads the token —
+ * matching the "both-off = current behavior" posture. Must not be enabled in
+ * production before PR-3 ships (mobile/frontend role-union widening + the
+ * hotel-group RM-picker fix, F-3), per ADR-030 §6's ordering constraint.
+ */
+export function isRmRoleEnabled(): boolean {
+  return getEnv().FEATURE_RM_ROLE;
+}
