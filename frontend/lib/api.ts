@@ -43,19 +43,36 @@ export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly details?: unknown;
+  /**
+   * ADR-031 D-6/PR-4a: seconds to wait before retrying, parsed from the
+   * edge's (Nginx/Cloudflare) `Retry-After` header on a 429. `undefined`
+   * when absent or unparseable — the edge is the sole source of rate
+   * limiting (no app-layer limiter per TREQ-AUTH-008), so this is passed
+   * through, never computed.
+   */
+  readonly retryAfterSeconds?: number;
 
   constructor(
     status: number,
     code: string,
     message: string,
     details?: unknown,
+    retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.details = details;
+    this.retryAfterSeconds = retryAfterSeconds;
   }
+}
+
+function parseRetryAfter(res: Response): number | undefined {
+  const header = res.headers.get("Retry-After");
+  if (!header) return undefined;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
 }
 
 interface ApiFetchOptions extends Omit<RequestInit, "body"> {
@@ -84,6 +101,19 @@ async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
     throw new ApiError(res.status, "INVALID_RESPONSE", text || res.statusText);
   }
 }
+
+/**
+ * ADR-031 D-3/C-7: the backend distinguishes an ordinary expired/absent
+ * token (any other 401) from a revoked one (`TOKEN_REVOKED` — the account
+ * was demoted, deactivated, deleted, had its password reset, or had all
+ * sessions explicitly revoked by an admin since the token was issued).
+ * A revoked token must never be sent through the refresh flow: the refresh
+ * token itself may still be cryptographically valid, but re-issuing an
+ * access token for an account in that state is exactly the stale-privilege
+ * window this record exists to close. Mirrors the backend's
+ * `ERROR_CODES.TOKEN_REVOKED` (`config/constants.ts`).
+ */
+const TOKEN_REVOKED_CODE = "TOKEN_REVOKED";
 
 /**
  * Calls the backend refresh endpoint with the stored refresh token.
@@ -159,12 +189,48 @@ export async function apiFetch<T>(
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
 
-  // Attempt a single transparent refresh + retry on unauthorized.
-  if (res.status === 401 && auth && !_retried) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      return apiFetch<T>(path, { ...options, _retried: true });
+  // TOKEN_REVOKED (ADR-031 C-7) is checked regardless of `_retried`: a
+  // revocation can just as easily land on the post-refresh retry request
+  // (a race between the refresh call succeeding and the retry completing)
+  // as on the first attempt, and must clear credentials either way rather
+  // than falling through to a generic error on the retried call.
+  if (res.status === 401 && auth) {
+    const peeked = await parseEnvelope<T>(res.clone());
+    const isRevoked =
+      peeked.status === "error" && peeked.error.code === TOKEN_REVOKED_CODE;
+
+    if (isRevoked) {
+      useAuthStore.getState().clear();
+      throw new ApiError(
+        res.status,
+        peeked.error.code,
+        peeked.error.message,
+        peeked.error.details,
+      );
     }
+
+    // Attempt a single transparent refresh + retry on unauthorized.
+    if (!_retried) {
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        return apiFetch<T>(path, { ...options, _retried: true });
+      }
+    }
+  }
+
+  // ADR-031 D-6/PR-4a: a 429 is produced by the Nginx/Cloudflare edge, not
+  // the application (no app-layer rate limiter — TREQ-AUTH-008), so its
+  // body is not guaranteed to be the app's JSON envelope. Handle it before
+  // attempting to parse as an envelope, carrying Retry-After through
+  // unconditionally.
+  if (res.status === 429) {
+    throw new ApiError(
+      res.status,
+      "RATE_LIMITED",
+      "Too many requests. Please wait before trying again.",
+      undefined,
+      parseRetryAfter(res),
+    );
   }
 
   const envelope = await parseEnvelope<T>(res);

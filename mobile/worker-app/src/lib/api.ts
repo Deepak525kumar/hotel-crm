@@ -51,14 +51,51 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly status: number,
+    // ADR-031 D-6/PR-4a: seconds to wait, parsed from the edge's
+    // (Nginx/Cloudflare) Retry-After header on a 429. undefined when absent
+    // or unparseable — the edge is the sole source of rate limiting (no
+    // app-layer limiter per TREQ-AUTH-008), so this is passed through only.
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = 'ApiError';
   }
 }
 
+function parseRetryAfter(res: Response): number | undefined {
+  const header = res.headers.get('Retry-After');
+  if (!header) return undefined;
+  const seconds = Number(header);
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+}
+
+// ADR-031 D-6: a 429 is produced by the Nginx/Cloudflare edge, not the
+// application (no app-layer rate limiter — TREQ-AUTH-008), so its body is
+// not guaranteed to be JSON. Every response-body parse in this file must
+// tolerate that rather than throwing on `.json()`.
+interface ErrorBody {
+  error?: { code?: string; message?: string };
+}
+
+async function safeJson(res: Response): Promise<ErrorBody> {
+  try {
+    return await res.json();
+  } catch {
+    return {};
+  }
+}
+
 // Auth endpoints that must never trigger the 401 interceptor (avoids infinite loops)
 const SKIP_REFRESH_PATHS = new Set(['/auth/login', '/auth/refresh', '/auth/logout']);
+
+// ADR-031 D-3/C-7: a 401 carrying this code means the account's
+// authorization state changed after the access token was issued (role
+// change, deactivation, deletion, password reset, or an admin-initiated
+// revoke-all-sessions) — refreshing would either loop or hand back a token
+// for a state that no longer holds. Must be treated as an immediate,
+// non-refreshable session failure, distinct from ordinary expiry. Mirrors
+// the backend's `ERROR_CODES.TOKEN_REVOKED`.
+const TOKEN_REVOKED_CODE = 'TOKEN_REVOKED';
 
 async function executeRefresh(): Promise<{ access_token: string; refresh_token: string }> {
   const res = await fetch(`${BASE_URL}/auth/refresh`, {
@@ -66,14 +103,23 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: _refreshToken }),
   });
-  const body = await res.json();
   if (!res.ok) {
+    const body = await safeJson(res);
+    if (res.status === 429) {
+      throw new ApiError(
+        'RATE_LIMITED',
+        'Too many requests. Please wait before trying again.',
+        429,
+        parseRetryAfter(res),
+      );
+    }
     throw new ApiError(
       body.error?.code ?? 'REFRESH_FAILED',
       body.error?.message ?? 'Token refresh failed',
       res.status,
     );
   }
+  const body = await res.json();
   return body.data as { access_token: string; refresh_token: string };
 }
 
@@ -88,9 +134,32 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-  const body = await res.json();
 
   if (!res.ok) {
+    // ADR-031 D-6/PR-4a: a 429 comes from the edge, not the app (no
+    // app-layer limiter — TREQ-AUTH-008); its body may not be JSON, so this
+    // is checked before any body parse and carries Retry-After through.
+    if (res.status === 429) {
+      throw new ApiError(
+        'RATE_LIMITED',
+        'Too many requests. Please wait before trying again.',
+        429,
+        parseRetryAfter(res),
+      );
+    }
+
+    const body = await safeJson(res);
+
+    if (res.status === 401 && body.error?.code === TOKEN_REVOKED_CODE) {
+      // Distinct from ordinary expiry (C-7): never attempt a refresh.
+      await _onAuthFailure?.();
+      throw new ApiError(
+        TOKEN_REVOKED_CODE,
+        body.error?.message ?? 'Your session was revoked. Please log in again.',
+        401,
+      );
+    }
+
     if (res.status === 401 && !SKIP_REFRESH_PATHS.has(path) && _refreshToken) {
       // Isolate refresh failure from persistence failure (F1).
       // Only a server-rejected refresh is a genuine session expiry.
@@ -126,14 +195,34 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         Authorization: `Bearer ${_accessToken}`,
       };
       const retryRes = await fetch(`${BASE_URL}${path}`, { ...options, headers: retryHeaders });
-      const retryBody = await retryRes.json();
       if (!retryRes.ok) {
+        if (retryRes.status === 429) {
+          throw new ApiError(
+            'RATE_LIMITED',
+            'Too many requests. Please wait before trying again.',
+            429,
+            parseRetryAfter(retryRes),
+          );
+        }
+        const retryBody = await safeJson(retryRes);
+        // A revocation can land on the post-refresh retry itself (a race
+        // between the refresh succeeding and the retry completing) — must
+        // clear credentials here too, not just on the first attempt.
+        if (retryRes.status === 401 && retryBody.error?.code === TOKEN_REVOKED_CODE) {
+          await _onAuthFailure?.();
+          throw new ApiError(
+            TOKEN_REVOKED_CODE,
+            retryBody.error?.message ?? 'Your session was revoked. Please log in again.',
+            401,
+          );
+        }
         throw new ApiError(
           retryBody.error?.code ?? 'UNKNOWN',
           retryBody.error?.message ?? 'Request failed',
           retryRes.status,
         );
       }
+      const retryBody = await retryRes.json();
       return retryBody.data as T;
     }
 
@@ -144,6 +233,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     );
   }
 
+  const body = await res.json();
   return body.data as T;
 }
 

@@ -19,11 +19,24 @@ const mockUser = {
   role: 'worker' as const,
 };
 
-function res(status: number, body: unknown): Response {
+function res(status: number, body: unknown, headers: Record<string, string> = {}): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
+    headers: { get: (name: string) => headers[name] ?? null },
+  } as unknown as Response;
+}
+
+// Simulates the Nginx/Cloudflare edge's 429 response, whose body is not
+// guaranteed to be JSON (ADR-031 D-6) — `.json()` rejects, as it would on
+// a plain-text/HTML edge error page.
+function nonJsonRes(status: number, headers: Record<string, string> = {}): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.reject(new SyntaxError('Unexpected token')),
+    headers: { get: (name: string) => headers[name] ?? null },
   } as unknown as Response;
 }
 
@@ -174,6 +187,90 @@ describe('401 interceptor', () => {
 
     await expect(api.auth.me()).rejects.toMatchObject({ status: 401 });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-031 C-7: TOKEN_REVOKED must never attempt a refresh
+// ---------------------------------------------------------------------------
+
+describe('TOKEN_REVOKED (ADR-031 C-7)', () => {
+  it('does not attempt a refresh, calls onAuthFailure, and throws TOKEN_REVOKED', async () => {
+    setAccessToken('old-access');
+    setRefreshToken('old-refresh');
+    const onAuthFailure = jest.fn().mockResolvedValue(undefined);
+    setOnAuthFailure(onAuthFailure);
+
+    mockFetch.mockResolvedValueOnce(
+      res(401, { error: { code: 'TOKEN_REVOKED', message: 'Token has been revoked' } }),
+    );
+
+    await expect(api.auth.me()).rejects.toMatchObject({ code: 'TOKEN_REVOKED', status: 401 });
+    // No refresh call, no retry — a single fetch only.
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
+  });
+
+  it('is distinguished from an ordinary UNAUTHORIZED 401, which still refreshes', async () => {
+    setAccessToken('old-access');
+    setRefreshToken('old-refresh');
+    const onAuthFailure = jest.fn().mockResolvedValue(undefined);
+    setOnAuthFailure(onAuthFailure);
+
+    mockFetch
+      .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'expired' } }))
+      .mockResolvedValueOnce(res(200, { data: { access_token: 'new-access', refresh_token: 'new-refresh' } }))
+      .mockResolvedValueOnce(res(200, { data: mockUser }));
+
+    const result = await api.auth.me();
+
+    expect(result).toEqual(mockUser);
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+    expect(onAuthFailure).not.toHaveBeenCalled();
+  });
+
+  it('clears credentials if TOKEN_REVOKED arrives on the post-refresh retry itself', async () => {
+    setAccessToken('old-access');
+    setRefreshToken('old-refresh');
+    const onAuthFailure = jest.fn().mockResolvedValue(undefined);
+    setOnAuthFailure(onAuthFailure);
+
+    mockFetch
+      // initial request -> ordinary expiry
+      .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED', message: 'expired' } }))
+      // refresh succeeds
+      .mockResolvedValueOnce(res(200, { data: { access_token: 'new-access', refresh_token: 'new-refresh' } }))
+      // retry itself comes back revoked (race: account revoked mid-refresh)
+      .mockResolvedValueOnce(res(401, { error: { code: 'TOKEN_REVOKED', message: 'Token has been revoked' } }));
+
+    await expect(api.auth.me()).rejects.toMatchObject({ code: 'TOKEN_REVOKED', status: 401 });
+    expect(onAuthFailure).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ADR-031 D-6/PR-4a: edge-level 429 + Retry-After
+// ---------------------------------------------------------------------------
+
+describe('429 rate limiting (ADR-031 D-6)', () => {
+  it('surfaces Retry-After as retryAfterSeconds even when the edge body is not JSON', async () => {
+    mockFetch.mockResolvedValueOnce(nonJsonRes(429, { 'Retry-After': '30' }));
+
+    await expect(api.auth.login('a@b.com', 'pw')).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: 30,
+    });
+  });
+
+  it('leaves retryAfterSeconds undefined when the header is absent', async () => {
+    mockFetch.mockResolvedValueOnce(res(429, {}));
+
+    await expect(api.auth.login('a@b.com', 'pw')).rejects.toMatchObject({
+      code: 'RATE_LIMITED',
+      status: 429,
+      retryAfterSeconds: undefined,
+    });
   });
 });
 

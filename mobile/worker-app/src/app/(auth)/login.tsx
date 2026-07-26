@@ -40,7 +40,13 @@ export default function LoginScreen() {
       }
       router.replace('/(app)/');
     } catch (err) {
-      if (err instanceof ApiError) {
+      if (err instanceof ApiError && err.status === 429) {
+        setError(
+          err.retryAfterSeconds !== undefined
+            ? `Too many attempts. Please try again in ${err.retryAfterSeconds}s.`
+            : 'Too many attempts. Please wait before trying again.',
+        );
+      } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
         setError('Login failed. Please try again.');
