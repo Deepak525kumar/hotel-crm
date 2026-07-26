@@ -114,6 +114,23 @@ const envSchema = z.object({
   // meaningful — see scripts/role-permissions-backfill.ts.
   FEATURE_GD02_MATRIX: z.coerce.boolean().default(false),
 
+  // Request-time permission derivation cutover flag (ADR-031 §7 PR-3, D-1/D-3).
+  // Defaults FALSE: while off, authMiddleware/optionalAuthMiddleware keep
+  // trusting the JWT's `permissions` claim exactly as today — the
+  // "both-off = current behavior" posture (ADR-024 D3/D4 topology, reused
+  // per ADR-031 C-4). Enabling this is gated on ADR-031 C-2's pre-flip
+  // reconciliation report (scripts/token-generation-reconciliation-report.ts)
+  // having been reviewed as Security-Review evidence.
+  FEATURE_DERIVED_PERMISSIONS: z.coerce.boolean().default(false),
+
+  // token_generation revocation-check cutover flag (ADR-031 §7 PR-3, D-3.2/D-4).
+  // Defaults FALSE: while off, a payload's token_generation (if present) is
+  // never compared against the row, so an already-issued token is not
+  // rejected on role change/deactivation/deletion/password-reset — matching
+  // "both-off = current behavior". Must not be enabled before ADR-031 PR-4a
+  // (client forced-re-auth handling) is deployed, per ADR-031 C-7.
+  FEATURE_TOKEN_GENERATION_ENFORCEMENT: z.coerce.boolean().default(false),
+
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).
   // Config-driven per ADR-029 §6/§8: the values below are the initial

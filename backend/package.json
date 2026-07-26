@@ -20,6 +20,7 @@
     "employment-record:backfill-status": "tsx src/scripts/run-employment-record-backfill-status.ts",
     "rm-role:promote": "tsx src/scripts/run-regional-manager-promotion.ts",
     "role-permissions:backfill": "tsx src/scripts/run-role-permissions-backfill.ts",
+    "token-generation:reconciliation-report": "tsx src/scripts/run-token-generation-reconciliation-report.ts",
     "test": "jest --forceExit",
     "test:coverage": "jest --coverage --forceExit"
   },

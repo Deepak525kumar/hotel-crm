@@ -20,6 +20,10 @@ export const ERROR_CODES = {
   TOKEN_EXPIRED: 'TOKEN_EXPIRED',
   TOKEN_INVALID: 'TOKEN_INVALID',
   ACCOUNT_DISABLED: 'ACCOUNT_DISABLED',
+  // ADR-031 D-3.2 (PR-3): distinct from TOKEN_EXPIRED/TOKEN_INVALID so
+  // clients can tell "re-authenticate now" (this code) apart from "refresh
+  // and retry" (the other two) — see ADR-031 C-7 / PR-4a.
+  TOKEN_REVOKED: 'TOKEN_REVOKED',
   INSUFFICIENT_PERMISSION: 'INSUFFICIENT_PERMISSION',
   UNAUTHORIZED: 'UNAUTHORIZED',
 
@@ -134,8 +138,18 @@ const MANAGER_PERMISSIONS = Object.freeze([
   'employees:read', 'employees:write',
 ]) as string[];
 
-export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  ADMIN: [
+// ADR-031 D-1 (PR-3): ROLE_PERMISSIONS is now consulted on the request path
+// (backend-auth's authMiddleware), not only at write time — a frozen
+// module-boundary contract, not an internal constant. MANAGER_PERMISSIONS was
+// already Object.freeze'd (see above); ADMIN/CHECKER/WORKER's array literals
+// and the outer map itself were not, a residual shallow-freeze gap flagged by
+// independent review of this ADR. Hardened here: every array is frozen
+// individually (all elements are string primitives, so a shallow freeze is
+// a complete freeze — there is no nested mutable structure to deep-freeze),
+// and the outer object is frozen last so no key can be added, removed, or
+// reassigned to a different array either.
+export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
+  ADMIN: Object.freeze([
     'admin:*',
     'users:read', 'users:write',
     'hotels:read', 'hotels:write',
@@ -150,10 +164,10 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     'audit:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): employee-management permissions.
     'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
-  ],
+  ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
   REGIONAL_MANAGER: MANAGER_PERMISSIONS,
-  CHECKER: [
+  CHECKER: Object.freeze([
     'hotels:read',
     'rooms:read',
     'tasks:read',
@@ -162,16 +176,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Epic 5 PR 5.6 (SPEC-EMP-001): Checker views a worker's profile at their
     // assigned hotel (permission matrix), read-only.
     'employees:read',
-  ],
-  WORKER: [
+  ]) as string[],
+  WORKER: Object.freeze([
     'hotels:read',
     'rooms:read',
     'tasks:read',
     'notifications:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): a worker may view their own profile & history (self only).
     'employees:read',
-  ],
-};
+  ]) as string[],
+});
 
 export const BCRYPT_ROUNDS = 12;
 
