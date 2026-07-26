@@ -1,11 +1,14 @@
 import { BaseService } from '../../lib/base-service.js';
-import { NotFoundError, ValidationError } from '../../lib/errors.js';
+import { NotFoundError, ValidationError, ForbiddenError } from '../../lib/errors.js';
 import {
   CreateHotelRequest, UpdateHotelRequest,
   ListHotelsQuery,
   CreateHotelGroupRequest, UpdateHotelGroupRequest,
   ListHotelGroupsQuery,
 } from './types.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { resolveScopeGroupFilter, isHotelGroupInScope } from '../../lib/scope.js';
+import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
   // ── Hotels ─────────────────────────────────────────────────────────────────
@@ -141,17 +144,35 @@ export class CrmService extends BaseService {
     }
   }
 
-  async listHotelGroups(query: ListHotelGroupsQuery) {
+  // ADR-030 PR-4 (D-7, C-08): previously unscoped — any manager listed every
+  // hotel group regardless of their own. Filters, does not deny (D-7): a
+  // scoped manager/regional_manager just sees their own group's row.
+  // Default-deny shape (security review FIND-01): admin is the only
+  // explicit bypass, not a `{manager, regional_manager}` allowlist — any
+  // other role reaching this method is scope-resolved, not implicitly
+  // trusted. See the matching note in users/service.ts listUsers.
+  async listHotelGroups(query: ListHotelGroupsQuery, actor: { role: string; scope: UserScope | null }) {
     const { page, limit } = query;
     const skip = (page - 1) * limit;
 
+    const where: Record<string, unknown> = {};
+    if (isScopeAuthzEnabled() && actor.role !== 'admin') {
+      const scopeFilter = await resolveScopeGroupFilter(actor.scope);
+      if (scopeFilter.kind === 'deny') {
+        where['id'] = '__none__';
+      } else if (scopeFilter.kind === 'group') {
+        where['id'] = scopeFilter.hotelGroupId;
+      }
+    }
+
     const [hotelGroups, total] = await Promise.all([
       this.prisma.hotelGroup.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { name: 'asc' },
       }),
-      this.prisma.hotelGroup.count(),
+      this.prisma.hotelGroup.count({ where }),
     ]);
 
     return {
@@ -165,9 +186,24 @@ export class CrmService extends BaseService {
     };
   }
 
-  async getHotelGroup(hotelGroupId: string, actorId: string, actorRole: string, ip?: string) {
+  // ADR-030 PR-4 (D-7, C-08): single-resource fetch, so "filter" isn't
+  // expressible — an out-of-scope group now denies (403), matching the
+  // existing checkHotelAccess() convention for single-hotel fetches.
+  // Default-deny shape (security review FIND-01): see listHotelGroups above.
+  async getHotelGroup(
+    hotelGroupId: string,
+    actorId: string,
+    actorRole: string,
+    actorScope: UserScope | null,
+    ip?: string
+  ) {
     const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
     if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+    if (isScopeAuthzEnabled() && actorRole !== 'admin') {
+      const inScope = await isHotelGroupInScope(actorScope, hotelGroupId);
+      if (!inScope) throw new ForbiddenError('Hotel group not in your scope');
+    }
 
     await this.logAudit(actorId, actorRole, 'VIEW', 'HOTEL_GROUP', hotelGroupId, {}, ip);
     return hotelGroup;

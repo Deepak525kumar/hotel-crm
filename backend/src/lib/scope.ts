@@ -55,3 +55,43 @@ export async function isWorkerInGroupScope(scope: UserScope | null, workerId: st
   });
   return !!hotel && hotel.hotel_group_id === record.hotel_group_id;
 }
+
+// ADR-030 PR-4 (D-7 "filter, don't deny"): resolves a manager/regional_manager
+// scope claim down to a single hotel_group_id list-filter. Three consumers
+// need the identical resolution (users/hotel-groups/analytics list reads),
+// hence a shared primitive rather than three inline copies. Distinct from
+// `isHotelInScope`/`isWorkerInGroupScope` (which answer "may this actor reach
+// one specific hotel/worker") — this answers "what group should a *list* be
+// narrowed to." A missing scope claim resolves to `deny` (there is nothing to
+// filter BY, so the safe default is zero rows, not every row).
+export type ScopeGroupFilter =
+  | { kind: 'none' }
+  | { kind: 'group'; hotelGroupId: string }
+  | { kind: 'deny' };
+
+export async function resolveScopeGroupFilter(scope: UserScope | null): Promise<ScopeGroupFilter> {
+  if (!scope) return { kind: 'deny' };
+  if (scope.type === 'global') return { kind: 'none' };
+  if (scope.type === 'hotel_group') return { kind: 'group', hotelGroupId: scope.hotel_group_id };
+  // scope.type === 'hotel': hotel groups are group-grain (ADR-023), so a
+  // hotel-scoped manager resolves to their one hotel's group — mirroring
+  // isHotelInScope's own hotel_group-scope branch in the opposite direction.
+  const prisma = getPrisma();
+  const hotel = await prisma.hotel.findUnique({
+    where: { id: scope.hotel_id },
+    select: { hotel_group_id: true },
+  });
+  if (!hotel?.hotel_group_id) return { kind: 'deny' };
+  return { kind: 'group', hotelGroupId: hotel.hotel_group_id };
+}
+
+// Evaluates whether a manager/regional_manager's scope claim grants access to
+// one specific hotel group (single-resource GET, e.g. GET
+// /crm/hotel-groups/:hotel_group_id) — the "may this actor reach this one
+// group" counterpart to the list-filter above.
+export async function isHotelGroupInScope(scope: UserScope | null, hotelGroupId: string): Promise<boolean> {
+  const filter = await resolveScopeGroupFilter(scope);
+  if (filter.kind === 'none') return true;
+  if (filter.kind === 'deny') return false;
+  return filter.hotelGroupId === hotelGroupId;
+}

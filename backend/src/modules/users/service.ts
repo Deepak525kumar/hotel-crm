@@ -3,9 +3,16 @@ import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
 import { CreateUserRequest, UpdateUserRequest, ListUsersQuery } from './types.js';
+import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
+import { resolveScopeGroupFilter } from '../../lib/scope.js';
+import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
-  async listUsers(query: ListUsersQuery) {
+  // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
+  // manager/regional_manager — any manager could list every user regardless
+  // of hotel/group. `actor` is optional so existing internal callers (none
+  // currently) keep compiling; the controller always passes it.
+  async listUsers(query: ListUsersQuery, actor?: { role: string; scope?: UserScope | null }) {
     const { page, limit, role, hotel_id, search, is_active } = query;
     const skip = (page - 1) * limit;
 
@@ -13,12 +20,47 @@ export class UserService extends BaseService {
 
     if (role) where['role'] = role.toUpperCase();
     if (is_active !== undefined) where['is_active'] = is_active === 'true';
+
+    // Resolve the explicit ?hotel_id filter (if any) to its group, same as
+    // before PR-4 — kept separate from the scope filter below so the two can
+    // be reconciled rather than one silently overwriting the other.
+    let targetGroupId: string | undefined;
     if (hotel_id) {
       const hotel = await this.prisma.hotel.findUnique({
         where: { id: hotel_id },
         select: { hotel_group_id: true },
       });
-      where['employment_record'] = { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' };
+      targetGroupId = hotel?.hotel_group_id ?? '__none__';
+    }
+
+    // Default-deny shape (security review finding FIND-01, ADR-030 PR-4):
+    // admin is the only explicit bypass; every other actor — manager,
+    // regional_manager, or any role added to this route's guard in the
+    // future without a matching update here — is scope-resolved, not
+    // allowlisted by role name. `resolveScopeGroupFilter` itself returns
+    // 'none' only for a `{type:'global'}` claim, which `resolveScope()`
+    // (auth/service.ts) mints only for admin — so this and the role check
+    // below agree by construction, not by coincidence.
+    if (isScopeAuthzEnabled() && actor && actor.role !== 'admin') {
+      const scopeFilter = await resolveScopeGroupFilter(actor.scope ?? null);
+      if (scopeFilter.kind === 'deny') {
+        where['id'] = '__none__';
+      } else if (scopeFilter.kind === 'group') {
+        // An explicit ?hotel_id outside the actor's own scope must not widen
+        // it — deny rather than let the client-supplied filter win.
+        if (targetGroupId && targetGroupId !== scopeFilter.hotelGroupId) {
+          where['id'] = '__none__';
+        } else {
+          targetGroupId = scopeFilter.hotelGroupId;
+        }
+      }
+      // 'none' (global claim on a non-admin actor — shouldn't occur, but
+      // treated the same as admin's bypass rather than denying) -> no
+      // added restriction beyond whatever ?hotel_id gave.
+    }
+
+    if (targetGroupId) {
+      where['employment_record'] = { hotel_group_id: targetGroupId, status: 'ACTIVE' };
     }
     if (search) {
       where['OR'] = [

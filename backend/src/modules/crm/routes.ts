@@ -16,9 +16,15 @@ router.delete('/hotels/:hotel_id', requireRole('admin'), (req, res, next) => crm
 
 // Hotel Groups CRUD (Epic 5 PR 5.2, ADR-023). Creation/modification is
 // Admin-only — REQ-CRM-010: Regional/Property Managers "manage assigned
-// hotels but not create hotels or modify hotel groups." No checkHotelAccess()
-// here: group-level scoping isn't wired until PR 5.4 (scope-claim issuance) /
-// PR 5.5 (authz flip), per ADR-024.
+// hotels but not create hotels or modify hotel groups." Read scoping (list
+// filters, single-fetch denies out-of-scope) is enforced in-service, not via
+// checkHotelAccess() middleware — the group-grain scope model doesn't fit that
+// hotel-grain seam (ADR-030 PR-4, D-7).
+// KNOWN GAP (security review FIND-02, tracked, fail-closed): 'regional_manager'
+// is not yet in the requireRole lists below. Harmless today — FEATURE_RM_ROLE
+// is off, so no live user holds that role — but once it's enabled, a
+// regional_manager will 403 here despite the service-layer scoping above
+// being ready for them. Must be added alongside PR-5 (ADR-030 §6, "enact §3").
 router.get('/hotel-groups', requireRole(['admin', 'manager']), requirePermission('hotels:read'), ...crmController.listHotelGroups);
 router.post('/hotel-groups', requireRole('admin'), requirePermission('hotels:write'), ...crmController.createHotelGroup);
 router.get('/hotel-groups/:hotel_group_id', requireRole(['admin', 'manager']), requirePermission('hotels:read'), (req, res, next) => crmController.getHotelGroup(req, res, next));

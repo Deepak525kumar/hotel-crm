@@ -17,6 +17,9 @@ const mockPrisma = {
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+jest.mock('../config/feature-flags.js', () => ({
+  isScopeAuthzEnabled: () => true,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -72,6 +75,101 @@ describe('UserService', () => {
 
       const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { role?: string } }>;
       expect(call[0]?.where.role).toBe('REGIONAL_MANAGER');
+    });
+
+    // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
+    // manager/regional_manager — any manager could list every user regardless
+    // of hotel/group. Filters, does not deny.
+    describe('scope filtering (ADR-030 PR-4)', () => {
+      it('scopes a hotel_group-claim manager to their own group', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{
+          where: { employment_record?: { hotel_group_id: string } };
+        }>;
+        expect(call[0]?.where.employment_record).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+      });
+
+      it('resolves a hotel-claim manager to their hotel\'s group', async () => {
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{
+          where: { employment_record?: { hotel_group_id: string } };
+        }>;
+        expect(call[0]?.where.employment_record).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+      });
+
+      it('denies (empty result) a manager with no scope claim', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'manager', scope: null }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('__none__');
+      });
+
+      it('denies rather than widens when an explicit ?hotel_id is outside the scope group', async () => {
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g_other' });
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: 'h_other', search: undefined, is_active: undefined },
+          { role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('__none__');
+      });
+
+      it('leaves admin unscoped regardless of scope claim', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'admin', scope: null }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{
+          where: { employment_record?: unknown; id?: unknown };
+        }>;
+        expect(call[0]?.where.employment_record).toBeUndefined();
+        expect(call[0]?.where.id).toBeUndefined();
+      });
+
+      // Security review FIND-01: the check must be an admin-bypass with
+      // default-deny for everyone else, not a `{manager, regional_manager}`
+      // allowlist that silently leaves any other role unrestricted.
+      it('scope-resolves an unexpected non-admin role rather than leaving it unrestricted', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'checker', scope: null }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('__none__');
+      });
     });
 
     // hotel_id filter resolves the hotel's group and filters via the
