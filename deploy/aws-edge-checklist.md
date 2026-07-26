@@ -69,10 +69,22 @@ Create the following records after the ALB is provisioned (its DNS name is known
 
 ## 5. Rate Limiting (AWS WAF)
 
+> `ADR-031` D-6: rate limiting is an edge-level control (Nginx zones for the no-ALB MVP path,
+> §5 below for the ALB/WAF path) per `TREQ-AUTH-008`/`TRULE-AUTH-002` (`SPEC-AUTH-001`, Confirmed
+> authority) — no rate-limiting/CAPTCHA is introduced at the application layer. IP-keyed only;
+> per-account throttling is an explicit, accepted gap (`ADR-031` §10 OI-3a), not built here.
+> A Cloudflare-equivalent edge rule is an acceptable substitute for AWS WAF if the deployment
+> topology changes — `TREQ-AUTH-008` names Nginx/Cloudflare interchangeably.
+
 - [ ] In the web ACL, add a **rate-based rule**:
+  - Name: `auth-strict-rate-limit`
+  - Scope-down statement: URI path is exactly `/api/v1/auth/login` or `/api/v1/auth/password-reset/confirm`
+  - Rate: **100 requests per 5 minutes per IP** (AWS WAF's minimum evaluation rate is 100/5min, so this is the closest floor to Nginx's stricter `auth_strict` zone — 1r/s, ~300/5min with bursting — not an exact match; the WAF rule is a coarser backstop, not a substitute for the Nginx zone on the no-ALB path)
+  - Action: Block
+- [ ] Add a second rate-based rule:
   - Name: `auth-rate-limit`
-  - Scope-down statement: URI path starts with `/api/v1/auth`
-  - Rate: 100 requests per 5 minutes per IP
+  - Scope-down statement: URI path starts with `/api/v1/auth` **and does not match** `auth-strict-rate-limit`'s scope-down (WAF evaluates rules in order; a request already blocked/rate-limited by `auth-strict-rate-limit` should not double-count here) — covers `signup`, `refresh`, `password-reset`
+  - Rate: 300 requests per 5 minutes per IP — deliberately looser than `auth-strict-rate-limit`'s 100/5min floor, preserving the same two-tier intent as the Nginx zones (`auth_strict` 1r/s vs `auth` 2r/s) even though WAF's evaluation floor prevents an exact numeric match
   - Action: Block
 - [ ] Add a broader API rate-based rule (e.g. 2000 req / 5 min per IP) as a safety net
 
