@@ -68,11 +68,26 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Retry-After (RFC 7231 §7.1.3) is either delay-seconds ("30") or an
+ * HTTP-date ("Wed, 21 Oct 2026 07:28:00 GMT"). Nginx emits delay-seconds
+ * today, but the header format is a property of the edge, not this app —
+ * an HTTP-date is handled defensively in case the edge/CDN ever changes.
+ */
 function parseRetryAfter(res: Response): number | undefined {
   const header = res.headers.get("Retry-After");
   if (!header) return undefined;
+
   const seconds = Number(header);
-  return Number.isFinite(seconds) && seconds >= 0 ? seconds : undefined;
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds;
+
+  const dateMs = Date.parse(header);
+  if (!Number.isNaN(dateMs)) {
+    const deltaSeconds = Math.ceil((dateMs - Date.now()) / 1000);
+    return deltaSeconds >= 0 ? deltaSeconds : 0;
+  }
+
+  return undefined;
 }
 
 interface ApiFetchOptions extends Omit<RequestInit, "body"> {

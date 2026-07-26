@@ -262,6 +262,17 @@ describe('429 rate limiting (ADR-031 D-6)', () => {
       retryAfterSeconds: undefined,
     });
   });
+
+  it('parses an HTTP-date form of Retry-After (RFC 7231), not just delay-seconds', async () => {
+    const futureDate = new Date(Date.now() + 45_000).toUTCString();
+    mockFetch.mockResolvedValueOnce(nonJsonRes(429, { 'Retry-After': futureDate }));
+
+    const error = await api.auth.login('a@b.com', 'pw').catch((e) => e);
+    expect(error).toMatchObject({ code: 'RATE_LIMITED', status: 429 });
+    // Allow slack for wall-clock rounding between the header and the assertion.
+    expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(43);
+    expect(error.retryAfterSeconds).toBeLessThanOrEqual(45);
+  });
 });
 
 // ---------------------------------------------------------------------------

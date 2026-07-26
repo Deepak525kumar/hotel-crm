@@ -52,17 +52,18 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
     enforcementEnabled = false;
   });
 
+  // ADR-031 PR-5: the `permissions` claim no longer exists on the token —
+  // this fixture omits it entirely, matching a real post-PR-5 payload.
   const basePayload = {
     sub: 'user-1',
     email: 'a@b.com',
     role: 'manager',
-    permissions: ['claim:permission'],
     scope: null,
     token_generation: 3,
   };
 
   describe('both flags off (C-4: today\'s behavior, byte-for-byte)', () => {
-    it('trusts the JWT claim and never reads the database', async () => {
+    it('never reads the database, and grants no permissions since the claim no longer exists (PR-5)', async () => {
       mockVerifyAccessToken.mockReturnValue(basePayload);
       const req = makeReq('tok');
       const next = jest.fn();
@@ -74,7 +75,7 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
         userId: 'user-1',
         email: 'a@b.com',
         role: 'manager',
-        permissions: ['claim:permission'],
+        permissions: [],
         scope: null,
       });
       expect(next).toHaveBeenCalledWith();
@@ -126,7 +127,12 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
       expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: ERROR_CODES.TOKEN_REVOKED }));
     });
 
-    it('D-3.2: a token with no token_generation claim is treated as generation 0, not undefined-passes', async () => {
+    // ADR-031 D-3.2/PR-5: a claim-less token (issued before PR-2, or after
+    // PR-5 dropped the claim's issuance guarantee entirely) is now REJECTED
+    // outright rather than coerced to generation 0 — the one intentional
+    // forced-re-auth event this record accepts (§8). This replaces the
+    // pre-PR-5 permissive "generation 0 passes" behavior.
+    it('D-3.2/PR-5: a token with no token_generation claim is rejected even against a row still at generation 0', async () => {
       const { token_generation: _omit, ...payloadWithoutClaim } = basePayload;
       mockVerifyAccessToken.mockReturnValue(payloadWithoutClaim);
       mockUserFindUnique.mockResolvedValue({
@@ -137,12 +143,11 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
 
       await authMiddleware(req, {} as any, next);
 
-      // generation 0 (claim absent, treated as 0) === row's 0 -> passes
-      expect(next).toHaveBeenCalledWith();
-      expect(req.auth).toBeDefined();
+      expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: ERROR_CODES.TOKEN_REVOKED }));
+      expect(req.auth).toBeUndefined();
     });
 
-    it('D-3.2: a claim-less token is REJECTED against a row that has since been bumped off 0', async () => {
+    it('D-3.2/PR-5: a claim-less token is REJECTED against a row that has since been bumped off 0', async () => {
       const { token_generation: _omit, ...payloadWithoutClaim } = basePayload;
       mockVerifyAccessToken.mockReturnValue(payloadWithoutClaim);
       mockUserFindUnique.mockResolvedValue({
@@ -156,7 +161,7 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
       expect(next).toHaveBeenCalledWith(expect.objectContaining({ code: ERROR_CODES.TOKEN_REVOKED }));
     });
 
-    it('passes through when generations match', async () => {
+    it('passes through when generations match, with no permissions claim to fall back on', async () => {
       mockVerifyAccessToken.mockReturnValue(basePayload);
       mockUserFindUnique.mockResolvedValue({
         id: 'user-1', role: 'MANAGER', is_active: true, deleted_at: null, token_generation: 3,
@@ -167,7 +172,7 @@ describe('ADR-031 PR-3 — authMiddleware / optionalAuthMiddleware cutover', () 
       await authMiddleware(req, {} as any, next);
 
       expect(next).toHaveBeenCalledWith();
-      expect(req.auth?.permissions).toEqual(['claim:permission']); // derivation still off
+      expect(req.auth?.permissions).toEqual([]); // derivation off, no claim to fall back on (PR-5)
     });
   });
 

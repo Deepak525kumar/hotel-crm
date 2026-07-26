@@ -101,9 +101,9 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      permissions: user.permissions,
       scope,
-      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      // ADR-031 D-2/D-4: mirrored from the row; verified on every request
+      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
       token_generation: user.token_generation,
     });
 
@@ -156,9 +156,9 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      permissions: user.permissions,
       scope,
-      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      // ADR-031 D-2/D-4: mirrored from the row; verified on every request
+      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
       token_generation: user.token_generation,
     });
 
@@ -215,9 +215,9 @@ export class AuthService extends BaseService {
       sub: user.id,
       email: user.email,
       role: user.role.toLowerCase(),
-      permissions: user.permissions,
       scope,
-      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      // ADR-031 D-2/D-4: mirrored from the row; verified on every request
+      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
       token_generation: user.token_generation,
     });
 

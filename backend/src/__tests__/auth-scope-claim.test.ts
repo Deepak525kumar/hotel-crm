@@ -113,7 +113,9 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.sub).toBe('admin_1');
       expect(payload.email).toBe('admin@test.com');
       expect(payload.role).toBe('admin');
-      expect(payload.permissions).toEqual(['admin:*']);
+      // ADR-031 D-2/PR-5: the permissions claim is dropped from issuance —
+      // permissions are derived request-time, never carried on the token.
+      expect(payload.permissions).toBeUndefined();
 
       // Admin short-circuits before any association lookup.
       expect(mockPrisma.hotelGroup.findFirst).not.toHaveBeenCalled();
