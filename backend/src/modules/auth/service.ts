@@ -83,6 +83,8 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       permissions: user.permissions,
       scope,
+      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      token_generation: user.token_generation,
     });
 
     await this.prisma.session.create({
@@ -136,6 +138,8 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       permissions: user.permissions,
       scope,
+      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      token_generation: user.token_generation,
     });
 
     await this.prisma.session.create({
@@ -193,6 +197,8 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       permissions: user.permissions,
       scope,
+      // ADR-031 D-2/D-4 (PR-2): seeded now, not yet verified by any request path.
+      token_generation: user.token_generation,
     });
 
     await this.prisma.session.update({
