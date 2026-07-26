@@ -39,9 +39,6 @@ jest.mock('../config/env.js', () => ({
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
-}));
 jest.mock('../lib/logger.js', () => ({
   logger: {
     info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,

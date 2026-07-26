@@ -88,12 +88,6 @@ const envSchema = z.object({
   // (broadcast/assignment) flow. See docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md.
   PIVOT_MODE: z.enum(['marketplace', 'direct_dispatch']).default('marketplace'),
 
-  // Scope-based authorization cutover flag (Epic 5 PR 5.5, ADR-024 D3).
-  // Defaults TRUE: the manager scope-authz fix is active on merge. Setting it
-  // OFF is the rollback path, which reproduces the pre-fix behavior (manager
-  // hotel-access bypass) — the ADR-024 D3 "both-off = current behavior" guarantee.
-  FEATURE_SCOPE_AUTHZ: z.coerce.boolean().default(true),
-
   // Employment-record module cutover flag (Epic 5 PR 5.6, SPEC-EMP-001).
   // Defaults FALSE: the new employee-management routes 404 until explicitly
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
@@ -107,6 +101,18 @@ const envSchema = z.object({
   // before PR-3 ships (ADR-030 §6 ordering constraint: the mobile/frontend
   // role-union widening and the hotel-group RM-picker fix, F-3).
   FEATURE_RM_ROLE: z.coerce.boolean().default(false),
+
+  // GD-02/GD-03 capability-matrix cutover flag (ADR-030 §6 PR-5).
+  // Defaults FALSE: while off, hotel-groups routes keep requiring the legacy
+  // `hotels:read`/`hotels:write` tokens (not the new `hotel_groups:read`/
+  // `hotel_groups:write` split, D-9) and `PUT /users/:id` keeps accepting the
+  // legacy combined profile+role body (not the D-4a split) — matching
+  // "both-off = current behavior", since ROLE_PERMISSIONS is a source
+  // constant with no effect on any existing account's stored permissions
+  // until M-2 backfills them (§1 fact 2: permissions are stored, not
+  // derived). Enabling this flag is a prerequisite for M-2 to do anything
+  // meaningful — see scripts/role-permissions-backfill.ts.
+  FEATURE_GD02_MATRIX: z.coerce.boolean().default(false),
 
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).

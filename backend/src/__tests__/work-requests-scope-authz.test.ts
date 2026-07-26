@@ -10,7 +10,7 @@ import type { Request, Response, NextFunction } from 'express';
  * create or patch a work request belonging to a hotel outside their scope
  * claim. `create()`/`update()` now run the same in-service
  * `isHotelInScope()` check as `quality/service.ts` and `attendance/service.ts`
- * whenever `FEATURE_SCOPE_AUTHZ` is enabled. Admin keeps unconditional
+ * (unconditional since ADR-030 PR-5, M-4). Admin keeps unconditional
  * cross-hotel access (unchanged, by design). Removing the manager-scope
  * check turns the out-of-scope cases below from 403 into success.
  */
@@ -77,7 +77,7 @@ const hotels: Record<string, any> = {
 };
 
 jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
+  isGD02MatrixEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

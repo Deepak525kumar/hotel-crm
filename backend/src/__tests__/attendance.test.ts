@@ -166,7 +166,7 @@ describe('AttendanceService', () => {
       mockAttendance.update.mockResolvedValue(
         makeRecord({ is_verified: true, verified_by_id: 'mgr1', verified_at: new Date() })
       );
-      await service.update('att1', { is_verified: true }, 'mgr1', 'manager');
+      await service.update('att1', { is_verified: true }, 'mgr1', 'admin');
       const data = mockAttendance.update.mock.calls[0][0].data;
       expect(data.is_verified).toBe(true);
       expect(data.verified_by).toEqual({ connect: { id: 'mgr1' } });
@@ -187,7 +187,7 @@ describe('AttendanceService', () => {
       mockAttendance.update.mockResolvedValue(makeRecord({ status: 'ABSENT' }));
       mockWorkerAssignment.findUnique.mockResolvedValue({ assigned_by_id: 'mgr1' });
 
-      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'manager');
+      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'admin');
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockOutboxEvent.create).toHaveBeenCalledTimes(1);
@@ -201,7 +201,7 @@ describe('AttendanceService', () => {
       mockAttendance.update.mockResolvedValue(makeRecord({ status: 'ABSENT' }));
       mockWorkerAssignment.findUnique.mockResolvedValue(null);
 
-      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'manager');
+      await service.update('att1', { status: 'ABSENT' }, 'mgr1', 'admin');
 
       expect(mockOutboxEvent.create).not.toHaveBeenCalled();
     });

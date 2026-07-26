@@ -54,7 +54,7 @@ const employmentRecords: Record<string, any> = {
 const auditCalls: any[] = [];
 
 jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
+  isGD02MatrixEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

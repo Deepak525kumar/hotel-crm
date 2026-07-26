@@ -16,7 +16,7 @@ let testAuth:
   | null = null;
 
 jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
+  isGD02MatrixEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

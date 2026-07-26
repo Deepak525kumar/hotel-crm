@@ -6,7 +6,6 @@ import {
   CreateHotelGroupRequest, UpdateHotelGroupRequest,
   ListHotelGroupsQuery,
 } from './types.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
 import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
@@ -156,7 +155,7 @@ export class CrmService extends BaseService {
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
-    if (isScopeAuthzEnabled() && actor.role !== 'admin') {
+    if (actor.role !== 'admin') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope);
       if (scopeFilter.kind === 'deny') {
         where['id'] = '__none__';
@@ -200,7 +199,7 @@ export class CrmService extends BaseService {
     const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
     if (!hotelGroup) throw new NotFoundError('Hotel group not found');
 
-    if (isScopeAuthzEnabled() && actorRole !== 'admin') {
+    if (actorRole !== 'admin') {
       const scopeFilter = await resolveNonAdminScopeFilter(actorRole, actorScope);
       const inScope = scopeFilter.kind === 'group' && scopeFilter.hotelGroupId === hotelGroupId;
       if (!inScope) throw new ForbiddenError('Hotel group not in your scope');

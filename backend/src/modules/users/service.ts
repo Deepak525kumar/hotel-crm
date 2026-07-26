@@ -2,9 +2,14 @@ import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
-import { CreateUserRequest, UpdateUserRequest, ListUsersQuery } from './types.js';
-import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
-import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
+import {
+  CreateUserRequest,
+  UpdateUserRequest,
+  UpdateUserProfileRequest,
+  UpdateUserRoleRequest,
+  ListUsersQuery,
+} from './types.js';
+import { resolveNonAdminScopeFilter, isWorkerInGroupScope } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
@@ -40,7 +45,7 @@ export class UserService extends BaseService {
     // allowlisted by role name. `resolveNonAdminScopeFilter` enforces (and
     // logs) the invariant that a non-admin actor never resolves to global
     // scope, rather than silently bypassing on that "shouldn't occur" case.
-    if (isScopeAuthzEnabled() && actor && actor.role !== 'admin') {
+    if (actor && actor.role !== 'admin') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
       if (scopeFilter.kind === 'deny') {
         where['id'] = '__none__';
@@ -217,6 +222,95 @@ export class UserService extends BaseService {
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { fields: Object.keys(data) }, ip);
+    return { ...updated, role: updated.role.toLowerCase() };
+  }
+
+  // ADR-030 D-4a/D-4: the profile-only half of the PUT /users/:id split
+  // (used once FEATURE_GD02_MATRIX is on). No `role` parameter exists on
+  // this method at all — there is no field for an elevation guard to police,
+  // because the code path cannot express a role change (the schema already
+  // enforced that at the boundary, UpdateUserProfileSchema.strict()).
+  async updateUserProfile(
+    userId: string,
+    data: UpdateUserProfileRequest,
+    actorId: string,
+    actorRole: string,
+    actorScope: UserScope | null,
+    ip?: string
+  ) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deleted_at) throw new NotFoundError('User not found');
+
+    // A scoped manager/regional_manager may only touch a profile within
+    // their own group — mirrors the HR module's identical worker-scope
+    // check (isWorkerInGroupScope), reused here rather than duplicated.
+    if (actorRole !== 'admin') {
+      const inScope = await isWorkerInGroupScope(actorScope, userId);
+      if (!inScope) throw new ForbiddenError('User not in your scope');
+    }
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        first_name: data.first_name ?? user.first_name,
+        last_name: data.last_name ?? user.last_name,
+        phone: data.phone ?? user.phone,
+        is_active: data.is_active ?? user.is_active,
+      },
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        phone: true,
+        role: true,
+        permissions: true,
+        is_active: true,
+        updated_at: true,
+      },
+    });
+
+    await this.logAudit(actorId, actorRole, 'UPDATE_PROFILE', 'USER', userId, { fields: Object.keys(data) }, ip);
+    return { ...updated, role: updated.role.toLowerCase() };
+  }
+
+  // ADR-030 D-4a: the Admin-only role-assignment half of the split
+  // (PUT /users/:id/role). Carries forward the C-15 fix (SIR-AUTH-019): the
+  // target's CURRENT role is checked, not merely the incoming value — an
+  // admin-only route makes this defense-in-depth rather than a live gap
+  // (only admin ever reaches this method), but the check costs nothing to
+  // keep and documents the invariant explicitly.
+  async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, ip?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deleted_at) throw new NotFoundError('User not found');
+
+    if (actorRole !== 'admin' && user.role === 'ADMIN') {
+      throw new ForbiddenError('Only admins can modify admin accounts');
+    }
+    if (actorRole !== 'admin') {
+      throw new ForbiddenError('Only admins can assign roles');
+    }
+
+    const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
+    const permissions = ROLE_PERMISSIONS[newRole] ?? user.permissions;
+
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole, permissions },
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        phone: true,
+        role: true,
+        permissions: true,
+        is_active: true,
+        updated_at: true,
+      },
+    });
+
+    await this.logAudit(actorId, actorRole, 'UPDATE_ROLE', 'USER', userId, { new_role: newRole }, ip);
     return { ...updated, role: updated.role.toLowerCase() };
   }
 

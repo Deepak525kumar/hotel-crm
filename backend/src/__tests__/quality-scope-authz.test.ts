@@ -24,7 +24,7 @@ const assignments: Record<string, { id: string; hotel_id: string; worker_id: str
 };
 
 jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
+  isGD02MatrixEnabled: () => false,
 }));
 
 jest.mock('../lib/logger.js', () => ({

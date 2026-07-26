@@ -85,11 +85,61 @@ export const PAGINATION = {
 } as const;
 
 // RBAC: permissions granted to each role
+//
+// ADR-030 PR-5 (§3): this constant is source-of-truth for NEW/newly-promoted
+// accounts (createUser, updateUserRole) immediately, but has zero effect on
+// any EXISTING account's stored `User.permissions` snapshot until M-2's
+// backfill runs (permissions are stored, not derived — §1 fact 2). D-8:
+// `hotels:delete`/`users:delete` deleted as tokens — both routes are
+// role-only (`requireRole('admin')`), no route ever checked them. D-9:
+// `hotel_groups:read`/`hotel_groups:write` split out of `hotels:write` (one
+// token no longer guards two differently-owned capabilities). D-4: MANAGER
+// gains `users:write` (profile-only — see users/types.ts D-4a DTO split;
+// role assignment stays a separate, Admin-only endpoint regardless of this
+// token). REGIONAL_MANAGER previously had no entry here at all — a real
+// latent bug (createUser/updateUserRole's `ROLE_PERMISSIONS[role] ?? ...`
+// would have silently fallen back to WORKER's permission set for any
+// REGIONAL_MANAGER row) — fixed here as MANAGER's set plus `hotel_groups:read`
+// (D-5: RM sees its own group; no MASTER-data token, per D-2/D-3).
+// ADR-030 D-5: Regional Manager holds Hotel Manager's full operational
+// capability set at group scope, plus nothing else (no MASTER-data token,
+// per D-2/D-3) — defined once here so REGIONAL_MANAGER below can reuse it
+// verbatim rather than drifting out of sync with a second copy. Frozen
+// because MANAGER and REGIONAL_MANAGER share this exact array by reference
+// (not a copy): a mutation like `ROLE_PERMISSIONS.MANAGER.push(...)` would
+// silently also grant REGIONAL_MANAGER the same token. If RM ever needs a
+// token MANAGER doesn't have, don't push onto this array — give
+// REGIONAL_MANAGER its own literal below, e.g.
+// `[...MANAGER_PERMISSIONS, 'new:token']`.
+const MANAGER_PERMISSIONS = Object.freeze([
+  'hotels:read',
+  // C-08: a manager may view (only) the hotel group their own hotel
+  // belongs to — enforced by scope filtering in-service (ADR-030 PR-4),
+  // not by this token, which merely gates the route.
+  'hotel_groups:read',
+  'rooms:read', 'rooms:write',
+  'tasks:read', 'tasks:write',
+  'quality:read',
+  'hr:read', 'hr:write',
+  'staffing:read', 'staffing:write',
+  'notifications:read',
+  'analytics:read',
+  'users:read',
+  // ADR-030 D-4: profile-only — the DTO/route split (D-4a) means this
+  // token never reaches User.role; see users/types.ts.
+  'users:write',
+  // Epic 5 PR 5.6 (SPEC-EMP-001): permission matrix — Hotel/Regional
+  // Manager may view/blocklist within scope; creation stays Admin-only
+  // (enforced service-side, OD-EMP-08).
+  'employees:read', 'employees:write',
+]) as string[];
+
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [
     'admin:*',
-    'users:read', 'users:write', 'users:delete',
-    'hotels:read', 'hotels:write', 'hotels:delete',
+    'users:read', 'users:write',
+    'hotels:read', 'hotels:write',
+    'hotel_groups:read', 'hotel_groups:write',
     'rooms:read', 'rooms:write',
     'tasks:read', 'tasks:write',
     'quality:read', 'quality:write',
@@ -101,21 +151,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     // Epic 5 PR 5.6 (SPEC-EMP-001): employee-management permissions.
     'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
   ],
-  MANAGER: [
-    'hotels:read',
-    'rooms:read', 'rooms:write',
-    'tasks:read', 'tasks:write',
-    'quality:read',
-    'hr:read', 'hr:write',
-    'staffing:read', 'staffing:write',
-    'notifications:read',
-    'analytics:read',
-    'users:read',
-    // Epic 5 PR 5.6 (SPEC-EMP-001): permission matrix — Hotel/Regional
-    // Manager may view/blocklist within scope; creation stays Admin-only
-    // (enforced service-side, OD-EMP-08).
-    'employees:read', 'employees:write',
-  ],
+  MANAGER: MANAGER_PERMISSIONS,
+  REGIONAL_MANAGER: MANAGER_PERMISSIONS,
   CHECKER: [
     'hotels:read',
     'rooms:read',

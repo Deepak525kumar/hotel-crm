@@ -62,9 +62,6 @@ mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => false,
-}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -229,7 +226,7 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'manager' }
+        { userId: 'u1', role: 'admin' }
       )
     ).rejects.toMatchObject({ name: 'ConflictError' });
 
@@ -249,7 +246,7 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'manager' }
+        { userId: 'u1', role: 'admin' }
       )
     ).rejects.toMatchObject({ name: 'ConflictError' });
   });
@@ -261,7 +258,7 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'manager' }
+        { userId: 'u1', role: 'admin' }
       )
     ).rejects.toThrow('db down');
   });
@@ -288,7 +285,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
 
     await service.createVerification(
       { assignment_id: 'a1', score: 80 } as any,
-      { userId: 'u1', role: 'manager' }
+      { userId: 'u1', role: 'admin' }
     );
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
@@ -304,7 +301,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
 
     await service.createVerification(
       { assignment_id: 'a1', score: 50 } as any,
-      { userId: 'u1', role: 'manager' }
+      { userId: 'u1', role: 'admin' }
     );
 
     const notifData = mockNotification.create.mock.calls[0][0].data;
@@ -315,7 +312,7 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     mockQualityVerification.create.mockRejectedValue(new Error('db down'));
 
     await expect(
-      service.createVerification({ assignment_id: 'a1', score: 80 } as any, { userId: 'u1', role: 'manager' })
+      service.createVerification({ assignment_id: 'a1', score: 80 } as any, { userId: 'u1', role: 'admin' })
     ).rejects.toThrow('db down');
 
     expect(mockOutboxEvent.create).not.toHaveBeenCalled();
@@ -418,7 +415,7 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     await expect(
       service.createRating(
         { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
-        { userId: 'u1', role: 'manager' }
+        { userId: 'u1', role: 'admin' }
       )
     ).rejects.toMatchObject({
       name: 'ConflictError',
@@ -454,7 +451,7 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
   it('emits RATING_RECEIVED to the rated worker after a successful rating', async () => {
     await service.createRating(
       { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
-      { userId: 'u1', role: 'manager' }
+      { userId: 'u1', role: 'admin' }
     );
 
     expect(mockNotification.create).toHaveBeenCalledTimes(1);

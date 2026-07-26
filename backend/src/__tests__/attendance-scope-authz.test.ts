@@ -45,15 +45,10 @@ function fullRecord(base: { id: string; hotel_id: string; worker_id: string }) {
   };
 }
 
-jest.mock('../config/feature-flags.js', () => ({
-  isScopeAuthzEnabled: () => true,
-}));
-
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
     NODE_ENV: 'test',
-    FEATURE_SCOPE_AUTHZ: true,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
