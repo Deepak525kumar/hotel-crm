@@ -8,9 +8,13 @@
 -- it does not restore correctness for the general case, and running it does
 -- not undo any authorization decision made based on live derivation since.
 --
--- Requires the backup table from this migration's up.sql
--- ("_User_permissions_backup_20260727") to still exist (it is retained one
--- release, not dropped automatically — see migration.sql's comment).
+-- The backup table is dropped here, after the restore, so this migration is
+-- fully reversible per the migration harness's teardown-to-empty invariant
+-- (every migration's down.sql must leave no schema object behind — see
+-- scripts/migrate-harness.sh's `verify`). The one-release retention window
+-- migration.sql's comment describes is an operational/deployment-sequencing
+-- policy (don't invoke this down.sql in production before that window has
+-- passed), not a claim that the table survives an actual rollback.
 BEGIN;
 
   ALTER TABLE "User" ADD COLUMN "permissions" TEXT[] NOT NULL DEFAULT '{}';
@@ -19,5 +23,7 @@ BEGIN;
   SET "permissions" = b."permissions"
   FROM "_User_permissions_backup_20260727" b
   WHERE u."id" = b."user_id";
+
+  DROP TABLE "_User_permissions_backup_20260727";
 
 COMMIT;
