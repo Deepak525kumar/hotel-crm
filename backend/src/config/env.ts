@@ -99,6 +99,15 @@ const envSchema = z.object({
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
   FEATURE_EMPLOYMENT_RECORD: z.coerce.boolean().default(false),
 
+  // Regional Manager role cutover flag (ADR-030 §6 PR-2, D-6).
+  // Defaults FALSE: the REGIONAL_MANAGER enum value exists (M-1, additive and
+  // irreversible) but M-3's promotion of existing group-associated managers
+  // does not run, and no route reads the token, until this is enabled — the
+  // "both-off = current behavior" posture. Must not be enabled in production
+  // before PR-3 ships (ADR-030 §6 ordering constraint: the mobile/frontend
+  // role-union widening and the hotel-group RM-picker fix, F-3).
+  FEATURE_RM_ROLE: z.coerce.boolean().default(false),
+
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).
   // Config-driven per ADR-029 §6/§8: the values below are the initial

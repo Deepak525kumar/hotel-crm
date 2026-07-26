@@ -24,6 +24,11 @@ enum UserRole {
   CHECKER
   MANAGER
   ADMIN
+  // ADR-030 D-5/M-1: additive-only (Postgres ALTER TYPE ADD VALUE). Gained no
+  // MASTER capability; operational manager at hotel_group scope (D-5).
+  // Promotion of existing group-associated managers happens via M-3, gated by
+  // FEATURE_RM_ROLE — this enum value alone authorizes nothing (ADR-030 §6 PR-2, D-6).
+  REGIONAL_MANAGER
 }
 
 // SP-1: INACTIVE removed; INVITED + REMOVED added to match frozen lifecycle.
