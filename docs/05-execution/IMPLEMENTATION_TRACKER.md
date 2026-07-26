@@ -18,6 +18,22 @@ remain authoritative in the linked planning artifacts. Each row below links to i
 definition in [IMPLEMENTATION_BACKLOG.md](../04-implementation/IMPLEMENTATION_BACKLOG.md) and its
 phase's entry/exit gates in [IMPLEMENTATION_PHASES.md](../04-implementation/IMPLEMENTATION_PHASES.md).
 
+**Reconciliation note (2026-07-27):** `ADR-030` (Manager Write-Authority Capability Model,
+Accepted 2026-07-25/26) and `ADR-031` (Request-Time Permission Derivation, Token-Generation
+Revocation, and Auth Rate-Limiting, Accepted 2026-07-26/27) both shipped substantial `backend-auth`/
+`backend-users` work — capability-based authorization, `REGIONAL_MANAGER` role, request-time
+permission derivation, session/token revocation, edge rate limiting, session sweep — entirely
+through the governance-decision (`GD-*`) track in
+[`docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md)
+(`GD-02`/`GD-03`/`GD-07`, each marked ✅ Accepted with its own PR-0..PR-8 sequence), **not** through
+this tracker's Phase 1 `EPIC-AUTH`/`EPIC-USERS` rows below. Those rows' `NOT_STARTED` status is
+accurate for *this tracker's own deliverable list* (a different, earlier planning artifact,
+`docs/04-implementation/IMPLEMENTATION_BACKLOG.md`) — it does not mean no authorization work has
+happened; it means that specific backlog item hasn't been picked up under this tracker. Anyone
+checking whether authorization/session-revocation work is done should consult
+`GOVERNANCE_DECISIONS_REQUIRED.md`'s `GD-02`/`GD-03`/`GD-07` rows, not this file, until a future
+pass reconciles the two planning layers (out of scope for this note).
+
 Status values: `NOT_STARTED` · `IN_PROGRESS` · `BLOCKED` · `G5_PASSED` · `G8_CLOSED`.
 
 Update this file as an exit condition of the [Implementation](../../.claude/workflows/implementation.md)
@@ -54,8 +70,8 @@ description lives once in [BLOCKERS.md](BLOCKERS.md); it is not restated here.
 | EPIC-PLATFORM | 0 | IN_PROGRESS | unassigned | [BLK-001](BLOCKERS.md); scope in [CURRENT_SPRINT.md](CURRENT_SPRINT.md) |
 | EPIC-SECREM | 0 | IN_PROGRESS | unassigned | [BLK-001](BLOCKERS.md); scope in [CURRENT_SPRINT.md](CURRENT_SPRINT.md) |
 | EPIC-OWNERSHIP | 0 | IN_PROGRESS | Human (reserved authority) | [BLK-001](BLOCKERS.md) |
-| EPIC-AUTH | 1 | NOT_STARTED | — | Phase 0 exit; release-prereqs [BLK-009](BLOCKERS.md) |
-| EPIC-USERS | 1 | NOT_STARTED | — | PRE: SPEC-USERS-001 G2 (backlog) |
+| EPIC-AUTH | 1 | NOT_STARTED | — | Phase 0 exit; release-prereqs [BLK-009](BLOCKERS.md). See reconciliation note above — `ADR-030`/`ADR-031` shipped authorization/revocation work via `GD-02`/`GD-07`, tracked outside this row. |
+| EPIC-USERS | 1 | NOT_STARTED | — | PRE: SPEC-USERS-001 G2 (backlog). See reconciliation note above — `ADR-030` shipped write-authority work via `GD-02`/`GD-03`, tracked outside this row. |
 | EPIC-CRM | 2 | NOT_STARTED | — | PRE: SPEC-CRM-001 G2 (backlog) |
 | EPIC-HOTELWORKERS | 2 | NOT_STARTED | — | [BLK-002](BLOCKERS.md) |
 | EPIC-NOTIFICATIONS | 2 (contract) / 5 (internals) | NOT_STARTED | — | PRE: SPEC-NOTIF-001 G2 (backlog) |
