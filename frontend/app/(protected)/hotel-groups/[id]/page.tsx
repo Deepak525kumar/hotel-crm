@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import {
   useHotelGroup,
   useHotels,
-  useUserOptions,
+  useRegionalManagerCandidates,
 } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
@@ -36,7 +36,7 @@ export default function HotelGroupDetailPage() {
   const id = params.id;
 
   const { data: group, isLoading, error } = useHotelGroup(id);
-  const { users: managers } = useUserOptions({ role: "manager" });
+  const { users: managers } = useRegionalManagerCandidates();
   // Hotels carrying this group id (the list endpoint doesn't filter by group,
   // so we request a wide page and narrow client-side).
   const { hotels } = useHotels({ limit: 100 });

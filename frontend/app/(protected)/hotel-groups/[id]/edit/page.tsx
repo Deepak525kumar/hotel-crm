@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
-import { useHotelGroup, useUserOptions } from "@/hooks/useHotels";
+import { useHotelGroup, useRegionalManagerCandidates } from "@/hooks/useHotels";
 import { ApiError, hotelGroupsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
@@ -17,9 +17,7 @@ function EditHotelGroup() {
   const router = useRouter();
 
   const { data: group, isLoading, error } = useHotelGroup(id);
-  const { users: managers, isLoading: managersLoading } = useUserOptions({
-    role: "manager",
-  });
+  const { users: managers, isLoading: managersLoading } = useRegionalManagerCandidates();
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

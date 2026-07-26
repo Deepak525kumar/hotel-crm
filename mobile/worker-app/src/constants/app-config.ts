@@ -1,7 +1,9 @@
 import type { PushApp, UserRole } from '@/types/api';
 
 export const APP_NAME = 'Worker Portal';
-export const ALLOWED_ROLES: readonly UserRole[] = ['worker', 'manager', 'admin'];
+// regional_manager added (ADR-030 PR-3): RM holds manager's capability set
+// at group scope, so may sign into this app exactly as manager does today.
+export const ALLOWED_ROLES: readonly UserRole[] = ['worker', 'manager', 'admin', 'regional_manager'];
 
 /**
  * Which application this build is, as the backend's `PushApp` (Epic 7 PR 7.7).

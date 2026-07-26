@@ -1,4 +1,8 @@
-export type UserRole = 'worker' | 'checker' | 'manager' | 'admin';
+// regional_manager added (ADR-030 PR-3, §6): the role exists at the backend
+// (M-1) but is not yet promoted into for any user (M-3 gated by
+// FEATURE_RM_ROLE, default off). Widened here so a future regional manager
+// isn't rejected by this app's type surface.
+export type UserRole = 'worker' | 'checker' | 'manager' | 'admin' | 'regional_manager';
 
 export interface User {
   id: string;

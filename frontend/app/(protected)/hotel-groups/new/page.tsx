@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { ApiError, hotelGroupsApi } from "@/lib/api";
-import { useUserOptions } from "@/hooks/useHotels";
+import { useRegionalManagerCandidates } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
 import type { HotelGroupFormValues } from "@/components/hotels/HotelGroupForm";
@@ -13,9 +13,7 @@ import type { CreateHotelGroupInput } from "@/lib/types";
 
 function NewHotelGroup() {
   const router = useRouter();
-  const { users: managers, isLoading: managersLoading } = useUserOptions({
-    role: "manager",
-  });
+  const { users: managers, isLoading: managersLoading } = useRegionalManagerCandidates();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
