@@ -10,7 +10,10 @@ export class UserController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const result = await userService.listUsers(req.query as never);
+        const result = await userService.listUsers(req.query as never, {
+          role: req.auth.role,
+          scope: req.auth.scope ?? null,
+        });
         res.status(200).json({
           status: 'success',
           data: result.users,

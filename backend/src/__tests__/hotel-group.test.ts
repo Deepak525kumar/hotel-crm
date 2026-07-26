@@ -9,10 +9,14 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  * existing user before create/update, per ADR-023's "one HotelGroup has
  * exactly one assigned Regional Manager"; (b) standard CRUD behavior
  * (create/read/list/update/delete) mirrors the existing Hotel CRUD pattern in
- * this same module. No authorization-scoping behavior is asserted here —
- * role/scope enforcement over HotelGroup data lands at Epic 5 PR 5.4/5.5
- * (ADR-024), not this PR.
+ * this same module. Scope enforcement over HotelGroup reads (list-filter,
+ * single-fetch deny) is added at ADR-030 PR-4 — see the dedicated describe
+ * block below.
  */
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
 
 const mockPrisma = {
   hotelGroup: {
@@ -26,10 +30,14 @@ const mockPrisma = {
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+jest.mock('../config/feature-flags.js', () => ({
+  isScopeAuthzEnabled: () => true,
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -88,15 +96,71 @@ describe('CrmService - Hotel Groups', () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.getHotelGroup('hg_1', 'actor_1', 'admin');
+      const result = await service.getHotelGroup('hg_1', 'actor_1', 'admin', null);
       expect(result.id).toBe('hg_1');
     });
 
     it('throws NotFoundError when the hotel group does not exist', async () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
 
-      await expect(service.getHotelGroup('nonexistent', 'actor_1', 'admin')).rejects.toMatchObject({
+      await expect(service.getHotelGroup('nonexistent', 'actor_1', 'admin', null)).rejects.toMatchObject({
         name: 'NotFoundError',
+      });
+    });
+
+    // ADR-030 PR-4 (D-7, C-08): single-resource fetch, so an out-of-scope
+    // group now denies (403-equivalent ForbiddenError) rather than being
+    // silently readable by any manager.
+    describe('scope enforcement (ADR-030 PR-4)', () => {
+      it('allows a manager whose hotel_group scope matches the group', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+
+        const result = await service.getHotelGroup('hg_1', 'mgr_1', 'manager', {
+          type: 'hotel_group',
+          hotel_group_id: 'hg_1',
+        });
+        expect(result.id).toBe('hg_1');
+      });
+
+      it('denies a manager whose hotel_group scope does not match the group', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+
+        await expect(
+          service.getHotelGroup('hg_1', 'mgr_1', 'manager', { type: 'hotel_group', hotel_group_id: 'hg_other' })
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      });
+
+      it('allows a hotel-scoped manager whose hotel belongs to the group', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'hg_1' });
+
+        const result = await service.getHotelGroup('hg_1', 'mgr_1', 'manager', { type: 'hotel', hotel_id: 'h1' });
+        expect(result.id).toBe('hg_1');
+      });
+
+      it('denies a manager with no scope claim', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+
+        await expect(service.getHotelGroup('hg_1', 'mgr_1', 'manager', null)).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
+
+      it('leaves admin unscoped regardless of scope claim', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+
+        const result = await service.getHotelGroup('hg_1', 'adm_1', 'admin', null);
+        expect(result.id).toBe('hg_1');
+      });
+
+      // Security review FIND-01: admin-bypass + default-deny, not a
+      // `{manager, regional_manager}` allowlist.
+      it('scope-resolves an unexpected non-admin role rather than leaving it unrestricted', async () => {
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
+
+        await expect(service.getHotelGroup('hg_1', 'chk_1', 'checker', null)).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
       });
     });
   });
@@ -106,10 +170,59 @@ describe('CrmService - Hotel Groups', () => {
       mockPrisma.hotelGroup.findMany.mockResolvedValue([{ id: 'hg_1', name: 'Berlin Group' }]);
       mockPrisma.hotelGroup.count.mockResolvedValue(1);
 
-      const result = await service.listHotelGroups({ page: 1, limit: 20 });
+      const result = await service.listHotelGroups({ page: 1, limit: 20 }, { role: 'admin', scope: null });
 
       expect(result.hotelGroups).toHaveLength(1);
       expect(result.pagination.total).toBe(1);
+    });
+
+    // ADR-030 PR-4 (D-7, C-08): previously unscoped — any manager listed
+    // every hotel group. Filters, does not deny.
+    describe('scope filtering (ADR-030 PR-4)', () => {
+      it('scopes a hotel_group-claim manager to their own group', async () => {
+        mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+        mockPrisma.hotelGroup.count.mockResolvedValue(0);
+
+        await service.listHotelGroups(
+          { page: 1, limit: 20 },
+          { role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'hg_1' } }
+        );
+
+        const call = (mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('hg_1');
+      });
+
+      it('denies (empty result) a manager with no scope claim', async () => {
+        mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+        mockPrisma.hotelGroup.count.mockResolvedValue(0);
+
+        await service.listHotelGroups({ page: 1, limit: 20 }, { role: 'manager', scope: null });
+
+        const call = (mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('__none__');
+      });
+
+      it('leaves admin unscoped regardless of scope claim', async () => {
+        mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+        mockPrisma.hotelGroup.count.mockResolvedValue(0);
+
+        await service.listHotelGroups({ page: 1, limit: 20 }, { role: 'admin', scope: null });
+
+        const call = (mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBeUndefined();
+      });
+
+      // Security review FIND-01: admin-bypass + default-deny, not a
+      // `{manager, regional_manager}` allowlist.
+      it('scope-resolves an unexpected non-admin role rather than leaving it unrestricted', async () => {
+        mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+        mockPrisma.hotelGroup.count.mockResolvedValue(0);
+
+        await service.listHotelGroups({ page: 1, limit: 20 }, { role: 'checker', scope: null });
+
+        const call = (mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: string } }>;
+        expect(call[0]?.where.id).toBe('__none__');
+      });
     });
   });
 

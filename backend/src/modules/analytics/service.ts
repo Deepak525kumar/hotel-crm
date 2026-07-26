@@ -22,9 +22,17 @@ export class AnalyticsService extends BaseService {
   // LeaderboardEntry contract while reading the same rows — and using the same
   // average_score ordering — as /quality/leaderboard, so the two surfaces can
   // never rank a worker differently.
-  async getLeaderboard(hotelId?: string): Promise<LeaderboardEntry[]> {
+  // `hotelGroupId` (ADR-030 PR-4, D-7) lets a scoped manager/regional_manager's
+  // own group filter directly, without resolving through a specific hotel.
+  async getLeaderboard(hotelId?: string, hotelGroupId?: string): Promise<LeaderboardEntry[]> {
     let where: Record<string, unknown> = {};
-    if (hotelId) {
+    if (hotelGroupId) {
+      where = {
+        worker: {
+          employment_record: { hotel_group_id: hotelGroupId, status: 'ACTIVE' },
+        },
+      };
+    } else if (hotelId) {
       const hotel = await this.prisma.hotel.findUnique({
         where: { id: hotelId },
         select: { hotel_group_id: true },
@@ -58,8 +66,19 @@ export class AnalyticsService extends BaseService {
     });
   }
 
-  async getDashboardStats(hotelId?: string): Promise<DashboardStats> {
-    const scope = hotelId ? { hotel_id: hotelId } : {};
+  // `hotelGroupId` (ADR-030 PR-4, D-7): these models are hotel-grain, so a
+  // group filter resolves to `hotel_id IN (every hotel in the group)`.
+  async getDashboardStats(hotelId?: string, hotelGroupId?: string): Promise<DashboardStats> {
+    let scope: Record<string, unknown> = {};
+    if (hotelGroupId) {
+      const hotels = await this.prisma.hotel.findMany({
+        where: { hotel_group_id: hotelGroupId },
+        select: { id: true },
+      });
+      scope = { hotel_id: { in: hotels.map((h) => h.id) } };
+    } else if (hotelId) {
+      scope = { hotel_id: hotelId };
+    }
 
     const [
       totalRequests,
