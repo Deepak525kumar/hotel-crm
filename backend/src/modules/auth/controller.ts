@@ -114,6 +114,22 @@ export class AuthController {
     },
   ];
 
+  // ADR-031 D-4 (PR-4): Admin-only incident-response endpoint — "log out
+  // everywhere" for a specific user, distinct from that user's own `logout`.
+  async revokeAllSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      await authService.revokeAllSessions(req.params['user_id']!, req.auth.userId, req.auth.role, req.ip);
+      res.status(200).json({
+        status: 'success',
+        data: { message: 'All sessions revoked' },
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   updateProfile = [
     validateBody(UpdateProfileSchema),
     async (req: Request, res: Response, next: NextFunction) => {

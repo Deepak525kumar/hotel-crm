@@ -59,6 +59,19 @@ jest.mock('../modules/users/service.js', () => ({
   },
 }));
 
+// ADR-031 D-4 (PR-4): users/routes.ts now also wires the Admin-only
+// revoke-all-sessions route to authController, which otherwise pulls in the
+// real auth/service.js -> config/env.js chain this test never exercises or
+// mocks. Out of scope for this file (which is about the D-4a route/schema
+// split), so stub it the same way userService is stubbed above.
+jest.mock('../modules/auth/controller.js', () => ({
+  authController: {
+    revokeAllSessions: jest.fn(async (_req: unknown, res: Response) => {
+      (res as any).status(200).json({ status: 'success', data: { message: 'All sessions revoked' } });
+    }),
+  },
+}));
+
 import express from 'express';
 import request from 'supertest';
 import usersRouter from '../modules/users/routes.js';
