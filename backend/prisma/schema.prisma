@@ -309,6 +309,11 @@ model PasswordResetToken {
 
   @@index([user_id])
   @@index([expires_at])
+  // ADR-031 D-5 (PR-6): a partial index on `used_at IS NOT NULL` also exists
+  // (migration 20260727000000), supporting the sweep job's used-token
+  // cleanup branch. Not expressible in the Prisma schema DSL (no `@@index`
+  // WHERE clause) — same accepted drift as WorkerAssignment's partial
+  // unique index (migration 20260613120000), which is likewise raw-SQL-only.
 }
 
 // =============================================================================

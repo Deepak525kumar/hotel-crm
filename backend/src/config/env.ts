@@ -169,6 +169,21 @@ const envSchema = z.object({
   // realistic single-delivery duration; handlers are idempotent so an occasional
   // reclaim-and-retry of an already-sent row is safe.
   OUTBOX_PROCESSING_TIMEOUT_MS: z.coerce.number().int().positive().default(300000),
+
+  // ADR-031 D-5 (PR-6): Session/PasswordResetToken sweep job on the Platform
+  // Worker. Config-driven per the same ADR-029 §6/§8 convention — the values
+  // below are the initial deployment defaults, changeable without a code
+  // change. Default interval: hourly.
+  SESSION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(3600000),
+  // Bounded per-run delete batch size, so a large first run (or a backlog
+  // after downtime) cannot lock either table (D-5).
+  SESSION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
+  // Hard cap on batches deleted per table per run (performance-review
+  // finding: this directly bounds per-tick work alongside batch size, so it
+  // must be adjustable without a code change if the pre-existing,
+  // never-swept backlog on first deploy turns out to need faster
+  // convergence than the default allows).
+  SESSION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 });
 
 type Env = z.infer<typeof envSchema>;
