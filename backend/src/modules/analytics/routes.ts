@@ -1,35 +1,41 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { checkHotelAccess, requireRole } from '../../middleware/permissions.js';
+import { checkHotelAccess, requirePermission, requireRole } from '../../middleware/permissions.js';
 import { analyticsController } from './controller.js';
 
 const router = Router();
 router.use(authMiddleware);
 
-// KNOWN GAP (security review FIND-02, tracked, fail-closed): 'regional_manager'
-// is not yet in the requireRole lists below. Harmless today — FEATURE_RM_ROLE
-// is off, so no live user holds that role — but once it's enabled, a
-// regional_manager will 403 here despite resolveScopedFilter (controller.ts)
-// already being ready to scope them. Must be added alongside PR-5 (ADR-030 §6).
+// ADR-030 PR-7 follow-up: closes the gap the security review (FIND-02) and
+// PR-7's generated route x role matrix both flagged — 'regional_manager' is
+// now included (C-31, D-5: RM holds analytics:read at group scope, scoped by
+// resolveScopedFilter in controller.ts) and each route now also checks the
+// named 'analytics:read' token (previously role-only with no accompanying
+// requirePermission call, even though ROLE_PERMISSIONS names analytics:read
+// as C-31's token).
 router.get(
   '/leaderboard',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('analytics:read'),
   (req, res, next) => analyticsController.getLeaderboard(req, res, next)
 );
 router.get(
   '/leaderboard/by-hotel/:hotel_id',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('analytics:read'),
   checkHotelAccess(),
   (req, res, next) => analyticsController.getLeaderboard(req, res, next)
 );
 router.get(
   '/stats',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('analytics:read'),
   (req, res, next) => analyticsController.getDashboardStats(req, res, next)
 );
 router.get(
   '/hotel-summary/:hotel_id',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('analytics:read'),
   checkHotelAccess(),
   (req, res, next) => analyticsController.getHotelSummary(req, res, next)
 );

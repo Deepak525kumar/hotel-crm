@@ -110,15 +110,30 @@ describe('Analytics leaderboard authorization (S0-6 regression / OQ-ANALYTICS-01
     });
 
     it('allows an admin (200)', async () => {
-      testAuth = { userId: 'u_admin', role: 'admin', hotel_ids: [], permissions: [] };
+      testAuth = { userId: 'u_admin', role: 'admin', hotel_ids: [], permissions: ['admin:*'] };
       const res = await request(makeApp()).get('/analytics/leaderboard');
       expect(res.status).toBe(200);
     });
 
     it('allows a manager (200)', async () => {
-      testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: [] };
+      testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: ['analytics:read'] };
       const res = await request(makeApp()).get('/analytics/leaderboard');
       expect(res.status).toBe(200);
+    });
+
+    // ADR-030 PR-7 follow-up (D-5/C-31): regional_manager was missing from
+    // this route's role gate entirely until now — the generated route x role
+    // matrix (PR-7) surfaced it as a live gap once FEATURE_RM_ROLE ships.
+    it('allows a regional_manager (200)', async () => {
+      testAuth = { userId: 'u_rm', role: 'regional_manager', hotel_ids: [], permissions: ['analytics:read'] };
+      const res = await request(makeApp()).get('/analytics/leaderboard');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager lacking the analytics:read token (403)', async () => {
+      testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: [] };
+      const res = await request(makeApp()).get('/analytics/leaderboard');
+      expect(res.status).toBe(403);
     });
   });
 
@@ -132,7 +147,7 @@ describe('Analytics leaderboard authorization (S0-6 regression / OQ-ANALYTICS-01
     });
 
     it('allows an admin for any hotel (200)', async () => {
-      testAuth = { userId: 'u_admin', role: 'admin', hotel_ids: [], permissions: [] };
+      testAuth = { userId: 'u_admin', role: 'admin', hotel_ids: [], permissions: ['admin:*'] };
       const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h_any');
       expect(res.status).toBe(200);
     });
@@ -142,7 +157,7 @@ describe('Analytics leaderboard authorization (S0-6 regression / OQ-ANALYTICS-01
     // bypass. See analytics-scope-authz.test.ts for the in-scope/out-of-scope
     // matrix this test predates.
     it('denies a manager with no scope claim for any hotel (403)', async () => {
-      testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: [] };
+      testAuth = { userId: 'u_mgr', role: 'manager', hotel_ids: [], permissions: ['analytics:read'] };
       const res = await request(makeApp()).get('/analytics/leaderboard/by-hotel/h_any');
       expect(res.status).toBe(403);
     });

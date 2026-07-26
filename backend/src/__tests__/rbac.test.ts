@@ -345,6 +345,31 @@ describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
     expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
   });
 
+  // ADR-030 D-5 / PR-7 review follow-up: regional_manager previously had no
+  // branch here at all and fell through to the worker-roster check below —
+  // wrong authorization model entirely (individual roster membership instead
+  // of group scope). isHotelInScope() is role-agnostic, so RM now shares
+  // manager's branch, exactly like the constants.ts MANAGER_PERMISSIONS
+  // sharing pattern (D-5: RM holds manager's operational capability set).
+  it('allows a regional_manager whose hotel_group scope matches the target (viaBypass:false)', async () => {
+    mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    const decision = await resolveHotelAccess('regional_manager', 'u1', 'h1', { type: 'hotel_group', hotel_group_id: 'g1' });
+    expect(decision).toEqual({ allowed: true, viaBypass: false });
+    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('denies a regional_manager whose hotel_group scope does not match the target (out_of_scope)', async () => {
+    mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+    const decision = await resolveHotelAccess('regional_manager', 'u1', 'h1', { type: 'hotel_group', hotel_group_id: 'g1' });
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+  });
+
+  it('denies a regional_manager with a null scope claim (deny-by-default)', async () => {
+    const decision = await resolveHotelAccess('regional_manager', 'u1', 'h1', null);
+    expect(decision).toEqual({ allowed: false, reason: 'out_of_scope' });
+    expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+  });
+
   it('allows a worker whose EmploymentRecord group matches the target hotel group', async () => {
     mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
     mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });

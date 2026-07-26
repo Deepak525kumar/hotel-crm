@@ -157,7 +157,16 @@ export async function resolveHotelAccess(
     return { allowed: true, viaBypass: true };
   }
 
-  if (role === 'manager') {
+  // ADR-030 D-5: regional_manager holds manager's operational capability set
+  // at hotel_group scope — isHotelInScope() is role-agnostic (it resolves
+  // purely from the scope claim's shape, not the caller's role), so the same
+  // branch that already serves 'manager' serves 'regional_manager' correctly.
+  // Before this, regional_manager fell through to the worker-roster branch
+  // below (an unrelated, individual-grain authorization model), which could
+  // both wrongly deny an RM within their own group and wrongly allow one
+  // outside it via incidental EmploymentRecord rows (security review finding
+  // on PR-7's analytics regional_manager/analytics:read fix).
+  if (role === 'manager' || role === 'regional_manager') {
     if (!hotelId) {
       return { allowed: false, reason: 'missing_hotel_id' };
     }
