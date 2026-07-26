@@ -7,7 +7,7 @@ import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { hotelsApi } from "@/lib/api";
-import { RoleGate, ManagerAdminGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -84,11 +84,11 @@ export default function HotelDetailPage() {
             }
             description={`${hotel.city}, ${hotel.country}`}
             actions={
-              <ManagerAdminGate>
+              <HotelWriteGate>
                 <Link href={`/hotels/${id}/edit`}>
                   <Button variant="outline">Edit</Button>
                 </Link>
-              </ManagerAdminGate>
+              </HotelWriteGate>
             }
           />
 
@@ -122,7 +122,7 @@ export default function HotelDetailPage() {
             </CardContent>
           </Card>
 
-          <RoleGate allow={["admin"]}>
+          <HotelWriteGate>
             {hotel.is_active && (
               <Card className="border-red-100">
                 <CardContent className="flex items-center justify-between gap-4">
@@ -143,7 +143,7 @@ export default function HotelDetailPage() {
                 </CardContent>
               </Card>
             )}
-          </RoleGate>
+          </HotelWriteGate>
         </>
       )}
 

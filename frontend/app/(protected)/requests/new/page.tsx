@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
-import { RoleGate } from "@/components/auth/RoleGate";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
   Button,
   Card,
@@ -247,8 +247,7 @@ function NewWorkRequestForm() {
 
 export default function NewWorkRequestPage() {
   return (
-    <RoleGate
-      allow={["manager", "admin"]}
+    <StaffingWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
@@ -260,6 +259,6 @@ export default function NewWorkRequestPage() {
       }
     >
       <NewWorkRequestForm />
-    </RoleGate>
+    </StaffingWriteGate>
   );
 }

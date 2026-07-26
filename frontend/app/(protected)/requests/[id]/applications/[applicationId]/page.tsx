@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useWorkApplication } from "@/hooks/useWorkApplications";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { ApiError, workApplicationsApi } from "@/lib/api";
-import { ManagerAdminGate } from "@/components/auth/RoleGate";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { ApplicationStatusBadge } from "@/components/work-applications/ApplicationStatusBadge";
 import { formatDateTime, formatScore } from "@/lib/format";
 import {
@@ -161,7 +161,7 @@ export default function ApplicationReviewPage() {
         </Card>
       )}
 
-      <ManagerAdminGate>
+      <StaffingWriteGate>
         {isPending && (
           <Card>
             <CardContent className="flex items-center justify-between gap-4">
@@ -188,7 +188,7 @@ export default function ApplicationReviewPage() {
             </CardContent>
           </Card>
         )}
-      </ManagerAdminGate>
+      </StaffingWriteGate>
 
       <FormError>{action.error}</FormError>
 
