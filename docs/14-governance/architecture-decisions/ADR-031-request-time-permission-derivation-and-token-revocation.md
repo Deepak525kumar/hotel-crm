@@ -93,9 +93,13 @@ The removal of `permissions` is deliberately sequenced **after** derivation is l
 2. **`payload.token_generation !== user.token_generation` → 401** with a distinct, machine-readable error code (`TOKEN_REVOKED`) so clients can distinguish "re-authenticate" from "refresh". A token carrying **no** `token_generation` claim is treated as generation `0` during the transition window and as **invalid** after PR-5's flag is defaulted on (this is the one intentional forced-re-auth event; see §8).
 3. `req.auth.permissions = ROLE_PERMISSIONS[user.role] ?? []` — derived, never read from the token.
 4. `req.auth.role = user.role.toLowerCase()`, from the row (matching the existing lowercase convention at `users/service.ts:98`).
-5. `req.auth.scope` continues to come from the **token** claim, unchanged (`ADR-023`). Scope is *not* re-resolved per request: `resolveScope()` performs up to two additional queries (`auth/service.ts:34-49`), and re-running them on every request is a performance decision this record does not take. Consequence, stated plainly: **a manager-reassignment (a change to `Hotel.manager_user_id`/`HotelGroup.regional_manager_user_id`) remains TTL-lagged.** The mitigation is that a reassignment is an Admin action (`ADR-030` C-09, master-data) which may bump `token_generation` to force re-issuance — the mechanism exists; making the bump automatic on reassignment is left open (§9 OI-2).
+5. `req.auth.scope` continues to come from the **token** claim, unchanged (`ADR-023`). Scope is *not* re-resolved per request: `resolveScope()` performs up to two additional queries (`auth/service.ts:34-49`), and re-running them on every request is a performance decision this record does not take. **Why role is derived live but scope is not, stated explicitly:** `role` is a single column on the row already being read for revocation — deriving it costs nothing beyond that read. `scope` requires resolving relational state (`Hotel.manager_user_id`/`HotelGroup.regional_manager_user_id`, up to two further queries) that is not already on the `User` row; deriving it live would add queries this record's cost model (§2, "one indexed `User` read") does not budget for. This is an asymmetry of *query cost*, not of architectural principle — if a future record is prepared to pay for those additional queries (or caches them), deriving scope live is a straightforward extension, not a reversal, of this one. Consequence, stated plainly: **a manager-reassignment (a change to `Hotel.manager_user_id`/`HotelGroup.regional_manager_user_id`) remains TTL-lagged.** The mitigation is that a reassignment is an Admin action (`ADR-030` C-09, master-data) which may bump `token_generation` to force re-issuance — the mechanism exists; making the bump automatic on reassignment is left open (§9 OI-2).
 
-**Per-request cost and caching.** The added read is one indexed lookup on `User.id` (the primary key), on a request that already performs at least one query in virtually every authenticated handler. A short-TTL in-process cache keyed by `user_id` is **permitted but not required**, and if used it is bounded by an explicit rule: **TTL ≤ 5 seconds, and every cache entry is invalidated by `user_id` on any `token_generation` bump within the same process.** A cache whose TTL exceeds the revocation guarantee would silently re-introduce the exact staleness this record removes, so the TTL is a stated policy value, not an implementation detail. No cross-process cache (that would be Option (b)'s infrastructure).
+**Why a DB read, when `role` could stay in the token and only `ROLE_PERMISSIONS` lookup be avoided?** Because the read is not there to derive permissions — `ROLE_PERMISSIONS[role]` is an in-process map lookup and would be free even against a token-embedded `role`. **The read exists to answer four questions no claim can answer once issued: is this account still active, still not deleted, still this role, and still holding a live `token_generation`.** Permission derivation is a by-product that becomes effectively free once that row is already being loaded for revocation and validity — it does not, by itself, justify a database round trip. Stated plainly: **the DB lookup exists primarily for revocation and account-validity enforcement; permission derivation rides along on it at zero marginal query cost.**
+
+**Per-request cost and caching.** The added read is one indexed lookup on `User.id` (the primary key), on a request that already performs at least one query in virtually every authenticated handler. **Caching is optional; implementations may disable it entirely and read the row on every request.** If caching is used, it is bounded by an explicit rule: a short-TTL in-process cache keyed by `user_id`, **TTL ≤ 5 seconds, every cache entry invalidated by `user_id` on any `token_generation` bump within the same process.** A cache whose TTL exceeds the revocation guarantee would silently re-introduce the exact staleness this record removes, so the TTL is a stated ceiling, not a target — going uncached is always compliant; caching beyond 5 seconds never is. No cross-process cache (that would be Option (b)'s infrastructure).
+
+**Failure mode when the database is unavailable, stated explicitly.** Today, a valid JWT authorizes a request even if the database is down (`authMiddleware` never queries it). After this record, a valid JWT plus an unreachable database means the added `User` read fails, and the request is rejected (401/500 depending on how the failure is surfaced) rather than authorized on claims alone. **This is an accepted, deliberate change to the platform's failure mode** — the trade this record makes (live revocation) is incompatible with authorizing purely from a cached claim during a database outage. It is not a new single point of failure in practice (every authenticated handler already queries the database at least once to do its work), but it does mean auth now fails *before* those handlers would have, rather than inside them. Recorded here rather than left implicit.
 
 ### D-4 — `token_generation` is the revocation primitive
 
@@ -110,6 +114,8 @@ The removal of `permissions` is deliberately sequenced **after** derivation is l
 | `logout` | `auth/service.ts:213-` | **Deliberately NOT bumped.** Logout on one device must not sign the user out everywhere. Logout keeps its current semantics (delete that one `Session` row); the access token expires naturally within its TTL. A separate "log out everywhere" is the admin/self-service revoke action above. |
 
 Every bump is written **in the same transaction** as the state change that motivates it, so a revocation can never be lost against a committed demotion or deactivation (the same atomicity argument as `ADR-029` §2). Every bump writes an `AuditLog` row (`ADR-016`, `backend-auth` as writer).
+
+**No module other than `backend-auth` writes `token_generation` directly.** `backend-users`' write paths that must trigger a bump (`updateUserRole`, deactivate, soft-delete) call into a `backend-auth`-owned service function (e.g. `bumpTokenGeneration(userId, tx)`, invoked inside the same transaction) rather than incrementing the column themselves. This is stated as a binding rule, not left to be inferred from the ownership table in §5: a future `prisma.user.update({ data: { token_generation: { increment: 1 } } })` written directly inside `backend-users` (or any other module) would work today and silently create a second, uncoordinated writer of authoritative token state — exactly the kind of drift `ADR-017` exists to prevent for `state-user` generally. PR-4's invariant coverage (C-6 territory) should include a check that the column is written only from the designated `backend-auth` seam.
 
 **Access-token TTL is shortened** from `1h` to a configuration default of **15 minutes** (`JWT_ACCESS_EXPIRY`, `config/env.ts:25`), stated as policy-then-value per `ADR-029` §8's convention: the TTL is configuration, and 15m is the initial deployment default. Refresh TTL (`7d`) is unchanged. The TTL is now defense-in-depth rather than the primary revocation mechanism — with D-3 live, revocation no longer *depends* on it.
 
@@ -128,12 +134,12 @@ Deletion is batched with a bounded per-run limit so a large first run cannot loc
 
 **Decision: rate limiting is an edge-level Nginx configuration change, not new backend code.**
 
-- **Mechanism:** `limit_req_zone`/`limit_req` directives added to `nginx/hotelcrm.conf` (and mirrored in `deploy/aws-edge-checklist.md`), keyed on `$binary_remote_addr`, applied to the five `auth/routes.ts:7-12` paths (`login`, `signup`, `refresh`, `password-reset`, `password-reset/confirm`) with a generous `burst` allowance so legitimate retry/refresh traffic is not denied. No new backend file, no new runtime dependency, no application code change.
-- **Scope, honestly stated:** Nginx limits by client IP only. **Per-account throttling is out of scope by the same confirmed requirement** that puts rate limiting at the edge — the application layer must not inspect the request to apply an account-keyed limit, since that is itself an application-layer control. This is recorded as a real, accepted gap (§9 OI-3a), not silently dropped.
+- **Mechanism:** `limit_req_zone`/`limit_req` directives added to `nginx/hotelcrm.conf` (and mirrored in `deploy/aws-edge-checklist.md`), keyed on `$binary_remote_addr`, applied to the five `auth/routes.ts:7-12` paths (`login`, `signup`, `refresh`, `password-reset`, `password-reset/confirm`) with a generous `burst` allowance so legitimate retry/refresh traffic is not denied. No new backend file, no new runtime dependency, no application code change. **Nginx is the initial deployment target, not a requirement of the decision itself:** any edge that enforces the same IP-keyed, application-blind property is equally compliant — a Cloudflare (or equivalent CDN/WAF edge) rate-limiting rule is an acceptable substitute or addition if the deployment topology changes, since `TREQ-AUTH-008` itself names "Nginx/Cloudflare" as interchangeable edge options.
+- **Scope, honestly stated:** Nginx limits by client IP only. **Per-account throttling is out of scope by the same confirmed requirement** that puts rate limiting at the edge — the application layer must not inspect the request to apply an account-keyed limit, since that is itself an application-layer control. This is recorded as a real, accepted gap (§10 OI-3a), not silently dropped.
 - **Client IP correctness:** the edge terminates TLS and sees the real client IP directly (no `X-Forwarded-For` trust chain to configure inside the app) — this removes the spoofing concern the rejected in-app design would have carried.
 - **Response:** Nginx's own `503`/`429` (`limit_req_status`) with a `Retry-After` header, configured directly in the edge config. The backend's `RATE_LIMIT_EXCEEDED` constant (`config/constants.ts:62`) remains unused dead code; retiring it is a separate, non-blocking hygiene item, not part of this decision.
-- **`SIR-AUTH-018`'s rate-limiting half is resolved at the edge, not in `backend/src`.** This changes what "resolved" means for that register row: closed by infrastructure configuration, cited accordingly in §10.
-- **`SIR-AUTH-017` (timing side-channel) is unaffected by this correction** — an edge IP limit bounds enumeration throughput exactly as an app-layer one would; it still does not equalize branch latency. §9 OI-1 keeps the residual open, unchanged.
+- **`SIR-AUTH-018`'s rate-limiting half is resolved at the edge, not in `backend/src`.** This changes what "resolved" means for that register row: closed by infrastructure configuration, cited accordingly in §11.
+- **`SIR-AUTH-017` (timing side-channel) is unaffected by this correction** — an edge IP limit bounds enumeration throughput exactly as an app-layer one would; it still does not equalize branch latency. §10 OI-1 keeps the residual open, unchanged.
 
 ### D-7 — `requirePermission` and `requireRole` are unchanged in source
 
@@ -194,13 +200,13 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 | **PR-0** | Characterization tests pinning today's behavior at the trust boundary: a deactivated / soft-deleted / demoted user's existing access token still authorizes; `req.auth.permissions` comes from the claim; no auth endpoint is rate-limited; `Session` rows survive expiry. These must **fail** after PR-3/PR-1 — they are the evidence that the change took effect | — | — | revert | — |
 | **PR-1** | **Rate limiting** (D-6): `limit_req_zone`/`limit_req` added to `nginx/hotelcrm.conf` (+ `deploy/aws-edge-checklist.md`) for the five `auth/routes.ts` endpoints, IP-keyed, with `Retry-After`. Infrastructure config, not backend code. Correct under any outcome of §2 — **may ship without ratifying this ADR** | PR-0 | — | revert (config) | **S** |
 | **PR-2** | **Schema + issuance**: M-1; `token_generation` added to `AccessTokenPayload` (`lib/jwt.ts`) and mirrored from the row at all three issuance sites (`auth/service.ts:84,137,194`). **Nothing verifies the claim yet** — additive, invisible, and it seeds the claim into circulation before PR-3 can require it (the `ADR-030` D-6 "add the token, read it later" pattern) | PR-1 | M-1 | revert; column droppable while unread | **S** |
-| **PR-3** | **The cutover.** `authMiddleware` **and** `optionalAuthMiddleware` (C-3) resolve the live `User` row: `is_active`/`deleted_at` → 401; `token_generation` mismatch → 401 `TOKEN_REVOKED`; `permissions` derived from `ROLE_PERMISSIONS[row.role]`; `role` taken from the row. `ROLE_PERMISSIONS` frozen (D-1). Behind `FEATURE_DERIVED_PERMISSIONS` + `FEATURE_TOKEN_GENERATION_ENFORCEMENT`, both default **off**; ships with M-2's reconciliation report as review evidence (C-2). The `permissions` claim is still issued and still honored when the flag is off | PR-2 | M-2 (read-only) | flags off (both-off = today, C-4) | **S**, **A**, **P** |
+| **PR-3** | **The cutover.** `authMiddleware` **and** `optionalAuthMiddleware` (C-3) resolve the live `User` row: `is_active`/`deleted_at` → 401; `token_generation` mismatch → 401 `TOKEN_REVOKED`; `permissions` derived from `ROLE_PERMISSIONS[row.role]`; `role` taken from the row. `ROLE_PERMISSIONS` frozen (D-1). Behind `FEATURE_DERIVED_PERMISSIONS` + `FEATURE_TOKEN_GENERATION_ENFORCEMENT`, both default **off**; ships with M-2's reconciliation report as review evidence (C-2). The `permissions` claim is still issued and still honored when the flag is off. **Performance-gate acceptance criterion (P):** with the flags on in a staging/load-test environment, the added `User` lookup must show **no statistically significant increase in median request latency** (target: <5ms added at p50) across the representative authenticated-route mix; if the measured cost exceeds this, PR-3 does not merge on the strength of "it's one indexed read" alone — the optional cache (D-3) becomes a requirement of this PR, not a fallback saved for later | PR-2 | M-2 (read-only) | flags off (both-off = today, C-4) | **S**, **A**, **P** |
 | **PR-4** | **Revocation triggers + write-path cleanup**: transactional `token_generation` bump (C-5) on role change, deactivation, soft delete, and password-reset confirm; new Admin-only "revoke all sessions for user" endpoint; `AuditLog` row per bump; `createUser`/`updateUser`/`updateUserRole` stop computing and writing `User.permissions`; C-6's no-reader invariant test. `logout` semantics explicitly unchanged (D-4) | PR-3 (flag-on) | — | revert | **S** |
 | **PR-5** | **Claim removal + client forced-re-auth**: drop `permissions` from `AccessTokenPayload` and all issuance sites; a claim-less token becomes invalid; `JWT_ACCESS_EXPIRY` default → `15m`. Requires the client work of PR-4a below to be already deployed (C-7) | PR-4, **PR-4a deployed** | — | revert (re-adding a claim is backward-compatible) | **S** |
 | **PR-4a** | **Clients**: `frontend/` + both mobile apps distinguish 401 `TOKEN_REVOKED` (clear credentials, re-authenticate) from ordinary expiry (refresh); surface 429 + `Retry-After` on login/reset. **Ships before PR-5's flag is enabled in production** (C-7). Numbered `4a` because it parallels PR-4 rather than following it — it depends only on PR-3's error contract | PR-3 | — | revert per app | — |
 | **PR-6** | **Sweep job** (D-5) on the Platform Worker: expired `Session` + expired/used `PasswordResetToken`, batched, bounded, metered, interval configurable (default hourly) | PR-1 (independent of PR-2..5) | — | disable job | **P** |
 | **PR-7** | **Flag retirement + column drop**: remove both flags and the dead claim-honoring branch; M-3 drops `User.permissions` after a full-release soak with C-6 green | PR-5, PR-6 | M-3 | **not reversible** (by design; pre-drop snapshot retained one release) | **S**, **A** |
-| **PR-8** | Documentation, register, and knowledge-graph synchronization: close the §10 SIR rows, mark GD-07 resolved, restate `ADR-030` §5 M-2 / §9 as superseded, reclassify `ROLE_PERMISSIONS` as a contract node in `DEPENDENCY_GRAPH.yaml`/`CONTRACT_INDEX.yaml`, register this ADR in `DECISION_INDEX.md` | PR-7 | — | — | — |
+| **PR-8** | Documentation, register, and knowledge-graph synchronization: close the §11 SIR rows, mark GD-07 resolved, restate `ADR-030` §5 M-2 / §9 as superseded, reclassify `ROLE_PERMISSIONS` as a contract node in `DEPENDENCY_GRAPH.yaml`/`CONTRACT_INDEX.yaml`, register this ADR in `DECISION_INDEX.md` | PR-7 | — | — | — |
 
 **Ordering constraints that are not negotiable:**
 
@@ -222,7 +228,7 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 - **A demotion, deactivation, or soft delete takes effect on the next request** — including mid-session. Handlers that assumed a stable `req.auth` for the life of a token do not exist today (nothing caches `req.auth` across requests), but this becomes a standing invariant.
 - **Manager-reassignment latency is unchanged** (D-3.5): scope stays issuance-time. Recorded as a known, bounded gap with an available manual mitigation, and as OI-2.
 - **Rate limiting changes observable behavior for legitimate clients** under retry storms; Nginx's `burst` allowance is configuration, set generously so only sustained abuse is denied.
-- **Rate limiting is IP-keyed only, per `TREQ-AUTH-008`.** Distributed credential stuffing across many IPs is not bounded by this decision — an accepted, confirmed-requirement-driven gap, not an oversight (§9 OI-3a).
+- **Rate limiting is IP-keyed only, per `TREQ-AUTH-008`.** Distributed credential stuffing across many IPs is not bounded by this decision — an accepted, confirmed-requirement-driven gap, not an oversight (§10 OI-3a).
 - **`Session` and `PasswordResetToken` gain a deletion policy** and therefore join `OutboxEvent` as records needing a GDPR retention tier under `SIR-NOTIF-002`/GD-09 before G8.
 - **New Prisma field:** `User.token_generation Int @default(0)`. New middleware file, one new Platform Worker job, one new Admin endpoint. No new module, no new external dependency, no new infrastructure.
 
@@ -233,11 +239,28 @@ Each PR is independently revertible except where noted. Gate column: **S** = Sec
 - **High, mitigated by C-5** — a non-transactional bump loses a revocation against a committed demotion.
 - **High, mitigated by C-7/PR-4a ordering** — clients stranded in a refresh loop on `TOKEN_REVOKED`.
 - **Medium** — an over-long authorization cache TTL would silently re-introduce staleness. Mitigation: D-3 fixes the TTL ceiling at 5 seconds as policy, with per-`user_id` invalidation on bump, and caching is optional.
-- **Low** — added per-request read latency. Mitigation: PR-3 carries a Performance Review gate; a primary-key read on a request that already queries is within noise, and the optional bounded cache exists if measurement says otherwise.
+- **Low** — added per-request read latency. Mitigation: PR-3 carries a Performance Review gate with a stated acceptance criterion (<5ms added at p50, no statistically significant regression); a primary-key read on a request that already queries is expected to be within noise, and the optional bounded cache is a PR-3 requirement, not a later fallback, if measurement says otherwise.
+- **Low** — the database becomes a hard dependency of authorization itself, where today a valid JWT authorizes even during a database outage. Not mitigated, by design: this is an accepted change to the platform's failure mode (D-3), traded for live revocation. Recorded, not hidden.
 
 ---
 
-## 9. Open items — NOT resolved by this record
+## 9. Non-goals
+
+Stated once, plainly, for reviewers who would otherwise ask "does this also fix X?" Everything below is unresolved by this record; each has its own entry in the Open Items table that follows, with a disposition. This section exists to make that scope boundary visible without reading the whole table.
+
+- **Not solved by `ADR-031`:**
+  - MFA (OI-5)
+  - Live derivation of `scope` (D-3.5 — role is derived live, scope is not; see the query-cost rationale there)
+  - Per-device / per-token revocation (OI-6 — `token_generation` is user-grained: revoking one device revokes all of a user's tokens)
+  - Permission inheritance / a privilege hierarchy (out of scope entirely; `ADR-030`'s flat capability model is consumed unchanged)
+  - RBAC redesign (`requirePermission`/`requireRole` are explicitly unchanged in source, D-7)
+  - Per-account (not per-IP) rate-limiting (OI-3a)
+  - `CHECKER`'s hotel-scope bypass (OI-7 — pre-existing, untouched)
+  - GDPR retention-tier assignment for `Session`/`PasswordResetToken` (OI-4 — this record sweeps for hygiene, it does not assign a tier)
+
+---
+
+## 10. Open items — NOT resolved by this record
 
 Recorded rather than assumed (Constitution §6). None blocks §7's sequence; each needs its own decision or its own PR.
 
@@ -253,7 +276,7 @@ Recorded rather than assumed (Constitution §6). None blocks §7's sequence; eac
 
 ---
 
-## 10. Compatibility
+## 11. Compatibility
 
 | Authority | Effect |
 |---|---|
@@ -274,6 +297,6 @@ Recorded rather than assumed (Constitution §6). None blocks §7's sequence; eac
 
 ---
 
-## 11. Scope note
+## 12. Scope note
 
-This record settles the derivation model, the revocation primitive, the sweep placement, the rate-limiting approach, the migration plan, and the PR sequence. It authors no code, freezes or amends no specification text, and performs no knowledge-layer reclassification beyond what §10 schedules for PR-8. **Status is `Proposed`:** ratification by the project owner is required before any PR in §7 other than PR-1 and PR-6 is authorized, and before the register rows in §10 may be touched.
+This record settles the derivation model, the revocation primitive, the sweep placement, the rate-limiting approach, the migration plan, and the PR sequence. It authors no code, freezes or amends no specification text, and performs no knowledge-layer reclassification beyond what §11 schedules for PR-8. **Status is `Proposed`:** ratification by the project owner is required before any PR in §7 other than PR-1 and PR-6 is authorized, and before the register rows in §11 may be touched.
