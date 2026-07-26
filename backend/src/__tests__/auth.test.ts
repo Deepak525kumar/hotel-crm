@@ -33,7 +33,14 @@ const mockPrisma = {
   hotel: {
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
-  $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)) as jest.MockedFunction<(...args: any[]) => any>,
+  // Supports both the array form ($transaction([...])) and the callback
+  // form ($transaction(async (tx) => ...)) used by ADR-031 PR-4's
+  // transactional token_generation bumps — the callback receives mockPrisma
+  // itself so tx.user.update etc. resolve against the same mocks.
+  $transaction: jest.fn(async (arg: unknown) => {
+    if (Array.isArray(arg)) return Promise.all(arg);
+    return (arg as (tx: unknown) => Promise<unknown>)(mockPrisma);
+  }) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({
@@ -219,6 +226,34 @@ describe('AuthService', () => {
     });
   });
 
+  // ADR-031 D-4: Admin-only "log out everywhere" — deliberately does NOT
+  // touch Session rows (that's logout's job); it only bumps token_generation
+  // so already-issued access tokens stop authorizing.
+  describe('revokeAllSessions', () => {
+    it('bumps token_generation and does not delete any sessions', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', deleted_at: null });
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.revokeAllSessions('user_1', 'admin_actor', 'admin');
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user_1' },
+        data: { token_generation: { increment: 1 } },
+      });
+      expect(mockPrisma.session.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('throws NotFoundError for a soft-deleted or missing user', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.revokeAllSessions('missing_user', 'admin_actor', 'admin')
+      ).rejects.toMatchObject({ name: 'NotFoundError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('getCurrentUser', () => {
     it('returns user when found', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
@@ -372,6 +407,24 @@ describe('AuthService', () => {
         expect.objectContaining({ where: { id: validTokenRecord.id }, data: expect.objectContaining({ used_at: expect.any(Date) }) })
       );
       expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({ where: { user_id: activeUser.id } });
+    });
+
+    // ADR-031 D-4: post-compromise lockout extends to already-issued access
+    // tokens, not just Session rows, and commits in the same transaction.
+    it('bumps token_generation in the same transaction as the reset', async () => {
+      mockPrisma.passwordResetToken.findUnique.mockResolvedValue(validTokenRecord);
+      mockPrisma.user.findUnique.mockResolvedValue(activeUser);
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.passwordResetToken.update.mockResolvedValue({});
+      mockPrisma.session.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' });
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: activeUser.id }, data: { token_generation: { increment: 1 } } })
+      );
     });
 
     it('rejects a random/forged token that was never issued', async () => {

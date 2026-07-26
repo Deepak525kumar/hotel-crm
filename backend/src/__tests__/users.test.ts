@@ -14,6 +14,13 @@ const mockPrisma = {
   },
   hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // ADR-031 PR-4: token_generation bumps commit inside a transaction whose
+  // callback receives mockPrisma itself, so tx.user.update etc. resolve
+  // against the same mocks as the non-transactional calls in this file.
+  $transaction: jest.fn(async (arg: unknown) => {
+    if (Array.isArray(arg)) return Promise.all(arg);
+    return (arg as (tx: unknown) => Promise<unknown>)(mockPrisma);
+  }) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -351,6 +358,87 @@ describe('UserService', () => {
       const result = await service.updateUser('u_worker', { first_name: 'Changed' }, 'manager_actor', 'manager');
       expect(result.first_name).toBe('Changed');
     });
+
+    // ADR-031 D-4/C-5: a role change or deactivation must bump
+    // token_generation atomically with the state change that motivates it.
+    it('bumps token_generation on a role change', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUser('u_worker', { role: 'manager' }, 'admin_actor', 'admin');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'u_worker' }, data: expect.objectContaining({ token_generation: { increment: 1 } }) })
+      );
+    });
+
+    it('bumps token_generation on deactivation (is_active -> false)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: false, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUser('u_worker', { is_active: false }, 'admin_actor', 'admin');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ token_generation: { increment: 1 } }) })
+      );
+    });
+
+    it('does not bump token_generation when neither role nor is_active change', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUser('u_worker', { first_name: 'Changed' }, 'admin_actor', 'admin');
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.not.objectContaining({ token_generation: expect.anything() }) })
+      );
+    });
+  });
+
+  describe('updateUserRole', () => {
+    it('always bumps token_generation on an assigned role change', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUserRole('u_worker', { role: 'manager' }, 'admin_actor', 'admin');
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'u_worker' }, data: expect.objectContaining({ role: 'MANAGER' }) })
+      );
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'u_worker' }, data: { token_generation: { increment: 1 } } })
+      );
+    });
   });
 
   describe('deleteUser', () => {
@@ -363,16 +451,20 @@ describe('UserService', () => {
       });
     });
 
-    it('soft-deletes user', async () => {
+    it('soft-deletes user and bumps token_generation', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', deleted_at: null, email: 'u@t.com' });
       mockPrisma.user.update.mockResolvedValue({ id: 'u1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.deleteUser('u1', 'actor', 'admin');
 
-      const updateCall = (mockPrisma.user.update as jest.Mock).mock.calls[0] as Array<{ data: { deleted_at: Date; is_active: boolean } }>;
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      const updateCall = (mockPrisma.user.update as jest.Mock).mock.calls[0] as Array<{ data: { deleted_at: Date; is_active: boolean; token_generation?: unknown } }>;
       expect(updateCall[0]?.data.is_active).toBe(false);
       expect(updateCall[0]?.data.deleted_at).toBeInstanceOf(Date);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ token_generation: { increment: 1 } }) })
+      );
     });
   });
 });

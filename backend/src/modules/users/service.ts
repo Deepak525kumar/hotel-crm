@@ -1,7 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
-import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
+import { BCRYPT_ROUNDS } from '../../config/constants.js';
+import { bumpTokenGeneration } from '../auth/service.js';
 import {
   CreateUserRequest,
   UpdateUserRequest,
@@ -148,8 +149,10 @@ export class UserService extends BaseService {
 
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
     const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
-    const permissions = ROLE_PERMISSIONS[role] ?? ROLE_PERMISSIONS['WORKER'];
 
+    // ADR-031 D-1/D-4 (PR-4): permissions are derived request-time from
+    // ROLE_PERMISSIONS[role] — this write path no longer computes or
+    // persists a snapshot into User.permissions.
     const user = await this.prisma.user.create({
       data: {
         email: data.email,
@@ -158,7 +161,6 @@ export class UserService extends BaseService {
         last_name: data.last_name,
         phone: data.phone,
         role,
-        permissions: permissions ?? [],
       },
       select: {
         id: true,
@@ -196,32 +198,46 @@ export class UserService extends BaseService {
     }
 
     const newRole = data.role ? (data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN') : user.role;
-    const permissions = data.role ? (ROLE_PERMISSIONS[newRole] ?? user.permissions) : user.permissions;
+    const newIsActive = data.is_active ?? user.is_active;
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        first_name: data.first_name ?? user.first_name,
-        last_name: data.last_name ?? user.last_name,
-        phone: data.phone ?? user.phone,
-        role: newRole,
-        permissions: permissions ?? user.permissions,
-        is_active: data.is_active ?? user.is_active,
-      },
-      select: {
-        id: true,
-        email: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        role: true,
-        permissions: true,
-        is_active: true,
-        updated_at: true,
-      },
+    // ADR-031 D-4 (C-5): a role change or deactivation must invalidate
+    // already-issued access tokens atomically with the state change itself —
+    // a bump committed separately from its trigger could be lost, leaving a
+    // demoted/deactivated user holding a valid token.
+    const shouldBump = newRole !== user.role || (newIsActive === false && user.is_active !== false);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: userId },
+        data: {
+          first_name: data.first_name ?? user.first_name,
+          last_name: data.last_name ?? user.last_name,
+          phone: data.phone ?? user.phone,
+          role: newRole,
+          is_active: newIsActive,
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          phone: true,
+          role: true,
+          permissions: true,
+          is_active: true,
+          updated_at: true,
+        },
+      });
+      if (shouldBump) {
+        await bumpTokenGeneration(tx, userId);
+      }
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { fields: Object.keys(data) }, ip);
+    if (shouldBump) {
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: newRole !== user.role ? 'role_change' : 'deactivation' }, ip);
+    }
     return { ...updated, role: updated.role.toLowerCase() };
   }
 
@@ -249,28 +265,40 @@ export class UserService extends BaseService {
       if (!inScope) throw new ForbiddenError('User not in your scope');
     }
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        first_name: data.first_name ?? user.first_name,
-        last_name: data.last_name ?? user.last_name,
-        phone: data.phone ?? user.phone,
-        is_active: data.is_active ?? user.is_active,
-      },
-      select: {
-        id: true,
-        email: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        role: true,
-        permissions: true,
-        is_active: true,
-        updated_at: true,
-      },
+    const newIsActive = data.is_active ?? user.is_active;
+    const shouldBump = newIsActive === false && user.is_active !== false;
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: userId },
+        data: {
+          first_name: data.first_name ?? user.first_name,
+          last_name: data.last_name ?? user.last_name,
+          phone: data.phone ?? user.phone,
+          is_active: newIsActive,
+        },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          phone: true,
+          role: true,
+          permissions: true,
+          is_active: true,
+          updated_at: true,
+        },
+      });
+      if (shouldBump) {
+        await bumpTokenGeneration(tx, userId);
+      }
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_PROFILE', 'USER', userId, { fields: Object.keys(data) }, ip);
+    if (shouldBump) {
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'deactivation' }, ip);
+    }
     return { ...updated, role: updated.role.toLowerCase() };
   }
 
@@ -292,25 +320,32 @@ export class UserService extends BaseService {
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
-    const permissions = ROLE_PERMISSIONS[newRole] ?? user.permissions;
 
-    const updated = await this.prisma.user.update({
-      where: { id: userId },
-      data: { role: newRole, permissions },
-      select: {
-        id: true,
-        email: true,
-        first_name: true,
-        last_name: true,
-        phone: true,
-        role: true,
-        permissions: true,
-        is_active: true,
-        updated_at: true,
-      },
+    // ADR-031 D-4 (C-5): the bump commits in the same transaction as the
+    // role write, so a demotion can never be committed without also
+    // invalidating the demoted user's already-issued access token.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: userId },
+        data: { role: newRole },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          phone: true,
+          role: true,
+          permissions: true,
+          is_active: true,
+          updated_at: true,
+        },
+      });
+      await bumpTokenGeneration(tx, userId);
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ROLE', 'USER', userId, { new_role: newRole }, ip);
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'role_change' }, ip);
     return { ...updated, role: updated.role.toLowerCase() };
   }
 
@@ -319,12 +354,19 @@ export class UserService extends BaseService {
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
     if (userId === actorId) throw new ForbiddenError('Cannot delete your own account');
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { deleted_at: new Date(), is_active: false },
+    // ADR-031 D-4 (C-5): bump commits with the soft delete itself — a
+    // deleted account must never remain authorizable on its already-issued
+    // access token (SIR-USERS-015, emergency-removal case).
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { deleted_at: new Date(), is_active: false },
+      });
+      await bumpTokenGeneration(tx, userId);
     });
 
     await this.logAudit(actorId, actorRole, 'DELETE', 'USER', userId, { email: user.email }, ip);
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'soft_delete' }, ip);
   }
 }
 

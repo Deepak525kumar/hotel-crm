@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { userController } from './controller.js';
+import { authController } from '../auth/controller.js';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requireRole, requirePermission } from '../../middleware/permissions.js';
 
@@ -30,6 +31,11 @@ router.put('/:user_id', requireRole(['admin', 'manager', 'regional_manager']), r
 // unconditionally — see controller.ts's updateUserRole for why this is safe
 // before FEATURE_GD02_MATRIX flips (no legacy caller exists for this route).
 router.put('/:user_id/role', requireRole('admin'), ...userController.updateUserRole);
+// ADR-031 D-4 (PR-4): Admin-only "revoke all sessions" incident-response
+// action — bumps token_generation without touching Session rows (logout's
+// job, deliberately unchanged). Delegates to authController since
+// token_generation is backend-auth-owned state (ADR-017).
+router.post('/:user_id/revoke-sessions', requireRole('admin'), (req, res, next) => authController.revokeAllSessions(req, res, next));
 router.delete('/:user_id', requireRole('admin'), (req, res, next) => userController.deleteUser(req, res, next));
 
 export default router;

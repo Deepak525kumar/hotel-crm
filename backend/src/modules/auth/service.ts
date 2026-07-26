@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { signTokens, verifyRefreshToken, UserScope } from '../../lib/jwt.js';
 import {
@@ -11,6 +12,25 @@ import {
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../../config/constants.js';
 import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
 import { AuthResponse } from './types.js';
+
+// ADR-031 D-4 (PR-4): the sole seam through which `User.token_generation` may
+// be incremented. `backend-auth` is the authoritative writer (ADR-017,
+// state-user); other modules (e.g. backend-users) call this from inside
+// their own transaction rather than incrementing the column directly, so
+// there is never a second, uncoordinated writer of this revocation state.
+// Takes a transaction client so the caller can commit the bump atomically
+// with the state change that motivates it (C-5) — a bump committed
+// separately from its trigger could be lost, leaving a valid pre-demotion
+// token live.
+export async function bumpTokenGeneration(
+  tx: Prisma.TransactionClient | PrismaClient,
+  userId: string
+): Promise<void> {
+  await tx.user.update({
+    where: { id: userId },
+    data: { token_generation: { increment: 1 } },
+  });
+}
 
 export class AuthService extends BaseService {
   // SECURITY (OQ-AUTH-15): only a SHA-256 digest of the refresh token is ever
@@ -305,13 +325,30 @@ export class AuthService extends BaseService {
 
     const password_hash = await bcrypt.hash(data.new_password, BCRYPT_ROUNDS);
 
-    await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: user.id }, data: { password_hash } }),
-      this.prisma.passwordResetToken.update({ where: { id: resetToken.id }, data: { used_at: new Date() } }),
-      this.prisma.session.deleteMany({ where: { user_id: user.id } }),
-    ]);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: user.id }, data: { password_hash } });
+      await tx.passwordResetToken.update({ where: { id: resetToken.id }, data: { used_at: new Date() } });
+      await tx.session.deleteMany({ where: { user_id: user.id } });
+      // ADR-031 D-4: post-compromise lockout extends to already-issued access
+      // tokens, not just Session rows, which this path already deleted above.
+      await bumpTokenGeneration(tx, user.id);
+    });
 
     await this.logAudit(user.id, user.role, 'MODIFY', 'USER', user.id, { action: 'password_reset_completed' }, ip);
+    await this.logAudit(user.id, user.role, 'MODIFY', 'USER', user.id, { action: 'token_generation_bumped', reason: 'password_reset_completed' }, ip);
+  }
+
+  // ADR-031 D-4 (PR-4): Admin-only "log out everywhere" — bumps
+  // token_generation without touching Session rows (that's `logout`'s job,
+  // deliberately left alone per D-4's table). Distinct from a demotion or
+  // deactivation bump: there is no other state change to be transactional
+  // with, so this stands alone as its own atomic unit.
+  async revokeAllSessions(userId: string, actorId: string, actorRole: string, ip?: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.deleted_at) throw new NotFoundError('User not found');
+
+    await bumpTokenGeneration(this.prisma, userId);
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'admin_revoke_all_sessions' }, ip);
   }
 
   async updateProfile(userId: string, data: UpdateProfileRequest, ip?: string) {
