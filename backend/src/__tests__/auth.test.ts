@@ -85,7 +85,6 @@ describe('AuthService', () => {
         first_name: 'John',
         last_name: 'Doe',
         role: 'WORKER',
-        permissions: ['hotels:read'],
         is_active: true,
         created_at: new Date(),
       });
@@ -107,23 +106,28 @@ describe('AuthService', () => {
       expect(mockPrisma.session.create).toHaveBeenCalledTimes(1);
     });
 
+    // ADR-031 D-1/M-3 (PR-7): permissions are no longer stored or written at
+    // signup — the response body's `permissions` is derived from
+    // ROLE_PERMISSIONS[role] after the row is created, so these assertions
+    // now target the response, not the (removed) `data.permissions` write.
     it('assigns the non-privileged WORKER role and permissions on legitimate signup', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
         id: 'user_2', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
-        role: 'WORKER', permissions: [], is_active: true, created_at: new Date(),
+        role: 'WORKER', is_active: true, created_at: new Date(),
       });
       mockPrisma.session.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      await service.signup({
+      const result = await service.signup({
         email: 'worker@test.com', password: 'password123', first_name: 'Work', last_name: 'Er',
       });
 
-      const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string; permissions: string[] } }>;
+      const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string } }>;
       expect(createCall[0]?.data.role).toBe('WORKER');
-      expect(createCall[0]?.data.permissions).not.toContain('admin:*');
-      expect(createCall[0]?.data.permissions).toEqual(
+      expect(createCall[0]?.data).not.toHaveProperty('permissions');
+      expect(result.user.permissions).not.toContain('admin:*');
+      expect(result.user.permissions).toEqual(
         expect.arrayContaining(['hotels:read', 'rooms:read', 'tasks:read', 'notifications:read'])
       );
     });
@@ -140,21 +144,22 @@ describe('AuthService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
         id: 'user_x', email: 'attacker@test.com', first_name: 'Mal', last_name: 'Ory',
-        role: 'WORKER', permissions: [], is_active: true, created_at: new Date(),
+        role: 'WORKER', is_active: true, created_at: new Date(),
       });
       mockPrisma.session.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      await service.signup({
+      const result = await service.signup({
         email: 'attacker@test.com', password: 'password123', first_name: 'Mal', last_name: 'Ory',
         // Simulate an attacker bypassing the schema and injecting a privileged role.
         role: injectedRole,
       } as any);
 
-      const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string; permissions: string[] } }>;
+      const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string } }>;
       expect(createCall[0]?.data.role).toBe('WORKER');
-      expect(createCall[0]?.data.permissions).not.toContain(privilegedPerm);
-      expect(createCall[0]?.data.permissions).not.toContain('admin:*');
+      expect(createCall[0]?.data).not.toHaveProperty('permissions');
+      expect(result.user.permissions).not.toContain(privilegedPerm);
+      expect(result.user.permissions).not.toContain('admin:*');
     });
   });
 

@@ -2,12 +2,12 @@ import { describe, it, expect } from '@jest/globals';
 import { ROLE_PERMISSIONS } from '../config/constants.js';
 
 /**
- * ADR-031 D-1 / C-6 (PR-3): once ROLE_PERMISSIONS is consulted on the request
- * path (authMiddleware, when FEATURE_DERIVED_PERMISSIONS is on), an
- * unfrozen array becomes a live authorization-integrity risk, not just a
- * write-time hygiene concern. This pins the freeze independent review found
- * incomplete: MANAGER_PERMISSIONS was already frozen, but ADMIN/CHECKER/
- * WORKER's literals and the outer map were not.
+ * ADR-031 D-1 / C-6 (unconditional as of PR-7): ROLE_PERMISSIONS is consulted
+ * on every request path (authMiddleware), so an unfrozen array is a live
+ * authorization-integrity risk, not just a write-time hygiene concern. This
+ * pins the freeze independent review found incomplete: MANAGER_PERMISSIONS
+ * was already frozen, but ADMIN/CHECKER/WORKER's literals and the outer map
+ * were not.
  */
 describe('ROLE_PERMISSIONS immutability (ADR-031 D-1/C-6)', () => {
   it('the outer map is frozen — a role cannot be reassigned to a different array', () => {

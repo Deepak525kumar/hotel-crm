@@ -44,8 +44,10 @@ export function isRmRoleEnabled(): boolean {
  * account's stored permissions until M-2 backfills them.
  *
  * TEMPORARY, tracked for removal: once production has run M-2 and stayed on
- * this flag through a full release cycle with no rollback need (see
- * run-role-permissions-backfill.ts's deployment sequence), this flag,
+ * this flag through a full release cycle with no rollback need (the backfill
+ * script that performed M-2, `role-permissions-backfill.ts`, was itself
+ * retired at ADR-031 PR-7 once request-time derivation superseded it — see
+ * that PR's history for the deployment sequence it once documented), this flag,
  * `requireRoleFlagged`/`requirePermissionFlagged` (middleware/permissions.ts),
  * the legacy `UpdateUserSchema`/`updateUser` path (users/types.ts,
  * users/service.ts), and the legacy-token branches in crm/routes.ts should
@@ -58,25 +60,7 @@ export function isGD02MatrixEnabled(): boolean {
   return getEnv().FEATURE_GD02_MATRIX;
 }
 
-/**
- * Request-time permission derivation cutover flag (ADR-031 §7 PR-3, D-1/D-3).
- * When disabled (default), authMiddleware/optionalAuthMiddleware keep trusting
- * the JWT's `permissions` claim exactly as today — "both-off = current
- * behavior" (ADR-024 D3/D4 topology, reused per ADR-031 C-4). Gated on C-2's
- * pre-flip reconciliation report being reviewed.
- */
-export function isDerivedPermissionsEnabled(): boolean {
-  return getEnv().FEATURE_DERIVED_PERMISSIONS;
-}
-
-/**
- * token_generation revocation-check cutover flag (ADR-031 §7 PR-3, D-3.2/D-4).
- * When disabled (default), an already-issued token's token_generation (if
- * present) is never compared against the row, so role change/deactivation/
- * deletion/password-reset do not revoke it — "both-off = current behavior".
- * Must not be enabled before ADR-031 PR-4a (client forced-re-auth) ships,
- * per ADR-031 C-7.
- */
-export function isTokenGenerationEnforcementEnabled(): boolean {
-  return getEnv().FEATURE_TOKEN_GENERATION_ENFORCEMENT;
-}
+// ADR-031 §7 PR-7: FEATURE_DERIVED_PERMISSIONS and
+// FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired —
+// request-time derivation and token_generation revocation are now
+// unconditional in middleware/auth.ts, both cutovers being complete.

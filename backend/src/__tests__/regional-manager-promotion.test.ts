@@ -3,8 +3,9 @@ import { describe, it, expect, jest } from '@jest/globals';
 /**
  * Regression test for ADR-030 M-3 (scripts/regional-manager-promotion.ts).
  * Locks: only current-MANAGER regional managers are promoted (idempotent),
- * the update and its AuditLog snapshot happen inside one transaction, and
- * User.permissions is left untouched (M-2's job, deferred to PR-5).
+ * and the update and its AuditLog snapshot happen inside one transaction.
+ * User.permissions is no longer read or written here — the column was
+ * dropped by ADR-031 M-3/PR-7.
  */
 
 import { promoteRegionalManagers } from '../scripts/regional-manager-promotion.js';
@@ -14,7 +15,7 @@ function makePrisma({
   users,
 }: {
   groups: Array<{ id: string; regional_manager_user_id: string }>;
-  users: Record<string, { id: string; role: string; permissions: string[] }>;
+  users: Record<string, { id: string; role: string }>;
 }) {
   const userUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
   const auditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -45,7 +46,7 @@ describe('promoteRegionalManagers (ADR-030 M-3)', () => {
   it('promotes a MANAGER referenced as a group RM to REGIONAL_MANAGER', async () => {
     const { prisma, userUpdate, auditLogCreate } = makePrisma({
       groups: [{ id: 'g1', regional_manager_user_id: 'u1' }],
-      users: { u1: { id: 'u1', role: 'MANAGER', permissions: ['hotels:read'] } },
+      users: { u1: { id: 'u1', role: 'MANAGER' } },
     });
 
     const result = await promoteRegionalManagers(prisma);
@@ -60,7 +61,7 @@ describe('promoteRegionalManagers (ADR-030 M-3)', () => {
         data: expect.objectContaining({
           action: 'PROMOTE_REGIONAL_MANAGER',
           resource_id: 'u1',
-          old_values: { role: 'MANAGER', permissions: ['hotels:read'] },
+          old_values: { role: 'MANAGER' },
         }),
       })
     );
@@ -69,7 +70,7 @@ describe('promoteRegionalManagers (ADR-030 M-3)', () => {
   it('is idempotent — skips a user already promoted to REGIONAL_MANAGER', async () => {
     const { prisma, userUpdate } = makePrisma({
       groups: [{ id: 'g1', regional_manager_user_id: 'u1' }],
-      users: { u1: { id: 'u1', role: 'REGIONAL_MANAGER', permissions: [] } },
+      users: { u1: { id: 'u1', role: 'REGIONAL_MANAGER' } },
     });
 
     const result = await promoteRegionalManagers(prisma);
@@ -77,22 +78,6 @@ describe('promoteRegionalManagers (ADR-030 M-3)', () => {
     expect(result.promoted).toEqual([]);
     expect(result.skippedAlreadyPromoted).toBe(1);
     expect(userUpdate).not.toHaveBeenCalled();
-  });
-
-  it('does not touch User.permissions (deferred to M-2/PR-5)', async () => {
-    const { prisma, userUpdate } = makePrisma({
-      groups: [{ id: 'g1', regional_manager_user_id: 'u1' }],
-      users: { u1: { id: 'u1', role: 'MANAGER', permissions: ['hotels:read', 'users:write'] } },
-    });
-
-    await promoteRegionalManagers(prisma);
-
-    expect(userUpdate).toHaveBeenCalledWith({
-      where: { id: 'u1' },
-      data: { role: 'REGIONAL_MANAGER' },
-    });
-    const updateArgs = userUpdate.mock.calls[0][0] as any;
-    expect(updateArgs.data.permissions).toBeUndefined();
   });
 
   it('skips a group whose regional_manager_user_id resolves to no user', async () => {

@@ -82,7 +82,6 @@ export class AuthService extends BaseService {
     // privilege assignment. Elevation happens only through the authenticated
     // users module under RBAC.
     const role = 'WORKER' as const;
-    const permissions = ROLE_PERMISSIONS['WORKER'] ?? [];
 
     const user = await this.prisma.user.create({
       data: {
@@ -92,7 +91,6 @@ export class AuthService extends BaseService {
         last_name: data.last_name,
         phone: data.phone,
         role,
-        permissions: permissions ?? [],
       },
     });
 
@@ -103,7 +101,7 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       scope,
       // ADR-031 D-2/D-4: mirrored from the row; verified on every request
-      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
+      // (middleware/auth.ts, unconditional as of PR-7).
       token_generation: user.token_generation,
     });
 
@@ -126,7 +124,9 @@ export class AuthService extends BaseService {
         phone: user.phone ?? undefined,
         profile_photo_url: user.profile_photo_url ?? undefined,
         role: user.role.toLowerCase(),
-        permissions: user.permissions,
+        // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+        // stored column (dropped).
+        permissions: ROLE_PERMISSIONS[user.role] ?? [],
         is_active: user.is_active,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
@@ -158,7 +158,7 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       scope,
       // ADR-031 D-2/D-4: mirrored from the row; verified on every request
-      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
+      // (middleware/auth.ts, unconditional as of PR-7).
       token_generation: user.token_generation,
     });
 
@@ -181,7 +181,9 @@ export class AuthService extends BaseService {
         phone: user.phone ?? undefined,
         profile_photo_url: user.profile_photo_url ?? undefined,
         role: user.role.toLowerCase(),
-        permissions: user.permissions,
+        // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+        // stored column (dropped).
+        permissions: ROLE_PERMISSIONS[user.role] ?? [],
         is_active: user.is_active,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
@@ -217,7 +219,7 @@ export class AuthService extends BaseService {
       role: user.role.toLowerCase(),
       scope,
       // ADR-031 D-2/D-4: mirrored from the row; verified on every request
-      // once FEATURE_TOKEN_GENERATION_ENFORCEMENT is on (middleware/auth.ts).
+      // (middleware/auth.ts, unconditional as of PR-7).
       token_generation: user.token_generation,
     });
 
@@ -258,14 +260,15 @@ export class AuthService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
-        permissions: true,
         is_active: true,
         created_at: true,
         updated_at: true,
       },
     });
     if (!user) throw new NotFoundError('User not found');
-    return { ...user, role: user.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
   }
 
   // HOTFIX-AUTH-002 (SIR-AUTH-001): step 1 of 2. Never accepts a new password —
@@ -371,14 +374,15 @@ export class AuthService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
-        permissions: true,
         is_active: true,
         updated_at: true,
       },
     });
 
     await this.logAudit(userId, user.role, 'MODIFY', 'USER', userId, { fields: Object.keys(data) }, ip);
-    return { ...updated, role: updated.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 }
 
