@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroups } from "@/hooks/useHotels";
 import { ApiError, hotelsApi } from "@/lib/api";
-import { RoleGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
 import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
@@ -98,19 +98,18 @@ function EditHotel() {
 
 export default function EditHotelPage() {
   return (
-    <RoleGate
-      allow={["manager", "admin"]}
+    <HotelWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500">
-              Only managers and admins can edit hotels.
+              Only admins can edit hotels.
             </CardContent>
           </Card>
         </div>
       }
     >
       <EditHotel />
-    </RoleGate>
+    </HotelWriteGate>
   );
 }

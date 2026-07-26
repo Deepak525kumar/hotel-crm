@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useWorkRequests } from "@/hooks/useWorkRequests";
-import { ManagerAdminGate } from "@/components/auth/RoleGate";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import {
   Button,
@@ -58,11 +58,11 @@ export default function WorkRequestsPage() {
         title="Work requests"
         description="Shifts open for staffing across your hotels."
         actions={
-          <ManagerAdminGate>
+          <StaffingWriteGate>
             <Link href="/requests/new">
               <Button>New request</Button>
             </Link>
-          </ManagerAdminGate>
+          </StaffingWriteGate>
         }
       />
 

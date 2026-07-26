@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { ApiError, workRequestsApi } from "@/lib/api";
-import { ManagerAdminGate } from "@/components/auth/RoleGate";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -150,7 +150,7 @@ export default function WorkRequestDetailPage() {
         </Card>
       )}
 
-      <ManagerAdminGate>
+      <StaffingWriteGate>
         {request.status !== "DRAFT" && (
           <Card>
             <CardContent className="flex items-center justify-between gap-4">
@@ -163,9 +163,9 @@ export default function WorkRequestDetailPage() {
             </CardContent>
           </Card>
         )}
-      </ManagerAdminGate>
+      </StaffingWriteGate>
 
-      <ManagerAdminGate>
+      <StaffingWriteGate>
         {request.status === "DRAFT" && (
           <Card>
             <CardContent className="flex items-center justify-between gap-4">
@@ -178,7 +178,7 @@ export default function WorkRequestDetailPage() {
             </CardContent>
           </Card>
         )}
-      </ManagerAdminGate>
+      </StaffingWriteGate>
 
       <FormError>{publish.error}</FormError>
     </div>

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useHotels } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { ManagerAdminGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate } from "@/components/auth/RoleGate";
 import {
   ActiveBadge,
   Button,
@@ -64,11 +64,11 @@ export default function HotelsPage() {
         title="Hotels"
         description="Properties staffed through the platform."
         actions={
-          <ManagerAdminGate>
+          <HotelWriteGate>
             <Link href="/hotels/new">
               <Button>New hotel</Button>
             </Link>
-          </ManagerAdminGate>
+          </HotelWriteGate>
         }
       />
 

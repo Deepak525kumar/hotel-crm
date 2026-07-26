@@ -23,8 +23,19 @@ export function RoleGate({ allow, fallback = null, children }: RoleGateProps) {
   return <>{children}</>;
 }
 
-/** Convenience gate for management-only UI (manager + admin). */
-export function ManagerAdminGate({
+/**
+ * ADR-030 PR-6: capability-named gates replace the old generic
+ * `ManagerAdminGate`, which conflated two capabilities with different
+ * owners — hotel create/edit is MASTER data (Admin-only, D-2/D-3) while
+ * work-request/analytics actions are OPS data (scoped-role capable, D-2).
+ * Collapsing them into one gate meant widening one always widened the
+ * other; splitting by capability is what let PR-5's backend narrowing
+ * (hotel writes → Admin-only) and this frontend gating agree with each
+ * other instead of drifting apart.
+ */
+
+/** C-01/C-02 (hotel create/edit) — MASTER data, Admin-only per D-2/D-3. */
+export function HotelWriteGate({
   fallback = null,
   children,
 }: {
@@ -32,7 +43,26 @@ export function ManagerAdminGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["manager", "admin"]} fallback={fallback}>
+    <RoleGate allow={["admin"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
+
+/**
+ * C-23/C-24/C-31 (work requests, assignments, analytics) — OPS data,
+ * scoped-role capable per D-2. `regional_manager` included per D-5: RM
+ * holds Manager's full operational capability set at group scope.
+ */
+export function StaffingWriteGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["manager", "regional_manager", "admin"]} fallback={fallback}>
       {children}
     </RoleGate>
   );

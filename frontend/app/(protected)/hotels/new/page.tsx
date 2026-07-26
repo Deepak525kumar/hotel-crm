@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
 import { ApiError, hotelsApi } from "@/lib/api";
-import { RoleGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
@@ -65,19 +65,18 @@ function NewHotel() {
 
 export default function NewHotelPage() {
   return (
-    <RoleGate
-      allow={["manager", "admin"]}
+    <HotelWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500">
-              Only managers and admins can create hotels.
+              Only admins can create hotels.
             </CardContent>
           </Card>
         </div>
       }
     >
       <NewHotel />
-    </RoleGate>
+    </HotelWriteGate>
   );
 }

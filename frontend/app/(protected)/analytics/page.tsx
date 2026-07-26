@@ -229,7 +229,7 @@ function AnalyticsDashboard() {
 export default function AnalyticsPage() {
   return (
     <RoleGate
-      allow={["manager", "admin"]}
+      allow={["manager", "regional_manager", "admin"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500">

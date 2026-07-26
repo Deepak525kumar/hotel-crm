@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
-import { ManagerAdminGate } from "@/components/auth/RoleGate";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { formatPercent, formatScore } from "@/lib/format";
@@ -145,9 +145,9 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <ManagerAdminGate>
+      <StaffingWriteGate>
         <ManagerOverview />
-      </ManagerAdminGate>
+      </StaffingWriteGate>
     </div>
   );
 }
