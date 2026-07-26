@@ -63,3 +63,33 @@ export function useUserOptions(query: ListUsersQuery = {}) {
   const swr = useSWR(key, ([, q]) => usersApi.list({ limit: 100, ...q }));
   return { ...swr, users: swr.data ?? [] };
 }
+
+/**
+ * Lists users eligible to be assigned as a hotel group's Regional Manager
+ * (ADR-030 D-5, closing F-3). `GET /users` takes one `role` value, so a
+ * manager-or-regional_manager set needs two parallel fetches merged
+ * client-side, de-duplicated by id. Safe before and after PR-4/5 land: while
+ * `FEATURE_RM_ROLE` stays off (M-3 never run), the `regional_manager` fetch
+ * returns an empty set and every candidate still comes from the `manager`
+ * fetch — once M-3 promotes users, they appear here with no further code
+ * change needed at any of this hook's four call sites.
+ */
+export function useRegionalManagerCandidates() {
+  const managers = useUserOptions({ role: "manager" });
+  const regionalManagers = useUserOptions({ role: "regional_manager" });
+
+  // Left to the React Compiler to memoize (Next 16) rather than a manual
+  // useMemo, which it cannot reliably preserve across this hook's own
+  // composed-hook shape.
+  const byId = new Map<string, (typeof managers.users)[number]>();
+  for (const user of [...managers.users, ...regionalManagers.users]) {
+    byId.set(user.id, user);
+  }
+  const users = Array.from(byId.values());
+
+  return {
+    users,
+    isLoading: managers.isLoading || regionalManagers.isLoading,
+    error: managers.error ?? regionalManagers.error,
+  };
+}

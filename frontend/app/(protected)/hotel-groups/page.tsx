@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useHotelGroups, useUserOptions } from "@/hooks/useHotels";
+import { useHotelGroups, useRegionalManagerCandidates } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import {
   Button,
@@ -29,7 +29,7 @@ export default function HotelGroupsPage() {
     page,
     limit: PER_PAGE,
   });
-  const { users: managers } = useUserOptions({ role: "manager" });
+  const { users: managers } = useRegionalManagerCandidates();
 
   const managerName = useMemo(() => {
     const map = new Map(managers.map((m) => [m.id, `${m.first_name} ${m.last_name}`]));

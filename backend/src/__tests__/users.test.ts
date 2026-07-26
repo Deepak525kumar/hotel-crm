@@ -61,6 +61,19 @@ describe('UserService', () => {
       expect(call[0]?.where.role).toBe('MANAGER');
     });
 
+    // ADR-030 PR-3: the read filter accepts 'regional_manager' so the
+    // hotel-group RM picker (F-3) can query it once M-3 promotes any user.
+    // No permission or write-path change — read-only filter widening.
+    it('filters by role=regional_manager', async () => {
+      mockPrisma.user.findMany.mockResolvedValue([]);
+      mockPrisma.user.count.mockResolvedValue(0);
+
+      await service.listUsers({ page: 1, limit: 20, role: 'regional_manager', hotel_id: undefined, search: undefined, is_active: undefined });
+
+      const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: { role?: string } }>;
+      expect(call[0]?.where.role).toBe('REGIONAL_MANAGER');
+    });
+
     // hotel_id filter resolves the hotel's group and filters via the
     // employment_record relation at group grain.
     describe('hotel_id filter', () => {
