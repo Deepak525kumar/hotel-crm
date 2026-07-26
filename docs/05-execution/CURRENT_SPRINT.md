@@ -7,7 +7,7 @@
 | Epics in scope | EPIC-PLATFORM, EPIC-SECREM (immediate portion), EPIC-OWNERSHIP — see [IMPLEMENTATION_BACKLOG.md](../04-implementation/IMPLEMENTATION_BACKLOG.md#cross-cutting-epics) |
 | Milestone | M0 — Enablement |
 | Status | Open |
-| Out of scope | Auth/job-dispatch/attendance release-prereqs under EPIC-SECREM — staged into their owning epics (Phases 1, 3, 4) per the backlog |
+| Out of scope | Auth/job-dispatch/attendance release-prereqs under EPIC-SECREM — staged into their owning epics (Phases 1, 3, 4) per the backlog. Also out of scope: the full authorization/authentication rebuild delivered by `ADR-030`/`ADR-031` (both Accepted, tracked as `GD-02`/`GD-03`/`GD-07` in [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md)) — that work shipped entirely outside Sprint 0's scope and this file's tracking. |
 
 This file tracks execution state only: status, owner, issue/PR, blocker. Every item's deliverable
 and acceptance criteria are defined once, in the linked `EPIC-PLATFORM`/`EPIC-SECREM`/`EPIC-OWNERSHIP`

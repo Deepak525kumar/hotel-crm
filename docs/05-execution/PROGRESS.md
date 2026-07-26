@@ -31,6 +31,14 @@ informational only — a phase exits on the verbatim criteria in
 Per-phase status (`IN_PROGRESS`/`NOT_STARTED`) is tracked once in
 [IMPLEMENTATION_TRACKER.md](IMPLEMENTATION_TRACKER.md#phase-tracker) and not repeated here.
 
+**Note (2026-07-27):** the `0%`/`NOT_STARTED` figures above do not reflect the substantial
+authorization/authentication work completed via `ADR-030` and `ADR-031` (capability-based
+write authority, request-time permission derivation, session/token revocation, edge rate
+limiting) — that work rode the governance-decision (`GD-*`) track, not this tracker's Phase/Epic
+model. See [IMPLEMENTATION_TRACKER.md](IMPLEMENTATION_TRACKER.md)'s own reconciliation note and
+[`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md)'s
+`GD-02`/`GD-03`/`GD-07` rows for that work's actual, complete status.
+
 ## Sprint 0 Progress
 
 **6 / 7 items done (86%).** Per-item status, owner, and issue/PR live only in
