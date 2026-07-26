@@ -11,6 +11,13 @@ import { validateBody, validateQuery } from '../../middleware/validation.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
 import { isGD02MatrixEnabled } from '../../config/feature-flags.js';
 
+// Matches the zodDetails() helper already duplicated per-controller in
+// attendance/work-requests/assignments — kept local rather than extracted
+// to a shared lib, consistent with that existing (if repeated) convention.
+function zodDetails(error: import('zod').ZodError) {
+  return error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }));
+}
+
 export class UserController {
   listUsers = [
     validateQuery(ListUsersQuerySchema),
@@ -77,10 +84,7 @@ export class UserController {
         if (!isGD02MatrixEnabled()) {
           const parsed = UpdateUserSchema.safeParse(req.body);
           if (!parsed.success) {
-            throw new ValidationError(
-              'Request body validation failed',
-              parsed.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }))
-            );
+            throw new ValidationError('Request body validation failed', zodDetails(parsed.error));
           }
           const user = await userService.updateUser(req.params['user_id']!, parsed.data, req.auth.userId, req.auth.role, req.ip);
           res.status(200).json({
@@ -96,10 +100,7 @@ export class UserController {
         // service (ADR-030 D-4a).
         const parsed = UpdateUserProfileSchema.safeParse(req.body);
         if (!parsed.success) {
-          throw new ValidationError(
-            'Request body validation failed',
-            parsed.error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }))
-          );
+          throw new ValidationError('Request body validation failed', zodDetails(parsed.error));
         }
         const user = await userService.updateUserProfile(
           req.params['user_id']!,

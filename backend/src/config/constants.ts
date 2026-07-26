@@ -104,8 +104,14 @@ export const PAGINATION = {
 // ADR-030 D-5: Regional Manager holds Hotel Manager's full operational
 // capability set at group scope, plus nothing else (no MASTER-data token,
 // per D-2/D-3) — defined once here so REGIONAL_MANAGER below can reuse it
-// verbatim rather than drifting out of sync with a second copy.
-const MANAGER_PERMISSIONS = [
+// verbatim rather than drifting out of sync with a second copy. Frozen
+// because MANAGER and REGIONAL_MANAGER share this exact array by reference
+// (not a copy): a mutation like `ROLE_PERMISSIONS.MANAGER.push(...)` would
+// silently also grant REGIONAL_MANAGER the same token. If RM ever needs a
+// token MANAGER doesn't have, don't push onto this array — give
+// REGIONAL_MANAGER its own literal below, e.g.
+// `[...MANAGER_PERMISSIONS, 'new:token']`.
+const MANAGER_PERMISSIONS = Object.freeze([
   'hotels:read',
   // C-08: a manager may view (only) the hotel group their own hotel
   // belongs to — enforced by scope filtering in-service (ADR-030 PR-4),
@@ -126,7 +132,7 @@ const MANAGER_PERMISSIONS = [
   // Manager may view/blocklist within scope; creation stays Admin-only
   // (enforced service-side, OD-EMP-08).
   'employees:read', 'employees:write',
-];
+]) as string[];
 
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ADMIN: [

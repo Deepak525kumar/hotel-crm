@@ -42,6 +42,17 @@ export function isRmRoleEnabled(): boolean {
  * (not the D-4a split) — matching "both-off = current behavior", since
  * `ROLE_PERMISSIONS` is a source constant with no effect on any existing
  * account's stored permissions until M-2 backfills them.
+ *
+ * TEMPORARY, tracked for removal: once production has run M-2 and stayed on
+ * this flag through a full release cycle with no rollback need (see
+ * run-role-permissions-backfill.ts's deployment sequence), this flag,
+ * `requireRoleFlagged`/`requirePermissionFlagged` (middleware/permissions.ts),
+ * the legacy `UpdateUserSchema`/`updateUser` path (users/types.ts,
+ * users/service.ts), and the legacy-token branches in crm/routes.ts should
+ * all be deleted in one pass — matching how `FEATURE_SCOPE_AUTHZ` was
+ * retired outright in this same PR (M-4), not left as permanent scaffolding.
+ * File this as part of ADR-030 §6 PR-7/PR-8 (permission-matrix invariant
+ * test + documentation sync), not as an open-ended "someday."
  */
 export function isGD02MatrixEnabled(): boolean {
   return getEnv().FEATURE_GD02_MATRIX;
