@@ -78,35 +78,35 @@ describe('Analytics bare-route scope (ADR-030 PR-4)', () => {
   });
 
   it('ignores a manager-supplied ?hotel_id and scopes to their own hotel_group claim', async () => {
-    testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
     const res = await request(makeApp()).get('/analytics/leaderboard?hotel_id=h_other');
     expect(res.status).toBe(200);
     expect(getLeaderboard).toHaveBeenCalledWith(undefined, 'g1');
   });
 
   it('resolves a hotel-claim manager to their hotel\'s group on /stats, ignoring any client hotel_id', async () => {
-    testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+    testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel', hotel_id: 'h1' } };
     const res = await request(makeApp()).get('/analytics/stats?hotel_id=h_other');
     expect(res.status).toBe(200);
     expect(getDashboardStats).toHaveBeenCalledWith(undefined, 'g1');
   });
 
   it('denies (empty scope) a manager with no scope claim on /leaderboard', async () => {
-    testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: null };
+    testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: null };
     const res = await request(makeApp()).get('/analytics/leaderboard');
     expect(res.status).toBe(200);
     expect(getLeaderboard).toHaveBeenCalledWith(undefined, '__none__');
   });
 
   it('lets an admin pass through an explicit ?hotel_id unfiltered on /stats', async () => {
-    testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+    testAuth = { userId: 'adm_1', role: 'admin', permissions: ['admin:*'], scope: null };
     const res = await request(makeApp()).get('/analytics/stats?hotel_id=h2');
     expect(res.status).toBe(200);
     expect(getDashboardStats).toHaveBeenCalledWith('h2', undefined);
   });
 
   it('lets an admin omit ?hotel_id entirely (every hotel) on /leaderboard', async () => {
-    testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+    testAuth = { userId: 'adm_1', role: 'admin', permissions: ['admin:*'], scope: null };
     const res = await request(makeApp()).get('/analytics/leaderboard');
     expect(res.status).toBe(200);
     expect(getLeaderboard).toHaveBeenCalledWith(undefined, undefined);
