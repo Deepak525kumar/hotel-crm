@@ -16,7 +16,7 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: 9ca0eed45dec34aa4ce3739da4bc8e4c117f6c3f  # rebound to HEAD 9ca0eed by SYNC-053 (post-#194 sync/planning pass, 2026-07-23); prior 09e0b16, content verified coherent through the pass
+  baseline_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3254c83 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); prior 9ca0eed, content verified coherent through the pass
   default_branch: main
   framework_version: see .claude/VERSION.yaml   # 1.3.0
   opened_at: "2026-07-14T00:00:00Z"

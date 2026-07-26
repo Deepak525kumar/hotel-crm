@@ -37,8 +37,8 @@ mobile screens) and assume the decision is made first — the decision itself is
 | # | Decision | Priority | MVP? | Unlocks (est. PRs) |
 |---|---|---|---|---|
 | GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ IMPLEMENTED 2026-07-24 → `ADR-029` decided 2026-07-23 (Option B: Transactional Outbox + Worker runtime); built and merged as Epic 7, PRs 7.1–7.8** |
-| GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 | **✅ DECIDED 2026-07-25 → `ADR-030` (capability-based model: hotel/group writes Admin-only; scoped `users:write`; manager/RM employee authority action-only, never field-level). PR-1 (security hardening) merged 2026-07-25; PR-2–PR-8 (matrix flip, `REGIONAL_MANAGER` enum) not yet built. `ADR-030` status remains `Proposed` pending explicit owner ratification.** |
-| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ PERMISSION SET DECIDED 2026-07-25 → `ADR-030` D-5 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) remains open — this decision resolves the permission set only. Code migration (enum + scope-claim issuance) pending `ADR-030` PR-2.** |
+| GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 | **✅ DECIDED 2026-07-25 → `ADR-030` (capability-based model: hotel/group writes Admin-only; scoped `users:write`; manager/RM employee authority action-only, never field-level). PR-1 through PR-8 (security hardening, matrix flip, `REGIONAL_MANAGER` enum, capability-named gates, documentation/register sync) all merged 2026-07-25/26. `ADR-030` status: Accepted (ratified `c951cfb`).** |
+| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ PERMISSION SET DECIDED 2026-07-25 → `ADR-030` D-5 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) remains open — this decision resolves the permission set only. Code migration (enum + scope-claim issuance) implemented via PR-2 through PR-5 (merged).** |
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
 | GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 |
 | GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 |
@@ -118,8 +118,8 @@ mobile screens) and assume the decision is made first — the decision itself is
 > raised during ratification, not originally scoped by this row) is decided as action-only, never
 > field-level — see `ADR-030` D-4b/D-4c. `PR-1` (HR/calendar authorization hardening, phantom-role removal,
 > elevation-guard fix — all correct regardless of this decision) merged 2026-07-25. `PR-2`–`PR-8` (the
-> capability-matrix flip itself) are not yet built. `ADR-030`'s status remains `Proposed` pending an explicit
-> owner ratification statement (Constitution §20).
+> capability-matrix flip itself, capability-named gates, invariant tests, documentation/register sync) are
+> all merged as of 2026-07-26. `ADR-030`'s status: Accepted (ratified `c951cfb`, Constitution §20).
 >
 > Resolves `OQ-USERS-09` (`users:delete` — deleted as a token rather than wired up, since the route is
 > role-gated only) in addition to the findings below.
@@ -161,8 +161,8 @@ mobile screens) and assume the decision is made first — the decision itself is
 > substance (RM inherits the Hotel-Manager scheduling capability at group scope) but not built.
 >
 > Code migration (enum addition, JWT scope-claim issuance, promoting existing RM users from `MANAGER`) is
-> `ADR-030` PR-2, not yet built. `SIR-USERS-012/020` and `SIR-AUTH-013` updated in the Specification Issues
-> Register to reflect the decision (implementation still pending).
+> implemented via `ADR-030` PR-2 through PR-5 (merged). `SIR-USERS-012/020` and `SIR-AUTH-013` updated in the
+> Specification Issues Register to reflect the decision.
 
 - **Why a decision is required:** CRR §1 / PDD §4.1 confirm **five** roles including a Regional Manager, but
   `UserRole` has only four tokens (`WORKER/CHECKER/MANAGER/ADMIN` — verified in `schema.prisma:22`). Epic 5
