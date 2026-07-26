@@ -27,8 +27,11 @@ export class ValidationError extends AppError {
 }
 
 export class UnauthorizedError extends AppError {
-  constructor(message: string = 'Unauthorized') {
-    super(ERROR_CODES.UNAUTHORIZED, HTTP_STATUS.UNAUTHORIZED, message);
+  // ADR-031 D-3.2 (PR-3): optional `code` override so callers that need a
+  // machine-readable distinction (e.g. TOKEN_REVOKED vs the default
+  // UNAUTHORIZED) don't need a bespoke error class per code.
+  constructor(message: string = 'Unauthorized', code: string = ERROR_CODES.UNAUTHORIZED) {
+    super(code, HTTP_STATUS.UNAUTHORIZED, message);
     this.name = 'UnauthorizedError';
     Object.setPrototypeOf(this, UnauthorizedError.prototype);
   }

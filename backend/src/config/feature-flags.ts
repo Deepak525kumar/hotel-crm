@@ -57,3 +57,26 @@ export function isRmRoleEnabled(): boolean {
 export function isGD02MatrixEnabled(): boolean {
   return getEnv().FEATURE_GD02_MATRIX;
 }
+
+/**
+ * Request-time permission derivation cutover flag (ADR-031 §7 PR-3, D-1/D-3).
+ * When disabled (default), authMiddleware/optionalAuthMiddleware keep trusting
+ * the JWT's `permissions` claim exactly as today — "both-off = current
+ * behavior" (ADR-024 D3/D4 topology, reused per ADR-031 C-4). Gated on C-2's
+ * pre-flip reconciliation report being reviewed.
+ */
+export function isDerivedPermissionsEnabled(): boolean {
+  return getEnv().FEATURE_DERIVED_PERMISSIONS;
+}
+
+/**
+ * token_generation revocation-check cutover flag (ADR-031 §7 PR-3, D-3.2/D-4).
+ * When disabled (default), an already-issued token's token_generation (if
+ * present) is never compared against the row, so role change/deactivation/
+ * deletion/password-reset do not revoke it — "both-off = current behavior".
+ * Must not be enabled before ADR-031 PR-4a (client forced-re-auth) ships,
+ * per ADR-031 C-7.
+ */
+export function isTokenGenerationEnforcementEnabled(): boolean {
+  return getEnv().FEATURE_TOKEN_GENERATION_ENFORCEMENT;
+}
