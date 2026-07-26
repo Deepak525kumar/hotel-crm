@@ -7,7 +7,7 @@ import {
   ListHotelGroupsQuery,
 } from './types.js';
 import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
-import { resolveScopeGroupFilter, isHotelGroupInScope } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
@@ -157,7 +157,7 @@ export class CrmService extends BaseService {
 
     const where: Record<string, unknown> = {};
     if (isScopeAuthzEnabled() && actor.role !== 'admin') {
-      const scopeFilter = await resolveScopeGroupFilter(actor.scope);
+      const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope);
       if (scopeFilter.kind === 'deny') {
         where['id'] = '__none__';
       } else if (scopeFilter.kind === 'group') {
@@ -201,7 +201,8 @@ export class CrmService extends BaseService {
     if (!hotelGroup) throw new NotFoundError('Hotel group not found');
 
     if (isScopeAuthzEnabled() && actorRole !== 'admin') {
-      const inScope = await isHotelGroupInScope(actorScope, hotelGroupId);
+      const scopeFilter = await resolveNonAdminScopeFilter(actorRole, actorScope);
+      const inScope = scopeFilter.kind === 'group' && scopeFilter.hotelGroupId === hotelGroupId;
       if (!inScope) throw new ForbiddenError('Hotel group not in your scope');
     }
 

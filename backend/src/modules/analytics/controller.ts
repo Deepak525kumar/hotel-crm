@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { analyticsService } from './service.js';
 import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
-import { resolveScopeGroupFilter } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import { UnauthorizedError } from '../../lib/errors.js';
 import type { UserScope } from '../../lib/jwt.js';
 
@@ -32,10 +32,12 @@ async function resolveScopedFilter(
 
   // Every non-admin actor: the client-supplied hotel_id is never trusted
   // here — the actor's own JWT scope claim is the only source of the filter.
-  const scopeFilter = await resolveScopeGroupFilter(auth.scope ?? null);
+  // `resolveNonAdminScopeFilter` enforces (and logs) the invariant that a
+  // non-admin actor never resolves to global scope, rather than silently
+  // returning unfiltered on that "shouldn't occur" case.
+  const scopeFilter = await resolveNonAdminScopeFilter(auth.role, auth.scope ?? null);
   if (scopeFilter.kind === 'deny') return { hotelGroupId: '__none__' };
-  if (scopeFilter.kind === 'group') return { hotelGroupId: scopeFilter.hotelGroupId };
-  return {}; // 'none' (global claim on a manager/regional_manager) -> unfiltered
+  return { hotelGroupId: scopeFilter.hotelGroupId };
 }
 
 export class AnalyticsController {

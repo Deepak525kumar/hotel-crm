@@ -4,7 +4,7 @@ import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.j
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS } from '../../config/constants.js';
 import { CreateUserRequest, UpdateUserRequest, ListUsersQuery } from './types.js';
 import { isScopeAuthzEnabled } from '../../config/feature-flags.js';
-import { resolveScopeGroupFilter } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
@@ -37,15 +37,14 @@ export class UserService extends BaseService {
     // admin is the only explicit bypass; every other actor — manager,
     // regional_manager, or any role added to this route's guard in the
     // future without a matching update here — is scope-resolved, not
-    // allowlisted by role name. `resolveScopeGroupFilter` itself returns
-    // 'none' only for a `{type:'global'}` claim, which `resolveScope()`
-    // (auth/service.ts) mints only for admin — so this and the role check
-    // below agree by construction, not by coincidence.
+    // allowlisted by role name. `resolveNonAdminScopeFilter` enforces (and
+    // logs) the invariant that a non-admin actor never resolves to global
+    // scope, rather than silently bypassing on that "shouldn't occur" case.
     if (isScopeAuthzEnabled() && actor && actor.role !== 'admin') {
-      const scopeFilter = await resolveScopeGroupFilter(actor.scope ?? null);
+      const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
       if (scopeFilter.kind === 'deny') {
         where['id'] = '__none__';
-      } else if (scopeFilter.kind === 'group') {
+      } else {
         // An explicit ?hotel_id outside the actor's own scope must not widen
         // it — deny rather than let the client-supplied filter win.
         if (targetGroupId && targetGroupId !== scopeFilter.hotelGroupId) {
@@ -54,9 +53,6 @@ export class UserService extends BaseService {
           targetGroupId = scopeFilter.hotelGroupId;
         }
       }
-      // 'none' (global claim on a non-admin actor — shouldn't occur, but
-      // treated the same as admin's bypass rather than denying) -> no
-      // added restriction beyond whatever ?hotel_id gave.
     }
 
     if (targetGroupId) {

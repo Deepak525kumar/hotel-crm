@@ -10,6 +10,7 @@
  * there unchanged.
  */
 import { getPrisma } from './db.js';
+import { logger } from './logger.js';
 import type { UserScope } from './jwt.js';
 
 // Evaluates whether a manager's PR 5.4 JWT `scope` claim grants access to the
@@ -85,13 +86,29 @@ export async function resolveScopeGroupFilter(scope: UserScope | null): Promise<
   return { kind: 'group', hotelGroupId: hotel.hotel_group_id };
 }
 
-// Evaluates whether a manager/regional_manager's scope claim grants access to
-// one specific hotel group (single-resource GET, e.g. GET
-// /crm/hotel-groups/:hotel_group_id) — the "may this actor reach this one
-// group" counterpart to the list-filter above.
-export async function isHotelGroupInScope(scope: UserScope | null, hotelGroupId: string): Promise<boolean> {
+// A non-admin actor can never legitimately resolve to 'none' (unrestricted) —
+// see resolveNonAdminScopeFilter below — so that state is deliberately
+// excluded from its return type, not just its runtime behavior.
+export type NonAdminScopeFilter = { kind: 'group'; hotelGroupId: string } | { kind: 'deny' };
+
+// Wraps resolveScopeGroupFilter for callers that already gate on
+// `actorRole !== 'admin'`. `resolveScope()` (auth/service.ts) only ever mints
+// a `{type:'global'}` claim for role === 'admin' — so a `'none'` result
+// reaching here for a non-admin actor is an invariant violation (a
+// token/claim-issuance bug), not a normal case. Logs loudly and fails closed
+// (deny) rather than silently granting the same unrestricted access this
+// primitive exists to prevent (security review FIND-01, ADR-030 PR-4).
+export async function resolveNonAdminScopeFilter(
+  actorRole: string,
+  scope: UserScope | null
+): Promise<NonAdminScopeFilter> {
   const filter = await resolveScopeGroupFilter(scope);
-  if (filter.kind === 'none') return true;
-  if (filter.kind === 'deny') return false;
-  return filter.hotelGroupId === hotelGroupId;
+  if (filter.kind === 'none') {
+    logger.error('Scope invariant violation: non-admin actor resolved to global scope', {
+      actorRole,
+    });
+    return { kind: 'deny' };
+  }
+  return filter;
 }
+
