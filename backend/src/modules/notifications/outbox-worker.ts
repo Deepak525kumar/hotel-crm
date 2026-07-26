@@ -21,9 +21,9 @@ export interface OutboxWorkerConfig {
  * (see worker.ts entrypoint); it delivers, it never enqueues.
  *
  * PR 7.2 scope: the runtime, claim/lifecycle, backoff, dispatch interface, and
- * scheduler mechanism. Real EMAIL/PUSH handlers (PR 7.4/7.5) and domain
- * scheduled jobs are registered later; here the registry carries only the
- * no-op/log handler and the scheduler is empty.
+ * scheduler mechanism. Real EMAIL/PUSH handlers (PR 7.4/7.5) are registered by
+ * the caller; the first domain scheduled job (the ADR-031 D-5 session sweep)
+ * is registered in worker.ts.
  */
 export class OutboxWorker {
   private running = false;
