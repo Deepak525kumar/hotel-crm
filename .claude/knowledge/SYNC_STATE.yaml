@@ -1,7 +1,7 @@
 schema_version: 1
 project: hotel-crm
 checked_at: "2026-07-13"
-baseline_revision: 3513c776ad570e66693955398ad163fcdb056392  # SYNC-031; see cache_state block below for the actively-maintained per-revision record
+baseline_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound by SYNC-054, 2026-07-26; this top-level field had drifted to a pre-SYNC-053 stamp (3513c776) while cache_state below was kept current -- see cache_state block for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
 
@@ -2097,7 +2097,7 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 9ca0eed45dec34aa4ce3739da4bc8e4c117f6c3f  # rebound to HEAD 9ca0eed by SYNC-053 (post-#194 sync/planning pass, 2026-07-23); prior 09e0b16, content verified coherent through the pass
+  baseline_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3254c83 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); prior 9ca0eed, content verified coherent through the pass
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
