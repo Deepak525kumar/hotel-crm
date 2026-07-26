@@ -35,11 +35,19 @@ export default function LoginPage() {
       await login(email, password);
       router.replace("/dashboard");
     } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Something went wrong. Please try again.",
-      );
+      if (err instanceof ApiError && err.status === 429) {
+        setError(
+          err.retryAfterSeconds !== undefined
+            ? `Too many attempts. Please try again in ${err.retryAfterSeconds}s.`
+            : "Too many attempts. Please wait before trying again.",
+        );
+      } else {
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : "Something went wrong. Please try again.",
+        );
+      }
     } finally {
       setSubmitting(false);
     }
