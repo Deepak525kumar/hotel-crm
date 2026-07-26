@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
-import { BCRYPT_ROUNDS } from '../../config/constants.js';
+import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import {
   CreateUserRequest,
@@ -85,7 +85,6 @@ export class UserService extends BaseService {
           phone: true,
           profile_photo_url: true,
           role: true,
-          permissions: true,
           is_active: true,
           created_at: true,
           updated_at: true,
@@ -96,7 +95,9 @@ export class UserService extends BaseService {
     ]);
 
     return {
-      users: users.map((u: { id: string; email: string; first_name: string; last_name: string; phone: string | null; profile_photo_url: string | null; role: string; permissions: string[]; is_active: boolean; created_at: Date; updated_at: Date }) => ({ ...u, role: u.role.toLowerCase() })),
+      // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+      // stored column (dropped).
+      users: users.map((u: { id: string; email: string; first_name: string; last_name: string; phone: string | null; profile_photo_url: string | null; role: string; is_active: boolean; created_at: Date; updated_at: Date }) => ({ ...u, role: u.role.toLowerCase(), permissions: ROLE_PERMISSIONS[u.role] ?? [] })),
       pagination: {
         page,
         per_page: limit,
@@ -119,7 +120,6 @@ export class UserService extends BaseService {
         phone: true,
         profile_photo_url: true,
         role: true,
-        permissions: true,
         is_active: true,
         created_at: true,
         updated_at: true,
@@ -129,7 +129,9 @@ export class UserService extends BaseService {
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
     await this.logAudit(actorId, actorRole, 'VIEW', 'USER', userId, {}, ip);
-    return { ...user, role: user.role.toLowerCase(), deleted_at: undefined };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [], deleted_at: undefined };
   }
 
   async createUser(data: CreateUserRequest, actorId: string, actorRole: string, ip?: string) {
@@ -169,14 +171,15 @@ export class UserService extends BaseService {
         last_name: true,
         phone: true,
         role: true,
-        permissions: true,
         is_active: true,
         created_at: true,
       },
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', user.id, { action: 'create', email: user.email }, ip);
-    return { ...user, role: user.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
   }
 
   async updateUser(userId: string, data: UpdateUserRequest, actorId: string, actorRole: string, ip?: string) {
@@ -223,7 +226,6 @@ export class UserService extends BaseService {
           last_name: true,
           phone: true,
           role: true,
-          permissions: true,
           is_active: true,
           updated_at: true,
         },
@@ -238,7 +240,9 @@ export class UserService extends BaseService {
     if (shouldBump) {
       await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: newRole !== user.role ? 'role_change' : 'deactivation' }, ip);
     }
-    return { ...updated, role: updated.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 
   // ADR-030 D-4a/D-4: the profile-only half of the PUT /users/:id split
@@ -284,7 +288,6 @@ export class UserService extends BaseService {
           last_name: true,
           phone: true,
           role: true,
-          permissions: true,
           is_active: true,
           updated_at: true,
         },
@@ -299,7 +302,9 @@ export class UserService extends BaseService {
     if (shouldBump) {
       await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'deactivation' }, ip);
     }
-    return { ...updated, role: updated.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 
   // ADR-030 D-4a: the Admin-only role-assignment half of the split
@@ -335,7 +340,6 @@ export class UserService extends BaseService {
           last_name: true,
           phone: true,
           role: true,
-          permissions: true,
           is_active: true,
           updated_at: true,
         },
@@ -346,7 +350,9 @@ export class UserService extends BaseService {
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ROLE', 'USER', userId, { new_role: newRole }, ip);
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'role_change' }, ip);
-    return { ...updated, role: updated.role.toLowerCase() };
+    // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
+    // stored column (dropped).
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 
   async deleteUser(userId: string, actorId: string, actorRole: string, ip?: string) {

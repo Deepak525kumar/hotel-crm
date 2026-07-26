@@ -279,7 +279,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
         id: 'u_worker', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
-        phone: null, role: 'WORKER', permissions: [], is_active: true, created_at: new Date(),
+        phone: null, role: 'WORKER', is_active: true, created_at: new Date(),
       });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -290,8 +290,14 @@ describe('UserService', () => {
       );
 
       expect(result.role).toBe('worker');
+      // ADR-031 D-1/M-3 (PR-7): permissions are derived from
+      // ROLE_PERMISSIONS[role] in the response, not read from a stored
+      // column (dropped) or written to the create call.
+      expect(result.permissions.length).toBeGreaterThan(0);
+      expect(result.permissions).not.toContain('admin:*');
       const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string } }>;
       expect(createCall[0]?.data.role).toBe('WORKER');
+      expect(createCall[0]?.data).not.toHaveProperty('permissions');
     });
   });
 

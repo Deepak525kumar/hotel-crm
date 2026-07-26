@@ -11,14 +11,15 @@
  *
  * Idempotent: only rows currently `role = MANAGER` are selected, so re-running
  * after a partial or repeat run touches nothing already promoted. Data-only —
- * does not touch `User.permissions` (that backfill is M-2, deferred to PR-5
- * per ADR-030 §5: "Runs with PR-5 and re-runs on any later matrix change").
+ * never touched `User.permissions` (that backfill was M-2, superseded by
+ * ADR-031's request-time derivation model; the column itself is dropped as of
+ * ADR-031 M-3/PR-7).
  *
- * Snapshot (ADR-030 §5's "operational envelope: ... both take a pre-migration
- * snapshot of (user_id, role, permissions) to a backup table retained for one
- * release") is recorded as one AuditLog row per promoted user rather than a
- * new table — AuditLog is already the append-only, never-mutated snapshot
- * mechanism (ADR-016) this repository uses for exactly this purpose.
+ * Snapshot (ADR-030 §5's "operational envelope: ... a pre-migration snapshot
+ * of (user_id, role) to a backup table retained for one release") is recorded
+ * as one AuditLog row per promoted user rather than a new table — AuditLog is
+ * already the append-only, never-mutated snapshot mechanism (ADR-016) this
+ * repository uses for exactly this purpose.
  */
 import { PrismaClient, UserRole } from '@prisma/client';
 
@@ -40,7 +41,7 @@ export async function promoteRegionalManagers(
   for (const group of groups) {
     const user = await prisma.user.findUnique({
       where: { id: group.regional_manager_user_id },
-      select: { id: true, role: true, permissions: true },
+      select: { id: true, role: true },
     });
 
     if (!user) continue;
@@ -63,8 +64,8 @@ export async function promoteRegionalManagers(
           action: 'PROMOTE_REGIONAL_MANAGER',
           resource_type: 'USER',
           resource_id: user.id,
-          old_values: { role: user.role, permissions: user.permissions },
-          new_values: { role: UserRole.REGIONAL_MANAGER, permissions: user.permissions },
+          old_values: { role: user.role },
+          new_values: { role: UserRole.REGIONAL_MANAGER },
           details: { hotel_group_id: group.id, migration: 'ADR-030-M-3' },
           timestamp: new Date(),
         },

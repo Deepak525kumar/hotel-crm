@@ -111,29 +111,18 @@ const envSchema = z.object({
   // `hotels:read`/`hotels:write` tokens (not the new `hotel_groups:read`/
   // `hotel_groups:write` split, D-9) and `PUT /users/:id` keeps accepting the
   // legacy combined profile+role body (not the D-4a split) — matching
-  // "both-off = current behavior", since ROLE_PERMISSIONS is a source
-  // constant with no effect on any existing account's stored permissions
-  // until M-2 backfills them (§1 fact 2: permissions are stored, not
-  // derived). Enabling this flag is a prerequisite for M-2 to do anything
-  // meaningful — see scripts/role-permissions-backfill.ts.
+  // "both-off = current behavior". Historical note: at ADR-030's ratification,
+  // permissions were stored (not derived), so enabling this flag was a
+  // prerequisite for its M-2 backfill (scripts/role-permissions-backfill.ts)
+  // to do anything meaningful. ADR-031 subsequently made permissions
+  // request-time-derived from ROLE_PERMISSIONS and retired that backfill
+  // script (PR-7) — this flag's own legacy-token-vs-split-token behavior is
+  // unaffected and still gates independently.
   FEATURE_GD02_MATRIX: z.coerce.boolean().default(false),
 
-  // Request-time permission derivation cutover flag (ADR-031 §7 PR-3, D-1/D-3).
-  // Defaults FALSE: while off, authMiddleware/optionalAuthMiddleware keep
-  // trusting the JWT's `permissions` claim exactly as today — the
-  // "both-off = current behavior" posture (ADR-024 D3/D4 topology, reused
-  // per ADR-031 C-4). Enabling this is gated on ADR-031 C-2's pre-flip
-  // reconciliation report (scripts/token-generation-reconciliation-report.ts)
-  // having been reviewed as Security-Review evidence.
-  FEATURE_DERIVED_PERMISSIONS: z.coerce.boolean().default(false),
-
-  // token_generation revocation-check cutover flag (ADR-031 §7 PR-3, D-3.2/D-4).
-  // Defaults FALSE: while off, a payload's token_generation (if present) is
-  // never compared against the row, so an already-issued token is not
-  // rejected on role change/deactivation/deletion/password-reset — matching
-  // "both-off = current behavior". Must not be enabled before ADR-031 PR-4a
-  // (client forced-re-auth handling) is deployed, per ADR-031 C-7.
-  FEATURE_TOKEN_GENERATION_ENFORCEMENT: z.coerce.boolean().default(false),
+  // ADR-031 §7 PR-7: FEATURE_DERIVED_PERMISSIONS and
+  // FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired — both
+  // cutovers are complete and unconditional in middleware/auth.ts.
 
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).

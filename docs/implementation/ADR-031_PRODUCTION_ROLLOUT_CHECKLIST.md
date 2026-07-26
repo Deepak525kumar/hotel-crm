@@ -53,10 +53,18 @@ first real production deployment of any commit at or after PR-7."
       environment — i.e., a `release/*` tag exists, or an equivalent manual-deploy record is made.
 - [ ] **RO-3** `token_generation` is verified live-readable on the production `User` table (M-1's
       migration has actually run there — `prisma migrate deploy` succeeded, not just validated).
-- [ ] **RO-4** M-2's reconciliation-report script
-      (`npm run token-generation:reconciliation-report`, PR-3) is run against production data
-      **before** derivation is trusted, and any `gains_permissions`-class drift is resolved first
-      (security-incident-class per ADR-031 C-2).
+- [x] **RO-4 — moot as of PR-7, not skipped.** M-2's reconciliation-report script
+      (`npm run token-generation:reconciliation-report`) and its underlying source data
+      (`User.permissions`) were both retired by PR-7's M-3 column drop — the script is deleted and
+      there is no stored snapshot left to compare against `ROLE_PERMISSIONS`. This check is
+      structurally unrunnable post-drop, not merely unperformed: by the time any real production
+      deployment reaches this checklist, derivation is the only behavior the code has (no flag, no
+      claim-honoring branch), so there is nothing for a "before you trust derivation" report to
+      gate. **Security-review finding (PR-7):** confirmed no production deployment has ever existed
+      for this repository (see Evidence above), so C-2's drift risk was never live against real
+      data — it is closed by the column's removal, not bypassed. If a *future* ADR reintroduces a
+      stored-then-derived transition (a different cutover, not this one), that ADR must define its
+      own equivalent of this check; this row does not carry forward as a template to skip.
 - [ ] **RO-5** PR-4a's client behavior (`TOKEN_REVOKED` handling, all three clients) is confirmed
       deployed to real users — app store / web release, not just merged to `main` — before any
       revocation-triggering event (role change, deactivation, password reset, admin revoke) can

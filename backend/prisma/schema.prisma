@@ -231,18 +231,23 @@ model User {
   phone              String?   @unique
   profile_photo_url  String?
   role               UserRole  @default(WORKER)
-  permissions        String[]  // granular permission codes e.g. ["work_request:read"]
+  // ADR-031 M-3 (PR-7): the stored permission snapshot is retired. Permissions
+  // are derived request-time from ROLE_PERMISSIONS[role] (D-1); this column
+  // ceased being read at PR-3, ceased being written at PR-4, and is dropped
+  // here after a full-release soak (relocated to an operational rollout gate,
+  // see docs/implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md). A
+  // pre-drop snapshot is retained for one release per the migration's own
+  // down.sql / backup-table note.
   is_active          Boolean   @default(true)
   email_verified_at  DateTime?
   phone_verified_at  DateTime?
   last_login_at      DateTime?
   deleted_at         DateTime? // GDPR soft delete — keep row, null PII via separate job
-  // ADR-031 M-1 (PR-2): monotonic revocation counter, mirrored into the access
-  // token's `token_generation` claim at issuance. Incremented (never reset) by
-  // backend-auth on role change / deactivation / soft delete / password reset;
-  // a mismatch against the row invalidates an already-issued access token
-  // (ADR-031 D-3/D-4). Not yet enforced by any request path — PR-2 seeds the
-  // claim, PR-3 is the first PR that reads/verifies it.
+  // ADR-031 M-1/D-3/D-4 (PR-2, enforced unconditionally as of PR-7): monotonic
+  // revocation counter, mirrored into the access token's `token_generation`
+  // claim at issuance. Incremented (never reset) by backend-auth on role
+  // change / deactivation / soft delete / password reset; a mismatch against
+  // the row invalidates an already-issued access token.
   token_generation   Int       @default(0)
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
