@@ -49,6 +49,13 @@ contracts:
     source: backend/src/middleware/validation.ts
     interface: "validateBody / validateQuery (zod-schema request validation)"
     consumers: [backend-users, backend-crm, backend-auth]
+  - id: role-permissions
+    owner_module: backend-auth
+    version: unversioned
+    source: backend/src/config/constants.ts
+    interface: "ROLE_PERMISSIONS[UserRole] -> string[] (frozen map + frozen per-role arrays); the single live authorization authority, consulted per request, not read from a stored snapshot or JWT claim"
+    consumers: [backend-auth, backend-users]
+    note: "ADR-031 D-1/PR-8 (2026-07-27): reclassified from an internal write-time constant of backend-users (ADR-030-era: consulted only by the now-retired role-permissions-backfill.ts to populate the since-dropped User.permissions column) to a request-path shared contract node owned by backend-auth. Consulted unconditionally on every authenticated request by auth-middleware (ADR-031 PR-3/PR-7, both feature flags retired) to derive req.auth.permissions from User.role; also consulted by backend-users' users/service.ts and backend-auth's auth/service.ts to compute the (API-contract-preserving) permissions field on user response bodies, since the underlying DB column is dropped (ADR-031 M-3). Must remain deep-frozen at runtime (ADR-031 D-1 hardening, pinned by role-permissions-frozen.test.ts) -- a request-path authorization-integrity concern now, not just write-time hygiene. Resolves the shared-contract-node gap SIR-USERS-017 previously left open."
 
 events: []  # No event bus exists (verified absent, DEPENDENCY_GRAPH events). No publish/subscribe contracts.
 
