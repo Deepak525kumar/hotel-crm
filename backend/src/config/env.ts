@@ -22,7 +22,11 @@ const envSchema = z.object({
   // leaked access secret (e.g. via an access-token verification oracle)
   // also forges long-lived refresh tokens. Fail closed at startup instead.
   JWT_REFRESH_SECRET: z.string().min(32, 'JWT_REFRESH_SECRET must be at least 32 characters'),
-  JWT_ACCESS_EXPIRY: z.string().default('1h'),
+  // ADR-031 D-4 (PR-5): 1h -> 15m. With request-time revocation live,
+  // token_generation is the primary revocation mechanism; TTL is now
+  // defense-in-depth rather than the platform's only expiry guarantee, so
+  // it can be shortened without weakening the previous behavior.
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
 
   // APNs (PATCH-05: base64 encoded private key)

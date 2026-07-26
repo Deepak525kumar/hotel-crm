@@ -47,13 +47,23 @@ async function resolveLiveAuth(
   }
 
   if (enforcementEnabled) {
-    // ADR-031 D-3.2: a token issued before PR-2 carries no claim at all.
-    // Explicitly treat that as generation 0 (the fallback `?? 0`, never a
+    // ADR-031 D-3.2/PR-5: a token issued before PR-2 carries no claim at
+    // all — `'token_generation' in payload` is checked explicitly (never a
     // non-null assertion) rather than trusting the type declaration, which
-    // says the field is always present — it is not, for any token issued
-    // before this cutover.
-    const claimGeneration = payload!.token_generation ?? 0;
-    if (claimGeneration !== user.token_generation) {
+    // claims the field is always present. Before PR-5, a claim-less token
+    // is treated as generation 0 (matches every never-revoked row, since
+    // `User.token_generation` also defaults to 0 — this is deliberately
+    // permissive during the transition window). PR-5 closes that gap: once
+    // the `permissions` claim is dropped from issuance and clients handle
+    // forced re-auth (C-7), a claim-less token is rejected outright rather
+    // than coerced to 0, which is the one intentional forced-re-auth event
+    // this record accepts (§8).
+    const hasClaim = 'token_generation' in (payload as object) && payload!.token_generation !== undefined;
+    if (!hasClaim) {
+      onInvalid(ERROR_CODES.TOKEN_REVOKED, 'Token has been revoked');
+      return null;
+    }
+    if (payload!.token_generation !== user.token_generation) {
       onInvalid(ERROR_CODES.TOKEN_REVOKED, 'Token has been revoked');
       return null;
     }
@@ -99,7 +109,12 @@ export async function authMiddleware(
       userId: payload.sub,
       email: payload.email,
       role: derived?.role ?? payload.role,
-      permissions: derived?.permissions ?? payload.permissions ?? [],
+      // ADR-031 D-1/PR-5: the `permissions` claim no longer exists on the
+      // token (C-1 requires derivation to already be live and soaked before
+      // the claim is removed, so `derived` is populated whenever this code
+      // runs against a real deployment) — the only remaining fallback is an
+      // empty grant, not a claim that was never issued.
+      permissions: derived?.permissions ?? [],
       scope: payload.scope ?? null,
     };
 
@@ -138,7 +153,12 @@ export async function optionalAuthMiddleware(
             userId: payload.sub,
             email: payload.email,
             role: derived?.role ?? payload.role,
-            permissions: derived?.permissions ?? payload.permissions ?? [],
+            // ADR-031 D-1/PR-5: the `permissions` claim no longer exists on the
+      // token (C-1 requires derivation to already be live and soaked before
+      // the claim is removed, so `derived` is populated whenever this code
+      // runs against a real deployment) — the only remaining fallback is an
+      // empty grant, not a claim that was never issued.
+      permissions: derived?.permissions ?? [],
             scope: payload.scope ?? null,
           };
         }

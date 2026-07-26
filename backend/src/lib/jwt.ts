@@ -11,12 +11,8 @@ export interface AccessTokenPayload {
   sub: string;
   email: string;
   role: string;
-  permissions: string[];
   scope: UserScope | null;
   // ADR-031 D-2/D-4 (PR-2): mirrored from User.token_generation at issuance.
-  // Additive only in this PR — nothing verifies it yet (PR-3 is the first
-  // request-path check). `permissions` is removed only at PR-5, once
-  // derivation (PR-3) is live and soaked.
   token_generation: number;
   iat: number;
   exp: number;
