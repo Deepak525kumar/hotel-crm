@@ -6,8 +6,14 @@
  *   error:   { status: "error", error: { code, message } }
  */
 
-/** Roles emitted by the backend (always lower-cased on the wire). */
-export type Role = "worker" | "checker" | "manager" | "admin";
+/**
+ * Roles emitted by the backend (always lower-cased on the wire).
+ * `regional_manager` added for ADR-030 PR-3 (§6): the enum value itself
+ * shipped in PR-2 (M-1), but no user holds it yet — M-3's promotion is
+ * still behind `FEATURE_RM_ROLE` (default off). This widening exists so the
+ * frontend doesn't reject/misrender a regional manager once one appears.
+ */
+export type Role = "worker" | "checker" | "manager" | "admin" | "regional_manager";
 
 export interface AuthUser {
   id: string;

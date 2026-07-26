@@ -6,6 +6,7 @@ const ROLE: Record<Role, { tone: "neutral" | "info" | "warning" | "success"; lab
   checker: { tone: "info", label: "Checker" },
   manager: { tone: "warning", label: "Manager" },
   admin: { tone: "success", label: "Admin" },
+  regional_manager: { tone: "warning", label: "Regional Manager" },
 };
 
 /** Coloured pill for a user's role. */
