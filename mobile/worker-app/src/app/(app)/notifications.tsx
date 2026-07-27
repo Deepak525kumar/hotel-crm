@@ -16,7 +16,7 @@ function NotifCard({ item, onPress }: { item: Notification; onPress: () => void 
           <ThemedText type="smallBold" style={styles.flex}>{item.title}</ThemedText>
           {unread && <View style={styles.dot} />}
         </View>
-        <ThemedText type="small" themeColor="textSecondary">{item.body}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{item.message}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
           {new Date(item.created_at).toLocaleString()}
         </ThemedText>

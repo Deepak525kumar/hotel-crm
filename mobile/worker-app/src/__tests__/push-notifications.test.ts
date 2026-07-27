@@ -4,6 +4,8 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
   getDevicePushTokenAsync: jest.fn(),
+  setNotificationHandler: jest.fn(),
+  addNotificationResponseReceivedListener: jest.fn(),
 }));
 jest.mock('@/lib/api', () => ({
   api: { notifications: { registerPushToken: jest.fn() } },
@@ -12,12 +14,14 @@ jest.mock('@/lib/api', () => ({
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from '@/lib/api';
-import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
+import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
 
 const mockNotifications = Notifications as unknown as {
   getPermissionsAsync: jest.Mock;
   requestPermissionsAsync: jest.Mock;
   getDevicePushTokenAsync: jest.Mock;
+  setNotificationHandler: jest.Mock;
+  addNotificationResponseReceivedListener: jest.Mock;
 };
 
 const mockRegister = (api as unknown as {
@@ -122,5 +126,42 @@ describe('registerForPushNotificationsAsync', () => {
     mockNotifications.getPermissionsAsync.mockRejectedValue(new Error('permission API unavailable'));
 
     await expect(registerForPushNotificationsAsync()).resolves.toBe('failed');
+  });
+});
+
+describe('subscribeToPushNotifications', () => {
+  const mockRemove = jest.fn();
+  const mockRouter = { push: jest.fn() } as unknown as Parameters<typeof subscribeToPushNotifications>[0];
+
+  beforeEach(() => {
+    mockRemove.mockReset();
+    (mockRouter.push as jest.Mock).mockReset();
+    mockNotifications.addNotificationResponseReceivedListener.mockReturnValue({ remove: mockRemove });
+  });
+
+  it('registers a foreground handler that shows the banner/sound/badge/list', () => {
+    subscribeToPushNotifications(mockRouter);
+
+    expect(mockNotifications.setNotificationHandler).toHaveBeenCalledWith(
+      expect.objectContaining({ handleNotification: expect.any(Function) }),
+    );
+  });
+
+  it('navigates to the Alerts tab when a delivered notification is tapped', () => {
+    subscribeToPushNotifications(mockRouter);
+
+    const onResponse = mockNotifications.addNotificationResponseReceivedListener.mock.calls[0][0];
+    onResponse();
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/notifications');
+  });
+
+  it('returns an unsubscribe function that removes the response listener', () => {
+    const unsubscribe = subscribeToPushNotifications(mockRouter);
+    expect(mockRemove).not.toHaveBeenCalled();
+
+    unsubscribe();
+
+    expect(mockRemove).toHaveBeenCalledTimes(1);
   });
 });
