@@ -120,6 +120,20 @@ export default function HotelDetailPage() {
                     )
                   }
                 />
+                <DataRow
+                  label="Geofence"
+                  value={
+                    hotel.latitude != null && hotel.longitude != null ? (
+                      <span className="text-green-700">
+                        Configured ({hotel.latitude.toFixed(4)}, {hotel.longitude.toFixed(4)})
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">
+                        Not set — worker check-in unavailable
+                      </span>
+                    )
+                  }
+                />
                 <DataRow label="Created" value={formatDateTime(hotel.created_at)} />
                 <DataRow label="Updated" value={formatDateTime(hotel.updated_at)} />
               </DataList>
