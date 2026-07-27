@@ -8,8 +8,9 @@ import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { usersApi } from "@/lib/api";
-import { RoleGate } from "@/components/auth/RoleGate";
+import { DocumentsGate, RoleGate, UserDeactivateGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
+import { DocumentsCard } from "@/components/documents/DocumentsCard";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -88,9 +89,15 @@ function UserDetail() {
             }
             description={user.email}
             actions={
-              <Link href={`/users/${id}/edit`}>
-                <Button variant="outline">Edit</Button>
-              </Link>
+              // The edit page itself remains admin-only (frontend-side,
+              // out of scope for this change) — hidden here for other
+              // roles so widening this page's own view gate doesn't leave
+              // a dead-end link to a page that will only show a fallback.
+              <RoleGate allow={["admin"]}>
+                <Link href={`/users/${id}/edit`}>
+                  <Button variant="outline">Edit</Button>
+                </Link>
+              </RoleGate>
             }
           />
 
@@ -129,29 +136,35 @@ function UserDetail() {
             </Card>
           )}
 
-          {user.is_active && (
-            <Card className="border-red-100">
-              <CardContent className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">
-                    Deactivate account
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {isSelf
-                      ? "You cannot deactivate your own account."
-                      : "Revokes sign-in access. The account can be reactivated later."}
-                  </p>
-                </div>
-                <Button
-                  variant="danger"
-                  disabled={isSelf}
-                  onClick={() => setConfirmOpen(true)}
-                >
-                  Deactivate
-                </Button>
-              </CardContent>
-            </Card>
-          )}
+          <DocumentsGate>
+            <DocumentsCard workerId={id} />
+          </DocumentsGate>
+
+          <UserDeactivateGate>
+            {user.is_active && (
+              <Card className="border-red-100">
+                <CardContent className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Deactivate account
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {isSelf
+                        ? "You cannot deactivate your own account."
+                        : "Revokes sign-in access. The account can be reactivated later."}
+                    </p>
+                  </div>
+                  <Button
+                    variant="danger"
+                    disabled={isSelf}
+                    onClick={() => setConfirmOpen(true)}
+                  >
+                    Deactivate
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+          </UserDeactivateGate>
         </>
       )}
 
@@ -190,11 +203,11 @@ function UserDetail() {
 export default function UserDetailPage() {
   return (
     <RoleGate
-      allow={["admin"]}
+      allow={["admin", "manager"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500">
-            Only admins can view user accounts.
+            Only admins and managers can view user accounts.
           </CardContent>
         </Card>
       }

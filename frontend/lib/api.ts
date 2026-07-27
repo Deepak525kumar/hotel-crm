@@ -36,6 +36,10 @@ import type {
   UserSummary,
   WorkApplication,
   WorkRequest,
+  WorkerDocument,
+  DocumentCategory,
+  DocumentCompleteness,
+  UploadDocumentInput,
 } from "@/lib/types";
 
 /** Error thrown by {@link apiFetch} for any non-2xx response. */
@@ -91,7 +95,11 @@ function parseRetryAfter(res: Response): number | undefined {
 }
 
 interface ApiFetchOptions extends Omit<RequestInit, "body"> {
-  /** JSON-serialisable request body. */
+  /** JSON-serialisable request body, or a `FormData` instance for a
+   * multipart upload (e.g. document upload) — see the `body` handling in
+   * {@link apiFetch}, which skips JSON serialisation and the
+   * `Content-Type` override for `FormData` so the browser can set the
+   * correct multipart boundary itself. */
   body?: unknown;
   /** Attach the bearer access token. Defaults to `true`. */
   auth?: boolean;
@@ -188,9 +196,13 @@ export async function apiFetch<T>(
   options: ApiFetchOptions = {},
 ): Promise<T> {
   const { body, auth = true, _retried = false, headers, ...rest } = options;
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const finalHeaders = new Headers(headers);
-  if (body !== undefined && !finalHeaders.has("Content-Type")) {
+  // A FormData body must NOT get an explicit Content-Type: the browser sets
+  // one itself (multipart/form-data; boundary=...), which fetch can only
+  // compute from the actual FormData instance it sends.
+  if (body !== undefined && !isFormData && !finalHeaders.has("Content-Type")) {
     finalHeaders.set("Content-Type", "application/json");
   }
   if (auth) {
@@ -201,7 +213,7 @@ export async function apiFetch<T>(
   const res = await fetch(buildUrl(path), {
     ...rest,
     headers: finalHeaders,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
   });
 
   // TOKEN_REVOKED (ADR-031 C-7) is checked regardless of `_retried`: a
@@ -496,4 +508,50 @@ export const usersApi = {
   /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
   remove: (id: string) =>
     apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
+};
+
+/**
+ * Documents API matching the backend `/documents/*` routes
+ * (SPEC-DOCUMENTS-001 @0.1.4 FROZEN, GD-16). GD-16's RBAC model: self-upload
+ * (worker) + manager-upload only, hotel-scoped read via `checkWorkerScope()`
+ * — enforced backend-side; this client passes `worker_id` through, never a
+ * client-declared actor identity.
+ */
+export const documentsApi = {
+  list: (workerId: string, category?: DocumentCategory) =>
+    apiFetch<WorkerDocument[]>(
+      `/documents/workers/${workerId}/documents${toQuery(category ? { category } : {})}`,
+    ),
+
+  get: (documentId: string) =>
+    apiFetch<WorkerDocument>(`/documents/documents/${documentId}`),
+
+  completeness: (workerId: string) =>
+    apiFetch<DocumentCompleteness>(
+      `/documents/workers/${workerId}/documents/completeness`,
+    ),
+
+  /**
+   * Uploads a file for a worker. `file` is attached as the multipart `file`
+   * field the backend's `upload.single('file')` middleware expects
+   * (documents/routes.ts, PR #247); every other field in `input` is sent as
+   * an accompanying form field. `file_size_bytes` is never sent — the
+   * backend derives it server-side from the parsed file (RULE-DOC-09).
+   */
+  upload: (workerId: string, file: File, input: UploadDocumentInput) => {
+    const form = new FormData();
+    form.set("file", file);
+    form.set("category", input.category);
+    form.set("original_filename", input.original_filename);
+    form.set("mime_type", input.mime_type);
+    if (input.is_work_permit !== undefined) {
+      form.set("is_work_permit", String(input.is_work_permit));
+    }
+    if (input.expires_at) form.set("expires_at", input.expires_at);
+
+    return apiFetch<WorkerDocument>(`/documents/workers/${workerId}/documents`, {
+      method: "POST",
+      body: form,
+    });
+  },
 };

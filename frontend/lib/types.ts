@@ -626,3 +626,51 @@ export interface UpdateAttendanceInput {
   minutes_worked?: number;
   is_verified?: boolean;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Documents — SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16)                       */
+/* -------------------------------------------------------------------------- */
+
+export type DocumentCategory = "GENERAL" | "WORK_PERMIT";
+
+/** Matches backend `WorkerDocumentDto` (documents/types.ts) exactly. */
+export interface WorkerDocument {
+  id: string;
+  worker_id: string;
+  uploaded_by_id: string;
+  category: DocumentCategory;
+  /** Short-lived S3 presigned GET URL; null if generation is deferred/unavailable. */
+  presigned_url: string | null;
+  original_filename: string;
+  mime_type: string;
+  file_size_bytes: number;
+  expires_at: string | null;
+  is_work_permit: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** GD-16 / REQ-DOC-002/005: response of `GET /workers/:id/documents/completeness`. */
+export interface DocumentCompleteness {
+  worker_id: string;
+  work_permit_required: boolean;
+  is_complete: boolean;
+  missing_categories: DocumentCategory[];
+  document_count: number;
+}
+
+/**
+ * Form fields for `POST /documents/workers/:worker_id/documents` (multipart).
+ * The file itself is attached separately as the `file` field — this covers
+ * only the accompanying metadata fields the backend's Zod schema validates
+ * (documents/validation.ts uploadDocumentSchema). file_size_bytes is
+ * deliberately NOT here: the backend derives it server-side from the parsed
+ * file (RULE-DOC-09), never from a client-supplied field.
+ */
+export interface UploadDocumentInput {
+  category: DocumentCategory;
+  original_filename: string;
+  mime_type: string;
+  is_work_permit?: boolean;
+  expires_at?: string;
+}
