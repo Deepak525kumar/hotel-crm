@@ -1,7 +1,10 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import type { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
 import { PUSH_APP } from '@/constants/app-config';
+
+type Router = ReturnType<typeof useRouter>;
 
 /**
  * Device push-token registration (Epic 7 PR 7.7, ADR-029 §4).
@@ -59,4 +62,48 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     console.warn('Push token registration failed', error);
     return 'failed';
   }
+}
+
+/**
+ * Foreground display + tap-through routing for incoming push notifications.
+ *
+ * Backend delivery (Platform Worker -> APNs/FCM, PR 7.5) was already real
+ * before this: without this wiring, a push arriving while the app is open
+ * produced no in-app banner (the OS suppresses a system notification for the
+ * foreground app by default), and tapping a delivered notification did
+ * nothing beyond returning to whatever screen was already open. Both gaps
+ * are closed here using only already-registered `expo-notifications`
+ * listeners -- no new channel, no new backend call, no websocket.
+ *
+ * Returns an unsubscribe function; call once from the signed-in app's root
+ * layout (mirrors registerForPushNotificationsAsync's placement) and clean
+ * up on unmount.
+ */
+export function subscribeToPushNotifications(router: Router): () => void {
+  // Foreground behavior: show the OS banner/sound/badge even while the app
+  // is open, rather than the SDK default of suppressing it. `notifications`
+  // is the app's only channel (Alerts tab lists the same rows), so there is
+  // no per-type filtering to do here.
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+
+  // Tapping a delivered notification (from the tray, or the in-app banner
+  // above) navigates to the Alerts tab, where the tapped notification is
+  // already listed and can be marked read -- deliberately not a per-type
+  // deep link: the backend's NotificationType/data payload isn't yet rich
+  // enough to route to every producer's specific detail screen, and
+  // guessing at that shape now would be a speculative abstraction.
+  const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+    router.push('/notifications');
+  });
+
+  return () => {
+    responseSub.remove();
+  };
 }

@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
-import { registerForPushNotificationsAsync } from '@/lib/push-notifications';
+import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
 
 export default function AppLayout() {
   const theme = useTheme();
+  const router = useRouter();
 
   // Register this device for push once per app launch (Epic 7 PR 7.7).
   // Placed in the (app) layout rather than the root layout because this tree
@@ -24,6 +25,13 @@ export default function AppLayout() {
   useEffect(() => {
     void registerForPushNotificationsAsync();
   }, []);
+
+  // Foreground banner + tap-to-Alerts-tab routing for incoming push. Same
+  // once-per-(app)-mount lifecycle reasoning as the registration effect
+  // above; the listener is removed on unmount rather than left dangling.
+  useEffect(() => {
+    return subscribeToPushNotifications(router);
+  }, [router]);
 
   return (
     <Tabs
