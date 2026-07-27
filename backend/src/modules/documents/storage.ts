@@ -68,10 +68,13 @@ export interface StorageClient {
 
 // ---------------------------------------------------------------------------
 // Concrete AWS S3 client (wired when S3_BUCKET is configured in env).
-// Uses the AWS SDK v3 (modular). The SDK is not yet a direct dependency of
-// backend — it must be added to package.json alongside this PR.
+// Uses the AWS SDK v3 (modular): @aws-sdk/client-s3 + @aws-sdk/s3-request-presigner
+// (real package.json dependencies as of PR #248).
 // OD-DOC-017: bucket is assumed private, no-public-ACL.
 // REQ-DOC-007/REQ-DOC-008: AWS_REGION defaults to eu-central-1 (env.ts:42).
+// Credentials: AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY are read implicitly by
+// the SDK's default credential provider chain when set (env.ts:47-48); when
+// unset, the SDK falls back to the EC2 instance role, per that same comment.
 // ---------------------------------------------------------------------------
 
 // Lazy import: only resolved when getStorageClient() is called and a bucket
@@ -82,9 +85,9 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
   // Dynamic import keeps the cold-start cost on the module-evaluation path zero
   // for envs that don't use S3 (unit tests, CI without a real bucket).
   const { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } = await import(
-    '@aws-sdk/client-s3' as string
+    '@aws-sdk/client-s3'
   );
-  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner' as string);
+  const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
   const client = new S3Client({ region });
 
