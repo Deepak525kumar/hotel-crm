@@ -21,6 +21,10 @@ export const NAV: NavItem[] = [
   { href: "/requests", label: "Work requests" },
   { href: "/assignments", label: "Assignments" },
   { href: "/attendance", label: "Attendance" },
+  // SPEC-GEO-001 (GD-14): matches backend-geo's own admin/manager-only role
+  // split exactly (geo/routes.ts) — regional_manager is deliberately
+  // excluded, same reasoning as GeoCheckinsGate.
+  { href: "/geo-checkins", label: "Geo check-ins", roles: ["manager", "admin"] },
   // regional_manager added (ADR-030 D-5/PR-3): RM holds the same operational
   // capability set as manager at group scope, so sees the same nav surface.
   { href: "/analytics", label: "Analytics", roles: ["manager", "regional_manager", "admin"] },
