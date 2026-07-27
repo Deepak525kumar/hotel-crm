@@ -121,11 +121,12 @@ export class AssignmentService extends BaseService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.workerAssignment.update({ where: { id }, data });
 
-      // GD-04: status transitions that affect completion_rate/on_time_rate/
-      // last_worked_at (WorkerOverallRating's derived fields) must recompute
-      // the aggregate here — it is not the trigger's job anymore, and
-      // createRating's own recompute only runs when a Rating is created,
-      // which can be long after (or never, relative to) a status change.
+      // GD-04: not the trigger's job anymore — recompute WorkerOverallRating
+      // here on any status change that affects it.
+      // Keyed on `status` rather than `completed_at` because
+      // SPEC-JOB-DISPATCH-001 (RULE-008, REQ-040) defines COMPLETED/CANCELLED
+      // as terminal states and rejects same-status transitions. If the
+      // specification changes, revisit this condition (SIR-JOBD-007).
       if (next === AssignmentStatus.COMPLETED || next === AssignmentStatus.CANCELLED) {
         await refreshWorkerOverallRating(tx, assignment.worker_id);
       }
