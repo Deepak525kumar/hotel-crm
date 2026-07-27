@@ -99,6 +99,7 @@ export class CrmService extends BaseService {
         address: data.address ?? hotel.address,
         timezone: data.timezone ?? hotel.timezone,
         is_active: data.is_active ?? hotel.is_active,
+        accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs,
         hotel_group_id: data.hotel_group_id ?? hotel.hotel_group_id,
       },
     });

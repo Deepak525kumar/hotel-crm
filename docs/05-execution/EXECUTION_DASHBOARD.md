@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 67/67 suites, 1024/1024 tests passing; `tsc --noEmit` clean) |
+| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 67/67 suites, 1033/1033 tests passing; `tsc --noEmit` clean) |
 
 ## Current Milestone
 
@@ -16,12 +16,12 @@ Rate-Limiting) are both Accepted and fully built (PR-1..PR-8 each, merged 2026-0
 (linked, not restated). This closed the `GD-02`, `GD-03` (permission-set half), and `GD-07` rows in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
-**Next milestone (proposed, not yet started): "MVP Completion Decisions."** Per the Implementation
-Planner's completion-state assessment, no module is currently code-blocked on an open decision —
-the highest-leverage next step is making the three remaining MVP-blocking owner decisions,
-`GD-04`/`GD-05`/`GD-06` (see the Blockers table below for what each blocks and its resolution
-owner; full options/impact detail lives only in
-[`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md)).
+**Next milestone (in progress): "MVP Completion Decisions."** `GD-04`, `GD-05`, and `GD-06` are all
+Decided. `GD-04` (quality rating single-writer fix) and `GD-05` (per-hotel "pause new jobs" toggle)
+are built and merged (2026-07-27; PR #237/#238 for `GD-04`; `GD-05`'s PR pending review). `GD-06`
+(worker-facing analytics endpoint) remains Decided but unbuilt. See the Blockers table below for
+what each still blocks; full options/impact detail lives only in
+[`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
 Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
 tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
@@ -37,11 +37,11 @@ path, specification reference, and freeze/review disposition.
 |---|---|---|---|
 | backend-auth | active | active | SPEC-AUTH-001@0.3.0 FROZEN |
 | backend-users | active | active | SPEC-USERS-001@0.2.0 FROZEN |
-| backend-crm | active | active | SPEC-CRM-001@0.2.0 FROZEN |
+| backend-crm | active | active | SPEC-CRM-001@0.2.1 FROZEN |
 | backend-hotel-workers | removed | removed | RETIRED (ADR-022) |
-| backend-work-requests | active | active | SPEC-JOB-DISPATCH-001@0.3.1 FROZEN |
-| backend-work-applications | active | active | SPEC-JOB-DISPATCH-001@0.3.1 FROZEN |
-| backend-assignments | active | active | SPEC-JOB-DISPATCH-001@0.3.1 FROZEN |
+| backend-work-requests | active | active | SPEC-JOB-DISPATCH-001@0.3.2 FROZEN |
+| backend-work-applications | active | active | SPEC-JOB-DISPATCH-001@0.3.2 FROZEN |
+| backend-assignments | active | active | SPEC-JOB-DISPATCH-001@0.3.2 FROZEN |
 | backend-attendance | active | active | SPEC-ATT-001@0.2.0 FROZEN |
 | backend-quality | active | active | SPEC-QUAL-001@0.2.0 FROZEN |
 | backend-hr | active | active-no-tests | SPEC-EMP-001@0.2.0 FROZEN (see registry `related_specification` note re: SPEC-HR-001 boundary disclosure) |
@@ -78,6 +78,16 @@ service method; `backend/src/modules/chatbot/` and `backend/src/modules/geo/` co
   revocation counter, session/reset-token sweep job, Nginx-edge rate limiting.
   `SIR-AUTH-017` (password-reset timing side-channel) and per-account rate-limiting are explicitly
   excluded from this decision's scope and remain open.
+- `GD-04` Quality rating single-writer + delete-behavior fix — Decided and built (2026-07-27, PR
+  #237/#238): dropped the DB trigger that partially duplicated `WorkerOverallRating` maintenance;
+  the app-level `refreshWorkerOverallRating()` is now the sole writer, called from both rating
+  creation and assignment-completion/cancellation. `SIR-QUAL-005` resolved. Tiers/warnings/photo
+  policy remain deferred as a separate product sub-decision, not covered by this fix.
+- `GD-05` Per-hotel "pause new jobs" toggle — Decided and built (2026-07-27): `Hotel.accepting_jobs`
+  boolean (default `true`), set via `PATCH /hotels/:hotel_id`, enforced in
+  `work-requests/service.ts` `create()`. `SIR-CRM-004`/`SIR-CRM-016` resolved; `SPEC-CRM-001`
+  amended to @0.2.1, `SPEC-JOB-DISPATCH-001` to @0.3.2 (reciprocal cross-module acknowledgment).
+  Frontend hotel-admin toggle UI not yet built (out of scope for this PR).
 
 Full narrative and PR-by-PR delivery evidence for all of the above:
 [`MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md`](../implementation/MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md).
@@ -97,7 +107,8 @@ every `GD-*` ID lives only in
 | backend-chatbot | zero code, `.placeholder` only | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
 | backend-geo | zero code, `.placeholder` only | `GD-14` (geofencing/location model) |
 | backend-consent, backend-compliance, backend-retention | zero code, no module directory | `GD-17` (consent), `GD-09` (retention, external tax-advisor sign-off), compliance is read-only downstream of both |
-| Quality rating dual-writer fix + tiers/warnings/photo policy, per-hotel "pause new jobs" toggle, worker-facing analytics | see Blockers below | `GD-04` / `GD-05` / `GD-06` |
+| Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
+| Worker-facing analytics endpoint | see Blockers below | `GD-06` |
 | MFA | no data model or endpoint anywhere | `GD-08` |
 | Platform event-bus formalization | in-process singleton only | `GD-12` (zero-code decision, gates HR/EMP/Calendar/Consent event contracts) |
 | GDPR retention-tier assignment + Retention module | unbuilt | `GD-09` (external sign-off, long lead time) |
@@ -122,9 +133,7 @@ table below — not repeated here.)
 | SYNC-001 | Every module/contract/state-domain ownership assignment | No CODEOWNERS file exists; `backend/package.json` "author" is empty; every module `owner: unassigned` in the registry | Human (reserved authority) |
 | OD-EMP-12 / OQ-AUTH-08 | Org-chart/reporting-model data structure | `ADR-030` D-5 explicitly resolved only the Regional-Manager permission set, not the underlying reporting-relationship model | Human decision |
 | SIR-AUTH-022 | Cleanup of `_User_permissions_backup_20260727` | Pre-drop backup table from `ADR-031` has no tracked removal date | Scheduled migration/ticket, possibly folded into `GD-09` |
-| GD-04 | Quality rating dual-writer fix + tiers/warnings/photo policy | Correctness bug open; split recommended (ship the fix now, defer tiering as its own sub-decision) | Human (Product Owner) |
-| GD-05 | Per-hotel "pause new jobs" toggle (`REQ-CRM-008`) | Unimplemented; small, independent (`Hotel.accepting_jobs` boolean recommended) | Human (Product Owner) |
-| GD-06 | Worker-facing analytics scope | mobile-worker calls admin/manager-only `/analytics/stats`, always 403 | Human (Product Owner) |
+| GD-06 | Worker-facing analytics scope | mobile-worker calls admin/manager-only `/analytics/stats`, always 403 | Human (Product Owner) — Decided, not yet built |
 
 Governance-decision (`GD-*`) status in full, including options and ROI ranking, is tracked
 exclusively in [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md) —

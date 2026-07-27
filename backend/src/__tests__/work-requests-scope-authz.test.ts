@@ -72,8 +72,8 @@ const workRequests: Record<string, any> = {
 };
 
 const hotels: Record<string, any> = {
-  h1: { id: 'h1', deleted_at: null, hotel_group_id: 'g1' },
-  h2: { id: 'h2', deleted_at: null, hotel_group_id: 'g2' },
+  h1: { id: 'h1', deleted_at: null, accepting_jobs: true, hotel_group_id: 'g1' },
+  h2: { id: 'h2', deleted_at: null, accepting_jobs: true, hotel_group_id: 'g2' },
 };
 
 jest.mock('../config/feature-flags.js', () => ({
