@@ -126,6 +126,11 @@ export class AssignmentService extends BaseService {
       // the aggregate here — it is not the trigger's job anymore, and
       // createRating's own recompute only runs when a Rating is created,
       // which can be long after (or never, relative to) a status change.
+      // Keyed on `status` (not e.g. completed_at) because the guard above
+      // rejects any call where input.status === assignment.status — so
+      // completed_at cannot change independently of a COMPLETED transition
+      // today. If a same-status update path is ever added (e.g. correcting
+      // completed_at after the fact), this condition must be revisited.
       if (next === AssignmentStatus.COMPLETED || next === AssignmentStatus.CANCELLED) {
         await refreshWorkerOverallRating(tx, assignment.worker_id);
       }

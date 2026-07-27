@@ -155,6 +155,21 @@ describe('AssignmentService', () => {
       await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
       expect(mockWorkerOverallRating.upsert).not.toHaveBeenCalled();
     });
+
+    // GD-04 review follow-up: the COMPLETED/CANCELLED recompute condition is
+    // keyed on `status`, not on completed_at directly, because this method
+    // rejects any call that doesn't change status (see the next test) — so
+    // completed_at can never change independently of a COMPLETED transition
+    // today. If this guard is ever relaxed to allow a same-status update
+    // (e.g. correcting completed_at after the fact), the recompute condition
+    // above must be revisited, since it would then miss that path silently.
+    it('rejects a same-status update, so completed_at cannot change without also recomputing the aggregate', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED', worker_id: 'w1' }));
+      await expect(service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+      expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('list', () => {
