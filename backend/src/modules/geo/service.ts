@@ -7,34 +7,54 @@ import { haversineDistanceMeters } from './distance.js';
 import { GEOFENCE_RADIUS_METERS } from './types.js';
 import type { CheckinInput, GeoCheckinDto, ListCheckinsQuery } from './types.js';
 
+// IF-GEO-DISTANCE-CHECK's result for callers outside this module (Attendance):
+// a discriminated outcome rather than a thrown error, so a caller can tell
+// "hotel has no coordinates configured yet" (not_configured -- GD-14 leaves
+// this not-yet-applicable, not a failure) apart from "verified, and outside
+// the radius" (which a caller may choose to fail closed on).
+export type GeofenceVerification =
+  | { status: 'not_configured' }
+  | { status: 'verified'; insideRadius: boolean; distanceMeters: number; checkin: WorkerGeoCheckin };
+
 export class GeoService extends BaseService {
+  // GD-14: lets Attendance decide, before it even asks the worker's device
+  // for a location fix, whether the geofence check is applicable to this
+  // hotel at all -- without this, a worker who simply denies location
+  // permission would produce the same "no coordinates supplied" shape as a
+  // hotel that has none configured, silently bypassing the geofence.
+  async isGeofenceConfigured(hotelId: string): Promise<boolean> {
+    const hotel = await this.prisma.hotel.findUnique({
+      where: { id: hotelId },
+      select: { latitude: true, longitude: true },
+    });
+    return !!hotel && hotel.latitude !== null && hotel.longitude !== null;
+  }
+
   // ---------------------------------------------------------------------------
   // IF-GEO-DISTANCE-CHECK (TREQ-GEO-001/004/005/006, RULE-GEO-001/002/004)
   // ---------------------------------------------------------------------------
-  // GD-14/OD-GEO-003: fails closed. Missing hotel coordinates -> NotFoundError
-  // (no clock event, no coordinate write, per TREQ-GEO-006) rather than
-  // silently allowing or defaulting to "inside radius."
-  //
-  // RULE-DOC-08-equivalent: workerId is always the authenticated caller's own
-  // identity (self-scoped self-checkin), never a client-supplied field --
-  // enforced in controller.ts from req.auth.userId, mirroring Documents'
-  // provenance discipline. A manager-on-behalf-of-worker actor is not part of
-  // GD-14's confirmed scope (only self-checkin is named by TREQ-GEO-004).
-  async checkIn(
+  // Shared by GeoService.checkIn (worker-facing "Verify Location") and
+  // Attendance's check-in (GD-14 backend-attendance <-> backend-geo wiring):
+  // the single place that reads hotel coordinates, computes the haversine
+  // distance, persists the WorkerGeoCheckin row (backend-geo-owned per
+  // OD-GEO-002 -- Attendance never writes this table itself), and audit-logs
+  // the result (OD-GEO-007, never including raw lat/long per OD-GEO-005).
+  async verifyGeofence(
     workerId: string,
     input: CheckinInput,
     actorRole: string,
     actorIp?: string
-  ): Promise<GeoCheckinDto> {
+  ): Promise<GeofenceVerification> {
     const hotel = await this.prisma.hotel.findUnique({
       where: { id: input.hotel_id },
       select: { latitude: true, longitude: true },
     });
 
-    // OD-GEO-003 fail-closed: no hotel row, or coordinates not yet set
-    // (OD-GEO-004: admin-only manual entry -- may simply not be done yet).
+    // OD-GEO-004: admin-only manual entry -- coordinates may simply not be
+    // set up yet for this hotel. Not a failure; callers treat the geofence
+    // check as not-yet-applicable rather than fail-closed on it.
     if (!hotel || hotel.latitude === null || hotel.longitude === null) {
-      throw new NotFoundError('Hotel coordinates are not configured; geofence check unavailable');
+      return { status: 'not_configured' };
     }
 
     const distanceMeters = haversineDistanceMeters(
@@ -46,9 +66,7 @@ export class GeoService extends BaseService {
     const insideRadius = distanceMeters <= GEOFENCE_RADIUS_METERS;
 
     // TREQ-GEO-004: actual device coordinates are captured and stored at
-    // every check, regardless of pass/fail -- distinct from TREQ-GEO-006
-    // (Attendance's own Start/Close write, which this module does not own,
-    // is what's gated by inside_radius; this row is geo's own capture).
+    // every check, regardless of pass/fail.
     const checkin = await this.prisma.workerGeoCheckin.create({
       data: {
         worker_id: workerId,
@@ -77,7 +95,34 @@ export class GeoService extends BaseService {
       actorIp
     );
 
-    return this.toDto(checkin);
+    return { status: 'verified', insideRadius, distanceMeters, checkin };
+  }
+
+  // GD-14/OD-GEO-003: fails closed. Missing hotel coordinates -> NotFoundError
+  // (no clock event, no coordinate write, per TREQ-GEO-006) rather than
+  // silently allowing or defaulting to "inside radius." This is the
+  // worker-facing "Verify Location" endpoint's own fail-closed contract --
+  // distinct from verifyGeofence()'s not_configured outcome used by callers
+  // (Attendance) for whom the geofence check is not yet applicable.
+  //
+  // RULE-DOC-08-equivalent: workerId is always the authenticated caller's own
+  // identity (self-scoped self-checkin), never a client-supplied field --
+  // enforced in controller.ts from req.auth.userId, mirroring Documents'
+  // provenance discipline. A manager-on-behalf-of-worker actor is not part of
+  // GD-14's confirmed scope (only self-checkin is named by TREQ-GEO-004).
+  async checkIn(
+    workerId: string,
+    input: CheckinInput,
+    actorRole: string,
+    actorIp?: string
+  ): Promise<GeoCheckinDto> {
+    const result = await this.verifyGeofence(workerId, input, actorRole, actorIp);
+
+    if (result.status === 'not_configured') {
+      throw new NotFoundError('Hotel coordinates are not configured; geofence check unavailable');
+    }
+
+    return this.toDto(result.checkin);
   }
 
   // ---------------------------------------------------------------------------

@@ -310,10 +310,15 @@ export const api = {
       }),
   },
   attendance: {
-    checkIn: (assignmentId: string) =>
+    // GD-14: when coordinates are available they're sent with the check-in
+    // itself so backend-attendance can run its geofence verification
+    // (IF-GEO-DISTANCE-CHECK via backend-geo) as part of the same request —
+    // coordinates are optional here only because location permission/signal
+    // can fail on-device, not because Attendance treats them as informational.
+    checkIn: (assignmentId: string, location?: { latitude: number; longitude: number }) =>
       request<Attendance>('/attendance', {
         method: 'POST',
-        body: JSON.stringify({ assignment_id: assignmentId }),
+        body: JSON.stringify({ assignment_id: assignmentId, ...location }),
       }),
     checkOut: (attendanceId: string) =>
       request<Attendance>(`/attendance/${attendanceId}`, {

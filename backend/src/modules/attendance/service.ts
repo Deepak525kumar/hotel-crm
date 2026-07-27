@@ -2,6 +2,7 @@ import { Attendance, AttendanceStatus, OutboxSourceModule, OutboxTransport, Pris
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
+import { geoService } from '../geo/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
@@ -32,7 +33,8 @@ export class AttendanceService extends BaseService {
   async checkIn(
     input: CheckInInput,
     actorId: string,
-    actorRole: string
+    actorRole: string,
+    actorIp?: string
   ): Promise<AttendanceDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: input.assignment_id },
@@ -49,6 +51,37 @@ export class AttendanceService extends BaseService {
     if (!existing) throw new NotFoundError('Attendance record not found');
     if (existing.status !== AttendanceStatus.EXPECTED) {
       throw new ConflictError('Already checked in');
+    }
+
+    // GD-14 (SPEC-GEO-001): CRM owns hotel coordinates, Geo owns the distance
+    // verification (IF-GEO-DISTANCE-CHECK via GeoService.verifyGeofence;
+    // Attendance never recomputes the haversine distance itself). Whether
+    // location is *required* is decided from the hotel's own configuration,
+    // never from whether the client happened to send coordinates -- a worker
+    // who denies location permission on a geofenced hotel is not the same as
+    // a hotel with no geofence configured, and must not be treated as if it
+    // were (that would let denying permission silently bypass the geofence).
+    if (input.latitude !== undefined && input.longitude !== undefined) {
+      const verification = await geoService.verifyGeofence(
+        actorId,
+        { hotel_id: assignment.hotel_id, latitude: input.latitude, longitude: input.longitude },
+        actorRole,
+        actorIp
+      );
+
+      if (verification.status === 'verified' && !verification.insideRadius) {
+        await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_GEOFENCE', 'ATTENDANCE', existing.id, {
+          assignment_id: input.assignment_id,
+          distance_meters: verification.distanceMeters,
+        });
+        throw new ForbiddenError('Check-in denied: outside the hotel geofence');
+      }
+    } else if (await geoService.isGeofenceConfigured(assignment.hotel_id)) {
+      await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_GEOFENCE', 'ATTENDANCE', existing.id, {
+        assignment_id: input.assignment_id,
+        reason: 'location_not_supplied',
+      });
+      throw new ForbiddenError('Location permission is required to check in at this hotel');
     }
 
     const now = new Date();
