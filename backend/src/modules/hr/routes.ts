@@ -3,13 +3,14 @@ import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requirePermission, requireRole } from '../../middleware/permissions.js';
 import { hrController } from './controller.js';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '../documents/validation.js';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '../documents/upload-policy.js';
 import { ValidationError } from '../../lib/errors.js';
 
 // MIG-GAP-DOC-001 / RULE-HR-13 / RULE-DOC-09: the contract-scan upload is
 // "mechanically treated like any other document upload" (CRR §9) — reuses
-// the exact same MIME allowlist/size cap Documents enforces, not a
-// HR-specific policy. Memory storage only, same as documents/routes.ts.
+// Documents' declared upload policy (upload-policy.ts), not another route's
+// implementation file, and not a HR-specific policy of its own. Memory
+// storage only, same as documents/routes.ts.
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },

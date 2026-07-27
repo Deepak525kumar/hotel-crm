@@ -6,7 +6,7 @@ import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requireRole } from '../../middleware/permissions.js';
 import { documentController } from './controller.js';
-import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './validation.js';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './upload-policy.js';
 import { ValidationError } from '../../lib/errors.js';
 
 // RULE-DOC-09/REQ-DOC-017: memory storage only — bytes are handed straight to
