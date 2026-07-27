@@ -22,9 +22,9 @@ jobs" toggle, PR #239), `GD-06` (worker-scoped analytics endpoint). No blocker r
 this batch. Full options/impact detail lives only in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
-**Next up:** no MVP-blocking decision remains undecided. Remaining work is either (a) governed by a
-still-undecided `GD-*` (see Remaining Modules & Work below), or (b) frontend/mobile work to surface
-already-shipped backend contracts (e.g. `GD-05`'s hotel-admin pause-toggle UI, not yet built).
+**Next up:** no MVP-blocking decision remains undecided, and `GD-05`'s hotel-admin pause-toggle UI
+(2026-07-27, follow-up PR) is also built. Every remaining item in Remaining Modules & Work below is
+gated on a still-undecided `GD-*` — none is currently actionable without a human decision.
 
 Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
 tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
