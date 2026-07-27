@@ -49,7 +49,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-11 | Performance SLO & workload baseline | **P2** | Prod | 0 (unblocks G8) |
 | GD-12 | Platform event-bus / inter-module transport | **P2** | Post | 0 (unblocks builds) |
 | GD-13 | Cross-module state-read boundary ADR | **P3** | Post | 2–4 |
-| GD-14 | Geofencing / location model (Geo + attendance) | **P2** | Post | 6–9 |
+| GD-14 | Geofencing / location model (Geo + attendance) | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): hotel coordinates as columns on `Hotel` (`state-hotel`, `backend-crm`-owned); `backend-geo` owns worker-coordinate columns and the 6-month hard-delete retention sweep (`OD-GEO-001/002`). Fail-closed on missing hotel coordinates or a distance-check service failure (`OD-GEO-003`). Hotel coordinates are admin-only manual entry, same `HotelWriteGate` MASTER-data surface as every other `Hotel` field — no geocoding-from-address service (`OD-GEO-004`). Admin/manager may view only the computed distance/pass-fail result, never a worker's raw stored coordinates (`OD-GEO-005`). Every geofence pass/fail result is audit-logged via the existing `BaseService.logAudit()` mechanism (`OD-GEO-007`). GPS-spoofing countermeasures (`OD-GEO-009`) are explicitly NOT included in this slice — disclosed and accepted as a known MVP-scope risk, not silently omitted. `OD-GEO-006` (performance budgets) remains OPEN, non-blocking (G8 release prerequisite, same precedent as every other frozen spec's performance-budget gaps). `OD-GEO-008` is a citation correction, not a decision item. Unlocks `SPEC-GEO-001` G2 freeze and geofenced attendance Start/Close gating.**|
 | GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 |
 | GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 |
@@ -394,24 +394,51 @@ plan. Detail below is retained as the decision record.
 
 ## GD-14 — Geofencing / location model (Geo + attendance geofence)
 
-- **Why a decision is required:** The confirmed geofenced check-in/out feature has no data model and a chain
+**✅ DECIDED 2026-07-27, by the commissioning human.**
+
+- **Why a decision was required:** The confirmed geofenced check-in/out feature had no data model and a chain
   of unresolved architecture questions (where coordinates live, retention owner, fail-open/closed, who edits
   coordinates, spoofing countermeasure, who may view raw coordinates).
-- **Current repository state:** `backend/src/modules/geo` is empty; attendance has no coordinate fields or
-  radius check; `SPEC-GEO-001` is a REVIEW stub.
-- **Merges findings:** `OD-GEO-001..009` (all), `OQ-ATT-04` (check-out radius — `SIR-ATT-004`), `OQ-09`
-  (`is_verified` naming collision — `SIR-ATT-008`), coordinate-retention ownership.
-- **Options:** (a) Coordinates as columns on `Hotel` (`state-hotel`, CRM-owned) + a `backend-geo` service for
-  distance-check and worker-coordinate retention; (b) a fully separate geo state domain.
-- **Recommended:** **(a).** Hotel coordinates naturally belong to the hotel entity; a thin geo service owns
-  the ephemeral worker coordinates + 6-month sweep (Tier 1, GD-09). Fail-closed on missing coordinates is the
-  safer default but is a product call. Client coordinates are spoofable — flag that a server-side
-  countermeasure is unspecified (Constitution §6).
-- **Artifacts blocked:** geofenced attendance; Geo module; attendance check-out gating.
-- **Impact:** backend geo + attendance + crm · 2 migrations (coords + worker-coord table) · frontend hotel
-  coord entry · mobile geolocation capture (both apps). **~6–9 PRs.**
+- **Current repository state at decision time:** `backend/src/modules/geo` is empty; attendance has no
+  coordinate fields or radius check; `SPEC-GEO-001` is a REVIEW stub, `0.1.1`. Not yet built as of this
+  decision — implementation follows this record.
+- **Decided — resolves `OD-GEO-001/002/003/004/005/007`:**
+  - **`OD-GEO-001`** (coordinate storage location): **Option (a)** — hotel coordinates as columns on the
+    existing `Hotel` model (`state-hotel`, `backend-crm`-owned). Not a new separate geo-owned state domain
+    (option (b), not adopted).
+  - **`OD-GEO-002`** (retention-job / coordinate-column ownership): `backend-geo` owns the worker-coordinate
+    columns (a new, `backend-geo`-owned table/model) and the 6-month hard-delete retention sweep job (Tier 1,
+    `GD-09`'s tier framework). Not `backend-attendance`.
+  - **`OD-GEO-003`** (fail-open vs fail-closed): **Fail-closed.** Missing hotel coordinates, or a
+    distance-check service failure, disables the Start/Close clock action — never silently allows it.
+  - **`OD-GEO-004`** (who sets/edits hotel coordinates): **Admin-only manual entry**, via the same
+    `HotelWriteGate` MASTER-data surface every other `Hotel` field already uses (`frontend/components/auth/
+    RoleGate.tsx`, confirmed admin-only per D-2/D-3, PR #251). No geocoding-from-address service; a plain
+    latitude/longitude form field.
+  - **`OD-GEO-005`** (raw worker-coordinate visibility): Admin/manager may see only the **computed distance
+    and pass/fail result** of a geofence check — never a worker's raw stored latitude/longitude. Minimizes
+    exposure of precise personal location data (GDPR data-minimization), consistent with `CRR §17`'s
+    worker-facing distance-only framing extended to the manager-facing side too.
+  - **`OD-GEO-007`** (geofence pass/fail audit logging): **Yes** — every distance-check result (pass or fail)
+    is recorded via the existing `BaseService.logAudit()` mechanism every other module already uses, distinct
+    from Attendance's own `CHECK_IN`/`UPDATE_ATTENDANCE` audit rows.
+- **Explicitly NOT decided by this record (remain OPEN, non-blocking or separately tracked):**
+  - **`OD-GEO-006`** (performance budgets/SLOs for distance-check latency, retention-sweep volume/cadence):
+    remains OPEN — a G8 release-readiness prerequisite, not a freeze blocker, same precedent as every other
+    frozen spec's performance-budget gaps (e.g. `SPEC-ATT-001`, `SPEC-DOCUMENTS-001`).
+  - **`OD-GEO-008`**: a citation correction (§37→§34), not a decision item — no action required.
+  - **`OD-GEO-009`** (GPS-spoofing countermeasure): **explicitly, deliberately NOT included** in this MVP
+    slice. Client-supplied device coordinates remain a known, disclosed, accepted risk (mock-location tooling
+    can defeat the distance-check) — not a silently-omitted gap. Revisit post-MVP if abuse is observed;
+    tracked, not resolved, by this decision.
+- **Artifacts unblocked:** geofenced attendance Start/Close gating; `backend-geo` module build; `SPEC-GEO-001`
+  G2 freeze (once the spec text is updated to reflect this decision and independently re-verified, per the
+  same process `SPEC-DOCUMENTS-001`/`GD-16` followed).
+- **Impact:** backend geo + attendance + crm · 2 migrations (Hotel lat/long columns + a new worker-coordinate
+  table) · frontend hotel-coordinate entry field (admin-only) · mobile geolocation capture (both worker-app
+  and checker-app, since both clock in/out). **~6–9 PRs**, matching the original estimate.
 - **Priority:** **P2 (attendance is core, geofence is a confirmed enhancement).** **Owner:** Product Owner +
-  Architect.
+  Architect (unchanged — `SYNC-001` accountable-owner assignment remains separately open).
 
 ## GD-15 — HR & Employee-Management module build scope
 
