@@ -42,7 +42,7 @@ All references of the form `docs/09-decisions/architecture-decisions/…` were r
 - Module docs: `attendance`, `compliance`, `geo`, `consent`, `documents` (`MODULE_SPEC.md`), `contracts`, `hotels` (`README.md`)
 - `docs/14-governance/README.md` (removed stale "migrate them here" guidance)
 
-Historical narration that correctly describes the *past* move (`docs/05-execution/CHANGELOG.md`, "prior `docs/09-decisions/` → `docs/14-governance/` restructuring") was intentionally left unchanged.
+Historical narration that correctly describes the *past* move (`docs/05-execution/CHANGELOG.md`, "prior `docs/09-decisions/` → `docs/14-governance/` restructuring") was intentionally left unchanged. **Note (2026-07-27):** `docs/05-execution/CHANGELOG.md` was subsequently deleted as part of the `docs/05-execution/` consolidation into `EXECUTION_DASHBOARD.md`/`RELEASE_STATUS.md`; this audit report is frozen historical evidence of the state at the time it was written and its citation is not updated — the deleted file's content remains recoverable via `git log`/`git show`.
 
 ### 3.3 Repaired DECISION_INDEX and broken ADR references
 `DECISION_INDEX.md` now links to the 18 restored files at the canonical path; all Pending-Decision-Record evidence links that cited the old path were repaired.
