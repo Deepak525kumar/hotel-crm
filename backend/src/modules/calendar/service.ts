@@ -98,13 +98,24 @@ export class CalendarService extends BaseService {
   ): Promise<AvailabilityDto> {
     const isSelf = actor.userId === workerId;
 
-    if (!isSelf && actor.role !== 'admin' && actor.role !== 'checker') {
-      // Permission matrix (MODULE_SPEC.md): Hotel Manager (their hotel),
+    if (!isSelf && actor.role !== 'admin') {
+      // Permission matrix (MODULE_SPEC.md:226): Hotel Manager (their hotel),
       // Regional Manager (their group) -- both resolved via the worker's
       // EmploymentRecord.hotel_group_id, same primitive HR/Attendance use
-      // for group-grain worker scoping (lib/scope.ts). Any other role
-      // (worker reading someone else, or a role with no scope claim at all)
-      // denies -- the permission matrix grants no other role this read.
+      // for group-grain worker scoping (lib/scope.ts).
+      //
+      // Checker is deliberately NOT given a cross-hotel bypass here, unlike
+      // resolveHotelAccess()'s admin/checker bypass for *hotel*-scoped
+      // operations. That bypass exists because a checker's quality-review
+      // work is legitimately cross-hotel; this permission is worker-centric,
+      // not hotel-centric, and the spec's own matrix marks it "checker:
+      // (scope)" -- an unspecified scope construct, not "(all)" like admin --
+      // while the sibling "View a worker's calendar" row marks checker
+      // `[OPEN]` outright (OD-CAL-07 is silent on what a checker's worker-
+      // scope would even mean). No checker-specific scope model exists
+      // anywhere in this codebase to resolve "(scope)" against, so this
+      // denies checker rather than guessing at one via an unrelated
+      // domain's bypass -- fail closed on an open decision, not open.
       if (actor.role !== 'manager' && actor.role !== 'regional_manager') {
         throw new ForbiddenError("Cannot read this worker's availability");
       }

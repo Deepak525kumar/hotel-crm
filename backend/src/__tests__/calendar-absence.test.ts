@@ -353,10 +353,16 @@ describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', (
       ).resolves.toBeDefined();
     });
 
-    it('allows checker unconditionally, cross-hotel (mirrors resolveHotelAccess\'s admin/checker bypass)', async () => {
+    // MODULE_SPEC.md's own matrix marks checker "(scope)" here, not "(all)"
+    // like admin -- and no checker-scope model exists anywhere in this
+    // codebase to resolve that against. This must NOT reuse
+    // resolveHotelAccess()'s admin/checker cross-hotel bypass, which exists
+    // for a different (hotel-centric, quality-review) reason; denying here
+    // is failing closed on an open decision, not a gap.
+    it('denies checker (no checker-scope model exists; spec marks this "(scope)", not "(all)")', async () => {
       await expect(
         service.getAvailability('w1', { userId: 'c1', role: 'checker' })
-      ).resolves.toBeDefined();
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
     it('allows a manager whose scope covers the worker\'s Hotel Group', async () => {

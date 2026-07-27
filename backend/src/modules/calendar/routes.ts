@@ -34,8 +34,11 @@ router.post('/my-absences', (req, res, next) => calendarController.markAbsence(r
 // RESOLVED"): no route-level role gate -- worker_id defaults to the caller
 // (self-scope is itself the authorization, same as /my-absences above), and
 // CalendarService.getAvailability() enforces the read-model's own permission
-// matrix (self; admin/checker cross-hotel; manager/regional_manager via the
-// worker's EmploymentRecord.hotel_group_id) for every other worker_id.
+// matrix (self; admin all; manager/regional_manager via the worker's
+// EmploymentRecord.hotel_group_id) for every other worker_id. Checker is
+// deliberately denied for any worker but itself, NOT given the cross-hotel
+// bypass checkHotelAccess() grants it elsewhere -- see the service method's
+// own comment for why that bypass doesn't transfer to this permission.
 router.get('/availability', (req, res, next) => calendarController.getAvailability(req, res, next));
 
 export default router;
