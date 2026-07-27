@@ -126,12 +126,8 @@ describe('AssignmentService', () => {
       expect(data.cancellation_reason).toBe('sick');
     });
 
-    // GD-04 (architecture-review finding AR-1): a status transition via this
-    // endpoint mutates exactly the fields WorkerOverallRating derives
-    // total_assignments/completion_rate/on_time_rate/last_worked_at from.
-    // Since the DB trigger that used to (partially) cover this was dropped
-    // (20260727020000_drop_rating_overall_trigger), the app must recompute
-    // the aggregate itself on any transition that affects those fields.
+    // GD-04: this endpoint mutates the fields WorkerOverallRating derives
+    // from, so it must recompute the aggregate itself (see SIR-QUAL-005).
     it('refreshes WorkerOverallRating when a transition completes the assignment', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS', worker_id: 'w1' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
@@ -156,16 +152,8 @@ describe('AssignmentService', () => {
       expect(mockWorkerOverallRating.upsert).not.toHaveBeenCalled();
     });
 
-    // GD-04 review follow-up: the COMPLETED/CANCELLED recompute condition is
-    // keyed on `status`, not on completed_at directly, because
-    // SPEC-JOB-DISPATCH-001 RULE-008/REQ-040 (FROZEN @0.3.1) make "no-op
-    // transition -> ConflictError" and "terminal states" domain rules, not
-    // an implementation accident — this guard is this repo's enforcement of
-    // that rule. A same-status "correction" path (e.g. editing completed_at
-    // without a status change) would itself require amending the FROZEN
-    // spec first, which routes through Requirements/Documentation/
-    // Specification-Freeze gates — the mechanism that should force this
-    // recompute condition to be revisited, not an implicit code coupling.
+    // Pins SPEC-JOB-DISPATCH-001's RULE-008/REQ-040 terminal-state rule —
+    // see SIR-JOBD-007 for why this makes the GD-04 recompute condition safe.
     it('rejects a same-status update, so completed_at cannot change without also recomputing the aggregate', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED', worker_id: 'w1' }));
       await expect(service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager')).rejects.toMatchObject({

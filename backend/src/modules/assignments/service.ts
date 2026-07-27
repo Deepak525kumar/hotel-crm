@@ -121,21 +121,12 @@ export class AssignmentService extends BaseService {
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.workerAssignment.update({ where: { id }, data });
 
-      // GD-04: status transitions that affect completion_rate/on_time_rate/
-      // last_worked_at (WorkerOverallRating's derived fields) must recompute
-      // the aggregate here — it is not the trigger's job anymore, and
-      // createRating's own recompute only runs when a Rating is created,
-      // which can be long after (or never, relative to) a status change.
-      // Keyed on `status`, not on completed_at directly: SPEC-JOB-DISPATCH-001
-      // RULE-008/REQ-040 (FROZEN @0.3.1) make "no-op transition -> ConflictError"
-      // and "timestamps set per transition target" domain rules, not an
-      // implementation accident — COMPLETED/CANCELLED are specified as
-      // terminal, and no requirement anywhere describes a same-status
-      // correction/admin-override/import path for completed_at. A future
-      // requirement introducing one would itself amend this FROZEN spec and
-      // go through Requirements -> Documentation -> Specification-Freeze
-      // gates — that gate is what should force this condition to be
-      // revisited, not a comment here.
+      // GD-04: not the trigger's job anymore — recompute WorkerOverallRating
+      // here on any status change that affects it.
+      // Keyed on `status` rather than `completed_at` because
+      // SPEC-JOB-DISPATCH-001 (RULE-008, REQ-040) defines COMPLETED/CANCELLED
+      // as terminal states and rejects same-status transitions. If the
+      // specification changes, revisit this condition (SIR-JOBD-007).
       if (next === AssignmentStatus.COMPLETED || next === AssignmentStatus.CANCELLED) {
         await refreshWorkerOverallRating(tx, assignment.worker_id);
       }
