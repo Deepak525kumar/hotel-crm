@@ -11,6 +11,7 @@ import {
   TransportRegistry,
 } from './modules/notifications/outbox-transport.js';
 import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
+import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -30,6 +31,10 @@ import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
  * job registered on the Scheduler — expired Session rows (SIR-AUTH-014)
  * and expired/used PasswordResetToken rows (SIR-AUTH-018), on a
  * configuration-driven interval (default hourly).
+ *
+ * GD-14/OD-GEO-002 (SPEC-GEO-001): the geo retention sweep hard-deletes
+ * WorkerGeoCheckin rows older than 6 months (GDPR Tier 1), on a
+ * configuration-driven interval (default daily).
  */
 async function main() {
   try {
@@ -60,13 +65,21 @@ async function main() {
         })
       );
 
-    const scheduler = new Scheduler().register(
-      new SessionSweepJob(prisma, {
-        intervalMs: env.SESSION_SWEEP_INTERVAL_MS,
-        batchSize: env.SESSION_SWEEP_BATCH_SIZE,
-        maxBatchesPerRun: env.SESSION_SWEEP_MAX_BATCHES_PER_RUN,
-      })
-    );
+    const scheduler = new Scheduler()
+      .register(
+        new SessionSweepJob(prisma, {
+          intervalMs: env.SESSION_SWEEP_INTERVAL_MS,
+          batchSize: env.SESSION_SWEEP_BATCH_SIZE,
+          maxBatchesPerRun: env.SESSION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      )
+      .register(
+        new GeoRetentionSweepJob(prisma, {
+          intervalMs: env.GEO_RETENTION_SWEEP_INTERVAL_MS,
+          batchSize: env.GEO_RETENTION_SWEEP_BATCH_SIZE,
+          maxBatchesPerRun: env.GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      );
 
     const worker = new OutboxWorker(
       new OutboxRepository(prisma),

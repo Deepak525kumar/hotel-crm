@@ -292,6 +292,9 @@ model User {
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
   employment_record           EmploymentRecord?         @relation("employment_record")
   blocklist_entries_authored  EmployeeBlocklistEntry[]  @relation("blocklist_author")
+  // GD-14/OD-GEO-002 (SPEC-GEO-001): backend-geo owns worker-coordinate
+  // capture + the 6-month retention sweep (Tier 1, CRR §25).
+  geo_checkins                 WorkerGeoCheckin[]        @relation("geo_checkin_worker")
   // ADR-028: manager-entered "rooms completed" daily count, per worker's
   // full-day WorkerAssignment — no room-level task layer implied.
   rooms_completed_as_worker   RoomsCompletedEntry[]     @relation("rooms_completed_worker")
@@ -377,6 +380,13 @@ model Hotel {
   // work-request creation, not a role/scope gate — checked in addition to
   // is_active/deleted_at, not instead of them.
   accepting_jobs Boolean  @default(true)
+  // GD-14/OD-GEO-001 (SPEC-GEO-001): the hotel-coordinate source of truth,
+  // kept as columns on Hotel (state-hotel, backend-crm-owned), not a
+  // separate backend-geo-owned domain. Nullable: most hotels have none set
+  // yet; backend-geo's distance-check fails closed (OD-GEO-003) when either
+  // is null. Admin-only manual entry (OD-GEO-004) — no geocoding service.
+  latitude      Float?
+  longitude     Float?
   deleted_at    DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
@@ -401,6 +411,9 @@ model Hotel {
   blocklist_entries EmployeeBlocklistEntry[] @relation("hotel_blocklist")
   // ADR-028: manager-entered "rooms completed" daily counts for this hotel.
   rooms_completed_entries RoomsCompletedEntry[]
+  // GD-14/OD-GEO-002 (SPEC-GEO-001): worker geofence checks against this
+  // hotel's coordinates (backend-geo-owned, read-only from CRM's side).
+  geo_checkins            WorkerGeoCheckin[]
 
   @@index([country])
   @@index([is_active])
@@ -937,4 +950,45 @@ model CalendarAbsence {
   @@unique([worker_id, day])
   @@index([worker_id])
   @@index([day])
+}
+
+// =============================================================================
+// GEO MODULE (SPEC-GEO-001 @0.1.2 FROZEN, GD-14 Decided 2026-07-27)
+// =============================================================================
+
+// state-worker-geo-checkin (SPEC-GEO-001 TREQ-GEO-004/005, RULE-GEO-004):
+// backend-geo-owned (OD-GEO-002) -- the ONLY module that writes/reads this
+// model. Distinct from Hotel.latitude/longitude (backend-crm-owned,
+// OD-GEO-001) and from Attendance's own CHECK_IN/UPDATE_ATTENDANCE record --
+// this row is the captured device coordinate + computed distance for one
+// geofence check, not an attendance-state transition (backend-attendance
+// remains sole owner of that, unmodified by this module).
+//
+// RULE-GEO-003/OD-GEO-005: raw latitude/longitude are stored here but MUST
+// NEVER be returned by any admin/manager-facing API -- only distance_meters
+// and inside_radius are exposed cross-role. Enforced in service.ts's DTO
+// mapping, not by the schema itself.
+model WorkerGeoCheckin {
+  id              String   @id @default(cuid())
+  worker_id       String
+  worker          User     @relation("geo_checkin_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  hotel_id        String
+  hotel           Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  // Raw device coordinates (RULE-GEO-002: sampled only at this single check,
+  // never continuous/background). Personal location data -- GDPR Tier 1.
+  latitude        Float
+  longitude       Float
+  // Computed at write time (RULE-GEO-001): distance_meters is exposed to
+  // admin/manager; latitude/longitude above are not (OD-GEO-005).
+  distance_meters Float
+  inside_radius   Boolean
+  checked_at      DateTime @default(now())
+
+  // RULE-GEO-004/TREQ-GEO-005: 6-month hard-delete retention sweep scans on
+  // checked_at, not created_at, to match "6 months after capture" precisely
+  // (the two are identical at write time, but checked_at is the
+  // spec-cited field).
+  @@index([worker_id])
+  @@index([hotel_id])
+  @@index([checked_at])
 }

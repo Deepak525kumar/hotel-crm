@@ -173,6 +173,15 @@ const envSchema = z.object({
   // never-swept backlog on first deploy turns out to need faster
   // convergence than the default allows).
   SESSION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
+
+  // GD-14/OD-GEO-002 (SPEC-GEO-001): WorkerGeoCheckin 6-month hard-delete
+  // retention sweep on the Platform Worker, same config-driven convention as
+  // the session sweep above. Default interval: daily (this data ages out
+  // over months, not hours, so a tighter poll than SESSION_SWEEP's hourly
+  // default isn't warranted).
+  GEO_RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
+  GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 });
 
 type Env = z.infer<typeof envSchema>;
