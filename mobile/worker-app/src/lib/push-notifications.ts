@@ -78,6 +78,13 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
  * Returns an unsubscribe function; call once from the signed-in app's root
  * layout (mirrors registerForPushNotificationsAsync's placement) and clean
  * up on unmount.
+ *
+ * Duplicated verbatim in mobile/checker-app/src/lib/push-notifications.ts
+ * (two independent Expo apps, no shared package between them today). Not
+ * worth extracting yet for one call site each. If a future change adds
+ * per-type deep links, notification categories, or other behavior beyond
+ * this, consider extracting a shared mobile package at that point rather
+ * than editing both copies again.
  */
 export function subscribeToPushNotifications(router: Router): () => void {
   // Foreground behavior: show the OS banner/sound/badge even while the app
