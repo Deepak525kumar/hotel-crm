@@ -77,6 +77,23 @@ export class AnalyticsController {
     }
   }
 
+  // GD-06: worker-scoped analytics — server-scoped to req.auth.userId, never
+  // a client-supplied id. Any authenticated role may call this; it is
+  // inherently self-scoped, not an admin/manager permission check.
+  async getMyStats(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await analyticsService.getWorkerStats(req.auth.userId);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getHotelSummary(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await analyticsService.getHotelSummary(req.params.hotel_id);

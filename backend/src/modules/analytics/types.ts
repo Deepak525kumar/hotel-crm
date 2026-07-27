@@ -48,6 +48,23 @@ export interface DashboardStats {
   };
 }
 
+// GD-06: worker-scoped analytics (own stats only). A distinct shape from
+// DashboardStats, not a filtered subset — the fields available at worker
+// scope aren't the same as at hotel/admin scope. Warning counts and
+// sick/vacation counts are explicitly deferred (need GD-04's tiers and
+// GD-18's Calendar respectively).
+export interface WorkerStats {
+  completed_assignments: number;
+  rooms_completed: number;
+  average_rating: number | null;
+  attendance: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+  };
+}
+
 export interface HotelSummary {
   hotel_id: string;
   open_requests: {

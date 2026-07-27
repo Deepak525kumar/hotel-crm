@@ -32,6 +32,12 @@ router.get(
   requirePermission('analytics:read'),
   (req, res, next) => analyticsController.getDashboardStats(req, res, next)
 );
+// GD-06: worker-scoped, self-only — any authenticated role, no
+// admin/manager permission gate. Deliberately does not ride /stats' guard.
+router.get(
+  '/my-stats',
+  (req, res, next) => analyticsController.getMyStats(req, res, next)
+);
 router.get(
   '/hotel-summary/:hotel_id',
   requireRole(['admin', 'manager', 'regional_manager']),

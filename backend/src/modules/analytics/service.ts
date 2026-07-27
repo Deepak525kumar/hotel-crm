@@ -5,7 +5,7 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { DashboardStats, HotelSummary, LeaderboardEntry } from './types.js';
+import { DashboardStats, HotelSummary, LeaderboardEntry, WorkerStats } from './types.js';
 
 interface OverallRatingRow {
   worker_id: string;
@@ -202,6 +202,53 @@ export class AnalyticsService extends BaseService {
           (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
             .rooms_completed ?? 0,
         entries: (roomsCompletedAgg as { _count: number })._count,
+      },
+    };
+  }
+
+  // GD-06: worker-scoped analytics (own stats only), resolving the
+  // mobile-worker dashboard's previously-silent 403 against the
+  // admin/manager-only /stats route. Server-scoped to workerId — the caller
+  // (controller) must pass only req.auth.userId, never a client-supplied id.
+  async getWorkerStats(workerId: string): Promise<WorkerStats> {
+    const [completedAssignments, roomsCompletedAgg, overallRating, attendanceByStatus, totalAttendance] =
+      await Promise.all([
+        this.prisma.workerAssignment.count({
+          where: { worker_id: workerId, status: AssignmentStatus.COMPLETED },
+        }),
+        this.prisma.roomsCompletedEntry.aggregate({
+          where: { worker_id: workerId },
+          _sum: { rooms_completed: true },
+        }),
+        this.prisma.workerOverallRating.findUnique({
+          where: { worker_id: workerId },
+          select: { average_score: true },
+        }),
+        this.prisma.attendance.groupBy({
+          by: ['status'],
+          where: { worker_id: workerId },
+          _count: { id: true },
+        }),
+        this.prisma.attendance.count({ where: { worker_id: workerId } }),
+      ]);
+
+    const attMap = new Map(
+      (attendanceByStatus as Array<{ status: AttendanceStatus; _count: { id: number } }>).map(
+        (a) => [a.status, a._count.id]
+      )
+    );
+
+    return {
+      completed_assignments: completedAssignments,
+      rooms_completed:
+        (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
+          .rooms_completed ?? 0,
+      average_rating: overallRating?.average_score ?? null,
+      attendance: {
+        total: totalAttendance,
+        present: attMap.get(AttendanceStatus.PRESENT) ?? 0,
+        late: attMap.get(AttendanceStatus.LATE) ?? 0,
+        absent: attMap.get(AttendanceStatus.ABSENT) ?? 0,
       },
     };
   }

@@ -50,9 +50,10 @@ jest.mock('../middleware/auth.js', () => ({
 const getLeaderboard = jest.fn(async () => []) as jest.MockedFunction<(...args: any[]) => any>;
 const getDashboardStats = jest.fn(async () => ({})) as jest.MockedFunction<(...args: any[]) => any>;
 const getHotelSummary = jest.fn(async () => ({})) as jest.MockedFunction<(...args: any[]) => any>;
+const getWorkerStats = jest.fn(async () => ({})) as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../modules/analytics/service.js', () => ({
-  analyticsService: { getLeaderboard, getDashboardStats, getHotelSummary },
+  analyticsService: { getLeaderboard, getDashboardStats, getHotelSummary, getWorkerStats },
 }));
 
 import express from 'express';
@@ -110,5 +111,39 @@ describe('Analytics bare-route scope (ADR-030 PR-4)', () => {
     const res = await request(makeApp()).get('/analytics/leaderboard');
     expect(res.status).toBe(200);
     expect(getLeaderboard).toHaveBeenCalledWith(undefined, undefined);
+  });
+
+  it('rejects /stats for a worker (admin/manager/regional_manager only)', async () => {
+    testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+    const res = await request(makeApp()).get('/analytics/stats');
+    expect(res.status).toBe(403);
+  });
+});
+
+describe('Analytics /my-stats (GD-06) — self-scoped, any authenticated role', () => {
+  beforeEach(() => {
+    testAuth = null;
+    getWorkerStats.mockClear();
+  });
+
+  it('scopes to the caller\'s own userId — never a client-supplied worker id, and ignores any attempt to pass one', async () => {
+    testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+    const res = await request(makeApp()).get('/analytics/my-stats?worker_id=w2&userId=w2');
+    expect(res.status).toBe(200);
+    expect(getWorkerStats).toHaveBeenCalledWith('w1');
+    expect(getWorkerStats).not.toHaveBeenCalledWith('w2');
+  });
+
+  it('permits any authenticated role, not just admin/manager', async () => {
+    testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
+    const res = await request(makeApp()).get('/analytics/my-stats');
+    expect(res.status).toBe(200);
+    expect(getWorkerStats).toHaveBeenCalledWith('a1');
+  });
+
+  it('rejects when unauthenticated', async () => {
+    testAuth = null;
+    const res = await request(makeApp()).get('/analytics/my-stats');
+    expect(res.status).toBe(401);
   });
 });

@@ -8,6 +8,7 @@ import type {
   Notification,
   LeaderboardEntry,
   DashboardStats,
+  WorkerStats,
   PushToken,
   PushPlatform,
   PushApp,
@@ -340,5 +341,7 @@ export const api = {
   analytics: {
     stats: () => request<DashboardStats>('/analytics/stats'),
     leaderboard: () => request<LeaderboardEntry[]>('/analytics/leaderboard'),
+    // GD-06: resolves the previously-silent 403 — /stats is admin/manager-only.
+    myStats: () => request<WorkerStats>('/analytics/my-stats'),
   },
 };
