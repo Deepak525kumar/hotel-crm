@@ -200,6 +200,97 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
     });
   });
 
+  describe('isGeofenceConfigured — GD-14 lets Attendance require location upfront', () => {
+    it('returns false when the hotel has no coordinates', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: null, longitude: null });
+      await expect(service.isGeofenceConfigured('h1')).resolves.toBe(false);
+    });
+
+    it('returns false when the hotel does not exist', async () => {
+      mockHotelFindUnique.mockResolvedValue(null);
+      await expect(service.isGeofenceConfigured('missing')).resolves.toBe(false);
+    });
+
+    it('returns true when both coordinates are set', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
+      await expect(service.isGeofenceConfigured('h1')).resolves.toBe(true);
+    });
+  });
+
+  describe('verifyGeofence — GD-14 shared interface for Attendance', () => {
+    it('returns not_configured instead of throwing when hotel coordinates are missing', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: null, longitude: null });
+
+      const result = await service.verifyGeofence(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+        'worker'
+      );
+
+      expect(result).toEqual({ status: 'not_configured' });
+      expect(mockWorkerGeoCheckinCreate).not.toHaveBeenCalled();
+    });
+
+    it('returns verified with insideRadius=true and persists/audits the same as checkIn()', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
+      mockWorkerGeoCheckinCreate.mockResolvedValue({
+        id: 'c1',
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        distance_meters: 5,
+        inside_radius: true,
+        checked_at: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      const result = await service.verifyGeofence(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.52001, longitude: 13.405 },
+        'worker'
+      );
+
+      expect(result.status).toBe('verified');
+      if (result.status === 'verified') {
+        expect(result.insideRadius).toBe(true);
+        expect(result.checkin.id).toBe('c1');
+      }
+      expect(mockAuditLogCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns verified with insideRadius=false when outside the radius, still persisting the check-in', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
+      mockWorkerGeoCheckinCreate.mockResolvedValue({
+        id: 'c2',
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        distance_meters: 5000,
+        inside_radius: false,
+        checked_at: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      const result = await service.verifyGeofence(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.57, longitude: 13.405 },
+        'worker'
+      );
+
+      expect(result.status).toBe('verified');
+      if (result.status === 'verified') {
+        expect(result.insideRadius).toBe(false);
+      }
+      expect(mockWorkerGeoCheckinCreate).toHaveBeenCalled();
+    });
+  });
+
+  describe('checkIn — still delegates to verifyGeofence with unchanged fail-closed contract', () => {
+    it('still throws NotFoundError (not the not_configured discriminant) for its own endpoint', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: null, longitude: null });
+
+      await expect(
+        service.checkIn('w1', { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 }, 'worker')
+      ).rejects.toBeInstanceOf(NotFoundError);
+    });
+  });
+
   describe('listCheckins — OD-GEO-005 access scoping', () => {
     beforeEach(() => {
       mockWorkerGeoCheckinFindMany.mockResolvedValue([]);

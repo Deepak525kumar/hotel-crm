@@ -17,7 +17,8 @@ export async function checkIn(req: Request, res: Response, next: NextFunction): 
     const result = await attendanceService.checkIn(
       parsed.data,
       req.auth!.userId,
-      req.auth!.role
+      req.auth!.role,
+      req.ip
     );
     res.status(201).json({
       status: 'success',

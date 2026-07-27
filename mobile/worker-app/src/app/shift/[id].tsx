@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { api, ApiError } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
-import type { WorkerAssignment, Attendance, GeoCheckin } from '@/types/api';
+import type { WorkerAssignment, Attendance } from '@/types/api';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -25,8 +25,6 @@ export default function ShiftDetailScreen() {
   const [att, setAtt] = useState<Attendance | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState(false);
-  const [checkingLocation, setCheckingLocation] = useState(false);
-  const [geoResult, setGeoResult] = useState<GeoCheckin | null>(null);
 
   // AssignmentDto does not embed attendance, so resolve it by assignment_id.
   // This survives app restart / navigation / reload because it is fetched
@@ -53,52 +51,40 @@ export default function ShiftDetailScreen() {
     ]).finally(() => setLoading(false));
   }, [id]);
 
+  // GD-14 (SPEC-GEO-001 TREQ-GEO-001/002/003): location is sampled as part of
+  // Check In itself and sent with the same request, so backend-attendance's
+  // geofence verification (IF-GEO-DISTANCE-CHECK via backend-geo) runs before
+  // the check-in is committed -- there is no separate "Verify Location" step.
+  // Location is sampled once per tap, never continuously (RULE-GEO-002) -- no
+  // background/watch API is used. If location can't be obtained (permission
+  // denied, no signal), the check-in request is still sent without
+  // coordinates -- backend-attendance is the actual enforcement point and
+  // will reject it with a clear message if this hotel has a geofence
+  // configured (denying permission must not bypass the geofence); if the
+  // hotel has none configured, the same omission is accepted as before.
   const handleCheckIn = async () => {
     if (!shift) return;
     setActing(true);
     try {
-      await api.attendance.checkIn(shift.id);
+      let location: { latitude: number; longitude: number } | undefined;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const position = await Location.getCurrentPositionAsync({});
+          location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        }
+      } catch {
+        // Location sampling failed -- fall through; backend decides whether
+        // this hotel requires it.
+      }
+
+      await api.attendance.checkIn(shift.id, location);
       await reload();
       Alert.alert('Checked In', 'You have successfully checked in.');
     } catch (err) {
       Alert.alert('Error', err instanceof ApiError ? err.message : 'Check-in failed.');
     } finally {
       setActing(false);
-    }
-  };
-
-  // GD-14 (SPEC-GEO-001 TREQ-GEO-001/002/003): standalone geofence
-  // verification -- informational only, does NOT gate handleCheckIn/
-  // handleCheckOut above. backend-attendance's own checkIn() has no
-  // coordinate field and no interface to call into backend-geo yet
-  // (IF-GEO-DISTANCE-CHECK's contract into Attendance is "not yet
-  // authored" per SPEC-GEO-001) -- wiring the two together is out of this
-  // slice's scope. Location is sampled only when this button is pressed,
-  // never continuously (RULE-GEO-002) -- no background/watch API is used.
-  const handleVerifyLocation = async () => {
-    const wr = shift?.work_request;
-    if (!wr?.hotel_id) return;
-
-    setCheckingLocation(true);
-    setGeoResult(null);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Location permission needed', 'Enable location access to verify you are at the hotel.');
-        return;
-      }
-
-      const position = await Location.getCurrentPositionAsync({});
-      const result = await api.geo.checkIn({
-        hotel_id: wr.hotel_id,
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      });
-      setGeoResult(result);
-    } catch (err) {
-      Alert.alert('Error', err instanceof ApiError ? err.message : 'Could not verify location.');
-    } finally {
-      setCheckingLocation(false);
     }
   };
 
@@ -185,34 +171,6 @@ export default function ShiftDetailScreen() {
             ) : null}
           </ThemedView>
 
-          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-            Location
-          </ThemedText>
-          <ThemedView type="backgroundElement" style={styles.section}>
-            <InfoRow
-              label="Geofence"
-              value={
-                geoResult
-                  ? `${geoResult.inside_radius ? 'At hotel' : 'Not at hotel'} (~${Math.round(geoResult.distance_meters)}m)`
-                  : 'Not checked yet'
-              }
-            />
-          </ThemedView>
-          <Pressable
-            onPress={handleVerifyLocation}
-            disabled={checkingLocation}
-            style={({ pressed }) => [
-              styles.verifyLocationBtn,
-              { opacity: pressed || checkingLocation ? 0.7 : 1 },
-            ]}
-          >
-            {checkingLocation ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText type="smallBold" style={styles.btnText}>Verify Location</ThemedText>
-            )}
-          </Pressable>
-
           {canCheckIn && (
             <Pressable
               onPress={handleCheckIn}
@@ -253,7 +211,6 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   divider: { height: 1, backgroundColor: '#E0E1E6', marginHorizontal: Spacing.three },
   sectionLabel: { marginBottom: Spacing.two, textTransform: 'uppercase', letterSpacing: 0.8 },
-  verifyLocationBtn: { backgroundColor: '#3182CE', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
   checkInBtn: { backgroundColor: '#38A169', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.two },
   checkOutBtn: { backgroundColor: '#DD6B20', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
   btnText: { color: '#fff' },

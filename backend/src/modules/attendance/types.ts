@@ -1,9 +1,17 @@
 import { z } from 'zod';
 import { AttendanceStatus } from '@prisma/client';
 
+// GD-14: latitude/longitude are optional -- Attendance's geofence
+// verification only runs when a caller supplies both (mobile's
+// "Verify Location" wiring is a later slice; omitting them preserves prior
+// check-in behavior exactly, per TREQ-ATT-GEO-001).
 export const CheckInSchema = z.object({
   assignment_id: z.string(),
   notes: z.string().max(1000).optional(),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+}).refine((d) => (d.latitude === undefined) === (d.longitude === undefined), {
+  message: 'latitude and longitude must both be provided together',
 });
 
 export const UpdateAttendanceSchema = z

@@ -33,7 +33,13 @@ const mockPrisma = {
 mockNotification.create.mockResolvedValue({ id: 'notif-default' });
 mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
+const mockVerifyGeofence = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockIsGeofenceConfigured = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+jest.mock('../modules/geo/service.js', () => ({
+  geoService: { verifyGeofence: mockVerifyGeofence, isGeofenceConfigured: mockIsGeofenceConfigured },
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -73,6 +79,8 @@ describe('AttendanceService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AttendanceService();
+    mockVerifyGeofence.mockReset();
+    mockIsGeofenceConfigured.mockReset();
   });
 
   describe('checkIn', () => {
@@ -118,6 +126,127 @@ describe('AttendanceService', () => {
       const updateCall = mockAttendance.update.mock.calls[0][0].data;
       expect(updateCall.status).toBe('LATE');
       expect(updateCall.minutes_late).toBeGreaterThan(0);
+    });
+  });
+
+  describe('checkIn — GD-14 geofence verification (SPEC-GEO-001 wiring)', () => {
+    it('proceeds without calling Geo\'s distance check when no coordinates are supplied and the hotel has no geofence configured', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockIsGeofenceConfigured.mockResolvedValue(false);
+
+      await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
+
+      expect(mockIsGeofenceConfigured).toHaveBeenCalledWith('h1');
+      expect(mockVerifyGeofence).not.toHaveBeenCalled();
+      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails closed when no coordinates are supplied but the hotel HAS a geofence configured (no permission-denial bypass)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockIsGeofenceConfigured.mockResolvedValue(true);
+
+      await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+
+      expect(mockVerifyGeofence).not.toHaveBeenCalled();
+      expect(mockAttendance.update).not.toHaveBeenCalled();
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'CHECK_IN_DENIED_GEOFENCE',
+            resource_type: 'ATTENDANCE',
+          }),
+        })
+      );
+    });
+
+    it('proceeds with check-in when the hotel has no coordinates configured (not_configured)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockVerifyGeofence.mockResolvedValue({ status: 'not_configured' });
+
+      await service.checkIn({ assignment_id: 'a1', latitude: 52.52, longitude: 13.405 }, 'w1', 'worker');
+
+      expect(mockVerifyGeofence).toHaveBeenCalledWith(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+        'worker',
+        undefined
+      );
+      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('proceeds with check-in when verified inside the geofence radius', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: true, distanceMeters: 5 });
+
+      const result = await service.checkIn(
+        { assignment_id: 'a1', latitude: 52.52, longitude: 13.405 },
+        'w1',
+        'worker'
+      );
+
+      expect(result.status).toBe('PRESENT');
+      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('fails closed with ForbiddenError when verified outside the geofence radius', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: false, distanceMeters: 5000 });
+
+      await expect(
+        service.checkIn({ assignment_id: 'a1', latitude: 52.57, longitude: 13.405 }, 'w1', 'worker')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+      expect(mockAttendance.update).not.toHaveBeenCalled();
+    });
+
+    it('audit-logs a denied check-in without writing the attendance record', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: false, distanceMeters: 5000 });
+
+      await expect(
+        service.checkIn({ assignment_id: 'a1', latitude: 52.57, longitude: 13.405 }, 'w1', 'worker')
+      ).rejects.toBeTruthy();
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'CHECK_IN_DENIED_GEOFENCE',
+            resource_type: 'ATTENDANCE',
+          }),
+        })
+      );
+    });
+
+    it('passes the actor IP through to Geo for audit logging', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: true, distanceMeters: 5 });
+
+      await service.checkIn(
+        { assignment_id: 'a1', latitude: 52.52, longitude: 13.405 },
+        'w1',
+        'worker',
+        '203.0.113.7'
+      );
+
+      expect(mockVerifyGeofence).toHaveBeenCalledWith(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+        'worker',
+        '203.0.113.7'
+      );
     });
   });
 
