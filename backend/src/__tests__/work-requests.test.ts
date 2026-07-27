@@ -136,7 +136,7 @@ describe('WorkRequestService', () => {
     it('GD-05: rejects creation when the hotel has paused accepting_jobs', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: false });
       await expect(service.create(baseInput, { userId: 'mgr1', role: 'admin' })).rejects.toMatchObject({
-        name: 'ForbiddenError',
+        name: 'ConflictError',
       });
       expect(mockWorkRequest.create).not.toHaveBeenCalled();
     });
