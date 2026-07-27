@@ -112,10 +112,11 @@ export class CalendarService extends BaseService {
       // (scope)" -- an unspecified scope construct, not "(all)" like admin --
       // while the sibling "View a worker's calendar" row marks checker
       // `[OPEN]` outright (OD-CAL-07 is silent on what a checker's worker-
-      // scope would even mean). No checker-specific scope model exists
-      // anywhere in this codebase to resolve "(scope)" against, so this
-      // denies checker rather than guessing at one via an unrelated
-      // domain's bypass -- fail closed on an open decision, not open.
+      // scope would even mean). No checker-specific worker-scope model is
+      // currently defined by the frozen specification or implemented in the
+      // repository, so this denies checker rather than guessing at one via
+      // an unrelated domain's bypass -- fail closed on an open decision,
+      // not open.
       if (actor.role !== 'manager' && actor.role !== 'regional_manager') {
         throw new ForbiddenError("Cannot read this worker's availability");
       }
