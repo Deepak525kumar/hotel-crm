@@ -166,6 +166,19 @@ export interface CalendarAbsence {
   updated_at: string;
 }
 
+// GD-14 (SPEC-GEO-001 TREQ-GEO-001/003/004) — matches backend GeoCheckinDto
+// (geo/types.ts) exactly. The response shape of POST/GET /geo/checkins.
+// Deliberately has no latitude/longitude fields: OD-GEO-005/RULE-GEO-003 --
+// the backend never returns raw coordinates to any caller, worker included.
+export interface GeoCheckin {
+  id: string;
+  worker_id: string;
+  hotel_id: string;
+  distance_meters: number;
+  inside_radius: boolean;
+  checked_at: string;
+}
+
 // Backend list endpoints return the array directly in body.data.
 // Pagination metadata (page, per_page, total) is in body.pagination but
 // is not extracted by the request() helper — use T[] for list calls.
