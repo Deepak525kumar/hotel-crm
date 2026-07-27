@@ -22,16 +22,25 @@ jobs" toggle, PR #239), `GD-06` (worker-scoped analytics endpoint). No blocker r
 this batch. Full options/impact detail lives only in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
-**Next up:** `GD-16` (Documents module RBAC & storage) Decided 2026-07-27, option (a) — self-upload
-+ manager-upload only, hotel-scoped read via existing `checkHotelAccess()`, presigned-URL
-retrieval, SSE-at-rest, malware-scan hook. `SPEC-DOCUMENTS-001` frozen @0.1.4 the same day (G2
-approval granted per `GD-16`) — implementation (a new `backend-documents` module) is the next
-buildable unit, not yet started. This was surfaced by a capability-level readiness audit (per your
-own direction: decompose modules into individual requirements rather than trust one module-level
-verdict) that also found `REQ-CAL-T06` (Calendar's availability read-model) is technically
-unblocked despite being grouped with the still-deferred manager-placement view under `GD-18`, and
-`IF-COMPLIANCE-GetAuditTrail` (a read-only surface over the already-existing `AuditLog` table) has
-no governance blocker at all.
+**Next up:** `GD-16` (Documents module RBAC & storage) **Decided** 2026-07-27, option (a) —
+self-upload + manager-upload only, hotel-scoped read via existing `checkHotelAccess()`,
+presigned-URL retrieval, SSE-at-rest, malware-scan hook. `SPEC-DOCUMENTS-001` frozen @0.1.4 the
+same day (G2 approval granted per `GD-16`) — a new `backend-documents` module is now
+implementation-ready; not yet started, and not the only candidate (see below).
+
+**Analysis, not a ratified decision:** a capability-level readiness audit (2026-07-27, per your own
+direction to decompose modules into individual requirements rather than trust one module-level
+verdict) additionally flagged two candidates that have **not** been decided or acted on — recorded
+here as findings for a future owner call, not as architecture fact:
+- `REQ-CAL-T06` (Calendar's availability read-model) appears technically unblocked (reads only
+  already-existing tables) despite being bundled with the still-deferred manager-placement view
+  under `GD-18` — but `GD-18` itself remains undecided, so building this ahead of that decision
+  would be building ahead of governance, not following it.
+- `IF-COMPLIANCE-GetAuditTrail` (a read-only surface over the already-existing `AuditLog` table)
+  appears to have no governance blocker — but this has not been confirmed by an owner or
+  architecture decision, only by this audit's reading of `ADR-016`.
+
+Neither claim should be treated as settled until a decision is made the same way `GD-16` was.
 
 Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
 tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
@@ -142,12 +151,12 @@ every `GD-*` ID lives only in
 |---|---|---|
 | backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` (HR/EMP build scope), which itself depends on `GD-03`'s open org-chart half, `GD-09`, `GD-16` (now Decided, see below), `GD-12` |
 | backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` (remaining scope) + Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001` |
-| backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | **Not schema-blocked** — reads only already-existing `WorkerAssignment`/`CalendarAbsence` tables. Only gated by `GD-18`'s human-directed scope bundling (a process decision, not a technical one); technically implementable now |
-| backend-documents (Documents module, RBAC/storage) | zero code; **spec now FROZEN @0.1.4** | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains — implementation (new `backend-documents` module) is the next buildable unit. Gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection. |
+| backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` (still undecided) — an audit finding (2026-07-27, not a ratified decision) observed this reads only already-existing tables and is not itself schema-blocked, but building it would still be getting ahead of `GD-18`'s own scope decision, not a substitute for one |
+| backend-documents (Documents module, RBAC/storage) | zero code; **spec now FROZEN @0.1.4** | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains. Implementation candidate (new `backend-documents` module); gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection. |
 | backend-chatbot | zero code, `.placeholder` only; every requirement checked, none independent | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
 | backend-geo | zero code, `.placeholder` only; every requirement checked, none independent | `GD-14` (geofencing/location model) |
 | backend-consent | zero code, no module directory | `GD-17`; a narrow consent-log table + notice-version catalog (no enforcement) is buildable without `GD-17`'s fail-open/closed question, but full daily-gate enforcement is not |
-| backend-compliance | zero code, no module directory | No dedicated `GD-*`; `IF-COMPLIANCE-GetAuditTrail` (read-only over the already-existing, already-written `AuditLog` table, boundary settled by `ADR-016`) has **no governance blocker** — the rest of the module (subject-rights orchestration) is downstream of Consent/Retention/Documents |
+| backend-compliance | zero code, no module directory | No dedicated `GD-*`; an audit finding (2026-07-27, not owner-confirmed) reads `IF-COMPLIANCE-GetAuditTrail` (read-only over the already-existing `AuditLog` table, boundary per `ADR-016`) as having no governance blocker — the rest of the module (subject-rights orchestration) is downstream of Consent/Retention/Documents |
 | backend-retention | zero code, no module directory; every requirement checked, none independent | `GD-09` (external tax-advisor sign-off, long lead time) — the one module where full-module-blocked holds up under decomposition |
 | Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
 | MFA | no data model or endpoint anywhere | `GD-08` |
