@@ -468,6 +468,88 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
   });
 });
 
+describe('Quality createRating — WorkerOverallRating single-writer aggregate (GD-04)', () => {
+  let service: QualityService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new QualityService();
+    mockWorkerAssignment.findUnique.mockResolvedValue({
+      id: 'a1',
+      hotel_id: 'h1',
+      worker_id: 'w1',
+    });
+    mockRating.create.mockResolvedValue({ id: 'r1' });
+    mockNotification.create.mockResolvedValue({ id: 'n1' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'outbox1' });
+    mockWorkerOverallRating.upsert.mockResolvedValue({});
+  });
+
+  it('upserts all five aggregate fields from a fresh computation, not just average_score/total_ratings', async () => {
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 72 }, _count: 4 });
+    mockWorkerAssignment.count
+      .mockResolvedValueOnce(10) // total_assignments
+      .mockResolvedValueOnce(6); // completed (status: COMPLETED)
+    mockPrisma.attendance.count.mockResolvedValue(3 as never); // on-time attendance
+    const lastCompletedAt = new Date('2026-07-20T00:00:00Z');
+    mockWorkerAssignment.findFirst.mockResolvedValue({ completed_at: lastCompletedAt });
+
+    await service.createRating(
+      { assignment_id: 'a1', worker_id: 'w1', score: 72 } as any,
+      { userId: 'u1', role: 'admin' }
+    );
+
+    expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+    const { create, update } = mockWorkerOverallRating.upsert.mock.calls[0][0];
+    const expected = {
+      average_score: 72,
+      total_ratings: 4,
+      total_assignments: 10,
+      completion_rate: 0.6,
+      on_time_rate: 0.3,
+      last_worked_at: lastCompletedAt,
+    };
+    expect(update).toMatchObject(expected);
+    expect(create).toMatchObject({ worker_id: 'w1', ...expected });
+  });
+
+  it('no code path deletes a Rating or WorkerAssignment row without recomputing the aggregate (delete case remains unreached)', () => {
+    // GD-04: the DB trigger that used to refresh WorkerOverallRating on
+    // Rating/WorkerAssignment DELETE (cascaded) was dropped in favor of the
+    // app-level refreshWorkerOverallRating() being the single writer. A
+    // .delete() call site would silently go unrefreshed since nothing calls
+    // this recompute today for a delete. This test pins that no such call
+    // site exists, forcing a future PR that adds one to also wire the
+    // recompute rather than silently regressing.
+    //
+    // NOTE: this does NOT cover .update() calls — WorkerAssignment.update()
+    // legitimately exists (assignments/service.ts AssignmentService.update())
+    // and is required to call refreshWorkerOverallRating() itself; see the
+    // "AssignmentService.update — WorkerOverallRating refresh" describe block
+    // in assignments.test.ts for that coverage.
+    const fs = require('fs');
+    const path = require('path');
+    const srcDir = path.join(__dirname, '..');
+
+    function walk(dir: string): string[] {
+      return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry: any) => {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) return walk(full);
+        return entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts') ? [full] : [];
+      });
+    }
+
+    const offenders: string[] = [];
+    for (const file of walk(srcDir)) {
+      const content = fs.readFileSync(file, 'utf8');
+      if (/\.(rating|workerAssignment)\.delete\s*\(/.test(content)) {
+        offenders.push(file);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe('Quality getLeaderboard — hotel_id filter', () => {
   let service: QualityService;
 
