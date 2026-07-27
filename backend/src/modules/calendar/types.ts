@@ -25,3 +25,11 @@ export interface CalendarAbsenceDto {
   created_at: string;
   updated_at: string;
 }
+
+// SPEC-CALENDAR-001 REQ-CAL-T06/RULE-CAL-08, IF-CAL-GetAvailability/v0.
+// Today-only; independent of any viewed calendar date -- there is no `day`
+// field to request or return.
+export interface AvailabilityDto {
+  worker_id: string;
+  available: boolean;
+}

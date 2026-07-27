@@ -1,10 +1,12 @@
 import { AssignmentStatus, CalendarAbsenceKind, EmploymentStatus, OutboxSourceModule, OutboxTransport } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { NotImplementedError, ConflictError } from '../../lib/errors.js';
+import { NotImplementedError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
+import { isWorkerInGroupScope } from '../../lib/scope.js';
+import type { UserScope } from '../../lib/jwt.js';
 import { AssignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
-import type { MarkAbsenceInput, CalendarAbsenceDto } from './types.js';
+import type { MarkAbsenceInput, CalendarAbsenceDto, AvailabilityDto } from './types.js';
 
 // Calendar depends directly on AssignmentService because GD-12 (event bus)
 // is unresolved -- the target design (EVT-CAL-SickVacationMarked) would
@@ -82,6 +84,72 @@ export class CalendarService extends BaseService {
     }
 
     return this.toDto(absence);
+  }
+
+  // REQ-CAL-T06/RULE-CAL-08 (IF-CAL-GetAvailability/v0). Ownership of this
+  // read-model is settled to Calendar by ADR-021 ("OD-CAL-01 RESOLVED") --
+  // this reads the same-day-assignment fact from Job Dispatch/assignments
+  // (WorkerAssignment, already read this way by autoCancelSameDayAssignment
+  // above) and this module's own sick/vacation state; it writes neither.
+  // Today-only and independent of any viewed calendar date, per RULE-CAL-08.
+  async getAvailability(
+    workerId: string,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<AvailabilityDto> {
+    const isSelf = actor.userId === workerId;
+
+    if (!isSelf && actor.role !== 'admin') {
+      // Permission matrix (MODULE_SPEC.md:226): Hotel Manager (their hotel),
+      // Regional Manager (their group) -- both resolved via the worker's
+      // EmploymentRecord.hotel_group_id, same primitive HR/Attendance use
+      // for group-grain worker scoping (lib/scope.ts).
+      //
+      // Checker is deliberately NOT given a cross-hotel bypass here, unlike
+      // resolveHotelAccess()'s admin/checker bypass for *hotel*-scoped
+      // operations. That bypass exists because a checker's quality-review
+      // work is legitimately cross-hotel; this permission is worker-centric,
+      // not hotel-centric, and the spec's own matrix marks it "checker:
+      // (scope)" -- an unspecified scope construct, not "(all)" like admin --
+      // while the sibling "View a worker's calendar" row marks checker
+      // `[OPEN]` outright (OD-CAL-07 is silent on what a checker's worker-
+      // scope would even mean). No checker-specific worker-scope model is
+      // currently defined by the frozen specification or implemented in the
+      // repository, so this denies checker rather than guessing at one via
+      // an unrelated domain's bypass -- fail closed on an open decision,
+      // not open.
+      if (actor.role !== 'manager' && actor.role !== 'regional_manager') {
+        throw new ForbiddenError("Cannot read this worker's availability");
+      }
+      const inScope = await isWorkerInGroupScope(actor.scope ?? null, workerId);
+      if (!inScope) {
+        throw new ForbiddenError("Cannot read this worker's availability");
+      }
+    }
+
+    const worker = await this.prisma.user.findUnique({
+      where: { id: workerId },
+      select: { id: true },
+    });
+    if (!worker) throw new NotFoundError('Worker not found');
+
+    const today = new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`);
+
+    const [assignedToday, absenceToday] = await Promise.all([
+      this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: workerId,
+          status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
+          work_request: { shift_date: today },
+        },
+        select: { id: true },
+      }),
+      this.prisma.calendarAbsence.findUnique({
+        where: { worker_id_day: { worker_id: workerId, day: today } },
+        select: { id: true },
+      }),
+    ]);
+
+    return { worker_id: workerId, available: !assignedToday && !absenceToday };
   }
 
   private async autoCancelSameDayAssignment(workerId: string, day: Date): Promise<void> {
