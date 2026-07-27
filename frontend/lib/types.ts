@@ -159,6 +159,10 @@ export interface Hotel {
   accepting_jobs: boolean;
   hotel_group_id: string | null;
   manager_user_id: string | null;
+  /** GD-14/OD-GEO-001 (SPEC-GEO-001): hotel-coordinate source of truth for
+   * backend-geo's distance-check. Null until an admin sets it (OD-GEO-004). */
+  latitude: number | null;
+  longitude: number | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -187,6 +191,9 @@ export interface UpdateHotelInput {
   accepting_jobs?: boolean;
   /** Group assignment is update-only (assigned after creation, ADR-023). */
   hotel_group_id?: string;
+  /** GD-14/OD-GEO-004: admin-only manual entry, no geocoding service. */
+  latitude?: number;
+  longitude?: number;
 }
 
 /** Query params accepted by `GET /crm/hotels`. */

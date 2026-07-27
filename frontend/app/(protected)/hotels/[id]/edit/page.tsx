@@ -38,6 +38,14 @@ function EditHotel() {
       ...(values.hotel_group_id
         ? { hotel_group_id: values.hotel_group_id }
         : {}),
+      // GD-14/OD-GEO-001/004: only send coordinates when both fields are
+      // filled in — same "omitted = leave unchanged" convention as
+      // hotel_group_id above. Sending only one of the two would leave the
+      // hotel in a state backend-geo's fail-closed check treats as
+      // "unconfigured" anyway (both are required for a valid distance-check).
+      ...(values.latitude.trim() && values.longitude.trim()
+        ? { latitude: Number(values.latitude), longitude: Number(values.longitude) }
+        : {}),
     };
     try {
       const updated = await hotelsApi.update(id, payload);

@@ -11,6 +11,7 @@ import type {
   WorkerStats,
   CalendarAbsence,
   CalendarAbsenceKind,
+  GeoCheckin,
   PushToken,
   PushPlatform,
   PushApp,
@@ -352,6 +353,17 @@ export const api = {
     myAbsences: () => request<CalendarAbsence[]>('/calendar/my-absences'),
     markAbsence: (input: { day: string; kind: CalendarAbsenceKind }) =>
       request<CalendarAbsence>('/calendar/my-absences', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+  },
+  geo: {
+    // GD-14: self-checkin, self-scoped to the authenticated worker
+    // (server-side, via req.auth.userId — no worker_id is ever sent from the
+    // client). The response never includes raw coordinates (OD-GEO-005) —
+    // only distance_meters/inside_radius.
+    checkIn: (input: { hotel_id: string; latitude: number; longitude: number }) =>
+      request<GeoCheckin>('/geo/checkins', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
