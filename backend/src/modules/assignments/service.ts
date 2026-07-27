@@ -4,6 +4,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.j
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
+import { refreshWorkerOverallRating } from '../quality/service.js';
 import {
   AssignmentDto,
   ListAssignmentsQuery,
@@ -117,7 +118,20 @@ export class AssignmentService extends BaseService {
       data.cancellation_reason = input.cancellation_reason ?? null;
     }
 
-    const updated = await this.prisma.workerAssignment.update({ where: { id }, data });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.workerAssignment.update({ where: { id }, data });
+
+      // GD-04: status transitions that affect completion_rate/on_time_rate/
+      // last_worked_at (WorkerOverallRating's derived fields) must recompute
+      // the aggregate here — it is not the trigger's job anymore, and
+      // createRating's own recompute only runs when a Rating is created,
+      // which can be long after (or never, relative to) a status change.
+      if (next === AssignmentStatus.COMPLETED || next === AssignmentStatus.CANCELLED) {
+        await refreshWorkerOverallRating(tx, assignment.worker_id);
+      }
+
+      return result;
+    });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ASSIGNMENT', 'WORKER_ASSIGNMENT', id, {
       from_status: assignment.status,

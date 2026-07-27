@@ -64,11 +64,13 @@ jest.mock('../config/env.js', () => ({
 }));
 
 // getPrisma() backs both the assignment lookup/update and the membership check.
-jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
+jest.mock('../lib/db.js', () => {
+  const prisma: any = {
     workerAssignment: {
       findUnique: async () => currentAssignment,
       update: async ({ data }: any) => ({ ...currentAssignment, ...data }),
+      count: async () => 0,
+      findFirst: async () => null,
     },
     employmentRecord: {
       findUnique: async ({ where }: any) =>
@@ -80,9 +82,14 @@ jest.mock('../lib/db.js', () => ({
       findUnique: async ({ where }: any) =>
         membershipHotelIds.includes(where.id) ? { hotel_group_id: 'g1' } : { hotel_group_id: 'g2' },
     },
+    rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
+    attendance: { count: async () => 0 },
+    workerOverallRating: { upsert: async () => ({}) },
     auditLog: { create: async () => ({}) },
-  }),
-}));
+    $transaction: async (cb: (tx: any) => Promise<unknown>) => cb(prisma),
+  };
+  return { getPrisma: () => prisma };
+});
 
 // Replace real JWT auth with an injector of the test-controlled context.
 jest.mock('../middleware/auth.js', () => ({

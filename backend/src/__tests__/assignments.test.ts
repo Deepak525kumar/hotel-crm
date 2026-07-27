@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockWorkerAssignment = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -15,11 +16,27 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockRating = {
+  aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockWorkerOverallRating = {
+  upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockAttendance = {
+  count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
+  rating: mockRating,
+  attendance: mockAttendance,
+  workerOverallRating: mockWorkerOverallRating,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -59,6 +76,11 @@ describe('AssignmentService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AssignmentService();
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 0 }, _count: 0 });
+    mockWorkerAssignment.count.mockResolvedValue(0);
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockAttendance.count.mockResolvedValue(0 as never);
+    mockWorkerOverallRating.upsert.mockResolvedValue({});
   });
 
   describe('update', () => {
@@ -102,6 +124,36 @@ describe('AssignmentService', () => {
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
       expect(data.cancellation_reason).toBe('sick');
+    });
+
+    // GD-04 (architecture-review finding AR-1): a status transition via this
+    // endpoint mutates exactly the fields WorkerOverallRating derives
+    // total_assignments/completion_rate/on_time_rate/last_worked_at from.
+    // Since the DB trigger that used to (partially) cover this was dropped
+    // (20260727020000_drop_rating_overall_trigger), the app must recompute
+    // the aggregate itself on any transition that affects those fields.
+    it('refreshes WorkerOverallRating when a transition completes the assignment', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+      expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+    });
+
+    it('refreshes WorkerOverallRating when a transition cancels the assignment', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'CONFIRMED', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager');
+      expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+      expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+    });
+
+    it('does not refresh WorkerOverallRating for a transition that does not affect the aggregate (CONFIRMED -> IN_PROGRESS)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'CONFIRMED', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      expect(mockWorkerOverallRating.upsert).not.toHaveBeenCalled();
     });
   });
 

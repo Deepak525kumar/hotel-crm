@@ -19,6 +19,60 @@ interface Actor {
   scope?: UserScope | null;
 }
 
+type RatingAggregateTx = Prisma.TransactionClient;
+
+// GD-04 single-writer fix: this is the only writer of WorkerOverallRating (a
+// DB trigger used to also write it; dropped in
+// 20260727020000_drop_rating_overall_trigger). Every call site that mutates a
+// Rating row or a WorkerAssignment's status/completed_at must call this
+// inside the same transaction, or the aggregate silently goes stale — see
+// assignments/service.ts's call from AssignmentService.update().
+export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_id: string) {
+  const [agg, totalAssignments, completedAssignments, onTimeAttendance, lastWorked] =
+    await Promise.all([
+      tx.rating.aggregate({
+        where: { worker_id },
+        _avg: { score: true },
+        _count: true,
+      }),
+      tx.workerAssignment.count({ where: { worker_id } }),
+      tx.workerAssignment.count({
+        where: { worker_id, status: AssignmentStatus.COMPLETED },
+      }),
+      tx.attendance.count({
+        where: { worker_id, status: AttendanceStatus.PRESENT },
+      }),
+      tx.workerAssignment.findFirst({
+        where: {
+          worker_id,
+          status: AssignmentStatus.COMPLETED,
+          completed_at: { not: null },
+        },
+        orderBy: { completed_at: 'desc' },
+        select: { completed_at: true },
+      }),
+    ]);
+
+  const averageScore = agg._avg.score ?? 0;
+  const completionRate = totalAssignments > 0 ? completedAssignments / totalAssignments : 0;
+  const onTimeRate = totalAssignments > 0 ? onTimeAttendance / totalAssignments : 0;
+
+  const aggregateData = {
+    average_score: averageScore,
+    total_ratings: agg._count,
+    total_assignments: totalAssignments,
+    completion_rate: completionRate,
+    on_time_rate: onTimeRate,
+    last_worked_at: lastWorked?.completed_at ?? null,
+  };
+
+  await tx.workerOverallRating.upsert({
+    where: { worker_id },
+    create: { worker_id, ...aggregateData },
+    update: aggregateData,
+  });
+}
+
 export class QualityService extends BaseService {
   async createVerification(
     data: CreateQualityVerificationRequest,
@@ -175,49 +229,7 @@ export class QualityService extends BaseService {
         throw error;
       }
 
-      const [agg, totalAssignments, completedAssignments, onTimeAttendance, lastWorked] =
-        await Promise.all([
-          tx.rating.aggregate({
-            where: { worker_id },
-            _avg: { score: true },
-            _count: true,
-          }),
-          tx.workerAssignment.count({ where: { worker_id } }),
-          tx.workerAssignment.count({
-            where: { worker_id, status: AssignmentStatus.COMPLETED },
-          }),
-          tx.attendance.count({
-            where: { worker_id, status: AttendanceStatus.PRESENT },
-          }),
-          tx.workerAssignment.findFirst({
-            where: {
-              worker_id,
-              status: AssignmentStatus.COMPLETED,
-              completed_at: { not: null },
-            },
-            orderBy: { completed_at: 'desc' },
-            select: { completed_at: true },
-          }),
-        ]);
-
-      const averageScore = agg._avg.score ?? 0;
-      const completionRate = totalAssignments > 0 ? completedAssignments / totalAssignments : 0;
-      const onTimeRate = totalAssignments > 0 ? onTimeAttendance / totalAssignments : 0;
-
-      const aggregateData = {
-        average_score: averageScore,
-        total_ratings: agg._count,
-        total_assignments: totalAssignments,
-        completion_rate: completionRate,
-        on_time_rate: onTimeRate,
-        last_worked_at: lastWorked?.completed_at ?? null,
-      };
-
-      await tx.workerOverallRating.upsert({
-        where: { worker_id },
-        create: { worker_id, ...aggregateData },
-        update: aggregateData,
-      });
+      await refreshWorkerOverallRating(tx, worker_id);
 
       // ADR-029 (GD-01, Epic 7 PR 7.3): joins the same transaction as the
       // rating write and aggregate refresh — single commit.
