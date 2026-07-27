@@ -21,11 +21,15 @@ export const ALLOWED_MIME_TYPES = [
 // Adjustable without a schema migration.
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
 
+// file_size_bytes is deliberately NOT part of this schema: with multipart
+// upload wired (PR #247), the byte count is derived server-side from the
+// parsed file (req.file.size), never trusted from a client-supplied field
+// (RULE-DOC-09 provenance discipline — the same reasoning already applied to
+// s3_key/actor_id).
 export const uploadDocumentSchema = z.object({
   category: z.enum(['GENERAL', 'WORK_PERMIT']),
   original_filename: z.string().min(1).max(255),
   mime_type: z.enum(ALLOWED_MIME_TYPES as unknown as [string, ...string[]]),
-  file_size_bytes: z.number().int().positive().max(MAX_FILE_SIZE_BYTES),
   is_work_permit: z.boolean().optional(),
   expires_at: z
     .string()

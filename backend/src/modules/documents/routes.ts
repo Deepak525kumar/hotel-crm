@@ -2,9 +2,29 @@
 // GD-16: self-upload (worker) + manager-upload only; hotel-scoped read.
 
 import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requireRole } from '../../middleware/permissions.js';
 import { documentController } from './controller.js';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './validation.js';
+import { ValidationError } from '../../lib/errors.js';
+
+// RULE-DOC-09/REQ-DOC-017: memory storage only — bytes are handed straight to
+// StorageService.upload() (S3 stub today, real S3 once wired), never written
+// to local disk. fileFilter rejects disallowed MIME types before the upload
+// even completes; limits.fileSize is defense-in-depth ahead of the service's
+// own size re-check.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
+      cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'file'));
+      return;
+    }
+    cb(null, true);
+  },
+});
 
 // checkWorkerScope() (permissions.ts resolveWorkerScope) allows only
 // admin (bypass) and manager (group-scope check) — every other role,
@@ -26,6 +46,27 @@ function scopeWorkerRoute() {
   };
 }
 
+// Translates multer's own MulterError into the platform's ValidationError
+// shape (422, ERROR_CODES.VALIDATION_ERROR) so a rejected upload (oversize,
+// disallowed MIME type, wrong field name) reaches the client in the same
+// error contract as every other validation failure, instead of the generic
+// handler's unexpected-error 500 fallback.
+function handleUploadErrors() {
+  return (err: unknown, _req: Request, _res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? `File exceeds the maximum size of ${MAX_FILE_SIZE_BYTES} bytes`
+          : err.code === 'LIMIT_UNEXPECTED_FILE'
+            ? 'Unsupported file type or unexpected field'
+            : err.message;
+      next(new ValidationError(message));
+      return;
+    }
+    next(err);
+  };
+}
+
 const router = Router();
 router.use(authMiddleware);
 
@@ -33,7 +74,9 @@ router.post(
   '/workers/:worker_id/documents',
   requireRole(['admin', 'manager', 'worker']),
   scopeWorkerRoute(),
-  (req, res, next) => documentController.uploadDocument(req, res, next)
+  upload.single('file'),
+  handleUploadErrors(),
+  (req: Request, res: Response, next: NextFunction) => documentController.uploadDocument(req, res, next)
 );
 
 router.get(

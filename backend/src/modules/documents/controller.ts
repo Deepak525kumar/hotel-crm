@@ -24,10 +24,14 @@ export class DocumentController {
         return;
       }
 
-      // RULE-DOC-09 defence-in-depth: no file-parsing middleware is wired on
-      // this route yet (mirrors the current backend-hr stub's gap, tracked
-      // separately) — the buffer is empty until multipart handling lands.
-      const fileBuffer = Buffer.alloc(0);
+      // RULE-DOC-09: the file itself is required and is never trusted from a
+      // client-declared field — routes.ts's upload.single('file') (memory
+      // storage only, no disk write) populates req.file; file_size_bytes is
+      // derived from the parsed buffer, never accepted as request-body input.
+      if (!req.file) {
+        next(new ValidationError('A file is required', [{ field: 'file', message: 'required' }]));
+        return;
+      }
 
       const result = await documentService.uploadDocument(
         {
@@ -36,11 +40,11 @@ export class DocumentController {
           category: parsed.data.category,
           original_filename: parsed.data.original_filename,
           mime_type: parsed.data.mime_type,
-          file_size_bytes: parsed.data.file_size_bytes,
+          file_size_bytes: req.file.size,
           is_work_permit: parsed.data.is_work_permit,
           expires_at: parsed.data.expires_at,
         },
-        fileBuffer,
+        req.file.buffer,
         req.auth.role,
         req.ip
       );
