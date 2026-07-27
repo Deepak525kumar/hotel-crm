@@ -408,7 +408,11 @@ plan. Detail below is retained as the decision record.
     (option (b), not adopted).
   - **`OD-GEO-002`** (retention-job / coordinate-column ownership): `backend-geo` owns the worker-coordinate
     columns (a new, `backend-geo`-owned table/model) and the 6-month hard-delete retention sweep job (Tier 1,
-    `GD-09`'s tier framework). Not `backend-attendance`.
+    `GD-09`'s tier framework). Not `backend-attendance`. **Note:** this is the *stateful* fork of the choice
+    the spec itself named (the alternative being `backend-geo` as a purely stateless distance-check service,
+    with `backend-attendance` owning its own coordinate columns) — it introduces a second storage owner
+    alongside `OD-GEO-001`'s CRM-owned `Hotel` coordinates (CRM: hotel coordinates; Geo: worker coordinates),
+    a deliberate architecture choice, not a default.
   - **`OD-GEO-003`** (fail-open vs fail-closed): **Fail-closed.** Missing hotel coordinates, or a
     distance-check service failure, disables the Start/Close clock action — never silently allows it.
   - **`OD-GEO-004`** (who sets/edits hotel coordinates): **Admin-only manual entry**, via the same
