@@ -157,12 +157,15 @@ describe('AssignmentService', () => {
     });
 
     // GD-04 review follow-up: the COMPLETED/CANCELLED recompute condition is
-    // keyed on `status`, not on completed_at directly, because this method
-    // rejects any call that doesn't change status (see the next test) — so
-    // completed_at can never change independently of a COMPLETED transition
-    // today. If this guard is ever relaxed to allow a same-status update
-    // (e.g. correcting completed_at after the fact), the recompute condition
-    // above must be revisited, since it would then miss that path silently.
+    // keyed on `status`, not on completed_at directly, because
+    // SPEC-JOB-DISPATCH-001 RULE-008/REQ-040 (FROZEN @0.3.1) make "no-op
+    // transition -> ConflictError" and "terminal states" domain rules, not
+    // an implementation accident — this guard is this repo's enforcement of
+    // that rule. A same-status "correction" path (e.g. editing completed_at
+    // without a status change) would itself require amending the FROZEN
+    // spec first, which routes through Requirements/Documentation/
+    // Specification-Freeze gates — the mechanism that should force this
+    // recompute condition to be revisited, not an implicit code coupling.
     it('rejects a same-status update, so completed_at cannot change without also recomputing the aggregate', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED', worker_id: 'w1' }));
       await expect(service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager')).rejects.toMatchObject({
