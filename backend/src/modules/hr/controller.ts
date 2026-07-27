@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { hrService } from './service.js';
+import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
 
 export class HrController {
   async createContract(req: Request, res: Response, next: NextFunction) {
@@ -54,9 +55,26 @@ export class HrController {
     }
   }
 
+  // MIG-GAP-DOC-001: mechanism-class upload (RULE-DOC-04) — the actual file
+  // is required and, per RULE-DOC-08, the acting actor is always derived
+  // from req.auth, never a client-supplied field.
   async uploadDocument(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await hrService.uploadDocument(req.params.worker_id, Buffer.alloc(0));
+      if (!req.auth) throw new UnauthorizedError();
+      if (!req.file) {
+        next(new ValidationError('A file is required', [{ field: 'file', message: 'required' }]));
+        return;
+      }
+
+      const result = await hrService.uploadDocument(
+        req.params.worker_id,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
       res.status(201).json({
         status: 'success',
         data: result,
