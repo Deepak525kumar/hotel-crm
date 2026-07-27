@@ -32,6 +32,7 @@ function EditHotel() {
       address: values.address,
       timezone: values.timezone,
       is_active: values.is_active,
+      accepting_jobs: values.accepting_jobs,
       // Only send a group assignment when one is selected; the API treats an
       // omitted field as "leave unchanged".
       ...(values.hotel_group_id

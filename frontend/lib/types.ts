@@ -155,6 +155,8 @@ export interface Hotel {
   contact_email: string | null;
   contact_phone: string | null;
   is_active: boolean;
+  /** GD-05: per-hotel "pause new jobs" toggle, distinct from is_active. */
+  accepting_jobs: boolean;
   hotel_group_id: string | null;
   manager_user_id: string | null;
   deleted_at: string | null;
@@ -181,6 +183,8 @@ export interface UpdateHotelInput {
   address?: string;
   timezone?: string;
   is_active?: boolean;
+  /** GD-05: per-hotel "pause new jobs" toggle, distinct from is_active. */
+  accepting_jobs?: boolean;
   /** Group assignment is update-only (assigned after creation, ADR-023). */
   hotel_group_id?: string;
 }
