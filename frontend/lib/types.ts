@@ -564,6 +564,34 @@ export interface ListAttendanceQuery {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Geo check-ins                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A geofence verification event as returned by `GET /geo/checkins` and
+ * `/geo/checkins/:id`. Mirrors the backend `GeoCheckinDto` (SPEC-GEO-001,
+ * GD-14). RULE-GEO-003/OD-GEO-005: latitude/longitude are never part of this
+ * shape, on any endpoint or role — only the computed distance and pass/fail
+ * result are ever returned. Do not add coordinate fields here.
+ */
+export interface GeoCheckin {
+  id: string;
+  worker_id: string;
+  hotel_id: string;
+  distance_meters: number;
+  inside_radius: boolean;
+  checked_at: string;
+}
+
+/** Query params accepted by `GET /geo/checkins`. */
+export interface ListGeoCheckinsQuery {
+  worker_id?: string;
+  hotel_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Notifications                                                              */
 /* -------------------------------------------------------------------------- */
 

@@ -13,11 +13,13 @@ import type {
   DashboardStats,
   HotelAnalyticsSummary,
   LeaderboardEntry,
+  GeoCheckin,
   Hotel,
   HotelGroup,
   ListApplicationsQuery,
   ListAssignmentsQuery,
   ListAttendanceQuery,
+  ListGeoCheckinsQuery,
   ListHotelGroupsQuery,
   ListHotelsQuery,
   ListUsersQuery,
@@ -424,6 +426,19 @@ export const attendanceApi = {
   /** Manager/checker: set the attendance status (e.g. mark ABSENT/EXCUSED). */
   setStatus: (id: string, status: NonNullable<UpdateAttendanceInput["status"]>) =>
     attendanceApi.update(id, { status }),
+};
+
+/**
+ * Geo check-ins API matching the backend `/geo/checkins/*` routes
+ * (SPEC-GEO-001, GD-14). Read-only from the frontend: check-in itself is
+ * worker-mobile-only. RBAC/hotel scoping (admin sees all, manager sees
+ * hotels in their own scope) is enforced entirely backend-side.
+ */
+export const geoCheckinsApi = {
+  list: (query: ListGeoCheckinsQuery = {}) =>
+    apiFetch<GeoCheckin[]>(`/geo/checkins${toQuery({ ...query })}`),
+
+  get: (id: string) => apiFetch<GeoCheckin>(`/geo/checkins/${id}`),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */

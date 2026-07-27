@@ -115,3 +115,26 @@ export function DocumentsGate({
     </RoleGate>
   );
 }
+
+/**
+ * SPEC-GEO-001 @0.1.2 FROZEN (GD-14): geo check-ins list/detail view.
+ * Matches the backend's own role split exactly (geo/routes.ts comment:
+ * "admin sees everything; manager sees only hotels within their own scope
+ * claim") — `regional_manager` is deliberately EXCLUDED, same reasoning as
+ * `DocumentsGate`: backend-geo's route/service layer never special-cases
+ * `regional_manager`, so admitting it here would show the UI to a role the
+ * backend then 403s on every request.
+ */
+export function GeoCheckinsGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
