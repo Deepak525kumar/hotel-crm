@@ -71,6 +71,26 @@ export class CalendarController {
       next(error);
     }
   }
+
+  // REQ-CAL-T06 (IF-CAL-GetAvailability/v0)
+  async getAvailability(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const workerId = (req.query.worker_id as string | undefined) ?? req.auth.userId;
+      const result = await calendarService.getAvailability(workerId, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 export const calendarController = new CalendarController();

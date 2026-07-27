@@ -12,6 +12,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockCalendarAbsence = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 const mockWorkerAssignment = {
@@ -281,5 +282,119 @@ describe('CalendarService.getOwnAbsences', () => {
     mockCalendarAbsence.findMany.mockResolvedValue([]);
     await service.getOwnAbsences('w1');
     expect(mockCalendarAbsence.findMany.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+  });
+});
+
+describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', () => {
+  let service: CalendarService;
+  let restoreClock: () => void;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new CalendarService();
+    restoreClock = fixedToday('2026-07-27');
+    mockUser.findUnique.mockResolvedValue({ id: 'w1' });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockCalendarAbsence.findUnique.mockResolvedValue(null);
+  });
+
+  afterEach(() => restoreClock());
+
+  it('returns available=true when the worker has no same-day assignment and no absence mark', async () => {
+    const result = await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
+    expect(result).toEqual({ worker_id: 'w1', available: true });
+  });
+
+  it('is today-only: reads today\'s date regardless of any other input', async () => {
+    await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
+    expect(mockWorkerAssignment.findFirst.mock.calls[0][0].where.work_request.shift_date).toEqual(
+      new Date('2026-07-27T00:00:00.000Z')
+    );
+    expect(mockCalendarAbsence.findUnique.mock.calls[0][0].where).toEqual({
+      worker_id_day: { worker_id: 'w1', day: new Date('2026-07-27T00:00:00.000Z') } ,
+    });
+  });
+
+  it('returns available=false when assigned today (CONFIRMED/IN_PROGRESS)', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1' });
+    const result = await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
+    expect(result.available).toBe(false);
+  });
+
+  it('returns available=false when marked sick/vacation today', async () => {
+    mockCalendarAbsence.findUnique.mockResolvedValue({ id: 'abs1' });
+    const result = await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
+    expect(result.available).toBe(false);
+  });
+
+  it('throws NotFoundError when the worker does not exist', async () => {
+    mockUser.findUnique.mockResolvedValue(null);
+    await expect(
+      service.getAvailability('missing', { userId: 'admin1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  describe('permission matrix', () => {
+    it('always allows a worker to read their own availability', async () => {
+      await expect(
+        service.getAvailability('w1', { userId: 'w1', role: 'worker' })
+      ).resolves.toBeDefined();
+    });
+
+    it('denies a worker reading another worker\'s availability', async () => {
+      await expect(
+        service.getAvailability('w2', { userId: 'w1', role: 'worker' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('allows admin unconditionally, cross-hotel', async () => {
+      await expect(
+        service.getAvailability('w1', { userId: 'admin1', role: 'admin' })
+      ).resolves.toBeDefined();
+    });
+
+    it('allows checker unconditionally, cross-hotel (mirrors resolveHotelAccess\'s admin/checker bypass)', async () => {
+      await expect(
+        service.getAvailability('w1', { userId: 'c1', role: 'checker' })
+      ).resolves.toBeDefined();
+    });
+
+    it('allows a manager whose scope covers the worker\'s Hotel Group', async () => {
+      mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const result = await service.getAvailability('w1', {
+        userId: 'm1',
+        role: 'manager',
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      });
+      expect(result).toBeDefined();
+    });
+
+    it('denies a manager whose scope does not cover the worker\'s Hotel Group', async () => {
+      mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await expect(
+        service.getAvailability('w1', {
+          userId: 'm1',
+          role: 'manager',
+          scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
+        })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('denies a manager with no scope claim', async () => {
+      mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await expect(
+        service.getAvailability('w1', { userId: 'm1', role: 'manager', scope: null })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('allows a regional_manager whose group scope covers the worker (ADR-030 D-5)', async () => {
+      mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const result = await service.getAvailability('w1', {
+        userId: 'rm1',
+        role: 'regional_manager',
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      });
+      expect(result).toBeDefined();
+    });
   });
 });
