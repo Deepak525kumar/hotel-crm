@@ -9,6 +9,8 @@ import type {
   LeaderboardEntry,
   DashboardStats,
   WorkerStats,
+  CalendarAbsence,
+  CalendarAbsenceKind,
   PushToken,
   PushPlatform,
   PushApp,
@@ -343,5 +345,15 @@ export const api = {
     leaderboard: () => request<LeaderboardEntry[]>('/analytics/leaderboard'),
     // GD-06: resolves the previously-silent 403 — /stats is admin/manager-only.
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
+  },
+  calendar: {
+    // GD-18 narrow slice: self-scoped to the authenticated worker (server-side,
+    // via req.auth.userId — no worker_id is ever sent from the client).
+    myAbsences: () => request<CalendarAbsence[]>('/calendar/my-absences'),
+    markAbsence: (input: { day: string; kind: CalendarAbsenceKind }) =>
+      request<CalendarAbsence>('/calendar/my-absences', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
 };

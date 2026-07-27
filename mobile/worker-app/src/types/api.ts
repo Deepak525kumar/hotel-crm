@@ -152,6 +152,20 @@ export interface WorkerStats {
   };
 }
 
+// GD-18 narrow slice (SPEC-CALENDAR-001 REQ-CAL-T02/T03/T04/T08) — matches
+// backend CalendarAbsenceDto (calendar/types.ts) exactly. The response shape
+// of GET/POST /calendar/my-absences.
+export type CalendarAbsenceKind = 'SICK' | 'VACATION';
+
+export interface CalendarAbsence {
+  id: string;
+  worker_id: string;
+  day: string; // YYYY-MM-DD
+  kind: CalendarAbsenceKind;
+  created_at: string;
+  updated_at: string;
+}
+
 // Backend list endpoints return the array directly in body.data.
 // Pagination metadata (page, per_page, total) is in body.pagination but
 // is not extracted by the request() helper — use T[] for list calls.
