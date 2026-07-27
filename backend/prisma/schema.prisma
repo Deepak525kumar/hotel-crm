@@ -156,6 +156,7 @@ enum OutboxSourceModule {
   ATTENDANCE
   QUALITY
   CALENDAR
+  DOCUMENTS
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
@@ -283,6 +284,10 @@ model User {
   managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
   managed_hotels            Hotel[]                 @relation("hotel_manager")
   calendar_absences         CalendarAbsence[]       @relation("calendar_absence_worker")
+  // SPEC-DOCUMENTS-001 (GD-16): documents owned by this worker and uploads
+  // performed by this user on behalf of a worker (manager contract-scan, RULE-DOC-04).
+  worker_documents            WorkerDocument[]          @relation("documents_worker")
+  documents_uploaded          WorkerDocument[]          @relation("documents_uploader")
   // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
   employment_record           EmploymentRecord?         @relation("employment_record")
@@ -863,6 +868,51 @@ model AuditLog {
   @@index([resource_id])
   @@index([timestamp])
   @@index([resource_type, resource_id]) // "full history of a resource"
+}
+
+// =============================================================================
+// DOCUMENTS MODULE (SPEC-DOCUMENTS-001 @0.1.4 FROZEN, GD-16 Decided 2026-07-27)
+// =============================================================================
+
+// CRR §7 lines 97-98: the only two confirmed document sub-type distinctions.
+// No broader category taxonomy is specified by CRR/PDD (OD-DOC-005 category half).
+enum DocumentCategory {
+  GENERAL      // General onboarding/identity document (all workers)
+  WORK_PERMIT  // Residence/work-authorization document (non-EU/EEA/Swiss only, REQ-DOC-003)
+}
+
+// state-worker-document (SPEC-DOCUMENTS-001, PDD §9.3 line 389).
+// Canonical target-state entity name is WorkerDocument -- not "Document" (PDD §9.3).
+// Actors: self-upload (worker) or manager-upload (contract-scan mechanism, RULE-DOC-04).
+// All document bytes live in S3 (EU); this table stores metadata only (REQ-DOC-007).
+// Retention tier: OD-DOC-001 (open; not yet mapped to CRR §25 tier).
+// Special-category applicability: OD-DOC-002 (no confirmed special-category doc type today).
+model WorkerDocument {
+  id                      String           @id @default(cuid())
+  worker_id               String
+  worker                  User             @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  // Uploader identity — always derived from the authenticated session (RULE-DOC-08).
+  // For worker self-uploads: uploaded_by_id == worker_id.
+  // For manager-on-behalf uploads (contract-scan mechanism): uploaded_by_id == manager's user id.
+  uploaded_by_id          String
+  uploaded_by             User             @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
+  category                DocumentCategory
+  // Server-generated storage key (RULE-DOC-09): never built from client input;
+  // includes a UUIDv4 segment for unpredictability (OD-DOC-017).
+  s3_key                  String           @unique
+  original_filename       String
+  mime_type               String
+  file_size_bytes         Int
+  // REQ-DOC-001: expiry tracking. Consequence/warning on crossing is OD-DOC-003 (open).
+  expires_at              DateTime?        @db.Date
+  // REQ-DOC-003: true only for non-EU/EEA/Swiss workers' work-permit documents.
+  is_work_permit          Boolean          @default(false)
+  created_at              DateTime         @default(now())
+  updated_at              DateTime         @updatedAt
+
+  // OD-DOC-019 (FIND-PERF-001): compound index required at schema-creation time.
+  @@index([worker_id, category])
+  @@index([worker_id])
 }
 
 // =============================================================================
