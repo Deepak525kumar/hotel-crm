@@ -1,7 +1,7 @@
 schema_version: 1
 project: hotel-crm
-checked_at: "2026-07-13"
-baseline_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound by SYNC-054, 2026-07-26; this top-level field had drifted to a pre-SYNC-053 stamp (3513c776) while cache_state below was kept current -- see cache_state block for the actively-maintained per-revision record
+checked_at: "2026-07-28"
+baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound by SYNC-055, 2026-07-28; see cache_state block for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
 
@@ -2082,6 +2082,106 @@ known_drift:
       Mode for the spec-revision items) before further implementation can begin. SYNC-001
       owner assignment remains reserved human authority, unchanged.
 
+  - id: SYNC-055
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository Synchronization pass (2026-07-28) covering everything merged
+      since the cache last bound at SYNC-054 (3254c83): PR #243 (GD-18 narrow
+      slice, worker self-mark sick/vacation, CalendarAbsence model), PR #244
+      (GD-16 decision + SPEC-DOCUMENTS-001 frozen @0.1.4), and PR #245
+      (backend-documents module implementation). HEAD advances 3254c83 ->
+      1aa5f88bce9ef27c9b0563363ebaa211d8aca240. Scope: reconcile
+      MODULE_REGISTRY.yaml, DEPENDENCY_GRAPH.yaml, BOUNDARY_INDEX.yaml, and the
+      shared observed_revision/baseline_revision stamps against the worktree at
+      HEAD (backend/src/, not commit messages); no source code touched; no new
+      architecture invented.
+      (1) backend-documents (PR #245): added a MODULE_REGISTRY.yaml module
+      entry (implementation_status: active-partial) -- all five IF-DOC-* target
+      interfaces built (upload/list/get/completeness/export), mounted at
+      /v1/documents; GD-16's actor model verified in code (worker self-scope
+      enforced in DocumentService per RULE-DOC-08, manager-upload group-scoped
+      via checkWorkerScope(), admin bypasses); the prior "zero code footprint"
+      note narrowed (not deleted) to record resolution, per the register's own
+      append/resolve/merge protocol. Added state-worker-document (kind:
+      state-domain) and the backend-documents module node to
+      DEPENDENCY_GRAPH.yaml, plus its two self-write/self-read edges (no
+      cross-module edge exists yet -- MIG-GAP-DOC-001, migrating backend-hr's
+      own separate upload stub to call into this module, is confirmed NOT done:
+      backend/src/modules/hr/routes.ts:44-51 still hosts its own
+      NotImplementedError-backed stub, independently re-verified against the
+      worktree, not merely asserted from the PR description). Updated
+      BOUNDARY_INDEX.yaml's stale "proposed, not registered" documents row and
+      added a backend-documents entry to its modules: list. Deferred gaps
+      explicitly recorded, not silently dropped: no multipart/file-parsing
+      middleware wired (Buffer.alloc(0) placeholder, mirrors the migrated-from
+      stub's own known gap); storage.ts's real-S3-client code path exists but
+      @aws-sdk/client-s3 / @aws-sdk/s3-request-presigner are confirmed absent
+      from backend/package.json (verified by direct inspection) -- the stub
+      client is what is actually active.
+      (2) backend-calendar (PR #243) registration gap: DEPENDENCY_GRAPH.yaml's
+      own state_domains/nodes lists never gained a state-calendar-absence entry
+      despite BOUNDARY_INDEX.yaml already recording backend-calendar's
+      owned_state: [state-calendar-absence] from a prior pass -- a genuine,
+      independently-discovered drift item, not part of this session's own
+      Documents work. Closed: added the state-calendar-absence node
+      (CalendarAbsence model, migrations 20260727040000/20260727050000).
+      Additionally corrected DEPENDENCY_GRAPH.yaml's analysis.orphan_modules
+      and analysis.stub_but_registered sections, both of which still described
+      backend-calendar as a pure NotImplementedError stub with "no cross-module
+      edge" -- stale since PR #243 landed GET/POST /my-absences as real,
+      non-stub code (backend-calendar's /operations surface remains a genuine
+      stub, OD-CAL-10, unrelated capability; this distinction is now stated
+      explicitly rather than collapsed). Retained the corrected rows in place
+      (narrowed, not deleted) with an inline note explaining the correction, and
+      updated the analysis.remaining_human_decisions line that made the same
+      stale claim.
+      (3) Health gates independently re-verified at HEAD 1aa5f88 (not merely
+      cited from the prior PR's own report): tsc --noEmit clean; full backend
+      suite 71/71 suites, 1113/1113 tests green (includes the two new documents
+      test files added by PR #245).
+      (4) New drift discovered, NOT remediated by this pass (out of scope --
+      rewriting historical narrative content, not reconciling merged-work
+      drift): MODULE_REGISTRY.yaml, DEPENDENCY_GRAPH.yaml, and
+      BOUNDARY_INDEX.yaml each independently fail strict YAML parsing
+      (python3 yaml.safe_load) at lines that predate this session --
+      MODULE_REGISTRY.yaml's unresolved: list has several items starting with
+      a bare backtick (invalid as a plain-scalar leading character);
+      DEPENDENCY_GRAPH.yaml's permissions-middleware contract note (~580
+      lines) and BOUNDARY_INDEX.yaml's backend-hr/backend-calendar boundary
+      notes contain embedded quoting that breaks strict-mode parsing.
+      Independently confirmed present, byte-for-byte, on origin/main before
+      this session's edits (git show origin/main:<path> piped through the same
+      parser) -- not introduced by PR #243/#244/#245 or by this synchronization
+      pass. These files remain human-readable and every prior synchronization
+      pass has treated them as such; flagging here as newly-observed,
+      non-blocking drift (a future documentation/consistency pass may choose to
+      requote the affected historical lines) rather than silently leaving it
+      undiscovered or unilaterally rewriting long-standing governance-authored
+      narrative text outside this pass's scope.
+      Rebound all 9 project-runtime index observed_revision stamps
+      (API_INDEX, CONTRACT_INDEX, BOUNDARY_INDEX, DEPENDENCY_GRAPH,
+      MODULE_MEMORY, MODULE_REGISTRY, SPECIFICATION_INDEX,
+      STATE_OWNERSHIP_INDEX, OWNERSHIP_INDEX) + SESSION_STATE.yaml + this
+      file's own top-level baseline_revision + cache_state block from 3254c83
+      to HEAD 1aa5f88. No other index required content change beyond what is
+      itemized above -- MODULE_MEMORY.yaml, SPECIFICATION_INDEX.yaml,
+      STATE_OWNERSHIP_INDEX.yaml, OWNERSHIP_INDEX.yaml, API_INDEX.yaml, and
+      CONTRACT_INDEX.yaml were independently checked against the PR #243/#244/
+      #245 diff and found to need no module/contract/state-domain content
+      change (Documents owns no shared contract; Calendar's
+      state-calendar-absence was already present in BOUNDARY_INDEX.yaml from a
+      prior pass and required no further OWNERSHIP_INDEX/STATE_OWNERSHIP_INDEX
+      change since backend-calendar was already the sole writer there).
+    authority_needed: none  # pure knowledge-layer synchronization; no new decision made or required by this pass
+    next_step: >-
+      Proceed to a fresh implementation-readiness audit (separate from this
+      synchronization record) to select the next implementation candidate.
+      MIG-GAP-DOC-001 (backend-hr stub -> backend-documents migration),
+      multipart upload wiring, and real S3 SDK integration remain open,
+      un-gated-by-governance follow-ups on backend-documents specifically, not
+      requiring a new GD-* decision.
+
 context_invalidators:
   - repository revision changes
   - default branch changes
@@ -2097,30 +2197,37 @@ cache_state:
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3254c83 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); prior 9ca0eed, content verified coherent through the pass
+  baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound to HEAD 1aa5f88 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); prior 3254c83, content verified coherent through the pass
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
-  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics, backend-auth, backend-work-requests, backend-attendance], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); ART-MEM-backend-auth/backend-work-requests/backend-attendance backfilled by SYNC-050 (Repository Synchronization Workflow, 2026-07-20) for the three specs frozen 2026-07-15 that had never received one -- all ten FROZEN modules now have a Module Memory entry, no backfill gap remains" }
+  module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics, backend-auth, backend-work-requests, backend-attendance, backend-documents], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); ART-MEM-backend-auth/backend-work-requests/backend-attendance backfilled by SYNC-050 (Repository Synchronization Workflow, 2026-07-20) for the three specs frozen 2026-07-15 that had never received one; ART-MEM-backend-documents backfilled by SYNC-055 (2026-07-28) for SPEC-DOCUMENTS-001, frozen 2026-07-27 (GD-16, PR #244, freeze HEAD 6e21e20) but not yet given a Module Memory entry when PR #245 built the module the same day -- all eleven FROZEN modules now have a Module Memory entry, no backfill gap remains" }
   note: >-
-    Rebound by SYNC-053 (post-#194 Repository Synchronization + implementation-planning
-    pass, 2026-07-23), advancing from `09e0b16` to HEAD `9ca0eed` (merge of PR #194,
-    Epic 8). Unlike SYNC-037's pure stamp-only rebind, the `09e0b16..9ca0eed` span is
-    NOT content-empty: it comprises Epic 5 PR 5.6/5.7/5.8 (employment-record build,
-    roster cutover, hotel-workers retirement), the ADR-024/025 ratification and
-    ADR-026/027/028 governance decisions, Epic 6/7 headline items (Rating rescale to
-    0-100, RoomsCompletedEntry, NotificationChannel.WEBHOOK), and Epic 8
-    (work-requests/work-applications in-service hotel-scoping). Those content changes
-    were already written into the knowledge indexes by their own sessions (SYNC-046..052
-    + the Epic 8 commit `353df1a`); this pass advances the stamps that lagged behind that
-    content and independently re-verifies coherence at HEAD: every completed epic checked
-    in `backend/src/` (not commit message), 367/367 backend tests green, `tsc --noEmit`
-    clean, `context-loader.js --validate` Errors:0, and `repository-integrity-check.js`
-    exit 0 (56 pre-existing WARN-only orphan/link findings unchanged in kind, 0 new
-    blocking). CONTRACT_INDEX advanced from its own later `2886267` stamp in the same
-    pass. Prior bind (retained for history): SYNC-037 rebound `39fc1f5..09e0b16` as a
-    pure stamp-only advance (Package A merge `4b58a42` + Fast-Documentation Package B
-    `9ba8944`/`09e0b16`, which touched only `docs/03-modules/*.md`). On any doubt about
-    validity, an artifact is treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1
-    invariant 5); the next repository-revision change re-opens this block.
+    Rebound by SYNC-055 (repository-synchronization pass, 2026-07-28), advancing
+    from `3254c83` to HEAD `1aa5f88` (PR #243 GD-18 calendar-absence narrow slice,
+    PR #244 GD-16 decision + SPEC-DOCUMENTS-001 freeze, PR #245 backend-documents
+    module implementation). NOT content-empty: added state-calendar-absence and
+    state-worker-document state-domain nodes to DEPENDENCY_GRAPH.yaml (both were
+    genuinely missing from that file's own state_domains/nodes lists despite
+    BOUNDARY_INDEX.yaml already recording the calendar one from a prior pass);
+    added a backend-documents module entry to MODULE_REGISTRY.yaml and
+    BOUNDARY_INDEX.yaml; corrected DEPENDENCY_GRAPH.yaml's stale
+    orphan_modules/stub_but_registered backend-calendar rows (still described it
+    as a pure NotImplementedError stub, false since PR #243); backfilled
+    ART-MEM-backend-documents (Module Memory gap, same pattern as SYNC-050).
+    Independently re-verified at HEAD 1aa5f88: `tsc --noEmit` clean, full backend
+    suite 71/71 suites, 1113/1113 tests green. Also recorded, not remediated (out
+    of this pass's scope): MODULE_REGISTRY.yaml/DEPENDENCY_GRAPH.yaml/
+    BOUNDARY_INDEX.yaml each independently fail strict YAML parsing at lines that
+    predate this session (confirmed present on origin/main before this session's
+    edits) — flagged as newly-observed, non-blocking drift, not fixed here since
+    it would mean rewriting long-standing governance-authored narrative text
+    outside this pass's reconciliation scope. See SYNC-055 for the full itemized
+    record. Prior bind (retained for history): SYNC-054 rebound `9ca0eed..3254c83`
+    (post-ADR-030 PR-1..PR-8, 2026-07-26) — ADR-030 capability-model rollout
+    reflected in permissions-middleware notes. Prior: SYNC-053 rebound `09e0b16..9ca0eed`
+    (post-#194, 2026-07-23) — Epic 5/6/7/8. Prior: SYNC-037 rebound `39fc1f5..09e0b16`
+    as a pure stamp-only advance. On any doubt about validity, an artifact is
+    treated as stale and reproduced (CONTEXT_ARTIFACTS.md §1 invariant 5); the
+    next repository-revision change re-opens this block.

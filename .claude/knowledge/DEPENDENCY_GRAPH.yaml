@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
+observed_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
 status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
 # MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
@@ -42,6 +42,11 @@ nodes:
   # resolved 2026-07-22, human decision, to a separate module — not backend-hr).
   - { id: employee-management, kind: module, owner: unassigned, source: backend/src/modules/employee-management, lifecycle: active }
   - { id: backend-analytics, kind: module, owner: unassigned, source: backend/src/modules/analytics }
+  # GD-16/SPEC-DOCUMENTS-001@0.1.4 (PR #245, 2026-07-27): first code registration
+  # for this module — mounted at /v1/documents. Sole writer/reader of
+  # state-worker-document; no other module reads or writes WorkerDocument yet
+  # (backend-hr's own upload stub is still self-contained, MIG-GAP-DOC-001 not done).
+  - { id: backend-documents, kind: module, owner: unassigned, source: backend/src/modules/documents, lifecycle: active-partial }
   # 2026-07-27 (GD-18 narrow slice): GET/POST /calendar/my-absences are real
   # (state-calendar-absence, CalendarAbsence model); /operations remains a
   # stub (unrelated capability, OD-CAL-10) -- mixed, not a pure stub.
@@ -152,6 +157,15 @@ nodes:
   # Platform Worker (PushTransportHandler deletes a token on provider-confirmed permanent
   # invalidity); read by the Platform Worker's PUSH fan-out.
   - { id: state-push-token, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma (model PushToken, added by Epic 7 PR 7.5)" }
+  # GD-18 narrow slice (2026-07-27, PR #243): worker self-mark sick/vacation.
+  # Previously unregistered in this list despite being live-code since PR #243 —
+  # closed by this synchronization pass (SYNC-055). See analysis.orphan_modules
+  # correction below (backend-calendar is no longer a pure orphan/stub).
+  - { id: state-calendar-absence, kind: state-domain, owner: backend-calendar, source: "backend/prisma/schema.prisma:926 (model CalendarAbsence, added by GD-18 narrow slice, migrations 20260727040000/20260727050000)" }
+  # GD-16/SPEC-DOCUMENTS-001@0.1.4 (PR #245, 2026-07-27): backend-documents module
+  # landed. First registration — this state-domain and its module node did not
+  # exist in this file before this pass (documents was zero-code through SYNC-054).
+  - { id: state-worker-document, kind: state-domain, owner: backend-documents, source: "backend/prisma/schema.prisma:890 (model WorkerDocument, added by GD-16, migration 20260727060000_add_worker_document)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -309,6 +323,23 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/quality/service.ts getLeaderboard()"
+  # GD-16/SPEC-DOCUMENTS-001 (PR #245, 2026-07-27): backend-documents' own
+  # writes/reads of its sole state domain. No cross-module edge exists yet
+  # (MIG-GAP-DOC-001, backend-hr's stub calling into this module, is not done).
+  - id: edge-documents-writes-worker-document
+    source: backend-documents
+    target: state-worker-document
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/documents/service.ts (uploadDocument: this.prisma.workerDocument.create)"
+  - id: edge-documents-reads-worker-document
+    source: backend-documents
+    target: state-worker-document
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/documents/service.ts (listWorkerDocuments/getDocument/getDocumentCompleteness/exportWorkerDocuments: this.prisma.workerDocument.findMany/findUnique)"
   - id: edge-analytics-reads-employment-record
     source: backend-analytics
     target: state-employment-record
@@ -742,10 +773,19 @@ analysis:
   orphan_modules:
     - { id: backend-chatbot, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
     - { id: backend-geo, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
-    - { id: backend-calendar, reason: "mounted at runtime (routes/v1/index.ts:34) but stub (all methods throw NotImplementedError); no discovered client consumer and no cross-module edge." }
+    # CORRECTED by SYNC-055 (2026-07-27): backend-calendar's /my-absences pair
+    # (GET/POST) has been real, non-stub code since PR #243 (GD-18 narrow slice);
+    # this row was stale (last true when only /operations existed). The
+    # /operations pair (OD-CAL-10, unrelated capability) still throws
+    # NotImplementedError — backend-calendar is mixed, not a pure orphan/stub.
+    # No client consumer of /my-absences has been discovered yet, so it is not
+    # removed from this list outright, only corrected to state the accurate reason.
+    - { id: backend-calendar, reason: "mounted at runtime (routes/v1/index.ts:34); GET/POST /my-absences (GD-18) are real, backed by state-calendar-absence, but /operations remains a stub (NotImplementedError, unrelated capability OD-CAL-10); no discovered client consumer of either surface and no cross-module edge." }
   stub_but_registered:
     - { id: backend-hr, note: "stub service (NotImplementedError) but consumed by mobile-worker (/hr) and mounted at runtime." }
-    - { id: backend-calendar, note: "stub service (NotImplementedError); mounted but no consumer discovered." }
+    # CORRECTED by SYNC-055: backend-calendar is no longer a pure stub (see
+    # orphan_modules correction above and state-calendar-absence node); moved
+    # out of this list, which is reserved for modules where every method throws.
   unknown_relationships:
     - "All module owners (node owner) and contract versions are UNKNOWN — human assignment required (per MODULE_REGISTRY.yaml)."
     - "state-user authoritative_writer RESOLVED backend-auth by ADR-017 (2026-07-15); backend-users is a bounded profile writer/reader (non-security fields only). Node-level accountable owner (SYNC-001) remains UNKNOWN."
@@ -755,5 +795,5 @@ remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
   - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs."
-  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub modules backend-hr and backend-calendar."
+  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub module backend-hr. backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
