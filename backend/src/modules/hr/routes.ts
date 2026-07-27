@@ -1,7 +1,45 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requirePermission, requireRole } from '../../middleware/permissions.js';
 import { hrController } from './controller.js';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '../documents/upload-policy.js';
+import { ValidationError } from '../../lib/errors.js';
+
+// MIG-GAP-DOC-001 / RULE-HR-13 / RULE-DOC-09: the contract-scan upload is
+// "mechanically treated like any other document upload" (CRR §9) — reuses
+// Documents' declared upload policy (upload-policy.ts), not another route's
+// implementation file, and not a HR-specific policy of its own. Memory
+// storage only, same as documents/routes.ts.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_FILE_SIZE_BYTES, files: 1 },
+  fileFilter: (_req, file, cb) => {
+    if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
+      cb(new multer.MulterError('LIMIT_UNEXPECTED_FILE', 'file'));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+// Translates multer's own MulterError into the platform's ValidationError
+// shape (422), mirroring documents/routes.ts's handleUploadErrors().
+function handleUploadErrors() {
+  return (err: unknown, _req: Request, _res: Response, next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === 'LIMIT_FILE_SIZE'
+          ? `File exceeds the maximum size of ${MAX_FILE_SIZE_BYTES} bytes`
+          : err.code === 'LIMIT_UNEXPECTED_FILE'
+            ? 'Unsupported file type or unexpected field'
+            : err.message;
+      next(new ValidationError(message));
+      return;
+    }
+    next(err);
+  };
+}
 
 const router = Router();
 router.use(authMiddleware);
@@ -41,13 +79,16 @@ router.post(
   (req, res, next) => hrController.createPayroll(req, res, next)
 );
 
-// Documents
+// Documents (contract-scan mechanism-class upload, MIG-GAP-DOC-001 — delegates
+// to backend-documents' DocumentService rather than hosting the mechanism)
 router.post(
   '/workers/:worker_id/documents',
   requireRole(['admin', 'manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
-  (req, res, next) => hrController.uploadDocument(req, res, next)
+  upload.single('file'),
+  handleUploadErrors(),
+  (req: Request, res: Response, next: NextFunction) => hrController.uploadDocument(req, res, next)
 );
 
 export default router;

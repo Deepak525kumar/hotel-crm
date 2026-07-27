@@ -1,25 +1,15 @@
 // SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16 Decided 2026-07-27).
-// REQ-DOC-017 / RULE-DOC-09: file-type and size validation for all upload paths.
-// Allowed content types and max size are stated explicitly here rather than
-// silently deferred (OD-DOC-016 covers malware scanning, explicitly deferred).
+// REQ-DOC-017 / RULE-DOC-09: file-type and size validation for the
+// POST /workers/:worker_id/documents request body. Shared upload policy
+// (allowed MIME types, max size) lives in upload-policy.ts, not here — this
+// file holds only the request-body Zod schema, which is specific to this
+// module's own route shape (category/filename/expiry), not shared with HR's
+// contract-scan mechanism-class upload.
 
 import { z } from 'zod';
+import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './upload-policy.js';
 
-// REQ-DOC-017 / RULE-DOC-09: confirmed allowed MIME types for worker document uploads.
-// Rationale: identity/residence documents are typically PDFs or images. No broader
-// type set is specified by CRR/PDD — the smallest set that covers the confirmed use
-// cases is used (Constitution §6: don't invent scope).
-export const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const;
-
-// REQ-DOC-017: maximum file size (10 MB). Not specified by CRR/PDD; chosen as a
-// generous-but-bounded limit consistent with identity/residence document sizes.
-// Adjustable without a schema migration.
-export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES };
 
 // file_size_bytes is deliberately NOT part of this schema: with multipart
 // upload wired (PR #247), the byte count is derived server-side from the
