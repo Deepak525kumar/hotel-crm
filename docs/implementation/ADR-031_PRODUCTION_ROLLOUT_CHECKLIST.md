@@ -26,8 +26,10 @@ that proxy breaks in a repository with no live deployment.
   2026-06-14 through 2026-07-26 (192 recorded attempts) resolved to `failure`, root cause
   `DATABASE_URL` resolving to an empty string at the migration step (`PROD_DATABASE_URL` and
   related secrets were never populated in GitHub). Zero `release/*` tags exist.
-- No document postdating 2026-06-20 in `docs/` or `docs/05-execution/CHANGELOG.md` records a
-  completed deployment.
+- No document postdating 2026-06-20 anywhere in `docs/` records a completed deployment.
+  (This bullet previously also cited `docs/05-execution/CHANGELOG.md`; that file was deleted
+  2026-07-27 as part of the execution-tracking redesign — its history remains recoverable via
+  `git log -- docs/05-execution/CHANGELOG.md`, and it never recorded a deployment either.)
 - `scripts/deploy.sh` (a manual, SSH-based deploy path independent of GitHub Actions) exists and
   is not itself proven unused — but no record of its use appears anywhere in the repository.
 

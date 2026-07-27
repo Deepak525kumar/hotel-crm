@@ -39,9 +39,9 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ IMPLEMENTED 2026-07-24 → `ADR-029` decided 2026-07-23 (Option B: Transactional Outbox + Worker runtime); built and merged as Epic 7, PRs 7.1–7.8** |
 | GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 | **✅ DECIDED 2026-07-25 → `ADR-030` (capability-based model: hotel/group writes Admin-only; scoped `users:write`; manager/RM employee authority action-only, never field-level). PR-1 through PR-8 (security hardening, matrix flip, `REGIONAL_MANAGER` enum, capability-named gates, documentation/register sync) all merged 2026-07-25/26. `ADR-030` status: Accepted (ratified `c951cfb`).** |
 | GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ PERMISSION SET DECIDED 2026-07-25 → `ADR-030` D-5 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) remains open — this decision resolves the permission set only. Code migration (enum + scope-claim issuance) implemented via PR-2 through PR-5 (merged).** |
-| GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 |
-| GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 |
-| GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 |
+| GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 | **✅ DECIDED 2026-07-27 → Split, per this row's own recommendation: (1) ship the single-writer + delete-behavior correctness fix now (app-owned writer replaces the DB-trigger/app dual-write divergence, `SIR-QUAL-005`); (2) recency-weighting, warning tiers, and photo-retention/retrieval-authorization are deferred as their own explicit product sub-decision (not decided by this session) — these are genuine new business rules the CRR does not fully specify (Constitution §6: do not assume). See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
+| GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 | **✅ DECIDED 2026-07-27 → Option (a): boolean `Hotel.accepting_jobs`, enforced at work-request creation. Matches the confirmed CRR text and the lowest-risk reversible build; scheduling windows (option b) explicitly not adopted as unrequested scope. See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
+| GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 | **✅ DECIDED 2026-07-27 → Option (a): a worker-scoped analytics endpoint (own stats only), resolving the silent 403. Warning-count and sick/vacation-count metrics remain deferred until `GD-04`'s tiers and `GD-18`'s Calendar land — this decision covers only the currently-derivable metrics (own completed jobs, own rating, own attendance-to-date). See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
 | GD-07 | Session/token revocation & auth rate-limiting | **P1** | Prod | 3–5 | **✅ DECIDED 2026-07-26 → `ADR-031` (Option (a): request-time permission derivation, `token_generation` revocation counter, Platform Worker session/reset-token sweep, Nginx-edge rate limiting per `TREQ-AUTH-008`). PR-0 through PR-8 (edge rate limiting, schema/claim, derivation+revocation cutover, write-path bumps, claim removal, client forced-re-auth, sweep job, flag retirement + `User.permissions` column drop, documentation/register/knowledge-graph sync) all merged 2026-07-26/27. `ADR-031` status: Accepted (ratified 2026-07-26). Rate-limiting resolved at the Nginx/Cloudflare edge, not in `backend/src`, per the Confirmed `TREQ-AUTH-008`/`TRULE-AUTH-002` requirement `ADR-031` consumes rather than amends. `FIND-004`/`SIR-AUTH-019` (admin-account-modification guard) was already resolved separately via `ADR-030` PR-1 and is not re-resolved here. `SIR-AUTH-017` (password-reset timing side-channel) remains explicitly OPEN — out of `ADR-031`'s scope (§9 Non-goals/§10 OI-1).** |
 | GD-08 | MFA design & data model | **P2** | Prod | 3–5 |
 | GD-09 | GDPR retention-tier assignment & Retention module | **P1** | Prod | 6–10 |
@@ -187,6 +187,10 @@ mobile screens) and assume the decision is made first — the decision itself is
 
 ## GD-04 — Quality rating derivation, warning tiers & photo policy (M3)
 
+**✅ DECIDED 2026-07-27 (split adopted, per this section's own recommendation).** See the summary
+row above and [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for
+the execution plan. Detail below is retained as the decision record.
+
 - **Why a decision is required:** The 0–100 scale (ADR-026) is shipped, but redefining the derived
   `WorkerOverallRating.average_score` under that scale is **BREAKING** for four consumers, and the target
   warning/tier model, recency-weighting, and photo-retention/retrieval-authorization are undecided.
@@ -209,6 +213,10 @@ mobile screens) and assume the decision is made first — the decision itself is
 
 ## GD-05 — Per-hotel "pause new jobs" toggle
 
+**✅ DECIDED 2026-07-27 (option (a) adopted).** See the summary row above and
+[`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution
+plan. Detail below is retained as the decision record.
+
 - **Why a decision is required:** A CRR §11-confirmed feature (`REQ-CRM-008`) is unimplemented, and its
   enforcement is a one-sided cross-module contract that needs the human to ratify the enforcement boundary.
 - **Current repository state:** No field, no route. `RULE-CRM-09` says enforcement lives in the
@@ -225,6 +233,11 @@ mobile screens) and assume the decision is made first — the decision itself is
 - **Priority:** **P1.** **Owner:** Product Owner.
 
 ## GD-06 — Worker-facing analytics scope & metric definitions
+
+**✅ DECIDED 2026-07-27 (option (a) adopted, scoped to currently-derivable metrics).** See the
+summary row above and
+[`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution
+plan. Detail below is retained as the decision record.
 
 - **Why a decision is required:** `mobile-worker`'s dashboard calls an admin/manager-only route and silently
   403s for every worker — so whether workers get *any* analytics is an unresolved product decision — and
