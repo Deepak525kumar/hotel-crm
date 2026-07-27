@@ -23,9 +23,10 @@ the highest-leverage next step is making the three remaining MVP-blocking owner 
 owner; full options/impact detail lives only in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md)).
 
-In parallel: initiate `GD-09` (GDPR retention tiers) now given its external tax-advisor sign-off
-lead time, and decide the zero-code `GD-12` (event-bus formalization), which unblocks HR/EMP/
-Calendar/Consent event-contract builds later at no build cost now.
+Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
+tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
+`GD-12` (event-bus formalization, zero-code — blocks HR/EMP/Calendar/Consent event-contract
+builds until decided).
 
 ## Per-Module Implementation Status
 
