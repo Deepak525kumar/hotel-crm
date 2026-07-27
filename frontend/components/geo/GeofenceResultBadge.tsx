@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui";
  */
 export function GeofenceResultBadge({ insideRadius }: { insideRadius: boolean }) {
   return insideRadius ? (
-    <Badge tone="success">At hotel</Badge>
+    <Badge tone="success">Inside geofence</Badge>
   ) : (
     <Badge tone="danger">Outside geofence</Badge>
   );
