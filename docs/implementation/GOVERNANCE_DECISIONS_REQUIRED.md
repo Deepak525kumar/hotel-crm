@@ -51,7 +51,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-13 | Cross-module state-read boundary ADR | **P3** | Post | 2–4 |
 | GD-14 | Geofencing / location model (Geo + attendance) | **P2** | Post | 6–9 |
 | GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 |
-| GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 |
+| GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 |
 | GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 |
 | GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 |
@@ -437,6 +437,9 @@ plan. Detail below is retained as the decision record.
 - **Priority:** **P2 (post-MVP; large).** **Owner:** Product Owner + Architect.
 
 ## GD-16 — Documents module — RBAC & storage design
+
+**✅ DECIDED 2026-07-27 (option (a) adopted, per this section's own recommendation).** See the
+summary row above. Detail below is retained as the decision record.
 
 - **Why a decision is required:** The Documents specification **cannot reach G2 freeze** until its
   document-level RBAC/permission model is decided; storage (S3 failure/encryption/retrieval), category
