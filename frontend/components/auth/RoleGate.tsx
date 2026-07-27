@@ -67,3 +67,51 @@ export function StaffingWriteGate({
     </RoleGate>
   );
 }
+
+/**
+ * User account deactivation (`DELETE /users/:id`) — Admin-only backend-side
+ * (users/routes.ts:39, `requireRole('admin')`), narrower than the worker
+ * detail page's own view gate (which now also admits Manager for the
+ * Documents section, GD-16). Split out so widening view access doesn't
+ * silently also expose an action the backend would 403.
+ */
+export function UserDeactivateGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
+
+/**
+ * SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16): worker document upload/view.
+ * GD-16's actor model is self-upload (worker) + manager-upload only. Unlike
+ * `StaffingWriteGate`, `regional_manager` is deliberately EXCLUDED here: the
+ * backend's own `resolveWorkerScope()` (middleware/permissions.ts) only
+ * special-cases `admin` and `manager` — every other role, including
+ * `regional_manager`, falls through to `{ allowed: false }` — and
+ * `documents/routes.ts`'s route-level `requireRole(['admin', 'manager',
+ * 'worker'])` doesn't list `regional_manager` either. Widening this gate to
+ * match the `StaffingWriteGate`/D-5 precedent would let an RM see this UI
+ * and then get a 403 on every request — do not "fix" this to match that
+ * precedent without first widening the backend.
+ */
+export function DocumentsGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
