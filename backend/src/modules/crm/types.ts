@@ -15,6 +15,8 @@ export const UpdateHotelSchema = z.object({
   address: z.string().min(1).max(500).optional(),
   timezone: z.string().optional(),
   is_active: z.boolean().optional(),
+  // GD-05: per-hotel "pause new jobs" toggle (REQ-CRM-008).
+  accepting_jobs: z.boolean().optional(),
   // Epic 5 PR 5.3 (ADR-023): group assignment happens after hotel creation
   // ("after a hotel is created, it is assigned" — CRR §11), so this is
   // update-only, not part of CreateHotelSchema.

@@ -25,10 +25,10 @@ still carries open G8 prerequisites.
 |---|---|---|
 | backend-auth | FROZEN @0.3.0 | `ADR-031` closed the session/token-revocation and rate-limiting prerequisites (`GD-07`). `SIR-AUTH-017` (password-reset timing side-channel) and per-account rate-limiting remain explicitly open and out of `ADR-031`'s scope. MFA (`GD-08`) undecided — no data model or endpoint exists. |
 | backend-users | FROZEN @0.2.0 | `OQ-USERS-01/02/05/06`, `SIR-USERS-005` (Medium), owner assignment (`SYNC-001`) |
-| backend-crm | FROZEN @0.2.0 | Owner assignment (`SYNC-001`); hotel/hotel-group writes now Admin-only per `ADR-030` |
-| backend-work-requests / work-applications / assignments | FROZEN @0.3.1 | Owner assignment (`SYNC-001`) |
+| backend-crm | FROZEN @0.2.1 | Owner assignment (`SYNC-001`); hotel/hotel-group writes now Admin-only per `ADR-030` |
+| backend-work-requests / work-applications / assignments | FROZEN @0.3.2 | Owner assignment (`SYNC-001`) |
 | backend-attendance | FROZEN @0.2.0 | Cross-tenant hotel-scoping (`OQ-02`, High, tracked `SYNC-019`); optimistic-locking pattern pending `GD-10`; auto-ABSENT/NO_SHOW automation pending `GD-21` |
-| backend-quality | FROZEN @0.2.0 | Dual-writer aggregate correctness bug open, blocked on `GD-04`; `OQ-01..09` and owner assignment remain G8 items |
+| backend-quality | FROZEN @0.2.0 | Dual-writer aggregate correctness bug resolved (`GD-04`, `SIR-QUAL-005`, 2026-07-27); `OQ-01..09` and owner assignment remain G8 items |
 | backend-hr (SPEC-EMP-001 mapping) | FROZEN @0.2.0 | No dedicated test file (`active-no-tests`); special-category access/audit controls unbuilt but disclosed; boundary conflict with a second, non-frozen `SPEC-HR-001` targeting the same code path is disclosed, not resolved |
 | employee-management | FROZEN @0.2.0 | Owner assignment; provisional perf budget (`OD-EMP-16`) |
 | backend-notifications | FROZEN @0.3.0 | `OQ-NOTIF-02/-03/-05`, owner assignment |
@@ -46,7 +46,7 @@ every row above live only in `.claude/knowledge/MODULE_REGISTRY.yaml` and
 
 | Prerequisite | Status |
 |---|---|
-| Test suite green | 67/67 suites, 1024/1024 tests passing; `tsc --noEmit` clean (independently re-verified 2026-07-27) |
+| Test suite green | 67/67 suites, 1033/1033 tests passing; `tsc --noEmit` clean (independently re-verified 2026-07-27) |
 | Accountable ownership (`SYNC-001`) | Fully unassigned repository-wide — no CODEOWNERS file, `backend/package.json` author empty. Hard release-accountability gate reserved to the human. |
 | MFA (`GD-08`) | No data model or endpoint anywhere; undecided |
 | Performance SLO & workload baseline (`GD-11`) | Undefined; blocks G8 for multiple modules until the human supplies workload assumptions |

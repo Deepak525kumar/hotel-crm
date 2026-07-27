@@ -74,7 +74,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-CRM-001@0.2.0 (FROZEN)  # docs/03-modules/crm/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High), reused unchanged for freeze. OD-CRM-01's Hotel Group facet RESOLVED by ADR-023 (HotelGroup entity owned by backend-crm); dedicated-Hotel-Manager facet plus OD-CRM-02/03/04/05(implementation)/06..17 and owner assignment (SYNC-001) are release/G8 prerequisites, not freeze blockers.
+    specification: SPEC-CRM-001@0.2.1 (FROZEN)  # docs/03-modules/crm/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/security/performance all PASS_WITH_ACTIONS, zero Critical/High), reused unchanged for freeze. OD-CRM-01's Hotel Group facet RESOLVED by ADR-023 (HotelGroup entity owned by backend-crm); dedicated-Hotel-Manager facet plus OD-CRM-02/03/05(implementation)/06..17 and owner assignment (SYNC-001) are release/G8 prerequisites, not freeze blockers. Amended 0.2.0->0.2.1 (2026-07-27, Correction) per GD-05: OD-CRM-04 (pause-jobs toggle) and OD-CRM-16 (bilateral cross-module contract) RESOLVED — Hotel.accepting_jobs implemented, enforced in work-requests/service.ts; reciprocal reference added to SPEC-JOB-DISPATCH-001@0.3.2.
     evidence: backend/src/routes/v1/index.ts:24
 
   - id: backend-hotel-workers
@@ -98,7 +98,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (accept-transaction coupling superseded-by-pivot, Accepted 2026-07-15). Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021 (Calendar boundary): CalendarEntry narrowed to assignment-kind only; TREQ-009/TRULE-008 auto-cancel converted to consuming EVT-CAL-SickVacationMarked; sick/vacation manager notification ceded to Calendar. FROZEN status retained (narrow reconciliation, not a re-open); see SYNC_STATE.yaml SYNC-042.
+    specification: SPEC-JOB-DISPATCH-001@0.3.2 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md; one bounded capability with work-applications + assignments. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018 (accept-transaction coupling superseded-by-pivot, Accepted 2026-07-15). Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021 (Calendar boundary): CalendarEntry narrowed to assignment-kind only; TREQ-009/TRULE-008 auto-cancel converted to consuming EVT-CAL-SickVacationMarked; sick/vacation manager notification ceded to Calendar. FROZEN status retained (narrow reconciliation, not a re-open); see SYNC_STATE.yaml SYNC-042. Amended 0.3.1->0.3.2 (2026-07-27, Correction) per GD-05: REQ-044/RULE-014 added, acknowledging read dependency on Hotel.accepting_jobs (SPEC-CRM-001@0.2.1); closes SIR-CRM-016/OD-CRM-16's bilateral-contract requirement.
     evidence: backend/src/routes/v1/index.ts:26; backend/src/modules/work-requests/service.ts:4
 
   - id: backend-work-applications
@@ -110,7 +110,7 @@ modules:
     dependencies: [backend-notifications]
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; see backend-work-requests entry.
+    specification: SPEC-JOB-DISPATCH-001@0.3.2 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; 0.3.1->0.3.2 (2026-07-27, Correction) per GD-05; see backend-work-requests entry.
     evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
 
   - id: backend-assignments
@@ -122,7 +122,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.1 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; see backend-work-requests entry.
+    specification: SPEC-JOB-DISPATCH-001@0.3.2 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; 0.3.1->0.3.2 (2026-07-27, Correction) per GD-05; see backend-work-requests entry.
     evidence: backend/src/routes/v1/index.ts:28
 
   - id: backend-attendance

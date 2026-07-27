@@ -66,6 +66,13 @@ export class WorkRequestService extends BaseService {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: input.hotel_id } });
     if (!hotel || hotel.deleted_at) throw new NotFoundError('Hotel not found');
 
+    // GD-05: per-hotel "pause new jobs" toggle (REQ-CRM-008). A business-state
+    // precondition, not an authorization check — ConflictError (409), matching
+    // this method's other state-based rejections, not ForbiddenError.
+    if (!hotel.accepting_jobs) {
+      throw new ConflictError('This hotel is not currently accepting new work requests');
+    }
+
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only create work
     // requests for hotels in their scope claim (retired M-4).
     // Admin keeps unconditional cross-hotel access (unchanged, by design).

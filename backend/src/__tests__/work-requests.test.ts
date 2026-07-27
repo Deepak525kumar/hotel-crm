@@ -113,7 +113,7 @@ describe('WorkRequestService', () => {
     });
 
     it('creates a DRAFT request without publishing', async () => {
-      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null });
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
       mockWorkRequest.create.mockResolvedValue(makeRow());
       const dto = await service.create(baseInput, { userId: 'mgr1', role: 'admin' });
       expect(dto.status).toBe('DRAFT');
@@ -125,12 +125,20 @@ describe('WorkRequestService', () => {
     });
 
     it('sets published_at when created directly as OPEN', async () => {
-      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null });
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
       mockWorkRequest.create.mockResolvedValue(makeRow({ status: 'OPEN', published_at: new Date() }));
       await service.create({ ...baseInput, status: 'OPEN' }, { userId: 'mgr1', role: 'admin' });
       const data = mockWorkRequest.create.mock.calls[0][0].data;
       expect(data.status).toBe('OPEN');
       expect(data.published_at).toBeInstanceOf(Date);
+    });
+
+    it('GD-05: rejects creation when the hotel has paused accepting_jobs', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: false });
+      await expect(service.create(baseInput, { userId: 'mgr1', role: 'admin' })).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+      expect(mockWorkRequest.create).not.toHaveBeenCalled();
     });
   });
 

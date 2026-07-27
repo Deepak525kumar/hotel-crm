@@ -111,6 +111,31 @@ describe('CrmService - Hotels', () => {
       const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { hotel_group_id: string } }>;
       expect(updateCall[0]?.data.hotel_group_id).toBe('hg_existing');
     });
+
+    it('GD-05: toggles accepting_jobs when provided', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, accepting_jobs: true, hotel_group_id: null };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotel.update.mockResolvedValue({ ...hotel, accepting_jobs: false });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateHotel('h1', { accepting_jobs: false }, 'admin_1', 'admin');
+
+      expect(result.accepting_jobs).toBe(false);
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { accepting_jobs: boolean } }>;
+      expect(updateCall[0]?.data.accepting_jobs).toBe(false);
+    });
+
+    it('GD-05: leaves accepting_jobs unchanged when not provided in the update', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, accepting_jobs: false, hotel_group_id: null };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotel.update.mockResolvedValue(hotel);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotel('h1', { name: 'Renamed Hotel' }, 'admin_1', 'admin');
+
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { accepting_jobs: boolean } }>;
+      expect(updateCall[0]?.data.accepting_jobs).toBe(false);
+    });
   });
 
   describe('getHotel', () => {

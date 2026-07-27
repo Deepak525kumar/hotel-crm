@@ -357,6 +357,10 @@ model Hotel {
   contact_email String?
   contact_phone String?
   is_active     Boolean   @default(true)
+  // GD-05: per-hotel "pause new jobs" toggle (REQ-CRM-008). Enforced at
+  // work-request creation, not a role/scope gate — checked in addition to
+  // is_active/deleted_at, not instead of them.
+  accepting_jobs Boolean  @default(true)
   deleted_at    DateTime?
   created_at    DateTime  @default(now())
   updated_at    DateTime  @updatedAt
