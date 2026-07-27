@@ -16,6 +16,7 @@ import hrRoutes from '../../modules/hr/routes.js';
 import notificationRoutes from '../../modules/notifications/routes.js';
 import analyticsRoutes from '../../modules/analytics/routes.js';
 import calendarRoutes from '../../modules/calendar/routes.js';
+import documentRoutes from '../../modules/documents/routes.js';
 import employeeManagementRoutes from '../../modules/employee-management/routes.js';
 
 const router = Router();
@@ -34,6 +35,7 @@ router.use('/hr', hrRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/calendar', calendarRoutes);
+router.use('/documents', documentRoutes);
 
 // Employee-management routes (Epic 5 PR 5.6, SPEC-EMP-001) — gated by
 // FEATURE_EMPLOYMENT_RECORD (default OFF). While disabled, requests fall
@@ -73,7 +75,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'notifications', 'analytics', 'quality', 'employee-management'],
+      modules: ['auth', 'users', 'crm', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'notifications', 'analytics', 'quality', 'employee-management'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {

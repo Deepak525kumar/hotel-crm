@@ -1,0 +1,199 @@
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+
+/**
+ * SPEC-DOCUMENTS-001 @0.1.4 FROZEN, GD-16 Decided 2026-07-27: service-level
+ * regression for the self-scope enforcement that routes.ts's scopeWorkerRoute()
+ * deliberately does NOT perform for the 'worker' role (checkWorkerScope() has
+ * no worker branch — see routes.ts comment). DocumentService is the actual
+ * enforcement point for RULE-DOC-08 / GD-16's "worker may only act on their
+ * own document set" requirement.
+ */
+
+const mockWorkerDocumentCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockWorkerDocumentFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockWorkerDocumentFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+
+jest.mock('../lib/logger.js', () => ({
+  logger: {
+    info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    warn: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    debug: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    error: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+}));
+
+jest.mock('../lib/db.js', () => ({
+  getPrisma: () => ({
+    workerDocument: {
+      create: mockWorkerDocumentCreate,
+      findMany: mockWorkerDocumentFindMany,
+      findUnique: mockWorkerDocumentFindUnique,
+    },
+    auditLog: { create: mockAuditLogCreate },
+  }),
+}));
+
+// Isolates the service test from env.S3_BUCKET (set in local .env for real
+// dev use) — storage.ts's real-vs-stub branch is exercised by its own test,
+// not this one.
+jest.mock('../modules/documents/storage.js', () => ({
+  generateStorageKey: (workerId: string, category: string, filename: string) =>
+    `documents/${workerId}/${category.toLowerCase()}/test-uuid/${filename}`,
+  getStorageClient: async () => ({
+    upload: jest.fn(),
+    getPresignedUrl: async () => null,
+    delete: jest.fn(),
+  }),
+}));
+
+import { DocumentService } from '../modules/documents/service.js';
+import { ForbiddenError, NotFoundError } from '../lib/errors.js';
+
+describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
+  let service: DocumentService;
+
+  beforeEach(() => {
+    service = new DocumentService();
+    mockWorkerDocumentCreate.mockReset();
+    mockWorkerDocumentFindMany.mockReset();
+    mockWorkerDocumentFindUnique.mockReset();
+    mockAuditLogCreate.mockReset();
+  });
+
+  describe('uploadDocument — RULE-DOC-08 self-scope for worker role', () => {
+    it('rejects a worker uploading to another worker\'s document set', async () => {
+      await expect(
+        service.uploadDocument(
+          {
+            worker_id: 'w2',
+            actor_id: 'w1',
+            category: 'GENERAL',
+            original_filename: 'id.pdf',
+            mime_type: 'application/pdf',
+            file_size_bytes: 100,
+          },
+          Buffer.from('x'),
+          'worker'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockWorkerDocumentCreate).not.toHaveBeenCalled();
+    });
+
+    it('allows a worker uploading to their own document set', async () => {
+      mockWorkerDocumentCreate.mockResolvedValue({
+        id: 'd1',
+        worker_id: 'w1',
+        uploaded_by_id: 'w1',
+        category: 'GENERAL',
+        s3_key: 'documents/w1/general/uuid/id.pdf',
+        original_filename: 'id.pdf',
+        mime_type: 'application/pdf',
+        file_size_bytes: 1,
+        expires_at: null,
+        is_work_permit: false,
+        created_at: new Date('2026-07-27T00:00:00.000Z'),
+        updated_at: new Date('2026-07-27T00:00:00.000Z'),
+      });
+
+      const result = await service.uploadDocument(
+        {
+          worker_id: 'w1',
+          actor_id: 'w1',
+          category: 'GENERAL',
+          original_filename: 'id.pdf',
+          mime_type: 'application/pdf',
+          file_size_bytes: 1,
+        },
+        Buffer.from('x'),
+        'worker'
+      );
+
+      expect(result.worker_id).toBe('w1');
+      // s3_key must never appear in the client-facing DTO (OD-DOC-017).
+      expect(result).not.toHaveProperty('s3_key');
+      expect(mockAuditLogCreate).toHaveBeenCalled();
+    });
+
+    it('does not self-scope a manager upload (GD-16 actor 2, group scope is enforced in routes.ts)', async () => {
+      mockWorkerDocumentCreate.mockResolvedValue({
+        id: 'd2',
+        worker_id: 'w1',
+        uploaded_by_id: 'm1',
+        category: 'WORK_PERMIT',
+        s3_key: 'documents/w1/work_permit/uuid/permit.pdf',
+        original_filename: 'permit.pdf',
+        mime_type: 'application/pdf',
+        file_size_bytes: 1,
+        expires_at: null,
+        is_work_permit: true,
+        created_at: new Date('2026-07-27T00:00:00.000Z'),
+        updated_at: new Date('2026-07-27T00:00:00.000Z'),
+      });
+
+      const result = await service.uploadDocument(
+        {
+          worker_id: 'w1',
+          actor_id: 'm1',
+          category: 'WORK_PERMIT',
+          original_filename: 'permit.pdf',
+          mime_type: 'application/pdf',
+          file_size_bytes: 1,
+          is_work_permit: true,
+        },
+        Buffer.from('x'),
+        'manager'
+      );
+
+      expect(result.uploaded_by_id).toBe('m1');
+    });
+  });
+
+  describe('listWorkerDocuments — self-scope', () => {
+    it('rejects a worker listing another worker\'s documents', async () => {
+      await expect(
+        service.listWorkerDocuments('w2', 'w1', 'worker')
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockWorkerDocumentFindMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getDocument — FIND-SEC-DOC-01 ownership binding', () => {
+    it('throws NotFoundError when the document does not exist', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(null);
+      await expect(service.getDocument('missing', 'w1', 'worker')).rejects.toBeInstanceOf(
+        NotFoundError
+      );
+    });
+
+    it('rejects a worker fetching a document that is not their own', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue({
+        id: 'd1',
+        worker_id: 'w2',
+        s3_key: 'k',
+      });
+      await expect(service.getDocument('d1', 'w1', 'worker')).rejects.toBeInstanceOf(
+        ForbiddenError
+      );
+    });
+  });
+
+  describe('getDocumentCompleteness — REQ-DOC-002/005', () => {
+    it('is incomplete when no GENERAL document exists', async () => {
+      mockWorkerDocumentFindMany.mockResolvedValue([]);
+      const result = await service.getDocumentCompleteness('w1', false);
+      expect(result.is_complete).toBe(false);
+      expect(result.missing_categories).toEqual(['GENERAL']);
+    });
+
+    it('requires WORK_PERMIT only when work_permit_required is true', async () => {
+      mockWorkerDocumentFindMany.mockResolvedValue([{ category: 'GENERAL' }]);
+      const notRequired = await service.getDocumentCompleteness('w1', false);
+      expect(notRequired.is_complete).toBe(true);
+
+      const required = await service.getDocumentCompleteness('w1', true);
+      expect(required.is_complete).toBe(false);
+      expect(required.missing_categories).toEqual(['WORK_PERMIT']);
+    });
+  });
+});
