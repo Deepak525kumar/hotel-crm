@@ -136,6 +136,34 @@ describe('CrmService - Hotels', () => {
       const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { accepting_jobs: boolean } }>;
       expect(updateCall[0]?.data.accepting_jobs).toBe(false);
     });
+
+    it('GD-14/OD-GEO-001/004: sets latitude/longitude when provided', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, accepting_jobs: true, hotel_group_id: null, latitude: null, longitude: null };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotel.update.mockResolvedValue({ ...hotel, latitude: 52.52, longitude: 13.405 });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateHotel('h1', { latitude: 52.52, longitude: 13.405 }, 'admin_1', 'admin');
+
+      expect(result.latitude).toBe(52.52);
+      expect(result.longitude).toBe(13.405);
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { latitude: number; longitude: number } }>;
+      expect(updateCall[0]?.data.latitude).toBe(52.52);
+      expect(updateCall[0]?.data.longitude).toBe(13.405);
+    });
+
+    it('GD-14: leaves latitude/longitude unchanged when not provided in the update', async () => {
+      const hotel = { id: 'h1', name: 'Hotel X', city: 'Hamburg', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, accepting_jobs: true, hotel_group_id: null, latitude: 52.52, longitude: 13.405 };
+      mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+      mockPrisma.hotel.update.mockResolvedValue(hotel);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotel('h1', { name: 'Renamed Hotel' }, 'admin_1', 'admin');
+
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { latitude: number; longitude: number } }>;
+      expect(updateCall[0]?.data.latitude).toBe(52.52);
+      expect(updateCall[0]?.data.longitude).toBe(13.405);
+    });
   });
 
   describe('getHotel', () => {

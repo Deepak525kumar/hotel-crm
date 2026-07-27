@@ -101,6 +101,8 @@ export class CrmService extends BaseService {
         is_active: data.is_active ?? hotel.is_active,
         accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs,
         hotel_group_id: data.hotel_group_id ?? hotel.hotel_group_id,
+        latitude: data.latitude ?? hotel.latitude,
+        longitude: data.longitude ?? hotel.longitude,
       },
     });
 
