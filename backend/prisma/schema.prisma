@@ -66,6 +66,13 @@ enum AssignmentStatus {
   REASSIGNED
 }
 
+// GD-18 narrow slice: SPEC-CALENDAR-001 REQ-CAL-T03/T08. Calendar-owned only —
+// distinct from Job Dispatch's CalendarEntry/WorkerAssignment (ADR-021).
+enum CalendarAbsenceKind {
+  SICK
+  VACATION
+}
+
 // SP-6: EXPECTED added as the initial pre-shift state; default changed to EXPECTED.
 enum AttendanceStatus {
   EXPECTED  // record created pre-shift; worker not yet checked in
@@ -117,6 +124,8 @@ enum NotificationType {
   QUALITY_VERIFICATION_SUBMITTED
   RATING_RECEIVED
   REWORK_REQUIRED            // to worker: verification failed, rework needed
+  // Calendar events (SPEC-CALENDAR-001, RULE-CAL-06)
+  CALENDAR_ABSENCE_MARKED    // to manager: worker marked sick/vacation
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -146,6 +155,7 @@ enum OutboxSourceModule {
   WORK_APPLICATIONS
   ATTENDANCE
   QUALITY
+  CALENDAR
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
@@ -272,6 +282,7 @@ model User {
   password_reset_tokens     PasswordResetToken[]
   managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
   managed_hotels            Hotel[]                 @relation("hotel_manager")
+  calendar_absences         CalendarAbsence[]       @relation("calendar_absence_worker")
   // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
   employment_record           EmploymentRecord?         @relation("employment_record")
@@ -852,4 +863,28 @@ model AuditLog {
   @@index([resource_id])
   @@index([timestamp])
   @@index([resource_type, resource_id]) // "full history of a resource"
+}
+
+// =============================================================================
+// CALENDAR MODULE (SPEC-CALENDAR-001, narrow ADR-021 slice)
+// =============================================================================
+
+// state-calendar-absence (SPEC-CALENDAR-001 REQ-CAL-T08): Calendar-owned,
+// distinct from Job Dispatch's CalendarEntry/WorkerAssignment (ADR-021).
+// Stores only a plain sick/vacation flag -- no health data (CRR §27 §353),
+// no leave-balance accounting (non-goal, REQ-CAL-T07).
+model CalendarAbsence {
+  id         String              @id @default(cuid())
+  worker_id  String
+  worker     User                @relation("calendar_absence_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  // Date-only (no time component); the specific day being marked, not a range.
+  day        DateTime            @db.Date
+  kind       CalendarAbsenceKind
+  created_at DateTime            @default(now())
+  updated_at DateTime            @updatedAt
+
+  // RULE-CAL-03: one mark per worker per day.
+  @@unique([worker_id, day])
+  @@index([worker_id])
+  @@index([day])
 }

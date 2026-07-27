@@ -49,6 +49,8 @@ jest.mock('../modules/calendar/controller.js', () => ({
   calendarController: {
     getDailyOperations: ok,
     createDailyOperation: ok,
+    getOwnAbsences: ok,
+    markAbsence: ok,
   },
 }));
 

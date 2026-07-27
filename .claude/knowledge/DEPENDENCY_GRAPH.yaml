@@ -42,7 +42,10 @@ nodes:
   # resolved 2026-07-22, human decision, to a separate module — not backend-hr).
   - { id: employee-management, kind: module, owner: unassigned, source: backend/src/modules/employee-management, lifecycle: active }
   - { id: backend-analytics, kind: module, owner: unassigned, source: backend/src/modules/analytics }
-  - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: stub }
+  # 2026-07-27 (GD-18 narrow slice): GET/POST /calendar/my-absences are real
+  # (state-calendar-absence, CalendarAbsence model); /operations remains a
+  # stub (unrelated capability, OD-CAL-10) -- mixed, not a pure stub.
+  - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: active-partial }
   # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
   # file); not imported or mounted anywhere. No relationships exist.
   # backend-chatbot: SPEC-CHATBOT-001@0.1.3 (REVIEW) now exists (SYNC-029), but no

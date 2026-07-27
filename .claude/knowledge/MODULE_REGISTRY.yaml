@@ -203,12 +203,12 @@ modules:
     path: backend/src/modules/calendar
     owner: unassigned
     lifecycle: active
-    implementation_status: stub  # route-registered but all CalendarService methods throw NotImplementedError (backend/src/modules/calendar/service.ts:5-11); reconciled from the prior mislabel active-no-tests per OD-CAL-05 / ADR-021 re-author (2026-07-19)
+    implementation_status: active-partial  # 2026-07-27 (GD-18 narrow slice): GET/POST /calendar/my-absences (worker self-mark sick/vacation, REQ-CAL-T02/T03/T04/T08) are real, backed by the new CalendarAbsence model. The /operations endpoints (reception-data stub, OD-CAL-10, unrelated capability) still throw NotImplementedError, as does the manager weekly-plan placement view and the today-only availability read-model (REQ-CAL-T01/T06) -- neither built by this slice.
     dependencies: []
-    published_events: none-observed  # current code; target (ADR-021): publishes EVT-CAL-SickVacationMarked
+    published_events: none-observed  # same-day auto-cancel implemented as a direct in-process call to AssignmentService.update(), not the target EVT-CAL-SickVacationMarked event (no event bus exists yet, GD-12 undecided) -- a human-approved narrower mechanism, independently architecture-reviewed as still respecting the ADR-021 ownership boundary (ADR-021: Calendar never writes WorkerAssignment/CalendarEntry directly)
     consumed_events: none-observed
-    specification: SPEC-CALENDAR-001@0.3.0 (FROZEN)  # docs/03-modules/calendar/MODULE_SPEC.md. FROZEN at G2 on 2026-07-19 by the commissioning human, on the ADR-021 boundary (narrow Calendar: owns state-calendar-absence + availability read-model; Job Dispatch retains WorkerAssignment/CalendarEntry/exclusivity). All five G4 dimensions PASS_WITH_ACTIONS or better, zero open Critical/High. Open decisions OD-CAL-04/06/07/08/10/11 + owner assignment OD-CAL-09/SYNC-001 are release/implementation prerequisites reviewed by G8, NOT freeze blockers. See SYNC_STATE.yaml SYNC-042/043/044; DECISION_INDEX ADR-021 (Accepted); MODULE_MEMORY.yaml ART-MEM-backend-calendar
-    evidence: backend/src/routes/v1/index.ts:34
+    specification: SPEC-CALENDAR-001@0.3.0 (FROZEN)  # docs/03-modules/calendar/MODULE_SPEC.md. FROZEN at G2 on 2026-07-19 by the commissioning human, on the ADR-021 boundary (narrow Calendar: owns state-calendar-absence + availability read-model; Job Dispatch retains WorkerAssignment/CalendarEntry/exclusivity). All five G4 dimensions PASS_WITH_ACTIONS or better, zero open Critical/High. Open decisions OD-CAL-04/06/07/08/10/11 + owner assignment OD-CAL-09/SYNC-001 are release/implementation prerequisites reviewed by G8, NOT freeze blockers. See SYNC_STATE.yaml SYNC-042/043/044; DECISION_INDEX ADR-021 (Accepted); MODULE_MEMORY.yaml ART-MEM-backend-calendar. Implementation (2026-07-27, GD-18 narrow slice) landed state-calendar-absence (CalendarAbsence model, migrations 20260727040000/20260727050000) and GET/POST /calendar/my-absences; OD-CAL-04 (timezone) implementation-time default: Europe/Berlin (matches Hotel.timezone default, SPEC-CRM-001); OD-CAL-06 (notification transport) implementation-time default: existing notificationService.enqueue() in-process call, not a formal event.
+    evidence: backend/src/modules/calendar/service.ts; backend/src/routes/v1/index.ts:34
 
   - id: backend-chatbot
     type: backend-module

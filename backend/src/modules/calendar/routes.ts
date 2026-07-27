@@ -24,4 +24,10 @@ router.post(
   (req, res, next) => calendarController.createDailyOperation(req, res, next)
 );
 
+// REQ-CAL-T02/T03: self-scoped -- any authenticated role, no admin/manager
+// gate (self-scope is itself the authorization, same pattern as GD-06's
+// /analytics/my-stats).
+router.get('/my-absences', (req, res, next) => calendarController.getOwnAbsences(req, res, next));
+router.post('/my-absences', (req, res, next) => calendarController.markAbsence(req, res, next));
+
 export default router;

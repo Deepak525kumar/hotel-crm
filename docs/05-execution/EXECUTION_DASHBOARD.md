@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 67/67 suites, 1045/1045 tests passing; `tsc --noEmit` clean) |
+| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 69/69 suites, 1071/1071 tests passing; `tsc --noEmit` clean) |
 
 ## Current Milestone
 
@@ -51,7 +51,7 @@ path, specification reference, and freeze/review disposition.
 | employee-management | active | active | SPEC-EMP-001@0.2.0 FROZEN |
 | backend-notifications | active | active | SPEC-NOTIF-001@0.3.0 FROZEN |
 | backend-analytics | active | active | SPEC-ANALYTICS-001@0.2.1 FROZEN |
-| backend-calendar | active | stub (route-registered; every `CalendarService` method throws `NotImplementedError`) | SPEC-CALENDAR-001@0.3.0 FROZEN |
+| backend-calendar | active | active-partial (2026-07-27, `GD-18` narrow slice: `GET`/`POST /calendar/my-absences` real; `/operations` remains stub, unrelated capability `OD-CAL-10`) | SPEC-CALENDAR-001@0.3.1 FROZEN |
 | backend-chatbot | declared | unimplemented-stub (`.placeholder` only, not route-registered) | SPEC-CHATBOT-001@0.1.3 REVIEW |
 | backend-geo | declared | unimplemented-stub (`.placeholder` only, not route-registered) | SPEC-GEO-001@0.1.1 REVIEW |
 | backend-consent | no module directory | zero-code | SPEC-CONSENT-001@0.1.1 REVIEW |
@@ -60,10 +60,12 @@ path, specification reference, and freeze/review disposition.
 | frontend-web, mobile-worker, mobile-checker | active | active | UNKNOWN (no client spec) |
 | operations (infra) | active | not-applicable | UNKNOWN |
 
-**Independently re-verified 2026-07-27:** `backend/src/modules/hr/service.ts` and
-`backend/src/modules/calendar/service.ts` both still throw `NotImplementedError` from every
-service method; `backend/src/modules/chatbot/` and `backend/src/modules/geo/` contain only
-`.placeholder`, no route mount.
+**Independently re-verified 2026-07-27:** `backend/src/modules/hr/service.ts` still throws
+`NotImplementedError` from every service method. `backend/src/modules/calendar/service.ts`'s
+`/operations` methods still throw `NotImplementedError` (unrelated capability, `OD-CAL-10`), but
+`getOwnAbsences`/`markAbsence` (the `GD-18` narrow slice: worker self-marks sick/vacation) are real
+— see Completed Work below. `backend/src/modules/chatbot/` and `backend/src/modules/geo/` contain
+only `.placeholder`, no route mount.
 
 ## Completed Work (this milestone)
 
@@ -101,6 +103,21 @@ service method; `backend/src/modules/chatbot/` and `backend/src/modules/geo/` co
   `DashboardStats` type-shape mismatch it also carried (the mobile client's old type never matched
   any real backend response). `SPEC-ANALYTICS-001` amended to @0.2.1. Warning counts and
   sick/vacation counts remain explicitly deferred (`GD-04`'s tiers, `GD-18`'s Calendar).
+- `GD-18` (Calendar) — **narrow slice built 2026-07-27**, `GD-18` itself still undecided as a
+  formal product decision. Per the frozen `SPEC-CALENDAR-001`'s own text (its `ADR-021` boundary
+  and `REQ-CAL-T08`'s explicit no-Phase-1-dependency note), the worker self-mark
+  sick/vacation capability (`REQ-CAL-T03/T04/T08`) required no governance decision to build — it
+  is independent of the manager weekly-plan placement view (`REQ-CAL-T01`, which does depend on
+  the still-marketplace-era `WorkerAssignment` schema) and independent of `GD-12`
+  (event-bus). Built: `CalendarAbsence` model (`state-calendar-absence`), `GET`/`POST
+  /calendar/my-absences` (self-scoped, any authenticated role), same-day auto-cancel via a direct
+  in-process call to `AssignmentService.update()` (not the target `EVT-CAL-SickVacationMarked`
+  event — no event bus exists yet), best-effort manager notification via the worker's
+  `EmploymentRecord`→`HotelGroup.regional_manager_user_id`. Independently architecture-reviewed:
+  the `ADR-021` ownership boundary (Calendar never writes `WorkerAssignment`/`CalendarEntry`
+  directly) holds. `SPEC-CALENDAR-001` amended to @0.3.1; `OD-CAL-04` (timezone) and `OD-CAL-06`
+  (notification transport) carry implementation-time defaults, not formal resolutions. The manager
+  weekly-plan placement view and the today-only availability read-model remain unbuilt.
 
 Full narrative and PR-by-PR delivery evidence for all of the above:
 [`MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md`](../implementation/MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md).
@@ -116,7 +133,7 @@ every `GD-*` ID lives only in
 | Area | State | Blocked on |
 |---|---|---|
 | backend-hr | mounted, every method `NotImplementedError` | `GD-15` (HR/EMP build scope), which itself depends on `GD-03`'s open org-chart half, `GD-09`, `GD-16`, `GD-12` |
-| backend-calendar | mounted, every method `NotImplementedError` | `GD-18` (Calendar module scope), depends on `GD-01` (done) / `GD-03` (role part done, RM edit scope `OD-CAL-07` build pending) / `GD-12` |
+| backend-calendar: manager weekly-plan placement view + today-only availability read-model | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` (remaining scope), depends on Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001` / `GD-03` (RM edit scope `OD-CAL-07`) / `GD-12` |
 | backend-chatbot | zero code, `.placeholder` only | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
 | backend-geo | zero code, `.placeholder` only | `GD-14` (geofencing/location model) |
 | backend-consent, backend-compliance, backend-retention | zero code, no module directory | `GD-17` (consent), `GD-09` (retention, external tax-advisor sign-off), compliance is read-only downstream of both |
