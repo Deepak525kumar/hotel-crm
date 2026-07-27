@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 67/67 suites, 1033/1033 tests passing; `tsc --noEmit` clean) |
+| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 67/67 suites, 1045/1045 tests passing; `tsc --noEmit` clean) |
 
 ## Current Milestone
 
@@ -16,12 +16,15 @@ Rate-Limiting) are both Accepted and fully built (PR-1..PR-8 each, merged 2026-0
 (linked, not restated). This closed the `GD-02`, `GD-03` (permission-set half), and `GD-07` rows in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
-**Next milestone (in progress): "MVP Completion Decisions."** `GD-04`, `GD-05`, and `GD-06` are all
-Decided. `GD-04` (quality rating single-writer fix) and `GD-05` (per-hotel "pause new jobs" toggle)
-are built and merged (2026-07-27; PR #237/#238 for `GD-04`; `GD-05`'s PR pending review). `GD-06`
-(worker-facing analytics endpoint) remains Decided but unbuilt. See the Blockers table below for
-what each still blocks; full options/impact detail lives only in
+**MVP Completion Decisions — COMPLETE (2026-07-27).** `GD-04`, `GD-05`, and `GD-06` are all Decided
+and built: `GD-04` (quality rating single-writer fix, PR #237/#238), `GD-05` (per-hotel "pause new
+jobs" toggle, PR #239), `GD-06` (worker-scoped analytics endpoint). No blocker remains open from
+this batch. Full options/impact detail lives only in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
+
+**Next up:** no MVP-blocking decision remains undecided. Remaining work is either (a) governed by a
+still-undecided `GD-*` (see Remaining Modules & Work below), or (b) frontend/mobile work to surface
+already-shipped backend contracts (e.g. `GD-05`'s hotel-admin pause-toggle UI, not yet built).
 
 Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
 tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
@@ -47,7 +50,7 @@ path, specification reference, and freeze/review disposition.
 | backend-hr | active | active-no-tests | SPEC-EMP-001@0.2.0 FROZEN (see registry `related_specification` note re: SPEC-HR-001 boundary disclosure) |
 | employee-management | active | active | SPEC-EMP-001@0.2.0 FROZEN |
 | backend-notifications | active | active | SPEC-NOTIF-001@0.3.0 FROZEN |
-| backend-analytics | active | active | SPEC-ANALYTICS-001@0.2.0 FROZEN |
+| backend-analytics | active | active | SPEC-ANALYTICS-001@0.2.1 FROZEN |
 | backend-calendar | active | stub (route-registered; every `CalendarService` method throws `NotImplementedError`) | SPEC-CALENDAR-001@0.3.0 FROZEN |
 | backend-chatbot | declared | unimplemented-stub (`.placeholder` only, not route-registered) | SPEC-CHATBOT-001@0.1.3 REVIEW |
 | backend-geo | declared | unimplemented-stub (`.placeholder` only, not route-registered) | SPEC-GEO-001@0.1.1 REVIEW |
@@ -83,11 +86,20 @@ service method; `backend/src/modules/chatbot/` and `backend/src/modules/geo/` co
   the app-level `refreshWorkerOverallRating()` is now the sole writer, called from both rating
   creation and assignment-completion/cancellation. `SIR-QUAL-005` resolved. Tiers/warnings/photo
   policy remain deferred as a separate product sub-decision, not covered by this fix.
-- `GD-05` Per-hotel "pause new jobs" toggle — Decided and built (2026-07-27): `Hotel.accepting_jobs`
-  boolean (default `true`), set via `PATCH /hotels/:hotel_id`, enforced in
-  `work-requests/service.ts` `create()`. `SIR-CRM-004`/`SIR-CRM-016` resolved; `SPEC-CRM-001`
-  amended to @0.2.1, `SPEC-JOB-DISPATCH-001` to @0.3.2 (reciprocal cross-module acknowledgment).
-  Frontend hotel-admin toggle UI not yet built (out of scope for this PR).
+- `GD-05` Per-hotel "pause new jobs" toggle — Decided and built (2026-07-27, PR #239):
+  `Hotel.accepting_jobs` boolean (default `true`), set via `PATCH /hotels/:hotel_id`, enforced in
+  `work-requests/service.ts` `create()` (`ConflictError` — a business-state precondition, not an
+  authorization check). `SIR-CRM-004`/`SIR-CRM-016` resolved; `SPEC-CRM-001` amended to @0.2.1,
+  `SPEC-JOB-DISPATCH-001` to @0.3.2 (reciprocal cross-module acknowledgment). Frontend hotel-admin
+  toggle UI not yet built (out of scope for this PR).
+- `GD-06` Worker-facing analytics scope & metric definitions — Decided and built (2026-07-27,
+  option (a), scoped to currently-derivable metrics): new self-scoped `GET /analytics/my-stats`
+  route (any authenticated role, scoped server-side to `req.auth.userId`, no admin/manager gate),
+  `AnalyticsService.getWorkerStats()`, and a `WorkerStats` type distinct from `DashboardStats`.
+  Resolves the mobile-worker dashboard's previously-silent 403 (`SIR-ANLY-002`) and the independent
+  `DashboardStats` type-shape mismatch it also carried (the mobile client's old type never matched
+  any real backend response). `SPEC-ANALYTICS-001` amended to @0.2.1. Warning counts and
+  sick/vacation counts remain explicitly deferred (`GD-04`'s tiers, `GD-18`'s Calendar).
 
 Full narrative and PR-by-PR delivery evidence for all of the above:
 [`MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md`](../implementation/MILESTONE_AUTHORIZATION_FOUNDATION_COMPLETE.md).
@@ -108,7 +120,7 @@ every `GD-*` ID lives only in
 | backend-geo | zero code, `.placeholder` only | `GD-14` (geofencing/location model) |
 | backend-consent, backend-compliance, backend-retention | zero code, no module directory | `GD-17` (consent), `GD-09` (retention, external tax-advisor sign-off), compliance is read-only downstream of both |
 | Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
-| Worker-facing analytics endpoint | see Blockers below | `GD-06` |
+| Frontend hotel-admin "pause new jobs" toggle UI | not yet built (backend/API complete, `GD-05`) | no decision blocker — implementation only |
 | MFA | no data model or endpoint anywhere | `GD-08` |
 | Platform event-bus formalization | in-process singleton only | `GD-12` (zero-code decision, gates HR/EMP/Calendar/Consent event contracts) |
 | GDPR retention-tier assignment + Retention module | unbuilt | `GD-09` (external sign-off, long lead time) |
@@ -133,9 +145,9 @@ table below — not repeated here.)
 | SYNC-001 | Every module/contract/state-domain ownership assignment | No CODEOWNERS file exists; `backend/package.json` "author" is empty; every module `owner: unassigned` in the registry | Human (reserved authority) |
 | OD-EMP-12 / OQ-AUTH-08 | Org-chart/reporting-model data structure | `ADR-030` D-5 explicitly resolved only the Regional-Manager permission set, not the underlying reporting-relationship model | Human decision |
 | SIR-AUTH-022 | Cleanup of `_User_permissions_backup_20260727` | Pre-drop backup table from `ADR-031` has no tracked removal date | Scheduled migration/ticket, possibly folded into `GD-09` |
-| GD-06 | Worker-facing analytics scope | mobile-worker calls admin/manager-only `/analytics/stats`, always 403 | Human (Product Owner) — Decided, not yet built |
 
-Governance-decision (`GD-*`) status in full, including options and ROI ranking, is tracked
+No `GD-*` blocker remains open from the MVP Completion Decisions batch (`GD-04`/`GD-05`/`GD-06`,
+all built as of 2026-07-27). Governance-decision (`GD-*`) status in full, including options and ROI ranking, is tracked
 exclusively in [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md) —
 not duplicated here beyond the summary above.
 

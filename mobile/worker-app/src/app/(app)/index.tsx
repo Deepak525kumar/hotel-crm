@@ -7,7 +7,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { DashboardStats, WorkerAssignment } from '@/types/api';
+import type { WorkerStats, WorkerAssignment } from '@/types/api';
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -25,7 +25,7 @@ function StatCard({ label, value, accent }: { label: string; value: string | num
 export default function DashboardScreen() {
   const { user } = useAuthStore();
   const theme = useTheme();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [stats, setStats] = useState<WorkerStats | null>(null);
   const [upcoming, setUpcoming] = useState<WorkerAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -33,7 +33,7 @@ export default function DashboardScreen() {
   const load = useCallback(async () => {
     try {
       const [statsRes, shiftsRes] = await Promise.allSettled([
-        api.analytics.stats(),
+        api.analytics.myStats(),
         api.assignments.list({ limit: 5 }),
       ]);
       if (statsRes.status === 'fulfilled') setStats(statsRes.value);
@@ -73,9 +73,9 @@ export default function DashboardScreen() {
                 Overview
               </ThemedText>
               <ThemedView style={styles.statsGrid}>
-                <StatCard label="Upcoming" value={stats?.upcoming_shifts ?? 0} accent={theme.text} />
-                <StatCard label="Completed" value={stats?.completed_shifts ?? 0} />
-                <StatCard label="Pending" value={stats?.pending_applications ?? 0} />
+                <StatCard label="Upcoming" value={upcoming.length} accent={theme.text} />
+                <StatCard label="Completed" value={stats?.completed_assignments ?? 0} />
+                <StatCard label="Rooms Completed" value={stats?.rooms_completed ?? 0} />
                 <StatCard
                   label="Rating"
                   value={stats?.average_rating ? stats.average_rating.toFixed(1) : '—'}

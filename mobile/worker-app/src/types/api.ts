@@ -138,6 +138,20 @@ export interface DashboardStats {
   pending_applications: number;
 }
 
+// GD-06: matches backend WorkerStats (analytics/types.ts) exactly — the
+// response shape of GET /analytics/my-stats.
+export interface WorkerStats {
+  completed_assignments: number;
+  rooms_completed: number;
+  average_rating: number | null;
+  attendance: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+  };
+}
+
 // Backend list endpoints return the array directly in body.data.
 // Pagination metadata (page, per_page, total) is in body.pagination but
 // is not extracted by the request() helper — use T[] for list calls.

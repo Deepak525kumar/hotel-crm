@@ -195,7 +195,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-ANALYTICS-001@0.2.0 (FROZEN)  # docs/03-modules/analytics/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/performance all PASS_WITH_ACTIONS; security upgraded FAIL -> PASS_WITH_ACTIONS -- the Critical OQ-ANALYTICS-01 leaderboard-authz gap was RESOLVED in code 2026-07-17 by Sprint 0 S0-5, see SIR-ANLY-001, independently re-verified against live routes.ts at freeze time; Medium OQ-ANALYTICS-11 and new Low OQ-ANALYTICS-12 non-blocking); G6-doc PASS_WITH_ACTIONS.
+    specification: SPEC-ANALYTICS-001@0.2.1 (FROZEN)  # docs/03-modules/analytics/MODULE_SPEC.md; FROZEN at G2 Specification Freeze 2026-07-20 (G2 Approval Workflow). G4 reviews complete (architecture/dependency/consistency/performance all PASS_WITH_ACTIONS; security upgraded FAIL -> PASS_WITH_ACTIONS -- the Critical OQ-ANALYTICS-01 leaderboard-authz gap was RESOLVED in code 2026-07-17 by Sprint 0 S0-5, see SIR-ANLY-001, independently re-verified against live routes.ts at freeze time; Medium OQ-ANALYTICS-11 and new Low OQ-ANALYTICS-12 non-blocking); G6-doc PASS_WITH_ACTIONS. Amended 0.2.0->0.2.1 (2026-07-27, Correction) per GD-06: OQ-ANALYTICS-02 resolved (worker-dashboard 403 + DashboardStats type-shape mismatch) -- new self-scoped GET /analytics/my-stats route, getWorkerStats() method, WorkerStats type; REQ-ANALYTICS-017/RULE-ANALYTICS-007 added.
     evidence: backend/src/routes/v1/index.ts:33
 
   - id: backend-calendar

@@ -32,7 +32,7 @@ still carries open G8 prerequisites.
 | backend-hr (SPEC-EMP-001 mapping) | FROZEN @0.2.0 | No dedicated test file (`active-no-tests`); special-category access/audit controls unbuilt but disclosed; boundary conflict with a second, non-frozen `SPEC-HR-001` targeting the same code path is disclosed, not resolved |
 | employee-management | FROZEN @0.2.0 | Owner assignment; provisional perf budget (`OD-EMP-16`) |
 | backend-notifications | FROZEN @0.3.0 | `OQ-NOTIF-02/-03/-05`, owner assignment |
-| backend-analytics | FROZEN @0.2.0 | Medium `OQ-ANALYTICS-11` (cross-module-read boundary, tracks to `GD-13`) and Low `OQ-ANALYTICS-12`; worker-facing analytics 403 pending `GD-06` |
+| backend-analytics | FROZEN @0.2.1 | Medium `OQ-ANALYTICS-11` (cross-module-read boundary, tracks to `GD-13`) and Low `OQ-ANALYTICS-12`; worker-facing analytics 403 resolved (`GD-06`, `SIR-ANLY-002`, 2026-07-27) |
 | backend-calendar | FROZEN @0.3.0 | Cannot pass G8 while `implementation_status: stub` — every service method throws `NotImplementedError`; build itself is blocked on `GD-18` |
 | backend-chatbot | REVIEW (not FROZEN) | Cannot reach G2 until `GD-19` decided; zero code |
 | backend-geo | REVIEW (not FROZEN) | Cannot reach G2 until `GD-14` decided; zero code |
@@ -46,7 +46,7 @@ every row above live only in `.claude/knowledge/MODULE_REGISTRY.yaml` and
 
 | Prerequisite | Status |
 |---|---|
-| Test suite green | 67/67 suites, 1033/1033 tests passing; `tsc --noEmit` clean (independently re-verified 2026-07-27) |
+| Test suite green | 67/67 suites, 1045/1045 tests passing; `tsc --noEmit` clean (independently re-verified 2026-07-27) |
 | Accountable ownership (`SYNC-001`) | Fully unassigned repository-wide — no CODEOWNERS file, `backend/package.json` author empty. Hard release-accountability gate reserved to the human. |
 | MFA (`GD-08`) | No data model or endpoint anywhere; undecided |
 | Performance SLO & workload baseline (`GD-11`) | Undefined; blocks G8 for multiple modules until the human supplies workload assumptions |
