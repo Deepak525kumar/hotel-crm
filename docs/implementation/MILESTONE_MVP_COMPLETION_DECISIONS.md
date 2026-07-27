@@ -77,20 +77,22 @@ aggregate fields are written from two places that can diverge:
       `accepting_jobs: z.boolean().optional()`.
 - [ ] `backend/src/modules/crm/service.ts` `updateHotel()` (lines 85-107): add
       `accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs` to the update payload.
-- [ ] `backend/src/modules/work-requests/service.ts` `create()` (lines 62-105): add
-      `if (!hotel.accepting_jobs) throw new ForbiddenError(...)` immediately after the existing
-      `hotel.deleted_at` check (line 67-68), before the manager-scope check.
-- [ ] Route/permission gate: ride the existing
-      `PATCH /hotels/:hotel_id` (`crm/routes.ts:24`, already `checkHotelAccess()` +
-      `requireRoleFlagged(['admin','manager'],'admin')` + `requirePermission('hotels:write')`) — no
-      new route needed for the toggle itself.
-- [ ] Frontend: hotel-admin toggle UI (per `GOVERNANCE_DECISIONS_REQUIRED.md`'s own impact estimate
-      — not yet built, scope TBD by whoever picks this up).
-- [ ] Regression tests: work-request creation rejected when `accepting_jobs: false`; toggle
-      round-trips via `PATCH /hotels/:hotel_id`; existing hotel-update tests unaffected.
+- [x] `backend/src/modules/work-requests/service.ts` `create()`: rejects with `ConflictError`
+      (business-state precondition, not `ForbiddenError` — matches this file's other state-based
+      rejections) immediately after the existing `hotel.deleted_at` check, before the manager-scope
+      check. Shipped PR #239.
+- [x] Route/permission gate: rides the existing `PATCH /hotels/:hotel_id` — no new route needed.
+      Shipped PR #239.
+- [x] Frontend: hotel-admin toggle UI. Shipped: `HotelForm.tsx` (edit-mode checkbox, same pattern as
+      `is_active`), hotel detail page (warning badge when paused), hotel list page (same badge in
+      the Status column, so a paused hotel is visible without opening it).
+- [x] Regression tests: work-request creation rejected when `accepting_jobs: false`; toggle
+      round-trips via `PATCH /hotels/:hotel_id`; existing hotel-update tests unaffected. Shipped
+      PR #239 (`backend/src/__tests__/hotel.test.ts`, `work-requests.test.ts`).
 - **Gate:** none named beyond standard implementation verification (small, additive, no
   cross-module ownership change).
-- **Est.:** 2–3 PRs, matching the register's own estimate.
+- **Est.:** 2–3 PRs, matching the register's own estimate. Delivered in 2 backend PRs (#239) + 1
+  frontend PR.
 
 ## PR-3 — GD-06: Worker-scoped analytics endpoint
 

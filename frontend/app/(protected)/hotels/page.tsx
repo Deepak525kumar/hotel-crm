@@ -7,6 +7,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import {
   ActiveBadge,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -142,7 +143,12 @@ export default function HotelsPage() {
                       </TD>
                       <TD className="text-gray-500">{h.timezone}</TD>
                       <TD>
-                        <ActiveBadge active={h.is_active} />
+                        <div className="flex items-center gap-2">
+                          <ActiveBadge active={h.is_active} />
+                          {!h.accepting_jobs && (
+                            <Badge tone="warning">Paused</Badge>
+                          )}
+                        </div>
                       </TD>
                     </TR>
                   ))}

@@ -11,6 +11,7 @@ import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -80,6 +81,9 @@ export default function HotelDetailPage() {
               <span className="flex items-center gap-3">
                 {hotel.name}
                 <ActiveBadge active={hotel.is_active} />
+                {!hotel.accepting_jobs && (
+                  <Badge tone="warning">Not accepting new work requests</Badge>
+                )}
               </span>
             }
             description={`${hotel.city}, ${hotel.country}`}

@@ -86,12 +86,13 @@ service method; `backend/src/modules/chatbot/` and `backend/src/modules/geo/` co
   the app-level `refreshWorkerOverallRating()` is now the sole writer, called from both rating
   creation and assignment-completion/cancellation. `SIR-QUAL-005` resolved. Tiers/warnings/photo
   policy remain deferred as a separate product sub-decision, not covered by this fix.
-- `GD-05` Per-hotel "pause new jobs" toggle — Decided and built (2026-07-27, PR #239):
-  `Hotel.accepting_jobs` boolean (default `true`), set via `PATCH /hotels/:hotel_id`, enforced in
-  `work-requests/service.ts` `create()` (`ConflictError` — a business-state precondition, not an
-  authorization check). `SIR-CRM-004`/`SIR-CRM-016` resolved; `SPEC-CRM-001` amended to @0.2.1,
-  `SPEC-JOB-DISPATCH-001` to @0.3.2 (reciprocal cross-module acknowledgment). Frontend hotel-admin
-  toggle UI not yet built (out of scope for this PR).
+- `GD-05` Per-hotel "pause new jobs" toggle — Decided and built (2026-07-27, PR #239 backend,
+  follow-up PR frontend): `Hotel.accepting_jobs` boolean (default `true`), set via
+  `PATCH /hotels/:hotel_id`, enforced in `work-requests/service.ts` `create()` (`ConflictError` —
+  a business-state precondition, not an authorization check). `SIR-CRM-004`/`SIR-CRM-016` resolved;
+  `SPEC-CRM-001` amended to @0.2.1, `SPEC-JOB-DISPATCH-001` to @0.3.2 (reciprocal cross-module
+  acknowledgment). Frontend: edit-mode checkbox in `HotelForm.tsx` (same pattern as `is_active`),
+  paused-status badge on the hotel detail page and list page.
 - `GD-06` Worker-facing analytics scope & metric definitions — Decided and built (2026-07-27,
   option (a), scoped to currently-derivable metrics): new self-scoped `GET /analytics/my-stats`
   route (any authenticated role, scoped server-side to `req.auth.userId`, no admin/manager gate),
@@ -120,7 +121,6 @@ every `GD-*` ID lives only in
 | backend-geo | zero code, `.placeholder` only | `GD-14` (geofencing/location model) |
 | backend-consent, backend-compliance, backend-retention | zero code, no module directory | `GD-17` (consent), `GD-09` (retention, external tax-advisor sign-off), compliance is read-only downstream of both |
 | Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
-| Frontend hotel-admin "pause new jobs" toggle UI | not yet built (backend/API complete, `GD-05`) | no decision blocker — implementation only |
 | MFA | no data model or endpoint anywhere | `GD-08` |
 | Platform event-bus formalization | in-process singleton only | `GD-12` (zero-code decision, gates HR/EMP/Calendar/Consent event contracts) |
 | GDPR retention-tier assignment + Retention module | unbuilt | `GD-09` (external sign-off, long lead time) |

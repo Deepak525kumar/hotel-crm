@@ -32,6 +32,7 @@ export interface HotelFormValues {
   address: string;
   timezone: string;
   is_active: boolean;
+  accepting_jobs: boolean;
   hotel_group_id: string;
 }
 
@@ -43,6 +44,7 @@ function toValues(hotel?: Hotel | null): HotelFormValues {
     address: hotel?.address ?? "",
     timezone: hotel?.timezone ?? "Europe/Berlin",
     is_active: hotel?.is_active ?? true,
+    accepting_jobs: hotel?.accepting_jobs ?? true,
     hotel_group_id: hotel?.hotel_group_id ?? "",
   };
 }
@@ -145,11 +147,18 @@ export function HotelForm({
           </div>
 
           {mode === "edit" && (
-            <Checkbox
-              label="Active (visible to workers and open for staffing)"
-              checked={form.is_active}
-              onChange={(e) => set("is_active", e.target.checked)}
-            />
+            <>
+              <Checkbox
+                label="Active (visible to workers and open for staffing)"
+                checked={form.is_active}
+                onChange={(e) => set("is_active", e.target.checked)}
+              />
+              <Checkbox
+                label="Accepting new work requests"
+                checked={form.accepting_jobs}
+                onChange={(e) => set("accepting_jobs", e.target.checked)}
+              />
+            </>
           )}
 
           <FormError>{error}</FormError>
