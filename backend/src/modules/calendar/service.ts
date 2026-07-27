@@ -6,6 +6,11 @@ import { AssignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import type { MarkAbsenceInput, CalendarAbsenceDto } from './types.js';
 
+// Calendar depends directly on AssignmentService because GD-12 (event bus)
+// is unresolved -- the target design (EVT-CAL-SickVacationMarked) would
+// remove this import entirely. Not introducing an interface/port for it now:
+// there is exactly one call site and one implementation: premature until a
+// second consumer or the event-bus decision actually lands.
 const assignmentService = new AssignmentService();
 
 // OD-CAL-04: "today" is anchored to Europe/Berlin (matches Hotel.timezone's
@@ -52,6 +57,11 @@ export class CalendarService extends BaseService {
       throw new ConflictError('Cannot mark a past day sick or vacation');
     }
 
+    // RULE-CAL-03's transition model only states (none) -> sick|vacation and
+    // is silent on re-marking an already-marked day. Last write wins (upsert
+    // overwrites kind) -- not spec-mandated, but consistent with REQ-CAL-T03's
+    // "no cap, no approval" intent: the worker may freely correct their own
+    // mark rather than being blocked by a prior one.
     const day = new Date(`${input.day}T00:00:00.000Z`);
     const absence = await this.prisma.calendarAbsence.upsert({
       where: { worker_id_day: { worker_id: workerId, day } },

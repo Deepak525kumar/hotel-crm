@@ -138,6 +138,41 @@ describe('CalendarService.markAbsence', () => {
     expect(result).toMatchObject({ id: 'abs1', worker_id: 'w1', kind: 'SICK', day: '2026-07-28' });
   });
 
+  // The spec's transition model (MODULE_SPEC.md:199, RULE-CAL-03) only
+  // states (none) -> sick|vacation; it is silent on changing an
+  // already-marked day's kind. REQ-CAL-T03's "no cap, no approval" intent
+  // supports allowing the worker to freely correct their own mark, so this
+  // pins the chosen (not spec-mandated) behavior: last write wins via
+  // upsert, rather than rejecting a kind change outright.
+  it('overwrites kind when re-marking an already-marked day (last write wins, not spec-mandated but consistent with no-approval intent)', async () => {
+    mockCalendarAbsence.upsert.mockResolvedValue({
+      id: 'abs1',
+      worker_id: 'w1',
+      day: new Date('2026-07-28T00:00:00.000Z'),
+      kind: 'VACATION',
+      created_at: new Date('2026-07-27T00:00:00.000Z'),
+      updated_at: new Date('2026-07-27T00:00:00.000Z'),
+    });
+    await service.markAbsence('w1', { day: '2026-07-28', kind: 'VACATION' });
+
+    mockCalendarAbsence.upsert.mockResolvedValue({
+      id: 'abs1',
+      worker_id: 'w1',
+      day: new Date('2026-07-28T00:00:00.000Z'),
+      kind: 'SICK',
+      created_at: new Date('2026-07-27T00:00:00.000Z'),
+      updated_at: new Date('2026-07-27T00:00:00.000Z'),
+    });
+    const result = await service.markAbsence('w1', { day: '2026-07-28', kind: 'SICK' });
+
+    expect(mockCalendarAbsence.upsert).toHaveBeenNthCalledWith(2, {
+      where: { worker_id_day: { worker_id: 'w1', day: new Date('2026-07-28T00:00:00.000Z') } },
+      create: { worker_id: 'w1', day: new Date('2026-07-28T00:00:00.000Z'), kind: 'SICK' },
+      update: { kind: 'SICK' },
+    });
+    expect(result.kind).toBe('SICK');
+  });
+
   it('auto-cancels an existing same-day CONFIRMED/IN_PROGRESS assignment via AssignmentService.update (no direct Calendar write)', async () => {
     mockWorkerAssignment.findFirst.mockResolvedValue({
       id: 'a1',
