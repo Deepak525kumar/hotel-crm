@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-27 (module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 69/69 suites, 1071/1071 tests passing; `tsc --noEmit` clean) |
+| Last verified | 2026-07-28 (SYNC-055 repository-synchronization pass, post-PR #243/#244/#245; module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 71/71 suites, 1113/1113 tests passing; `tsc --noEmit` clean) |
 
 ## Current Milestone
 
@@ -22,11 +22,14 @@ jobs" toggle, PR #239), `GD-06` (worker-scoped analytics endpoint). No blocker r
 this batch. Full options/impact detail lives only in
 [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md).
 
-**Next up:** `GD-16` (Documents module RBAC & storage) **Decided** 2026-07-27, option (a) —
+**Landed since:** `GD-16` (Documents module RBAC & storage) **Decided** 2026-07-27, option (a) —
 self-upload + manager-upload only, hotel-scoped read via existing `checkHotelAccess()`,
 presigned-URL retrieval, SSE-at-rest, malware-scan hook. `SPEC-DOCUMENTS-001` frozen @0.1.4 the
-same day (G2 approval granted per `GD-16`) — a new `backend-documents` module is now
-implementation-ready; not yet started, and not the only candidate (see below).
+same day (G2 approval granted per `GD-16`); the `backend-documents` module was then built and
+merged the same day (PR #245) — see its row below for what shipped vs. what remains deferred
+(multipart upload, real S3 SDK, `MIG-GAP-DOC-001`). Repository-synchronization pass SYNC-055
+(2026-07-28) reconciled the knowledge layer against this and the two other PRs merged since GD-16
+(`#243` GD-18 calendar-absence slice, `#244` the GD-16 decision/freeze itself).
 
 **Analysis, not a ratified decision:** a capability-level readiness audit (2026-07-27, per your own
 direction to decompose modules into individual requirements rather than trust one module-level

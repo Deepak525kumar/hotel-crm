@@ -12,7 +12,7 @@ purpose: >-
 scope: project-runtime  # memory instances are project runtime state; the mechanism is framework
 canonical_policy: .claude/constitution/CONTEXT_ARTIFACTS.md
 version_source: .claude/VERSION.yaml
-observed_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; no module reached G2 freeze, entries: [] unchanged
+observed_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14, stamp-only) was two merges behind HEAD; no module reached G2 freeze, entries: [] unchanged
 
 # An entry is created ONLY at G2 specification freeze (reserved human authority).
 # backend-users and backend-calendar reached G2 freeze on 2026-07-19
@@ -36,6 +36,10 @@ observed_revision: 3254c83754f3660dee968c5138a32b6bc54d5578  # rebound to HEAD 3
 # ART-MEM-backend-work-requests, and ART-MEM-backend-attendance were produced by reusing
 # each frozen specification's content verbatim (no requirement reinterpreted, no spec
 # content changed). All ten FROZEN modules now have a Module Memory entry.
+# BACKFILL (SYNC-055, 2026-07-28): SPEC-DOCUMENTS-001 reached G2 freeze on 2026-07-27
+# (PR #244, GD-16) but had not yet received a Module Memory entry when PR #245 (the
+# built module) landed the same day. ART-MEM-backend-documents is now added, same
+# backfill pattern as SYNC-050. All eleven FROZEN modules now have a Module Memory entry.
 
 entry_schema:
   required: [artifact, module, freeze_revision, spec, summary, authority, invalidated_by]
@@ -171,6 +175,19 @@ module_memory:
     authority: corroborating
     invalidated_by: [new frozen spec for backend-work-requests/backend-work-applications/backend-assignments, owned-state/contract change, OQ-01/FIND-SEC-001 code fix]
     open_prerequisites: [OQ-01/FIND-SEC-001 (Critical, unguarded PATCH /assignments/:id -- warrants immediate remediation), OQ-07 (hotel/group scoping gap, MIG-GAP-07), owner assignment/SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; OQ-02..06/08/09 are RESOLVED-BY-TARGET or SUPERSEDED per the spec's own disposition, not carried here as open
+  - artifact: ART-MEM-backend-documents
+    module: backend-documents
+    freeze_revision: 6e21e20e45220e7e9822494734afee7384e1309d  # HEAD at G2 freeze (PR #244, 2026-07-27, GD-16); code-truth basis of the built module is PR #245 (1aa5f88), added AFTER this freeze revision -- backfilled by SYNC-055 (2026-07-28), the same pattern SYNC-050 used for backend-auth/work-requests/attendance
+    spec: SPEC-DOCUMENTS-001 v0.1.4 (FROZEN)
+    summary:
+      boundary: Document lifecycle, metadata, uploads, storage abstraction (S3 EU), categories (GENERAL/WORK_PERMIT), completeness, retrieval, and export for worker-facing and manager-facing documents. GD-16 (Decided 2026-07-27) settles the actor/RBAC model -- self-upload (worker) + manager-upload only, hotel-scoped read via checkHotelAccess()/checkWorkerScope(); no broader RBAC taxonomy adopted. backend-hr's own contract-scan upload stub is a separate, not-yet-migrated code path (MIG-GAP-DOC-001, OD-DOC-015) -- Documents does not yet consume or supersede it.
+      owned_state: [state-worker-document]  # WorkerDocument model, sole writer/reader backend-documents. As of PR #245 (post-freeze-revision code): worker self-scope enforced in DocumentService (RULE-DOC-08, actor_id === worker_id), not by route-level middleware (checkWorkerScope() has no worker branch, only admin/manager).
+      owned_contracts: [IF-DOC-UploadDocument/v0, IF-DOC-GetDocumentCompleteness/v0, IF-DOC-GetDocument/v0, IF-DOC-ListWorkerDocuments/v0, IF-DOC-ExportWorkerDocuments/v0]
+      interfaces: []  # at freeze_revision (PR #244) no code existed -- all five IF-DOC-* were target-only. Built by PR #245, AFTER this freeze revision: POST/GET /workers/:worker_id/documents, GET /workers/:worker_id/documents/completeness, GET /workers/:worker_id/documents/export, GET /documents/:document_id -- recorded here as a post-freeze code note, not as part of the frozen spec's own content.
+      key_rules: [RULE-DOC-01, RULE-DOC-02, RULE-DOC-03, RULE-DOC-04, RULE-DOC-05, RULE-DOC-06, RULE-DOC-07, RULE-DOC-08, RULE-DOC-09, RULE-DOC-10]
+    authority: corroborating
+    invalidated_by: [new frozen spec for backend-documents, owned-state/contract change, MIG-GAP-DOC-001 migration landing]
+    open_prerequisites: [OD-DOC-001, OD-DOC-002, OD-DOC-003, OD-DOC-004, OD-DOC-006, OD-DOC-008, OD-DOC-009, OD-DOC-010, OD-DOC-011, OD-DOC-012, OD-DOC-013, OD-DOC-014/SYNC-001, OD-DOC-015 (MIG-GAP-DOC-001), OD-DOC-016, OD-DOC-017, OD-DOC-018, OD-DOC-019]  # release/impl prerequisites reviewed by G8, not freeze blockers; OD-DOC-005/OD-DOC-007 (permission-granularity) already RESOLVED by GD-16, excluded from this list
   - artifact: ART-MEM-backend-attendance
     module: backend-attendance
     freeze_revision: 6e1af5e94c7237646e5c6a07d424fba47106f102  # HEAD at backfill (Repository Synchronization Workflow, 2026-07-20); spec's own code-truth basis unchanged since cca1d29; backfills the Module Memory gap this file's own header noted since the 2026-07-15 G2 freeze -- no spec content reinterpreted, reused verbatim from SPEC-ATT-001 v0.2.0
