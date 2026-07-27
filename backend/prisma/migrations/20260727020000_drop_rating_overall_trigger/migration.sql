@@ -12,6 +12,15 @@
 -- writer; assignments/service.ts's AssignmentService.update() calls it
 -- directly on any COMPLETED/CANCELLED transition so this path is not
 -- silently dropped by removing the trigger.
+--
+-- Deployment ordering (once a real rolling-deploy environment exists — see
+-- RELEASE_STATUS.md, this repo has had none to date): this migration must
+-- not apply before the application build containing AssignmentService's
+-- app-level recompute is live. Applying this DROP TRIGGER against an old
+-- app version would silently stop refreshing total_assignments/
+-- completion_rate/on_time_rate/last_worked_at on assignment completion,
+-- with nothing left to catch it. Deploy app -> confirm live -> apply this
+-- migration, not the reverse.
 DROP TRIGGER "Rating_refresh_overall_rating" ON "Rating";
 DROP FUNCTION trg_rating_refresh_overall();
 DROP FUNCTION refresh_worker_overall_rating(TEXT);
