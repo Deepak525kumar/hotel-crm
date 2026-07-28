@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../../lib/errors.js';
+import { sendPaginated, sendSuccess } from '../../lib/http-envelope.js';
 import { assignmentService } from './service.js';
 import { ListAssignmentsQuerySchema, LogRoomsCompletedSchema, UpdateAssignmentSchema } from './types.js';
 
@@ -23,10 +24,10 @@ export async function listAssignments(
       role: req.auth!.role,
     });
     const { page, per_page } = parsed.data;
-    res.status(200).json({
-      status: 'success',
+    sendPaginated(
+      res,
       data,
-      pagination: {
+      {
         page,
         per_page,
         total,
@@ -34,8 +35,8 @@ export async function listAssignments(
         has_next: page * per_page < total,
         has_prev: page > 1,
       },
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+      { requestId: req.requestId }
+    );
   } catch (error) {
     next(error);
   }
@@ -51,11 +52,7 @@ export async function getAssignment(
       userId: req.auth!.userId,
       role: req.auth!.role,
     });
-    res.status(200).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
     next(error);
   }
@@ -78,11 +75,7 @@ export async function updateAssignment(
       req.auth!.userId,
       req.auth!.role
     );
-    res.status(200).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
     next(error);
   }
@@ -106,11 +99,7 @@ export async function logRoomsCompleted(
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,
     });
-    res.status(201).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
   } catch (error) {
     next(error);
   }
