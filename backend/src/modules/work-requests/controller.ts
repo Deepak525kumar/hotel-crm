@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../../lib/errors.js';
+import { sendPaginated, sendSuccess } from '../../lib/http-envelope.js';
 import { workRequestService } from './service.js';
 import {
   CreateWorkRequestSchema,
@@ -27,11 +28,7 @@ export async function createWorkRequest(
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,
     });
-    res.status(201).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
   } catch (error) {
     next(error);
   }
@@ -53,10 +50,10 @@ export async function listWorkRequests(
       role: req.auth!.role,
     });
     const { page, per_page } = parsed.data;
-    res.status(200).json({
-      status: 'success',
+    sendPaginated(
+      res,
       data,
-      pagination: {
+      {
         page,
         per_page,
         total,
@@ -64,8 +61,8 @@ export async function listWorkRequests(
         has_next: page * per_page < total,
         has_prev: page > 1,
       },
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+      { requestId: req.requestId }
+    );
   } catch (error) {
     next(error);
   }
@@ -81,11 +78,7 @@ export async function getWorkRequest(
       userId: req.auth!.userId,
       role: req.auth!.role,
     });
-    res.status(200).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
     next(error);
   }
@@ -107,11 +100,7 @@ export async function updateWorkRequest(
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,
     });
-    res.status(200).json({
-      status: 'success',
-      data: result,
-      meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
-    });
+    sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
     next(error);
   }
