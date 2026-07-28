@@ -26,9 +26,8 @@ export function useAvailability(workerId: string | null | undefined) {
     {
       onError: (error) => {
         if (error instanceof ApiError && error.status === 403) return;
-        // workerId included so a failure is traceable back to which of
-        // possibly several concurrent availability requests on the page
-        // (e.g. a list of workers) actually failed.
+        // workerId included so the failed request can be correlated to a
+        // specific worker/backend call, not just "availability failed."
         console.error("Failed to load worker availability", { workerId }, error);
       },
     },
