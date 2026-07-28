@@ -38,7 +38,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 |---|---|---|---|---|
 | GD-01 | Notification dispatch & delivery model | **P0** | MVP | 4–6 | **✅ IMPLEMENTED 2026-07-24 → `ADR-029` decided 2026-07-23 (Option B: Transactional Outbox + Worker runtime); built and merged as Epic 7, PRs 7.1–7.8** |
 | GD-02 | Manager write-permission authority | **P0** | MVP | 2–3 | **✅ DECIDED 2026-07-25 → `ADR-030` (capability-based model: hotel/group writes Admin-only; scoped `users:write`; manager/RM employee authority action-only, never field-level). PR-1 through PR-8 (security hardening, matrix flip, `REGIONAL_MANAGER` enum, capability-named gates, documentation/register sync) all merged 2026-07-25/26. `ADR-030` status: Accepted (ratified `c951cfb`).** |
-| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ PERMISSION SET DECIDED 2026-07-25 → `ADR-030` D-5 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart reporting model (`OD-EMP-12`, `OQ-AUTH-08`) remains open — this decision resolves the permission set only. Code migration (enum + scope-claim issuance) implemented via PR-2 through PR-5 (merged).** |
+| GD-03 | 5-role model & Regional-Manager authority | **P0** | MVP | 5–8 | **✅ FULLY DECIDED 2026-07-29 → permission set: `ADR-030` D-5, 2026-07-25 (`REGIONAL_MANAGER` token, operational authority at `hotel_group` scope, no master-data capability). Org-chart/reporting-model half (`OD-EMP-12`, `OQ-AUTH-08`): `ADR-060`, 2026-07-29 — flat, hotel-scoped; no reporting-tree data model; visibility derived implicitly from existing hotel/hotel-group scope membership. Code migration (enum + scope-claim issuance) implemented via PR-2 through PR-5 (merged). `GD-03` is now fully resolved; also satisfies `ADR-058`'s named architectural-eligibility gate for Job-Dispatch (`GD-20`/Epic 9).** |
 | GD-04 | Quality rating derivation, warning tiers & photo policy | **P1** | MVP | 5–7 | **✅ DECIDED 2026-07-27 → Split, per this row's own recommendation: (1) ship the single-writer + delete-behavior correctness fix now (app-owned writer replaces the DB-trigger/app dual-write divergence, `SIR-QUAL-005`); (2) recency-weighting, warning tiers, and photo-retention/retrieval-authorization are deferred as their own explicit product sub-decision (not decided by this session) — these are genuine new business rules the CRR does not fully specify (Constitution §6: do not assume). See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
 | GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 | **✅ DECIDED 2026-07-27 → Option (a): boolean `Hotel.accepting_jobs`, enforced at work-request creation. Matches the confirmed CRR text and the lowest-risk reversible build; scheduling windows (option b) explicitly not adopted as unrequested scope. See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
 | GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 | **✅ DECIDED 2026-07-27 → Option (a): a worker-scoped analytics endpoint (own stats only), resolving the silent 403. Warning-count and sick/vacation-count metrics remain deferred until `GD-04`'s tiers and `GD-18`'s Calendar land — this decision covers only the currently-derivable metrics (own completed jobs, own rating, own attendance-to-date). See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
@@ -155,14 +155,28 @@ mobile screens) and assume the decision is made first — the decision itself is
 > behaviour-preserving, not a new grant: `backend/src/modules/auth/service.ts`'s `resolveScope()` already
 > resolves an RM to `hotel_group` scope with documented "broader scope wins" precedence.
 >
-> **This row's org-chart/reporting-model half is NOT resolved by this decision** — `OD-EMP-12` (the
-> underlying reporting-relationship model) and `OQ-AUTH-08`'s data-model half remain open; only the RM
-> *permission* (who may view an org chart) is settled. `OD-CAL-07` (RM scheduling scope) is settled in
+> **This row's org-chart/reporting-model half was NOT resolved by this 2026-07-25 decision** — `OD-EMP-12` (the
+> underlying reporting-relationship model) and `OQ-AUTH-08`'s data-model half remained open; only the RM
+> *permission* (who may view an org chart) was settled here. `OD-CAL-07` (RM scheduling scope) is settled in
 > substance (RM inherits the Hotel-Manager scheduling capability at group scope) but not built.
 >
 > Code migration (enum addition, JWT scope-claim issuance, promoting existing RM users from `MANAGER`) is
 > implemented via `ADR-030` PR-2 through PR-5 (merged). `SIR-USERS-012/020` and `SIR-AUTH-013` updated in the
 > Specification Issues Register to reflect the decision.
+>
+> **Org-chart/reporting-model half RESOLVED 2026-07-29 → `ADR-060`** (Governance Resolution workflow,
+> ratifying the commissioning human's explicit verbatim disposition). Flat, hotel-scoped: no explicit
+> `reports_to_user_id` FK or reporting-tree data model is introduced. Org-chart visibility (RM+Admin,
+> already granted by `ADR-030` D-5) is derived implicitly from existing hotel/hotel-group scope
+> membership, reusing `ADR-023`/`ADR-030`'s already-established discriminated JWT `scope` claim rather
+> than introducing a new authorization primitive. Job Dispatch's manager-assignment routing is built
+> against hotel/hotel-group membership, not an org-chart tree. Explicit reporting chains/approval
+> hierarchies/escalations remain deferred until a confirmed business requirement needs one (Constitution
+> §12). **`GD-03` is now fully resolved** — both the permission-set and data-model halves are decided.
+> This is also the named architectural-eligibility gate `ADR-058` set for Job-Dispatch (`GD-20`/Epic 9):
+> Job-Dispatch implementation is now architecturally eligible (scheduling/planning remains a distinct
+> future pass, not authorized here). `SIR-EMP-009`/`SIR-AUTH-009` updated to RESOLVED in the Specification
+> Issues Register.
 
 - **Why a decision is required:** CRR §1 / PDD §4.1 confirm **five** roles including a Regional Manager, but
   `UserRole` has only four tokens (`WORKER/CHECKER/MANAGER/ADMIN` — verified in `schema.prisma:22`). Epic 5

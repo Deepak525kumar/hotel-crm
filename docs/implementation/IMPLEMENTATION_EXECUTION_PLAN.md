@@ -190,6 +190,36 @@ live `backend/src/` code.
 
 ---
 
+## Verification pass (2026-07-29, GD-03 org-chart resolution — Job-Dispatch eligibility gate)
+
+Re-verified against `main` @ `eca502a` plus this session's own working-tree changes. `GD-03`'s
+remaining org-chart/reporting-relationship half (`OD-EMP-12`, `SIR-EMP-009`; twin auth-side
+citation `OQ-AUTH-08`/`SIR-AUTH-009`) is now **Decided → `ADR-060`**, ratifying the commissioning
+human's explicit disposition: flat, hotel-scoped — no explicit `reports_to_user_id` FK or
+reporting-tree data model; org-chart visibility (RM+Admin, already confirmed by `REQ-EMP-013`) is
+derived implicitly from existing hotel/hotel-group scope membership, reusing `ADR-023`/`ADR-030`'s
+already-established discriminated JWT `scope` claim rather than introducing a new authorization
+primitive. `GD-03` (5-role model & Regional-Manager authority) is now **fully resolved** — its
+permission-set half (`ADR-030` D-5, 2026-07-25) and this data-model half together close it.
+
+- **`ADR-058`'s named architectural-eligibility gate for Job-Dispatch (`GD-20`/Epic 9) is now
+  satisfied.** `ADR-058` §3 states implementation "becomes architecturally eligible once `GD-03`
+  ... is resolved." With `GD-03` fully decided, **Job-Dispatch (Epic 9) is now architecturally
+  eligible.**
+- **Epic 9 is opened by this implementation-planning pass** (§2 above, "Epic 9 — Job-Dispatch
+  two-tier pivot"), adopting `ADR-054`–`ADR-058`'s already-ratified target architecture and
+  migration plan unmodified — per `ADR-058` §4, opening/scheduling an epic is implementation
+  planning's responsibility, not governance's, so this is not a governance act and reopens nothing.
+  Per-PR breakdown within Epic 9's Phase 1/Phase 2 remains a distinct, later, dedicated pass.
+- **No other epic or PR is affected.** `GD-21` (attendance automation, implementation not
+  authorized) and `GD-19` (chatbot, deferred post-MVP) are unchanged by this pass. No code was
+  authored or modified as an exit condition of this record.
+- **Zero remaining standalone `GD-01..23` items outside `GD-19`'s deferred remainder.** `OD-HR-02b`
+  (Personalfragebogen data-source ambiguity) is now the sole genuinely open named residual item;
+  `GD-03`'s org-chart half no longer belongs in that list.
+
+---
+
 ## 0. Sequencing challenge to the proposed framing (read first)
 
 The commissioning brief proposed: Epic 1 = Critical PATCH fix; Epic 2 = shared
@@ -485,6 +515,39 @@ can create, patch, approve, or reject requests/applications belonging to hotel B
   `backend-work-requests`/`backend-work-applications` now also import `isHotelInScope()`
   in-service (same shared primitive as `backend-attendance`/`backend-quality`), as part of this
   PR.
+
+### Epic 9 — Job-Dispatch two-tier pivot (`GD-20`, opened 2026-07-29 following `GD-03`/`ADR-060`)
+
+Architecturally eligible as of this pass: `ADR-058`'s named eligibility gate (`GD-03`'s org-chart/
+reporting-model half) is resolved by `ADR-060` (flat, hotel-scoped; see the verification pass
+above). Per `ADR-058` §4, this record only opens the epic and adopts its already-ratified scope —
+it does not invent new PR-by-PR content beyond what `ADR-054`–`ADR-058` already ratified, since
+scheduling/sequencing (not architecture) is the one thing left to implementation planning.
+
+Scope is exactly `SPEC-JOB-DISPATCH-001`'s existing Rollout and Compatibility section
+(`MODULE_SPEC.md:495-506`), ratified unmodified by `ADR-058`: a **forward refactor** (not a
+dual-running migration — pre-launch, no production employee data), feature-flagged per phase,
+trivially rollback-able (disable flag + redeploy prior build):
+
+- **Phase 1 — Foundation realignment:** Regional Manager role + scope added to auth/RBAC
+  (`ADR-030` D-5, `ADR-060`'s hotel/hotel-group scope membership as the routing basis — no
+  reporting-tree lookup); success-envelope refactor behind `sendSuccess()`/`sendPaginated()`;
+  **remove `WorkApplication`**; repoint `WorkerAssignment` to direct creation; re-label the schema
+  off "marketplace" terminology.
+- **Phase 2 — Core dispatch:** Calendar + daily exclusivity + sick/vacation auto-cancel; Broadcast
+  `JobRequest` + optimistic-concurrency slot arbitration + 6h auto-close on the Platform
+  Worker/outbox (`ADR-029`, `ADR-057`).
+
+Per-PR breakdown within Phase 1/Phase 2 (file lists, migration order, test plan) is deliberately
+**not** authored by this pass — that is the next dedicated implementation-planning pass for this
+epic, to be triggered when the human operator schedules it. This entry exists so Epic 9 is no
+longer absent from the plan's own epic numbering, matching every other epic's opening pattern
+(cf. Epic 5, Epic 7 openings above).
+
+Dependencies: `GD-03` (fully resolved, `ADR-030` + `ADR-060`); Platform Worker/Outbox runtime
+(Epic 7, merged); `isHotelInScope()`/scope-authz seam (Epic 3/5, merged). No dependency on `GD-21`
+(Attendance automation, implementation not authorized) or `GD-19` (chatbot, deferred — unrelated
+module).
 
 ---
 

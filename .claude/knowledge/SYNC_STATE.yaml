@@ -2306,6 +2306,62 @@ context_invalidators:
       per the existing SYNC-055/SYNC-056 pattern (rebind follows a HEAD change, not a
       working-tree edit).
 
+  - id: SYNC-058
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Governance Resolution workflow: OD-EMP-12 (GD-03's remaining org-chart/reporting-
+      relationship half; twin auth-side citation OQ-AUTH-08/SIR-AUTH-009, same underlying
+      fact, not a separate decision) resolved via ADR-060, ratifying the commissioning
+      human's explicit verbatim disposition. Flat, hotel-scoped: no explicit
+      reports_to_user_id FK or reporting-tree data model is introduced. Org-chart
+      visibility (RM+Admin, already confirmed by REQ-EMP-013) is derived implicitly from
+      existing hotel/hotel-group scope membership, reusing ADR-023/ADR-030's already-
+      established discriminated JWT scope claim rather than introducing a new
+      authorization primitive. Job Dispatch's manager-assignment routing is built against
+      hotel/hotel-group membership, not an org-chart tree. Explicit reporting chains/
+      approval hierarchies/escalations remain deferred until a confirmed business
+      requirement needs one (Constitution Article 12).
+      GD-03 (5-role model & Regional-Manager authority) is now fully resolved -- the
+      permission-set half (ADR-030 D-5, 2026-07-25) and this data-model half together
+      close it. This is also the named architectural-eligibility gate ADR-058 set for
+      Job-Dispatch (GD-20/Epic 9): "architecturally eligible once GD-03 ... is resolved."
+      Job-Dispatch implementation is now architecturally eligible to be planned --
+      scheduling/sequencing remains implementation planning's own future, dedicated
+      responsibility (ADR-058 Section 4), not authorized or performed by this record.
+      Files touched: new docs/14-governance/architecture-decisions/ADR-060-org-chart-
+      flat-hotel-scoped-no-reporting-tree.md; docs/03-modules/employee-management/
+      MODULE_SPEC.md (OD-EMP-12 row RESOLVED, Review and Change Log 0.2.6->0.2.7);
+      docs/03-modules/auth/MODULE_SPEC.md (OQ-AUTH-08 row RESOLVED both facets, Review
+      and Change Log 0.2.5->0.2.6); .claude/governance/SPECIFICATION_ISSUES_REGISTER.md
+      (SIR-EMP-009 and SIR-AUTH-009 both marked RESOLVED, both modules' "Section last
+      verified" markers updated); .claude/knowledge/DECISION_INDEX.md (new ADR-060 row;
+      OD-EMP-12 pending-decision row updated to RESOLVED; ADR-050's stale "still-open"
+      cross-reference to OD-EMP-12/GD-03 corrected); docs/implementation/
+      GOVERNANCE_REGISTER.md (OQ-AUTH-08 and OD-EMP-12 rows RESOLVED; closing summary
+      note corrected -- OD-HR-02b is now the sole remaining named residual item outside
+      any decided GD-* row); docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md (GD-03
+      summary row and GD-03 detail section updated to FULLY DECIDED); docs/05-execution/
+      EXECUTION_DASHBOARD.md (Completed Work GD-03 entry, Blockers table row struck
+      through per its own resolution not removed, backend-hr row corrected);
+      docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md (new dated verification-pass
+      section recording Epic 9/Job-Dispatch's eligibility gate now satisfied; Epic 9 is
+      NOT opened by this pass -- its own PR sequence/backlog is explicitly deferred to a
+      distinct, later, dedicated implementation-planning pass per ADR-058 Section 4 and
+      this record's own scope note).
+      GD-19 (chatbot, deferred post-MVP), OD-HR-02b, and every other open item are
+      untouched by this pass. No production code was touched. No architecture decision
+      other than ADR-060 itself was authored, changed, or reopened.
+    authority_needed: none  # the ratifying decision itself was supplied verbatim by the commissioning human; this entry records synchronization of that decision across the knowledge/governance layer, not a new decision
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the orchestrating
+      session handles git add/commit and any PR. cache_state.baseline_revision is
+      intentionally NOT rebound by this entry since HEAD has not advanced yet, per the
+      existing SYNC-055/SYNC-056/SYNC-057 pattern (rebind follows a HEAD change, not a
+      working-tree edit). Once merged, Job-Dispatch (Epic 9) is eligible to be taken up
+      by a future, dedicated implementation-planning pass -- not scheduled or sequenced
+      by this entry.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
