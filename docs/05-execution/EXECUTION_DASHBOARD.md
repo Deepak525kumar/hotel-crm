@@ -36,9 +36,11 @@ direction to decompose modules into individual requirements rather than trust on
 verdict) additionally flagged two candidates that have **not** been decided or acted on — recorded
 here as findings for a future owner call, not as architecture fact:
 - `REQ-CAL-T06` (Calendar's availability read-model) appears technically unblocked (reads only
-  already-existing tables) despite being bundled with the still-deferred manager-placement view
-  under `GD-18` — but `GD-18` itself remains undecided, so building this ahead of that decision
-  would be building ahead of governance, not following it.
+  already-existing tables) despite being bundled with the manager-placement view under `GD-18`.
+  **`GD-18` is now Decided (2026-07-28, `ADR-049`–`ADR-052`)** — the governance-ambiguity blocker
+  this note originally flagged no longer applies; both `REQ-CAL-T06` and the manager-placement view
+  (`REQ-CAL-T01`) may now be planned against settled timezone/RM-scope/operations-stub decisions.
+  Both remain unbuilt, but that is an implementation-effort gap now, not a governance one.
 - `IF-COMPLIANCE-GetAuditTrail` (a read-only surface over the already-existing `AuditLog` table)
   appears to have no governance blocker — but this has not been confirmed by an owner or
   architecture decision, only by this audit's reading of `ADR-016`.
@@ -131,6 +133,20 @@ when it's pursued — it no longer gates the tier mapping itself or any dependen
 > `OD-HR-02b` and `GD-03`'s org-chart half remain genuinely open. Full record:
 > `GOVERNANCE_DECISIONS_REQUIRED.md` GD-15 section; `ADR-039`–`ADR-048`.
 
+> **Sync note (2026-07-28, cont'd 9):** `GD-18` was also decided — four sub-decisions, each its own
+> ADR (`ADR-049` through `ADR-052`): `OD-CAL-04` timezone anchored to `Hotel.timezone` (currently
+> `Europe/Berlin` for all deployments), not a hardcoded constant; `OD-CAL-07` Regional-Manager
+> cross-hotel edit scope resolved by adopting the existing `ADR-030`/`ADR-023` authorization model
+> (hotel-group grain), independent of `OD-EMP-12`; `OD-CAL-10` the `/operations` stub removed,
+> underlying occupancy/staffing-demand state left unassigned pending future Requirements Intake,
+> Calendar's weekly-plan view established as a composite read model under `ADR-034`'s existing
+> read-only allow-list; `OD-CAL-11` Calendar's auto-cancel responsibility ends at cancellation,
+> re-broadcast policy deferred entirely to Job Dispatch/`GD-20`, not prohibited. `ADR-051`'s
+> resolution was informed by a real-world weekly-planner ("Dienstplan") artifact the commissioning
+> human supplied mid-decision, and surfaced two likely-missing requirements (arrivals count,
+> staffing-demand target) flagged for a future Requirements Intake pass, not resolved by this
+> workflow. Full record: `GOVERNANCE_DECISIONS_REQUIRED.md` GD-18 section; `ADR-049`–`ADR-052`.
+
 ## Per-Module Implementation Status
 
 Derived from `.claude/knowledge/MODULE_REGISTRY.yaml`. See that file for each module's evidence
@@ -202,9 +218,12 @@ only `.placeholder`, no route mount.
   Resolves the mobile-worker dashboard's previously-silent 403 (`SIR-ANLY-002`) and the independent
   `DashboardStats` type-shape mismatch it also carried (the mobile client's old type never matched
   any real backend response). `SPEC-ANALYTICS-001` amended to @0.2.1. Warning counts and
-  sick/vacation counts remain explicitly deferred (`GD-04`'s tiers, `GD-18`'s Calendar).
-- `GD-18` (Calendar) — **narrow slice built 2026-07-27**, `GD-18` itself still undecided as a
-  formal product decision. Per the frozen `SPEC-CALENDAR-001`'s own text (its `ADR-021` boundary
+  sick/vacation counts remain explicitly deferred (`GD-04`'s tiers, `GD-18`'s Calendar — `GD-18`
+  now Decided 2026-07-28, see below; the metric itself remains deferred on implementation, not
+  governance ambiguity).
+- `GD-18` (Calendar) — **narrow slice built 2026-07-27; `GD-18` itself Decided 2026-07-28
+  (`ADR-049`–`ADR-052`, see Sync note below).** At the time of this narrow slice, `GD-18` was still
+  undecided as a formal product decision. Per the frozen `SPEC-CALENDAR-001`'s own text (its `ADR-021` boundary
   and `REQ-CAL-T08`'s explicit no-Phase-1-dependency note), the worker self-mark
   sick/vacation capability (`REQ-CAL-T03/T04/T08`) required no governance decision to build — it
   is independent of the manager weekly-plan placement view (`REQ-CAL-T01`, which does depend on
@@ -234,8 +253,8 @@ every `GD-*` ID lives only in
 | Area | State | Blocked on |
 |---|---|---|
 | backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` **Decided 2026-07-28** (`ADR-039`–`ADR-048`, ten sub-decisions; see Sync note below) — no governance blocker remains for this module's own scoping. Remaining prerequisite: ownership assignment (`SYNC-001`) and ordinary G4/G2 gate progression. `GD-03`'s org-chart half (`OD-EMP-12`) remains separately open, not part of `GD-15`'s resolution. |
-| backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` (remaining scope) + Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001` |
-| backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` (still undecided) — an audit finding (2026-07-27, not a ratified decision) observed this reads only already-existing tables and is not itself schema-blocked, but building it would still be getting ahead of `GD-18`'s own scope decision, not a substitute for one |
+| backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` **Decided 2026-07-28** (`ADR-049`–`ADR-052`, see Sync note above) — no governance blocker remains; still gated on Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001`, and on ordinary implementation effort |
+| backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` **Decided 2026-07-28** — the governance-scope blocker this row previously flagged no longer applies; this item reads only already-existing tables and is not schema-blocked, so it may now be built without waiting on any further governance decision |
 | backend-documents (Documents module, RBAC/storage) | **in progress (2026-07-27):** `WorkerDocument` model + migration landed; module built (`types.ts`, `validation.ts`, `storage.ts` (S3 stub, real client deferred — `@aws-sdk/client-s3` not yet a dependency), `service.ts`, `controller.ts`, `routes.ts`); mounted at `/v1/documents`. All five `IF-DOC-*` target interfaces implemented. No multipart/file-parsing middleware wired yet — uploads persist metadata with an empty byte buffer (same gap the migrated-from `backend-hr` stub had, `MIG-GAP-DOC-001`, itself still open and out of this session's scope). `MIG-GAP-DOC-001` (migrating `backend-hr`'s stub route to call into this module) not yet done. | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains. Gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection (neither wired yet). |
 | backend-chatbot | zero code, `.placeholder` only; every requirement checked, none independent | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
 | backend-geo | zero code, `.placeholder` only; every requirement checked, none independent | `GD-14` (geofencing/location model) |

@@ -53,7 +53,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 | **✅ DECIDED 2026-07-28 → `ADR-039`–`ADR-048`** (10 sub-decisions, resolved one at a time). A standing architecture blocker (`OD-HR-01a`/`OD-HR-01b`, HR-vs-Onboarding boundary) was found already resolved by `ADR-012` (2026-07-12) — a documentation-synchronization gap, corrected during this audit. `OD-EMP-16` was separately found already resolved by `GD-11`/`ADR-035` — its own spec row corrected. `OD-HR-02b` and `GD-03`'s org-chart half remain genuinely open, not resolved by `GD-15`. |
 | GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 | **✅ DECIDED 2026-07-28 → `ADR-037`** (`OD-CONSENT-002` Option (b): chatbot engagement requires consent, decline routes to manual onboarding path, does not block; `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the same pass). Resolves `OD-CONSENT-001/002/004/006/007/009/011`. Directly informs Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent portion; transcript-persistence portion remains open). |
-| GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 |
+| GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 | **✅ DECIDED 2026-07-28 → `ADR-049`–`ADR-052`** (4 sub-decisions). `ADR-051` was informed by real-world weekly-planner evidence supplied mid-decision, surfacing two likely-missing requirements (arrivals, staffing-demand target) flagged for future Requirements Intake, not resolved here. |
 | GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 |
 | GD-20 | Job-Dispatch two-tier calendar+broadcast pivot | **P3** | Post | 12+ |
 | GD-21 | Attendance operational automation | **P3** | Post | 2–4 |
@@ -630,22 +630,48 @@ summary row above. Detail below is retained as the decision record.
 
 ## GD-18 — Calendar module scope (M2)
 
-- **Why a decision is required:** Calendar is a stub; timezone anchoring, the RM edit scope, the
-  sick/vacation notification contract, and the auto-cancel/re-broadcast behavior are undecided. It also gates
-  the Analytics sick/vacation metric.
-- **Current repository state:** `calendar/service.ts` throws `NotImplementedError`; a `/operations` stub
-  actually models reception data, not scheduling. ADR-021 already fixed the Job-Dispatch↔Calendar ownership
-  boundary.
-- **Merges findings:** `OD-CAL-04` (timezone anchor), `OD-CAL-06` (notification contract — needs GD-01/GD-12),
-  `OD-CAL-07` (RM edit scope — needs GD-03), `OD-CAL-08` (interface schema — needs GD-12), `OD-CAL-10`
-  (operations-vs-calendar shape), `OD-CAL-11` (auto-cancel re-broadcast).
-- **Options:** (a) Build the confirmed sick/vacation calendar + auto-cancel per ADR-021, `Europe/Berlin`
-  anchoring; (b) broader scheduling scope.
-- **Recommended:** **(a) — the ADR-021-confirmed scope only.** Depends on GD-01, GD-03, GD-12.
-- **Artifacts blocked:** Calendar module; Analytics M2 sick/vacation counts (`OQ-ANALYTICS-07`).
+**✅ DECIDED 2026-07-28, by the commissioning human. Resolved as 4 sub-decisions, one at a time, per the
+Governance Resolution workflow.**
+
+- **Why a decision was required:** Calendar is a stub; timezone anchoring, the RM edit scope, the
+  sick/vacation notification contract, and the auto-cancel/re-broadcast behavior were undecided. It also
+  gates the Analytics sick/vacation metric.
+- **Current repository state at decision time:** `calendar/service.ts` throws `NotImplementedError`; a
+  `/operations` stub actually modeled reception data, not scheduling. `ADR-021` already fixed the
+  Job-Dispatch↔Calendar ownership boundary; `GD-01`/`GD-12` (notification contract dependency) and `GD-03`'s
+  permission-set half (RM edit scope dependency) were already decided before this decision, verified during
+  audit — only `OD-CAL-06`/`OD-CAL-08` (already resolved via `GD-12`/`ADR-032` in an earlier session) needed
+  no further action from `GD-18` itself.
+- **Decided — resolves, four sub-decisions each with its own ADR:**
+  1. `OD-CAL-04` (timezone anchor) → `ADR-049`: anchored to `Hotel.timezone` field (currently `Europe/Berlin`
+     for all deployments), not a hardcoded constant — ratified permanent.
+  2. `OD-CAL-07` (RM cross-hotel edit scope) → `ADR-050`: Calendar adopts the existing `ADR-030`/`ADR-023`
+     authorization model (Hotel Manager hotel scope, RM hotel-group scope, Admin global); authorization-only,
+     independent of `OD-EMP-12`/`GD-03`'s still-open org-chart half.
+  3. `OD-CAL-10` (`/operations` stub disposition) → `ADR-051`: three-part resolution, informed by real-world
+     weekly-planner ("Dienstplan") evidence the commissioning human supplied mid-decision — the write-capable
+     stub is removed; the underlying occupancy/staffing-demand state remains unassigned pending future
+     Requirements Intake; Calendar's weekly-plan view is established as a composite read model that may
+     display that state once owned elsewhere, under `ADR-034`'s existing read-only allow-list.
+  4. `OD-CAL-11` (auto-cancel re-broadcast) → `ADR-052`: Calendar's responsibility ends at cancellation;
+     re-broadcast policy belongs entirely to Job Dispatch, addressed (if at all) during `GD-20` — not a
+     prohibition on future dispatch-side automation, only a bounded-context boundary statement.
+- **Explicitly NOT decided by this record:** whether arrivals-count and a persisted staffing-demand target
+  become new confirmed requirements (flagged by `ADR-051` for a future Requirements Intake pass, which this
+  Governance Resolution workflow is not positioned to perform — that activity confirms new requirements,
+  this workflow resolves ambiguity in existing ones); `GD-20`'s own re-broadcast policy question.
+- **Merges findings:** `OD-CAL-04/07/10/11`, all resolved. `OD-CAL-06`/`OD-CAL-08` required no action —
+  already resolved by `GD-12`/`ADR-032`.
+- **Artifacts unblocked:** Calendar's governance ambiguity is fully resolved; `REQ-CAL-T01` (manager
+  weekly-plan placement view) and `REQ-CAL-T06` (today-only availability read-model) may now be planned
+  against settled authorization/timezone/scope decisions — though both remain unbuilt, gated on ordinary
+  implementation effort, not governance ambiguity. Analytics' `OQ-ANALYTICS-07` (sick/vacation counts) is
+  similarly ungated at the governance level but still blocked on that same unbuilt view.
 - **Impact:** backend calendar + notifications + analytics · 1–2 migrations · frontend calendar UI · mobile
-  none (manager-web). **~4–6 PRs.**
-- **Priority:** **P3.** **Owner:** Product Owner + Architect.
+  none (manager-web). **~4–6 PRs** (unchanged — this decision scopes the build, it does not itself implement
+  it).
+- **Priority:** **P3.** Decided by the commissioning human 2026-07-28. **Owner:** Product Owner + Architect.
+  Full decision records: `ADR-049` through `ADR-052`.
 
 ## GD-19 — Chatbot module scope & LLM safety
 
@@ -891,6 +917,20 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 > resolved by `GD-11`/`ADR-035` — its own stale spec row corrected in the same audit. `OD-HR-02b`
 > and `GD-03`'s org-chart half remain genuinely open, not resolved by `GD-15`. Genuinely-still-open
 > count in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly (now 5: `GD-18/19/20/21/22`).
+
+> **Sync note (2026-07-28, cont'd 9):** `GD-18` is also no longer an open decision to make — decided
+> 2026-07-28 as four sub-decisions, each with its own ADR (`ADR-049` through `ADR-052`), Decision #10
+> in the Governance Resolution workflow's sequence. `ADR-051` (the `/operations` stub disposition) was
+> informed by real-world weekly-planner ("Dienstplan") evidence the commissioning human supplied
+> mid-decision — the resolution path involved two rounds of correction (an initial "remove and treat
+> as out of scope" recommendation, corrected first on evidence grounds and then on an ownership-vs-
+> presentation distinction) before settling on: stub removed, underlying state unassigned pending a
+> future Requirements Intake pass, and Calendar's weekly-plan view established as a composite read
+> model under `ADR-034`'s existing allow-list. Two likely-missing requirements (arrivals count,
+> staffing-demand target) were surfaced but not resolved — that requires confirming new requirements,
+> outside this workflow's scope. `OD-CAL-11`'s resolution (`ADR-052`) explicitly defers re-broadcast
+> policy to `GD-20`, not resolving it. Genuinely-still-open count in `GOVERNANCE_REGISTER.md` Part 2
+> decrements accordingly (now 4: `GD-19/20/21/22`).
 
 - **Highest-leverage decisions (make these first):**
   1. **GD-02 Manager write-permission authority** — smallest, highest ROI-per-effort remaining item;
