@@ -385,10 +385,14 @@ export class EmployeeManagementService extends BaseService {
     }
 
     if (actor.role === 'regional_manager') {
+      // resolveScope() (auth/service.ts) only ever mints {type: 'global'}
+      // for role === 'admin' -- a regional_manager always resolves to
+      // 'hotel_group' or null. No 'global' branch here: that would be
+      // granting a capability no token this role can hold actually needs,
+      // and mirrors resolveNonAdminScopeFilter's own treatment of the same
+      // case as an invariant violation, not a valid claim to allow.
       const scope = actor.scope ?? null;
-      const ownsGroup =
-        scope?.type === 'global' ||
-        (scope?.type === 'hotel_group' && scope.hotel_group_id === hotelGroupId);
+      const ownsGroup = scope?.type === 'hotel_group' && scope.hotel_group_id === hotelGroupId;
       if (!ownsGroup) {
         throw new ForbiddenError('Cannot view another group\'s org chart');
       }
@@ -416,17 +420,22 @@ export class EmployeeManagementService extends BaseService {
     if (!group) throw new NotFoundError('Hotel group not found');
 
     // Group-grain, not hotel-grain (REQ-EMP-012): EmploymentRecord has no
-    // hotel_id, so employees are listed once under the group, not
-    // duplicated per hotel. ACTIVE only -- an org chart shows who is
-    // currently staffed, not the full lifecycle history REQ-EMP-004 covers.
+    // hotel_id, so employees are listed once under the group -- they are
+    // NOT nested under any one hotel in `hotels` above, since the data model
+    // doesn't associate them with one. No status filter: REQ-EMP-013's own
+    // acceptance text ("Regional Manager sees employee data across their
+    // group") names no lifecycle-status carve-out, so this returns every
+    // non-deleted record and includes `status` in the response -- filtering
+    // to a particular status (e.g. only ACTIVE) is a consumer-side choice,
+    // not something this endpoint should decide unasked.
     const employees = await this.prisma.employmentRecord.findMany({
-      where: { hotel_group_id: hotelGroupId, status: EmploymentStatus.ACTIVE },
+      where: { hotel_group_id: hotelGroupId, deleted_at: null },
       select: {
         employee_id: true,
         job_title: true,
+        status: true,
         user: { select: { id: true, first_name: true, last_name: true } },
       },
-      orderBy: { job_title: 'asc' },
     });
 
     await this.logAudit(actor.userId, actor.role, 'employee.org_chart.view', 'HOTEL_GROUP', group.id, {});
@@ -435,10 +444,16 @@ export class EmployeeManagementService extends BaseService {
       hotel_group_id: group.id,
       name: group.name,
       regional_manager: group.regional_manager,
+      // Hotels within the group, each with their Hotel Manager (may be
+      // null). Employees are listed separately below -- they are
+      // group-scoped, not hotel-scoped; do not assume they belong to any
+      // one entry in this array.
       hotels: group.hotels,
+      // Group-scoped, not hotel-scoped (see note above and REQ-EMP-012).
       employees: employees.map((e) => ({
         employee_id: e.employee_id,
         job_title: e.job_title,
+        status: e.status,
         user: e.user,
       })),
     };

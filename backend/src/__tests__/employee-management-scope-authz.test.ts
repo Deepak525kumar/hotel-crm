@@ -67,7 +67,14 @@ const groupEmploymentRecords: Record<string, any[]> = {
     {
       employee_id: 'E-001',
       job_title: 'Cleaner',
+      status: 'ACTIVE',
       user: { id: 'user_1', first_name: 'Wanda', last_name: 'Worker' },
+    },
+    {
+      employee_id: 'E-002',
+      job_title: 'Waiter',
+      status: 'UNDER_REVIEW',
+      user: { id: 'user_2', first_name: 'Ravi', last_name: 'Review' },
     },
   ],
 };
@@ -249,8 +256,12 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       expect(res.body.data.hotel_group_id).toBe('g1');
       expect(res.body.data.regional_manager.id).toBe('rm_1');
       expect(res.body.data.hotels).toHaveLength(1);
-      expect(res.body.data.employees).toHaveLength(1);
-      expect(res.body.data.employees[0].user.first_name).toBe('Wanda');
+      // Not status-filtered (REQ-EMP-013 names no lifecycle-status
+      // carve-out): both the ACTIVE and UNDER_REVIEW fixture records are
+      // returned, each carrying its own `status`.
+      expect(res.body.data.employees).toHaveLength(2);
+      expect(res.body.data.employees.map((e: any) => e.user.first_name).sort()).toEqual(['Ravi', 'Wanda']);
+      expect(res.body.data.employees.find((e: any) => e.employee_id === 'E-002').status).toBe('UNDER_REVIEW');
     });
 
     it("denies a regional_manager viewing another group's org chart (403)", async () => {
