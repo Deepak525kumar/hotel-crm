@@ -118,7 +118,7 @@ is specified as a single capability (the three modules are NOT split).
 | `TREQ-001` calendar direct assignment (manager places workers per day; NO accept step; appears on worker calendar; NO broadcast) | PIVOT §4.4, §5.5, §7.2; CONFIRMED §13 (Primary) | Confirmed authority | Target; unbuilt (MIG-GAP-03) |
 | `TREQ-002` broadcast JobRequest fired only on a standalone manager request; skill(s) × headcount-per-skill | PIVOT §4.4, §7.3; CONFIRMED §13 (Fallback) | Confirmed authority | Target; unbuilt (MIG-GAP-04) |
 | `TREQ-003` eligibility = matching skill ∧ free that day; only those workers notified | PIVOT §5.5; CONFIRMED §13 | Confirmed authority | Target; unbuilt (MIG-GAP-04) |
-| `TREQ-004` first-accept wins; tie-break = earliest server-received timestamp; Redis slot lock (DB `SELECT..FOR UPDATE` fallback) | PIVOT §5.5, §5.7, §7.3; CONFIRMED §13 | Confirmed authority | Target; unbuilt (MIG-GAP-06) |
+| `TREQ-004` first-accept wins; tie-break = earliest server-received timestamp; optimistic concurrency (version column + transactional conditional update), per `ADR-057` — no Redis mutex | PIVOT §5.5, §7.3; CONFIRMED §13; `ADR-057` | Confirmed authority | Target; unbuilt (MIG-GAP-06) |
 | `TREQ-005` when a skill's slots fill, later responders receive explicit "requirement fulfilled" notification (not silence, not error) | PIVOT §4.4, §7.3; CONFIRMED §13 | Confirmed authority | Target; unbuilt (MIG-GAP-04) |
 | `TREQ-006` unfilled JobRequest auto-closes after 6 hours; manager may close manually sooner | PIVOT §4.4, §5.6; CONFIRMED §13 | Confirmed authority | Target; unbuilt (MIG-GAP-09) |
 | `TREQ-007` daily exclusivity: one active assignment per worker per DAY (calendar OR broadcast); partial unique index | PIVOT §4.4, §9.4; CONFIRMED §12, §13 | Confirmed authority | Target; unbuilt (MIG-GAP-08) |
@@ -142,7 +142,7 @@ role to the guard casing. Statements below use the guard casing.
 | Work application | `[CURRENT; RETIRED in target]` A rostered worker's expression of interest in one work request; at most one live row per (request,worker); accepted applications are the sole gateway to an assignment. Removed in target (PIVOT §9.2). | `schema.prisma:279`; `work-applications/service.ts` |
 | Assignment (WorkerAssignment) | A confirmed booking of a worker to work. `[CURRENT]` created only from an accepted application (mandatory `application_id` FK), driven CONFIRMED->IN_PROGRESS->COMPLETED/CANCELLED. `[TARGET]` created directly from calendar or broadcast accept; `application_id` dropped (PIVOT §9.1). | `schema.prisma:314`; `assignments/service.ts` |
 | Roster | The set of `HotelWorker` memberships for a hotel; ACTIVE membership gates non-management visibility and the current apply precondition. `[TARGET]` HotelWorker becomes the permanent-employment record (PIVOT §9.1). | `schema.prisma:206`; `work-requests/service.ts:101,135`; `work-applications/service.ts:50` |
-| Slot | One unit of `workers_needed` capacity; `[CURRENT]` claimed via optimistic `updateMany`; `[TARGET]` claimed via Redis slot lock (DB `FOR UPDATE` fallback), one per skill (PIVOT §5.5, §7.3). | `work-applications/service.ts:219-229`; `schema.prisma:243-244` |
+| Slot | One unit of `workers_needed` capacity; `[CURRENT]` claimed via optimistic `updateMany`; `[TARGET]` claimed via the same optimistic-concurrency pattern (version column + transactional conditional update), one per skill (PIVOT §5.5, §7.3; `ADR-057`). | `work-applications/service.ts:219-229`; `schema.prisma:243-244` |
 | admin / manager (management) | `[CURRENT]` Roles permitted to create/patch work requests and accept/reject applications; exempt from roster-scoping on reads and NOT hotel-scoped. | `work-requests/routes.ts:18,21`; `work-applications/service.ts:122,167` |
 | worker | Role permitted to apply and to withdraw own application; reads scoped to own resources/rostered hotels. | `work-applications/routes.ts:14`; `work-requests/service.ts:100,148` |
 | checker | Non-management role treated as worker for read-scoping and `my_application` embedding. | `work-requests/service.ts:148` |
@@ -213,7 +213,7 @@ role to the guard casing. Statements below use the guard casing.
 | TREQ-001 | Manager places workers on a calendar day-by-day as a DIRECT assignment — no worker accept/decline; the shift appears on the worker's calendar; no broadcast fires. | Must | A calendar placement creates a `CalendarEntry`/assignment directly; no application row; no broadcast notification emitted. | TRULE-001 |
 | TREQ-002 | A broadcast `JobRequest` fires only when a manager raises a standalone request specifying skill(s) and headcount per skill. | Must | JobRequest persists skill×headcount; calendar edits never emit a broadcast. | TRULE-002 |
 | TREQ-003 | Only workers with a matching skill who are free that day are eligible and notified. | Must | Eligible set = {skill matches ∧ no assignment that day}; only they receive push. | TRULE-002, TRULE-006 |
-| TREQ-004 | First acceptance wins each slot; ties broken by earliest server-received timestamp; arbitration via Redis slot lock, DB `SELECT..FOR UPDATE` fallback when Redis is down. | Must | Under concurrent accepts on the last slot, exactly one succeeds (earliest timestamp); Redis-down path still yields exactly one winner. | TRULE-003 |
+| TREQ-004 | First acceptance wins each slot; ties broken by earliest server-received timestamp; arbitration via optimistic concurrency (version column + transactional conditional update), per `ADR-057`. | Must | Under concurrent accepts on the last slot, exactly one succeeds (earliest timestamp); losing transactions receive zero affected rows and the "requirement fulfilled" response. | TRULE-003 |
 | TREQ-005 | When a skill's slots are full, later responders receive an explicit "requirement fulfilled" notification (not silence, not an error). | Must | Post-fill accept returns a "requirement fulfilled" message; no assignment created. | TRULE-004 |
 | TREQ-006 | An unfilled JobRequest auto-closes 6 hours after creation; the manager may close it manually sooner. | Must | Scheduled job closes at +6h and notifies the manager; manual close available earlier. | TRULE-005 |
 | TREQ-007 | A worker assigned anything for a day (calendar OR broadcast) is blocked from any further assignment that whole day (daily exclusivity), enforced by a partial unique index (one active assignment per worker per day). | Must | Second same-day assignment rejected at DB level; eligibility computation excludes already-assigned workers. | TRULE-006 |
@@ -235,7 +235,7 @@ role to the guard casing. Statements below use the guard casing.
 | RULE-003 `[RETIRED in target]` | Apply, or accept/reject/withdraw of an application | Applications are created/approved only while the request is OPEN or PARTIALLY_FILLED; updates require the application to be PENDING. | Otherwise ConflictError. Approve-on-closed is UNTESTED (FIND-BRV-009). RETIRED by TREQ-011 (applications removed). | `unassigned (SYNC-001)`; `work-applications/service.ts:44-47,163-165,213-215` |
 | RULE-004 `[RETIRED in target]` | Apply to a request | At most one application per (request,worker); only a WITHDRAWN row may re-apply (row reused). | PENDING/ACCEPTED/REJECTED block re-apply -> ConflictError. (Former OQ-06 "REJECTED permanent lock" MOOT — applications removed.) RETIRED by TREQ-011. | `unassigned (SYNC-001)`; `work-applications/service.ts:56-84`; `schema.prisma:301` |
 | RULE-005 | Update of an application | A worker may only withdraw their own application; admin/manager may accept, reject, OR withdraw any pending application (worker-branch guards apply only when isWorker). | Route RBAC limits create/patch of requests and apply to management/worker respectively. `[TARGET]` application-update authz RETIRED; superseded by role×scope (TRULE-007). | `unassigned (SYNC-001)`; `work-applications/service.ts:167-173`; `work-requests/routes.ts:18,21` |
-| RULE-006 | Slot claim + all WorkRequest writes | Invariant 0 <= workers_confirmed <= workers_needed, enforced by app-layer predicate and DB CHECK. | Claim predicate returning count 0 -> ConflictError. `[TARGET]` slot arbitration moves to Redis lock (TRULE-003). | `unassigned (SYNC-001)`; `work-applications/service.ts:219-230`; `migration.sql:564-566` |
+| RULE-006 | Slot claim + all WorkRequest writes | Invariant 0 <= workers_confirmed <= workers_needed, enforced by app-layer predicate and DB CHECK. | Claim predicate returning count 0 -> ConflictError. `[TARGET]` slot arbitration remains optimistic concurrency, same mechanism, per `ADR-057` (TRULE-003). | `unassigned (SYNC-001)`; `work-applications/service.ts:219-230`; `migration.sql:564-566` |
 | RULE-007 `[RETIRED in target]` | Accept transaction commit | FILLED (with filled_at) iff workers_confirmed>=workers_needed after claim; otherwise PARTIALLY_FILLED. | — RETIRED: accept-transaction fill recompute removed with the marketplace flow (TREQ-011/012/013). | `unassigned (SYNC-001)`; `work-applications/service.ts:276-287` |
 | RULE-008 | Update of an assignment | Lifecycle CONFIRMED->{IN_PROGRESS,CANCELLED}; IN_PROGRESS->{COMPLETED,CANCELLED}. COMPLETED and CANCELLED are terminal. Cancel stamps cancelled_at only — it does NOT decrement workers_confirmed nor reopen the request. | Illegal/no-op -> ConflictError. NO_SHOW/REASSIGNED declared but UNREACHABLE (superseded — target simplifies job status, TREQ-013); cancel side-effect is a target design detail (OQ-02, partially resolved by TREQ-009's event-driven sick/vacation cancel, `ADR-021`). | `unassigned (SYNC-001)`; `assignments/service.ts:6-9,92-108`; `schema.prisma:55-62` |
 | RULE-009 `[RETIRED in target]` | Assignment creation | Every assignment traces to an accepted application via a non-null `application_id` FK (onDelete Restrict); no bypass path exists. | — RETIRED by TREQ-012: assignment created directly from calendar/broadcast; `application_id` dropped. | `unassigned (SYNC-001)`; `schema.prisma:324-327`; `work-applications/service.ts:243-253` |
@@ -255,7 +255,7 @@ role to the guard casing. Statements below use the guard casing.
 |---|---|---|---|---|
 | TRULE-001 | Manager places a worker on a calendar day | Direct assignment created; worker calendar reflects it; NO accept/decline step; NO broadcast fired. | Blocked if worker already assigned/sick/vacation that day (TRULE-006). | PIVOT §4.4, §7.2; CONFIRMED §13 |
 | TRULE-002 | Manager raises a standalone JobRequest | Broadcast targets only workers with matching skill who are free that day; per-skill headcount honored; calendar edits never broadcast. | Ineligible workers not notified. | PIVOT §4.4, §7.3; CONFIRMED §13 |
-| TRULE-003 | Concurrent broadcast accepts | First accept to acquire the slot lock wins; ties broken by earliest server-received timestamp; Redis slot lock, DB `SELECT..FOR UPDATE` fallback if Redis down. | Losers do not get an assignment (TRULE-004). No client retry semantics defined (see Performance). | PIVOT §5.5, §5.7, §7.3; CONFIRMED §13 |
+| TRULE-003 | Concurrent broadcast accepts | First accept to win the optimistic-concurrency claim wins; ties broken by earliest server-received timestamp; version column + transactional conditional update, per `ADR-057` — no Redis mutex. | Losers do not get an assignment (TRULE-004). No client retry semantics defined (see Performance). | PIVOT §5.5, §7.3; CONFIRMED §13; `ADR-057` |
 | TRULE-004 | A skill's slots are full | Later responders receive an explicit "requirement fulfilled" notification. | Not an error, not silence. | PIVOT §4.4, §7.3; CONFIRMED §13 |
 | TRULE-005 | JobRequest open | Auto-closes 6h after creation via scheduled job (notifies manager); manager may close manually sooner. | Prevents zombie requests. | PIVOT §4.4, §5.6; CONFIRMED §13 |
 | TRULE-006 | Any assignment (calendar or broadcast) for a day | One active assignment per worker per day; further same-day assignment blocked (partial unique index). | DB rejects second same-day active row. | PIVOT §4.4, §9.4; CONFIRMED §12, §13 |
@@ -387,9 +387,12 @@ notification for that event.
 - `mobile-worker-app` (Expo/RN Employee App) consumes work-request and application endpoints — notably the apply/list-my-application path (`mobile/worker-app/src/lib/api.ts:173-181`; `app/job/[id].tsx:36,57`). The corresponding `edge-mobile-worker-work-applications` edge is MISSING from DEPENDENCY_GRAPH (FIND-DEP-001) — proposed as a knowledge delta below. These consumers are the reason WorkApplication removal (TREQ-011) is a breaking change (mitigated by being pre-launch, PIVOT §10).
 
 `[TARGET]` new dependencies (unbuilt):
-- **Redis** — broadcast slot locks / first-accept arbitration; non-critical, with a DB `SELECT..FOR UPDATE` fallback (PIVOT §5.5, §5.7, §7.3). New runtime dependency for this capability.
+- **No new runtime dependency for slot arbitration.** First-accept arbitration reuses the existing
+  optimistic-concurrency mechanism (version column + transactional conditional update) already in use by
+  this capability; no Redis slot lock is introduced (PIVOT §5.5, §7.3, superseded on this point by
+  `ADR-057`).
 - **New models** — `CalendarEntry` (per-worker per-day **assignment kind only** — sick/vacation is Calendar's own `state-calendar-absence` model, owned by `backend-calendar` per `ADR-021`, Accepted 2026-07-19, Correction v0.3.1) and `JobRequest` (broadcast; skills×headcount; 6h auto-close), PIVOT §9.3; plus the daily-exclusivity partial unique index (PIVOT §9.4), both owned and enforced by this capability.
-- **Scheduled jobs** — job-request auto-close (6h) via node-cron / BullMQ on Redis (PIVOT §5.6).
+- **Scheduled jobs** — job-request auto-close (6h) via the Platform Worker / `state-outbox` (PIVOT §5.6; `ADR-029`; `ADR-057`).
 - **`EVT-CAL-SickVacationMarked` (consumed)** — published by `backend-calendar` (`SPEC-CALENDAR-001`); triggers this module's same-day assignment cancellation (`TREQ-009`/`TRULE-008`). Contract `[OPEN]`; event-driven, not a cross-module transaction (`ADR-021`, Correction v0.3.1).
 - Architecture anchors: modular-monolith (ADR-003, PIVOT §5.1/§11) and Prisma-over-PostgreSQL (ADR-004, PIVOT §2.1/§11) are retained.
 
@@ -421,9 +424,9 @@ notification for that event.
 `updateMany WHERE id AND version=known AND workers_confirmed<workers_needed`, incrementing both
 `workers_confirmed` and `version`; a returned count of 0 (lost race or full) raises ConflictError and
 aborts the transaction (`work-applications/service.ts:219-230`). Active double-booking is additionally
-prevented by the DB partial unique index (RULE-010). `[TARGET]` concurrency arbitration moves to a Redis
-slot lock (first-accept wins, earliest-timestamp tie-break), with a DB `SELECT..FOR UPDATE` fallback
-(TRULE-003; PIVOT §5.5, §5.7).
+prevented by the DB partial unique index (RULE-010). `[TARGET]` concurrency arbitration retains this same
+optimistic-concurrency mechanism (first-accept wins, earliest-timestamp tie-break); no Redis mutex is
+introduced (TRULE-003; PIVOT §5.5; `ADR-057`).
 
 **`[CURRENT]` Atomic 7-step accept transaction** (`work-applications/service.ts:217-290`): (1) optimistic
 slot claim; (2) mark application ACCEPTED; (3) create CONFIRMED WorkerAssignment with mandatory
@@ -435,8 +438,9 @@ AFTER commit. Any step's throw rolls back all writes including the cross-owner w
 **`[TARGET]` direct-assignment + broadcast flow** (PIVOT §5.5, §7.2, §7.3; CONFIRMED §13): (a) Calendar —
 manager writes a `CalendarEntry`/assignment directly; no acceptance; subject to daily exclusivity
 (TRULE-006). (b) Broadcast — manager raises a `JobRequest` (skill×headcount); system computes eligible
-workers (skill ∧ free that day); targeted push; first accept acquires a Redis slot lock and creates the
-`WorkerAssignment`; losers get "requirement fulfilled"; 6h timer or manual action closes the request.
+workers (skill ∧ free that day); targeted push; first accept wins the optimistic-concurrency claim and
+creates the `WorkerAssignment` (`ADR-057`); losers get "requirement fulfilled"; 6h timer (Platform Worker/
+outbox, `ADR-029`) or manual action closes the request.
 Per CONFIRMED §13 there is **no formal job-status state machine** in the target (Open→Assigned→InProgress
 removed); remaining status handling is manual (TREQ-013).
 
@@ -449,8 +453,8 @@ migration (pre-launch, PIVOT §10); Phase 1 removes `WorkApplication` and repoin
 **Failure modes/recovery:** `[CURRENT]` Conflict/validation/not-found/forbidden surface as typed HTTP
 errors. Accept-transaction failures roll back atomically. Notification delivery failures are swallowed
 and never roll back (RULE-012) — a published request or accepted application can succeed while its
-notification is silently lost. `[TARGET]` broadcast concurrency resolved by Redis lock (first-accept);
-Redis-down degrades to a short DB transaction lock (PIVOT §5.7).
+notification is silently lost. `[TARGET]` broadcast concurrency resolved by the same optimistic-concurrency
+mechanism (first-accept wins); no Redis dependency, no degraded-mode path to reason about (`ADR-057`).
 
 **Trust boundaries/authorization:** `[CURRENT]` Route RBAC guards create/patch work-request
 (admin,manager) and apply (worker). Read scoping is enforced in-service by roster membership/ownership
@@ -472,7 +476,7 @@ clock coordinates carry a 6-month TTL (CONFIRMED §17; separate capability).
 - **No explicit budgets or SLOs are defined in code or authority docs.** `[ESCALATION]` No SLO for dispatch/accept latency or broadcast fan-out is defined; setting one is a human decision, currently blocked on ownership (SYNC-001). Recorded per FIND-PERF-004; see open decisions.
 - Workload assumptions (FIND-PERF-004, explicit, unconfirmed): roster size per hotel and concurrent-accept volume are UNKNOWN; single-tenant-per-client deployment (PIVOT §5.1) suggests modest scale, but no figures are confirmed.
 - FIND-PERF-001 (owned capacity risk): publish fan-out issues one notification per ACTIVE roster worker in parallel (`Promise.all`, `work-requests/service.ts:222-250`) and is **awaited on the request path** — cost is O(roster); large rosters degrade publish latency. `[TARGET]` broadcast targets only eligible (skill ∧ free) workers, bounding fan-out.
-- FIND-PERF-002 (contention): concurrent multi-slot accepts serialize on the single-row optimistic `updateMany`; losers get ConflictError with **no server-side retry** — clients must retry. `[TARGET]` Redis slot lock changes this arbitration (TRULE-003); retry semantics for the target path are undefined and should be specified at M2.
+- FIND-PERF-002 (contention): concurrent multi-slot accepts serialize on the single-row optimistic `updateMany`; losers get ConflictError with **no server-side retry** — clients must retry. `[TARGET]` arbitration remains the same optimistic-concurrency mechanism (TRULE-003; `ADR-057`); retry semantics for the target path are undefined and should be specified at M2.
 - FIND-PERF-003 (Low, tracked): redundant in-transaction `findUnique` re-read of WorkRequest before fill recompute (`work-applications/service.ts` step 5).
 - FIND-PERF-005 (Low, tracked): list endpoints use offset pagination with an unindexed `created_at` sort; may degrade on large tables.
 - Hot-path index `@@index([hotel_id, status, shift_date])` (`schema.prisma:273`) supports open-shift queries. `[TARGET]` PIVOT §9.4 adds `(skill, hotel_id)` + availability indexing for fast eligible-worker computation.
@@ -494,7 +498,8 @@ the system is **pre-launch with no production employee data**:
   success envelope behind `sendSuccess()`/`sendPaginated()`; **REMOVE `WorkApplication`**; repoint
   `WorkerAssignment` to direct creation; re-label the schema off "marketplace".
 - **Phase 2 — Core dispatch:** Calendar + daily exclusivity + sick/vacation auto-cancel; Broadcast
-  JobRequest + Redis slot lock + 6h auto-close.
+  JobRequest + optimistic-concurrency slot arbitration + 6h auto-close on the Platform Worker/outbox
+  (`ADR-029`; `ADR-057`).
 - **Feature-flagged:** each new module gated by the existing `FEATURE_*` env convention; partial deploys
   are safe.
 - **Backward compatibility:** the **only breaking change is the removal of `WorkApplication`**, done in
@@ -513,10 +518,10 @@ the system is **pre-launch with no production employee data**:
 | MIG-GAP-03 | No calendar direct-assignment path (`calendar` module is non-dispatch; no `CalendarEntry`) | Manager places workers per day, no accept step; new `CalendarEntry` (PIVOT §4.4, §7.2, §9.3; CONFIRMED §13) — TREQ-001 | 2 |
 | MIG-GAP-04 | Marketplace `WorkRequest` (publish + apply) is the only fan-out (`work-requests/service.ts:222-250`) | Repurpose as broadcast `JobRequest` (skill×headcount; eligibility skill ∧ free; "requirement fulfilled") (PIVOT §7.3, §9.1; CONFIRMED §13) — TREQ-002/003/005 | 2 |
 | MIG-GAP-05 | `position` is free text (`schema.prisma:236-260`; `CreateWorkRequestSchema`) | Skills constrained to enum {Cleaner, Public Service, Kitchen Dishwasher, Waiter} (CONFIRMED §4) — TREQ-010 | 2 |
-| MIG-GAP-06 | Slot arbitration via single-row optimistic `updateMany` (`work-applications/service.ts:219-230`); no Redis | First-accept via Redis slot lock, DB `FOR UPDATE` fallback (PIVOT §5.5, §5.7, §7.3) — TREQ-004 | 2 |
+| MIG-GAP-06 | Slot arbitration via single-row optimistic `updateMany` (`work-applications/service.ts:219-230`); no Redis | First-accept via the same optimistic-concurrency pattern (version column + transactional conditional update), per `ADR-057` — TREQ-004 | 2 |
 | MIG-GAP-07 | Roles admin/manager/worker/checker; managers NOT hotel-scoped (`work-requests/routes.ts:18,21`; no scope check) | role × scope, deny-by-default; new Regional Manager; Hotel Manager one-hotel; cross-hotel within group; JWT scope (PIVOT §5.3, §5.4; CONFIRMED §1, §11, §12) — TREQ-008 | 1 (role), 2 (scope) |
 | MIG-GAP-08 | Partial unique index keyed on active (request,worker) (`migration.sql:580-582`) | Re-key: one active assignment per worker per DAY (daily exclusivity) (PIVOT §9.4) — TREQ-007 | 2 |
-| MIG-GAP-09 | EXPIRED via external job absent from repo; `expires_at` arbitrary (`work-requests/service.ts:13-14`) | 6h auto-close scheduled job + manual close (PIVOT §4.4, §5.6) — TREQ-006 | 2 |
+| MIG-GAP-09 | EXPIRED via external job absent from repo; `expires_at` arbitrary (`work-requests/service.ts:13-14`) | 6h auto-close via the Platform Worker/outbox + manual close (PIVOT §4.4, §5.6; `ADR-029`; `ADR-057`) — TREQ-006 | 2 |
 | MIG-GAP-10 | No same-day assignment auto-cancel path | On consuming Calendar's `EVT-CAL-SickVacationMarked` (Calendar-owned `state-calendar-absence` mark; Calendar sends the manager notification), cancel the same-day assignment (PIVOT §7.2; CONFIRMED §22) — TREQ-009. **Amended by `ADR-021`** (Correction v0.3.1): no longer a cross-module atomic transaction; event-driven, eventual convergence. | 2 |
 | MIG-GAP-11 | `PATCH /assignments/:id` unguarded — any authenticated user drives any assignment (`assignments/service.ts:83-118`; `routes.ts:14`) | Assignment actions behind role × scope, deny-by-default (PIVOT §5.4) — TREQ-008; current-state CRITICAL (FIND-SEC-001) | 1/2 (see open decision) |
 | MIG-GAP-12 | Marketplace framing + WorkRequest/Assignment status machine (DRAFT/OPEN/PARTIALLY_FILLED/FILLED; CONFIRMED/IN_PROGRESS/COMPLETED) | Re-label off "marketplace"; no formal job-status state machine (CONFIRMED §13; PIVOT §10 Phase 1) — TREQ-013 | 1 |
@@ -545,7 +550,7 @@ the system is **pre-launch with no production employee data**:
 | Authorization on PATCH /assignments (FIND-SEC-001) | Security test (to add) | arbitrary authenticated user | MUST fail once rule exists — no rule/test today |
 
 `[TARGET STATE]` criteria (to be authored at M2; recorded as expectations, not yet executable):
-TREQ-004 concurrency (exactly one winner under concurrent last-slot accepts, Redis + DB-fallback paths);
+TREQ-004 concurrency (exactly one winner under concurrent last-slot accepts, optimistic-concurrency path, `ADR-057`);
 TREQ-007 daily-exclusivity DB rejection; TREQ-008 role×scope deny-by-default + cross-group denial;
 TREQ-009 event-driven sick/vacation same-day cancel (on consuming `EVT-CAL-SickVacationMarked`, `ADR-021`); TREQ-006 6h auto-close job. Success gates per PIVOT §10/§12.
 
@@ -566,7 +571,7 @@ RESOLVED-BY-TARGET / SUPERSEDED (moved out of open decisions; retained for trace
 
 | Prior ID | Prior description | Resolution |
 |---|---|---|
-| OQ-04 | EXPIRED transition owner/job unknown | RESOLVED-BY-TARGET: 6h auto-close scheduled job (TREQ-006; PIVOT §5.6). Current absence = MIG-GAP-09. |
+| OQ-04 | EXPIRED transition owner/job unknown | RESOLVED-BY-TARGET: 6h auto-close via the Platform Worker/outbox (TREQ-006; PIVOT §5.6; `ADR-029`; `ADR-057`). Current absence = MIG-GAP-09. |
 | OQ-05 | Accept-tx cross-owner coupling approved? | RESOLVED-BY-TARGET: MOOT — accept tx and `WorkApplication` removed; assignment created directly (TREQ-011/012; PIVOT §5.5). Current-state architecture observation only (see FIND-ARCH-003 for the record type). |
 | OQ-06 | REJECTED applicant permanently barred? | RESOLVED-BY-TARGET: MOOT — applications removed (TREQ-011). |
 | OQ-07 | Create/patch not hotel-scoped — intended? | RESOLVED-BY-TARGET: hotel/group scoping is REQUIRED (TREQ-008/TRULE-007; PIVOT §5.4). Current lack = MIG-GAP-07 + current-state FIND-SEC-002/003 (residual remediation decision above). |
@@ -594,9 +599,11 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
   - ADD missing edge `edge-mobile-worker-work-applications` (mobile-worker-app -> `state-work-application` /
     apply endpoints), evidence `mobile/worker-app/src/lib/api.ts:173-181`, `app/job/[id].tsx:36,57`
     (FIND-DEP-001). This edge is retired when TREQ-011 lands, but the graph must reflect current reality.
-  - NOTE (future, do not add yet): target introduces Redis (broadcast slot locks), and new `CalendarEntry`
-    and `JobRequest` state domains + a 6h auto-close scheduled job (PIVOT §5.5, §5.6, §9.3). The current
-    cross-owner accept-tx write edges become removable when the accept flow is deleted (Phase 1).
+  - NOTE (future, do not add yet): target introduces new `CalendarEntry` and `JobRequest` state domains
+    + a 6h auto-close job on the Platform Worker/`state-outbox` (PIVOT §5.5, §5.6, §9.3; `ADR-029`;
+    `ADR-057`); broadcast slot arbitration reuses the existing optimistic-concurrency mechanism and
+    introduces no new infrastructure. The current cross-owner accept-tx write edges become removable when
+    the accept flow is deleted (Phase 1).
   - ADD (per `ADR-021`, Correction v0.3.1): this capability **consumes** `EVT-CAL-SickVacationMarked`
     (published by `backend-calendar`) to drive `TREQ-009`/`TRULE-008`'s same-day assignment cancellation.
     Mirrors `SPEC-CALENDAR-001`'s own publisher-side proposed delta so the bidirectional edge has a

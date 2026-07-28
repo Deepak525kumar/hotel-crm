@@ -12,6 +12,7 @@
 | Item | Value |
 |---|---|
 | Supersedes | MASTER_ARCHITECTURE_v2.0, API_STANDARDS_v1.0, RBAC_PERMISSION_MATRIX_v1.0, DATABASE_RELATIONSHIP_DIAGRAM_v1.0, EVENT_FLOW_MAPPING_v1.0, and all earlier marketplace-era documents |
+| Decision-Integration forward-note | This document's "node-cron / BullMQ on Redis" scheduled-job assumption (§5.6, §14) and "Redis slot lock" broadcast-concurrency mechanism (§5.5, §5.7, §7.3, §9, §11) are **superseded on the execution-mechanism point only** by `ADR-029` (Platform Worker/transactional outbox; scheduled jobs) and `ADR-057` (optimistic concurrency; broadcast slot arbitration — no Redis mutex introduced). No other content in this document — product requirements, timing rules, tie-break semantics, eligibility logic — is affected; this document's prose is left as originally authored (historical record), per the same forward-note convention `ADR-029` itself established for `SPEC-NOTIF-001`. |
 | Open items | 0 — all product questions resolved. Remaining items are non-engineering action items (DPA, DPO threshold, tax-advisor retention sign-off) |
 | Build sequence | Documentation → code-gap closure → module build |
 ---

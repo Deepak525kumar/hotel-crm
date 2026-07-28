@@ -55,7 +55,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 | **✅ DECIDED 2026-07-28 → `ADR-037`** (`OD-CONSENT-002` Option (b): chatbot engagement requires consent, decline routes to manual onboarding path, does not block; `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the same pass). Resolves `OD-CONSENT-001/002/004/006/007/009/011`. Directly informs Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent portion; transcript-persistence portion remains open). |
 | GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 | **✅ DECIDED 2026-07-28 → `ADR-049`–`ADR-052`** (4 sub-decisions). `ADR-051` was informed by real-world weekly-planner evidence supplied mid-decision, surfacing two likely-missing requirements (arrivals, staffing-demand target) flagged for future Requirements Intake, not resolved here. |
 | GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 | **⏸ DEFERRED — POST-MVP, 2026-07-28.** Sub-decision 1 (`OD-CHAT-002`, orchestration-layer architecture) Decided → `ADR-053` (retained, not weakened). Remainder of `GD-19` explicitly deferred by commissioning-human decision, not resolved. Full resumption checkpoint: [`GD-19_CHATBOT_CHECKPOINT.md`](GD-19_CHATBOT_CHECKPOINT.md). Confirmed isolated from `GD-20`/`GD-21`/`GD-22` — no remaining MVP decision depends on it. |
-| GD-20 | Job-Dispatch two-tier calendar+broadcast pivot | **P3** | Post | 12+ |
+| GD-20 | Job-Dispatch two-tier calendar+broadcast pivot | **P3** | Post | 12+ | **✅ DECIDED 2026-07-28 → `ADR-054`–`ADR-058`** (5 sub-decisions, resolved one at a time). Sub-decision 1 (Overall Job Dispatch Model) → `ADR-054` (two-tier Calendar+Broadcast ratified as permanent target architecture; marketplace is the current, not legacy, implementation; timing deferred to Sub-decision 5). Sub-decision 2 (Broadcast Lifecycle) → `ADR-055` (broadcast remains exclusively manager-initiated; assignment cancellation never implicitly creates/reopens a JobRequest; any re-broadcast is a brand-new JobRequest with its own lifecycle). Sub-decision 3 (Assignment Model) → `ADR-056` (direct WorkerAssignment creation from either assignment path, day-level exclusivity, bounded skill enum, no formal job-status machine, ratified as target architecture only; implementation/migration/retirement remain Sub-decision 5's exclusive responsibility). Sub-decision 4 (Background Execution) → `ADR-057` (auto-close runs on the Platform Worker/outbox per ADR-029; slot arbitration standardizes on optimistic concurrency — no BullMQ, no Redis mutex; evidence-based per ADR-035's workload baseline, which supports neither). Sub-decision 5 (Migration Strategy) → `ADR-058` (existing Phase 1/Phase 2 forward-refactor plan ratified unmodified; ADR-054–057 introduce no new migration dependencies; implementation becomes architecturally eligible once GD-03 resolves, not the sole gate — actual scheduling remains implementation planning's responsibility). Sub-decision 6 (Analytics/Attendance follow-up) closed as MOOT — OQ-05/OQ-06 [attendance] and OQ-ANALYTICS-04 are mechanically resolved by ADR-054/056 (direct assignment creation, no application intermediary) with no genuine ambiguity remaining; these are implementation follow-ups, not GD-20 decisions. |
 | GD-21 | Attendance operational automation | **P3** | Post | 2–4 |
 | GD-22 | Hotel-Group billing model | **P3** | Post | 3–5 |
 | GD-23 | Platform ADR ratification (Constitution §20) | **P2** | Prod | 0 (governance) | **✅ DECIDED 2026-07-28 → Option (a): ratified as-is.** `ADR-019`/`ADR-020` flipped Proposed → Accepted. Verification found ADR-001..009 already ratified 2026-07-15 (this row's own "current repository state" line was stale on that point) — `SIR-GLOB-003`'s last remaining open element was already closed and is now corrected in the register. |
@@ -716,13 +716,77 @@ decision can resume with zero context loss.
   for explicit human authorization (deferred-by-design).
 - **Current repository state:** current `WorkApplication` apply/accept flow live; target model unbuilt.
   ADR-018 already classified the accept-transaction coupling superseded-by-pivot.
-- **Merges findings:** `MIG-GAP-JOBD-01..12` (`SIR-JOBD-006`), `OQ-ATT-05`/`OQ-06` (EXPECTED-seed owner under
-  the calendar model — `SIR-ATT-005/006`), `OQ-ANALYTICS-04` (status-enum pivot re-validation).
-- **Options:** (a) Full pivot to calendar-direct assignment + broadcast tier; (b) keep the current
-  marketplace flow for MVP, pivot post-MVP.
-- **Recommended:** **(b) — defer.** The current flow works and is what Epics 1/8 hardened. The pivot is a
-  post-MVP strategic rebuild; authorize it only when the calendar (GD-18) and roles (GD-03) are settled.
-- **Artifacts blocked:** target dispatch model; attendance EXPECTED-seed re-owner; analytics status metrics.
+- **Decomposition:** per the commissioning human's explicit direction (2026-07-28), GD-20 is resolved as
+  5-6 independent sub-decisions rather than a single bundled decision, at product-decision granularity (each
+  independently answerable by the Product Owner), not implementation/migration-gap granularity:
+  1. **Overall Job Dispatch Model** — Decided → `ADR-054`.
+  2. **Broadcast Lifecycle** (JobRequest, eligibility, first-acceptance, slot locking, auto-close,
+     re-broadcast, notifications) — open.
+  3. **Assignment Model** (WorkerAssignment/CalendarEntry, WorkApplication removal, assignment creation,
+     daily exclusivity) — open.
+  4. **Background Execution** (Platform Worker/outbox vs. node-cron/BullMQ/Redis; the sole `ADR-029`
+     conflict point) — open.
+  5. **Migration Strategy** (phasing/sequencing from current to target implementation) — open.
+  6. **Analytics/Attendance follow-up** (`OQ-05`/`OQ-06` [attendance], `OQ-ANALYTICS-04`) — only if real unresolved
+     downstream impact remains after 1-5; otherwise these are implementation follow-ups after GD-20, not
+     GD-20 decisions themselves.
+- **Sub-decision 1 — Decided 2026-07-28 → `ADR-054`:** the two-tier Calendar+Broadcast model is ratified as
+  the **permanent target architecture**; the current marketplace flow is the **current** (not legacy)
+  implementation, unchanged by this record. Implementation timing, phasing, and retirement are explicitly
+  reserved for Sub-decision 5 — this decision took no position on build-now vs. build-later, deliberately
+  separating destination from journey per the same pattern as `ADR-053` and `ADR-029`.
+- **Sub-decision 2 — Decided 2026-07-28 → `ADR-055`:** broadcast (`TREQ-002..006`) ratified as already
+  specified; closes `ADR-052`'s deferred re-broadcast question — a Calendar-cancelled slot does NOT
+  auto-re-broadcast; broadcast remains exclusively manager-initiated; assignment cancellation never
+  implicitly creates or modifies a `JobRequest`; any manager-initiated re-broadcast is a brand-new
+  `JobRequest` with its own lifecycle, never a reopened prior request — preserving bounded-context ownership
+  (`ADR-021`) and a clean audit trail.
+- **Sub-decision 3 — Decided 2026-07-28 → `ADR-056`:** the assignment model
+  (`TREQ-001/007/009/010/011/012/013`) ratified as target architecture — `WorkerAssignment` is created
+  directly from either assignment path (calendar placement or broadcast accept), with no intermediating
+  application/acceptance record; daily exclusivity enforced at the data layer (one active assignment per
+  worker per day); worker skill is a bounded enum; no formal multi-state job-status machine. Framed around
+  the architectural outcome (direct assignment creation) rather than specific implementation artifacts
+  (model/endpoint removal). Explicitly establishes the target model only — implementation, migration, and
+  retirement of the current marketplace implementation remain Sub-decision 5's (Migration Strategy)
+  exclusive responsibility.
+- **Sub-decision 4 — Decided 2026-07-28 → `ADR-057`:** background execution standardized —
+  the 6h `JobRequest` auto-close (`TREQ-006`) runs on the Platform Worker/`state-outbox`, per `ADR-029`
+  (no new mechanism, applies the already-accepted pattern). First-accept slot arbitration (`TREQ-004`)
+  standardizes on optimistic concurrency (version column + transactional conditional update), matching the
+  pattern already proven in `work-applications/service.ts` for the equivalent marketplace scenario;
+  Redis-based slot locking is explicitly not part of the target architecture. `ADR-035` (GD-11 workload
+  baseline) was checked directly and provides no evidence supporting a Redis distributed mutex; the burden of
+  proof for introducing new infrastructure was placed on Redis, not on retaining it. A future ADR may
+  introduce a distributed lock if production evidence later demonstrates the need. `MODULE_SPEC.md`'s
+  `TREQ-004`/`TREQ-006` mechanism references corrected accordingly, and `PIVOT_DESIGN_DOCUMENT.md` received a
+  Decision-Integration forward-note (matching the `ADR-029`/`SPEC-NOTIF-001` precedent).
+- **Sub-decision 5 — Decided 2026-07-28 → `ADR-058`:** the existing Phase 1/Phase 2 forward-refactor
+  migration plan (`MODULE_SPEC.md:495-506`) is ratified unmodified. `ADR-054` through `ADR-057` clarify the
+  target architecture but introduce no new migration dependency, data-model concern, or ordering constraint
+  the plan doesn't already account for — the two-phase forward-refactor, feature-flagged rollout, and
+  trivial-rollback characteristics remain valid without modification. Implementation becomes
+  architecturally eligible once `GD-03` (roles/org-chart) resolves — named because Phase 1 depends on the
+  Regional Manager role, not because it is the only consideration bearing on implementation. Actual
+  scheduling, prioritization, and sequencing against other work remain implementation planning's
+  responsibility, not this record's.
+- **Sub-decision 6 — Closed as MOOT, 2026-07-28:** `OQ-05`/`OQ-06` [attendance] (EXPECTED-seed re-ownership) and
+  `OQ-ANALYTICS-04` (status-enum re-validation) were evaluated and found to have no genuine ambiguity
+  remaining once `ADR-054`/`ADR-056` are applied — EXPECTED-seeding mechanically moves to whatever writes
+  assignments directly in the target model (no `WorkApplication` intermediary), `expected_start/end` sources
+  from the assignment/calendar entity, and analytics' status-enum reads mechanically re-point to the ratified
+  target schema. These are implementation/migration follow-ups (Sub-decision 5's territory), not independent
+  GD-20 governance decisions. One documentation defect was surfaced during this evaluation (`MODULE_SPEC.md`'s
+  internally inconsistent claim that `WorkRequest` is both "repurposed as `JobRequest`" and that `JobRequest`
+  is "newly added") — logged to the Specification Issues Register, not requiring a governance decision to
+  resolve.
+- **`GD-20` is now fully resolved — all five core sub-decisions decided (`ADR-054`–`ADR-058`), Sub-decision 6
+  closed as moot.**
+- **Merges findings:** `MIG-GAP-01..12` (`SIR-JOBD-006`, addressed across Sub-decisions 2/3/5, not
+  individually), `OQ-05`/`OQ-06` [attendance] (Sub-decision 6), `OQ-ANALYTICS-04` (Sub-decision 6).
+- **Artifacts unblocked:** target dispatch model (`ADR-054`–`ADR-058`); attendance EXPECTED-seed re-owner and
+  analytics status metrics (Sub-decision 6, closed as moot). Actual implementation remains gated on `GD-03`
+  (architectural eligibility, `ADR-058`) and subsequent implementation planning (scheduling).
 - **Impact:** backend work-requests/applications/assignments/attendance/calendar · multiple migrations ·
   significant frontend + mobile rework. **~12+ PRs.**
 - **Priority:** **P3 (large, strategic, explicitly deferrable).** **Owner:** Product Owner + Architect.
