@@ -5,13 +5,17 @@ import type { Request, Response, NextFunction } from 'express';
  * Envelope-shape regression for Epic 9 PR 9.1 (response-envelope extraction).
  *
  * `backend/src/lib/http-envelope.ts`'s `sendSuccess()`/`sendPaginated()` are a
- * pure extraction of the inline shape every `work-requests`, `work-applications`,
- * and `assignments` controller handler built before this PR (e.g.
+ * pure extraction of the inline shape every `work-requests` and `assignments`
+ * controller handler built before this PR (e.g.
  * `work-requests/controller.ts:30-34,56-68` pre-refactor) — no contract change.
  * This test asserts every job-dispatch-family endpoint still returns exactly
  * `{status, data, pagination?, meta:{timestamp, request_id}}`, so a future
- * change to the shared helper cannot silently alter the wire shape for any of
- * the three modules without failing here.
+ * change to the shared helper cannot silently alter the wire shape for either
+ * remaining module without failing here.
+ *
+ * Epic 9 PR 9.2: the `work-applications` describe block (and its fixtures/
+ * mocks) was removed here — the module it exercised (WorkApplication routes/
+ * controller/service) was deleted in this PR (TREQ-011).
  */
 
 let testAuth:
@@ -45,22 +49,6 @@ const workRequests: Record<string, any> = {
   },
 };
 
-const workApplications: Record<string, any> = {
-  app_1: {
-    id: 'app_1',
-    work_request_id: 'wr_1',
-    worker_id: 'wkr_1',
-    reviewed_by_id: null,
-    status: 'PENDING',
-    cover_note: null,
-    worker_rating_snapshot: null,
-    reviewed_at: null,
-    rejection_reason: null,
-    applied_at: new Date('2026-06-02T00:00:00Z'),
-    updated_at: new Date('2026-06-02T00:00:00Z'),
-  },
-};
-
 const assignments: Record<string, any> = {
   asg_1: {
     id: 'asg_1',
@@ -68,7 +56,6 @@ const assignments: Record<string, any> = {
     worker_id: 'wkr_1',
     hotel_id: 'h1',
     assigned_by_id: 'mgr_1',
-    application_id: 'app_1',
     status: 'CONFIRMED',
     confirmed_at: new Date('2026-06-02T00:00:00Z'),
     started_at: null,
@@ -141,20 +128,6 @@ jest.mock('../lib/db.js', () => ({
         updated_at: new Date(),
       }),
     },
-    workApplication: {
-      findUnique: async ({ where }: any) => {
-        if (where.id) return workApplications[where.id] ?? null;
-        return null;
-      },
-      findFirst: async () => null,
-      findMany: async () => Object.values(workApplications),
-      count: async () => Object.values(workApplications).length,
-      update: async ({ where, data }: any) => ({
-        ...workApplications[where.id],
-        ...data,
-        updated_at: new Date(),
-      }),
-    },
     workerAssignment: {
       findUnique: async ({ where }: any) => assignments[where.id] ?? null,
       findMany: async () => Object.values(assignments),
@@ -164,13 +137,6 @@ jest.mock('../lib/db.js', () => ({
     auditLog: { create: async () => undefined },
     $transaction: async (fn: any) =>
       fn({
-        workApplication: {
-          update: async ({ where, data }: any) => ({
-            ...workApplications[where.id],
-            ...data,
-            updated_at: new Date(),
-          }),
-        },
         workRequest: {
           update: async ({ where, data }: any) => ({
             ...workRequests[where.id],
@@ -196,7 +162,6 @@ jest.mock('../middleware/auth.js', () => ({
 import express from 'express';
 import request from 'supertest';
 import workRequestRouter from '../modules/work-requests/routes.js';
-import workApplicationRouter from '../modules/work-applications/routes.js';
 import assignmentsRouter from '../modules/assignments/routes.js';
 import { requestLoggerMiddleware } from '../middleware/requestLogger.js';
 import { AppError } from '../lib/errors.js';
@@ -206,7 +171,6 @@ function makeApp() {
   app.use(express.json());
   app.use(requestLoggerMiddleware);
   app.use('/work-requests', workRequestRouter);
-  app.use('/work-requests/:id/applications', workApplicationRouter);
   app.use('/assignments', assignmentsRouter);
   app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
     const status = err instanceof AppError ? err.statusCode : 500;
@@ -275,22 +239,6 @@ describe('Job-dispatch response envelope (Epic 9 PR 9.1)', () => {
       const res = await request(makeApp())
         .patch('/work-requests/wr_1')
         .send({ status: 'CANCELLED', cancellation_reason: 'no demand' });
-      expect(res.status).toBe(200);
-      expectSuccessEnvelope(res.body);
-    });
-  });
-
-  describe('work-applications', () => {
-    it('GET /work-requests/:id/applications (list) returns the paginated envelope', async () => {
-      const res = await request(makeApp()).get('/work-requests/wr_1/applications');
-      expect(res.status).toBe(200);
-      expectPaginatedEnvelope(res.body);
-    });
-
-    it('PATCH /work-requests/:id/applications/:applicationId returns the success envelope', async () => {
-      const res = await request(makeApp())
-        .patch('/work-requests/wr_1/applications/app_1')
-        .send({ status: 'REJECTED', rejection_reason: 'unavailable' });
       expect(res.status).toBe(200);
       expectSuccessEnvelope(res.body);
     });

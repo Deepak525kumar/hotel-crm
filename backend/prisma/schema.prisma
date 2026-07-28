@@ -49,14 +49,6 @@ enum WorkRequestStatus {
   EXPIRED
 }
 
-enum ApplicationStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  WITHDRAWN
-  EXPIRED
-}
-
 enum AssignmentStatus {
   CONFIRMED
   IN_PROGRESS
@@ -266,8 +258,6 @@ model User {
   // Relations
   sessions                  Session[]
   hotel_workers             HotelWorker[]
-  work_applications         WorkApplication[]       @relation("applicant")
-  reviewed_applications     WorkApplication[]       @relation("application_reviewer")
   assignments               WorkerAssignment[]      @relation("assigned_worker")
   assignments_managed       WorkerAssignment[]      @relation("assignment_manager")
   attendance_records        Attendance[]            @relation("attendee")
@@ -534,7 +524,6 @@ model WorkRequest {
   updated_at          DateTime          @updatedAt
 
   // Relations
-  applications WorkApplication[]
   assignments  WorkerAssignment[]
 
   // workers_confirmed must never exceed workers_needed — CHECK constraint in migration.
@@ -547,44 +536,18 @@ model WorkRequest {
   @@index([hotel_id, status, shift_date]) // hot path: "open shifts at hotel on date"
 }
 
-// WorkApplication: a worker expresses interest in a WorkRequest.
-// Manager accepts → WorkerAssignment created. Flow is mandatory (no bypass).
-// SP-4: assignment back-relation declared here.
-model WorkApplication {
-  id              String            @id @default(cuid())
-  work_request_id String
-  work_request    WorkRequest       @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
-  worker_id       String
-  worker          User              @relation("applicant", fields: [worker_id], references: [id], onDelete: Cascade)
-  reviewed_by_id  String?
-  reviewed_by     User?             @relation("application_reviewer", fields: [reviewed_by_id], references: [id], onDelete: SetNull)
-  status          ApplicationStatus @default(PENDING)
-  cover_note      String?
-  // Snapshot of worker's rating at application time — avoids joining WorkerOverallRating
-  // on every marketplace listing query
-  worker_rating_snapshot Float?
-  reviewed_at     DateTime?
-  rejection_reason String?
-  applied_at      DateTime          @default(now())
-  updated_at      DateTime          @updatedAt
-
-  // SP-4: back-relation to the assignment created from this application
-  assignment      WorkerAssignment?
-
-  // One application per worker per request
-  @@unique([work_request_id, worker_id])
-  @@index([work_request_id])
-  @@index([worker_id])
-  @@index([status])
-  @@index([applied_at])
-}
-
-// SP-3: application_id is non-nullable and FK-linked to WorkApplication.
-//       Every assignment must trace back to an accepted application — no bypass.
 // SP-5: @@unique([work_request_id, worker_id]) removed.
 //       A worker can have multiple assignment rows for the same request
 //       (CANCELLED + new CONFIRMED via reassignment chain). Double-booking for
 //       active statuses is prevented by the partial unique index in the migration.
+// Epic 9 PR 9.2: application_id (mandatory FK to the now-removed
+// WorkApplication) dropped. WorkApplication and ApplicationStatus are
+// deleted in this same PR (TREQ-011: no apply endpoint, no WorkApplication
+// table). This leaves WorkerAssignment with no create path — the only
+// creator was work-applications/service.ts's approve(), deleted alongside
+// it. A replacement creation path is out of this PR's scope; PR 9.3 repoints
+// this model to a nullable job_request_id, with fresh creation paths landing
+// in PR 9.5 (calendar) and PR 9.9 (broadcast accept).
 model WorkerAssignment {
   id                     String           @id @default(cuid())
   work_request_id        String
@@ -595,9 +558,6 @@ model WorkerAssignment {
   hotel                  Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   assigned_by_id         String
   assigned_by            User             @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
-  // SP-3: required FK to WorkApplication — marketplace flow is mandatory
-  application_id         String           @unique
-  application            WorkApplication  @relation(fields: [application_id], references: [id], onDelete: Restrict)
   status                 AssignmentStatus @default(CONFIRMED)
   confirmed_at           DateTime         @default(now())
   started_at             DateTime?

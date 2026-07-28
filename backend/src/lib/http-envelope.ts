@@ -8,8 +8,9 @@ import { Response } from 'express';
  * pre-PR-9.1) — no contract change. `MODULE_SPEC.md:498` (job-dispatch)
  * presupposes these helpers exist under Phase 1's "refactor the success
  * envelope behind `sendSuccess()`/`sendPaginated()`"; they did not, this PR
- * creates them and points `work-requests`, `work-applications`, and
- * `assignments` controllers at them.
+ * creates them and points `work-requests` and `assignments` controllers at
+ * them (`work-applications` was a third consumer at authoring time; the
+ * module was removed in PR 9.2).
  */
 
 interface Meta {

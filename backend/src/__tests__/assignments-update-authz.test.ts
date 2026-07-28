@@ -30,7 +30,6 @@ const makeAssignment = (overrides: Record<string, unknown> = {}) => ({
   worker_id: 'w1',
   hotel_id: 'h1',
   assigned_by_id: 'mgr1',
-  application_id: 'app1',
   status: 'CONFIRMED' as const,
   confirmed_at: new Date('2026-06-01T00:00:00Z'),
   started_at: null,

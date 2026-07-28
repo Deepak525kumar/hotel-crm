@@ -164,15 +164,16 @@ export class WorkRequestService extends BaseService {
 
     const dto = this.toDto(wr);
 
+    // Epic 9 PR 9.2 (TREQ-011): WorkApplication was dropped in this same PR —
+    // there is nothing left to populate `my_application` from. Per the
+    // reviewed decision, the field is kept on the response as an
+    // always-null temporary compatibility stub (ADR-058's additive/
+    // non-breaking migration philosophy) rather than removed, because the
+    // mobile client still reads it and its companion cleanup PR (which
+    // removes the field from both sides) has not landed yet. Delete this
+    // branch and the field once that mobile companion PR ships.
     if (actor.role === 'worker' || actor.role === 'checker') {
-      const app = await this.prisma.workApplication.findFirst({
-        where: { work_request_id: id, worker_id: actor.userId },
-        select: { id: true, status: true, applied_at: true },
-        orderBy: { applied_at: 'desc' },
-      });
-      dto.my_application = app
-        ? { id: app.id, status: app.status, created_at: app.applied_at.toISOString() }
-        : null;
+      dto.my_application = null;
     }
 
     return dto;

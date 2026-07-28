@@ -193,7 +193,6 @@ describe('CalendarService.markAbsence', () => {
       hotel_id: 'h1',
       work_request_id: 'wr1',
       assigned_by_id: 'mgr1',
-      application_id: 'app1',
       confirmed_at: new Date(),
       started_at: null,
       completed_at: null,
