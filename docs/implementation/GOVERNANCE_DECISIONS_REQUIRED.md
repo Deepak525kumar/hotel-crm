@@ -50,7 +50,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-12 | Platform event-bus / inter-module transport | **P2** | Post | 0 (unblocks builds) | **✅ DECIDED 2026-07-28 → `ADR-032` (Option (a): direct in-process calls for synchronous cross-module effects; the existing `ADR-029` Outbox is the sole approved async/durable mechanism; no generic event bus/dispatcher exists or is introduced; any future pub/sub need requires a new ADR). Unblocks the transport-convention half of `OD-HR-04`, `OD-EMP-09`, `OD-CAL-06/08`, `OD-CONSENT-005`, `OD-CRM-12`, `OD-DOC-009`, `OD-CHAT-023` — each spec's own event/interface rows still require per-spec reclassification at that spec's next revision.** |
 | GD-13 | Cross-module state-read boundary ADR | **P3** | Post | 2–4 | **✅ DECIDED 2026-07-28 → `ADR-034` (Option (c): direct read-only cross-module Prisma reads ratified as the platform standard for aggregator/reporting modules, subject to a three-point allow-list; a future read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s SLO baseline). Resolves `OQ-ANALYTICS-11`/`SIR-ANLY-013`/`SIR-GLOB-010`. No code change; all existing `reads-state` edges already satisfy the criterion.** |
 | GD-14 | Geofencing / location model (Geo + attendance) | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): hotel coordinates as columns on `Hotel` (`state-hotel`, `backend-crm`-owned); `backend-geo` owns worker-coordinate columns and the 6-month hard-delete retention sweep (`OD-GEO-001/002`). Fail-closed on missing hotel coordinates or a distance-check service failure (`OD-GEO-003`). Hotel coordinates are admin-only manual entry, same `HotelWriteGate` MASTER-data surface as every other `Hotel` field — no geocoding-from-address service (`OD-GEO-004`). Admin/manager may view only the computed distance/pass-fail result, never a worker's raw stored coordinates (`OD-GEO-005`). Every geofence pass/fail result is audit-logged via the existing `BaseService.logAudit()` mechanism (`OD-GEO-007`). GPS-spoofing countermeasures (`OD-GEO-009`) are explicitly NOT included in this slice — disclosed and accepted as a known MVP-scope risk, not silently omitted. `OD-GEO-006` (performance budgets) remains OPEN, non-blocking (G8 release prerequisite, same precedent as every other frozen spec's performance-budget gaps). `OD-GEO-008` is a citation correction, not a decision item. Unlocks `SPEC-GEO-001` G2 freeze and geofenced attendance Start/Close gating.**|
-| GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 |
+| GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 | **✅ DECIDED 2026-07-28 → `ADR-039`–`ADR-048`** (10 sub-decisions, resolved one at a time). A standing architecture blocker (`OD-HR-01a`/`OD-HR-01b`, HR-vs-Onboarding boundary) was found already resolved by `ADR-012` (2026-07-12) — a documentation-synchronization gap, corrected during this audit. `OD-EMP-16` was separately found already resolved by `GD-11`/`ADR-035` — its own spec row corrected. `OD-HR-02b` and `GD-03`'s org-chart half remain genuinely open, not resolved by `GD-15`. |
 | GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 | **✅ DECIDED 2026-07-28 → `ADR-037`** (`OD-CONSENT-002` Option (b): chatbot engagement requires consent, decline routes to manual onboarding path, does not block; `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the same pass). Resolves `OD-CONSENT-001/002/004/006/007/009/011`. Directly informs Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent portion; transcript-persistence portion remains open). |
 | GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 |
@@ -533,25 +533,44 @@ plan. Detail below is retained as the decision record.
 
 ## GD-15 — HR & Employee-Management module build scope
 
-- **Why a decision is required:** HR (contracts/payroll/documents) and Employee-Management are stubs, and
+**✅ DECIDED 2026-07-28, by the commissioning human. Resolved as 10 sub-decisions, one at a time, per the
+Governance Resolution workflow — not a single bundled ADR.**
+
+- **Why a decision was required:** HR (contracts/payroll/documents) and Employee-Management are stubs, and
   their security posture (IDOR, hotel-scoping, upload validation), payroll scope, contract-lifecycle
-  transitions, and target field domains are undecided — each a product/architecture call before build.
-- **Current repository state:** `hr/service.ts` throws `NotImplementedError` for all ops;
+  transitions, and target field domains were undecided — each a product/architecture call before build.
+- **Current repository state at decision time:** `hr/service.ts` throws `NotImplementedError` for all ops;
   `employee-management` is built for the Epic-5 slice only. Multiple High security findings recorded against
-  the *future* HR routes (IDOR, missing `checkHotelAccess`, upload validation).
-- **Merges findings:** HR: `OD-HR-02` (payroll model conflict), `OD-HR-03`/`OD-HR-07` (contract
-  lapse + continuation-capture), `OD-HR-09` (payslip escalation), `OD-HR-10`/`OD-HR-13` (IDOR / hotel-scope —
-  `SIR-HR-004/005`), `RULE-HR-13`/`OD-HR-14` (upload validation — `SIR-HR-006`); EMP: `OD-EMP-04` (offboarding
-  trigger), `OD-EMP-06` (self-edit), `OD-EMP-08` (bulk-CSV), `OD-EMP-13` (job-title domain), `OD-EMP-14`
-  (skill-tag editability), `OD-EMP-16` (perf budget — overlaps GD-11).
-- **Options:** (a) Build HR+EMP as a bundled milestone once the contract lifecycle and payroll scope are
-  fixed; (b) ship Employee-Management target fields first, HR contracts/payroll later.
-- **Recommended:** **(b) phased.** EMP fields (job title, skills, self-edit) are lower-risk and partially
-  built; HR contracts/payroll carry the security + retention weight (GD-09) and should follow. Depends on
-  GD-03 (roles), GD-09 (retention), GD-16 (documents for contract scans), GD-12 (events).
-- **Artifacts blocked:** HR module; EMP completion; contract lifecycle; payslip flow.
+  the *future* HR routes (IDOR, missing `checkHotelAccess`, upload validation). **A pre-decision audit found
+  a standing architecture blocker (`OD-HR-01a`/`OD-HR-01b`, the HR-vs-Onboarding module-boundary dispute) had
+  actually already been resolved by `ADR-012` (Accepted, 2026-07-12) — sixteen days before this session —
+  but neither `SPEC-HR-001`'s nor `docs/03-modules/onboarding/MODULE_SPEC.md`'s text had ever been updated to
+  reflect it. This was corrected as a documentation-synchronization fix, not a new decision, before the ten
+  genuine sub-decisions below were addressed.**
+- **Decided — resolves, ten sub-decisions each with its own ADR:**
+  1. `OD-HR-02` (payroll model conflict) → `ADR-039`: target types redesigned, zero payroll computation.
+  2. `OD-HR-03`/`OD-HR-07` (contract lapse + continuation-capture) → `ADR-040`: manager-only confirmation, no worker veto.
+  3. `OD-HR-09` (payslip escalation) → `ADR-041`: 3-business-day auto-escalation via the existing Outbox.
+  4. `OD-HR-10` (worker-facing RBAC) → `ADR-042`: two new self-scoped permissions, no blanket extension.
+  5. `OD-HR-13` (list-route hotel-scope, remainder) → `ADR-043`: `checkWorkerScope()` extended to list routes.
+  6. `OD-HR-14` (malware-scan position) → `ADR-044`: synchronous scan-hook, reject on detection.
+  7. `OD-EMP-04` (offboarding trigger) → `ADR-045`: hybrid — automatic for contract lapse, manual otherwise; re-engagement via new `EmploymentRecord`.
+  8. `OD-EMP-06` (self-edit) → `ADR-046`: narrow contact/preference-field allow-list, recorded **platform-wide**.
+  9. `OD-EMP-08` (bulk-CSV, remainder) → `ADR-047`: per-row isolation, duplicates always skipped.
+  10. `OD-EMP-13`/`OD-EMP-14` (job-title/skill-tag governance) → `ADR-048`: Admin-managed lookup tables, retire-not-delete.
+- **Explicitly NOT decided by this record:** `OD-HR-02b` (Personalfragebogen data-source ambiguity, Onboarding
+  vs. employee-management) — `ADR-039` explicitly did not touch it, remains genuinely open. `GD-03`'s
+  org-chart/reporting-model half (`OD-EMP-12`) — a standalone item, not folded into `GD-15`.
+- **Merges findings:** all ten items above, resolved; `OD-EMP-16` (perf budget) was separately found already
+  resolved by `GD-11`/`ADR-035` — its own spec row was stale and corrected in the same audit.
+- **Artifacts unblocked:** both modules' product/architecture ambiguity is closed; the only remaining
+  prerequisite is ownership assignment (`SYNC-001`) and each module's own remaining G4/G2 gate progression —
+  no further governance decision blocks HR or Employee-Management build scoping.
 - **Impact:** backend hr + employee-management (+ documents dependency) · 3–4 migrations · frontend HR/EMP
-  admin UIs · mobile manager contract-confirm flow. **~10–14 PRs.**
+  admin UIs · mobile manager contract-confirm flow. **~10–14 PRs** (unchanged — this decision scopes the
+  build, it does not itself implement it).
+- **Priority:** **P2.** Decided by the commissioning human 2026-07-28. **Owner:** Product Owner + Architect.
+  Full decision records: `ADR-039` through `ADR-048`.
 - **Priority:** **P2 (post-MVP; large).** **Owner:** Product Owner + Architect.
 
 ## GD-16 — Documents module — RBAC & storage design
@@ -862,6 +881,16 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 > deliberate scheduling decision, not a silent gap; no data model or mechanism selected). Decision
 > #8 in the Governance Resolution workflow's sequence. Genuinely-still-open count in
 > `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 8):** `GD-15` is also no longer an open decision to make — decided
+> 2026-07-28 as ten sub-decisions, each with its own ADR (`ADR-039` through `ADR-048`), Decision #9
+> in the Governance Resolution workflow's sequence. A pre-decision audit found `OD-HR-01a`/`OD-HR-01b`
+> (the HR-vs-Onboarding module-boundary dispute this GD's own text never mentioned as a blocker) had
+> already been resolved by `ADR-012` on 2026-07-12 — a documentation-synchronization gap corrected
+> before the ten genuine sub-decisions were addressed. `OD-EMP-16` was separately found already
+> resolved by `GD-11`/`ADR-035` — its own stale spec row corrected in the same audit. `OD-HR-02b`
+> and `GD-03`'s org-chart half remain genuinely open, not resolved by `GD-15`. Genuinely-still-open
+> count in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly (now 5: `GD-18/19/20/21/22`).
 
 - **Highest-leverage decisions (make these first):**
   1. **GD-02 Manager write-permission authority** — smallest, highest ROI-per-effort remaining item;
