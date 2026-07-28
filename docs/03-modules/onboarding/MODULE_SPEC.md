@@ -471,7 +471,7 @@ Worker fills Personalfragebogen with Name = "Max Müller" but later uploads an I
 
 ### 17.4 Worker Declines Consent During Onboarding
 
-Engaging the chatbot may require a GDPR data-processing consent gate (e.g., before chatbot-guided document collection). Per `ADR-015`, this gate is owned and implemented entirely by `backend-consent`/`SPEC-CONSENT-001`, exposed to Onboarding via `IF-CONSENT-*`; Onboarding requests consent through that interface and reacts to its outcome, but does not own the gate, its logic, or its state. [OPEN] Whether a decline blocks onboarding or is optional is a Consent-module product/design decision (OPQ-3).
+Engaging the chatbot requires a GDPR data-processing consent gate (e.g., before chatbot-guided document collection). Per `ADR-015`, this gate is owned and implemented entirely by `backend-consent`/`SPEC-CONSENT-001`, exposed to Onboarding via `IF-CONSENT-*`; Onboarding requests consent through that interface and reacts to its outcome, but does not own the gate, its logic, or its state. **RESOLVED `GD-17`/`ADR-037`, 2026-07-28** (OPQ-3): a decline does NOT block onboarding — it routes the worker to a manual/non-chatbot onboarding path instead.
 
 ## 18. Dependencies
 
@@ -525,7 +525,7 @@ The following genuine unknowns are unresolved and will block final implementatio
 
 **OPQ-3: Chatbot conversation persistence & consent** — **RESOLVED (consent portion) by `ADR-015`**
 - Are chatbot conversations (with worker) persisted for future reference / subject-rights export, or discarded after onboarding? This is a Chatbot-module (`backend-chatbot`) decision per `ADR-013`; Onboarding only consumes the outcome. This portion remains open (tracked at `SIR-CHAT-008`).
-- Does engaging the chatbot require explicit data-processing consent? **Resolved by `ADR-015`:** Consent is a standalone bounded context owned by `backend-consent`/`SPEC-CONSENT-001`. Whether chatbot engagement requires explicit consent, and whether declining blocks onboarding (see §17.4), is a Consent-module product/design decision exposed to Onboarding via `IF-CONSENT-*` interfaces. Onboarding owns no consent gate, logic, or state of its own.
+- Does engaging the chatbot require explicit data-processing consent? **Resolved by `ADR-015`** (authority) **and concretely decided by `GD-17`/`ADR-037`, 2026-07-28** (outcome): yes, chatbot engagement requires explicit consent. A decline does **not** block onboarding — it routes the worker to a manual/non-chatbot onboarding path instead (see §17.4). Onboarding owns no consent gate, logic, or state of its own; it consumes this outcome via `IF-CONSENT-*`.
 - Impacts: Compliance/audit trail (Compliance consumes Consent for governance/audit only, per `ADR-015` — it is not the consent owner); GDPR subject-rights scope.
 
 **OPQ-4: Rejected applicant re-application**

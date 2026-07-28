@@ -1,6 +1,6 @@
 # ADR-019: Deterministic Repository Integrity Validation as a Reusable Consistency-Review Gate
 
-- **Status:** Proposed — pending human ratification (Engineering Constitution §20), consistent with the ADR-001..009 precedent before their 2026-07-15 ratification.
+- **Status:** Accepted — ratified by the commissioning human on 2026-07-28, resolving `GD-23` (Platform ADR ratification, Constitution §20) via the Governance Resolution workflow, Option (a): ratified as-is, since this ADR's mechanism (the repository-integrity CI gate and `.claude/tooling/` directory) was already the operating reality prior to ratification, backward-compatible, with no disclosed defect. Previously: Proposed — pending human ratification, consistent with the ADR-001..009 precedent before their 2026-07-15 ratification.
 - **Date:** 2026-07-16
 - **Scope:** Engineering operating system (`.claude/`) — framework 1.4.0. Also introduces one new top-level, dependency-free tool directory (`.claude/tooling/`) and one new CI job (`.github/workflows/ci.yml`, job `repository-integrity`).
 - **Supersedes:** none (additive; extends the existing Consistency Review workflow rather than introducing a new gate or workflow).

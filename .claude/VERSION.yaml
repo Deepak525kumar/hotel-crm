@@ -47,8 +47,9 @@ history:
       workflows/README.md registers the new ART-MANIFEST artifact-id prefix.
       Backward compatible and fail-safe: absent the manifests or the loader,
       behavior equals 1.4.0 (read every authoritative document).
-      See ADR-020 (Proposed, pending human ratification per Constitution §20,
-      consistent with the ADR-001..010 precedent).
+      See ADR-020 (Accepted — ratified by the commissioning human 2026-07-28,
+      resolving GD-23 via the Governance Resolution workflow; previously
+      Proposed, pending human ratification per Constitution §20).
   - version: 1.4.0
     status: Stable
     released: "2026-07-16"
@@ -75,9 +76,10 @@ history:
       the working tree during a 2026-07-16 documentation restructuring (commit
       e0c5e8b) with no copy step performed, breaking 20+ cross-references
       platform-wide (see governance/SPECIFICATION_ISSUES_REGISTER.md SIR-GLOB-021,
-      RESOLVED; SIR-GLOB-020, OPEN/baselined). See ADR-019 (Proposed, pending
-      human ratification per Constitution §20, consistent with the ADR-001..010
-      precedent).
+      RESOLVED; SIR-GLOB-020, OPEN/baselined). See ADR-019 (Accepted — ratified
+      by the commissioning human 2026-07-28, resolving GD-23 via the
+      Governance Resolution workflow; previously Proposed, pending human
+      ratification per Constitution §20).
   - version: 1.3.0
     status: Stable
     released: "2026-07-09"
@@ -128,8 +130,9 @@ history:
 # 1.5.0 supersedes 1.4.0 as the current stable line. 1.4.0, 1.3.0, 1.2.0, 1.1.0, and 1.0.0 remain
 # valid history. The 1.5.0 change set is additive; no breaking changes and no new constitutional
 # article (CONTEXT_ARTIFACTS.md gains an additive §8; see CHANGELOG). ADR-020 (Context Management
-# Layer) and ADR-019 (Repository Integrity Validation) are Proposed, pending human
-# ratification per Engineering Constitution §20, consistent with the ADR-001..010 precedent (see
-# SYNC_STATE.yaml SYNC-039). Constitutional additions in 1.2.0 trace to ADR-009; formal human
+# Layer) and ADR-019 (Repository Integrity Validation) were ratified Accepted by the commissioning
+# human on 2026-07-28, resolving GD-23 via the Governance Resolution workflow (previously Proposed,
+# pending human ratification per Engineering Constitution §20, consistent with the ADR-001..010
+# precedent — see SYNC_STATE.yaml SYNC-039). Constitutional additions in 1.2.0 trace to ADR-009; formal human
 # ratification is reserved human authority per Engineering Constitution 20 (see
 # SYNC_STATE.yaml SYNC-012).
