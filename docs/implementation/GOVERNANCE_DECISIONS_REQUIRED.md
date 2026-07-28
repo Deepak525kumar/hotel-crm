@@ -54,7 +54,7 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
 | GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 | **✅ DECIDED 2026-07-28 → `ADR-037`** (`OD-CONSENT-002` Option (b): chatbot engagement requires consent, decline routes to manual onboarding path, does not block; `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the same pass). Resolves `OD-CONSENT-001/002/004/006/007/009/011`. Directly informs Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent portion; transcript-persistence portion remains open). |
 | GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 | **✅ DECIDED 2026-07-28 → `ADR-049`–`ADR-052`** (4 sub-decisions). `ADR-051` was informed by real-world weekly-planner evidence supplied mid-decision, surfacing two likely-missing requirements (arrivals, staffing-demand target) flagged for future Requirements Intake, not resolved here. |
-| GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 |
+| GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 | **⏸ DEFERRED — POST-MVP, 2026-07-28.** Sub-decision 1 (`OD-CHAT-002`, orchestration-layer architecture) Decided → `ADR-053` (retained, not weakened). Remainder of `GD-19` explicitly deferred by commissioning-human decision, not resolved. Full resumption checkpoint: [`GD-19_CHATBOT_CHECKPOINT.md`](GD-19_CHATBOT_CHECKPOINT.md). Confirmed isolated from `GD-20`/`GD-21`/`GD-22` — no remaining MVP decision depends on it. |
 | GD-20 | Job-Dispatch two-tier calendar+broadcast pivot | **P3** | Post | 12+ |
 | GD-21 | Attendance operational automation | **P3** | Post | 2–4 |
 | GD-22 | Hotel-Group billing model | **P3** | Post | 3–5 |
@@ -675,21 +675,39 @@ Governance Resolution workflow.**
 
 ## GD-19 — Chatbot module scope & LLM safety
 
-- **Why a decision is required:** The Chatbot spec **cannot reach G2 freeze** until conversation-level RBAC
-  and a prompt-injection-resistance posture are decided; tool-execution scope, persistence, budget-guard
-  model, and provider-outage fallback are also open.
-- **Current repository state:** `backend/src/modules/chatbot` empty; no Claude/Anthropic SDK; no conversation
-  model; `SPEC-CHATBOT-001` REVIEW. `SIR-CHAT-005`/`SIR-CHAT-006` are High and freeze-blocking.
-- **Merges findings:** `OD-CHAT-001..023` (conversation model, tool scope, file handling, RBAC, prompt-
-  injection, persistence/consent, budget-guard, outage fallback, rate-limiting, encryption, concurrency).
-- **Options:** (a) Conversational-only (no tool execution) with self-scoped RBAC + explicit prompt-injection
-  guardrail + synchronous budget check; (b) tool-executing agent (larger safety surface).
-- **Recommended:** **(a) conversational-only for v1** — smallest safety surface that still meets the
-  onboarding-assistant intent; escalate tool-execution as a separate later decision.
-- **Artifacts blocked:** `SPEC-CHATBOT-001` freeze; onboarding chatbot flow.
+**⏸ DEFERRED — POST-MVP, by explicit commissioning-human decision on 2026-07-28.** Sub-decision 1
+(`OD-CHAT-002`) was Decided via the Governance Resolution workflow → `ADR-053`, ratifying the chatbot as
+an AI orchestration layer with a tool-registry/plugin architecture. Immediately after that ADR merged, the
+commissioning human directed that the remainder of `GD-19` be deferred until after MVP, to keep governance
+effort focused on MVP-blocking decisions (`GD-20`/`GD-21`/`GD-22`). **`ADR-053` is retained in force,
+unweakened, unreopened** — it is the governing architecture for whenever Chatbot work resumes. A complete
+resumption checkpoint — every `OD-CHAT-*` item's exact current status, every dependency, every deferred
+recommendation — is preserved at [`GD-19_CHATBOT_CHECKPOINT.md`](GD-19_CHATBOT_CHECKPOINT.md), so this
+decision can resume with zero context loss.
+
+- **Why a decision was required:** The Chatbot spec **cannot reach G2 freeze** until conversation-level RBAC
+  and a prompt-injection-resistance posture are decided; tool-execution scope (now resolved, `ADR-053`),
+  persistence, budget-guard model, and provider-outage fallback are also open.
+- **Current repository state at deferral:** `backend/src/modules/chatbot` empty; no Claude/Anthropic SDK; no
+  conversation model; `SPEC-CHATBOT-001` REVIEW, version 0.2.0. Three standing G2-freeze blockers remain:
+  `OD-CHAT-005` (RBAC, partially resolved — worker-id provenance MUST closed, read-scope/initiation-scope
+  open), `OD-CHAT-006` (prompt-injection, interim posture stated, not resolved), `OD-CHAT-013` (owner
+  unassigned, `SYNC-001` — not resolvable by this workflow at all, requires an actual human/team assignment).
+- **Merges findings:** `OD-CHAT-001..023`. **`OD-CHAT-002` (tool-execution scope) Decided → `ADR-053`.**
+  `OD-CHAT-004` (routing), `OD-CHAT-008` (consent half), `OD-CHAT-019` (retention, provisional), `OD-CHAT-023`
+  (transport) also resolved/partially resolved by this or other decisions — see the checkpoint for the exact
+  status of every item. The remaining ~16 items (RBAC remainder, prompt-injection, file-handling
+  registration, rate-limiting, budget-tracking mechanism, outage fallback, concurrency, encryption,
+  cache-invalidation, timeout/backpressure, and others) are untouched and preserved in the checkpoint.
+- **Decided — resolves:** `OD-CHAT-002` only, via `ADR-053` (see that record for full architecture). No other
+  `GD-19` sub-decision is resolved by this record.
+- **Explicitly NOT decided:** everything else in `GD-19` — deliberately deferred, not silently abandoned.
+- **Artifacts blocked:** `SPEC-CHATBOT-001` freeze; onboarding chatbot flow. Both remain blocked until
+  `GD-19` resumes post-MVP.
 - **Impact:** backend new chatbot module + Anthropic SDK + budget-guard job · 2 migrations · frontend/mobile
-  chat UI. **~8–12 PRs.**
-- **Priority:** **P3 (post-MVP; out of the core staffing loop).** **Owner:** Product Owner + Architect.
+  chat UI. **~8–12 PRs** (unchanged estimate; deferred, not reduced in scope).
+- **Priority:** **P3 (post-MVP; out of the core staffing loop) — explicitly deferred, 2026-07-28.**
+  **Owner:** Product Owner + Architect, to resume post-MVP.
 
 ## GD-20 — Job-Dispatch two-tier calendar+broadcast pivot
 
@@ -931,6 +949,17 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 > outside this workflow's scope. `OD-CAL-11`'s resolution (`ADR-052`) explicitly defers re-broadcast
 > policy to `GD-20`, not resolving it. Genuinely-still-open count in `GOVERNANCE_REGISTER.md` Part 2
 > decrements accordingly (now 4: `GD-19/20/21/22`).
+
+> **Sync note (2026-07-28, cont'd 10):** `GD-19`'s first sub-decision (`OD-CHAT-002`, tool-execution
+> scope) was decided via the Governance Resolution workflow → `ADR-053` (chatbot ratified as an AI
+> orchestration layer with a tool-registry/plugin architecture, risk-tiered confirmation policy).
+> Immediately after, the commissioning human directed that the remainder of `GD-19` be **deferred to
+> post-MVP** — an explicit product decision, not an abandonment. `ADR-053` is retained in force,
+> unweakened. A full resumption checkpoint (every `OD-CHAT-*` item's exact status, every dependency,
+> every preserved recommendation) lives at `GD-19_CHATBOT_CHECKPOINT.md`. Verified isolated from all
+> remaining MVP decisions (`GD-20`/`21`/`22`) — no dependency exists either direction. `GD-19` is
+> excluded from the "genuinely-still-open" count below going forward, tracked instead as
+> deferred-not-open; the count for actively-open MVP decisions is now **3**: `GD-20/21/22`.
 
 - **Highest-leverage decisions (make these first):**
   1. **GD-02 Manager write-permission authority** — smallest, highest ROI-per-effort remaining item;
