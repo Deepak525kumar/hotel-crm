@@ -57,6 +57,11 @@ export const SpecialCategoryParamsSchema = z.object({
 
 export type SpecialCategoryField = z.infer<typeof SpecialCategoryParamsSchema>['field'];
 
+// IF-EMP-GetOrgChart / v0 (REQ-EMP-013).
+export const OrgChartParamsSchema = z.object({
+  hotel_group_id: z.string().min(1),
+});
+
 // IF-EMP-LifecycleSignal / v0 (internal, Onboarding-driven).
 export const LifecycleSignalSchema = z.object({
   signal: z.enum(['submitted_for_review', 'approved', 'rejected']),

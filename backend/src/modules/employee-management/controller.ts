@@ -5,6 +5,7 @@ import {
   BulkImportSchema,
   CreateEmployeeSchema,
   LifecycleSignalSchema,
+  OrgChartParamsSchema,
   ProfileHistoryQuerySchema,
   SetBlocklistSchema,
   SpecialCategoryParamsSchema,
@@ -187,6 +188,26 @@ export class EmployeeManagementController {
           reason: req.body.reason,
         });
         res.status(201).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  getOrgChart = [
+    validateParams(OrgChartParamsSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.getOrgChart(
+          req.auth,
+          req.params['hotel_group_id']!
+        );
+        res.status(200).json({
           status: 'success',
           data: result,
           meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

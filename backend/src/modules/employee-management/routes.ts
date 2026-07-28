@@ -71,4 +71,13 @@ router.post(
   ...controller.setBlocklist
 );
 
+// Org chart (REQ-EMP-013 / RULE-EMP-08) — Regional Manager (their own
+// group) and Admin only; group-ownership scoping enforced service-side
+// (same pattern as getProfileHistory/getSkills above), not at the route.
+router.get(
+  '/hotel-groups/:hotel_group_id/org-chart',
+  requirePermission('employees:read'),
+  ...controller.getOrgChart
+);
+
 export default router;
