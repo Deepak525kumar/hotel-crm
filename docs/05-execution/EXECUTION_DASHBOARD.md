@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-28 (SYNC-055 repository-synchronization pass, post-PR #243/#244/#245; module implementation status independently re-checked against `backend/src/modules/*/service.ts`; test suite re-run: 71/71 suites, 1113/1113 tests passing; `tsc --noEmit` clean) |
+| Last verified | 2026-07-29, `HEAD` `586a55d` (post-GD-19/20/21/22/23 governance-resolution pass; this milestone's per-module/GD-* prose below was written the same day those decisions landed and is confirmed current — see `docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md`'s 2026-07-29 verification-pass note for the implementation-sequencing implication). Module implementation status still keyed to the 2026-07-28 SYNC-055 repository-synchronization pass (post-PR #243/#244/#245; independently re-checked against `backend/src/modules/*/service.ts`; test suite 71/71 suites, 1113/1113 tests passing; `tsc --noEmit` clean) — no code changed between SYNC-055 and this verification, only governance documentation. |
 
 ## Current Milestone
 
@@ -217,7 +217,11 @@ only `.placeholder`, no route mount.
   `users:write`.
 - `GD-03` 5-role model & Regional-Manager permission set — Decided and built (`ADR-030` D-5,
   `REGIONAL_MANAGER` enum + capability gates, merged). The org-chart/reporting-model half
-  (`OD-EMP-12`, `OQ-AUTH-08`) is explicitly **not** resolved by this decision.
+  (`OD-EMP-12`, `OQ-AUTH-08`) **Decided 2026-07-29** (`ADR-060`): flat, hotel-scoped, no reporting-tree
+  data model — org-chart visibility derived implicitly from existing hotel/hotel-group scope
+  membership, reusing `ADR-023`/`ADR-030`'s existing scope-based authorization model. `GD-03` is now
+  fully resolved; this also satisfies `ADR-058`'s named architectural-eligibility gate for Job-Dispatch
+  (`GD-20`/Epic 9).
 - `GD-07` Session/token revocation & auth rate-limiting — Decided and built (`ADR-031`, PR-0..PR-8
   incl. PR-4a, merged 2026-07-26/27): request-time permission derivation, `token_generation`
   revocation counter, session/reset-token sweep job, Nginx-edge rate limiting.
@@ -276,7 +280,7 @@ every `GD-*` ID lives only in
 
 | Area | State | Blocked on |
 |---|---|---|
-| backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` **Decided 2026-07-28** (`ADR-039`–`ADR-048`, ten sub-decisions; see Sync note below) — no governance blocker remains for this module's own scoping. Remaining prerequisite: ownership assignment (`SYNC-001`) and ordinary G4/G2 gate progression. `GD-03`'s org-chart half (`OD-EMP-12`) remains separately open, not part of `GD-15`'s resolution. |
+| backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` **Decided 2026-07-28** (`ADR-039`–`ADR-048`, ten sub-decisions; see Sync note below) — no governance blocker remains for this module's own scoping. Remaining prerequisite: ownership assignment (`SYNC-001`) and ordinary G4/G2 gate progression. `GD-03`'s org-chart half (`OD-EMP-12`) **Decided 2026-07-29** (`ADR-060`, not part of `GD-15`'s own resolution) — no governance blocker remains platform-wide. |
 | backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` **Decided 2026-07-28** (`ADR-049`–`ADR-052`, see Sync note above) — no governance blocker remains; still gated on Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001`, and on ordinary implementation effort |
 | backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` **Decided 2026-07-28** — the governance-scope blocker this row previously flagged no longer applies; this item reads only already-existing tables and is not schema-blocked, so it may now be built without waiting on any further governance decision |
 | backend-documents (Documents module, RBAC/storage) | **in progress (2026-07-27):** `WorkerDocument` model + migration landed; module built (`types.ts`, `validation.ts`, `storage.ts` (S3 stub, real client deferred — `@aws-sdk/client-s3` not yet a dependency), `service.ts`, `controller.ts`, `routes.ts`); mounted at `/v1/documents`. All five `IF-DOC-*` target interfaces implemented. No multipart/file-parsing middleware wired yet — uploads persist metadata with an empty byte buffer (same gap the migrated-from `backend-hr` stub had, `MIG-GAP-DOC-001`, itself still open and out of this session's scope). `MIG-GAP-DOC-001` (migrating `backend-hr`'s stub route to call into this module) not yet done. | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains. Gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection (neither wired yet). |
@@ -306,7 +310,7 @@ table below — not repeated here.)
 | ID | Blocks | Description | Resolution owner |
 |---|---|---|---|
 | SYNC-001 | Every module/contract/state-domain ownership assignment | No CODEOWNERS file exists; `backend/package.json` "author" is empty; every module `owner: unassigned` in the registry | Human (reserved authority) |
-| OD-EMP-12 / OQ-AUTH-08 | Org-chart/reporting-model data structure | `ADR-030` D-5 explicitly resolved only the Regional-Manager permission set, not the underlying reporting-relationship model | Human decision |
+| ~~OD-EMP-12 / OQ-AUTH-08~~ | ~~Org-chart/reporting-model data structure~~ | **RESOLVED 2026-07-29 (`ADR-060`)** — flat, hotel-scoped; derived implicitly from existing hotel/hotel-group scope membership; no reporting-tree model. Struck through per this table's own resolution, not removed. | — (closed) |
 | SIR-AUTH-022 | Cleanup of `_User_permissions_backup_20260727` | Pre-drop backup table from `ADR-031` has no tracked removal date | Scheduled migration/ticket, possibly folded into `GD-09` |
 
 No `GD-*` blocker remains open from the MVP Completion Decisions batch (`GD-04`/`GD-05`/`GD-06`,

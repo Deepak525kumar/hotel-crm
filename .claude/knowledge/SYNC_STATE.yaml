@@ -2192,19 +2192,193 @@ context_invalidators:
   - framework version change  # invalidates Boot Context
   - specification issue resolved or newly discovered  # invalidates the affected Specification Issues Register row
 
+  - id: SYNC-056
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Cache-key rebind only (Governance-to-Implementation-Planning Mode switch audit,
+      2026-07-29). HEAD advances 1aa5f88 -> 586a55d, covering 8 commits, all docs-only
+      (zero backend/frontend/mobile production-code changes; verified via
+      `git diff --stat 1aa5f88..586a55d`): GD-19 deferred to post-MVP (ADR-053 retained,
+      checkpoint at docs/implementation/GD-19_CHATBOT_CHECKPOINT.md), GD-20 decided
+      (ADR-054..058, Job-Dispatch two-tier pivot -- target ratified, zero code authorized),
+      GD-21 decided (ADR-059, Attendance automation -- target ratified, zero code
+      authorized, plus two already-shipped consistency corrections SIR-ATT-001/SIR-ATT-012
+      retroactively recorded), GD-22 resolved by disposition (Hotel-Group billing, no new
+      architecture), GD-23 ratification cleanup, and PR #268 review-feedback fixes. This
+      closes the last standalone GD-01..23 decision: zero remaining open GD-* items
+      (GD-19's deferred remainder tracked separately, not counted; GD-03's org-chart half
+      OD-EMP-12 and OD-HR-02b remain the two named residual non-GD items, both open,
+      human/product authority).
+      Content-vs-cache-key distinction: docs/05-execution/EXECUTION_DASHBOARD.md's
+      "Current Milestone" prose already correctly narrated all of GD-19/20/21/22/23's
+      resolution before this pass (those sync notes were added by commits inside this
+      same 1aa5f88..586a55d range) -- only its "Last verified" header line cited the
+      superseded SYNC-055/PR#243-245 pass rather than the governance-resolution commits;
+      corrected in place, non-narrowing (SYNC-055's module-implementation-status claim
+      retained, since no code changed).
+      docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md (the live implementation-
+      sequencing authority per PROJECT_PROFILE.md, distinct from the superseded
+      docs/04-implementation/ G3 draft candidate at ancient baseline 09e0b16, framework
+      1.3.0, never adopted) gained a new dated verification-pass section: confirmed no
+      new epic is opened by GD-20 or GD-21, since ADR-054..059 each explicitly authorize
+      no code ("no code changes are made or authorized by this record", verbatim in all
+      six), and ADR-058 names GD-03's org-chart half as GD-20's own implementation-
+      eligibility gate, independently confirmed still open. GD-22 needs no epic (no
+      architecture). This mirrors, not repeats, the plan's own established pattern from
+      its 2026-07-23/24 passes.
+      No architecture, specification, or governance decision was authored, changed, or
+      reopened by this pass -- pure knowledge-layer/cache-key and documentation-drift
+      synchronization, the narrow correction class permitted during Implementation Mode
+      per PROJECT_PROFILE.md.
+    authority_needed: none  # pure cache-key/documentation synchronization; no new decision made or required
+    next_step: >-
+      Implementation roadmap re-derivation complete: existing docs/implementation/
+      IMPLEMENTATION_EXECUTION_PLAN.md epic set (1-8, all COMPLETE except Epic 6
+      sub-items) remains correct and complete; no epic reordering or addition was
+      warranted by the final governance baseline. Next candidate work is bounded by two
+      open human/product decisions (GD-03 org-chart half / OD-EMP-12, OD-HR-02b) rather
+      than by any remaining implementation-planning gap.
+
+  - id: SYNC-057
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository hygiene/readiness sweep synchronization pass (2026-07-29), closing three
+      concrete, low-risk gaps a prior sweep found and the commissioning human explicitly
+      approved fixing in one small synchronization PR (docs/gd-21-22-review-fixes branch).
+      No architecture, specification, or governance decision made or reopened; no
+      production code touched; no module specification content modified.
+      (1) SPECIFICATION_INDEX.yaml gap closed: SPEC-DOCUMENTS-001 (docs/03-modules/documents/
+      MODULE_SPEC.md, v0.1.4, FROZEN 2026-07-27 per GD-16) was already correctly present in
+      MODULE_REGISTRY.yaml (backend-documents entry) but absent from SPECIFICATION_INDEX.yaml
+      -- a pure index-completeness gap, not a content disagreement. Added the missing
+      backend-documents row, matching the field shape of neighboring FROZEN entries
+      (module/spec/version/status/path/frozen_at/release_prerequisites/note).
+      (2) docs/04-implementation/ archived, not deleted: confirmed via IMPLEMENTATION_
+      EXECUTION_PLAN.md and PROJECT_PROFILE.md that docs/implementation/
+      IMPLEMENTATION_EXECUTION_PLAN.md is the sole live implementation-sequencing
+      authority, and docs/04-implementation/* (7 files, framework v1.3.0-era G3 draft,
+      never adopted) was superseded, dead weight at its original path. Moved via `git mv`
+      (history-preserving) to docs/legacy/04-implementation/ -- this repository's
+      established archive location (docs/legacy/<topic>/ with a .gitkeep per category;
+      pre-existing categories are api/architecture/database/deployment/frontend/
+      infrastructure/mobile/planning/rbac/testing). Added docs/04-implementation/README.md
+      at the original path: a short dated redirect stub pointing to
+      docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md and to the new legacy location,
+      so any existing inbound link/citation still resolves to an explanatory page rather
+      than 404ing.
+      Reference sweep (the ~4 known repo-wide mentions of "04-implementation" from the
+      prior sweep) resolved individually, not mechanically: `.claude/tooling/
+      repository-integrity.config.json` (categoryPathPatterns "broken-implementation-
+      execution-reference") and `.claude/REPOSITORY_INTEGRITY_VALIDATION_PROPOSAL.md`'s
+      matching table row both describe a link-category *classifier pattern* keyed on the
+      docs/04-implementation/ path prefix, not a live-content assertion -- left unchanged,
+      since the pattern remains correct (the redirect stub keeps the path resolvable, and
+      any dangling link to a since-moved file is still correctly caught by this same
+      category, which is the intended behavior). `docs/05-execution/
+      MIGRATION_REPORT_2026-07-27.md:65`'s "untouched" claim was accurate narration of
+      that migration's own 2026-07-27 scope and is retained verbatim (never rewrite
+      history), but a reader today would be misled about the directory's current
+      location, so a dated 2026-07-29 note was appended in place pointing to the new
+      path and this SYNC entry. `.claude/knowledge/SYNC_STATE.yaml` SYNC-056's own prior
+      mention of "docs/04-implementation/ G3 draft candidate at ancient baseline 09e0b16"
+      is pure historical narration of a past fact (that it was superseded and never
+      adopted) that remains true regardless of where the directory now physically lives
+      -- left unchanged.
+      (3) This entry closes out the hygiene sweep findings: SPECIFICATION_INDEX.yaml gap
+      closed, docs/04-implementation/ archived with a redirect stub, and all directly
+      affected cross-references reconciled per the itemization above.
+      MODULE_REGISTRY.yaml and BOUNDARY_INDEX.yaml were checked and require no change:
+      neither cites a docs/04-implementation/ path, and MODULE_REGISTRY.yaml's
+      backend-documents entry already correctly named SPEC-DOCUMENTS-001 -- the gap was
+      one-directional (index missing the registry's already-correct fact), so no
+      registry-side correction was needed, only the index addition itemized in (1).
+      DECISION_INDEX.md was checked and requires no change (no 04-implementation
+      citation, and GD-16 is cited by module id/ADR id, not by index-file cross-reference,
+      in the newly added SPECIFICATION_INDEX.yaml row).
+    authority_needed: none  # pure knowledge-layer/documentation-archival synchronization; no new decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the orchestrating
+      session handles git add/commit and any PR. cache_state.baseline_revision is
+      intentionally NOT rebound by this entry since HEAD has not advanced yet -- the
+      next commit/merge that changes HEAD is what triggers the next cache-key rebind,
+      per the existing SYNC-055/SYNC-056 pattern (rebind follows a HEAD change, not a
+      working-tree edit).
+
+  - id: SYNC-058
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Governance Resolution workflow: OD-EMP-12 (GD-03's remaining org-chart/reporting-
+      relationship half; twin auth-side citation OQ-AUTH-08/SIR-AUTH-009, same underlying
+      fact, not a separate decision) resolved via ADR-060, ratifying the commissioning
+      human's explicit verbatim disposition. Flat, hotel-scoped: no explicit
+      reports_to_user_id FK or reporting-tree data model is introduced. Org-chart
+      visibility (RM+Admin, already confirmed by REQ-EMP-013) is derived implicitly from
+      existing hotel/hotel-group scope membership, reusing ADR-023/ADR-030's already-
+      established discriminated JWT scope claim rather than introducing a new
+      authorization primitive. Job Dispatch's manager-assignment routing is built against
+      hotel/hotel-group membership, not an org-chart tree. Explicit reporting chains/
+      approval hierarchies/escalations remain deferred until a confirmed business
+      requirement needs one (Constitution Article 12).
+      GD-03 (5-role model & Regional-Manager authority) is now fully resolved -- the
+      permission-set half (ADR-030 D-5, 2026-07-25) and this data-model half together
+      close it. This is also the named architectural-eligibility gate ADR-058 set for
+      Job-Dispatch (GD-20/Epic 9): "architecturally eligible once GD-03 ... is resolved."
+      Job-Dispatch implementation is now architecturally eligible to be planned --
+      scheduling/sequencing remains implementation planning's own future, dedicated
+      responsibility (ADR-058 Section 4), not authorized or performed by this record.
+      Files touched: new docs/14-governance/architecture-decisions/ADR-060-org-chart-
+      flat-hotel-scoped-no-reporting-tree.md; docs/03-modules/employee-management/
+      MODULE_SPEC.md (OD-EMP-12 row RESOLVED, Review and Change Log 0.2.6->0.2.7);
+      docs/03-modules/auth/MODULE_SPEC.md (OQ-AUTH-08 row RESOLVED both facets, Review
+      and Change Log 0.2.5->0.2.6); .claude/governance/SPECIFICATION_ISSUES_REGISTER.md
+      (SIR-EMP-009 and SIR-AUTH-009 both marked RESOLVED, both modules' "Section last
+      verified" markers updated); .claude/knowledge/DECISION_INDEX.md (new ADR-060 row;
+      OD-EMP-12 pending-decision row updated to RESOLVED; ADR-050's stale "still-open"
+      cross-reference to OD-EMP-12/GD-03 corrected); docs/implementation/
+      GOVERNANCE_REGISTER.md (OQ-AUTH-08 and OD-EMP-12 rows RESOLVED; closing summary
+      note corrected -- OD-HR-02b is now the sole remaining named residual item outside
+      any decided GD-* row); docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md (GD-03
+      summary row and GD-03 detail section updated to FULLY DECIDED); docs/05-execution/
+      EXECUTION_DASHBOARD.md (Completed Work GD-03 entry, Blockers table row struck
+      through per its own resolution not removed, backend-hr row corrected);
+      docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md (new dated verification-pass
+      section recording Epic 9/Job-Dispatch's eligibility gate now satisfied; Epic 9 is
+      NOT opened by this pass -- its own PR sequence/backlog is explicitly deferred to a
+      distinct, later, dedicated implementation-planning pass per ADR-058 Section 4 and
+      this record's own scope note).
+      GD-19 (chatbot, deferred post-MVP), OD-HR-02b, and every other open item are
+      untouched by this pass. No production code was touched. No architecture decision
+      other than ADR-060 itself was authored, changed, or reopened.
+    authority_needed: none  # the ratifying decision itself was supplied verbatim by the commissioning human; this entry records synchronization of that decision across the knowledge/governance layer, not a new decision
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the orchestrating
+      session handles git add/commit and any PR. cache_state.baseline_revision is
+      intentionally NOT rebound by this entry since HEAD has not advanced yet, per the
+      existing SYNC-055/SYNC-056/SYNC-057 pattern (rebind follows a HEAD change, not a
+      working-tree edit). Once merged, Job-Dispatch (Epic 9) is eligible to be taken up
+      by a future, dedicated implementation-planning pass -- not scheduled or sequenced
+      by this entry.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound to HEAD 1aa5f88 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); prior 3254c83, content verified coherent through the pass
+  baseline_revision: 586a55def058592099b7cb123b2482cfb0845e6b  # rebound to HEAD 586a55d by SYNC-056 (2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution; docs-only delta, no code changed); prior 1aa5f88 (SYNC-055, 2026-07-28), content verified coherent through the pass
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
   dependency_context:  { slices: [], key: baseline_revision+capability }
   module_memory:       { modules: [backend-users, backend-calendar, backend-hr, backend-crm, backend-notifications, backend-quality, backend-analytics, backend-auth, backend-work-requests, backend-attendance, backend-documents], key: module+freeze-revision, note: "ART-MEM-backend-users produced at SPEC-USERS-001 G2 freeze (SYNC-041, freeze HEAD 7762de5); ART-MEM-backend-calendar produced at SPEC-CALENDAR-001 G2 freeze (SYNC-044, freeze HEAD 9560c04); ART-MEM-backend-hr produced at SPEC-EMP-001 G2 freeze (SYNC-045, freeze HEAD 1796c37); ART-MEM-backend-crm produced at SPEC-CRM-001 G2 freeze (SYNC-046, freeze HEAD 5651915); ART-MEM-backend-notifications produced at SPEC-NOTIF-001 G2 freeze (SYNC-047, freeze HEAD efde2a9); ART-MEM-backend-quality produced at SPEC-QUAL-001 G2 freeze (SYNC-048, freeze HEAD 6e404ab); ART-MEM-backend-analytics produced at SPEC-ANALYTICS-001 G2 freeze (SYNC-049, freeze HEAD 5ddf1de); ART-MEM-backend-auth/backend-work-requests/backend-attendance backfilled by SYNC-050 (Repository Synchronization Workflow, 2026-07-20) for the three specs frozen 2026-07-15 that had never received one; ART-MEM-backend-documents backfilled by SYNC-055 (2026-07-28) for SPEC-DOCUMENTS-001, frozen 2026-07-27 (GD-16, PR #244, freeze HEAD 6e21e20) but not yet given a Module Memory entry when PR #245 built the module the same day -- all eleven FROZEN modules now have a Module Memory entry, no backfill gap remains" }
   note: >-
-    Rebound by SYNC-055 (repository-synchronization pass, 2026-07-28), advancing
+    Rebound by SYNC-056 (2026-07-29), advancing from `1aa5f88` to HEAD `586a55d` --
+    a cache-key-only rebind (see SYNC-056 above for the full record): 8 docs-only
+    commits covering the final GD-19/20/21/22/23 governance resolutions and PR #268
+    review-feedback fixes, zero production-code change. Prior bind (retained for
+    history): rebound by SYNC-055 (repository-synchronization pass, 2026-07-28), advancing
     from `3254c83` to HEAD `1aa5f88` (PR #243 GD-18 calendar-absence narrow slice,
     PR #244 GD-16 decision + SPEC-DOCUMENTS-001 freeze, PR #245 backend-documents
     module implementation). NOT content-empty: added state-calendar-absence and

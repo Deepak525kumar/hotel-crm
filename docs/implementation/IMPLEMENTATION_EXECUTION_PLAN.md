@@ -141,6 +141,85 @@ pass found stale and corrects.
 
 ---
 
+## Verification pass (2026-07-29, post GD-19/20/21/22/23 governance resolution)
+
+Re-verified against `main` @ `586a55d` (governance resolution + review-feedback commits,
+2026-07-28/29 — the repository's final MVP governance decisions). Method: read `ADR-054` through
+`ADR-059` directly (not summaries), cross-checked against `docs/implementation/GOVERNANCE_REGISTER.md`
+Part 2 and `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`'s per-row status, confirmed against
+live `backend/src/` code.
+
+- **No new epic opened by GD-20 (Job-Dispatch two-tier pivot).** `ADR-054`–`ADR-058` ratify the
+  target architecture, broadcast lifecycle, assignment model, background-execution mechanism, and
+  migration strategy — but each closes with "no code changes are made or authorized by this
+  record" (verbatim, all five). `ADR-058` names an explicit eligibility gate: implementation
+  becomes architecturally eligible only "once `GD-03` (roles/org-chart) is resolved." `GD-03`'s
+  org-chart/reporting-model half (`OD-EMP-12`) is independently confirmed still open
+  (`GOVERNANCE_REGISTER.md` Part 2 closing note; `SPECIFICATION_ISSUES_REGISTER.md` `OD-EMP-12`
+  row). `SIR-JOBD-006` (`MIG-GAP-01..12`) remains `OPEN — deferred by design`, unchanged in status
+  by GD-20's resolution (which ratified the destination, not the journey). **This plan does not
+  open an Epic 9 for Job-Dispatch.** When `GD-03`'s org-chart half is separately resolved, a future
+  planning pass must open an epic sequencing `MODULE_SPEC.md`'s own Phase 1/Phase 2 forward-refactor
+  plan (`ADR-058`, ratified unmodified) — that epic does not exist today because building it now
+  would implement ahead of the named architectural prerequisite.
+- **No new epic opened by GD-21 (Attendance operational automation).** `ADR-059` ratifies
+  scheduled reminders + automatic ABSENT/NO_SHOW marking as permanent target architecture but is
+  equally explicit: it does not authorize implementation and sets no grace-period or override
+  policy; the current manual manager-override path continues unaffected until a future
+  implementation decision. No grace-period/trigger-condition policy exists to build against;
+  authoring one now would invent a requirement (Constitution §12). **Two small, non-automation
+  items GD-21 also resolved were already implemented before this pass and require no new epic,
+  only this retroactive record:**
+  - `SIR-ATT-001`/`OQ-01` (checker `getById` role-guard alignment to `list`/`update`) —
+    `backend/src/modules/attendance/service.ts:163`. Consistency correction, not a governance
+    fork.
+  - `SIR-ATT-012`/`OQ-11` (`AuditLog.old_values`/`new_values` population) — platform-level fix in
+    `backend/src/lib/base-service.ts` (`logAudit()` gains optional `old_values`/`new_values`
+    params, backward-compatible), consumed by `attendance/service.ts`'s `checkIn`/`update` audit
+    calls.
+  Both are already merged (register: `SPECIFICATION_ISSUES_REGISTER.md` lines 121, 132, 470, 472)
+  — zero further action; neither is a "new epic."
+- **No new epic opened by GD-22 (Hotel-Group billing).** Resolved by disposition; no architecture,
+  no code implication. `billing_info` unchanged.
+- **Numbering unaffected.** Epic 8 remains the last-numbered epic (per the plan's own §"Numbering
+  note"); no Epic 9 is opened by this pass, for the same reason no Epic 9 was opened by the
+  2026-07-24 pass — no unblocked, spec-traceable, human-authorized application-code epic exists
+  for GD-19 (deferred post-MVP — see `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md`; chatbot
+  work must NOT resume), GD-20 (architecturally ineligible pending GD-03), or GD-21 (implementation
+  not authorized, no policy to build against).
+
+---
+
+## Verification pass (2026-07-29, GD-03 org-chart resolution — Job-Dispatch eligibility gate)
+
+Re-verified against `main` @ `eca502a` plus this session's own working-tree changes. `GD-03`'s
+remaining org-chart/reporting-relationship half (`OD-EMP-12`, `SIR-EMP-009`; twin auth-side
+citation `OQ-AUTH-08`/`SIR-AUTH-009`) is now **Decided → `ADR-060`**, ratifying the commissioning
+human's explicit disposition: flat, hotel-scoped — no explicit `reports_to_user_id` FK or
+reporting-tree data model; org-chart visibility (RM+Admin, already confirmed by `REQ-EMP-013`) is
+derived implicitly from existing hotel/hotel-group scope membership, reusing `ADR-023`/`ADR-030`'s
+already-established discriminated JWT `scope` claim rather than introducing a new authorization
+primitive. `GD-03` (5-role model & Regional-Manager authority) is now **fully resolved** — its
+permission-set half (`ADR-030` D-5, 2026-07-25) and this data-model half together close it.
+
+- **`ADR-058`'s named architectural-eligibility gate for Job-Dispatch (`GD-20`/Epic 9) is now
+  satisfied.** `ADR-058` §3 states implementation "becomes architecturally eligible once `GD-03`
+  ... is resolved." With `GD-03` fully decided, **Job-Dispatch (Epic 9) is now architecturally
+  eligible.**
+- **Epic 9 is opened by this implementation-planning pass** (§2 above, "Epic 9 — Job-Dispatch
+  two-tier pivot"), adopting `ADR-054`–`ADR-058`'s already-ratified target architecture and
+  migration plan unmodified — per `ADR-058` §4, opening/scheduling an epic is implementation
+  planning's responsibility, not governance's, so this is not a governance act and reopens nothing.
+  Per-PR breakdown within Epic 9's Phase 1/Phase 2 remains a distinct, later, dedicated pass.
+- **No other epic or PR is affected.** `GD-21` (attendance automation, implementation not
+  authorized) and `GD-19` (chatbot, deferred post-MVP) are unchanged by this pass. No code was
+  authored or modified as an exit condition of this record.
+- **Zero remaining standalone `GD-01..23` items outside `GD-19`'s deferred remainder.** `OD-HR-02b`
+  (Personalfragebogen data-source ambiguity) is now the sole genuinely open named residual item;
+  `GD-03`'s org-chart half no longer belongs in that list.
+
+---
+
 ## 0. Sequencing challenge to the proposed framing (read first)
 
 The commissioning brief proposed: Epic 1 = Critical PATCH fix; Epic 2 = shared
@@ -437,6 +516,330 @@ can create, patch, approve, or reject requests/applications belonging to hotel B
   in-service (same shared primitive as `backend-attendance`/`backend-quality`), as part of this
   PR.
 
+### Epic 9 — Job-Dispatch two-tier pivot (`GD-20`, opened 2026-07-29 following `GD-03`/`ADR-060`; PR-by-PR breakdown authored 2026-07-29)
+
+Architecturally eligible as of the opening pass: `ADR-058`'s named eligibility gate (`GD-03`'s
+org-chart/reporting-model half) is resolved by `ADR-060` (flat, hotel-scoped). This section is the
+dedicated implementation-planning pass `ADR-058` §4 reserved and the prior opening entry deferred —
+it decomposes the already-ratified scope (`ADR-054`–`ADR-058`, `MODULE_SPEC.md:495-506`) into
+ordered, reviewable PRs. It invents no new behavior: every PR cites the `TREQ`/`TRULE`/`REQ`/`RULE`
+row it closes, and touches no ADR.
+
+**Code-grounding note (material to sequencing, not a scope change).** Re-inspection of
+`backend/src/` at this pass's baseline found four pieces of Phase-1/2 scaffolding **already built**
+by earlier epics, for reasons unrelated to Job Dispatch, which materially shrinks Phase 1:
+- `UserRole.REGIONAL_MANAGER` (`schema.prisma:31`), `resolveHotelAccess()`'s `manager`/
+  `regional_manager` branch via `isHotelInScope()` (`middleware/permissions.ts:160-176`), and
+  `isWorkerInGroupScope()`/`resolveScopeGroupFilter()` (`lib/scope.ts`) — the entire role×scope
+  primitive `TREQ-008`/`TRULE-007` requires — were built by `ADR-030` (GD-02/03 capability matrix,
+  PR-1..PR-8, merged). `FEATURE_RM_ROLE`/`isRmRoleEnabled()` (`config/feature-flags.ts:24-30`)
+  already gates the RM-role cutover.
+- `SkillTag` enum `{CLEANER, PUBLIC_SERVICE, KITCHEN_DISHWASHER, WAITER}` (`schema.prisma:225-230`,
+  on `EmploymentRecord.skills`) already matches `TREQ-010`'s enum **exactly** — built for
+  `SPEC-EMP-001`, not Job Dispatch, but directly reusable.
+- `work-requests/service.ts` and `work-applications/service.ts` already call `isHotelInScope()`
+  in-service (Epic 8, `SIR-JOBD-002` resolved) — the manager-scope check Phase 1 would otherwise
+  need to add to the create/broadcast path already exists on the current marketplace code.
+- **`TREQ-009`/`TRULE-008`'s "consume `EVT-CAL-SickVacationMarked`" is already implemented and
+  live**, not unbuilt: `calendar/service.ts:155-174`'s `autoCancelSameDayAssignment()` calls
+  `AssignmentService.update()` directly today. `ADR-032` (GD-12, 2026-07-28) ratified this
+  already-shipped direct call as the **permanent** mechanism — no event bus exists or is planned;
+  `EVT-CAL-SickVacationMarked` is retained purely as a documentation label for this direct call,
+  per `ADR-032` Decision point 1/Consequence 1. `MODULE_SPEC.md`'s "on consuming Calendar's event"
+  phrasing is therefore stale relative to `ADR-032` but is **not a contradiction requiring
+  escalation** — `ADR-032` already resolved the mechanism question platform-wide and named this
+  exact call site as the ratifying precedent (`ADR-032` Consequences, bullet 2). No PR in this
+  epic needs to build sick/vacation auto-cancel; Phase 2's `CalendarEntry`/`JobRequest` broadcast
+  path is unaffected by and independent of this fact. See §6(f) below for why this is not escalated
+  as a spec/ADR contradiction.
+- The Platform Worker/`Scheduler`/Outbox runtime (`backend/src/worker.ts`, `lib/scheduler.ts`,
+  `ScheduledJob` interface) is live (Epic 7) with two already-registered jobs
+  (`SessionSweepJob`, `GeoRetentionSweepJob`) as the direct precedent for the 6h auto-close job.
+
+None of this shrinks Phase 2's genuinely unbuilt surface (`CalendarEntry`, `JobRequest`, broadcast
+eligibility/arbitration, daily exclusivity, auto-close) — it only means several Phase-1 line items
+in `MODULE_SPEC.md:497` ("Regional Manager role + scope added to auth/RBAC") are **verify-and-wire**
+work against existing primitives, not net-new authorization design.
+
+**Ordered PR table** (dependency order; `9.1`–`9.10`; Phase 1 = `9.1`–`9.4`, Phase 2 = `9.5`–`9.10`):
+
+| PR | Title | Scope | DB / migration | Feature flag (default) | Depends on |
+|----|-------|-------|-----------------|-------------------------|------------|
+| **9.1** | RM role/scope verification + envelope refactor | Verify `REGIONAL_MANAGER`/`isHotelInScope` cover `TREQ-008`/`TRULE-007` for the marketplace routes (no new authz code expected — write the missing regression only if a gap is found); introduce `sendSuccess()`/`sendPaginated()` response-envelope helpers (`lib/http-envelope.ts`, new — **verified absent from the repo today**: every controller in `work-requests`, `work-applications`, `assignments` currently constructs `{status:'success',data,meta:{timestamp,request_id}}` inline per-handler, e.g. `work-requests/controller.ts:30-34`; `MODULE_SPEC.md:498`'s phrasing presupposes these helpers exist, they do not — this PR creates them, matching the exact shape already in use so it is a pure extraction/refactor, not a contract change) and refactor the three modules' controllers onto them | — | `FEATURE_RM_ROLE` (already exists, default off — unchanged by this PR) | none (first PR) |
+| **9.2** | Remove `WorkApplication` (breaking) | Delete `work-applications` module (routes/controller/service/types); delete nested `POST/GET/PATCH /work-requests/:id/applications`; drop `WorkApplication` model + `ApplicationStatus` enum | +1 migration (drop table + enum, drop `WorkerAssignment.application_id` FK) | `FEATURE_JOBDISPATCH_PHASE1` (new, default **off**) | 9.1 |
+| **9.3** | Repoint `WorkerAssignment` to direct creation | Drop mandatory `application_id` FK (`TREQ-012`); add nullable `job_request_id` FK (populated only by Phase 2's broadcast-accept path, PR 9.9); `assignments/service.ts` unaffected (no create path lives there yet — creation moves to 9.5/9.9) | Same migration as 9.2 (paired: dropping `application_id` and adding `job_request_id` in one migration avoids two transient assignment-creation-invariant states) | `FEATURE_JOBDISPATCH_PHASE1` | 9.2 |
+| **9.4** | Re-label schema off "marketplace" | Rename `WorkRequest`→`JobRequest` (Prisma model rename via migration, `@@map` preserved for the physical table name if needed to avoid a data-moving migration), `work-requests` module → `job-requests`; update route mounts, `DEPENDENCY_GRAPH.yaml`/`MODULE_REGISTRY.yaml` node ids; **no behavior change** | +1 migration (model rename only, no column change) | `FEATURE_JOBDISPATCH_PHASE1` | 9.3 |
+| **9.5** | `CalendarEntry` + Calendar direct-assignment (`TREQ-001`) | New `CalendarEntry` model (per-worker per-day assignment-kind record, PIVOT §9.3) + migration; `POST /calendar-entries` (manager places a worker on a day — direct `WorkerAssignment` creation, no accept step, no broadcast); read endpoint for a worker's own calendar | +1 migration (`CalendarEntry` table) | `FEATURE_JOBDISPATCH_PHASE2` (new, default **off**) | 9.4 |
+| **9.6** | Daily-exclusivity partial unique index (`TREQ-007`) | Partial unique index on `WorkerAssignment` keyed `(worker_id, day)` for active statuses, replacing the current `(request,worker)`-keyed index (`RULE-010`/`REQ-042`); eligibility computation (9.5, 9.7) excludes already-assigned workers | +1 migration (drop old partial index, add new one) | `FEATURE_JOBDISPATCH_PHASE2` | 9.5 |
+| **9.7** | Broadcast `JobRequest`-fallback + eligibility (`TREQ-002/003/010`) | New broadcast-raise endpoint (skill(s) × headcount-per-skill on the re-labeled `JobRequest`, `TREQ-010`'s `SkillTag` enum reused from `EmploymentRecord`); eligible-worker computation (skill ∧ free that day, via 9.6's exclusivity read) | — (reuses 9.4's `JobRequest` table + 9.6's exclusivity read) | `FEATURE_JOBDISPATCH_PHASE2` | 9.6 |
+| **9.8** | Skill-matched broadcast notification | Enqueue push notification (`notificationService.enqueue`, `OutboxTransport.PUSH`) to each eligible worker on broadcast-raise, inside the raise transaction (mirrors `work-requests/service.ts`'s existing `enqueueRosterPublished` shape) | — | `FEATURE_JOBDISPATCH_PHASE2` | 9.7 |
+| **9.9** | First-accept arbitration + "requirement fulfilled" (`TREQ-004/005`, `ADR-057`) | Accept endpoint: optimistic-concurrency claim (version column + transactional conditional `updateMany`, mirroring `work-applications/service.ts`'s retired `approve()` slot-claim shape) creates `WorkerAssignment` directly (`job_request_id` FK from 9.3) on win; zero-affected-rows loss path returns "requirement fulfilled" (no error, no assignment) | — | `FEATURE_JOBDISPATCH_PHASE2` | 9.8 |
+| **9.10** | 6h auto-close scheduled job (`TREQ-006`, `ADR-029`/`ADR-057`) | New `JobRequestAutoCloseJob implements ScheduledJob` registered on the Platform Worker's `Scheduler` (`worker.ts`, mirrors `SessionSweepJob`/`GeoRetentionSweepJob`); closes any `JobRequest` unfilled 6h past creation, enqueues manager notification; manual close reuses the existing manual-transition endpoint pattern (9.4) | — | `FEATURE_JOBDISPATCH_PHASE2` | 9.9 |
+
+**Numbering note (Epic 7 PR 7.8 precedent):** all ten PRs are listed in final dependency order with
+no reordering needed — unlike Epic 7's 7.8, this table was authored once, in this pass, after full
+code-grounding, so no renumbering-after-the-fact situation arose. If a future implementer discovers
+a genuine reordering need, follow the Epic 7 precedent (keep the original number, add a footnote),
+not silent renumbering.
+
+---
+
+#### PR 9.1 — RM role/scope verification + envelope refactor
+
+- **Files:** `backend/src/modules/work-requests/controller.ts`, `work-applications/controller.ts`,
+  `assignments/controller.ts` (envelope refactor); new `backend/src/lib/http-envelope.ts` exporting
+  `sendSuccess(res, data, extra?)`/`sendPaginated(res, data, pagination, extra?)`, extracted from the
+  identical inline shape already repeated in every handler (`work-requests/controller.ts:30-34,56-68`
+  and siblings) — **no such helper exists in the repo today** (verified: `grep -rn "sendSuccess\|sendPaginated" backend/src/` returns nothing); this PR creates it once and points these three
+  modules at it, a pure extraction with no response-shape change. No service-layer change expected. **If** the RM/scope
+  verification step (below) finds a gap, the fix lands in `work-requests/service.ts`/
+  `work-applications/service.ts` (`create()`/`update()`/`approve()`), following the exact
+  `isHotelInScope()` pattern already in those files (Epic 8).
+- **Acceptance criteria closed:** `TREQ-008`/`TRULE-007` (verified, not re-implemented, against the
+  three marketplace modules — Phase 1's role×scope requirement is satisfied by `ADR-030`'s existing
+  RM/scope primitives; this PR's job is to confirm no gap and normalize the envelope, not invent
+  new authorization).
+- **Test file:** `backend/src/__tests__/job-dispatch-envelope.test.ts` (envelope-shape regression:
+  every job-dispatch-family response matches `{status,data,pagination?,meta}` exactly, citing this
+  PR) plus, only if a gap is found, an addition to the existing
+  `work-requests-scope-authz.test.ts`/`work-applications-scope-authz.test.ts` suites (do not create
+  new scope-authz test files — the existing ones from Epic 8 are the canonical location, per Epic 5
+  PR 5.5's "one authz test file per affected consumer" precedent) with a docstring citing `TREQ-008`.
+- **Rollback:** code-only. `git revert`. No schema, no data.
+
+#### PR 9.2 — Remove `WorkApplication` (breaking)
+
+- **Files:** delete `backend/src/modules/work-applications/` (controller/routes/service/types);
+  `backend/src/routes/v1/index.ts` (unmount `/work-requests/:id/applications`); `schema.prisma`
+  (drop `WorkApplication` model, `ApplicationStatus` enum, and the `WorkerAssignment.application`
+  relation); new migration under `backend/prisma/migrations/`.
+- **Acceptance criteria closed:** `TREQ-011` ("no apply endpoint; no `WorkApplication` table; worker-
+  initiated application is a confirmed NON-GOAL").
+- **Breaking-change disclosure (required by `ADR-058`'s ratified migration plan, not new to this
+  pass):** this is the **only** breaking change in the whole rollout, done pre-launch before any
+  client depends on it (`MODULE_SPEC.md:505`). `DEPENDENCY_GRAPH.yaml`'s
+  `edge-mobile-worker-work-applications` (`mobile/worker-app/src/lib/api.ts:173-181`,
+  `app/job/[id].tsx:36,57`) must be removed from the graph in the same PR's knowledge-sync step,
+  and `mobile/worker-app`'s apply/withdraw UI must be removed or feature-flagged off in a
+  **coordinated companion PR** (owned by mobile, out of this backend PR's file list, but blocking —
+  see §6(c) below) before `FEATURE_JOBDISPATCH_PHASE1` is ever turned on in an environment mobile
+  clients hit.
+- **Test file:** `backend/src/__tests__/work-applications.test.ts` and
+  `work-applications-scope-authz.test.ts` are **deleted** (the module they test no longer exists);
+  `backend/src/__tests__/job-requests.test.ts` (renamed/adapted from `work-requests.test.ts` in
+  9.4, not this PR) gains a case asserting `POST /work-requests/:id/applications` now 404s
+  (route removed).
+- **Rollback:** migration-involved. Down-migration recreates `WorkApplication`/`ApplicationStatus`
+  and the `application_id` FK **schema only** — no data recovery, since `FEATURE_JOBDISPATCH_PHASE1`
+  stays off until this and 9.3/9.4 are verified together, meaning no production `WorkApplication`
+  row is ever written under the new schema. Revert = `git revert` the code + run the down-migration
+  in the same deploy. Because this is pre-launch with no production employee data
+  (`ADR-058`/`MODULE_SPEC.md:495-496`), a destructive down-migration carries no data-loss risk in
+  practice — but the down-migration must still exist and be exercised in CI (`migrate-harness.sh
+  verify`, the same convention Epic 5 PR 5.1 used) before merge.
+
+#### PR 9.3 — Repoint `WorkerAssignment` to direct creation
+
+- **Files:** `schema.prisma` (`WorkerAssignment.application_id` dropped; add nullable
+  `job_request_id String?` + relation, added now so 9.9's broadcast-accept path has somewhere to
+  write without a second migration); same migration file as 9.2 (paired per the table's DB column —
+  one migration, two logically-related schema changes, to avoid a transient state where
+  `WorkerAssignment` has neither a mandatory `application_id` nor any other creation-path FK).
+  `assignments/service.ts` requires **no change** — it has never had a create path (assignments were
+  always created by `work-applications/service.ts`'s `approve()`, now deleted in 9.2); creation
+  paths land fresh in 9.5 (calendar) and 9.9 (broadcast accept).
+- **Acceptance criteria closed:** `TREQ-012` ("assignment rows exist with no application linkage;
+  creation path does not require an application").
+- **Test file:** `backend/src/__tests__/assignments.test.ts` — remove/adapt any fixture that seeds
+  a `WorkerAssignment` via `application_id` (replace with direct Prisma `create` in test setup,
+  since the service itself never created one); add a schema-level test asserting
+  `application_id` no longer exists as a required column (Prisma Client type-level, caught by
+  `tsc --noEmit` in CI already, but also assert at the DB level via `migrate-harness.sh verify`).
+- **Rollback:** same migration as 9.2 — see 9.2's rollback note; the down-migration must restore
+  `application_id` as NOT NULL only if no row exists that would violate it (again: no production
+  data exists under the new schema while the flag is off, so this is safe in practice, verified
+  in CI regardless).
+
+#### PR 9.4 — Re-label schema off "marketplace"
+
+- **Files:** `schema.prisma` (`WorkRequest` → `JobRequest` model rename, `@@map("work_requests")`
+  retained to avoid a physical table rename — a Prisma-level rename only, not a data migration);
+  `backend/src/modules/work-requests/` → `backend/src/modules/job-requests/` (directory rename,
+  all internal references updated); `backend/src/routes/v1/index.ts` mount path
+  (`/work-requests` route path itself is a public API contract — **retained unchanged** per
+  `MODULE_SPEC.md`'s "baseline/UNKNOWN" compatibility posture; only the internal model/module name
+  changes, not the URL, since renaming the URL would be an undisclosed second breaking change this
+  PR's own acceptance criterion, `TREQ-013`, does not require).
+- **Acceptance criteria closed:** `TREQ-013` ("no formal job-status state machine... remaining
+  status handling is manual") to the extent it requires re-labeling off marketplace framing;
+  `MIG-GAP-12`.
+- **Knowledge sync (this PR's exit condition, not a separate PR):** `DEPENDENCY_GRAPH.yaml` node
+  ids `backend-work-requests`→`backend-job-requests`, `state-work-request`→`state-job-request`
+  (all edges, e.g. `edge-work-requests-notifications`, renamed in place — same convention Epic 5
+  PR 5.8 used for `state-hotel-worker`'s retirement note); `MODULE_REGISTRY.yaml` entry renamed,
+  `specification` field bumped to cite this pass. `TERMINOLOGY.md` promotion (`MODULE_SPEC.md`'s
+  own Proposed Knowledge Delta, §"Proposed Knowledge Deltas") applied in this PR, not deferred.
+- **Test file:** rename `work-requests.test.ts`→`job-requests.test.ts`,
+  `work-requests-scope-authz.test.ts`→`job-requests-scope-authz.test.ts` (content unchanged except
+  import paths — this PR is a pure rename, asserted by running the full pre-rename suite green
+  immediately before and the post-rename suite green immediately after, same test count).
+- **Rollback:** code + migration (model rename only, no column/data change). `git revert` + run the
+  down-migration (renames back). Zero data risk (rename, not restructure).
+
+#### PR 9.5 — `CalendarEntry` + Calendar direct-assignment
+
+- **Files:** `schema.prisma` (new `CalendarEntry` model — per-worker per-day assignment-kind record
+  only, explicitly **not** overlapping Calendar's own `state-calendar-absence`/`CalendarAbsence`
+  per `ADR-021`'s narrowing; owned by `backend-assignments`, not `backend-calendar`, consistent
+  with `ADR-021`'s "assignment creation... remain owned by Job Dispatch/backend-assignments");
+  new migration; `backend/src/modules/assignments/service.ts` gains a `placeOnCalendar()` method
+  (direct `WorkerAssignment` + `CalendarEntry` creation in one transaction, no accept step);
+  `assignments/controller.ts`/`routes.ts` gain `POST /calendar-entries`,
+  `GET /calendar-entries?worker_id=`; `assignments/types.ts` gains the DTO.
+- **Acceptance criteria closed:** `TREQ-001`/`TRULE-001` ("manager places workers on a calendar
+  day-by-day as a DIRECT assignment — no worker accept/decline; the shift appears on the worker's
+  calendar; no broadcast fires"); `MIG-GAP-03`.
+- **Feature flag:** `FEATURE_JOBDISPATCH_PHASE2` (new, default **off** — gates every Phase 2 route;
+  same "additive, both-off = current behavior" posture as every prior epic's flag).
+- **Test file:** `backend/src/__tests__/calendar-entries.test.ts` — cases: manager places worker
+  (assignment + CalendarEntry created, no notification of a broadcast kind emitted); manager places
+  an already-assigned-that-day worker (blocked, see 9.6 — this PR alone does not yet enforce the
+  DB-level exclusivity, so this case is marked pending until 9.6 lands, per this table's own
+  dependency order — do not assert DB-level rejection in this PR's test file, only in 9.6's).
+- **Rollback:** migration-involved (additive new table only, unread until this PR itself, so a
+  down-migration dropping it is safe and immediate). Code + drop-table revert.
+
+#### PR 9.6 — Daily-exclusivity partial unique index
+
+- **Files:** new migration re-keying the existing partial unique index (`migration.sql:580-582`,
+  currently `(work_request_id, worker_id)` for active statuses) to `(worker_id, day)` where `day`
+  is derived from the assignment's shift date (calendar entry's day or broadcast `JobRequest`'s
+  shift date — requires a denormalized `day` column on `WorkerAssignment` if one does not already
+  exist; verify against current `schema.prisma` before authoring — if `WorkerAssignment` has no
+  own date field today, add one in this migration, backfilled from `work_request.shift_date` for
+  every existing row, since this is the one column-level change touching potentially-existing rows
+  in the whole epic and must be additive-then-backfilled, not a blind NOT NULL add).
+  `assignments/service.ts` (or a small shared helper) enforces the invariant read-side (eligibility
+  exclusion for 9.7).
+- **Acceptance criteria closed:** `TREQ-007`/`TRULE-006` ("one active assignment per worker per DAY
+  ... enforced by a partial unique index"); `MIG-GAP-08`.
+- **Test file:** `backend/src/__tests__/assignments-daily-exclusivity.test.ts` — DB-level test:
+  second same-day active assignment for the same worker (via either creation path) is rejected at
+  the constraint layer, not just app-layer; retroactively completes 9.5's deferred case.
+- **Rollback:** migration-involved, **the one PR in this epic with a genuine backfill risk** if the
+  denormalized `day` column does not already exist. Down-migration drops the new index and restores
+  the old `(work_request_id, worker_id)` one; the `day` column itself (if added) is left in place on
+  rollback (additive column, harmless to leave, cheaper/safer than a second down-migration removing
+  it) — document this asymmetry explicitly in the PR body, per this plan's own Definition of Done
+  §6 rollback-documentation requirement. Take a DB snapshot immediately before applying, same
+  discipline as Epic 5 PR 5.3's backfill guidance.
+
+#### PR 9.7 — Broadcast `JobRequest`-fallback + eligibility
+
+- **Files:** `job-requests/service.ts` (new `raiseBroadcast()` — skill(s) × headcount-per-skill,
+  reusing `SkillTag` from `schema.prisma:225-230`, already defined for `EmploymentRecord`; add a
+  `skill SkillTag?`/headcount-per-skill shape to `JobRequest` if the re-labeled model doesn't
+  already carry a skill dimension — verify against 9.4's renamed schema before authoring, since
+  `WorkRequest.position` today is free text per `MIG-GAP-05`/current-state `REQ-004`, and this PR
+  is where `MIG-GAP-05` actually closes, not 9.4); `job-requests/service.ts` eligibility query
+  (skill match ∧ no active assignment that day, via 9.6's exclusivity read).
+- **Acceptance criteria closed:** `TREQ-002`/`TRULE-002` (broadcast fires only on standalone manager
+  request), `TREQ-003`/`TRULE-002`/`TRULE-006` (eligibility = skill ∧ free), `TREQ-010`/`TRULE-009`
+  (skill enum replaces free-text `position`); `MIG-GAP-04`, `MIG-GAP-05`.
+- **Test file:** `backend/src/__tests__/job-requests-broadcast.test.ts` — cases: raise with
+  skill×headcount persists correctly; eligibility set excludes non-matching-skill workers and
+  already-assigned-that-day workers; calendar placement (9.5) never triggers a broadcast (negative
+  assertion, closing `TRULE-002`'s "calendar edits never emit a broadcast" clause explicitly).
+- **Rollback:** migration-involved only if the skill/headcount columns are new (see Files note);
+  otherwise code-only. Document whichever applies in the PR body.
+
+#### PR 9.8 — Skill-matched broadcast notification
+
+- **Files:** `job-requests/service.ts` (extend `raiseBroadcast()`'s transaction with
+  `notificationService.enqueue()` calls to each eligible worker, `OutboxTransport.PUSH`,
+  `OutboxSourceModule.WORK_REQUESTS` — reuse the existing enum value rather than adding
+  `JOB_REQUESTS`, since 9.4 kept the module's outbox-facing identity stable by design, or add
+  `OutboxSourceModule.JOB_REQUESTS` via `ALTER TYPE ... ADD VALUE` if the rename in 9.4 already
+  touched this enum — verify against 9.4's actual diff before authoring); mirrors
+  `work-requests/service.ts:270-291`'s existing `enqueueRosterPublished()` shape exactly (same
+  transaction-join pattern `ADR-029`/Epic 7 PR 7.3 established).
+- **Acceptance criteria closed:** `TREQ-003` (only eligible workers are notified, delivery half).
+- **Test file:** extend `job-requests-broadcast.test.ts` (from 9.7) with notification-enqueue
+  assertions (an `OutboxEvent` row exists per eligible worker, none for ineligible ones) — the same
+  "assert an OutboxEvent was enqueued, not that delivery happened" pattern every Epic 7-era producer
+  test already uses (delivery itself is the Platform Worker's own, separately-tested concern).
+- **Rollback:** code-only (no schema — enum `ADD VALUE` if used is additive/irreversible-forward
+  only, matching Epic 7 PR 7.8's `PushApp` precedent of treating additive enum growth as safe to
+  leave even on a code revert).
+
+#### PR 9.9 — First-accept arbitration + "requirement fulfilled"
+
+- **Files:** `job-requests/service.ts` (new `acceptBroadcast()` — optimistic-concurrency slot claim
+  via a transactional conditional `updateMany` on a per-skill headcount counter, structurally
+  identical to `work-applications/service.ts`'s now-deleted (9.2) `approve()` claim
+  (`workRequest.updateMany({ where: { version, ... }, data: { ...: increment(1), version:
+  increment(1) } })`) — `ADR-057` names this exact precedent as the reused mechanism, so this PR's
+  implementation is a structural port, not new design); on `claimed.count === 0`, return the
+  "requirement fulfilled" response (`TREQ-005`) instead of throwing; on success, create
+  `WorkerAssignment` directly with `job_request_id` set (9.3's added FK) inside the same
+  transaction.
+- **Acceptance criteria closed:** `TREQ-004`/`TRULE-003` (first-accept wins, optimistic concurrency,
+  no Redis, per `ADR-057`), `TREQ-005`/`TRULE-004` ("requirement fulfilled" for losers);
+  `MIG-GAP-06`.
+- **Test file:** `backend/src/__tests__/job-requests-arbitration.test.ts` — concurrency test:
+  simulate concurrent accepts on the last remaining slot (same pattern as the currently-untested
+  `FIND-BRV-006` gap this repo's own register flags for the marketplace equivalent — **this PR
+  must not repeat that gap**: the concurrency test is mandatory, not deferred, since `ADR-057`'s own
+  rationale explicitly cites this scenario); exactly one winner, tie-break by earliest
+  server-received timestamp; losing transaction returns "requirement fulfilled", zero assignment
+  rows created for it.
+- **Rollback:** code-only (creation path uses 9.3's already-migrated `job_request_id` column).
+  `git revert`.
+
+#### PR 9.10 — 6h auto-close scheduled job
+
+- **Files:** `backend/src/modules/job-requests/auto-close-job.ts` (new
+  `JobRequestAutoCloseJob implements ScheduledJob`, mirroring
+  `auth/session-sweep-job.ts`'s/`geo/retention-sweep-job.ts`'s exact shape: constructor-injected
+  `PrismaClient` + config, `name`/`intervalMs`/`run()`); `backend/src/worker.ts` (register the new
+  job on the `Scheduler`, alongside `SessionSweepJob`/`GeoRetentionSweepJob`); `job-requests/service.ts`
+  gains a `manualClose()` method reusing the existing manual-transition validation shape (9.4).
+- **Acceptance criteria closed:** `TREQ-006`/`TRULE-005` (auto-close at 6h, manager may close
+  manually sooner); `MIG-GAP-09`. Confirms `ADR-057`'s Platform-Worker-not-BullMQ decision in code.
+- **Test file:** `backend/src/__tests__/job-requests-auto-close.test.ts` — unit test on
+  `JobRequestAutoCloseJob.run()` (mirroring `SessionSweepJob`'s own test shape): a `JobRequest`
+  created >6h ago and still open is closed + manager notified; one created <6h ago is untouched;
+  manual close available at any time before the 6h mark via the existing transition endpoint.
+- **Rollback:** code-only. `git revert` + stop registering the job (no data cleanup needed — a
+  `JobRequest` left open past 6h with the job unregistered is a correctness regression, not a
+  data-integrity one, and is caught immediately by re-registering on redeploy).
+
+---
+
+**Dependencies (unchanged from the opening pass, re-confirmed against live code this pass):**
+`GD-03` (fully resolved, `ADR-030` + `ADR-060`); Platform Worker/Outbox runtime (Epic 7, merged,
+`backend/src/worker.ts`); `isHotelInScope()`/scope-authz seam (Epic 3/5/8, merged). No dependency on
+`GD-21` (Attendance automation, implementation not authorized) or `GD-19` (chatbot, deferred —
+unrelated module). New edges this epic adds to the dependency graph: 9.5/9.9 write
+`state-worker-assignment` directly (no cross-owner accept-transaction coupling — the exact
+opposite of the retired `ADR-018`-disposed pattern); 9.10 registers on the existing
+Platform-Worker `Scheduler` (no new edge kind, same shape as `edge-worker-registers-session-sweep`
+if/when that edge is formalized).
+
+**`SIR-JOBD-*` disposition (verified against `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`
+this pass, not re-derived):**
+- `SIR-JOBD-001`/`002`/`003`/`004`/`007` — already `RESOLVED` by prior epics (1, 8, `ADR-018`,
+  `ADR-035`, and a 2026-07-27 clarification respectively); **not reopened, not re-touched** by any
+  PR in this epic.
+- `SIR-JOBD-005` (module ownership, `SYNC-001`) — remains `OPEN`, human-authority, **explicitly
+  out of this epic's scope**; no PR here assigns an owner.
+- `SIR-JOBD-006` (the `MIG-GAP-01..12` enumeration) — this is the one register row this epic
+  **closes by construction**: every `MIG-GAP-01..12` id is mapped to exactly one PR above
+  (01→9.2, 02→9.3, 03→9.5, 04→9.7/9.8, 05→9.7, 06→9.9, 07→9.1, 08→9.6, 09→9.10, 10→already-live
+  per the code-grounding note above, 11→9.1's verification, 12→9.4). The register itself is
+  updated (append a resolution note, never delete history) as an exit condition of this
+  implementation-planning pass, per this repo's own Repository Rules.
+
 ---
 
 ## 3. Dependency graph (epics / PRs)
@@ -455,6 +858,26 @@ Epic 5:  PR 5.1 ─> PR 5.2 ─> PR 5.3 ─> PR 5.4 ─> PR 5.5 (authz flip: clo
          [PR 5.5 before PR 5.7 — decided by ADR-024]
 
 Epic 6, Epic 7: no edge into 1–5; gated only on their own module Decision Records.
+
+Epic 9 (opens once Epic 5 PR 5.5/PR 5.4, Epic 7 all 8 PRs, and Epic 8 PR 8.1 are merged):
+
+  Epic 5 PR 5.4/5.5 (RM role + scope claim) ──┐
+  Epic 8 PR 8.1 (isHotelInScope in-service)   ─┼─> Epic 9 PR 9.1 (verify, not rebuild, TREQ-008)
+  Epic 7 PR 7.1–7.8 (Outbox + Platform Worker)┘        │
+                                                        ▼
+  PR 9.1 ─> PR 9.2 ─> PR 9.3 ─> PR 9.4  (Phase 1: WorkApplication removed, WorkerAssignment
+                                          repointed, schema re-labeled JobRequest)
+                                                        │
+                                                        ▼
+  PR 9.4 ─> PR 9.5 ─> PR 9.6 ─> PR 9.7 ─> PR 9.8 ─> PR 9.9 ─> PR 9.10  (Phase 2: calendar direct-
+     assignment, daily exclusivity, broadcast raise+eligibility+notify+arbitration, 6h auto-close
+     on the Epic-7 Platform Worker/Scheduler — PR 9.10's only edge OUT of Epic 9 is registering on
+     Epic 7's already-live Scheduler, no new runtime)
+
+  Calendar's sick/vacation auto-cancel (calendar/service.ts -> AssignmentService.update(),
+  ratified as a direct call by ADR-032/GD-12) already depends on backend-assignments today,
+  predating this epic — Epic 9 introduces no new edge here, only Phase 2's CalendarEntry/
+  JobRequest additions live beside it in the same module.
 ```
 
 Justification from real `DEPENDENCY_GRAPH.yaml` edges (not invented):
