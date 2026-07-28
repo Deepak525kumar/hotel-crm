@@ -332,7 +332,7 @@ No existing frozen spec was edited to apply these corrections — they are recor
 | ID | Description | Authority | Status | Category |
 |---|---|---|---|---|
 | OD-CHAT-001 | No confirmed conversation/AI-session entity in any authority doc | Product/Human | Open | Product |
-| OD-CHAT-002 | Tool-execution scope (conversational-only vs. tool-executing agent) | Product/Architecture | Open | Architecture |
+| OD-CHAT-002 | Tool-execution scope (conversational-only vs. tool-executing agent) | Product/Architecture | **RESOLVED `GD-19`/`ADR-053`, 2026-07-28** — orchestration-layer/tool-registry architecture ratified, risk-tiered confirmation policy; no specific tool approved, architecture only | Architecture |
 | OD-CHAT-003 | File-byte handling/storage-write mechanism | Architecture/Human | Open | Architecture |
 | OD-CHAT-004 | Worker-facing routing/proxy question | Architecture | Resolved (v0.1.2 correction, two-part), subject to G2 ratification | Architecture |
 | OD-CHAT-005 | Conversation-level RBAC (read-scope + write-path/initiation-scope) | Product/Architecture | **Open — blocks G2 Specification Freeze** | Security |
