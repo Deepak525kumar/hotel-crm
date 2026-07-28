@@ -166,9 +166,10 @@ when it's pursued — it no longer gates the tier mapping itself or any dependen
 > `GD-20` → `ADR-054` through `ADR-058` (5 sub-decisions). `GD-21` → `ADR-059` (sole sub-decision;
 > two further items closed as consistency corrections, not governance forks). `GD-22` → resolved by
 > disposition, no new architecture (`ADR-023` had already settled Hotel-Group billing ownership; no
-> new ADR authored). Actively-pursuable open count across the full `GD-01..23` numbering is now
-> **zero**, outside `GD-19`'s deferred remainder and two named residual items (`OD-HR-02b`, `GD-03`'s
-> org-chart half) — see `docs/implementation/GOVERNANCE_REGISTER.md` for the current canonical status.
+> new ADR authored). **Zero remaining standalone `GD-*` decisions** across the full `GD-01..23`
+> numbering — `GD-19`'s deferred remainder (post-MVP resumption) and two named residual items outside
+> any `GD-*` row (`OD-HR-02b`, `GD-03`'s org-chart half) are separately tracked, not counted here —
+> see `docs/implementation/GOVERNANCE_REGISTER.md` for the current canonical status.
 
 ## Per-Module Implementation Status
 

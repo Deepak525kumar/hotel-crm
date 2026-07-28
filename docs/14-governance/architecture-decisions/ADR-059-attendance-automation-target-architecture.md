@@ -37,7 +37,7 @@ architectural one — exactly the failure mode `ADR-054`, `ADR-053`, and `ADR-03
    NO_SHOW marking after a missed check-in, are confirmed as the platform's eventual direction — not merely a
    deferred-but-uncommitted possibility.
 
-2. **The execution mechanism, if and when built, is the Platform Worker** (`ADR-029`), consistent with
+2. **If implemented, the execution mechanism MUST be the Platform Worker** (`ADR-029`), consistent with
    `ADR-057`'s generalization of that pattern as the platform's canonical scheduled-job runtime, and with
    attendance's own existing use of the outbox for `WORKER_NO_SHOW` notification delivery today
    (`attendance/service.ts:262-283`). No new infrastructure decision is required if this is built.
