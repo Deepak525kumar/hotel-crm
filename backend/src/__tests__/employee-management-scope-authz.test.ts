@@ -51,6 +51,34 @@ const employmentRecords: Record<string, any> = {
   },
 };
 
+const hotelGroups: Record<string, any> = {
+  g1: {
+    id: 'g1',
+    name: 'North Region',
+    regional_manager: { id: 'rm_1', first_name: 'Rita', last_name: 'Regional', email: 'rita@hotelcrm.test' },
+    hotels: [
+      { id: 'h1', name: 'Hotel One', manager: { id: 'mgr_1', first_name: 'Mo', last_name: 'Manager', email: 'mo@hotelcrm.test' } },
+    ],
+  },
+};
+
+const groupEmploymentRecords: Record<string, any[]> = {
+  g1: [
+    {
+      employee_id: 'E-001',
+      job_title: 'Cleaner',
+      status: 'ACTIVE',
+      user: { id: 'user_1', first_name: 'Wanda', last_name: 'Worker' },
+    },
+    {
+      employee_id: 'E-002',
+      job_title: 'Waiter',
+      status: 'UNDER_REVIEW',
+      user: { id: 'user_2', first_name: 'Ravi', last_name: 'Review' },
+    },
+  ],
+};
+
 const auditCalls: any[] = [];
 
 jest.mock('../config/feature-flags.js', () => ({
@@ -70,6 +98,7 @@ jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     employmentRecord: {
       findUnique: async ({ where }: any) => employmentRecords[where.employee_id] ?? null,
+      findMany: async ({ where }: any) => groupEmploymentRecords[where.hotel_group_id] ?? [],
     },
     employeeBlocklistEntry: {
       create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
@@ -79,7 +108,10 @@ jest.mock('../lib/db.js', () => ({
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
       findFirst: async () => null,
     },
-    hotelGroup: { findFirst: async () => null },
+    hotelGroup: {
+      findFirst: async () => null,
+      findUnique: async ({ where }: any) => hotelGroups[where.id] ?? null,
+    },
     attendance: { findMany: async () => [] },
     rating: { findMany: async () => [] },
     auditLog: {
@@ -208,6 +240,81 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
       const res = await request(makeApp()).get('/employees/hotels/h2/blocklist');
       expect(res.status).toBe(200);
+    });
+  });
+
+  describe('GET /employees/hotel-groups/:hotel_group_id/org-chart — RM own-group/Admin-only (REQ-EMP-013)', () => {
+    it('allows a regional_manager to view their own group\'s org chart (200)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: ['employees:read'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(200);
+      expect(res.body.data.hotel_group_id).toBe('g1');
+      expect(res.body.data.regional_manager.id).toBe('rm_1');
+      expect(res.body.data.hotels).toHaveLength(1);
+      // Not status-filtered (REQ-EMP-013 names no lifecycle-status
+      // carve-out): both the ACTIVE and UNDER_REVIEW fixture records are
+      // returned, each carrying its own `status`.
+      expect(res.body.data.employees).toHaveLength(2);
+      expect(res.body.data.employees.map((e: any) => e.user.first_name).sort()).toEqual(['Ravi', 'Wanda']);
+      expect(res.body.data.employees.find((e: any) => e.employee_id === 'E-002').status).toBe('UNDER_REVIEW');
+    });
+
+    it("denies a regional_manager viewing another group's org chart (403)", async () => {
+      testAuth = {
+        userId: 'rm_2',
+        role: 'regional_manager',
+        permissions: ['employees:read'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
+      };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('denies a regional_manager with no scope claim (403)', async () => {
+      testAuth = { userId: 'rm_3', role: 'regional_manager', permissions: ['employees:read'], scope: null };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a hotel manager (not RM/Admin) outright (403)', async () => {
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:read'],
+        scope: { type: 'hotel', hotel_id: 'h1' },
+      };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a worker outright (403)', async () => {
+      testAuth = { userId: 'user_1', role: 'worker', permissions: ['employees:read'], scope: null };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows an admin to view any group\'s org chart regardless of scope (200)', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(200);
+    });
+
+    it('returns 404 for a hotel group that does not exist', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      const res = await request(makeApp()).get('/employees/hotel-groups/missing/org-chart');
+      expect(res.status).toBe(404);
+    });
+
+    it('audit-logs the org chart view', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(auditCalls.some((c) => c.data.action === 'employee.org_chart.view')).toBe(true);
     });
   });
 
