@@ -833,12 +833,15 @@ this pass, not re-derived):**
   PR in this epic.
 - `SIR-JOBD-005` (module ownership, `SYNC-001`) — remains `OPEN`, human-authority, **explicitly
   out of this epic's scope**; no PR here assigns an owner.
-- `SIR-JOBD-006` (the `MIG-GAP-01..12` enumeration) — this is the one register row this epic
-  **closes by construction**: every `MIG-GAP-01..12` id is mapped to exactly one PR above
-  (01→9.2, 02→9.3, 03→9.5, 04→9.7/9.8, 05→9.7, 06→9.9, 07→9.1, 08→9.6, 09→9.10, 10→already-live
-  per the code-grounding note above, 11→9.1's verification, 12→9.4). The register itself is
-  updated (append a resolution note, never delete history) as an exit condition of this
-  implementation-planning pass, per this repo's own Repository Rules.
+- `SIR-JOBD-006` (the `MIG-GAP-01..12` enumeration) — every `MIG-GAP-01..12` id is **mapped** to
+  exactly one PR above (01→9.2, 02→9.3, 03→9.5, 04→9.7/9.8, 05→9.7, 06→9.9, 07→9.1, 08→9.6,
+  09→9.10, 10→already-live per the code-grounding note above, 11→9.1's verification, 12→9.4).
+  **This mapping is planning, not resolution — `SIR-JOBD-006` stays `OPEN — deferred by design`**
+  in `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` and is **not** touched by this pass
+  (per the commissioning human's explicit instruction, 2026-07-29: closing a register row is an
+  implementation-completion act, not a planning act). It is closed only once the mapped PRs are
+  actually merged, as an exit condition of Epic 9's own final implementation/synchronization pass
+  — not this document.
 
 ---
 
