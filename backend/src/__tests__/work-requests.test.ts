@@ -27,15 +27,10 @@ const mockHotel = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
-const mockWorkApplication = {
-  findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
-};
-
 const mockPrisma = {
   hotel: mockHotel,
   workRequest: mockWorkRequest,
   employmentRecord: mockEmploymentRecord,
-  workApplication: mockWorkApplication,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
