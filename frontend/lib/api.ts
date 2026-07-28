@@ -5,6 +5,7 @@ import type {
   Assignment,
   Attendance,
   AuthUser,
+  Availability,
   CheckInInput,
   CreateHotelGroupInput,
   CreateHotelInput,
@@ -439,6 +440,19 @@ export const geoCheckinsApi = {
     apiFetch<GeoCheckin[]>(`/geo/checkins${toQuery({ ...query })}`),
 
   get: (id: string) => apiFetch<GeoCheckin>(`/geo/checkins/${id}`),
+};
+
+/**
+ * Calendar API matching the backend `/calendar/*` routes (SPEC-CALENDAR-001,
+ * ADR-021). Only the availability read-model is consumed here — sick/
+ * vacation self-marking is a worker-mobile-only capability with no web
+ * consumer. RBAC/group scoping (self always allowed; admin all; manager/
+ * regional_manager via the worker's Hotel Group; checker denied) is enforced
+ * entirely backend-side.
+ */
+export const calendarApi = {
+  getAvailability: (workerId: string) =>
+    apiFetch<Availability>(`/calendar/availability${toQuery({ worker_id: workerId })}`),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */
