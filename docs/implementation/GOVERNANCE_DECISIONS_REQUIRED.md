@@ -43,22 +43,22 @@ mobile screens) and assume the decision is made first — the decision itself is
 | GD-05 | Per-hotel "pause new jobs" toggle | **P1** | MVP | 2–3 | **✅ DECIDED 2026-07-27 → Option (a): boolean `Hotel.accepting_jobs`, enforced at work-request creation. Matches the confirmed CRR text and the lowest-risk reversible build; scheduling windows (option b) explicitly not adopted as unrequested scope. See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
 | GD-06 | Worker-facing analytics scope & metric definitions | **P1** | MVP | 3–5 | **✅ DECIDED 2026-07-27 → Option (a): a worker-scoped analytics endpoint (own stats only), resolving the silent 403. Warning-count and sick/vacation-count metrics remain deferred until `GD-04`'s tiers and `GD-18`'s Calendar land — this decision covers only the currently-derivable metrics (own completed jobs, own rating, own attendance-to-date). See [`MILESTONE_MVP_COMPLETION_DECISIONS.md`](MILESTONE_MVP_COMPLETION_DECISIONS.md) for the execution plan.** |
 | GD-07 | Session/token revocation & auth rate-limiting | **P1** | Prod | 3–5 | **✅ DECIDED 2026-07-26 → `ADR-031` (Option (a): request-time permission derivation, `token_generation` revocation counter, Platform Worker session/reset-token sweep, Nginx-edge rate limiting per `TREQ-AUTH-008`). PR-0 through PR-8 (edge rate limiting, schema/claim, derivation+revocation cutover, write-path bumps, claim removal, client forced-re-auth, sweep job, flag retirement + `User.permissions` column drop, documentation/register/knowledge-graph sync) all merged 2026-07-26/27. `ADR-031` status: Accepted (ratified 2026-07-26). Rate-limiting resolved at the Nginx/Cloudflare edge, not in `backend/src`, per the Confirmed `TREQ-AUTH-008`/`TRULE-AUTH-002` requirement `ADR-031` consumes rather than amends. `FIND-004`/`SIR-AUTH-019` (admin-account-modification guard) was already resolved separately via `ADR-030` PR-1 and is not re-resolved here. `SIR-AUTH-017` (password-reset timing side-channel) remains explicitly OPEN — out of `ADR-031`'s scope (§9 Non-goals/§10 OI-1).** |
-| GD-08 | MFA design & data model | **P2** | Prod | 3–5 |
-| GD-09 | GDPR retention-tier assignment & Retention module | **P1** | Prod | 6–10 |
-| GD-10 | Platform concurrency / optimistic-locking pattern | **P2** | Prod | 3–4 |
-| GD-11 | Performance SLO & workload baseline | **P2** | Prod | 0 (unblocks G8) |
-| GD-12 | Platform event-bus / inter-module transport | **P2** | Post | 0 (unblocks builds) |
-| GD-13 | Cross-module state-read boundary ADR | **P3** | Post | 2–4 |
+| GD-08 | MFA design & data model | **P2** | Prod | 3–5 | **✅ DECIDED 2026-07-28 → `ADR-038`** (Option (c): MFA explicitly deferred to a post-MVP hardening milestone — a deliberate scheduling decision, not a silent gap; no mechanism selected). Resolves `OQ-AUTH-01` (MFA portion, `SIR-AUTH-005`) and `OQ-AUTH-02` (`SIR-AUTH-006`). |
+| GD-09 | GDPR retention-tier assignment & Retention module | **P1** | Prod | 6–10 | **✅ DECIDED (mapping half) 2026-07-28 → `ADR-033` (Option (c): every previously-unassigned record type provisionally mapped to one of CRR §25's three existing tiers now — `Notification`/`User`/`Session`/consent records/chatbot metadata → Tier 2; `AuditLog` excluded, retained indefinitely; HR contract docs/work-permit documents → Tier 3 — disclosed as provisional, tax-advisor sign-off, `OD-RETENTION-01`, tracked separately as a non-blocking follow-up, not a gate). Unlocks `OQ-NOTIF-02`, `OQ-AUTH-11`, `OD-HR-11`, `OD-DOC-001`, `OD-CHAT-019`, `OD-CONSENT-003`. `backend-retention`'s own build remains gated on its other open items (`OD-RETENTION-05/10/11/14/15`), none of which are tier-mapping questions.** |
+| GD-10 | Platform concurrency / optimistic-locking pattern | **P2** | Prod | 3–4 | **✅ DECIDED 2026-07-28 → `ADR-036`** (optimistic concurrency adopted as the platform standard; attendance's `checkIn`/`update` race MUST be fixed, not accepted as residual risk; concrete mechanism explicitly deferred to implementation). Resolves `SIR-ATT-013`/`OQ-12`. **Verification found this row's own "Merges findings" line stale on two of three items: `OD-CRM-13`/`SIR-CRM-013` was already resolved 2026-07-25 via `ADR-030`; `OQ-QUAL-04`/`SIR-QUAL-005` was already resolved 2026-07-27 via `GD-04`+PR #237/#238. Neither reopened by `ADR-036`.** |
+| GD-11 | Performance SLO & workload baseline | **P2** | Prod | 0 (unblocks G8) | **✅ DECIDED 2026-07-28 → `ADR-035`** (Option (a): platform-wide baseline — ~100 hotels, ~5,000 workers, ~300 concurrent users; p95 targets 150ms/400ms/800ms by query class; leaderboard pagination now a MUST; cross-module fan-out capped at 15 parallel queries, feeding `ADR-034`'s escalation trigger). Resolves `SIR-JOBD-004`, `SIR-ATT-009`, `SIR-QUAL-007`, `SIR-ANLY-012`, `SIR-EMP-014`, `SIR-GEO-006`, `SIR-DOC-019(a)`. **`SIR-CRM-013` was found mislabeled as a GD-11 item in this row's own "Merges findings" line below — it is actually a `GD-10` (optimistic-locking) item and was already separately resolved via `ADR-030`; not touched by this decision.** |
+| GD-12 | Platform event-bus / inter-module transport | **P2** | Post | 0 (unblocks builds) | **✅ DECIDED 2026-07-28 → `ADR-032` (Option (a): direct in-process calls for synchronous cross-module effects; the existing `ADR-029` Outbox is the sole approved async/durable mechanism; no generic event bus/dispatcher exists or is introduced; any future pub/sub need requires a new ADR). Unblocks the transport-convention half of `OD-HR-04`, `OD-EMP-09`, `OD-CAL-06/08`, `OD-CONSENT-005`, `OD-CRM-12`, `OD-DOC-009`, `OD-CHAT-023` — each spec's own event/interface rows still require per-spec reclassification at that spec's next revision.** |
+| GD-13 | Cross-module state-read boundary ADR | **P3** | Post | 2–4 | **✅ DECIDED 2026-07-28 → `ADR-034` (Option (c): direct read-only cross-module Prisma reads ratified as the platform standard for aggregator/reporting modules, subject to a three-point allow-list; a future read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s SLO baseline). Resolves `OQ-ANALYTICS-11`/`SIR-ANLY-013`/`SIR-GLOB-010`. No code change; all existing `reads-state` edges already satisfy the criterion.** |
 | GD-14 | Geofencing / location model (Geo + attendance) | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): hotel coordinates as columns on `Hotel` (`state-hotel`, `backend-crm`-owned); `backend-geo` owns worker-coordinate columns and the 6-month hard-delete retention sweep (`OD-GEO-001/002`). Fail-closed on missing hotel coordinates or a distance-check service failure (`OD-GEO-003`). Hotel coordinates are admin-only manual entry, same `HotelWriteGate` MASTER-data surface as every other `Hotel` field — no geocoding-from-address service (`OD-GEO-004`). Admin/manager may view only the computed distance/pass-fail result, never a worker's raw stored coordinates (`OD-GEO-005`). Every geofence pass/fail result is audit-logged via the existing `BaseService.logAudit()` mechanism (`OD-GEO-007`). GPS-spoofing countermeasures (`OD-GEO-009`) are explicitly NOT included in this slice — disclosed and accepted as a known MVP-scope risk, not silently omitted. `OD-GEO-006` (performance budgets) remains OPEN, non-blocking (G8 release prerequisite, same precedent as every other frozen spec's performance-budget gaps). `OD-GEO-008` is a citation correction, not a decision item. Unlocks `SPEC-GEO-001` G2 freeze and geofenced attendance Start/Close gating.**|
 | GD-15 | HR & Employee-Management module build scope | **P2** | Post | 10–14 |
 | GD-16 | Documents module — RBAC & storage design | **P2** | Post | 6–9 | **✅ DECIDED 2026-07-27 → Option (a): self-upload + manager-upload only (the two confirmed actors), hotel-scoped read via existing `checkHotelAccess()`, presigned-URL retrieval, SSE-at-rest, malware-scan hook. Broader RBAC taxonomy (option b) explicitly not adopted as unrequested scope (Constitution §6). Unlocks `SPEC-DOCUMENTS-001` G2 freeze, HR's contract-scan upload, and onboarding document collection.** |
-| GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 |
+| GD-17 | Consent module — lifecycle & fail-safety | **P3** | Post | 5–7 | **✅ DECIDED 2026-07-28 → `ADR-037`** (`OD-CONSENT-002` Option (b): chatbot engagement requires consent, decline routes to manual onboarding path, does not block; `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the same pass). Resolves `OD-CONSENT-001/002/004/006/007/009/011`. Directly informs Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent portion; transcript-persistence portion remains open). |
 | GD-18 | Calendar module scope (M2) | **P3** | Post | 4–6 |
 | GD-19 | Chatbot module scope & LLM safety | **P3** | Post | 8–12 |
 | GD-20 | Job-Dispatch two-tier calendar+broadcast pivot | **P3** | Post | 12+ |
 | GD-21 | Attendance operational automation | **P3** | Post | 2–4 |
 | GD-22 | Hotel-Group billing model | **P3** | Post | 3–5 |
-| GD-23 | Platform ADR ratification (Constitution §20) | **P2** | Prod | 0 (governance) |
+| GD-23 | Platform ADR ratification (Constitution §20) | **P2** | Prod | 0 (governance) | **✅ DECIDED 2026-07-28 → Option (a): ratified as-is.** `ADR-019`/`ADR-020` flipped Proposed → Accepted. Verification found ADR-001..009 already ratified 2026-07-15 (this row's own "current repository state" line was stale on that point) — `SIR-GLOB-003`'s last remaining open element was already closed and is now corrected in the register. |
 
 ---
 
@@ -283,114 +283,201 @@ plan. Detail below is retained as the decision record.
 
 ## GD-08 — MFA design & data model
 
-- **Why a decision is required:** MFA (`TREQ-AUTH-006`) is a CONFIRMED requirement, but *where MFA state
-  persists* (secret / enrollment / recovery-code storage) appears nowhere in the model lists — the data model
-  must be decided before planning.
-- **Current repository state:** No MFA-related model, field, or endpoint anywhere in the repository.
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** MFA (`TREQ-AUTH-006`) is a CONFIRMED requirement, but *where MFA state
+  persists* (secret / enrollment / recovery-code storage) appeared nowhere in the model lists — the data
+  model needed to be decided before planning, or the deferral itself needed to be made explicit.
+- **Current repository state at decision time:** No MFA-related model, field, or endpoint anywhere in the
+  repository.
+- **Decided — resolves, per Option (c):** MFA is explicitly deferred to a post-MVP hardening milestone —
+  it is not in near-term scope. This is a deliberate scheduling decision, not a silent gap: `TREQ-AUTH-006`
+  remains a confirmed requirement, just not scheduled for the current build horizon. No data model or
+  mechanism (TOTP vs. OTP) is selected by this decision — that choice is intentionally left open until MFA
+  is re-prioritized, at which point it should be revisited fresh rather than defaulted to whichever option
+  this decision's own prior analysis leaned toward. Full record: `ADR-038`.
+- **Explicitly NOT decided by this record:** the MFA mechanism (TOTP vs. email/SMS OTP vs. any other
+  approach) — deferred until MFA re-enters scope.
 - **Merges findings:** `OQ-AUTH-01` (MFA portion — `SIR-AUTH-005`), `OQ-AUTH-02` (MFA data model —
-  `SIR-AUTH-006`).
-- **Options:** (a) TOTP (authenticator app) with a `MfaEnrollment` model + hashed recovery codes; (b)
-  email/SMS OTP (depends on GD-01 delivery); (c) defer MFA to a post-MVP hardening milestone.
-- **Recommended:** **(a) TOTP** if MFA is in the near-term scope — no delivery dependency, standard model.
-  If not near-term, **explicitly defer (c)** rather than leave it as a silent gap.
-- **Artifacts blocked:** `TREQ-AUTH-006` planning.
-- **Impact:** backend auth · 1 migration (MFA tables) · frontend enrollment/challenge UI · mobile
-  enrollment/challenge. **~3–5 PRs.**
-- **Priority:** **P2.** **Owner:** Product Owner.
+  `SIR-AUTH-006`) — both resolved as deferred.
+- **Artifacts unblocked:** none functionally (MFA remains unbuilt); the requirement's status is now
+  disclosed and traceable rather than an ambiguous open item with no stated intent.
+- **Impact:** **0 PRs** now (deferred); the original ~3–5 PR estimate applies whenever MFA is re-prioritized
+  and a mechanism is chosen.
+- **Priority:** **P2.** Decided by the commissioning human 2026-07-28. **Owner:** Product Owner. Full
+  decision record: `ADR-038`.
 
 ## GD-09 — GDPR retention-tier assignment & Retention module
 
-- **Why a decision is required:** CRR §25 defines three retention tiers, but **most record types are not yet
+**✅ DECIDED (mapping half) 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** CRR §25 defines three retention tiers, but **most record types were not yet
   assigned to a tier**, the automatic-deletion Retention module is unbuilt, and the tier mapping carries an
   explicit `[ACTION]` for the client's tax advisor to sign off before lock-in. Retention gates G8 Release
   Readiness across many modules.
-- **Current repository state:** Tiers defined (6mo coords / 5yr general / 6yr payroll-adjacent) in CRR §25,
-  but `Notification`, `User`/`Session`/`AuditLog`, HR contract docs, documents, chatbot records, consent
-  records, and geo coordinates are unassigned. No Retention module code; no `backend-retention` id registered.
-- **Merges findings:** `SIR-RETENTION-002` (tax-advisor sign-off), `OD-RETENTION-05/10/11/14/15`,
-  `SIR-RETENTION-006` and the per-module tier rows it aggregates (`OQ-NOTIF-02`, `OQ-AUTH-11`, `OD-HR-11`,
-  `OD-DOC-001`, `OD-CHAT-019`, `OD-CONSENT-003`, `OD-GEO-002`, `OPQ-1`).
-- **Options:** (a) Assign every record type to one of the three existing tiers + build a single
-  category-driven sweep job; (b) defer non-payroll tiers post-MVP.
-- **Recommended:** **(a), after tax-advisor sign-off.** The tiers already exist; the work is mapping +
-  one sweep engine. This is a compliance prerequisite, not new architecture. The tax-advisor `[ACTION]` is a
-  hard external dependency — surface it now.
-- **Artifacts blocked:** G8 Release Readiness for notifications, auth, HR, documents, chatbot, consent, geo;
-  the Retention module build.
+- **Current repository state at decision time:** Tiers defined (6mo coords / 5yr general / 6yr payroll-adjacent) in CRR §25,
+  but `Notification`, `User`/`Session`/`AuditLog`, HR contract docs, documents, chatbot records, and consent
+  records were unassigned. Geo coordinates (`OD-GEO-002`) had already been separately resolved by `GD-14`
+  (2026-07-27). No Retention module code; no `backend-retention` id registered.
+- **Decided — resolves the mapping question only, per Option (c):** every previously-unassigned record type is
+  provisionally assigned to one of CRR §25's three existing tiers now, disclosed as provisional pending
+  tax-advisor sign-off (not asserted as legally final): `Notification` → Tier 2; `User`/`Session` → Tier 2;
+  `AuditLog` → excluded from all three tiers, retained indefinitely (CRR §30 accountability record); HR
+  contract document → Tier 3; uploaded documents → Tier 2 (general) / Tier 3 (work-permit); chatbot
+  conversation metadata/spend counters → Tier 2 (transcripts contingent on `OD-CHAT-008`); consent records →
+  Tier 2. Full record: `ADR-033`.
+- **Explicitly NOT decided by this record:** the tax-advisor sign-off itself (`OD-RETENTION-01`/
+  `SIR-RETENTION-002`) — reclassified from "blocks the mapping decision" to "blocks legal certification of an
+  already-decided provisional mapping, non-blocking for engineering," but still open and still tracked to
+  closure. Also not decided: `backend-retention`'s own remaining open items (`OD-RETENTION-05/10/11/14/15` —
+  RBAC scope, cross-module delete authorization, sweep query design, owner assignment, fan-out workload), none
+  of which are tier-mapping questions.
+- **Merges findings:** `SIR-RETENTION-002` (tax-advisor sign-off, reclassified non-blocking, still open),
+  `SIR-RETENTION-006` and the per-module tier rows it aggregated (`OQ-NOTIF-02`, `OQ-AUTH-11`, `OD-HR-11`,
+  `OD-DOC-001`, `OD-CHAT-019`, `OD-CONSENT-003` — each now individually RESOLVED provisional at its own
+  module; `OD-GEO-002` already resolved separately by `GD-14`, not by this decision).
+- **Artifacts unblocked:** `SPEC-NOTIF-001`, `SPEC-AUTH-001` (amended, both FROZEN), `SPEC-HR-001`,
+  `SPEC-DOCUMENTS-001` (amended, FROZEN), `SPEC-CHATBOT-001`, `SPEC-CONSENT-001` (each module's own tier row
+  resolved provisional). `backend-retention`'s own build remains gated on its other open items, unaffected by
+  this decision.
 - **Impact:** backend new retention module + per-module `retention_tier`/`delete_after` fields · several
   migrations · frontend none · mobile none. **~6–10 PRs.**
-- **Priority:** **P1 (production/compliance blocker; long external lead time).** **Owner:** Product Owner →
-  client's tax advisor.
+- **Priority:** **P1 (production/compliance blocker).** Decided by the commissioning human 2026-07-28 rather
+  than gated indefinitely on the tax advisor's external, uncontrollable timeline. **Owner:** Product Owner →
+  client's tax advisor (legal certification only, no longer a mapping blocker). Full decision record: `ADR-033`.
 
 ## GD-10 — Platform concurrency / optimistic-locking pattern
 
-- **Why a decision is required:** Multiple modules have unguarded read-then-write races with no agreed
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** Multiple modules had unguarded read-then-write races with no agreed
   platform pattern; picking one (and where it applies) is an architecture decision.
-- **Current repository state:** `WorkRequest` has a `version` column; `Hotel.updateHotel`, attendance
-  `checkIn`/`update`, and the quality aggregate do not — real lost-update / double-submit windows exist.
-- **Merges findings:** `OQ-ATT-12` (attendance concurrency — `SIR-ATT-013`), `OD-CRM-13` (hotel lost-update —
-  `SIR-CRM-013`), `OQ-QUAL-04` (aggregate divergence — overlaps GD-04).
-- **Options:** (a) Standardize an optimistic-lock `version` column + guarded update across mutable entities;
-  (b) transactional `SELECT … FOR UPDATE` per hot path.
-- **Recommended:** **(a).** Mirrors the pattern `WorkRequest` already uses; consistent and reversible.
-- **Artifacts blocked:** attendance/CRM/quality write-path robustness (no feature blocked, correctness only).
-- **Impact:** backend 3–4 modules · 1 migration (add `version` columns) · frontend conflict-retry handling ·
-  mobile conflict-retry. **~3–4 PRs.**
-- **Priority:** **P2.** **Owner:** Architect (with Product Owner sign-off).
+- **Current repository state at decision time:** `WorkRequest` has a `version` column. `Hotel.updateHotel`'s
+  lost-update risk was already independently resolved 2026-07-25 via `ADR-030` (`REQ-CRM-010`'s own
+  re-evaluation trigger fired; no schema change needed — Admin-only, low-churn writer population confirmed
+  unchanged). The quality rating aggregate's divergence risk was already independently resolved 2026-07-27
+  via `GD-04` + PR #237/#238 (DB trigger dropped; app-level `refreshWorkerOverallRating` is the sole writer).
+  Only attendance's `checkIn`/`update` double-submit window remained a genuinely open race.
+- **Decided — resolves:** optimistic concurrency is adopted as the **platform-wide standard** for mutable-
+  entity read-then-write races, ratifying the pattern `WorkRequest.version` already establishes. Attendance's
+  `checkIn`/`update` race (`OQ-ATT-12`/`SIR-ATT-013`) MUST be fixed, not accepted as residual risk — this is a
+  routine occurrence for a field-worker mobile app, not a rare edge case. The **concrete mechanism** (a
+  `version` column mirroring `WorkRequest`, a transactional row-level lock, or another optimistic-concurrency-
+  consistent approach) is **explicitly deferred to implementation** — the implementing engineer verifies which
+  mechanism best fits attendance's own write shape and records that choice at implementation time, rather than
+  it being mandated at the governance level. Full record: `ADR-036`.
+- **Explicitly NOT decided by this record:** the specific mechanism for the attendance fix (deferred to
+  implementation, per above).
+- **Merges findings — verified, not assumed:** `OQ-ATT-12`/`SIR-ATT-013` (attendance concurrency) — the one
+  genuinely open item, resolved by this decision. **`OD-CRM-13`/`SIR-CRM-013` (hotel lost-update) and
+  `OQ-QUAL-04`/`SIR-QUAL-005` (aggregate divergence) were found, on verification, to already be resolved by
+  other decisions (`ADR-030` and `GD-04`+PR #237/#238 respectively) before this decision was made — this
+  row's own "Merges findings" line was stale on both. Neither is reopened or re-decided by `ADR-036`.**
+- **Artifacts unblocked:** attendance write-path robustness now has a mandated fix + platform standard;
+  no feature was blocked, this is a correctness commitment.
+- **Impact:** the attendance fix requires 1 migration (mechanism-dependent) + mobile conflict-retry handling,
+  scoped at implementation time. **~1–2 PRs** (narrower than the original ~3–4 estimate, since CRM/quality
+  needed no further work).
+- **Priority:** **P2.** Decided by the commissioning human 2026-07-28. **Owner:** Architect (with Product
+  Owner sign-off) for the platform standard; implementing engineer for the attendance mechanism choice.
+  Full decision record: `ADR-036`.
 
 ## GD-11 — Performance SLO & workload baseline
 
-- **Why a decision is required:** No module defines a latency/throughput/cardinality SLO; several unpaginated
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** No module defines a latency/throughput/cardinality SLO; several unpaginated
   hot paths exist. G4 performance reviews recorded these as required-before-implementation, and setting an
-  SLO needs confirmed workload assumptions the human must supply.
-- **Current repository state:** Leaderboard/stats/hotel-summary/dispatch/attendance/HR/emp/geo all lack SLOs;
-  the leaderboard is an unpaginated `take 50`; dashboard stats fan out to 8–11 parallel queries.
+  SLO needed confirmed workload assumptions the human had to supply.
+- **Current repository state at decision time:** Leaderboard/stats/hotel-summary/dispatch/attendance/HR/emp/geo
+  all lacked SLOs; the leaderboard is an unpaginated `take 50`; dashboard stats fan out to 8–11 parallel queries.
+- **Decided — resolves, per Option (a):** a platform-wide workload baseline (~100 hotels, ~5,000 workers,
+  ~300 concurrent users at peak) and p95 latency targets by query class (simple single-entity reads ≤150ms;
+  scoped list/filter queries ≤400ms; cross-module aggregation ≤800ms). Pagination is now a MUST for any
+  unbounded list endpoint (leaderboard, audit log, notification history — default page size 25, max 100).
+  Cross-module aggregation fan-out is capped at 15 parallel queries per request, directly feeding `ADR-034`'s
+  (`GD-13`) named escalation trigger for when a read-model interface becomes the correct call instead of a
+  direct cross-module read. Full record: `ADR-035`.
+- **Explicitly NOT decided by this record:** per-endpoint conformance to these targets (whether a specific
+  query actually meets its p95) is an implementation/G8 verification activity, not settled here. The baseline
+  is disclosed as provisional, revisable once real production traffic data exists.
 - **Merges findings:** `SIR-JOBD-004`, `SIR-ATT-009`, `SIR-QUAL-007`, `SIR-ANLY-012`, `SIR-EMP-014`,
-  `SIR-GEO-006`, `SIR-DOC-019(a)`, `SIR-CRM-013` (perf facet).
-- **Options:** (a) One platform-wide SLO/workload baseline document (roster size, concurrent volumes, p95
-  targets); (b) per-module SLOs at each module's implementation time.
-- **Recommended:** **(a).** A single baseline avoids re-litigating workload per module and unblocks all the
-  G4 perf rows at once. Note: many are also entangled with owner assignment (excluded), which the human must
-  resolve separately.
-- **Artifacts blocked:** G8 for every module carrying a perf row; pagination fixes.
+  `SIR-GEO-006`, `SIR-DOC-019(a)` — all resolved at the baseline level. **`SIR-CRM-013` was found, on
+  verification, to be a `GD-10` (optimistic-locking/concurrency) item mislabeled in this row — it concerns
+  `Hotel`'s missing version column, not an SLO/workload question, and was already separately resolved via
+  `ADR-030`. Not touched by this decision; flagged here rather than silently resolved under the wrong topic.**
+- **Artifacts unblocked:** G8 for every module carrying a perf row now has a baseline to verify against;
+  the leaderboard pagination fix is now a named, required follow-on task, not merely a disclosed risk.
 - **Impact:** backend pagination/index PRs follow the SLO but the decision itself is 0 code. **~0 PRs to
   decide; ~3–5 follow-on.**
-- **Priority:** **P2.** **Owner:** Product Owner + Architect.
+- **Priority:** **P2.** Decided by the commissioning human 2026-07-28. **Owner:** Product Owner + Architect.
+  Full decision record: `ADR-035`.
 
 ## GD-12 — Platform event-bus / inter-module transport
 
-- **Why a decision is required:** No event bus exists; many modules' Interfaces/Events sections are
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** No event bus exists; many modules' Interfaces/Events sections are
   "candidate-level only" because the transport (in-process call vs. real event) is undecided platform-wide.
   This blocks freezing and building the event-driven modules.
-- **Current repository state:** Only an in-process `notification-service` singleton pattern exists. HR,
-  Employee-Management, Calendar, Consent, CRM, Documents all declare events with no transport. No repository
-  convention distinguishes in-process calls from HTTP contracts.
+- **Current repository state at decision time:** Only an in-process `notification-service` singleton pattern
+  exists (backed by the `ADR-029` Outbox). HR, Employee-Management, Calendar, Consent, CRM, Documents, Chatbot
+  all declare events with no ratified transport. No repository convention distinguishes in-process calls from
+  Outbox-backed delivery.
+- **Decided — resolves `OD-HR-04`, `OD-EMP-09`, `OD-CAL-06/08`, `OD-CONSENT-005`, `OD-CRM-12`, `OD-DOC-009`,
+  `OD-CHAT-023` at the transport-convention level:** **Option (a)**, with an explicit clarification from the
+  commissioning human folded into the ratifying record — see `ADR-032`:
+  - **Direct, in-process service-to-service calls** are the platform standard for synchronous cross-module
+    operations (an effect that must complete atomically with, or immediately after, its trigger). No new
+    dispatcher/wrapper abstraction is introduced — a producer calls the consumer's service class directly,
+    exactly as `backend-calendar` already does for its same-day auto-cancel.
+  - **The existing `ADR-029` Outbox is the sole approved mechanism for asynchronous, durable work** — anything
+    that must survive a crash, may be retried, or fans out to an external delivery channel (push/email/SMS/
+    webhook).
+  - **No generic event bus, message broker, or pub/sub dispatcher exists in this architecture, and none is
+    introduced by this decision.** Every cross-module effect the platform needs today falls into one of the
+    two categories above.
+  - **Explicitly NOT decided by this record:** any future need for pub/sub, fan-out-to-unknown-consumers, or
+    distributed messaging. Such a need requires **its own new ADR** — it must not be retrofitted onto either
+    mechanism this decision ratifies.
 - **Merges findings:** `OD-HR-04` (`SIR-HR-012`), `OD-EMP-09` (`SIR-EMP-006`), `OD-CAL-06/08`,
   `OD-CONSENT-005`, `OD-CRM-12`, `OD-DOC-009`, `OD-CHAT-023`/`SIR-GLOB-016` (in-process-vs-HTTP naming).
-- **Options:** (a) Formalize the in-process singleton pattern as the platform standard (no new infra); (b)
-  introduce a real message bus (Redis/SQS/outbox events).
-- **Recommended:** **(a) for the modular monolith**, reusing the outbox from GD-01 for anything that needs
-  durability. Introducing a bus (b) is a large infra commitment the CRR does not require.
-- **Artifacts blocked:** HR, Employee-Management, Calendar, Consent event contracts (freeze + build).
-- **Impact:** decision is 0 code; unblocks the module builds below. **~0 PRs to decide.**
-- **Priority:** **P2 (gates several builds).** **Owner:** Architect (with Product Owner sign-off).
+- **Artifacts unblocked:** HR, Employee-Management, Calendar, Consent, CRM, Documents, Chatbot event/interface
+  contracts (freeze + build) — each spec's own `EVT-*`/`IF-*` rows still require per-spec reclassification into
+  "direct call" or "Outbox-backed" at that spec's own next revision; this decision removes the platform-level
+  blocker, it does not itself rewrite every row (tracked per-module in `GOVERNANCE_REGISTER.md`).
+- **Impact:** decision was 0 code — both mechanisms it ratifies (`ADR-029`'s Outbox; `backend-calendar`'s
+  direct call) were already shipped. **0 PRs to decide, as estimated.**
+- **Priority:** **P2 (gated several builds).** **Owner:** Architect (with Product Owner sign-off) — ratified
+  by the commissioning human 2026-07-28. Full decision record: `ADR-032`.
 
 ## GD-13 — Cross-module state-read boundary ADR
 
-- **Why a decision is required:** `backend-analytics` (and structurally, other aggregators) read directly
-  into 10+ Prisma state domains owned by other modules with no ADR governing this platform boundary
-  (Constitution §7). A platform-wide decision is needed, not a per-module patch.
-- **Current repository state:** analytics owns no state; ~100% of its contract is direct cross-module Prisma
-  reads across six domains owned by five modules.
-- **Merges findings:** `OQ-ANALYTICS-11` (`SIR-ANLY-013` / promoted `SIR-GLOB-010`).
-- **Options:** (a) Ratify direct read-only cross-module reads as allowed for aggregators (documented
-  boundary); (b) require read-model/view interfaces owned by each source module.
-- **Recommended:** **(a) with a documented allow-list** for the modular monolith; (b) is cleaner but a large
-  refactor with no functional payoff pre-MVP.
-- **Artifacts blocked:** clean analytics boundary; future aggregator modules.
-- **Impact:** backend analytics (optional read-model layer if (b)) · 0 migrations. **~2–4 PRs if (b), ~0 if
-  (a).**
-- **Priority:** **P3.** **Owner:** Architect (Lead Architect, platform-wide).
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** `backend-analytics` (and structurally, `backend-quality`'s own readers)
+  read directly into Prisma state domains owned by other modules with no ADR governing this platform
+  boundary (Constitution §7). A platform-wide decision was needed, not a per-module patch.
+- **Current repository state at decision time:** analytics owns no state; ~100% of its contract is direct
+  cross-module Prisma reads across seven domains owned by five modules. `backend-quality` discloses the
+  structurally identical reverse pattern (read directly by `work-applications`/`analytics`).
+- **Decided — resolves, per Option (c):** direct read-only cross-module Prisma reads are ratified as the
+  platform standard for aggregator/reporting modules, subject to a three-point allow-list: (i) read-only,
+  no write-back; (ii) a plain query, not a re-implementation or bypass of the owning module's own
+  business-rule logic; (iii) display/reporting only, never another module's write-path decision source.
+  All of analytics' existing seven read edges satisfy this — no code change required. Full record: `ADR-034`.
+- **Explicitly NOT decided by this record:** a dedicated read-model/interface layer (Option (b)) is not
+  built now — it remains the correct future escalation only if a named trigger is met (frequent
+  schema-shape breakage, or a confirmed performance bottleneck once `GD-11`'s SLO baseline exists to
+  measure against). Neither condition is met today; this is a forward-looking note, not new scope.
+- **Merges findings:** `OQ-ANALYTICS-11` (`SIR-ANLY-013` / promoted `SIR-GLOB-010`) — resolved.
+- **Artifacts unblocked:** analytics' cross-module read boundary is now ratified, not merely
+  non-blocking-by-review; any future aggregator-shaped module (e.g. Compliance's subject-rights
+  orchestration, if it exhibits the identical pattern) has a named precedent to check against rather than
+  re-litigating the question.
+- **Impact:** no code change. **0 PRs.**
+- **Priority:** **P3.** Decided by the commissioning human 2026-07-28. **Owner:** Architect (Lead Architect,
+  platform-wide). Full decision record: `ADR-034`.
 
 ## GD-14 — Geofencing / location model (Geo + attendance geofence)
 
@@ -492,22 +579,35 @@ summary row above. Detail below is retained as the decision record.
 
 ## GD-17 — Consent module — lifecycle & fail-safety
 
-- **Why a decision is required:** GDPR consent capture has unresolved lifecycle semantics and, critically, a
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** GDPR consent capture had unresolved lifecycle semantics and, critically, a
   **fail-open vs. fail-closed** decision when `backend-consent` is unavailable to a caller — an architecture
   posture that determines whether dependent onboarding/chatbot flows proceed or block.
-- **Current repository state:** `SPEC-CONSENT-001` authored (v0.1.1); no module code. Highest-impact open
-  item: whether chatbot engagement requires consent and whether a decline blocks onboarding.
-- **Merges findings:** `OD-CONSENT-001` (withdrawal/renewal trigger), `OD-CONSENT-002` (chatbot-consent gates
-  onboarding — highest-impact), `OD-CONSENT-004` (stale-notice-version), `OD-CONSENT-006` (fail-open/closed),
-  `OD-CONSENT-007/009` (state persistence, language fallback), `OD-CONSENT-011` (audit RBAC).
-- **Options:** (a) Fail-closed (block consuming flow if consent status unknown) + reject stale-notice
-  submissions; (b) fail-open with async reconciliation.
-- **Recommended:** **(a) fail-closed** for a GDPR-integrity surface — the safer default; but this is
-  explicitly the human's call since it changes user-visible flow behavior.
-- **Artifacts blocked:** onboarding consent flow; chatbot consent gate; Consent module build.
+- **Current repository state at decision time:** `SPEC-CONSENT-001` authored (v0.1.1); no module code.
+  Highest-impact open item: whether chatbot engagement requires consent and whether a decline blocks
+  onboarding.
+- **Decided — resolves:** `OD-CONSENT-002` (chatbot consent gate) per **Option (b)**: chatbot engagement
+  requires explicit consent; a decline does **not** block onboarding — it routes the worker to a
+  manual/non-chatbot onboarding path instead. `OD-CONSENT-006` (fail-open/fail-closed) resolved
+  **fail-closed**: dependent flows block, not silently proceed, when this module is unavailable — the safer
+  default for a GDPR-integrity surface. Five smaller items resolved in the same pass: `OD-CONSENT-001`
+  ("Renewed" persisted for the general verb only), `OD-CONSENT-004` (stale-notice submissions rejected,
+  re-fetch required), `OD-CONSENT-007` ("Lapsed"/"Requested" computed, not persisted), `OD-CONSENT-009`
+  (platform-default-language fallback), `OD-CONSENT-011` (no new RBAC permission — rides Compliance's
+  existing governance-read path, mirroring `ADR-016`). Full record: `ADR-037`.
+- **Explicitly NOT decided by this record:** the specific default fallback language for `OD-CONSENT-009`
+  (implementation/configuration detail); `backend-consent`'s own build timeline/prioritization.
+- **Merges findings:** `OD-CONSENT-001`, `OD-CONSENT-002` (highest-impact), `OD-CONSENT-004`,
+  `OD-CONSENT-006`, `OD-CONSENT-007/009`, `OD-CONSENT-011` — all resolved.
+- **Artifacts unblocked:** Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008` (consent-requirement portion
+  only — transcript-persistence remains its own separate open question) may now be updated to reflect the
+  concrete resolution instead of deferring to an undecided Consent-module question; `backend-consent`'s own
+  build now has a scoped, unambiguous product/architecture basis.
 - **Impact:** backend new consent module · 1–2 migrations · frontend consent UI · mobile consent capture.
-  **~5–7 PRs.**
-- **Priority:** **P3 (post-MVP; gates onboarding/chatbot).** **Owner:** Product Owner + Architect.
+  **~5–7 PRs** (unchanged — this decision scopes the build, it does not itself implement it).
+- **Priority:** **P3 (post-MVP; gates onboarding/chatbot).** Decided by the commissioning human 2026-07-28.
+  **Owner:** Product Owner + Architect. Full decision record: `ADR-037`.
 
 ## GD-18 — Calendar module scope (M2)
 
@@ -601,19 +701,25 @@ summary row above. Detail below is retained as the decision record.
 
 ## GD-23 — Platform ADR ratification (Constitution §20)
 
-- **Why a decision is required:** Several platform ADRs and constitutional additions are implemented but still
-  `Proposed`; formal ratification is reserved human authority (Constitution §20). No code is unblocked, but
-  the governance record is incomplete until ratified.
-- **Current repository state:** ADR-001..009 ratification is the last open element of `SIR-GLOB-003`;
-  ADR-019/020 and the 1.2.0 Context-Artifacts additions are `Proposed` pending ratification.
-- **Merges findings:** `SIR-GLOB-003` (ratification element), `SIR-GLOB-008`-class residue, VERSION.yaml
-  ADR-019/020 notes.
-- **Options:** (a) Ratify as-is (they are backward-compatible and already in force); (b) review-then-ratify.
-- **Recommended:** **(a) ratify as-is** — they are already the operating reality; ratification just closes
-  the governance loop.
-- **Artifacts blocked:** none functionally; closes the `Proposed` governance debt.
-- **Impact:** **0 PRs** (governance record only).
-- **Priority:** **P2 (cheap; clears governance debt before release).** **Owner:** Product Owner
+**✅ DECIDED 2026-07-28, by the commissioning human.**
+
+- **Why a decision was required:** Several platform ADRs and constitutional additions were implemented but
+  still `Proposed`; formal ratification is reserved human authority (Constitution §20). No code was unblocked,
+  but the governance record was incomplete until ratified.
+- **Current repository state at decision time:** ADR-001..009 were verified already ratified Accepted on
+  2026-07-15 (via the G2 Approval Workflow) — this row's own prior text was stale in describing that as
+  still-pending. Only `ADR-019` (Repository Integrity Validation Gate) and `ADR-020` (Context Management
+  Layer) remained genuinely `Proposed`, both already backward-compatible and already the operating reality.
+- **Decided — resolves, per Option (a):** `ADR-019` and `ADR-020` are ratified as-is, Proposed → Accepted.
+  `SIR-GLOB-003` (Specification Issues Register) — whose last remaining open element was exactly the
+  ADR-001..009 ratification status — is corrected to RESOLVED, since that ratification was already
+  confirmed complete as of 2026-07-15, prior to this decision.
+- **Merges findings:** `SIR-GLOB-003` (ratification element, now RESOLVED), `VERSION.yaml` ADR-019/020 notes
+  (updated to reflect Accepted status across all three locations: 1.5.0 entry, 1.4.0 entry, and the
+  1.5.0-supersedes-1.4.0 summary comment).
+- **Artifacts unblocked:** none functionally (no code was blocked); closes the `Proposed` governance debt.
+- **Impact:** **0 PRs** (governance record only), as originally estimated.
+- **Priority:** **P2.** Decided by the commissioning human 2026-07-28. **Owner:** Product Owner
   (Constitution §20).
 
 ---
@@ -691,6 +797,71 @@ tax advisor), GD-10, GD-11, GD-13, GD-22, GD-23.
 > The "Total remaining unique governance decisions" count is unchanged at 23 in the historical
 > per-item sections below (each `GD-*` section is append-only, per governance protocol), but with
 > `GD-01` implemented, **22 remain open**.
+
+> **Sync note (2026-07-28):** `GD-12` is no longer an open decision to make — it was decided
+> 2026-07-28 (`ADR-032`, Option (a): direct in-process calls for synchronous cross-module effects;
+> the existing `ADR-029` Outbox is the sole approved async/durable mechanism; no generic event bus
+> exists or is introduced; a future pub/sub need requires its own new ADR). It is removed from the
+> "highest-leverage" list below. Per the Governance Register (`docs/implementation/GOVERNANCE_REGISTER.md`,
+> assembled 2026-07-28), `GD-02, 03, 04, 05, 06, 07, 14, 16` were also independently confirmed decided
+> and built in that same session's audit — this document's historical per-`GD-*` sections and
+> ROI/executive-summary lists below are append-only and have not been rewritten to reflect that
+> broader finding beyond this note; `GOVERNANCE_REGISTER.md` Part 2 is the current authoritative count
+> of genuinely-still-open decisions (9, not 22) until each is resolved via the Governance Resolution
+> workflow and recorded here in its own right.
+
+> **Sync note (2026-07-28, cont'd):** `GD-09`'s mapping half is also no longer an open decision to
+> make — decided 2026-07-28 (`ADR-033`, Option (c): every previously-unassigned record type
+> provisionally mapped to one of CRR §25's three tiers now; tax-advisor sign-off, `OD-RETENTION-01`,
+> tracked separately as a non-blocking follow-up rather than a gate). Per the Governance Resolution
+> workflow's per-decision approval sequence (`GD-12` was Decision #1, `GD-09` is Decision #2), this is
+> recorded here as its own right per the same protocol as the note above. Genuinely-still-open count
+> in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 2):** `GD-13` is also no longer an open decision to make — decided
+> 2026-07-28 (`ADR-034`, Option (c): direct read-only cross-module Prisma reads ratified as the
+> platform standard for aggregator/reporting modules, subject to a three-point allow-list; a future
+> read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s still-open SLO
+> baseline). Decision #3 in the Governance Resolution workflow's sequence. Genuinely-still-open count
+> in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 3):** `GD-11` is also no longer an open decision to make — decided
+> 2026-07-28 (`ADR-035`, Option (a): platform-wide workload baseline, ~100 hotels/~5,000 workers/~300
+> concurrent users; p95 targets 150/400/800ms by query class; leaderboard pagination now a MUST;
+> cross-module fan-out capped at 15 parallel queries). Decision #4 in the Governance Resolution
+> workflow's sequence. `SIR-CRM-013` was found mislabeled under this GD's "Merges findings" — it is
+> actually a `GD-10` item, already resolved via `ADR-030`, and was left untouched by `ADR-035`.
+> Genuinely-still-open count in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 4):** `GD-10` is also no longer an open decision to make — decided
+> 2026-07-28 (`ADR-036`: optimistic concurrency adopted as the platform standard; attendance's
+> `checkIn`/`update` race MUST be fixed, mechanism deferred to implementation). Decision #5 in the
+> Governance Resolution workflow's sequence. Verification found two of this GD's own three "merges
+> findings" items already resolved by other decisions before `ADR-036` — `OD-CRM-13`/`SIR-CRM-013`
+> (`ADR-030`, 2026-07-25) and `OQ-QUAL-04`/`SIR-QUAL-005` (`GD-04`+PR #237/#238, 2026-07-27) — neither
+> reopened. Genuinely-still-open count in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 5):** `GD-17` is also no longer an open decision to make — decided
+> 2026-07-28 (`ADR-037`: `OD-CONSENT-002` resolved via Option (b) — chatbot engagement requires
+> consent, decline routes to a manual/non-chatbot onboarding path, does not block onboarding;
+> `OD-CONSENT-006` resolved fail-closed; five smaller lifecycle/RBAC items also resolved in the
+> same pass). Decision #6 in the Governance Resolution workflow's sequence. Onboarding's `OPQ-3`
+> and Chatbot's `OD-CHAT-008` (consent portion only) were updated to reflect the concrete
+> resolution. Genuinely-still-open count in `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 6):** `GD-23` is also no longer an open decision to make — decided
+> 2026-07-28, Option (a): `ADR-019`/`ADR-020` ratified Proposed → Accepted; `VERSION.yaml`'s three
+> stale ADR-019/020 notes corrected accordingly. Verification found ADR-001..009 were already
+> ratified 2026-07-15 (this GD's own "current repository state" line was stale) — `SIR-GLOB-003`
+> is now marked RESOLVED in the register, closing its last open element. Decision #7 in the
+> Governance Resolution workflow's sequence. Genuinely-still-open count in `GOVERNANCE_REGISTER.md`
+> Part 2 decrements accordingly.
+
+> **Sync note (2026-07-28, cont'd 7):** `GD-08` is also no longer an open decision to make — decided
+> 2026-07-28 (`ADR-038`, Option (c): MFA explicitly deferred to a post-MVP hardening milestone, a
+> deliberate scheduling decision, not a silent gap; no data model or mechanism selected). Decision
+> #8 in the Governance Resolution workflow's sequence. Genuinely-still-open count in
+> `GOVERNANCE_REGISTER.md` Part 2 decrements accordingly.
 
 - **Highest-leverage decisions (make these first):**
   1. **GD-02 Manager write-permission authority** — smallest, highest ROI-per-effort remaining item;

@@ -45,10 +45,78 @@ here as findings for a future owner call, not as architecture fact:
 
 Neither claim should be treated as settled until a decision is made the same way `GD-16` was.
 
-Also pending, independent of the above: `GD-09` (GDPR retention tiers — has an external
-tax-advisor sign-off dependency, so its lead time runs regardless of when work on it starts) and
-`GD-12` (event-bus formalization, zero-code — blocks HR/EMP/Calendar/Consent event-contract
-builds until decided).
+`GD-09` (GDPR retention tiers) and `GD-12` (event-bus / inter-module transport) are **no longer
+pending — both Decided 2026-07-28**, see below. `GD-09`'s tax-advisor sign-off (`OD-RETENTION-01`)
+remains its own separate, non-blocking follow-up with an external lead time that runs regardless of
+when it's pursued — it no longer gates the tier mapping itself or any dependent module.
+
+> **Sync note (2026-07-28):** `GD-12` was decided via the Governance Resolution workflow
+> (`ADR-032`, Option (a): direct in-process calls are the platform standard for synchronous
+> cross-module effects; the existing Outbox, `ADR-029`, is the sole approved async/durable
+> mechanism; no generic event bus exists or is introduced; a future pub/sub need requires its own
+> new ADR). This resolves the *transport mechanism* question only — it does not itself unblock
+> any module's own build scope (HR/EMP/Calendar/Consent/CRM/Documents/Chatbot each still gated on
+> their own remaining `GD-*`/`OD-*` items as listed in this document). Full record:
+> `GOVERNANCE_DECISIONS_REQUIRED.md` GD-12 section; `docs/implementation/GOVERNANCE_REGISTER.md`.
+
+> **Sync note (2026-07-28, cont'd):** `GD-09`'s mapping half was also decided via the Governance
+> Resolution workflow (`ADR-033`, Option (c): every previously-unassigned record type provisionally
+> mapped to one of CRR §25's three tiers now — `Notification`/`User`/`Session`/HR contracts/
+> documents/chatbot metadata/consent records; `AuditLog` excluded, retained indefinitely — tax-advisor
+> sign-off, `OD-RETENTION-01`, tracked separately as a non-blocking follow-up rather than a gate).
+> This resolves the *tier-mapping* question only — it does not itself unblock `backend-retention`'s
+> own build, which remains gated on `OD-RETENTION-05/10/11/14/15` (RBAC scope, cross-module delete
+> authorization, sweep query design, owner assignment, fan-out workload). Full record:
+> `GOVERNANCE_DECISIONS_REQUIRED.md` GD-09 section; `ADR-033`.
+
+> **Sync note (2026-07-28, cont'd 2):** `GD-13` was also decided via the Governance Resolution
+> workflow (`ADR-034`, Option (c): direct read-only cross-module Prisma reads ratified as the
+> platform standard for aggregator/reporting modules — analytics' existing seven `reads-state`
+> edges all satisfy the criterion, no code change — subject to a three-point allow-list; a future
+> read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s still-open SLO
+> baseline). Full record: `GOVERNANCE_DECISIONS_REQUIRED.md` GD-13 section; `ADR-034`.
+
+> **Sync note (2026-07-28, cont'd 3):** `GD-11` was also decided via the Governance Resolution
+> workflow (`ADR-035`, Option (a): platform-wide workload baseline — ~100 hotels, ~5,000 workers,
+> ~300 concurrent users at peak — and p95 latency targets by query class: simple reads ≤150ms,
+> scoped list/filter ≤400ms, cross-module aggregation ≤800ms; leaderboard pagination now a MUST,
+> default 25/max 100; cross-module fan-out capped at 15 parallel queries per request, feeding
+> `ADR-034`'s escalation trigger). Per-endpoint conformance to these targets remains a G8
+> verification activity, not settled by this decision alone. Full record:
+> `GOVERNANCE_DECISIONS_REQUIRED.md` GD-11 section; `ADR-035`.
+
+> **Sync note (2026-07-28, cont'd 4):** `GD-10` was also decided via the Governance Resolution
+> workflow (`ADR-036`: optimistic concurrency adopted as the platform standard, ratifying the
+> pattern `WorkRequest.version` already establishes; attendance's `checkIn`/`update` double-submit
+> race MUST be fixed, not accepted as residual risk; the concrete mechanism — version column,
+> transactional row-level lock, or another optimistic-concurrency-consistent approach — is
+> explicitly deferred to implementation). Verification found two of this GD's three original
+> "merges findings" items already resolved by other decisions — `Hotel`'s lost-update risk via
+> `ADR-030` (2026-07-25) and the quality rating aggregate's divergence via `GD-04`+PR #237/#238
+> (2026-07-27) — neither reopened by `ADR-036`. Full record: `GOVERNANCE_DECISIONS_REQUIRED.md`
+> GD-10 section; `ADR-036`.
+
+> **Sync note (2026-07-28, cont'd 5):** `GD-17` was also decided via the Governance Resolution
+> workflow (`ADR-037`: `OD-CONSENT-002` resolved via Option (b) — chatbot engagement requires
+> explicit consent, a decline routes the worker to a manual/non-chatbot onboarding path rather than
+> blocking onboarding outright; `OD-CONSENT-006` resolved fail-closed — dependent flows block, not
+> silently proceed, when Consent is unavailable; five smaller lifecycle/RBAC items also resolved:
+> `OD-CONSENT-001`/`004`/`007`/`009`/`011`). Onboarding's `OPQ-3` and Chatbot's `OD-CHAT-008`
+> (consent portion only — transcript-persistence remains its own open question) were updated to
+> reflect the concrete resolution. Full record: `GOVERNANCE_DECISIONS_REQUIRED.md` GD-17 section;
+> `ADR-037`.
+
+> **Sync note (2026-07-28, cont'd 6):** `GD-23` was also decided (Option (a): ratify as-is) —
+> `ADR-019` and `ADR-020` flipped Proposed → Accepted; `.claude/VERSION.yaml` corrected in three
+> places (1.5.0 entry, 1.4.0 entry, 1.5.0-supersedes-1.4.0 summary comment). Verification found
+> ADR-001..009 were already ratified 2026-07-15 — `SIR-GLOB-003`'s last open element was already
+> closed and is now corrected to RESOLVED in the Specification Issues Register. Full record:
+> `GOVERNANCE_DECISIONS_REQUIRED.md` GD-23 section.
+
+> **Sync note (2026-07-28, cont'd 7):** `GD-08` was also decided (Option (c): explicit deferral) —
+> MFA is deferred to a post-MVP hardening milestone, a deliberate scheduling decision, not a silent
+> gap; no data model or mechanism (TOTP vs. OTP) is selected. `TREQ-AUTH-006` remains a confirmed,
+> unimplemented requirement. Full record: `GOVERNANCE_DECISIONS_REQUIRED.md` GD-08 section; `ADR-038`.
 
 ## Per-Module Implementation Status
 
@@ -152,25 +220,25 @@ every `GD-*` ID lives only in
 
 | Area | State | Blocked on |
 |---|---|---|
-| backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` (HR/EMP build scope), which itself depends on `GD-03`'s open org-chart half, `GD-09`, `GD-16` (now Decided, see below), `GD-12` |
+| backend-hr | mounted, every method `NotImplementedError`; every individual requirement checked, none independently ready | `GD-15` (HR/EMP build scope), which itself depends on `GD-03`'s open org-chart half, `GD-16` (now Decided, see below); `GD-09` and `GD-12` now Decided (see Sync notes above), neither itself unblocks this row |
 | backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` (remaining scope) + Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001` |
 | backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` (still undecided) — an audit finding (2026-07-27, not a ratified decision) observed this reads only already-existing tables and is not itself schema-blocked, but building it would still be getting ahead of `GD-18`'s own scope decision, not a substitute for one |
 | backend-documents (Documents module, RBAC/storage) | **in progress (2026-07-27):** `WorkerDocument` model + migration landed; module built (`types.ts`, `validation.ts`, `storage.ts` (S3 stub, real client deferred — `@aws-sdk/client-s3` not yet a dependency), `service.ts`, `controller.ts`, `routes.ts`); mounted at `/v1/documents`. All five `IF-DOC-*` target interfaces implemented. No multipart/file-parsing middleware wired yet — uploads persist metadata with an empty byte buffer (same gap the migrated-from `backend-hr` stub had, `MIG-GAP-DOC-001`, itself still open and out of this session's scope). `MIG-GAP-DOC-001` (migrating `backend-hr`'s stub route to call into this module) not yet done. | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains. Gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection (neither wired yet). |
 | backend-chatbot | zero code, `.placeholder` only; every requirement checked, none independent | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
 | backend-geo | zero code, `.placeholder` only; every requirement checked, none independent | `GD-14` (geofencing/location model) |
-| backend-consent | zero code, no module directory | `GD-17`; a narrow consent-log table + notice-version catalog (no enforcement) is buildable without `GD-17`'s fail-open/closed question, but full daily-gate enforcement is not |
+| backend-consent | zero code, no module directory | `GD-17` **Decided 2026-07-28** (`ADR-037`) — chatbot consent gate resolved (Option (b): decline routes to manual onboarding, does not block), fail-closed adopted, five smaller lifecycle/RBAC items resolved. No governance blocker remains; the module's own build is now a scoping/prioritization question, not an open architecture decision. |
 | backend-compliance | zero code, no module directory | No dedicated `GD-*`; an audit finding (2026-07-27, not owner-confirmed) reads `IF-COMPLIANCE-GetAuditTrail` (read-only over the already-existing `AuditLog` table, boundary per `ADR-016`) as having no governance blocker — the rest of the module (subject-rights orchestration) is downstream of Consent/Retention/Documents |
-| backend-retention | zero code, no module directory; every requirement checked, none independent | `GD-09` (external tax-advisor sign-off, long lead time) — the one module where full-module-blocked holds up under decomposition |
+| backend-retention | zero code, no module directory; every requirement checked, none independent | `GD-09`'s mapping half now **Decided** (`ADR-033`, see Sync note above); module build remains gated on `OD-RETENTION-05/10/11/14/15` (RBAC scope, cross-module delete authorization, sweep query design, owner assignment, fan-out workload) and, for legal certification only (non-blocking for the build itself), `OD-RETENTION-01` tax-advisor sign-off |
 | Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
-| MFA | no data model or endpoint anywhere | `GD-08` |
-| Platform event-bus formalization | in-process singleton only | `GD-12` (zero-code decision, gates HR/EMP/Calendar/Consent event contracts) |
-| Optimistic-locking/concurrency pattern (attendance, CRM hotel update, quality aggregate) | unbuilt | `GD-10` |
-| Performance SLO & workload baseline | undefined | `GD-11` (unblocks G8 for multiple modules) |
-| Cross-module state-read boundary ratification (analytics reads 6+ state domains it doesn't own) | undocumented | `GD-13` |
+| ~~MFA~~ | ~~no data model or endpoint anywhere~~ | **`GD-08` Decided 2026-07-28 (`ADR-038`)** — explicitly deferred to a post-MVP hardening milestone; no mechanism selected. `TREQ-AUTH-006` remains confirmed, unimplemented, disclosed as deferred rather than a silent gap. |
+| ~~Platform event-bus formalization~~ | ~~in-process singleton only~~ | **`GD-12` Decided 2026-07-28 (`ADR-032`)** — direct in-process calls for sync effects, existing Outbox (`ADR-029`) for async/durable; no event bus exists or is introduced. Struck through per this row's own resolution, not removed; individual HR/EMP/Calendar/Consent/CRM/Documents/Chatbot build gates are unaffected by this row and remain tracked in their own rows above. |
+| ~~Optimistic-locking/concurrency pattern (attendance, CRM hotel update, quality aggregate)~~ | ~~unbuilt~~ | **`GD-10` Decided 2026-07-28 (`ADR-036`)** — optimistic concurrency adopted as the platform standard; attendance's `checkIn`/`update` race MUST be fixed, mechanism deferred to implementation. CRM hotel-update and quality-aggregate items were verified already resolved by `ADR-030`/`GD-04` before this decision, not reopened. |
+| ~~Performance SLO & workload baseline~~ | ~~undefined~~ | **`GD-11` Decided 2026-07-28 (`ADR-035`)** — platform baseline (~100 hotels/~5,000 workers/~300 concurrent users); p95 targets 150/400/800ms by query class; leaderboard pagination now a MUST; cross-module fan-out capped at 15 parallel queries. Per-endpoint conformance remains a G8 verification activity. |
+| ~~Cross-module state-read boundary ratification (analytics reads 6+ state domains it doesn't own)~~ | ~~undocumented~~ | **`GD-13` Decided 2026-07-28 (`ADR-034`)** — direct read-only reads ratified as the platform standard for aggregators, subject to a three-point allow-list; a future read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s SLO baseline. No code change. |
 | Job-Dispatch two-tier calendar+broadcast pivot | not started | `GD-20` (recommendation: defer) |
 | Attendance auto-ABSENT/NO_SHOW automation | unbuilt | `GD-21` |
 | Hotel-Group billing model | undecided | `GD-22` (recommendation: defer) |
-| Platform ADR ratification cleanup (ADR-001..009, ADR-019/020) | governance-record only, 0 code | `GD-23` |
+| ~~Platform ADR ratification cleanup (ADR-001..009, ADR-019/020)~~ | ~~governance-record only, 0 code~~ | **`GD-23` Decided 2026-07-28** — `ADR-019`/`ADR-020` ratified Proposed → Accepted (Option (a): as-is); `VERSION.yaml` corrected in three places. ADR-001..009 verified already ratified 2026-07-15 — `SIR-GLOB-003` now RESOLVED, correcting this row's own prior stale framing. |
 
 **Engineering hygiene items (non-blocking):** `TD-1` orphan-doc warnings, `TD-4` mobile Expo
 scaffold residue, `TD-3` dead `super_admin` branch, `TD-5` no CI coverage gate / no frontend unit

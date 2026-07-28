@@ -1,6 +1,6 @@
 # ADR-020: Context Management Layer — Deterministic Minimum-Context Loading over the Existing Context Artifacts
 
-- **Status:** Proposed — pending human ratification (Engineering Constitution §20), consistent with the ADR-001..010 precedent and the framework-1.2.0 Context Artifacts (§6–§7) and framework-1.4.0 (ADR-019) precedents.
+- **Status:** Accepted — ratified by the commissioning human on 2026-07-28, resolving `GD-23` (Platform ADR ratification, Constitution §20) via the Governance Resolution workflow, Option (a): ratified as-is, since this ADR's mechanism (the `.claude/context/` directory and the deterministic `context-loader.js` engine) was already the operating reality prior to ratification, backward-compatible, with no disclosed defect. Previously: Proposed — pending human ratification, consistent with the ADR-001..010 precedent and the framework-1.2.0 Context Artifacts (§6–§7) and framework-1.4.0 (ADR-019) precedents.
 - **Date:** 2026-07-16
 - **Scope:** Engineering operating system (`.claude/`) — framework 1.5.0. Introduces one new top-level directory (`.claude/context/`) and one deterministic engine (`.claude/tooling/context-loader.js`) in the existing `.claude/tooling/` directory, plus one CI job (`.github/workflows/ci.yml`, job `context-manifest`).
 - **Supersedes:** none (additive; operationalizes the existing [Context Artifacts](../../../.claude/constitution/CONTEXT_ARTIFACTS.md) policy rather than introducing a new gate or workflow).
