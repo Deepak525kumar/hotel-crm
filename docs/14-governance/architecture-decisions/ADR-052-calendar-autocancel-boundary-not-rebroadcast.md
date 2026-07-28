@@ -5,6 +5,7 @@
 - **Scope:** `SPEC-CALENDAR-001`'s `RULE-CAL-04` (same-day auto-cancel). Explicitly does not decide any Job Dispatch behavior — that remains `GD-20`'s (Job-Dispatch two-tier calendar+broadcast pivot) own scope, still open.
 - **Supersedes:** none (additive — narrows disclosure of an already-built mechanism's boundary; the auto-cancel call itself, `RULE-CAL-04`, is already shipped).
 - **Change class:** Architecture decision per Constitution §6/§7.
+- **Decision-Integration forward-note (added 2026-07-28, same day, subsequent to this record):** every statement below that `GD-20` "remains open"/"still open" (§Scope, Decision item 2, Rationale, Consequences) describes this ADR's own state at authoring time. `GD-20` was resolved later the same day via `ADR-054` through `ADR-058`; `ADR-055` (Sub-decision 2, Broadcast Lifecycle) is the record that actually answers the re-broadcast-policy question this ADR deliberately left to Job Dispatch — deciding it exactly as this record anticipated (a Calendar-cancelled slot does not auto-re-broadcast; any re-broadcast is manager-initiated). This ADR's own text is left as originally authored (historical record), per the same convention used for `PIVOT_DESIGN_DOCUMENT.md`'s `ADR-029` forward-note.
 
 ## Problem
 
