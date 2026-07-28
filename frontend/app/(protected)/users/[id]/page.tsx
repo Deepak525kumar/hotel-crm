@@ -7,10 +7,12 @@ import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useAvailability } from "@/hooks/useCalendar";
 import { usersApi } from "@/lib/api";
 import { DocumentsGate, RoleGate, UserDeactivateGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { DocumentsCard } from "@/components/documents/DocumentsCard";
+import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -35,6 +37,11 @@ function UserDetail() {
   const { user: currentUser } = useAuth();
 
   const { data: user, isLoading, error } = useUser(id);
+  // Availability (SPEC-CALENDAR-001 REQ-CAL-T06) is a worker-only concept —
+  // only fetched once the account's role is known to be "worker", so an
+  // admin/manager/checker account never shows a meaningless badge for a
+  // read-model that doesn't apply to them.
+  const { data: availability } = useAvailability(user?.role === "worker" ? id : null);
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
@@ -110,6 +117,12 @@ function UserDetail() {
                 <DataRow label="Email" value={user.email} />
                 <DataRow label="Phone" value={user.phone || "—"} />
                 <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+                {user.role === "worker" && availability && (
+                  <DataRow
+                    label="Availability"
+                    value={<AvailabilityBadge available={availability.available} />}
+                  />
+                )}
                 <DataRow label="Created" value={formatDateTime(user.created_at)} />
                 <DataRow label="Updated" value={formatDateTime(user.updated_at)} />
               </DataList>

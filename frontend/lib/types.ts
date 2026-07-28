@@ -592,6 +592,21 @@ export interface ListGeoCheckinsQuery {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Calendar (availability read-model)                                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Today-only red/green availability for one worker, as returned by
+ * `GET /calendar/availability` (SPEC-CALENDAR-001 REQ-CAL-T06/RULE-CAL-08,
+ * ADR-021). Independent of any viewed calendar date — there is no `day`
+ * field to request or receive; the backend always answers for "today."
+ */
+export interface Availability {
+  worker_id: string;
+  available: boolean;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Notifications                                                              */
 /* -------------------------------------------------------------------------- */
 
