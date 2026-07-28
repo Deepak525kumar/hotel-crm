@@ -99,9 +99,17 @@ export class AttendanceService extends BaseService {
       },
     });
 
-    await this.logAudit(actorId, actorRole, 'CHECK_IN', 'ATTENDANCE', updated.id, {
-      assignment_id: input.assignment_id,
-    });
+    await this.logAudit(
+      actorId,
+      actorRole,
+      'CHECK_IN',
+      'ATTENDANCE',
+      updated.id,
+      { assignment_id: input.assignment_id },
+      undefined,
+      { status: existing.status, check_in_at: existing.check_in_at, minutes_late: existing.minutes_late },
+      { status: updated.status, check_in_at: updated.check_in_at, minutes_late: updated.minutes_late }
+    );
 
     return this.toDto(updated);
   }
@@ -159,7 +167,7 @@ export class AttendanceService extends BaseService {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
 
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    if (actor.role !== 'admin' && actor.role !== 'manager' && actor.role !== 'checker') {
       if (record.worker_id !== actor.userId) {
         throw new ForbiddenError('Cannot access this attendance record');
       }
@@ -287,9 +295,27 @@ export class AttendanceService extends BaseService {
       return u;
     });
 
-    await this.logAudit(actorId, actorRole, 'UPDATE_ATTENDANCE', 'ATTENDANCE', id, {
-      worker_id: record.worker_id,
-    });
+    await this.logAudit(
+      actorId,
+      actorRole,
+      'UPDATE_ATTENDANCE',
+      'ATTENDANCE',
+      id,
+      { worker_id: record.worker_id },
+      undefined,
+      {
+        status: record.status,
+        check_out_at: record.check_out_at,
+        minutes_worked: record.minutes_worked,
+        is_verified: record.is_verified,
+      },
+      {
+        status: updated.status,
+        check_out_at: updated.check_out_at,
+        minutes_worked: updated.minutes_worked,
+        is_verified: updated.is_verified,
+      }
+    );
 
     return this.toDto(updated);
   }
