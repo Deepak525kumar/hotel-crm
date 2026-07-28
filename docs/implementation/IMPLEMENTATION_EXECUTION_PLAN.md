@@ -141,6 +141,55 @@ pass found stale and corrects.
 
 ---
 
+## Verification pass (2026-07-29, post GD-19/20/21/22/23 governance resolution)
+
+Re-verified against `main` @ `586a55d` (governance resolution + review-feedback commits,
+2026-07-28/29 — the repository's final MVP governance decisions). Method: read `ADR-054` through
+`ADR-059` directly (not summaries), cross-checked against `docs/implementation/GOVERNANCE_REGISTER.md`
+Part 2 and `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`'s per-row status, confirmed against
+live `backend/src/` code.
+
+- **No new epic opened by GD-20 (Job-Dispatch two-tier pivot).** `ADR-054`–`ADR-058` ratify the
+  target architecture, broadcast lifecycle, assignment model, background-execution mechanism, and
+  migration strategy — but each closes with "no code changes are made or authorized by this
+  record" (verbatim, all five). `ADR-058` names an explicit eligibility gate: implementation
+  becomes architecturally eligible only "once `GD-03` (roles/org-chart) is resolved." `GD-03`'s
+  org-chart/reporting-model half (`OD-EMP-12`) is independently confirmed still open
+  (`GOVERNANCE_REGISTER.md` Part 2 closing note; `SPECIFICATION_ISSUES_REGISTER.md` `OD-EMP-12`
+  row). `SIR-JOBD-006` (`MIG-GAP-01..12`) remains `OPEN — deferred by design`, unchanged in status
+  by GD-20's resolution (which ratified the destination, not the journey). **This plan does not
+  open an Epic 9 for Job-Dispatch.** When `GD-03`'s org-chart half is separately resolved, a future
+  planning pass must open an epic sequencing `MODULE_SPEC.md`'s own Phase 1/Phase 2 forward-refactor
+  plan (`ADR-058`, ratified unmodified) — that epic does not exist today because building it now
+  would implement ahead of the named architectural prerequisite.
+- **No new epic opened by GD-21 (Attendance operational automation).** `ADR-059` ratifies
+  scheduled reminders + automatic ABSENT/NO_SHOW marking as permanent target architecture but is
+  equally explicit: it does not authorize implementation and sets no grace-period or override
+  policy; the current manual manager-override path continues unaffected until a future
+  implementation decision. No grace-period/trigger-condition policy exists to build against;
+  authoring one now would invent a requirement (Constitution §12). **Two small, non-automation
+  items GD-21 also resolved were already implemented before this pass and require no new epic,
+  only this retroactive record:**
+  - `SIR-ATT-001`/`OQ-01` (checker `getById` role-guard alignment to `list`/`update`) —
+    `backend/src/modules/attendance/service.ts:163`. Consistency correction, not a governance
+    fork.
+  - `SIR-ATT-012`/`OQ-11` (`AuditLog.old_values`/`new_values` population) — platform-level fix in
+    `backend/src/lib/base-service.ts` (`logAudit()` gains optional `old_values`/`new_values`
+    params, backward-compatible), consumed by `attendance/service.ts`'s `checkIn`/`update` audit
+    calls.
+  Both are already merged (register: `SPECIFICATION_ISSUES_REGISTER.md` lines 121, 132, 470, 472)
+  — zero further action; neither is a "new epic."
+- **No new epic opened by GD-22 (Hotel-Group billing).** Resolved by disposition; no architecture,
+  no code implication. `billing_info` unchanged.
+- **Numbering unaffected.** Epic 8 remains the last-numbered epic (per the plan's own §"Numbering
+  note"); no Epic 9 is opened by this pass, for the same reason no Epic 9 was opened by the
+  2026-07-24 pass — no unblocked, spec-traceable, human-authorized application-code epic exists
+  for GD-19 (deferred post-MVP — see `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md`; chatbot
+  work must NOT resume), GD-20 (architecturally ineligible pending GD-03), or GD-21 (implementation
+  not authorized, no policy to build against).
+
+---
+
 ## 0. Sequencing challenge to the proposed framing (read first)
 
 The commissioning brief proposed: Epic 1 = Critical PATCH fix; Epic 2 = shared

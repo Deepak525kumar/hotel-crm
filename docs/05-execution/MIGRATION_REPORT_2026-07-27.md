@@ -64,6 +64,10 @@ themselves the problem.
   `DECISION_INDEX.md` — read as sources, not modified.
 - `docs/04-implementation/*` (the original frozen planning layer) — untouched; it's the planning
   baseline, not the execution-tracking layer this migration replaces.
+  **2026-07-29 note:** this directory was subsequently archived to `docs/legacy/04-implementation/`
+  (SYNC-057, hygiene sweep) as a never-adopted G3 draft; the statement above remains accurate as of
+  this migration's own date (2026-07-27) and is retained unchanged as historical narration. A
+  redirect stub now lives at `docs/04-implementation/README.md`.
 - All ADR files and `.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` — ADR authoring/status
   has its own governance lifecycle, explicitly out of scope for this new system per the task's own
   requirement.
