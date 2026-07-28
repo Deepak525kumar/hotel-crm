@@ -64,3 +64,17 @@ export function isGD02MatrixEnabled(): boolean {
 // FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired —
 // request-time derivation and token_generation revocation are now
 // unconditional in middleware/auth.ts, both cutovers being complete.
+
+/**
+ * Job Dispatch Phase 1 cutover flag (Epic 9, TREQ-011).
+ * Gates nothing in PR 9.2 itself — WorkApplication/ApplicationStatus and
+ * WorkerAssignment.application_id are removed unconditionally in this PR,
+ * with no code path reading this flag yet. It is introduced here so PR 9.3
+ * (WorkerAssignment repointed to a nullable job_request_id) and PR 9.4, plus
+ * the still-pending mobile companion PR, have a single cutover flag to
+ * consume from the start of the phase, matching this repo's existing
+ * "flag lands ahead of its first consumer" precedent (e.g. FEATURE_RM_ROLE).
+ */
+export function isJobDispatchPhase1Enabled(): boolean {
+  return getEnv().FEATURE_JOBDISPATCH_PHASE1;
+}

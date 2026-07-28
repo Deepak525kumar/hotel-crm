@@ -124,6 +124,12 @@ const envSchema = z.object({
   // FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired — both
   // cutovers are complete and unconditional in middleware/auth.ts.
 
+  // Job Dispatch Phase 1 cutover flag (Epic 9, TREQ-011). Defaults FALSE.
+  // Gates nothing in PR 9.2 itself (WorkApplication removal is unconditional
+  // in this PR) — it exists for PR 9.3/9.4 and the mobile companion PR to
+  // consume once the replacement dispatch flow lands.
+  FEATURE_JOBDISPATCH_PHASE1: z.coerce.boolean().default(false),
+
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).
   // Config-driven per ADR-029 §6/§8: the values below are the initial

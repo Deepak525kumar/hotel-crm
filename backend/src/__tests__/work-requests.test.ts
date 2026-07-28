@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import type { Request, Response, NextFunction } from 'express';
 
 const mockWorkRequest = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -57,6 +58,16 @@ jest.mock('../config/env.js', () => ({
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
+jest.mock('../middleware/auth.js', () => ({
+  authMiddleware: (req: Request, _res: Response, next: NextFunction) => {
+    (req as any).auth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+    next();
+  },
+}));
+
+import express from 'express';
+import request from 'supertest';
+import workRequestRouter from '../modules/work-requests/routes.js';
 import { WorkRequestService } from '../modules/work-requests/service.js';
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
@@ -303,6 +314,22 @@ describe('WorkRequestService', () => {
           name: 'ForbiddenError',
         });
       });
+    });
+  });
+
+  // Epic 9 PR 9.2 (TREQ-011): WorkApplication and its routes/controller/
+  // service were deleted in this PR — there is no apply endpoint any more.
+  // This asserts the route stays gone (Express's default unmatched-route
+  // 404), guarding against it being accidentally reintroduced or re-mounted.
+  describe('POST /work-requests/:id/applications (removed route)', () => {
+    it('returns 404 — no apply endpoint exists post-PR-9.2', async () => {
+      const app = express();
+      app.use(express.json());
+      app.use('/work-requests', workRequestRouter);
+      const res = await request(app)
+        .post('/work-requests/wr1/applications')
+        .send({});
+      expect(res.status).toBe(404);
     });
   });
 });

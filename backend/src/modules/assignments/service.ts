@@ -26,7 +26,6 @@ export class AssignmentService extends BaseService {
       worker_id: a.worker_id,
       hotel_id: a.hotel_id,
       assigned_by_id: a.assigned_by_id,
-      application_id: a.application_id,
       status: a.status,
       confirmed_at: a.confirmed_at.toISOString(),
       started_at: a.started_at?.toISOString() ?? null,

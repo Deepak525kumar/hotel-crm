@@ -8,7 +8,6 @@ import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
 import crmRoutes from '../../modules/crm/routes.js';
 import workRequestRoutes from '../../modules/work-requests/routes.js';
-import workApplicationRoutes from '../../modules/work-applications/routes.js';
 import assignmentRoutes from '../../modules/assignments/routes.js';
 import attendanceRoutes from '../../modules/attendance/routes.js';
 import qualityRoutes from '../../modules/quality/routes.js';
@@ -28,7 +27,6 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/crm', crmRoutes);
 router.use('/work-requests', workRequestRoutes);
-router.use('/work-requests/:id/applications', workApplicationRoutes);
 router.use('/assignments', assignmentRoutes);
 router.use('/attendance', attendanceRoutes);
 router.use('/quality', qualityRoutes);
@@ -77,7 +75,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'work-requests', 'work-applications', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'geo', 'notifications', 'analytics', 'quality', 'employee-management'],
+      modules: ['auth', 'users', 'crm', 'work-requests', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'geo', 'notifications', 'analytics', 'quality', 'employee-management'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {
