@@ -11,7 +11,9 @@ export class BaseService {
     resource_type: string,
     resource_id: string,
     details?: Record<string, unknown>,
-    ip_address?: string
+    ip_address?: string,
+    old_values?: Record<string, unknown>,
+    new_values?: Record<string, unknown>
   ) {
     const normalizedRole = actor_role
       ? (actor_role.toUpperCase() as UserRole)
@@ -24,6 +26,8 @@ export class BaseService {
         resource_type,
         resource_id,
         details: details ? (details as Prisma.InputJsonValue) : Prisma.JsonNull,
+        old_values: old_values ? (old_values as Prisma.InputJsonValue) : Prisma.JsonNull,
+        new_values: new_values ? (new_values as Prisma.InputJsonValue) : Prisma.JsonNull,
         ip_address: ip_address || null,
         timestamp: new Date(),
       },

@@ -161,6 +161,14 @@ when it's pursued — it no longer gates the tier mapping itself or any dependen
 > `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md` for zero-context-loss resumption. Verified
 > isolated from all remaining MVP decisions (`GD-20`/`21`/`22`) — no dependency either direction.
 > Actively-pursuable open count is now **3**: `GD-20/21/22`.
+>
+> **Synchronization note (2026-07-28, later the same day):** all three were subsequently resolved.
+> `GD-20` → `ADR-054` through `ADR-058` (5 sub-decisions). `GD-21` → `ADR-059` (sole sub-decision;
+> two further items closed as consistency corrections, not governance forks). `GD-22` → resolved by
+> disposition, no new architecture (`ADR-023` had already settled Hotel-Group billing ownership; no
+> new ADR authored). Actively-pursuable open count across the full `GD-01..23` numbering is now
+> **zero**, outside `GD-19`'s deferred remainder and two named residual items (`OD-HR-02b`, `GD-03`'s
+> org-chart half) — see `docs/implementation/GOVERNANCE_REGISTER.md` for the current canonical status.
 
 ## Per-Module Implementation Status
 
@@ -282,9 +290,9 @@ every `GD-*` ID lives only in
 | ~~Optimistic-locking/concurrency pattern (attendance, CRM hotel update, quality aggregate)~~ | ~~unbuilt~~ | **`GD-10` Decided 2026-07-28 (`ADR-036`)** — optimistic concurrency adopted as the platform standard; attendance's `checkIn`/`update` race MUST be fixed, mechanism deferred to implementation. CRM hotel-update and quality-aggregate items were verified already resolved by `ADR-030`/`GD-04` before this decision, not reopened. |
 | ~~Performance SLO & workload baseline~~ | ~~undefined~~ | **`GD-11` Decided 2026-07-28 (`ADR-035`)** — platform baseline (~100 hotels/~5,000 workers/~300 concurrent users); p95 targets 150/400/800ms by query class; leaderboard pagination now a MUST; cross-module fan-out capped at 15 parallel queries. Per-endpoint conformance remains a G8 verification activity. |
 | ~~Cross-module state-read boundary ratification (analytics reads 6+ state domains it doesn't own)~~ | ~~undocumented~~ | **`GD-13` Decided 2026-07-28 (`ADR-034`)** — direct read-only reads ratified as the platform standard for aggregators, subject to a three-point allow-list; a future read-model interface remains a named, unmet escalation trigger tied to `GD-11`'s SLO baseline. No code change. |
-| Job-Dispatch two-tier calendar+broadcast pivot | not started | `GD-20` (recommendation: defer) |
-| Attendance auto-ABSENT/NO_SHOW automation | unbuilt | `GD-21` |
-| Hotel-Group billing model | undecided | `GD-22` (recommendation: defer) |
+| ~~Job-Dispatch two-tier calendar+broadcast pivot~~ | ~~not started~~ | **`GD-20` Decided 2026-07-28 (`ADR-054`–`ADR-058`, 5 sub-decisions)** — two-tier target architecture ratified, marketplace confirmed as current (not legacy) implementation; implementation eligibility gated on `GD-03`, scheduling deferred to implementation planning. Struck through per this row's own resolution, not removed; the module itself remains unbuilt. |
+| ~~Attendance auto-ABSENT/NO_SHOW automation~~ | ~~unbuilt~~ | **`GD-21` Decided 2026-07-28 (`ADR-059`)** — automated reminders + automatic ABSENT/NO_SHOW marking ratified as permanent target architecture, implementation timing deferred. Two consistency corrections (checker `getById` alignment, `AuditLog` `old_values`/`new_values`) applied directly, not treated as governance forks. Struck through per this row's own resolution; automation itself remains unbuilt. |
+| ~~Hotel-Group billing model~~ | ~~undecided~~ | **`GD-22` Resolved by disposition 2026-07-28 — no new architecture.** `ADR-023` already settled ownership (`backend-crm`); no billing mechanics existed in CRR/PDD to decide, so none were invented. `billing_info` remains an opaque placeholder pending a concrete requirement. Struck through per this row's own resolution, not removed. |
 | ~~Platform ADR ratification cleanup (ADR-001..009, ADR-019/020)~~ | ~~governance-record only, 0 code~~ | **`GD-23` Decided 2026-07-28** — `ADR-019`/`ADR-020` ratified Proposed → Accepted (Option (a): as-is); `VERSION.yaml` corrected in three places. ADR-001..009 verified already ratified 2026-07-15 — `SIR-GLOB-003` now RESOLVED, correcting this row's own prior stale framing. |
 
 **Engineering hygiene items (non-blocking):** `TD-1` orphan-doc warnings, `TD-4` mobile Expo

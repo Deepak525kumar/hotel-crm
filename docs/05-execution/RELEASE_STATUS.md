@@ -27,7 +27,7 @@ still carries open G8 prerequisites.
 | backend-users | FROZEN @0.2.0 | `OQ-USERS-01/02/05/06`, `SIR-USERS-005` (Medium), owner assignment (`SYNC-001`) |
 | backend-crm | FROZEN @0.2.1 | Owner assignment (`SYNC-001`); hotel/hotel-group writes now Admin-only per `ADR-030` |
 | backend-work-requests / work-applications / assignments | FROZEN @0.3.2 | Owner assignment (`SYNC-001`) |
-| backend-attendance | FROZEN @0.2.0 | Cross-tenant hotel-scoping (`OQ-02`, High, tracked `SYNC-019`); optimistic-locking pattern pending `GD-10`; auto-ABSENT/NO_SHOW automation pending `GD-21` |
+| backend-attendance | FROZEN @0.2.2 | Cross-tenant hotel-scoping (`OQ-02`, High, tracked `SYNC-019`); optimistic-locking mechanism pending implementation (`GD-10`/`ADR-036` decided the standard, concrete mechanism deferred); auto-ABSENT/NO_SHOW automation architecture ratified (`GD-21`/`ADR-059`), implementation itself still pending |
 | backend-quality | FROZEN @0.2.0 | Dual-writer aggregate correctness bug resolved (`GD-04`, `SIR-QUAL-005`, 2026-07-27); `OQ-01..09` and owner assignment remain G8 items |
 | backend-hr (SPEC-EMP-001 mapping) | FROZEN @0.2.0 | No dedicated test file (`active-no-tests`); special-category access/audit controls unbuilt but disclosed; boundary conflict with a second, non-frozen `SPEC-HR-001` targeting the same code path is disclosed, not resolved |
 | employee-management | FROZEN @0.2.0 | Owner assignment; provisional perf budget (`OD-EMP-16`) |
