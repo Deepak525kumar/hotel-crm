@@ -147,6 +147,21 @@ when it's pursued — it no longer gates the tier mapping itself or any dependen
 > staffing-demand target) flagged for a future Requirements Intake pass, not resolved by this
 > workflow. Full record: `GOVERNANCE_DECISIONS_REQUIRED.md` GD-18 section; `ADR-049`–`ADR-052`.
 
+> **Sync note (2026-07-28, cont'd 10):** `GD-19`'s first sub-decision (`OD-CHAT-002`, tool-execution
+> scope) was decided — the chatbot is ratified as a first-class platform interface (dedicated chat
+> page + floating widget) and an AI orchestration layer, not a business module: it owns conversation,
+> intent recognition, clarification, tool selection, and response generation; every executable
+> platform capability is a tool invoking an existing `IF-*` interface owned by another module, which
+> retains all business rules, validation, authorization, state, persistence, and auditing. Tools are
+> allow-listed via a tool-registry/plugin model, risk-tiered (read-only / low-risk write / high-risk
+> write) with a corresponding confirmation policy. Full record: `ADR-053`. **Immediately after this
+> ADR merged, the commissioning human explicitly deferred the remainder of `GD-19` to post-MVP** —
+> `ADR-053` is retained in force, unweakened; every other `OD-CHAT-*` item's exact status, every
+> dependency, and every preserved recommendation is recorded at
+> `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md` for zero-context-loss resumption. Verified
+> isolated from all remaining MVP decisions (`GD-20`/`21`/`22`) — no dependency either direction.
+> Actively-pursuable open count is now **3**: `GD-20/21/22`.
+
 ## Per-Module Implementation Status
 
 Derived from `.claude/knowledge/MODULE_REGISTRY.yaml`. See that file for each module's evidence
@@ -256,7 +271,7 @@ every `GD-*` ID lives only in
 | backend-calendar: manager weekly-plan placement view (`REQ-CAL-T01`) | unbuilt (worker self-mark sick/vacation half already built, see Completed Work) | `GD-18` **Decided 2026-07-28** (`ADR-049`–`ADR-052`, see Sync note above) — no governance blocker remains; still gated on Phase-1 schema realignment (`WorkerAssignment.application_id` still mandatory) owned by `SPEC-JOB-DISPATCH-001`, and on ordinary implementation effort |
 | backend-calendar: today-only availability read-model (`REQ-CAL-T06`) | unbuilt | `GD-18` **Decided 2026-07-28** — the governance-scope blocker this row previously flagged no longer applies; this item reads only already-existing tables and is not schema-blocked, so it may now be built without waiting on any further governance decision |
 | backend-documents (Documents module, RBAC/storage) | **in progress (2026-07-27):** `WorkerDocument` model + migration landed; module built (`types.ts`, `validation.ts`, `storage.ts` (S3 stub, real client deferred — `@aws-sdk/client-s3` not yet a dependency), `service.ts`, `controller.ts`, `routes.ts`); mounted at `/v1/documents`. All five `IF-DOC-*` target interfaces implemented. No multipart/file-parsing middleware wired yet — uploads persist metadata with an empty byte buffer (same gap the migrated-from `backend-hr` stub had, `MIG-GAP-DOC-001`, itself still open and out of this session's scope). `MIG-GAP-DOC-001` (migrating `backend-hr`'s stub route to call into this module) not yet done. | **`GD-16` Decided 2026-07-27** (option (a): self-upload + manager-upload only, hotel-scoped read, presigned URLs, SSE-at-rest). No governance blocker remains. Gates HR's `REQ-HR-008/011` contract-scan upload and onboarding document collection (neither wired yet). |
-| backend-chatbot | zero code, `.placeholder` only; every requirement checked, none independent | `GD-19` (chatbot scope & LLM safety) — spec cannot reach G2 freeze until decided |
+| backend-chatbot | zero code, `.placeholder` only; every requirement checked, none independent | `GD-19` **⏸ DEFERRED — POST-MVP, 2026-07-28** (explicit commissioning-human decision, not an unresolved item). Sub-decision 1 (`OD-CHAT-002`) Decided → `ADR-053` (orchestration-layer/tool-registry architecture, retained in force). Remainder deferred; spec cannot reach G2 freeze until `GD-19` resumes post-MVP and its three standing blockers (`OD-CHAT-005/006/013`) are resolved. Full checkpoint: `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md`. |
 | backend-geo | zero code, `.placeholder` only; every requirement checked, none independent | `GD-14` (geofencing/location model) |
 | backend-consent | zero code, no module directory | `GD-17` **Decided 2026-07-28** (`ADR-037`) — chatbot consent gate resolved (Option (b): decline routes to manual onboarding, does not block), fail-closed adopted, five smaller lifecycle/RBAC items resolved. No governance blocker remains; the module's own build is now a scoping/prioritization question, not an open architecture decision. |
 | backend-compliance | zero code, no module directory | No dedicated `GD-*`; an audit finding (2026-07-27, not owner-confirmed) reads `IF-COMPLIANCE-GetAuditTrail` (read-only over the already-existing `AuditLog` table, boundary per `ADR-016`) as having no governance blocker — the rest of the module (subject-rights orchestration) is downstream of Consent/Retention/Documents |
