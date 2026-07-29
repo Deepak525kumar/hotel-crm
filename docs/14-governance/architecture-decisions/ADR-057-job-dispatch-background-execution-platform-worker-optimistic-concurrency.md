@@ -122,10 +122,49 @@ describes for broadcast.
   mechanism as superseded.
 - No code changes are made or authorized by this record.
 
+## Addendum (2026-07-30, ratified by the commissioning human)
+
+**Context:** Epic 9 PR 9.7 (2026-07-29) introduced `JobRequestSkillSlot` — a per-skill child row on a
+broadcast `JobRequest` (`skill`, `headcount`, `confirmed_count`), the actual arbitration target `TREQ-004`
+claims against once a broadcast can request multiple skills with independent headcounts (per
+`CONFIRMED_REQUIREMENTS_REGISTER.md` §13's "2 Cleaners + 1 Waiter" example — a single request-level `version`
+column, as this Decision's item 2 literally names, cannot arbitrate independent per-skill slot counts on one
+row). `JobRequestSkillSlot` was built with `confirmed_count`/`headcount` only, no `version` column; PR 9.7's
+own migration comment asserted a bare `WHERE confirmed_count < headcount` conditional update would serve as
+PR 9.9's arbitration target, without amending this Decision to say so. A pre-implementation architecture
+review (ahead of PR 9.9) surfaced this as a literal conflict against item 2's unhedged "a version column"
+wording and escalated it rather than resolving it by inference.
+
+**Resolution:** a bare `WHERE confirmed_count < headcount` conditional `UPDATE`/`updateMany` on
+`JobRequestSkillSlot` (no separate `version` column) is confirmed a **conforming instance** of this Decision's
+optimistic-concurrency mechanism, not a deviation from it. The engineering substance of "a version column plus
+a transactional conditional update" is a monotonically-changing guard column compared against a stale read
+inside one atomic `UPDATE` statement, re-evaluated by Postgres's row-level locking against post-lock values for
+any concurrent claimant — `confirmed_count` performs exactly this role for a per-skill slot (it changes on
+every successful claim, exactly as `version` would), and Postgres's `READ COMMITTED` re-evaluation-on-lock
+behavior is what makes either column race-safe, not the literal name or presence of a second column. The
+retired marketplace `approve()`'s combined `version` + `workers_confirmed: { lt: ... }` guard was proven
+correct at the whole-request grain (one slot count on `WorkRequest` itself); at the per-skill-slot grain a
+single guard column (`confirmed_count`) is the mechanistically equivalent claim condition, not an
+under-provisioned one.
+
+Item 2's language is retained unchanged elsewhere in this record (the whole-request marketplace precedent it
+describes remains historically accurate); this addendum narrows only how "a version column" applies to
+`JobRequestSkillSlot`'s per-skill grain, which item 2 did not anticipate at ratification time (`JobRequestSkillSlot`
+did not exist until PR 9.7, a day after this ADR's original acceptance). No schema change is required or
+authorized by this addendum — `JobRequestSkillSlot` is unchanged from its PR 9.7 shape. PR 9.9 may implement
+`acceptBroadcast()`'s slot claim as `UPDATE "JobRequestSkillSlot" SET confirmed_count = confirmed_count + 1
+WHERE id = $slotId AND confirmed_count < headcount` (or the Prisma `updateMany` equivalent), inside the same
+transaction that creates the resulting `WorkerAssignment` on a successful claim, per this Decision's item 2
+tie-break rule (first successful claim wins; a losing claim receives zero affected rows and returns the
+"requirement fulfilled" response, `TREQ-005`).
+
 ## Compatibility
 
 No runtime behavior changes — no target-model code exists yet to be affected; the current marketplace's own
-optimistic-concurrency slot-claim mechanism is unchanged. No migration, no rollback concern.
+optimistic-concurrency slot-claim mechanism is unchanged. No migration, no rollback concern. The 2026-07-30
+addendum above authorizes no schema change (`JobRequestSkillSlot` is unchanged) and clarifies existing
+authorization for PR 9.9's implementation, not new runtime behavior.
 
 ## Scope note
 
