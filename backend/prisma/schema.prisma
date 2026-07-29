@@ -525,6 +525,10 @@ model WorkRequest {
 
   // Relations
   assignments  WorkerAssignment[]
+  // Epic 9 PR 9.3: back-relation for WorkerAssignment.job_request_id (forward-
+  // named ahead of PR 9.4's WorkRequest -> JobRequest rename). Nullable FK;
+  // no creation path populates it until PR 9.9 (broadcast-accept).
+  job_request_assignments WorkerAssignment[] @relation("job_request_assignment")
 
   // workers_confirmed must never exceed workers_needed — CHECK constraint in migration.
   // Slot-fill race: app layer must do UPDATE ... WHERE version = $known AND workers_confirmed < workers_needed.
@@ -548,10 +552,20 @@ model WorkRequest {
 // it. A replacement creation path is out of this PR's scope; PR 9.3 repoints
 // this model to a nullable job_request_id, with fresh creation paths landing
 // in PR 9.5 (calendar) and PR 9.9 (broadcast accept).
+// Epic 9 PR 9.3: job_request_id added (nullable — no creation path writes
+// it yet; PR 9.9's broadcast-accept path is the first writer). Forward-
+// named ahead of PR 9.4's WorkRequest -> JobRequest rename: the field is
+// named job_request_id even though the relation target is still the
+// WorkRequest model as of this PR. onDelete: SetNull matches this schema's
+// convention for optional FKs (see Hotel.hotel_group, User.hotel_group,
+// AuditLog.actor) — an assignment should outlive the job request it was
+// created from, not be deleted alongside it.
 model WorkerAssignment {
   id                     String           @id @default(cuid())
   work_request_id        String
   work_request           WorkRequest      @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
+  job_request_id         String?
+  job_request            WorkRequest?     @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
   worker_id              String
   worker                 User             @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id               String
@@ -580,6 +594,7 @@ model WorkerAssignment {
   // SP-5: full unique constraint removed. Active-slot double-booking is enforced
   // by the partial unique index in the migration (status IN CONFIRMED, IN_PROGRESS).
   @@index([work_request_id])
+  @@index([job_request_id])
   @@index([worker_id])
   @@index([hotel_id])
   @@index([status])
