@@ -3,6 +3,7 @@ import { authMiddleware } from '../../middleware/auth.js';
 import { requireRole } from '../../middleware/permissions.js';
 import { isJobDispatchPhase2Enabled } from '../../config/feature-flags.js';
 import {
+  acceptBroadcast,
   createWorkRequest,
   getBroadcastEligibility,
   getWorkRequest,
@@ -49,6 +50,20 @@ router.get('/broadcasts/:id/eligibility', (req, res, next) => {
     return;
   }
   getBroadcastEligibility(req, res, next);
+});
+
+// Epic 9 PR 9.9 (TREQ-004/TREQ-005, MIG-GAP-06): worker accepts one skill
+// slot on a broadcast. No requireRole gate (any authenticated role) — this
+// is a worker-initiated action, not a manager one; the service enforces
+// worker roster-eligibility, skill match, and daily-exclusivity itself
+// (same shape as getBroadcastEligibility()'s own no-requireRole route
+// above, and getWorkRequest()'s worker-facing read below).
+router.post('/broadcasts/:id/accept', (req, res, next) => {
+  if (!isJobDispatchPhase2Enabled()) {
+    next();
+    return;
+  }
+  acceptBroadcast(req, res, next);
 });
 
 // RBAC per API_SPEC_V1_PATCH_V2 §PATCH-07g.

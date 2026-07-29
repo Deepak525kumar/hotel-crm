@@ -318,6 +318,14 @@ edges:
     status: observed
     evidence: "backend/src/modules/job-requests/service.ts getBroadcastEligibility(), via backend-assignments' exported isWorkerFreeOnDay()/ACTIVE_ASSIGNMENT_STATUSES (PR 9.6, assignments/service.ts:30-63)"
     note: "New edge, Epic 9 PR 9.7 (TREQ-003/TRULE-006, MIG-GAP-04): getBroadcastEligibility() reuses backend-assignments' PR-9.6 daily-exclusivity read helper rather than duplicating the active-status query, so a broadcast's eligible-worker set stays in lock-step with the DB-level WorkerAssignment_active_slot_unique partial index this helper mirrors. Read-only, function-level import (no new state ownership, no shared-write)."
+  - id: edge-job-requests-writes-worker-assignment
+    source: backend-job-requests
+    target: state-worker-assignment
+    kind: writes-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/job-requests/service.ts acceptBroadcast() -> tx.workerAssignment.create() (Epic 9 PR 9.9)"
+    note: "New edge, Epic 9 PR 9.9 (TREQ-004/TREQ-005, MIG-GAP-06): acceptBroadcast() creates a WorkerAssignment directly on a successful first-accept claim -- a genuine cross-module write into a state domain backend-job-requests does not own, but one ADR-056 item 1 already pre-authorized explicitly (\"created directly from either assignment path — a calendar placement or a broadcast accept\"), the same shape backend-assignments' own placeOnCalendar() (PR 9.5) established for the calendar path. authoritative_writer for state-worker-assignment remains backend-assignments (see that node's own entry, updated in this same pass); this is a second, ADR-ratified creator, not a change in state ownership."
   - id: edge-users-reads-employment-record
     source: backend-users
     target: state-employment-record
@@ -645,10 +653,10 @@ state_domains:
   - id: state-worker-assignment
     model: WorkerAssignment
     authoritative_writer: backend-assignments
-    writers: [backend-assignments]
+    writers: [backend-assignments, backend-job-requests]
     readers: [backend-quality, backend-attendance, backend-analytics]
-    evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
-    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module (and the WorkerAssignment.application_id FK it depended on) was physically deleted; it no longer creates WorkerAssignment records. See SYNC-059. The historical cross-module-write coupling this entry previously described is recorded in git history. WorkerAssignment gained a new nullable job_request_id FK back onto WorkRequest by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012) — see edge-assignments-job-request-fk above; schema-only as of this pass, no write path populates it yet. See SYNC-060."
+    evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; placeOnCalendar creates: backend/src/modules/assignments/service.ts:301 (Epic 9 PR 9.5); acceptBroadcast creates: backend/src/modules/job-requests/service.ts (Epic 9 PR 9.9); reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
+    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module (and the WorkerAssignment.application_id FK it depended on) was physically deleted; it no longer creates WorkerAssignment records. See SYNC-059. The historical cross-module-write coupling this entry previously described is recorded in git history. WorkerAssignment gained a new nullable job_request_id FK back onto WorkRequest by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012) — see edge-assignments-job-request-fk above. backend-job-requests added as a second writer by Epic 9 PR 9.9 (2026-07-30, TREQ-004/005/MIG-GAP-06): acceptBroadcast() creates a WorkerAssignment directly on a successful slot claim, per ADR-056 item 1's explicit ratification of direct creation \"from either assignment path — a calendar placement or a broadcast accept\" (this cross-module write was already ADR-pre-authorized, not a new architecture decision this PR makes). authoritative_writer remains backend-assignments (state ownership, invariants, and lifecycle stay owned there); backend-job-requests is a second, ADR-ratified creator, the same shape backend-assignments' own placeOnCalendar() already established for the calendar path. See SYNC-067."
   - id: state-attendance
     model: Attendance
     authoritative_writer: backend-attendance

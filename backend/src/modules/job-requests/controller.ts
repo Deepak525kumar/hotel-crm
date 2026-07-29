@@ -3,6 +3,7 @@ import { ValidationError } from '../../lib/errors.js';
 import { sendPaginated, sendSuccess } from '../../lib/http-envelope.js';
 import { jobRequestService } from './service.js';
 import {
+  AcceptBroadcastSchema,
   CreateWorkRequestSchema,
   ListWorkRequestsQuerySchema,
   RaiseBroadcastSchema,
@@ -143,6 +144,31 @@ export async function getBroadcastEligibility(
       scope: req.auth!.scope ?? null,
     });
     sendSuccess(res, result, { requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Epic 9 PR 9.9 (TREQ-004/TREQ-005, MIG-GAP-06).
+export async function acceptBroadcast(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = AcceptBroadcastSchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await jobRequestService.acceptBroadcast(req.params.id, parsed.data.skill, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+    });
+    sendSuccess(res, result, {
+      statusCode: result.status === 'accepted' ? 201 : 200,
+      requestId: req.requestId,
+    });
   } catch (error) {
     next(error);
   }

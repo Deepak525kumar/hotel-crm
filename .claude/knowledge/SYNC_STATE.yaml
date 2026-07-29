@@ -2987,12 +2987,119 @@ context_invalidators:
       "requirement fulfilled") begins only after this PR merges and its own
       Repository Synchronization Workflow pass runs.
 
+  - id: SYNC-067
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass following Epic 9 PR 9.8 merge (PR #279,
+      commit 1ea934d, merged da620d9; TREQ-003 delivery half, MIG-GAP-04), run
+      before starting PR 9.9 per the commissioning human's Repository
+      Synchronization Workflow instruction. Verified the merge landed
+      correctly: JobRequestSkillSlot/raiseBroadcast()/getBroadcastEligibility()/
+      enqueueBroadcastNotifications()/NotificationType.JOB_REQUEST_BROADCAST
+      all present. Full validation re-run clean at merge HEAD: 81 suites/1274
+      tests, tsc clean, prisma validate/generate clean,
+      repository-integrity-check.js exit 0 (0 new blocking findings, 90
+      total/86 WARN/4 baselined -- unchanged in kind from the SYNC-066
+      baseline), context-loader.js --validate 0 errors.
+      PR 9.9 (first-accept arbitration + "requirement fulfilled", TREQ-004/005,
+      MIG-GAP-06) then implemented. Two pre-implementation escalations found
+      and resolved before writing code, per the commissioning human's own
+      "if repository reality differs from the plan, stop and escalate" instruction:
+      (1) ADR-057 (ratified 2026-07-28) named "a version column plus a
+      transactional conditional update" as the slot-arbitration mechanism,
+      matching the retired work-applications/service.ts approve()'s combined
+      version+count-guard shape -- but JobRequestSkillSlot (built by PR 9.7,
+      one day after ADR-057's ratification, arbitrating at a per-skill grain
+      ADR-057 could not have anticipated) has no version column, only
+      confirmed_count/headcount; PR 9.7's own migration comment asserted a
+      bare count-guard would suffice for PR 9.9 without any ADR amendment
+      reconciling the two. An architecture-reviewer pass confirmed a bare
+      `WHERE confirmed_count < headcount` conditional updateMany is fully
+      atomic/race-safe in Postgres (row-level locking re-evaluates the
+      predicate against post-lock values for any concurrent claimant, the
+      same mechanism a version column relies on) but is not literally what
+      ADR-057's unhedged text names, and recommended escalation rather than
+      resolving it by inference since a Decision Record is not delegable to
+      an implementer mid-PR. Escalated via AskUserQuestion; the commissioning
+      human chose amending ADR-057 with an addendum (not adding a version
+      column to JobRequestSkillSlot) -- ADR-057
+      (docs/14-governance/architecture-decisions/ADR-057-...) now carries a
+      2026-07-30 addendum confirming the bare confirmed_count guard is a
+      conforming instance of the ratified optimistic-concurrency mechanism at
+      this per-skill-slot grain, not a deviation requiring schema change.
+      DECISION_INDEX.md's ADR-057 row updated to note the addendum. (2)
+      WorkerAssignment.assigned_by_id (NOT NULL, onDelete: Restrict, relation
+      "assignment_manager") has no natural value for a worker-initiated
+      self-accept -- no manager acts in the moment of acceptance. Escalated;
+      the commissioning human chose setting assigned_by_id to the broadcast
+      JobRequest's own created_by_id (the manager who raised it), not the
+      accepting worker's own id.
+      Implemented: JobRequestService.acceptBroadcast() (job-requests/service.ts)
+      -- worker-side authz (isWorkerEligibleForHotel(), matching skill via
+      EmploymentRecord.skills, isWorkerFreeOnDay() reused from PR 9.6/9.7,
+      not recalculated); transactional conditional updateMany claim on
+      JobRequestSkillSlot.confirmed_count; on claimed.count === 0 returns
+      { status: 'requirement_fulfilled' } instead of throwing (TREQ-005); on
+      success creates a WorkerAssignment (job_request_id set, work_request_id
+      null, day = shift_date, assigned_by_id = created_by_id) inside the same
+      transaction, with the same P2002-catch pattern placeOnCalendar() (PR
+      9.5) established for the daily-exclusivity partial unique index. New
+      route POST /work-requests/broadcasts/:id/accept, no requireRole gate
+      (worker-initiated, mirrors getBroadcastEligibility()'s own no-gate
+      shape), gated by FEATURE_JOBDISPATCH_PHASE2. Test file
+      job-requests-arbitration.test.ts (12 new tests) includes the mandatory
+      concurrency test the module's own governance register flags as
+      historically untested for the marketplace equivalent (FIND-BRV-006) --
+      not deferred, per this PR's own scope: a stateful mock (the shared
+      JobRequestSkillSlot row's confirmed_count actually mutates across two
+      concurrent acceptBroadcast() calls, modeling Postgres's row-lock
+      serialization) proves exactly one of two concurrent claimants on a
+      single-headcount slot wins, the loser receives requirement_fulfilled,
+      and exactly one WorkerAssignment row is created. Full validation clean:
+      82 suites/1291 tests (81+1 new suite; 1274 + 12 new - 5 shifted... see
+      journal for exact delta), tsc --noEmit clean, prisma validate/generate
+      clean (no schema/migration change -- the ADR-057 addendum resolution
+      means no new column was needed), repository-integrity-check.js exit 0
+      (0 new blocking findings, 90 total/86 WARN/4 baselined, unchanged).
+      Knowledge layer updated in this same pass: MODULE_SPEC.md bumped
+      0.3.5->0.3.6 with a new Review-and-Change-Log row and updated
+      TREQ-004/TREQ-005/MIG-GAP-04/MIG-GAP-06 status cells (MIG-GAP-04 and
+      MIG-GAP-06 both now fully closed); MODULE_REGISTRY.yaml/
+      SPECIFICATION_INDEX.yaml citations bumped to @0.3.6 for both
+      backend-job-requests and backend-assignments; DEPENDENCY_GRAPH.yaml's
+      state-worker-assignment node gained backend-job-requests as a second
+      writer (authoritative_writer remains backend-assignments -- this is an
+      ADR-056-item-1-ratified second creator, not a state-ownership change)
+      plus a new edge-job-requests-writes-worker-assignment edge;
+      TERMINOLOGY.md's "Broadcast (Job Request)" entry updated to record
+      arbitration is now built, and a new "Slot" term promoted (named in
+      SPEC-JOB-DISPATCH-001's own Proposed Knowledge Delta list, now
+      load-bearing via JobRequestSkillSlot/acceptBroadcast()).
+      SIR-JOBD-006 (the MIG-GAP-01..12 enumeration) NOT touched -- same
+      standing instruction SYNC-064/065/066 already recorded: closing a
+      register row is an implementation-completion act reserved for Epic 9's
+      own final pass, not a per-PR act.
+      No auto-close, scheduler registration, or any PR 9.10 behavior was
+      implemented.
+    authority_needed: none  # this pass's schema/service/route/test work is implementation authorized by the standing Epic 9 PR 9.9 scope in the implementation execution plan; both escalated points (ADR-057 addendum, assigned_by_id value) were explicitly confirmed by the commissioning human before code was written, not inferred; the knowledge-layer updates are synchronization exit conditions of this same PR, not new authority
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit, branch creation, push,
+      and PR open. cache_state.baseline_revision is NOT rebound by this
+      entry (still da620d9, the PR #279 merge HEAD this pass verified) since
+      this pass's own commit has not merged yet -- the next
+      repository-synchronization pass (verifying this PR's own merge, before
+      PR 9.10) rebinds it forward. PR 9.10 (6h auto-close scheduled job)
+      begins only after this PR merges and its own Repository Synchronization
+      Workflow pass runs.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: cbad94e  # rebound to HEAD cbad94e by SYNC-065 (2026-07-29, post Epic 9 PR 9.7 merge, PR #278 — JobRequestSkillSlot + raiseBroadcast()/getBroadcastEligibility(), plus the same-day pre-merge documentation correction); prior e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: da620d9  # rebound to HEAD da620d9 by SYNC-067 (2026-07-30, post Epic 9 PR 9.8 merge, PR #279 — JobRequestSkillSlot notification delivery, NotificationType.JOB_REQUEST_BROADCAST); prior cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }

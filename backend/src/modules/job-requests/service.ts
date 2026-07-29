@@ -1,4 +1,5 @@
 import {
+  AssignmentStatus,
   OutboxSourceModule,
   OutboxTransport,
   Prisma,
@@ -19,6 +20,7 @@ import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
+  AcceptBroadcastResultDto,
   BroadcastEligibilityDto,
   CreateWorkRequestInput,
   JobRequestSkillSlotDto,
@@ -567,6 +569,123 @@ export class JobRequestService extends BaseService {
         );
       }
     }
+  }
+
+  /**
+   * Epic 9 PR 9.9 (TREQ-004/TRULE-003, TREQ-005/TRULE-004, MIG-GAP-06): a
+   * worker accepts one skill slot on a broadcast JobRequest. First-accept
+   * wins via optimistic concurrency — a transactional conditional
+   * `updateMany` on JobRequestSkillSlot.confirmed_count, structurally
+   * identical in shape to the retired work-applications/service.ts
+   * approve()'s slot-claim (ADR-057 item 2), narrowed by ADR-057's
+   * 2026-07-30 addendum to a bare confirmed_count guard (no separate
+   * version column) since JobRequestSkillSlot arbitrates at the per-skill
+   * grain, not the whole-request grain the retired approve() claimed
+   * against. On `claimed.count === 0` (slot already filled by a faster
+   * claimant), returns the "requirement fulfilled" response instead of
+   * throwing (TREQ-005) — not an error, not silence. On success, creates a
+   * WorkerAssignment directly inside the same transaction, with
+   * job_request_id set (PR 9.3's FK) and work_request_id left null (PR
+   * 9.5's nullability relax) — the identical disposition PR 9.5's
+   * placeOnCalendar() already established; see that method's own forward-
+   * note. assigned_by_id is set to the broadcast's own created_by_id (the
+   * manager who raised it) rather than the accepting worker, since
+   * assigned_by_id's "assignment_manager" relation has no natural
+   * self-accept value and the raising manager's action is what made this
+   * assignment possible (escalated and confirmed by the commissioning
+   * human before this PR's implementation).
+   *
+   * Does NOT implement auto-close, scheduler registration, or any PR
+   * 9.10 behavior — only the accept/arbitration path.
+   */
+  async acceptBroadcast(
+    id: string,
+    skill: JobRequestSkillSlot['skill'],
+    actor: { userId: string; role: string }
+  ): Promise<AcceptBroadcastResultDto> {
+    const wr = await this.prisma.jobRequest.findUnique({
+      where: { id },
+      include: { skill_slots: true },
+    });
+    if (!wr) throw new NotFoundError('Work request not found');
+    if (wr.skill_slots.length === 0) {
+      throw new ConflictError('This work request is not a broadcast (no skill slots)');
+    }
+    if (wr.status !== WorkRequestStatus.OPEN) {
+      throw new ConflictError('This broadcast is no longer open for acceptance');
+    }
+
+    const slot = wr.skill_slots.find((s) => s.skill === skill);
+    if (!slot) {
+      throw new NotFoundError('No matching skill slot on this broadcast');
+    }
+
+    // Worker-side eligibility: roster membership (hotel-group scope, same
+    // check getById()'s worker branch uses), matching skill, and free that
+    // day. A worker who doesn't hold this skill or isn't roster-eligible at
+    // this hotel cannot accept regardless of the slot's fill state —
+    // deny-by-default, mirrors every other worker-facing read/write in this
+    // module.
+    const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
+    if (!eligible) {
+      throw new ForbiddenError('Cannot accept this broadcast');
+    }
+    const record = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: actor.userId },
+      select: { skills: true },
+    });
+    if (!record || !record.skills.includes(skill)) {
+      throw new ForbiddenError('Cannot accept this broadcast');
+    }
+    const free = await isWorkerFreeOnDay(actor.userId, wr.shift_date);
+    if (!free) {
+      throw new ConflictError('Already assigned that day');
+    }
+
+    let assignmentId: string | null = null;
+    try {
+      assignmentId = await this.prisma.$transaction(async (tx) => {
+        // First-accept-wins optimistic-concurrency claim (ADR-057, addendum
+        // 2026-07-30): the WHERE clause's confirmed_count < headcount
+        // predicate is what Postgres re-evaluates against post-lock values
+        // for any concurrent claimant on this same row, making this single
+        // UPDATE atomic without a separate version column.
+        const claimed = await tx.jobRequestSkillSlot.updateMany({
+          where: { id: slot.id, confirmed_count: { lt: slot.headcount } },
+          data: { confirmed_count: { increment: 1 } },
+        });
+        if (claimed.count === 0) return null;
+
+        const assignment = await tx.workerAssignment.create({
+          data: {
+            work_request_id: null,
+            job_request_id: wr.id,
+            worker_id: actor.userId,
+            hotel_id: wr.hotel_id,
+            assigned_by_id: wr.created_by_id,
+            status: AssignmentStatus.CONFIRMED,
+            day: wr.shift_date,
+          },
+        });
+        return assignment.id;
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('Worker already has an assignment for this day');
+      }
+      throw error;
+    }
+
+    if (assignmentId === null) {
+      return { status: 'requirement_fulfilled', job_request_id: wr.id, skill };
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST', 'WORKER_ASSIGNMENT', assignmentId, {
+      job_request_id: wr.id,
+      skill,
+    });
+
+    return { status: 'accepted', assignment_id: assignmentId, job_request_id: wr.id, skill };
   }
 }
 

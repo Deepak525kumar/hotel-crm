@@ -124,6 +124,34 @@ export interface BroadcastEligibilityDto {
   slots: SkillSlotEligibilityDto[];
 }
 
+// Epic 9 PR 9.9 (TREQ-004/TREQ-005, MIG-GAP-06): a worker accepts one skill
+// slot on a broadcast JobRequest. `skill` disambiguates which slot on a
+// multi-skill broadcast the worker is claiming (e.g. a worker holding both
+// CLEANER and WAITER must say which opening they're accepting).
+export const AcceptBroadcastSchema = z.object({
+  skill: z.nativeEnum(SkillTag),
+});
+
+export type AcceptBroadcastInput = z.infer<typeof AcceptBroadcastSchema>;
+
+// Discriminated response: a successful claim returns the created assignment;
+// a lost race (slot already filled by the time this claim ran) returns the
+// "requirement fulfilled" response (TREQ-005) instead of an error.
+export interface AcceptBroadcastAssignmentDto {
+  status: 'accepted';
+  assignment_id: string;
+  job_request_id: string;
+  skill: SkillTag;
+}
+
+export interface AcceptBroadcastFulfilledDto {
+  status: 'requirement_fulfilled';
+  job_request_id: string;
+  skill: SkillTag;
+}
+
+export type AcceptBroadcastResultDto = AcceptBroadcastAssignmentDto | AcceptBroadcastFulfilledDto;
+
 export interface WorkRequestDto {
   id: string;
   hotel_id: string;
