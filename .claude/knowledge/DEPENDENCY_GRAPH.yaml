@@ -30,7 +30,12 @@ nodes:
   # No node entry remains; see state-hotel-worker's own note below and git
   # history for the historical relationship record.
   - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
-  - { id: backend-work-applications, kind: module, owner: unassigned, source: backend/src/modules/work-applications }
+  # backend-work-applications module REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
+  # merged b035700; TREQ-011/ADR-058) — physically deleted from
+  # backend/src/modules/work-applications; WorkApplication model + ApplicationStatus enum
+  # + WorkerAssignment.application_id FK dropped from schema.prisma (migration
+  # 20260729000000_drop_work_application). No node entry remains; see state-work-application's
+  # own note below and git history for the historical relationship record. See SYNC-059.
   - { id: backend-assignments, kind: module, owner: unassigned, source: backend/src/modules/assignments }
   - { id: backend-attendance, kind: module, owner: unassigned, source: backend/src/modules/attendance }
   - { id: backend-quality, kind: module, owner: unassigned, source: backend/src/modules/quality }
@@ -142,7 +147,11 @@ nodes:
   - { id: state-hotel-group, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:231 (model HotelGroup, added by ADR-023)" }  # added during governance audit (governance-audit-recalc, 2026-07-22); was previously missing from this list despite Hotel.hotel_group_id FK (state-hotel note below) and MODULE_REGISTRY.yaml backend-crm entry already referencing ADR-023's HotelGroup ownership
   - { id: state-hotel-worker, kind: state-domain, owner: none, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }  # owner backend-hotel-workers removed by Epic 5 PR 5.8; see state_domains note below
   - { id: state-work-request, kind: state-domain, owner: backend-work-requests, source: "backend/prisma/schema.prisma:236 (model WorkRequest)" }
-  - { id: state-work-application, kind: state-domain, owner: backend-work-applications, source: "backend/prisma/schema.prisma:279 (model WorkApplication)" }
+  # state-work-application node REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
+  # merged b035700; TREQ-011/ADR-058) — the WorkApplication model and ApplicationStatus
+  # enum were dropped from schema.prisma (migration 20260729000000_drop_work_application);
+  # its sole writer, backend-work-applications, was physically deleted in the same PR.
+  # No node entry remains; see git history for the historical relationship record. See SYNC-059.
   - { id: state-worker-assignment, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma:314 (model WorkerAssignment)" }
   - { id: state-attendance, kind: state-domain, owner: backend-attendance, source: "backend/prisma/schema.prisma:359 (model Attendance)" }
   - { id: state-quality-verification, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:395 (model QualityVerification)" }
@@ -184,14 +193,9 @@ edges:
     compatibility: unknown
     status: observed
     evidence: "backend/src/modules/work-requests/service.ts:4,240-242"
-  - id: edge-work-applications-notifications
-    source: backend-work-applications
-    target: backend-notifications
-    kind: calls
-    contract: notification-service
-    compatibility: unknown
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:12,103,194,299,306"
+  # edge-work-applications-notifications REMOVED by Epic 9 PR 9.2 (commits
+  # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
+  # was physically deleted; it no longer calls notification-service. See SYNC-059.
   - id: edge-attendance-notifications
     source: backend-attendance
     target: backend-notifications
@@ -210,28 +214,12 @@ edges:
     evidence: "backend/src/modules/quality/service.ts:4,75,191"
 
   # --- Cross-module state writes (work-applications accept-application transaction) ---
-  # The accept flow provisions records in state domains owned by other modules.
-  - id: edge-work-applications-writes-work-request
-    source: backend-work-applications
-    target: state-work-request
-    kind: writes-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:219,278,283 (tx.workRequest.updateMany/update)"
-  - id: edge-work-applications-writes-worker-assignment
-    source: backend-work-applications
-    target: state-worker-assignment
-    kind: writes-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:243 (tx.workerAssignment.create)"
-  - id: edge-work-applications-writes-attendance
-    source: backend-work-applications
-    target: state-attendance
-    kind: writes-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:256 (tx.attendance.create)"
+  # edge-work-applications-writes-work-request, edge-work-applications-writes-worker-assignment,
+  # and edge-work-applications-writes-attendance REMOVED by Epic 9 PR 9.2 (commits
+  # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the accept-application
+  # transaction and the module that ran it (backend-work-applications) were physically
+  # deleted; these cross-module writes no longer occur. See SYNC-059 and git history
+  # for the historical relationship record.
 
   # --- Cross-module state reads (a module reads a state domain it does not own) ---
   # ADR-031 D-3/PR-8 (2026-07-27): backend-auth already owns state-user's writer role
@@ -300,13 +288,9 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts"
-  - id: edge-work-applications-reads-employment-record
-    source: backend-work-applications
-    target: state-employment-record
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts apply(), via lib/roster-scope.ts"
+  # edge-work-applications-reads-employment-record REMOVED by Epic 9 PR 9.2 (commits
+  # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
+  # was physically deleted; it no longer reads state-employment-record. See SYNC-059.
   - id: edge-work-requests-reads-employment-record
     source: backend-work-requests
     target: state-employment-record
@@ -352,27 +336,12 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/analytics/service.ts getLeaderboard()"
-  - id: edge-work-requests-reads-work-application
-    source: backend-work-requests
-    target: state-work-application
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-requests/service.ts:149 (this.prisma.workApplication.findFirst)"
-  - id: edge-work-applications-reads-work-request
-    source: backend-work-applications
-    target: state-work-request
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:43,118,211,276 (this.prisma.workRequest)"
-  - id: edge-work-applications-reads-worker-overall-rating
-    source: backend-work-applications
-    target: state-worker-overall-rating
-    kind: reads-state
-    compatibility: not-applicable
-    status: observed
-    evidence: "backend/src/modules/work-applications/service.ts:64 (this.prisma.workerOverallRating.findUnique)"
+  # edge-work-requests-reads-work-application, edge-work-applications-reads-work-request,
+  # and edge-work-applications-reads-worker-overall-rating REMOVED by Epic 9 PR 9.2
+  # (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the WorkApplication
+  # model was dropped and backend-work-applications was physically deleted; none of
+  # these reads occur any longer. See SYNC-059 and git history for the historical
+  # relationship record.
   - id: edge-attendance-reads-worker-assignment
     source: backend-attendance
     target: state-worker-assignment
@@ -459,7 +428,7 @@ edges:
   # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
   - { id: edge-frontend-auth, source: frontend-web, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:171,177,180 (/auth/login,/auth/me,/auth/logout)" }
   - { id: edge-frontend-work-requests, source: frontend-web, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:202,204,207 (/work-requests)" }
-  - { id: edge-frontend-work-applications, source: frontend-web, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/work-requests/${id}/applications)" }
+  - { id: edge-frontend-work-applications, source: frontend-web, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: broken, evidence: "frontend/lib/api.ts:335-350 (/work-requests/${workRequestId}/applications, /work-requests/${workRequestId}/applications/${applicationId}); frontend/hooks/useWorkApplications.ts; frontend/app/(protected)/requests/[id]/applications/ pages", note: "TARGET REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- backend-work-applications and its route mount no longer exist, so these calls now 404/error. The caller code itself is NOT removed (confirmed live in the worktree) -- a coordinated frontend companion PR to remove it is pending, per the human operator's own prior decision on PR 9.2. This is a live, unresolved inconsistency, not a retired relationship. See SYNC-059." }
   - { id: edge-frontend-attendance, source: frontend-web, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/attendance)" }
   - { id: edge-frontend-assignments, source: frontend-web, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/assignments)" }
   - { id: edge-frontend-notifications, source: frontend-web, target: backend-notifications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/notifications)" }
@@ -467,7 +436,7 @@ edges:
   # mobile-worker (Expo) via mobile/worker-app/src/lib/api.ts
   - { id: edge-mobile-worker-auth, source: mobile-worker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:61 (/auth); mobile/worker-app/src (/auth)" }
   - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)" }
-  - { id: edge-mobile-worker-work-applications, source: mobile-worker, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:173-183 (applications.apply/withdraw); app/job/[id].tsx:36,57" }  # added by SPEC-JOB-DISPATCH-001 dependency review (FIND-DEP-001)
+  - { id: edge-mobile-worker-work-applications, source: mobile-worker, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: broken, evidence: "mobile/worker-app/src/lib/api.ts:285-292 (applications.apply/withdraw); mobile/worker-app/src/app/job/[id].tsx:36,57", note: "TARGET REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- backend-work-applications and its route mount no longer exist, so these calls now 404/error. The caller code itself is NOT removed (confirmed live in the worktree) -- a coordinated mobile companion PR to remove it is pending, already disclosed in PR 9.2's own description. This is a live, unresolved inconsistency, not a retired relationship. See SYNC-059." }  # added by SPEC-JOB-DISPATCH-001 dependency review (FIND-DEP-001)
   - { id: edge-mobile-worker-assignments, source: mobile-worker, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/assignments)" }
   - { id: edge-mobile-worker-attendance, source: mobile-worker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/attendance)" }
   - { id: edge-mobile-worker-analytics, source: mobile-worker, target: backend-analytics, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/analytics)" }
@@ -496,7 +465,9 @@ runtime:
     - { module: backend-crm, mount: "/api/v1/crm", evidence: "backend/src/routes/v1/index.ts:24" }
     # backend-hotel-workers mount REMOVED by Epic 5 PR 5.8 (route + module deleted).
     - { module: backend-work-requests, mount: "/api/v1/work-requests", evidence: "backend/src/routes/v1/index.ts:26" }
-    - { module: backend-work-applications, mount: "/api/v1/work-requests/:id/applications", nested_under: backend-work-requests, evidence: "backend/src/routes/v1/index.ts:27" }
+    # backend-work-applications mount REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
+    # merged b035700; TREQ-011/ADR-058) -- route unmounted, module physically deleted.
+    # See SYNC-059.
     - { module: backend-assignments, mount: "/api/v1/assignments", evidence: "backend/src/routes/v1/index.ts:28" }
     - { module: backend-attendance, mount: "/api/v1/attendance", evidence: "backend/src/routes/v1/index.ts:29" }
     - { module: backend-quality, mount: "/api/v1/quality", evidence: "backend/src/routes/v1/index.ts:30" }
@@ -520,23 +491,24 @@ contracts:
     payload_contract: "backend/src/modules/notifications/types.ts (NotificationPayload); backend/src/modules/notifications/outbox.types.ts (EnqueueNotificationInput, OutboxEnvelope, NotificationCreatedPayloadV1)"
     consumers:
       - backend-work-requests
-      - backend-work-applications
       - backend-attendance
       - backend-quality
-    # No consumer calls enqueue() yet -- the four producers above still call
+    # backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits
+    # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically
+    # deleted and no longer calls notification-service. See SYNC-059.
+    # No consumer calls enqueue() yet -- the producers above still call
     # sendNotification() fire-and-forget, unchanged by PR 7.1. Producer migration
     # to enqueue() is Epic 7 PR 7.3, out of this PR's scope.
   - id: prisma-schema
     version: unversioned
     owner_module: unassigned
     source: backend/prisma/schema.prisma
-    note: "Central shared data contract. Consumed by every active backend module through @prisma/client types and the shared PrismaClient (BaseService)."
+    note: "Central shared data contract. Consumed by every active backend module through @prisma/client types and the shared PrismaClient (BaseService). backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically deleted. See SYNC-059."
     consumers:
       - backend-auth
       - backend-users
       - backend-crm
       - backend-work-requests
-      - backend-work-applications
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -546,13 +518,12 @@ contracts:
     version: unversioned
     owner_module: unassigned
     source: backend/src/lib/base-service.ts
-    note: "Shared abstract base every service extends; provides PrismaClient access and logAudit (writes state-audit-log)."
+    note: "Shared abstract base every service extends; provides PrismaClient access and logAudit (writes state-audit-log). backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically deleted. See SYNC-059."
     consumers:
       - backend-auth
       - backend-users
       - backend-crm
       - backend-work-requests
-      - backend-work-applications
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -564,12 +535,11 @@ contracts:
     version: unversioned
     owner_module: backend-auth
     source: backend/src/middleware/auth.ts
-    note: "authMiddleware / optionalAuthMiddleware. Applied globally to v1 router and per-module in routes.ts."
+    note: "authMiddleware / optionalAuthMiddleware. Applied globally to v1 router and per-module in routes.ts. backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically deleted. See SYNC-059."
     consumers:
       - backend-users
       - backend-crm
       - backend-work-requests
-      - backend-work-applications
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -582,12 +552,11 @@ contracts:
     version: unversioned
     owner_module: unassigned
     source: backend/src/middleware/permissions.ts
-    note: "requireRole / requirePermission / checkHotelAccess authorization guards. backend-assignments removed from consumers 2026-07-08 (SPEC-AUTH-001 dependency review FIND-001, independently confirmed by architecture review): backend/src/modules/assignments/routes.ts imports only authMiddleware, not middleware/permissions; its comments cite service-level guards instead of route-level RBAC. Epic 5 PR 5.5 (2026-07-21, manager authorization flip, ADR-023/024/025): resolveHotelAccess() now scope-binds the manager role via the PR 5.4 JWT `scope` claim instead of the blanket bypass (flag-gated FEATURE_SCOPE_AUTHZ, default on; off = pre-fix behavior per ADR-024 D3). This adds a new read from permissions-middleware to state-hotel (Hotel.hotel_group_id, via the exported isHotelInScope() helper, for hotel_group-scoped managers) and makes the middleware a consumer of backend-auth's issued scope claim (req.auth.scope). resolveHotelAccess() (exported from permissions.ts) remains the single canonical role->scope authorization decision for the checkHotelAccess() middleware seam (Epic 3); isHotelInScope() is the shared scope-evaluation primitive it delegates to, additionally imported in-service by backend-attendance (attendance/service.ts list()/update()) and backend-quality (quality/service.ts createVerification()/createRating()) to enforce the same manager scope on their non-middleware-gated paths (SIR-ATT-002, SIR-QUAL-004) — those two consumers do not call resolveHotelAccess() itself (they are not routed through checkHotelAccess()), only the shared isHotelInScope() primitive it also uses. checkHotelAccess() still reads state-hotel-worker ACTIVE membership for the worker role (unchanged; the ADR-022 authz-migration removal of that branch is a later PR, gated on the scope claim being live). Recorded as evidence; formal edge_schema promotion (permissions->state-hotel; attendance/quality->permissions-middleware) deferred to the dedicated repository-synchronization pass that also owns the pending state-hotel-worker reader edges above. Epic 8 (2026-07-23, SIR-JOBD-002 / FIND-SEC-002/FIND-SEC-003): backend-work-requests (work-requests/service.ts create()/update()) and backend-work-applications (work-applications/service.ts update()'s reject path and approve()) now also import isHotelInScope() in-service, same shared primitive and same manager-only/flag-gated pattern as backend-attendance/backend-quality, closing the two sibling findings that Epic 5 PR 5.5 had no seam to flip for these two modules (they were never routed through checkHotelAccess()). ADR-030 (2026-07-25/26, PR-1..PR-8, Accepted, capability-based write-authority model, FEATURE_GD02_MATRIX): resolveHotelAccess() gains a REGIONAL_MANAGER branch mirroring the manager hotel_group scope resolution (PR-7 security review FIND-1, commit 82ff718 -- prior state had no RM branch at all, a gap this note's Epic 5 description did not yet reflect); backend-analytics' regional_manager/analytics:read gate gap closed with a D-8 debt-allowlist split (PR-7 review follow-up, commit 5719e05); frontend ManagerAdminGate consumer replaced by capability-named gates HotelWriteGate/StaffingWriteGate (PR-6, commit 8919c87) -- tracked here as the dependency-graph record of that consumer-side rename, not a change to this module's own exports.
+    note: "requireRole / requirePermission / checkHotelAccess authorization guards. backend-assignments removed from consumers 2026-07-08 (SPEC-AUTH-001 dependency review FIND-001, independently confirmed by architecture review): backend/src/modules/assignments/routes.ts imports only authMiddleware, not middleware/permissions; its comments cite service-level guards instead of route-level RBAC. Epic 5 PR 5.5 (2026-07-21, manager authorization flip, ADR-023/024/025): resolveHotelAccess() now scope-binds the manager role via the PR 5.4 JWT `scope` claim instead of the blanket bypass (flag-gated FEATURE_SCOPE_AUTHZ, default on; off = pre-fix behavior per ADR-024 D3). This adds a new read from permissions-middleware to state-hotel (Hotel.hotel_group_id, via the exported isHotelInScope() helper, for hotel_group-scoped managers) and makes the middleware a consumer of backend-auth's issued scope claim (req.auth.scope). resolveHotelAccess() (exported from permissions.ts) remains the single canonical role->scope authorization decision for the checkHotelAccess() middleware seam (Epic 3); isHotelInScope() is the shared scope-evaluation primitive it delegates to, additionally imported in-service by backend-attendance (attendance/service.ts list()/update()) and backend-quality (quality/service.ts createVerification()/createRating()) to enforce the same manager scope on their non-middleware-gated paths (SIR-ATT-002, SIR-QUAL-004) — those two consumers do not call resolveHotelAccess() itself (they are not routed through checkHotelAccess()), only the shared isHotelInScope() primitive it also uses. checkHotelAccess() still reads state-hotel-worker ACTIVE membership for the worker role (unchanged; the ADR-022 authz-migration removal of that branch is a later PR, gated on the scope claim being live). Recorded as evidence; formal edge_schema promotion (permissions->state-hotel; attendance/quality->permissions-middleware) deferred to the dedicated repository-synchronization pass that also owns the pending state-hotel-worker reader edges above. Epic 8 (2026-07-23, SIR-JOBD-002 / FIND-SEC-002/FIND-SEC-003): backend-work-requests (work-requests/service.ts create()/update()) and backend-work-applications (work-applications/service.ts update()'s reject path and approve()) now also import isHotelInScope() in-service, same shared primitive and same manager-only/flag-gated pattern as backend-attendance/backend-quality, closing the two sibling findings that Epic 5 PR 5.5 had no seam to flip for these two modules (they were never routed through checkHotelAccess()). ADR-030 (2026-07-25/26, PR-1..PR-8, Accepted, capability-based write-authority model, FEATURE_GD02_MATRIX): resolveHotelAccess() gains a REGIONAL_MANAGER branch mirroring the manager hotel_group scope resolution (PR-7 security review FIND-1, commit 82ff718 -- prior state had no RM branch at all, a gap this note's Epic 5 description did not yet reflect); backend-analytics' regional_manager/analytics:read gate gap closed with a D-8 debt-allowlist split (PR-7 review follow-up, commit 5719e05); frontend ManagerAdminGate consumer replaced by capability-named gates HotelWriteGate/StaffingWriteGate (PR-6, commit 8919c87) -- tracked here as the dependency-graph record of that consumer-side rename, not a change to this module's own exports. backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically deleted (its in-service isHotelInScope() usage described above is a historical fact, unaffected). See SYNC-059.
     consumers:
       - backend-users
       - backend-crm
       - backend-work-requests
-      - backend-work-applications
       - backend-attendance
       - backend-quality
       - backend-hr
@@ -644,30 +613,28 @@ state_domains:
   - id: state-work-request
     model: WorkRequest
     authoritative_writer: backend-work-requests
-    writers: [backend-work-requests, backend-work-applications]
-    readers: [backend-work-applications, backend-analytics]
-    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; work-applications writes (accept tx): backend/src/modules/work-applications/service.ts:219,278,283; analytics reads: backend/src/modules/analytics/service.ts:75,76,189"
-    note: "work-applications mutates WorkRequest status during the accept-application transaction (cross-module write)."
-  - id: state-work-application
-    model: WorkApplication
-    authoritative_writer: backend-work-applications
-    writers: [backend-work-applications]
-    readers: [backend-work-requests]
-    evidence: "work-applications writes: backend/src/modules/work-applications/service.ts:86,72,186,233; work-requests reads: backend/src/modules/work-requests/service.ts:149"
+    writers: [backend-work-requests]
+    readers: [backend-analytics]
+    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; analytics reads: backend/src/modules/analytics/service.ts:75,76,189"
+    note: "backend-work-applications removed from writers/readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted and no longer writes/reads WorkRequest. See SYNC-059."
+  # state-work-application entry REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
+  # merged b035700; TREQ-011/ADR-058) — the WorkApplication model was dropped from
+  # schema.prisma and its sole writer, backend-work-applications, was physically
+  # deleted. No row remains; see git history for the historical record. See SYNC-059.
   - id: state-worker-assignment
     model: WorkerAssignment
     authoritative_writer: backend-assignments
-    writers: [backend-assignments, backend-work-applications]
+    writers: [backend-assignments]
     readers: [backend-quality, backend-attendance, backend-analytics]
-    evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; work-applications creates (accept tx): backend/src/modules/work-applications/service.ts:243; reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
-    note: "The assignment RECORD is created by work-applications during accept but subsequently owned/updated by assignments (cross-module write)."
+    evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
+    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module (and the WorkerAssignment.application_id FK it depended on) was physically deleted; it no longer creates WorkerAssignment records. See SYNC-059. The historical cross-module-write coupling this entry previously described is recorded in git history."
   - id: state-attendance
     model: Attendance
     authoritative_writer: backend-attendance
-    writers: [backend-attendance, backend-work-applications]
+    writers: [backend-attendance]
     readers: [backend-analytics, backend-quality]
-    evidence: "attendance writes: backend/src/modules/attendance/service.ts:57,179; work-applications creates placeholder (accept tx): backend/src/modules/work-applications/service.ts:256; analytics reads: backend/src/modules/analytics/service.ts:87,88,200; quality reads: backend/src/modules/quality/service.ts:147-149 (on_time_rate recompute)"
-    note: "work-applications seeds the initial Attendance row during accept (cross-module write)."
+    evidence: "attendance writes: backend/src/modules/attendance/service.ts:57,179; analytics reads: backend/src/modules/analytics/service.ts:87,88,200; quality reads: backend/src/modules/quality/service.ts:147-149 (on_time_rate recompute)"
+    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted; it no longer seeds Attendance rows. See SYNC-059."
   - id: state-quality-verification
     model: QualityVerification
     authoritative_writer: backend-quality
@@ -684,8 +651,9 @@ state_domains:
     model: WorkerOverallRating
     authoritative_writer: backend-quality
     writers: [backend-quality]
-    readers: [backend-work-applications, backend-analytics]
-    evidence: "quality writes: backend/src/modules/quality/service.ts:174; reads: backend/src/modules/work-applications/service.ts:64, backend/src/modules/analytics/service.ts:37"
+    readers: [backend-analytics]
+    evidence: "quality writes: backend/src/modules/quality/service.ts:174; reads: backend/src/modules/analytics/service.ts:37"
+    note: "backend-work-applications removed from readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted. See SYNC-059."
   - id: state-rooms-completed-entry
     model: RoomsCompletedEntry
     authoritative_writer: backend-assignments
@@ -774,7 +742,7 @@ state_domains:
 analysis:
   circular_dependencies:
     code_imports: none
-    note: "No backend module imports another module except the notification-service singleton (notifications imports no other module), so the static import graph is acyclic. A DATA-level bidirectional coupling exists between backend-work-requests and backend-work-applications (work-requests reads WorkApplication; work-applications reads and writes WorkRequest) via shared Prisma models, but this is not a code-import cycle."
+    note: "No backend module imports another module except the notification-service singleton (notifications imports no other module), so the static import graph is acyclic. A DATA-level bidirectional coupling HAD existed between backend-work-requests and backend-work-applications (work-requests read WorkApplication; work-applications read and wrote WorkRequest) via shared Prisma models, but this was never a code-import cycle. This coupling no longer exists as of Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058): backend-work-applications and the WorkApplication model were physically deleted, so one side of the coupling no longer exists. Corrected to historical per the commissioning human's own instruction that this note needed updating since one side no longer exists. See SYNC-059."
   orphan_modules:
     - { id: backend-chatbot, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
     - { id: backend-geo, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
@@ -799,6 +767,6 @@ analysis:
 remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
-  - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs."
+  - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs. UPDATE: this removal is now complete -- Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) physically deleted backend-work-applications and dropped the WorkApplication model. See SYNC-059."
   - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub module backend-hr. backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."

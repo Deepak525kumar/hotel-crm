@@ -29,6 +29,8 @@ status: verified-inventory
 # SPEC-ATT-001 on 2026-07-15. Only backend-chatbot (SPEC-CHATBOT-001@0.1.3) and backend-geo
 # (SPEC-GEO-001@0.1.1) remain REVIEW-status, both unimplemented stubs blocked on open
 # decisions (see SPECIFICATION_INDEX.yaml). backend-hotel-workers is RETIRED (ADR-022).
+# backend-work-applications is RETIRED (TREQ-011 / ADR-058; Epic 9 PR 9.2, commits
+# 12b1c31/2e89c4f, merged b035700) -- see SYNC-059.
 
 modules:
   - id: backend-auth
@@ -105,13 +107,13 @@ modules:
     type: backend-module
     path: backend/src/modules/work-applications
     owner: unassigned
-    lifecycle: active
-    implementation_status: active
-    dependencies: [backend-notifications]
+    lifecycle: removed  # Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700): TREQ-011 (ADR-058-eligible target, GD-20) required removing the WorkApplication model and all worker-initiated application endpoints (confirmed NON-GOAL of the marketplace-to-broadcast pivot). The module (routes/controller/service/types, backend/src/modules/work-applications/) was physically deleted, its route mount removed, and the WorkApplication model + ApplicationStatus enum + WorkerAssignment.application_id FK dropped from schema.prisma via migration 20260729000000_drop_work_application. Unlike the backend-hotel-workers precedent (ADR-022, CODE-ONLY: table left dormant, no migration), this retirement is CODE-AND-SCHEMA: the underlying table and enum are actually dropped, not merely orphaned.
+    implementation_status: removed
+    dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-JOB-DISPATCH-001@0.3.2 (FROZEN)  # docs/03-modules/job-dispatch/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-15 (G2 Approval Workflow); the spec is frozen independently of open security findings, which are RELEASE PREREQUISITES (review by G8), not freeze blockers, per the approving human ruling. Architecture BLOCKED cleared by ADR-018. Amended 0.3.0->0.3.1 (2026-07-19, Correction) per ADR-021; 0.3.1->0.3.2 (2026-07-27, Correction) per GD-05; see backend-work-requests entry.
-    evidence: backend/src/routes/v1/index.ts:27; backend/src/modules/work-applications/service.ts:12
+    specification: RETIRED (TREQ-011 / ADR-058)  # module and its owning capability removed; docs/03-modules/job-dispatch/MODULE_SPEC.md retains the historical rule/endpoint rows marked `[RETIRED in target]`/`[TARGET: REMOVED]` for record purposes.
+    evidence: git history (removed by Epic 9 PR 9.2, commits 12b1c31/2e89c4f, merged b035700); backend/prisma/migrations/20260729000000_drop_work_application/ (schema.prisma DROP)
 
   - id: backend-assignments
     type: backend-module

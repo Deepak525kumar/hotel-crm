@@ -2362,6 +2362,73 @@ context_invalidators:
       by a future, dedicated implementation-planning pass -- not scheduled or sequenced
       by this entry.
 
+  - id: SYNC-059
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass retiring backend-work-applications and
+      state-work-application across the knowledge layer, following Epic 9 PR 9.2
+      (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058): the confirmed
+      marketplace-to-broadcast pivot required removing the WorkApplication model and
+      all worker-initiated application endpoints. The module (backend/src/modules/
+      work-applications/, routes/controller/service/types) was physically deleted, its
+      route mount removed, and the WorkApplication model + ApplicationStatus enum +
+      WorkerAssignment.application_id FK dropped from schema.prisma via migration
+      20260729000000_drop_work_application.
+      MODULE_REGISTRY.yaml: backend-work-applications entry set to lifecycle: removed,
+      implementation_status: removed, dependencies: [], specification: RETIRED
+      (TREQ-011 / ADR-058), evidence citing the retiring PR/migration; file-header
+      comment added citing this entry.
+      DEPENDENCY_GRAPH.yaml: the backend-work-applications module node, the
+      state-work-application state-domain node and state_domains row, and every edge
+      whose entire purpose was describing a backend-work-applications relationship
+      (notification-service call; the three accept-application-transaction
+      cross-module writes to state-work-request/state-worker-assignment/
+      state-attendance; the reads of state-work-request/state-worker-overall-rating/
+      state-employment-record; the accept-application worker-overall-rating read)
+      replaced with retirement comments, no dangling entries left. Multi-consumer
+      lists (state-work-request writers/readers, state-worker-assignment writers,
+      state-attendance writers, state-worker-overall-rating readers, and the
+      notification-service/prisma-schema/base-service/auth-middleware/
+      permissions-middleware contract consumer lists) had only the
+      backend-work-applications entry stripped, all other consumers retained. The
+      route_registration mount table row for backend-work-applications was replaced
+      with a retirement comment. The two client-side edges
+      (edge-frontend-work-applications, edge-mobile-worker-work-applications) were
+      NOT removed -- frontend/lib/api.ts, frontend/hooks/useWorkApplications.ts,
+      frontend/app/(protected)/requests/[id]/applications/, mobile/worker-app/src/
+      lib/api.ts, and mobile/worker-app/src/app/job/[id].tsx still contain live
+      caller code hitting the now-deleted endpoints; both edges were instead marked
+      status: broken with a note explaining the target was removed by PR 9.2 and a
+      coordinated frontend/mobile companion PR (per the human operator's own prior
+      decision on PR 9.2) is pending to remove the callers. The circular_dependencies
+      note describing a DATA-level bidirectional coupling between backend-work-requests
+      and backend-work-applications was corrected to historical/past-tense, citing
+      this retirement, since one side (backend-work-applications) no longer exists.
+      The remaining_human_decisions entry recording ADR-018's SUPERSEDED-BY-PIVOT
+      disposition (already correctly historical/forward-looking) had a short
+      completion note appended recording that the live-code removal it anticipated
+      is now done.
+      STATE_OWNERSHIP_INDEX.yaml: the state-work-application row retired with the same
+      comment convention; state-work-request/state-worker-assignment/state-attendance/
+      state-worker-overall-rating rows had backend-work-applications stripped from
+      writers/readers with a note; cross_module_write_couplings (previously a single
+      entry describing the now-gone accept-application-transaction coupling) set to
+      an empty list with an explanatory comment, since the coupling no longer exists.
+      No ADR, MODULE_SPEC.md, application code, migration, or test file was touched.
+      SIR-JOBD-006 and all other governance-register items were left exactly as-is
+      (no governance item reopened). MODULE_MEMORY.yaml and IMPROVEMENT_LOG.yaml were
+      not touched (already correct from a prior pass).
+    authority_needed: none  # pure knowledge-layer synchronization following an already-merged code change (Epic 9 PR 9.2) and an already-ratified decision (TREQ-011/ADR-058); no new decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the orchestrating
+      session handles git add/commit and any PR. cache_state.baseline_revision is
+      intentionally NOT rebound by this entry since HEAD has not advanced yet, per the
+      existing SYNC-055/SYNC-056/SYNC-057/SYNC-058 pattern (rebind follows a HEAD
+      change, not a working-tree edit). Run node .claude/tooling/
+      repository-integrity-check.js to confirm no new blocking findings before this
+      pass's changes are committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
