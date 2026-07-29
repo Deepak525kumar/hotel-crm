@@ -775,14 +775,29 @@ not silent renumbering.
 
 #### PR 9.6 — Daily-exclusivity partial unique index
 
+- **Repository-reality correction (2026-07-29):** this section originally assumed a single backfill
+  source (`work_request.shift_date`) for every existing `WorkerAssignment` row. Since PR 9.5,
+  that assumption no longer holds: calendar-placed rows (`placeOnCalendar()`) have
+  `work_request_id: null` — their date lives on the sibling `CalendarEntry.day` (1:1 via
+  `assignment_id`), not on a `JobRequest`. A single-source backfill would silently leave
+  calendar-placed rows with a null/wrong `day`. Per explicit review decision, the backfill is
+  **two-sourced by creation path**: `work_request.shift_date` when `work_request_id` is set
+  (legacy/broadcast-lineage rows), `calendar_entry.day` when it is a calendar-placed row
+  (`work_request_id` null, `calendar_entry` present via the 1:1 relation). No other PR in this
+  plan is affected — PR 9.9 (broadcast-accept) will populate `job_request_id`, not
+  `work_request_id`, so this migration's backfill (a one-time pass over rows that exist *before*
+  this migration runs) is unaffected by that future write path; a forward-note is added below for
+  whoever implements PR 9.9's own `day` population at creation time.
 - **Files:** new migration re-keying the existing partial unique index (`migration.sql:580-582`,
   currently `(work_request_id, worker_id)` for active statuses) to `(worker_id, day)` where `day`
-  is derived from the assignment's shift date (calendar entry's day or broadcast `JobRequest`'s
-  shift date — requires a denormalized `day` column on `WorkerAssignment` if one does not already
-  exist; verify against current `schema.prisma` before authoring — if `WorkerAssignment` has no
-  own date field today, add one in this migration, backfilled from `work_request.shift_date` for
-  every existing row, since this is the one column-level change touching potentially-existing rows
-  in the whole epic and must be additive-then-backfilled, not a blind NOT NULL add).
+  is a new denormalized column on `WorkerAssignment` (confirmed absent from `schema.prisma` today),
+  added nullable-then-backfilled-then-`NOT NULL` (additive-then-backfill, not a blind `NOT NULL`
+  add): backfilled per the two-sourced logic above, one `UPDATE` per source. `placeOnCalendar()`
+  (PR 9.5) and any future PR 9.9 broadcast-accept creation path must also populate `day` directly
+  at creation time going forward — this migration's backfill only covers rows that exist *before*
+  it runs; `assignments/service.ts`'s `placeOnCalendar()` needs a small follow-up write in this
+  same PR to set `day` on new rows too (`CalendarEntry.day`'s value, at creation), since otherwise
+  every new calendar placement after this migration would violate the new `NOT NULL` constraint.
   `assignments/service.ts` (or a small shared helper) enforces the invariant read-side (eligibility
   exclusion for 9.7).
 - **Acceptance criteria closed:** `TREQ-007`/`TRULE-006` ("one active assignment per worker per DAY
