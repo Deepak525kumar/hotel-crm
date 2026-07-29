@@ -27,8 +27,10 @@ state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDE
   - { domain: state-session, authoritative_writer: backend-auth }
   - { domain: state-hotel, authoritative_writer: backend-crm }
   - { domain: state-hotel-worker, authoritative_writer: none }  # DORMANT since Epic 5 PR 5.8: backend-hotel-workers (the sole writer) was physically deleted; module retirement (ADR-022/ADR-024) executed via the separate EmploymentRecord build rather than in-place repurposing; see STATE_OWNERSHIP_INDEX.yaml for detail
-  - { domain: state-work-request, authoritative_writer: backend-work-requests }
-  - { domain: state-work-application, authoritative_writer: backend-work-applications }
+  - { domain: state-job-request, authoritative_writer: backend-job-requests }  # renamed from state-work-request/backend-work-requests by Epic 9 PR 9.4 (TREQ-013/MIG-GAP-12). See SYNC-061, SYNC-062.
+  # state-work-application entry REMOVED by Epic 9 PR 9.2 (TREQ-011/ADR-058): backend-work-applications
+  # (sole writer) physically deleted; no row remains, see git history for the historical record.
+  # See SYNC-059, SYNC-062.
   - { domain: state-worker-assignment, authoritative_writer: backend-assignments }
   - { domain: state-attendance, authoritative_writer: backend-attendance }
   - { domain: state-quality-verification, authoritative_writer: backend-quality }

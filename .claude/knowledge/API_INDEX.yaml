@@ -21,15 +21,18 @@ apis:
   # /api/v1/crm/hotels/:hotel_id/workers (backend-hotel-workers) mount REMOVED by Epic 5 PR 5.8
   # (ADR-022 roadmap step 6, ADR-024 D5) -- route + module physically deleted; see MODULE_REGISTRY.yaml
   # (lifecycle: removed) and DEPENDENCY_GRAPH.yaml:400.
-  - { mount: /api/v1/work-requests, module: backend-work-requests, evidence: routes/v1/index.ts:26, clients: [frontend-web, mobile-worker] }
-  - { mount: "/api/v1/work-requests/:id/applications", module: backend-work-applications, nested_under: backend-work-requests, evidence: routes/v1/index.ts:27, clients: [frontend-web, mobile-worker] }
-  - { mount: /api/v1/assignments, module: backend-assignments, evidence: routes/v1/index.ts:28, clients: [frontend-web, mobile-worker] }
-  - { mount: /api/v1/attendance, module: backend-attendance, evidence: routes/v1/index.ts:29, clients: [frontend-web, mobile-worker, mobile-checker] }
-  - { mount: /api/v1/quality, module: backend-quality, evidence: routes/v1/index.ts:30, clients: [mobile-checker] }
-  - { mount: /api/v1/hr, module: backend-hr, evidence: routes/v1/index.ts:31, clients: [mobile-worker], note: stub service (NotImplementedError) but mounted + consumed }
-  - { mount: /api/v1/notifications, module: backend-notifications, evidence: routes/v1/index.ts:32, clients: [frontend-web, mobile-worker, mobile-checker] }
-  - { mount: /api/v1/analytics, module: backend-analytics, evidence: routes/v1/index.ts:33, clients: [mobile-worker], note: "leaderboard routes lack requireRole/checkHotelAccess — Critical security defect OQ-ANALYTICS-01 (SYNC-010)" }
-  - { mount: /api/v1/calendar, module: backend-calendar, evidence: routes/v1/index.ts:34, clients: [], note: stub service (NotImplementedError); no discovered consumer }
+  # /api/v1/work-requests/:id/applications (backend-work-applications) mount REMOVED by Epic 9
+  # PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- route + module physically
+  # deleted; see MODULE_REGISTRY.yaml (lifecycle: removed) and DEPENDENCY_GRAPH.yaml. See SYNC-059,
+  # SYNC-062.
+  - { mount: /api/v1/work-requests, module: backend-job-requests, evidence: routes/v1/index.ts:29, clients: [frontend-web, mobile-worker], note: "module renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4 (commits a69c8fd, merged b0904ba; TREQ-013/MIG-GAP-12); URL mount path /work-requests retained unchanged (public API contract, not renamed). See SYNC-061, SYNC-062." }
+  - { mount: /api/v1/assignments, module: backend-assignments, evidence: routes/v1/index.ts:30, clients: [frontend-web, mobile-worker] }
+  - { mount: /api/v1/attendance, module: backend-attendance, evidence: routes/v1/index.ts:31, clients: [frontend-web, mobile-worker, mobile-checker] }
+  - { mount: /api/v1/quality, module: backend-quality, evidence: routes/v1/index.ts:32, clients: [mobile-checker] }
+  - { mount: /api/v1/hr, module: backend-hr, evidence: routes/v1/index.ts:33, clients: [mobile-worker], note: stub service (NotImplementedError) but mounted + consumed }
+  - { mount: /api/v1/notifications, module: backend-notifications, evidence: routes/v1/index.ts:34, clients: [frontend-web, mobile-worker, mobile-checker] }
+  - { mount: /api/v1/analytics, module: backend-analytics, evidence: routes/v1/index.ts:35, clients: [mobile-worker], note: "leaderboard routes lack requireRole/checkHotelAccess — Critical security defect OQ-ANALYTICS-01 (SYNC-010)" }
+  - { mount: /api/v1/calendar, module: backend-calendar, evidence: routes/v1/index.ts:36, clients: [], note: stub service (NotImplementedError); no discovered consumer }
 
 unregistered:  # not mounted; hold only a .placeholder file; no API surface
   - backend-chatbot

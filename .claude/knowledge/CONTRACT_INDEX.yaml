@@ -17,32 +17,32 @@ contracts:
     version: unversioned
     source: backend/src/modules/notifications/service.ts
     interface: "sendNotification(userId, NotificationPayload); getNotifications; markAsRead"
-    consumers: [backend-work-requests, backend-work-applications, backend-attendance, backend-quality]
+    consumers: [backend-job-requests, backend-attendance, backend-quality]
   - id: prisma-schema
     owner_module: unassigned
     version: unversioned
     source: backend/prisma/schema.prisma
     interface: "@prisma/client types + shared PrismaClient (central shared data contract)"
-    consumers: [backend-auth, backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics]
+    consumers: [backend-auth, backend-users, backend-crm, backend-job-requests, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics]
   - id: base-service
     owner_module: unassigned
     version: unversioned
     source: backend/src/lib/base-service.ts
     interface: "abstract BaseService: PrismaClient access + logAudit (writes state-audit-log)"
-    consumers: [backend-auth, backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics, backend-hr, backend-calendar]
+    consumers: [backend-auth, backend-users, backend-crm, backend-job-requests, backend-assignments, backend-attendance, backend-quality, backend-notifications, backend-analytics, backend-hr, backend-calendar]
   - id: auth-middleware
     owner_module: backend-auth
     version: unversioned
     source: backend/src/middleware/auth.ts
     interface: "authMiddleware / optionalAuthMiddleware (global on v1 router + per-module)"
-    consumers: [backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-assignments, backend-attendance, backend-quality, backend-hr, backend-notifications, backend-analytics, backend-calendar, backend-auth]
+    consumers: [backend-users, backend-crm, backend-job-requests, backend-assignments, backend-attendance, backend-quality, backend-hr, backend-notifications, backend-analytics, backend-calendar, backend-auth]
   - id: permissions-middleware
     owner_module: unassigned  # OQ-AUTH-07 reassignment pending (SYNC-011)
     version: unversioned
     source: backend/src/middleware/permissions.ts
     interface: "requireRole / requirePermission / checkHotelAccess authorization guards"
-    consumers: [backend-users, backend-crm, backend-work-requests, backend-work-applications, backend-attendance, backend-quality, backend-hr, backend-analytics, backend-calendar]
-    note: backend-assignments removed 2026-07-08 (SPEC-AUTH-001 FIND-001, arch-confirmed); backend-hotel-workers removed by Epic 5 PR 5.8 (module physically deleted; ADR-022/ADR-024); routes.ts imports only authMiddleware. ADR-030 (2026-07-25/26, PR-1..PR-8, Accepted): capability-based write-authority model added -- FEATURE_GD02_MATRIX capability matrix (hotel/group writes admin-only; scoped users:write; manager/RM employee authority action-only), frontend ManagerAdminGate replaced by capability-named gates HotelWriteGate/StaffingWriteGate (PR-6, consumed outside this contract), and REGIONAL_MANAGER added to resolveHotelAccess() (PR-7 security review FIND-1, commit 82ff718) plus the analytics regional_manager/analytics:read gap closed with a D-8 debt-allowlist split (PR-7 follow-up, commit 5719e05). Supersedes the Epic 5 PR 5.5-only description above as the current authorization mechanism for backend-analytics and backend-users consumers.
+    consumers: [backend-users, backend-crm, backend-job-requests, backend-attendance, backend-quality, backend-hr, backend-analytics, backend-calendar]
+    note: "backend-assignments removed 2026-07-08 (SPEC-AUTH-001 FIND-001, arch-confirmed); backend-hotel-workers removed by Epic 5 PR 5.8 (module physically deleted; ADR-022/ADR-024); routes.ts imports only authMiddleware. ADR-030 (2026-07-25/26, PR-1..PR-8, Accepted): capability-based write-authority model added -- FEATURE_GD02_MATRIX capability matrix (hotel/group writes admin-only; scoped users:write; manager/RM employee authority action-only), frontend ManagerAdminGate replaced by capability-named gates HotelWriteGate/StaffingWriteGate (PR-6, consumed outside this contract), and REGIONAL_MANAGER added to resolveHotelAccess() (PR-7 security review FIND-1, commit 82ff718) plus the analytics regional_manager/analytics:read gap closed with a D-8 debt-allowlist split (PR-7 follow-up, commit 5719e05). Supersedes the Epic 5 PR 5.5-only description above as the current authorization mechanism for backend-analytics and backend-users consumers. backend-work-applications removed from all five consumer lists in this file by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- module physically deleted; backend-work-requests renamed backend-job-requests by Epic 9 PR 9.4 (commits a69c8fd, merged b0904ba; TREQ-013/MIG-GAP-12) -- same live consumer, module rename only. See SYNC-059, SYNC-061, SYNC-062."
   - id: validation-middleware
     owner_module: unassigned
     version: unversioned

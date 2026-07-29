@@ -46,19 +46,18 @@ modules:
     owned_contracts: []
     owned_apis: []  # /api/v1/crm/hotels/:hotel_id/workers mount removed with the module
     boundary: "HISTORICAL: formerly the hotel-worker roster (reads state-hotel, state-user). Physically retired by Epic 5 PR 5.8 -- NOT part of the target architecture (ADR-022). The HotelWorker table/model itself remains untouched in schema.prisma (no DROP TABLE, no data loss); Employee Management (backend-hr/SPEC-EMP-001) is the long-term owner of the employment-record capability via a separate build, not an in-place repurposing of this module."
-  - module: backend-work-requests
+  - module: backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4 (commits a69c8fd, merged b0904ba; TREQ-013/MIG-GAP-12), same live module. See SYNC-061, SYNC-062.
     owner: unassigned
-    owned_state: [state-work-request]
+    owned_state: [state-job-request]  # renamed from state-work-request by Epic 9 PR 9.4. See SYNC-061.
     owned_contracts: []
-    owned_apis: [/api/v1/work-requests]
-    boundary: Work-request lifecycle; state-work-request also written by work-applications (accept tx coupling).
-  - module: backend-work-applications
-    owner: unassigned
-    owned_state: [state-work-application]
-    cross_module_writes: [state-work-request, state-worker-assignment, state-attendance]  # accept-application tx (approved-coupling decision pending)
+    owned_apis: [/api/v1/work-requests]  # URL mount path retained unchanged by Epic 9 PR 9.4 (module/model rename only, public API contract not renamed)
+    boundary: Job-request lifecycle (renamed from "work-request" by Epic 9 PR 9.4); the former cross-module write coupling from work-applications' accept transaction no longer applies -- backend-work-applications was physically deleted by Epic 9 PR 9.2 (TREQ-011/ADR-058). See SYNC-059, SYNC-061.
+  - module: backend-work-applications  # RETIRED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058)
+    lifecycle: removed  # module (routes/controller/service/types) and route mount, plus the WorkApplication model + ApplicationStatus enum + WorkerAssignment.application_id FK, physically deleted; see MODULE_REGISTRY.yaml. See SYNC-059, SYNC-062.
+    owned_state: []  # state-work-application entry REMOVED; no row remains, see git history for the historical record
     owned_contracts: []
-    owned_apis: ["/api/v1/work-requests/:id/applications"]
-    boundary: Applications + accept-application transaction provisioning other domains.
+    owned_apis: []  # /api/v1/work-requests/:id/applications mount removed with the module
+    boundary: "HISTORICAL: formerly the marketplace apply/accept flow (worker applies, manager approves), owning state-work-application and cross-module-writing state-work-request/state-worker-assignment/state-attendance via the accept-application transaction. Physically retired by Epic 9 PR 9.2 -- the confirmed marketplace-to-broadcast pivot (TREQ-011) required removing worker-initiated applications entirely. The cross-module write coupling this entry's own note previously flagged as 'approved-coupling decision pending' was classified SUPERSEDED-BY-PIVOT by ADR-018 (Accepted, 2026-07-15), not adopted as a permanent pattern -- consistent with this retirement."
   - module: backend-assignments
     owner: unassigned
     owned_state: [state-worker-assignment]   # record created by work-applications, owned/updated here

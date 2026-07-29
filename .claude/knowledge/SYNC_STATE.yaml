@@ -2597,6 +2597,82 @@ context_invalidators:
       repository-integrity-check.js to confirm no new blocking findings
       before this pass's changes are committed.
 
+  - id: SYNC-062
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass closing knowledge-layer drift that both
+      SYNC-059 (Epic 9 PR 9.2, backend-work-applications retirement) and
+      SYNC-061 (Epic 9 PR 9.4, backend-work-requests -> backend-job-requests
+      rename) had missed: five canonical lookup indexes
+      (API_INDEX.yaml, BOUNDARY_INDEX.yaml, CONTRACT_INDEX.yaml,
+      OWNERSHIP_INDEX.yaml, SPECIFICATION_INDEX.yaml) still described
+      backend-work-requests/state-work-request as current and
+      backend-work-applications/state-work-application as live, discovered
+      during this session's mandatory pre-PR-9.5 synchronization/drift check
+      and confirmed by the commissioning human as real drift to close before
+      starting PR 9.5.
+      API_INDEX.yaml: the /api/v1/work-requests/:id/applications mount row
+      removed (route physically unmounted by PR 9.2); the /api/v1/work-requests
+      row's module renamed backend-work-requests -> backend-job-requests, and
+      its evidence line citations corrected (routes/v1/index.ts's mount lines
+      shifted after the applications route was removed and optionalAuthMiddleware
+      moved — re-verified against live code, not assumed).
+      BOUNDARY_INDEX.yaml: backend-work-requests entry renamed
+      backend-job-requests (owned_state renamed state-job-request); the
+      backend-work-applications entry retired to lifecycle: removed, matching
+      the same convention already used for backend-hotel-workers' retirement
+      in this same file.
+      CONTRACT_INDEX.yaml: all five consumer lists (notification-service,
+      prisma-schema, base-service, auth-middleware, permissions-middleware)
+      had backend-work-requests renamed backend-job-requests and
+      backend-work-applications stripped (module deleted, no longer a
+      consumer of anything); a citation note appended to the
+      permissions-middleware entry.
+      OWNERSHIP_INDEX.yaml: state_owners' state-work-request row renamed
+      state-job-request (authoritative_writer backend-job-requests); the
+      state-work-application row removed with a retirement comment, matching
+      the state-hotel-worker precedent already in this file.
+      SPECIFICATION_INDEX.yaml: backend-work-requests row renamed
+      backend-job-requests; ALSO found and corrected a second, independent
+      staleness this index had accumulated regardless of the PR 9.2/9.4
+      renames -- its version field was frozen at 0.3.1, two amendments
+      behind MODULE_REGISTRY.yaml's authoritative 0.3.3 (missing both the
+      0.3.2 GD-05/Hotel.accepting_jobs bump and the 0.3.3 Epic 9 PR 9.4
+      rename bump). Both backend-job-requests and backend-assignments rows
+      corrected to 0.3.3 with the full amendment history appended. The
+      backend-work-applications row was removed with a retirement comment.
+      Two pre-existing, unrelated YAML strict-parse issues (unquoted colons
+      inside plain-scalar note fields on the backend-hr and backend-notifications
+      rows of BOUNDARY_INDEX.yaml/SPECIFICATION_INDEX.yaml respectively) were
+      found during validation but are NOT touched by this pass -- confirmed
+      present at baseline (main, before this session's edits) via git show,
+      unrelated to the work-requests/work-applications drift this pass
+      closes, and consistent with this repository's established tolerance
+      for this class of issue elsewhere (e.g. DEPENDENCY_GRAPH.yaml's own
+      long-standing unescaped-apostrophe parse issue, left unfixed by
+      SYNC-055/056 for the same reason). CONTRACT_INDEX.yaml's
+      permissions-middleware note field WAS quoted during this pass (by an
+      IDE lint hook triggered incidentally while editing that exact line),
+      resolving that one instance of the same pre-existing issue class as a
+      side effect, not a deliberate expansion of scope.
+      Also observed, not fixed (out of this pass's narrow scope): API_INDEX.yaml
+      has no row for backend-documents or backend-geo's /documents and /geo
+      mounts, a pre-existing gap unrelated to the work-requests/
+      work-applications drift this pass closes.
+      No ADR, MODULE_SPEC.md, application code, migration, or test file was
+      touched. SIR-JOBD-006 and all other governance-register items left
+      exactly as-is.
+    authority_needed: none  # pure knowledge-layer synchronization following already-merged code changes (Epic 9 PR 9.2/9.4) and already-ratified decisions (TREQ-011/ADR-058, TREQ-013/MIG-GAP-12); no new decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit. cache_state.baseline_revision
+      is intentionally NOT rebound by this entry since HEAD has not advanced
+      yet (working-tree-only pass atop HEAD b0904ba), per the SYNC-057/058/059/061
+      pattern. Run node .claude/tooling/repository-integrity-check.js to
+      confirm no new blocking findings before this pass's changes are
+      committed. PR 9.5 implementation begins after this pass is committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
