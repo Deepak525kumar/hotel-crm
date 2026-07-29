@@ -290,4 +290,55 @@ describe('AssignmentService', () => {
       expect(addMigration).toBeDefined();
     });
   });
+
+  // Epic 9 PR 9.5 (MIG-GAP-03 correction): WorkerAssignment.work_request_id is
+  // relaxed from mandatory to nullable in this PR's own migration (paired
+  // with the CalendarEntry add). Regression guard for the null-safety pass
+  // this made necessary in toDto()'s existing DTO mapping — a calendar-placed
+  // (or, later, broadcast-accept) row with a null work_request_id must map
+  // cleanly through list()/getById() without throwing or coercing null to a
+  // string.
+  describe('Epic 9 PR 9.5: work_request_id null-safety regression guard', () => {
+    it('the Prisma schema declares work_request_id as nullable on WorkerAssignment', () => {
+      const schemaPath = path.join(__dirname, '../../prisma/schema.prisma');
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+
+      const modelMatch = schema.match(/model WorkerAssignment \{([\s\S]*?)\n\}/);
+      expect(modelMatch).not.toBeNull();
+
+      const modelBody = modelMatch![1];
+      expect(modelBody).toMatch(/^\s*work_request_id\s+String\?\s*$/m);
+    });
+
+    it('a migration exists that relaxes work_request_id to nullable', () => {
+      const migrationsDir = path.join(__dirname, '../../prisma/migrations');
+      const migrationDirs = fs.readdirSync(migrationsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+
+      const relaxMigration = migrationDirs.find((dir) => {
+        const sqlPath = path.join(migrationsDir, dir.name, 'migration.sql');
+        if (!fs.existsSync(sqlPath)) return false;
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+        return /ALTER COLUMN\s+"work_request_id"\s+DROP NOT NULL/i.test(sql);
+      });
+
+      expect(relaxMigration).toBeDefined();
+    });
+
+    it('getById maps a work_request_id: null row through toDto without error', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ work_request_id: null }));
+      const dto = await service.getById('a1', { userId: 'a1', role: 'admin' });
+      expect(dto.work_request_id).toBeNull();
+    });
+
+    it('list maps a mix of null and non-null work_request_id rows through toDto', async () => {
+      mockWorkerAssignment.findMany.mockResolvedValue([
+        makeAssignment({ id: 'a1', work_request_id: null }),
+        makeAssignment({ id: 'a2', work_request_id: 'wr1' }),
+      ]);
+      mockWorkerAssignment.count.mockResolvedValue(2);
+      const { data } = await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
+      expect(data[0].work_request_id).toBeNull();
+      expect(data[1].work_request_id).toBe('wr1');
+    });
+  });
 });
