@@ -2429,12 +2429,53 @@ context_invalidators:
       repository-integrity-check.js to confirm no new blocking findings before this
       pass's changes are committed.
 
+  - id: SYNC-060
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass recording the new WorkerAssignment.
+      job_request_id FK added by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged
+      945dba2; TREQ-012), and confirming PR 9.3 merged correctly (backend/prisma/
+      schema.prisma has job_request_id String? on WorkerAssignment; migration
+      20260729010000_add_worker_assignment_job_request present; frontend/lib/
+      types.ts and mobile/worker-app/src/types/api.ts no longer declare
+      application_id, per PR 9.3's own follow-on type-synchronization commit).
+      DEPENDENCY_GRAPH.yaml: state-work-request gained backend-assignments as a
+      reader (evidence: schema.prisma:567, the new FK), with a note explaining the
+      column is forward-named ahead of PR 9.4's WorkRequest -> JobRequest rename
+      and is schema-only/unpopulated until PR 9.5 (calendar) or PR 9.9
+      (broadcast-accept) writes to it. A new edge, edge-assignments-job-request-fk
+      (backend-assignments -> state-work-request, kind: reads-state, status:
+      schema-only-unpopulated), records this relationship explicitly. The
+      state-worker-assignment node's own note was extended to point at this new
+      edge. No other module/state/edge entry changed.
+      No ADR, MODULE_SPEC.md, application code, migration, or test file was
+      touched. SIR-JOBD-006 and all other governance-register items left exactly
+      as-is. MODULE_REGISTRY.yaml and STATE_OWNERSHIP_INDEX.yaml required no change
+      for this pass — backend-assignments' own MODULE_REGISTRY.yaml entry and
+      dependency list are unaffected by a new field on a model it already owns, and
+      STATE_OWNERSHIP_INDEX.yaml's writer/reader model does not track FK-level
+      relationships within a domain's own owning module at this granularity (no
+      existing precedent for recording an owner's own read of a sibling domain via
+      a same-model FK at that index's level of detail — left to the next pass that
+      genuinely needs it, e.g. once PR 9.9 gives the FK an actual writer).
+    authority_needed: none  # pure knowledge-layer synchronization following an already-merged code change (Epic 9 PR 9.3); no new decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the orchestrating
+      session handles git add/commit. cache_state.baseline_revision IS rebound by
+      this entry to HEAD 945dba2, since this pass runs after HEAD actually advanced
+      (PR 9.3 merged) rather than being a working-tree-only edit atop an unchanged
+      HEAD — matching the SYNC-056 precedent (rebind follows a HEAD change) rather
+      than SYNC-057/058/059's working-tree-only pattern. Run node .claude/tooling/
+      repository-integrity-check.js to confirm no new blocking findings before this
+      pass's changes are committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 586a55def058592099b7cb123b2482cfb0845e6b  # rebound to HEAD 586a55d by SYNC-056 (2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution; docs-only delta, no code changed); prior 1aa5f88 (SYNC-055, 2026-07-28), content verified coherent through the pass
+  baseline_revision: 945dba206aaa23ec3f015d4c89d99c02d569702f  # rebound to HEAD 945dba2 by SYNC-060 (2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes); prior 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }

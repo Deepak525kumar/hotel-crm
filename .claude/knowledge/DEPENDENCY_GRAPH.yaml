@@ -288,6 +288,14 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts"
+  - id: edge-assignments-job-request-fk
+    source: backend-assignments
+    target: state-work-request
+    kind: reads-state
+    compatibility: not-applicable
+    status: schema-only-unpopulated
+    evidence: "backend/prisma/schema.prisma:567 (WorkerAssignment.job_request_id FK to WorkRequest, onDelete: SetNull)"
+    note: "Added by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012). Schema-only as of this edge's creation: no write path populates job_request_id yet (PR 9.5 calendar and PR 9.9 broadcast-accept are the two future writers). Forward-named ahead of PR 9.4's WorkRequest -> JobRequest rename — the relation target is still the WorkRequest model. See SYNC-060."
   # edge-work-applications-reads-employment-record REMOVED by Epic 9 PR 9.2 (commits
   # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
   # was physically deleted; it no longer reads state-employment-record. See SYNC-059.
@@ -614,9 +622,9 @@ state_domains:
     model: WorkRequest
     authoritative_writer: backend-work-requests
     writers: [backend-work-requests]
-    readers: [backend-analytics]
-    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; analytics reads: backend/src/modules/analytics/service.ts:75,76,189"
-    note: "backend-work-applications removed from writers/readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted and no longer writes/reads WorkRequest. See SYNC-059."
+    readers: [backend-analytics, backend-assignments]
+    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; analytics reads: backend/src/modules/analytics/service.ts:75,76,189; assignments reads: backend/prisma/schema.prisma:567 (WorkerAssignment.job_request_id FK, Epic 9 PR 9.3)"
+    note: "backend-work-applications removed from writers/readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted and no longer writes/reads WorkRequest. See SYNC-059. backend-assignments added as a reader by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012): WorkerAssignment.job_request_id is a new nullable FK back onto WorkRequest, forward-named ahead of PR 9.4's WorkRequest -> JobRequest rename. No creation path writes to this column yet — it is unpopulated until PR 9.9 (broadcast-accept); PR 9.5 (calendar) is the other future writer. See SYNC-060."
   # state-work-application entry REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
   # merged b035700; TREQ-011/ADR-058) — the WorkApplication model was dropped from
   # schema.prisma and its sole writer, backend-work-applications, was physically
@@ -627,7 +635,7 @@ state_domains:
     writers: [backend-assignments]
     readers: [backend-quality, backend-attendance, backend-analytics]
     evidence: "assignments updates: backend/src/modules/assignments/service.ts:110; reads: backend/src/modules/quality/service.ts:19,100,150, backend/src/modules/attendance/service.ts:35,195, backend/src/modules/analytics/service.ts:81,82,197"
-    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module (and the WorkerAssignment.application_id FK it depended on) was physically deleted; it no longer creates WorkerAssignment records. See SYNC-059. The historical cross-module-write coupling this entry previously described is recorded in git history."
+    note: "backend-work-applications removed from writers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module (and the WorkerAssignment.application_id FK it depended on) was physically deleted; it no longer creates WorkerAssignment records. See SYNC-059. The historical cross-module-write coupling this entry previously described is recorded in git history. WorkerAssignment gained a new nullable job_request_id FK back onto WorkRequest by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012) — see edge-assignments-job-request-fk above; schema-only as of this pass, no write path populates it yet. See SYNC-060."
   - id: state-attendance
     model: Attendance
     authoritative_writer: backend-attendance
