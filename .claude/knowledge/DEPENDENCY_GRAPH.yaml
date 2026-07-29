@@ -182,6 +182,23 @@ nodes:
   # landed. First registration — this state-domain and its module node did not
   # exist in this file before this pass (documents was zero-code through SYNC-054).
   - { id: state-worker-document, kind: state-domain, owner: backend-documents, source: "backend/prisma/schema.prisma:890 (model WorkerDocument, added by GD-16, migration 20260727060000_add_worker_document)" }
+  # HR implementation PR 1 (following the backend-hr/SPEC-EMP-001 boundary
+  # review, ADR-012/ADR-014 bounded context): first schema registration for
+  # backend-hr's own owned state. Contract.scanned_document_id is a 1:1 FK
+  # into state-worker-document (backend-documents) -- HR delegates storage,
+  # does not duplicate it (MIG-GAP-DOC-001, RULE-DOC-04); not a new
+  # state-domain edge since it is a reference into a domain HR doesn't own,
+  # not a write. Schema-only as of this PR: no service/route code reads or
+  # writes either model yet (hr/service.ts's createContract/listContracts/
+  # createPayroll/listPayroll still throw NotImplementedError) -- the planned
+  # edge-hr-reads-employment-record (Contract generation reading
+  # EmploymentRecord.personal_data, per OD-HR-02b's resolution in the HR
+  # boundary review: the persisted employee-management record, not a
+  # transient Onboarding source) is added when PR 2's actual code lands, not
+  # here, matching this file's own convention of recording only
+  # repository-observed relationships.
+  - { id: state-hr-contract, kind: state-domain, owner: backend-hr, source: "backend/prisma/schema.prisma (model Contract, added by HR implementation PR 1, migration 20260730010000_add_hr_contract_payslip_request)" }
+  - { id: state-hr-payslip-request, kind: state-domain, owner: backend-hr, source: "backend/prisma/schema.prisma (model PayslipRequest, added by HR implementation PR 1, migration 20260730010000_add_hr_contract_payslip_request)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
