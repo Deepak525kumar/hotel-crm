@@ -3,6 +3,7 @@ import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+import { getPrisma } from '../../lib/db.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
 import {
@@ -20,6 +21,46 @@ const ALLOWED_TRANSITIONS: Partial<Record<AssignmentStatus, AssignmentStatus[]>>
   [AssignmentStatus.CONFIRMED]: [AssignmentStatus.IN_PROGRESS, AssignmentStatus.CANCELLED],
   [AssignmentStatus.IN_PROGRESS]: [AssignmentStatus.COMPLETED, AssignmentStatus.CANCELLED],
 };
+
+// Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): the same active-status set
+// the WorkerAssignment_active_slot_unique partial index enforces DB-side.
+// Exported so a future PR 9.9 eligibility computation (or any other reader)
+// stays in lock-step with the DB constraint's own status list without
+// duplicating it.
+export const ACTIVE_ASSIGNMENT_STATUSES: AssignmentStatus[] = [
+  AssignmentStatus.CONFIRMED,
+  AssignmentStatus.IN_PROGRESS,
+];
+
+/**
+ * Read-side enforcement of the daily-exclusivity invariant (TRULE-006): is
+ * this worker free (no active-status assignment) on the given day?
+ *
+ * This is a read-only helper — it does not create, lock, or reserve
+ * anything, so it is inherently racy against a concurrent creation on the
+ * same worker/day (the DB-level WorkerAssignment_active_slot_unique partial
+ * index, re-keyed by this same PR, is the actual source of truth that
+ * prevents a double-booking from ever being persisted; this helper exists to
+ * let a caller pre-filter candidates cheaply before attempting a write, not
+ * to replace the constraint).
+ *
+ * Added ready for PR 9.9's broadcast-accept eligibility computation to
+ * import (skill match ∧ no active assignment that day, per the plan's PR 9.7
+ * section) — PR 9.7/9.9's own broadcast/eligibility logic is NOT implemented
+ * here, only this helper.
+ */
+export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<boolean> {
+  const prisma = getPrisma();
+  const existing = await prisma.workerAssignment.findFirst({
+    where: {
+      worker_id: workerId,
+      day,
+      status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+    },
+    select: { id: true },
+  });
+  return existing === null;
+}
 
 export class AssignmentService extends BaseService {
   private toDto(a: WorkerAssignment): AssignmentDto {
@@ -230,12 +271,12 @@ export class AssignmentService extends BaseService {
   // all (per ADR-056; job_request_id is reserved for the future PR 9.9
   // broadcast-accept creation path, not this one).
   //
-  // Daily exclusivity (TRULE-006) is only partially enforced here: the
-  // CalendarEntry(worker_id, day) unique constraint blocks a second calendar
-  // placement for the same worker/day via THIS path, but does not yet block
-  // a same-day assignment created via a different path (broadcast-accept,
-  // PR 9.9) — full DB-level daily exclusivity across both paths is PR 9.6's
-  // scope (re-keyed partial unique index on WorkerAssignment).
+  // Daily exclusivity (TRULE-006) is now fully enforced DB-side as of Epic 9
+  // PR 9.6 (TREQ-007/MIG-GAP-08): the re-keyed WorkerAssignment_active_slot_
+  // unique partial index on (worker_id, day) spans every creation path
+  // uniformly (this one, and any future PR 9.9 broadcast-accept path), not
+  // just this path's own CalendarEntry(worker_id, day) constraint. A P2002
+  // from either index surfaces through the same catch below.
   async placeOnCalendar(
     input: CreateCalendarEntryInput,
     actor: { userId: string; role: string; scope?: UserScope | null }
@@ -265,6 +306,15 @@ export class AssignmentService extends BaseService {
             hotel_id: input.hotel_id,
             assigned_by_id: actor.userId,
             status: AssignmentStatus.CONFIRMED,
+            // Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): populate the
+            // denormalized day column directly at creation time -- the
+            // migration's backfill only covers rows that existed before it
+            // ran; every creation path going forward (this one, and any
+            // future PR 9.9 broadcast-accept path) must write `day` itself.
+            // Reuses the same parsed `day` value already computed below for
+            // CalendarEntry.day, in the same transaction, so both rows agree
+            // on the exact date with no risk of drift between them.
+            day,
           },
         });
 

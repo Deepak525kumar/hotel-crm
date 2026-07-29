@@ -604,6 +604,18 @@ model WorkerAssignment {
   reassignments          WorkerAssignment[] @relation("reassignment_chain")
   updated_at             DateTime           @updatedAt
 
+  // Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): denormalized calendar
+  // day for this assignment, populated identically regardless of creation
+  // path (work_request_id-lineage rows backfilled from JobRequest.shift_date;
+  // calendar-placed rows backfilled from the sibling CalendarEntry.day;
+  // going forward, every creation path writes this directly at create time --
+  // see placeOnCalendar()'s follow-up write in assignments/service.ts). Backs
+  // the re-keyed WorkerAssignment_active_slot_unique partial index below,
+  // which spans every creation path uniformly (unlike the prior
+  // work_request_id-scoped index, which could not see a competing
+  // calendar-placed or future broadcast-accept assignment on the same day).
+  day                    DateTime           @db.Date
+
   // Relations — each assignment yields at most one attendance record, one QV, one rating,
   // one rooms-completed entry (ADR-028)
   attendance            Attendance?
@@ -617,12 +629,16 @@ model WorkerAssignment {
 
   // SP-5: full unique constraint removed. Active-slot double-booking is enforced
   // by the partial unique index in the migration (status IN CONFIRMED, IN_PROGRESS).
+  // Epic 9 PR 9.6: re-keyed from (work_request_id, worker_id) to (worker_id,
+  // day) -- see WorkerAssignment_active_slot_unique in
+  // 20260729030000_add_worker_assignment_day_exclusivity/migration.sql.
   @@index([work_request_id])
   @@index([job_request_id])
   @@index([worker_id])
   @@index([hotel_id])
   @@index([status])
   @@index([confirmed_at])
+  @@index([day])
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): per-worker per-day

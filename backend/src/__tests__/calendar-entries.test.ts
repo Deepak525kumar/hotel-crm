@@ -12,12 +12,10 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  * required" language — see IMPLEMENTATION_EXECUTION_PLAN.md's PR 9.5
  * repository-reality correction).
  *
- * The already-assigned-that-day rejection case is deliberately NOT asserted
- * here: DB-level daily exclusivity spanning both creation paths (calendar +
- * broadcast-accept) is PR 9.6's scope (re-keyed partial unique index on
- * WorkerAssignment). This PR's own CalendarEntry(worker_id, day) unique
- * constraint only guards its own creation path — see `service.ts`'s
- * `placeOnCalendar()` comment.
+ * The already-assigned-that-day rejection case spanning both creation paths
+ * (calendar + broadcast-accept) is now asserted below, closing the test.todo
+ * this file originally deferred to PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08:
+ * re-keyed WorkerAssignment_active_slot_unique partial index).
  */
 
 const mockWorkerAssignment = {
@@ -207,15 +205,38 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       ).rejects.toThrow('Worker already has a calendar placement for this day');
     });
 
-    // Deliberately deferred to PR 9.6, per IMPLEMENTATION_EXECUTION_PLAN.md's
-    // PR 9.5 test-file note: this PR does not yet enforce DB-level daily
-    // exclusivity across a competing broadcast-accept-created assignment on
-    // the same day (only this PR's own CalendarEntry(worker_id, day) unique
-    // constraint, exercised by the P2002 case above, guards its own creation
-    // path). Do not assert cross-path rejection here.
-    it.todo(
-      'PR 9.6: rejects placing an already-assigned-that-day worker via a competing creation path (partial unique index on WorkerAssignment)'
-    );
+    // Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): closes the test.todo
+    // deferred by PR 9.5. The re-keyed WorkerAssignment_active_slot_unique
+    // partial index (worker_id, day) now spans every creation path, so a
+    // competing active-status assignment for the same worker/day — created
+    // via ANY path, not just a second placeOnCalendar() call — raises a
+    // P2002 on tx.workerAssignment.create() itself (before
+    // tx.calendarEntry.create() is ever reached), not only on the
+    // CalendarEntry-level constraint the P2002 case above exercises. The
+    // existing catch in placeOnCalendar() wraps the whole transaction body,
+    // so both the WorkerAssignment-level and CalendarEntry-level constraint
+    // violations are translated identically — this test asserts that is
+    // still true now that there are two distinct underlying constraints.
+    it('rejects placing an already-assigned-that-day worker via a competing creation path (WorkerAssignment_active_slot_unique partial index, re-keyed by PR 9.6)', async () => {
+      const { Prisma } = await import('@prisma/client');
+      mockWorkerAssignment.create.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.22.0',
+        })
+      );
+
+      await expect(
+        service.placeOnCalendar(
+          { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
+          { userId: 'mgr1', role: 'admin' }
+        )
+      ).rejects.toThrow('Worker already has a calendar placement for this day');
+
+      // The failure happened on the WorkerAssignment create — calendarEntry.create()
+      // must never have been reached in this transaction attempt.
+      expect(mockCalendarEntry.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('listCalendarEntries', () => {
