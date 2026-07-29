@@ -101,7 +101,7 @@ jest.mock('../lib/db.js', () => ({
     hotel: {
       findUnique: async ({ where }: any) => hotels[where.id] ?? null,
     },
-    workRequest: {
+    jobRequest: {
       findUnique: async ({ where }: any) => workRequests[where.id] ?? null,
       create: async ({ data }: any) => ({
         id: 'wr_new',
@@ -141,7 +141,7 @@ jest.mock('../middleware/auth.js', () => ({
 
 import express from 'express';
 import request from 'supertest';
-import workRequestRouter from '../modules/work-requests/routes.js';
+import workRequestRouter from '../modules/job-requests/routes.js';
 import { AppError } from '../lib/errors.js';
 
 function makeApp() {

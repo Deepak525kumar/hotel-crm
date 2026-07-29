@@ -268,7 +268,7 @@ model User {
   overall_rating            WorkerOverallRating?
   notifications             Notification[]
   push_tokens               PushToken[]
-  created_work_requests     WorkRequest[]           @relation("request_creator")
+  created_work_requests     JobRequest[]            @relation("request_creator")
   audit_logs                AuditLog[]
   password_reset_tokens     PasswordResetToken[]
   managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
@@ -391,7 +391,7 @@ model Hotel {
 
   // Relations
   hotel_workers    HotelWorker[]
-  work_requests    WorkRequest[]
+  work_requests    JobRequest[]
   assignments      WorkerAssignment[]
   attendance       Attendance[]
   verifications    QualityVerification[]
@@ -497,7 +497,11 @@ model EmployeeBlocklistEntry {
 // =============================================================================
 
 // SP-9: version column added for optimistic locking against slot-fill race conditions.
-model WorkRequest {
+// Epic 9 PR 9.4: model renamed WorkRequest -> JobRequest ("re-label schema off
+// marketplace" framing, TREQ-013/MIG-GAP-12). @@map("WorkRequest") preserves the
+// physical table name so this is a Prisma-level rename only, not a data migration
+// (see IMPLEMENTATION_EXECUTION_PLAN.md PR 9.4's repository-reality correction).
+model JobRequest {
   id                  String            @id @default(cuid())
   hotel_id            String
   hotel               Hotel             @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
@@ -526,8 +530,8 @@ model WorkRequest {
   // Relations
   assignments  WorkerAssignment[]
   // Epic 9 PR 9.3: back-relation for WorkerAssignment.job_request_id (forward-
-  // named ahead of PR 9.4's WorkRequest -> JobRequest rename). Nullable FK;
-  // no creation path populates it until PR 9.9 (broadcast-accept).
+  // named ahead of PR 9.4's WorkRequest -> JobRequest rename, now completed).
+  // Nullable FK; no creation path populates it until PR 9.9 (broadcast-accept).
   job_request_assignments WorkerAssignment[] @relation("job_request_assignment")
 
   // workers_confirmed must never exceed workers_needed — CHECK constraint in migration.
@@ -538,6 +542,7 @@ model WorkRequest {
   @@index([shift_date])
   @@index([position])
   @@index([hotel_id, status, shift_date]) // hot path: "open shifts at hotel on date"
+  @@map("WorkRequest")
 }
 
 // SP-5: @@unique([work_request_id, worker_id]) removed.
@@ -553,19 +558,18 @@ model WorkRequest {
 // this model to a nullable job_request_id, with fresh creation paths landing
 // in PR 9.5 (calendar) and PR 9.9 (broadcast accept).
 // Epic 9 PR 9.3: job_request_id added (nullable — no creation path writes
-// it yet; PR 9.9's broadcast-accept path is the first writer). Forward-
-// named ahead of PR 9.4's WorkRequest -> JobRequest rename: the field is
-// named job_request_id even though the relation target is still the
-// WorkRequest model as of this PR. onDelete: SetNull matches this schema's
-// convention for optional FKs (see Hotel.hotel_group, User.hotel_group,
-// AuditLog.actor) — an assignment should outlive the job request it was
-// created from, not be deleted alongside it.
+// it yet; PR 9.9's broadcast-accept path is the first writer). PR 9.4
+// completed the WorkRequest -> JobRequest model rename; job_request_id's
+// relation target is the JobRequest model. onDelete: SetNull matches this
+// schema's convention for optional FKs (see Hotel.hotel_group,
+// User.hotel_group, AuditLog.actor) — an assignment should outlive the job
+// request it was created from, not be deleted alongside it.
 model WorkerAssignment {
   id                     String           @id @default(cuid())
   work_request_id        String
-  work_request           WorkRequest      @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
+  work_request           JobRequest       @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
   job_request_id         String?
-  job_request            WorkRequest?     @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
+  job_request            JobRequest?      @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
   worker_id              String
   worker                 User             @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id               String

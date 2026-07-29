@@ -7,7 +7,7 @@ import { isEmploymentRecordEnabled } from '../../config/feature-flags.js';
 import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
 import crmRoutes from '../../modules/crm/routes.js';
-import workRequestRoutes from '../../modules/work-requests/routes.js';
+import workRequestRoutes from '../../modules/job-requests/routes.js';
 import assignmentRoutes from '../../modules/assignments/routes.js';
 import attendanceRoutes from '../../modules/attendance/routes.js';
 import qualityRoutes from '../../modules/quality/routes.js';

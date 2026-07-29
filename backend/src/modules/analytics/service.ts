@@ -94,8 +94,8 @@ export class AnalyticsService extends BaseService {
       totalRatings,
       roomsCompletedAgg,
     ] = await Promise.all([
-      this.prisma.workRequest.count({ where: scope }),
-      this.prisma.workRequest.groupBy({
+      this.prisma.jobRequest.count({ where: scope }),
+      this.prisma.jobRequest.groupBy({
         by: ['status'],
         where: scope,
         _count: { id: true },
@@ -269,7 +269,7 @@ export class AnalyticsService extends BaseService {
       roomsCompletedAgg,
       topWorkers,
     ] = await Promise.all([
-      this.prisma.workRequest.aggregate({
+      this.prisma.jobRequest.aggregate({
         where: {
           hotel_id: hotelId,
           status: { in: [WorkRequestStatus.OPEN, WorkRequestStatus.PARTIALLY_FILLED] },

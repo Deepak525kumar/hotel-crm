@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../../lib/errors.js';
 import { sendPaginated, sendSuccess } from '../../lib/http-envelope.js';
-import { workRequestService } from './service.js';
+import { jobRequestService } from './service.js';
 import {
   CreateWorkRequestSchema,
   ListWorkRequestsQuerySchema,
@@ -23,7 +23,7 @@ export async function createWorkRequest(
       next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
       return;
     }
-    const result = await workRequestService.create(parsed.data, {
+    const result = await jobRequestService.create(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,
@@ -45,7 +45,7 @@ export async function listWorkRequests(
       next(new ValidationError('Invalid query parameters', zodDetails(parsed.error)));
       return;
     }
-    const { data, total } = await workRequestService.list(parsed.data, {
+    const { data, total } = await jobRequestService.list(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
     });
@@ -74,7 +74,7 @@ export async function getWorkRequest(
   next: NextFunction
 ): Promise<void> {
   try {
-    const result = await workRequestService.getById(req.params.id, {
+    const result = await jobRequestService.getById(req.params.id, {
       userId: req.auth!.userId,
       role: req.auth!.role,
     });
@@ -95,7 +95,7 @@ export async function updateWorkRequest(
       next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
       return;
     }
-    const result = await workRequestService.update(req.params.id, parsed.data, {
+    const result = await jobRequestService.update(req.params.id, parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,

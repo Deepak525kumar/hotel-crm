@@ -29,7 +29,7 @@ const mockHotel = {
 
 const mockPrisma = {
   hotel: mockHotel,
-  workRequest: mockWorkRequest,
+  jobRequest: mockWorkRequest,
   employmentRecord: mockEmploymentRecord,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
@@ -62,8 +62,8 @@ jest.mock('../middleware/auth.js', () => ({
 
 import express from 'express';
 import request from 'supertest';
-import workRequestRouter from '../modules/work-requests/routes.js';
-import { WorkRequestService } from '../modules/work-requests/service.js';
+import workRequestRouter from '../modules/job-requests/routes.js';
+import { JobRequestService } from '../modules/job-requests/service.js';
 
 const makeRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'wr1',
@@ -103,11 +103,11 @@ const baseInput = {
 };
 
 describe('WorkRequestService', () => {
-  let service: WorkRequestService;
+  let service: JobRequestService;
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new WorkRequestService();
+    service = new JobRequestService();
   });
 
   describe('create', () => {

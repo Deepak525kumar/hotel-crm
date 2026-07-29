@@ -101,7 +101,7 @@ jest.mock('../lib/db.js', () => ({
     hotel: {
       findUnique: async ({ where }: any) => hotels[where.id] ?? null,
     },
-    workRequest: {
+    jobRequest: {
       findUnique: async ({ where }: any) => workRequests[where.id] ?? null,
       findMany: async () => Object.values(workRequests),
       count: async () => Object.values(workRequests).length,
@@ -137,7 +137,7 @@ jest.mock('../lib/db.js', () => ({
     auditLog: { create: async () => undefined },
     $transaction: async (fn: any) =>
       fn({
-        workRequest: {
+        jobRequest: {
           update: async ({ where, data }: any) => ({
             ...workRequests[where.id],
             ...data,
@@ -161,7 +161,7 @@ jest.mock('../middleware/auth.js', () => ({
 
 import express from 'express';
 import request from 'supertest';
-import workRequestRouter from '../modules/work-requests/routes.js';
+import workRequestRouter from '../modules/job-requests/routes.js';
 import assignmentsRouter from '../modules/assignments/routes.js';
 import { requestLoggerMiddleware } from '../middleware/requestLogger.js';
 import { AppError } from '../lib/errors.js';
