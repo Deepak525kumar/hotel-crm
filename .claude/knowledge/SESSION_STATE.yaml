@@ -16,9 +16,9 @@ version_source: .claude/VERSION.yaml
 
 session:
   active: true
-  baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound to HEAD 1aa5f88 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); prior 3254c83, content verified coherent through the pass
+  baseline_revision: ca222072bf62ec7dcea05cbdb5ec3a44254f3a6e  # rebound to HEAD ca22207 by SYNC-069 (Epic 9 Completion Audit governance-closure pass, 2026-07-30) -- this SESSION_STATE.yaml stamp was materially stale (still reading 1aa5f88, bound by SYNC-055 on 2026-07-28, two days and ~12 merges behind origin/main's tip -- SYNC_STATE.yaml's own cache_state.baseline_revision had already been kept current through SYNC-055..068 but this file's session block was never advanced alongside it, a synchronization gap this pass closes). Confirmed current via `git fetch origin main` immediately before rebinding: origin/main tip unchanged at ca22207 (merge #281, Epic 9 PR 9.10). Prior 1aa5f88 (SYNC-055, post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); prior 3254c83, content verified coherent through the pass
   default_branch: main
-  framework_version: see .claude/VERSION.yaml   # 1.3.0
+  framework_version: see .claude/VERSION.yaml   # 1.5.0
   opened_at: "2026-07-14T00:00:00Z"
   note: >-
     Rebound by SYNC-037 (Repository Synchronization Workflow, Revision Rebind
