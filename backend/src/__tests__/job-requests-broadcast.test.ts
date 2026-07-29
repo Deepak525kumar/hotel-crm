@@ -2,17 +2,23 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 /**
  * Broadcast raise + eligibility computation for Epic 9 PR 9.7
- * (TREQ-002/TREQ-003/TREQ-010, MIG-GAP-04/05).
+ * (TREQ-002/TREQ-003/TREQ-010, MIG-GAP-04/05), extended by Epic 9 PR 9.8
+ * with skill-matched notification delivery (TREQ-003 delivery half).
  *
  * raiseBroadcast() creates a JobRequest + JobRequestSkillSlot rows (one per
  * skill x headcount line, e.g. "2 Cleaners + 1 Waiter") in one transaction,
- * published immediately. getBroadcastEligibility() computes, per skill slot,
+ * published immediately, then (PR 9.8) enqueues a JOB_REQUEST_BROADCAST
+ * notification to every eligible worker per skill slot in that same
+ * transaction. getBroadcastEligibility() computes, per skill slot,
  * {hotel-group roster ∩ matching skill ∩ free that day} by reusing
  * listEligibleWorkerIds() (roster-scope.ts) and isWorkerFreeOnDay() (PR 9.6,
- * assignments/service.ts) rather than duplicating either.
+ * assignments/service.ts) rather than duplicating either; PR 9.8's
+ * notification step reuses this exact same eligibility computation
+ * (computeBroadcastEligibility()) rather than recalculating it.
  *
- * Out of this PR's scope, not asserted here: notification enqueue (PR 9.8),
- * first-accept arbitration (PR 9.9), auto-close (PR 9.10).
+ * Out of this PR's scope, not asserted here: first-accept arbitration,
+ * optimistic concurrency, "requirement fulfilled" detection (PR 9.9),
+ * auto-close (PR 9.10).
  */
 
 const mockJobRequest = {
@@ -32,14 +38,29 @@ const mockWorkerAssignment = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   hotel: mockHotel,
   jobRequest: mockJobRequest,
   employmentRecord: mockEmploymentRecord,
   workerAssignment: mockWorkerAssignment,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
+
+// ADR-029 (GD-01, Epic 7 PR 7.3): default resolved values so enqueue() inside
+// raiseBroadcast()'s transaction has something to read `.id` off of.
+mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
@@ -232,6 +253,157 @@ describe('JobRequestService.raiseBroadcast', () => {
         }),
       })
     );
+  });
+
+  describe('notification delivery (Epic 9 PR 9.8, TREQ-003 delivery half)', () => {
+    it('enqueues a JOB_REQUEST_BROADCAST notification for each eligible worker on a matching skill slot', async () => {
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+      mockEmploymentRecord.findMany
+        // roster-scope.listEligibleWorkerIds()'s own ACTIVE-membership lookup
+        .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+        // this service's own skills-by-worker lookup
+        .mockResolvedValueOnce([
+          { user_id: 'w1', skills: ['CLEANER'] },
+          { user_id: 'w2', skills: ['WAITER'] },
+        ]);
+      mockWorkerAssignment.findFirst.mockResolvedValue(null); // both free that day
+
+      await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+      // Only w1 matches CLEANER (the only skill slot on baseBroadcastInput) and is free.
+      expect(mockNotification.create).toHaveBeenCalledTimes(1);
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            user_id: 'w1',
+            type: 'JOB_REQUEST_BROADCAST',
+            hotel_id: 'h1',
+          }),
+        })
+      );
+    });
+
+    it('does not notify a worker whose skill does not match any slot', async () => {
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }])
+        .mockResolvedValueOnce([{ user_id: 'w1', skills: ['WAITER'] }]);
+      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+
+      await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).not.toHaveBeenCalled();
+    });
+
+    it('does not notify a worker already assigned that day', async () => {
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }])
+        .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER'] }]);
+      mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'existing-assignment' }); // already assigned
+
+      await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).not.toHaveBeenCalled();
+    });
+
+    it('notifies once per matching skill slot for a worker eligible on multiple slots of the same broadcast', async () => {
+      const multiSkillInput = {
+        ...baseBroadcastInput,
+        skills: [
+          { skill: 'CLEANER' as const, headcount: 2 },
+          { skill: 'WAITER' as const, headcount: 1 },
+        ],
+      };
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(
+        makeJobRequestRow({
+          workers_needed: 3,
+          skill_slots: [
+            makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 2 }),
+            makeSkillSlotRow({ id: 'slot2', skill: 'WAITER', headcount: 1 }),
+          ],
+        })
+      );
+      // w1 holds both skills — eligible on both slots of this one broadcast.
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }])
+        .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER', 'WAITER'] }]);
+      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+
+      await service.raiseBroadcast(multiSkillInput, { userId: 'mgr1', role: 'admin' });
+
+      // Two distinct openings on the same broadcast — one notification per slot, not deduplicated.
+      expect(mockNotification.create).toHaveBeenCalledTimes(2);
+      const notifiedSkills = mockNotification.create.mock.calls.map(
+        (call: any) => call[0].data.data.skill
+      );
+      expect(notifiedSkills.sort()).toEqual(['CLEANER', 'WAITER']);
+    });
+
+    it('enqueues the notification and its OutboxEvent in the same transaction as the JobRequest create', async () => {
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }])
+        .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER'] }]);
+      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+
+      await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(mockNotification.create).toHaveBeenCalledTimes(1);
+      expect(mockOutboxEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ source_module: 'WORK_REQUESTS', transport: 'PUSH' }),
+        })
+      );
+    });
+
+    it('does not notify anyone when the hotel roster is empty (no ungrouped-hotel crash)', async () => {
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: null,
+      });
+      mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+
+      await expect(
+        service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' })
+      ).resolves.toBeDefined();
+
+      expect(mockNotification.create).not.toHaveBeenCalled();
+      expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
+    });
   });
 });
 
