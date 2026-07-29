@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SkillTag } from '@prisma/client';
 
 // Schema is the frozen authority for enums (PRISMA_SCHEMA_V2_FREEZE). The
 // API_SPEC_V1_PATCH_V2 OPEN/CLOSED enum was written before the freeze and is
@@ -66,6 +67,63 @@ export const ListWorkRequestsQuerySchema = z.object({
 
 export type ListWorkRequestsQuery = z.infer<typeof ListWorkRequestsQuerySchema>;
 
+// Epic 9 PR 9.7 (TREQ-002/TREQ-003/TREQ-010, MIG-GAP-04/05): manager raises a
+// standalone broadcast JobRequest specifying skill(s) and headcount per
+// skill (e.g. "2 Cleaners + 1 Waiter" is two entries in `skills`), per
+// CONFIRMED_REQUIREMENTS_REGISTER.md §13. Distinct from
+// CreateWorkRequestSchema (the pre-existing marketplace publish/apply
+// shape, untouched by this PR) -- a broadcast has no free-text `position`
+// and no single `workers_needed`.
+export const RaiseBroadcastSchema = z.object({
+  hotel_id: z.string().min(1),
+  shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
+  shift_start_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM (24h)'),
+  shift_end_time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Must be HH:MM (24h)'),
+  hourly_rate: z.number().positive().optional(),
+  currency: z.string().length(3).optional(),
+  description: z.string().optional(),
+  skills: z
+    .array(
+      z.object({
+        skill: z.nativeEnum(SkillTag),
+        headcount: z.number().int().positive(),
+      })
+    )
+    .min(1, 'At least one skill x headcount line is required'),
+});
+
+export type RaiseBroadcastInput = z.infer<typeof RaiseBroadcastSchema>;
+
+export interface JobRequestSkillSlotDto {
+  id: string;
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+}
+
+// Read-only: the set of workers eligible for one skill slot on a broadcast
+// (skill match ∧ free that day, TREQ-003/TRULE-006). Populated only for a
+// broadcast JobRequest (one that has skill_slots); this PR computes and
+// returns this set but does not notify anyone (PR 9.8) or let anyone accept
+// (PR 9.9).
+export interface SkillSlotEligibilityDto {
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+  eligible_worker_ids: string[];
+}
+
+export interface BroadcastEligibilityDto {
+  job_request_id: string;
+  hotel_id: string;
+  shift_date: string; // YYYY-MM-DD
+  slots: SkillSlotEligibilityDto[];
+}
+
 export interface WorkRequestDto {
   id: string;
   hotel_id: string;
@@ -89,4 +147,9 @@ export interface WorkRequestDto {
   created_at: string;
   updated_at: string;
   my_application?: { id: string; status: string; created_at: string } | null;
+  // Epic 9 PR 9.7: present (non-empty) only for a broadcast JobRequest
+  // raised via raiseBroadcast(); absent/undefined for a marketplace
+  // publish/apply row (this PR does not backfill or infer skill_slots for
+  // pre-existing rows).
+  skill_slots?: JobRequestSkillSlotDto[];
 }

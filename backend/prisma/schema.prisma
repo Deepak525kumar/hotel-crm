@@ -540,6 +540,18 @@ model JobRequest {
   // named ahead of PR 9.4's WorkRequest -> JobRequest rename, now completed).
   // Nullable FK; no creation path populates it until PR 9.9 (broadcast-accept).
   job_request_assignments WorkerAssignment[] @relation("job_request_assignment")
+  // Epic 9 PR 9.7 (TREQ-002/TREQ-010, MIG-GAP-04/05): per-skill headcount
+  // lines for a broadcast raised via raiseBroadcast(). `position`/
+  // `workers_needed`/`workers_confirmed` above are left untouched — they
+  // remain the live fields for the pre-existing marketplace publish/apply
+  // flow (job-requests/service.ts create()/update(), still reachable until
+  // TREQ-011's removal, out of this PR's scope) and for
+  // analytics/service.ts's existing aggregate. A broadcast JobRequest (raised
+  // by raiseBroadcast(), not create()) carries its skill×headcount breakdown
+  // here instead, per CONFIRMED_REQUIREMENTS_REGISTER.md §13's "2 Cleaners +
+  // 1 Waiter" example (one broadcast, multiple skill lines) — see
+  // architecture review before this PR's implementation.
+  skill_slots JobRequestSkillSlot[]
 
   // workers_confirmed must never exceed workers_needed — CHECK constraint in migration.
   // Slot-fill race: app layer must do UPDATE ... WHERE version = $known AND workers_confirmed < workers_needed.
@@ -550,6 +562,33 @@ model JobRequest {
   @@index([position])
   @@index([hotel_id, status, shift_date]) // hot path: "open shifts at hotel on date"
   @@map("WorkRequest")
+}
+
+// Epic 9 PR 9.7 (TREQ-002/TREQ-003/TREQ-010, MIG-GAP-04/05): one row per
+// skill×headcount line on a broadcast JobRequest (raiseBroadcast()), e.g.
+// "2 Cleaners + 1 Waiter" is two rows on the same job_request_id. Purely
+// additive — no legacy JobRequest row is backfilled into this table, since
+// broadcast is new capability, not a repurposed existing field.
+//
+// `confirmed_count` is included now (default 0, unused by this PR's own
+// eligibility-only logic) so PR 9.9's first-accept arbitration has a
+// per-skill optimistic-concurrency target to claim against
+// (`UPDATE ... WHERE id = $slotId AND confirmed_count < headcount`, the same
+// conditional-updateMany shape ADR-057 names as the reused precedent) without
+// needing its own schema-only PR before that logic lands.
+model JobRequestSkillSlot {
+  id             String     @id @default(cuid())
+  job_request_id String
+  job_request    JobRequest @relation(fields: [job_request_id], references: [id], onDelete: Cascade)
+  skill          SkillTag
+  headcount      Int
+  confirmed_count Int       @default(0)
+  created_at     DateTime   @default(now())
+  updated_at     DateTime   @updatedAt
+
+  // confirmed_count must never exceed headcount — CHECK constraint in migration.
+  @@index([job_request_id])
+  @@index([skill])
 }
 
 // SP-5: @@unique([work_request_id, worker_id]) removed.

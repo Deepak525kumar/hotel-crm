@@ -1,0 +1,358 @@
+import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+
+/**
+ * Broadcast raise + eligibility computation for Epic 9 PR 9.7
+ * (TREQ-002/TREQ-003/TREQ-010, MIG-GAP-04/05).
+ *
+ * raiseBroadcast() creates a JobRequest + JobRequestSkillSlot rows (one per
+ * skill x headcount line, e.g. "2 Cleaners + 1 Waiter") in one transaction,
+ * published immediately. getBroadcastEligibility() computes, per skill slot,
+ * {hotel-group roster ∩ matching skill ∩ free that day} by reusing
+ * listEligibleWorkerIds() (roster-scope.ts) and isWorkerFreeOnDay() (PR 9.6,
+ * assignments/service.ts) rather than duplicating either.
+ *
+ * Out of this PR's scope, not asserted here: notification enqueue (PR 9.8),
+ * first-accept arbitration (PR 9.9), auto-close (PR 9.10).
+ */
+
+const mockJobRequest = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockEmploymentRecord = {
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockWorkerAssignment = {
+  findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockPrisma = {
+  hotel: mockHotel,
+  jobRequest: mockJobRequest,
+  employmentRecord: mockEmploymentRecord,
+  workerAssignment: mockWorkerAssignment,
+  auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+jest.mock('../config/env.js', () => ({
+  getEnv: () => ({
+    JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
+    JWT_ACCESS_EXPIRY: '1h',
+    JWT_REFRESH_EXPIRY: '7d',
+    NODE_ENV: 'test',
+  }),
+  loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+}));
+
+import { JobRequestService } from '../modules/job-requests/service.js';
+
+const makeSkillSlotRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 'slot1',
+  job_request_id: 'jr1',
+  skill: 'CLEANER' as const,
+  headcount: 2,
+  confirmed_count: 0,
+  created_at: new Date('2026-07-29T00:00:00Z'),
+  updated_at: new Date('2026-07-29T00:00:00Z'),
+  ...overrides,
+});
+
+const makeJobRequestRow = (overrides: Record<string, unknown> = {}) => ({
+  id: 'jr1',
+  hotel_id: 'h1',
+  created_by_id: 'mgr1',
+  position: '2x CLEANER, 1x WAITER',
+  workers_needed: 3,
+  workers_confirmed: 0,
+  version: 0,
+  shift_date: new Date('2026-08-01T00:00:00.000Z'),
+  shift_start_time: '08:00',
+  shift_end_time: '16:00',
+  hourly_rate: null,
+  currency: 'EUR',
+  description: null,
+  requirements: null,
+  status: 'OPEN' as const,
+  published_at: new Date('2026-07-29T00:00:00Z'),
+  expires_at: null,
+  filled_at: null,
+  cancelled_at: null,
+  cancellation_reason: null,
+  created_at: new Date('2026-07-29T00:00:00Z'),
+  updated_at: new Date('2026-07-29T00:00:00Z'),
+  skill_slots: [makeSkillSlotRow()],
+  ...overrides,
+});
+
+const baseBroadcastInput = {
+  hotel_id: 'h1',
+  shift_date: '2026-08-01',
+  shift_start_time: '08:00',
+  shift_end_time: '16:00',
+  skills: [{ skill: 'CLEANER' as const, headcount: 2 }],
+};
+
+describe('JobRequestService.raiseBroadcast', () => {
+  let service: JobRequestService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new JobRequestService();
+  });
+
+  it('throws NotFoundError when hotel does not exist', async () => {
+    mockHotel.findUnique.mockResolvedValue(null);
+    await expect(
+      service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  it('GD-05: rejects when the hotel has paused accepting_jobs', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: false });
+    await expect(
+      service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+    expect(mockJobRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('manager out of scope is rejected (ForbiddenError)', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    await expect(
+      service.raiseBroadcast(baseBroadcastInput, {
+        userId: 'mgr1',
+        role: 'manager',
+        scope: { type: 'hotel', hotel_id: 'h2' },
+      })
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    expect(mockJobRequest.create).not.toHaveBeenCalled();
+  });
+
+  it('manager in scope succeeds', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+    await expect(
+      service.raiseBroadcast(baseBroadcastInput, {
+        userId: 'mgr1',
+        role: 'manager',
+        scope: { type: 'hotel', hotel_id: 'h1' },
+      })
+    ).resolves.toBeDefined();
+  });
+
+  it('persists a single-skill broadcast correctly (skill x headcount)', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+
+    const dto = await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+    expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(mockJobRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          hotel_id: 'h1',
+          status: 'OPEN',
+          skill_slots: { create: [{ skill: 'CLEANER', headcount: 2 }] },
+        }),
+        include: { skill_slots: true },
+      })
+    );
+    expect(dto.skill_slots).toEqual([
+      { id: 'slot1', skill: 'CLEANER', headcount: 2, confirmed_count: 0 },
+    ]);
+  });
+
+  it('persists a multi-skill broadcast ("2 Cleaners + 1 Waiter") as multiple skill_slots lines', async () => {
+    const multiSkillInput = {
+      ...baseBroadcastInput,
+      skills: [
+        { skill: 'CLEANER' as const, headcount: 2 },
+        { skill: 'WAITER' as const, headcount: 1 },
+      ],
+    };
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(
+      makeJobRequestRow({
+        workers_needed: 3,
+        skill_slots: [
+          makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 2 }),
+          makeSkillSlotRow({ id: 'slot2', skill: 'WAITER', headcount: 1 }),
+        ],
+      })
+    );
+
+    const dto = await service.raiseBroadcast(multiSkillInput, { userId: 'mgr1', role: 'admin' });
+
+    expect(mockJobRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          workers_needed: 3,
+          skill_slots: {
+            create: [
+              { skill: 'CLEANER', headcount: 2 },
+              { skill: 'WAITER', headcount: 1 },
+            ],
+          },
+        }),
+      })
+    );
+    expect(dto.skill_slots).toHaveLength(2);
+    expect(dto.skill_slots?.map((s) => s.skill)).toEqual(['CLEANER', 'WAITER']);
+  });
+
+  it('publishes immediately (status OPEN, published_at set) — a broadcast has no DRAFT step', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+
+    await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+    const data = mockJobRequest.create.mock.calls[0][0].data;
+    expect(data.status).toBe('OPEN');
+    expect(data.published_at).toBeInstanceOf(Date);
+  });
+
+  it('logs an audit entry citing the raised skills', async () => {
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
+
+    await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
+
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'CREATE',
+          details: expect.objectContaining({ skills: baseBroadcastInput.skills }),
+        }),
+      })
+    );
+  });
+});
+
+describe('JobRequestService.getBroadcastEligibility', () => {
+  let service: JobRequestService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new JobRequestService();
+  });
+
+  it('throws NotFoundError when the job request does not exist', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(null);
+    await expect(
+      service.getBroadcastEligibility('missing', { userId: 'mgr1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  it('throws ConflictError when the job request has no skill slots (not a broadcast)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow({ skill_slots: [] }));
+    await expect(
+      service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+  });
+
+  it('manager out of scope is rejected (ForbiddenError)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    await expect(
+      service.getBroadcastEligibility('jr1', {
+        userId: 'mgr1',
+        role: 'manager',
+        scope: { type: 'hotel', hotel_id: 'h2' },
+      })
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+  });
+
+  it('excludes non-matching-skill workers from the eligible set', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      // roster-scope.listEligibleWorkerIds()'s own ACTIVE-membership lookup
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      // this service's own skills-by-worker lookup
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: ['WAITER'] },
+      ]);
+    mockWorkerAssignment.findFirst.mockResolvedValue(null); // both free that day
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots).toHaveLength(1);
+    expect(dto.slots[0].skill).toBe('CLEANER');
+    expect(dto.slots[0].eligible_worker_ids).toEqual(['w1']);
+  });
+
+  it('excludes already-assigned-that-day workers from the eligible set', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: ['CLEANER'] },
+      ]);
+    // w1 already has an active assignment that day; w2 is free.
+    mockWorkerAssignment.findFirst.mockImplementation(async ({ where }: any) =>
+      where.worker_id === 'w1' ? { id: 'existing-assignment' } : null
+    );
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots[0].eligible_worker_ids).toEqual(['w2']);
+  });
+
+  it('computes a distinct eligible set per skill slot on a multi-skill broadcast', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({
+        skill_slots: [
+          makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 2 }),
+          makeSkillSlotRow({ id: 'slot2', skill: 'WAITER', headcount: 1 }),
+        ],
+      })
+    );
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: ['WAITER'] },
+      ]);
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots.find((s) => s.skill === 'CLEANER')?.eligible_worker_ids).toEqual(['w1']);
+    expect(dto.slots.find((s) => s.skill === 'WAITER')?.eligible_worker_ids).toEqual(['w2']);
+  });
+
+  it('returns an empty eligible set per slot when the hotel roster is empty (no ungrouped-hotel crash)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: null });
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots[0].eligible_worker_ids).toEqual([]);
+    expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  it('calendar placement never triggers a broadcast (negative assertion, TRULE-002)', async () => {
+    // A calendar-placed JobRequest read never happens — placeOnCalendar()
+    // (PR 9.5) does not create or touch a JobRequest at all, so there is no
+    // JobRequest row for a calendar placement to be mistaken for a
+    // broadcast. This is asserted at the type/call level: raiseBroadcast()
+    // is the only method that writes skill_slots, and
+    // assignments/service.ts's placeOnCalendar() (a distinct module/service)
+    // never calls it.
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow({ skill_slots: [] }));
+    await expect(
+      service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+    expect(mockJobRequest.create).not.toHaveBeenCalled();
+  });
+});

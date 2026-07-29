@@ -2734,12 +2734,82 @@ context_invalidators:
       to confirm no new blocking findings before this pass's changes are
       committed. PR 9.6 implementation begins after this pass is committed.
 
+  - id: SYNC-064
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass following Epic 9 PR 9.6 merge (PR #277,
+      commit 3be6019, merged e7efebe; TREQ-007/TRULE-006/MIG-GAP-08), run
+      before starting PR 9.7 per the commissioning human's Repository
+      Synchronization Workflow instruction. Verified the merge landed
+      correctly (WorkerAssignment.day column + re-keyed
+      WorkerAssignment_active_slot_unique partial index present,
+      isWorkerFreeOnDay()/ACTIVE_ASSIGNMENT_STATUSES exported from
+      assignments/service.ts); full validation re-run clean at merge HEAD
+      (80 suites/1242 tests, tsc clean, prisma validate clean,
+      repository-integrity-check.js exit 0, 0 new blocking findings, 86
+      WARN/4 baselined — unchanged in kind from the prior session's baseline).
+      PR 9.7 (broadcast JobRequest-fallback + eligibility, TREQ-002/003/010,
+      MIG-GAP-04/05) then implemented: an architecture-reviewer pass (run
+      before code, matching the precedent PR 9.5/9.6 set for a repository-
+      reality-vs-plan-text divergence) confirmed the confirmed-requirements
+      authority (CONFIRMED_REQUIREMENTS_REGISTER.md §13, "2 Cleaners + 1
+      Waiter") requires a new child table (one row per skill x headcount
+      line), not a single-skill JobRequest field, and confirmed
+      JobRequest.position/workers_needed/workers_confirmed must stay
+      untouched (still live for the marketplace publish/apply flow and
+      analytics' aggregate). Added: JobRequestSkillSlot model (migration
+      20260729040000_add_job_request_skill_slot, purely additive, includes a
+      confirmed_count column now for PR 9.9's future optimistic-concurrency
+      target per the architecture review's recommendation);
+      JobRequestService.raiseBroadcast()/getBroadcastEligibility()
+      (job-requests/service.ts), reusing isWorkerFreeOnDay()/
+      ACTIVE_ASSIGNMENT_STATUSES (PR 9.6) and listEligibleWorkerIds()
+      (roster-scope.ts) rather than duplicating either; new routes
+      POST /work-requests/broadcasts + GET /work-requests/broadcasts/:id/
+      eligibility, gated by the existing FEATURE_JOBDISPATCH_PHASE2 flag
+      (default off), mirroring PR 9.5's /calendar-entries gating shape; test
+      file job-requests-broadcast.test.ts (16 new tests, including the
+      multi-skill "2 Cleaners + 1 Waiter" case and the negative
+      calendar-never-broadcasts assertion TRULE-002 requires).
+      Knowledge layer updated in this same pass: MODULE_SPEC.md
+      (docs/03-modules/job-dispatch/) bumped 0.3.3->0.3.4 with a
+      Review-and-Change-Log row and updated TREQ-002/003/010 + MIG-GAP-04/05
+      status cells (each precisely scoped to what 9.7 actually closed vs. what
+      remains for 9.8/9.9/9.10); MODULE_REGISTRY.yaml's backend-job-requests
+      and backend-assignments specification citations bumped to @0.3.4 with
+      explanatory notes; DEPENDENCY_GRAPH.yaml gained the
+      state-job-request-skill-slot state-domain node and the
+      edge-job-requests-reads-worker-assignment edge (read-only, function-level
+      import, no new state ownership); TERMINOLOGY.md promoted two new target
+      terms ("Broadcast (Job Request)", "Skill") per
+      SPEC-JOB-DISPATCH-001's own Proposed Knowledge Delta list
+      (MODULE_SPEC.md §"Proposed Knowledge Deltas", same promote-in-the-PR-
+      that-builds-it precedent Epic 9 PR 9.4 set for "Job request").
+      SIR-JOBD-006 (the MIG-GAP-01..12 enumeration) NOT touched — per the
+      commissioning human's standing instruction (recorded in the
+      implementation execution plan), closing a register row is an
+      implementation-completion act reserved for Epic 9's own final pass, not
+      a per-PR act.
+      No ADR was created or reopened; no accept/arbitration/notification/
+      auto-close logic (PR 9.8/9.9/9.10's scope) was implemented.
+    authority_needed: none  # this pass's schema/service/route/test work is implementation authorized by the standing Epic 9 PR 9.7 scope in the implementation execution plan; the architecture-reviewer's schema-shape finding is an evidence-based clarification of already-ratified target requirements (CONFIRMED_REQUIREMENTS_REGISTER.md §13, TREQ-002/003/010), not a new decision; the knowledge-layer updates are synchronization exit conditions of this same PR, not new authority
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit. cache_state.baseline_revision
+      is rebound below to e7efebe (PR #277 merge HEAD) since this pass began
+      by verifying that merge, then advances further once this PR's own
+      commit lands. Full validation suite (tsc, prisma validate/generate,
+      backend test suite, repository-integrity-check.js) re-run clean after
+      this PR's code changes, recorded above. PR 9.8 (skill-matched broadcast
+      notification) begins after this pass is committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 945dba206aaa23ec3f015d4c89d99c02d569702f  # rebound to HEAD 945dba2 by SYNC-060 (2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes); prior 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: e7efebe  # rebound to HEAD e7efebe by SYNC-064 (2026-07-29, post Epic 9 PR 9.6 merge, PR #277 — WorkerAssignment.day column + re-keyed daily-exclusivity partial index); prior 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
