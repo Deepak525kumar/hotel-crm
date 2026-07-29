@@ -332,6 +332,19 @@ export class JobRequestService extends BaseService {
    * construction: this is the *only* creation path that populates
    * skill_slots, and it is never invoked by placeOnCalendar() (PR 9.5) or by
    * the marketplace create()/update() methods above.
+   *
+   * skill_slots is the sole source of truth for a broadcast's skill×headcount
+   * data. `position`/`workers_needed` ARE also written on the created row,
+   * but only as a compatibility projection derived from skill_slots (a
+   * summary string / sum, never independently authored) so existing
+   * consumers that read those legacy columns (list()/getById()'s DTO
+   * mapping, analytics/service.ts's _sum aggregate) keep working for a
+   * broadcast row without a broadcast-aware branch in either. This is a
+   * deliberate transitional-compatibility decision (Option B, confirmed
+   * 2026-07-29 pre-merge review of PR 9.7), not an oversight — see
+   * MODULE_SPEC.md's 0.3.4 Review-and-Change-Log entry. Nothing in this
+   * service (or any future PR 9.8/9.9 logic) may read `position` back as
+   * authoritative for a broadcast; only skill_slots may be.
    */
   async raiseBroadcast(input: RaiseBroadcastInput, actor: Actor): Promise<WorkRequestDto> {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: input.hotel_id } });
@@ -352,12 +365,20 @@ export class JobRequestService extends BaseService {
       }
     }
 
+    // Decision (transitional compatibility, Option B — confirmed 2026-07-29
+    // pre-merge review of PR 9.7): a broadcast row DOES populate the legacy
+    // position/workers_needed columns, derived (not manager-authored) from
+    // the skill×headcount breakdown below, alongside skill_slots. This is
+    // deliberate, not accidental: list()/getById()'s DTO mapping and
+    // analytics/service.ts's existing _sum(workers_needed/workers_confirmed)
+    // aggregate have no other field to read for a broadcast row today, and
+    // giving them a derived value keeps a broadcast visible/summable through
+    // those existing surfaces without adding a broadcast-aware branch to
+    // either. skill_slots remains the SOLE authority for any decision logic
+    // (eligibility, future arbitration) — position is a display-only
+    // derivative, never read back for behavior. Superseded once TREQ-011
+    // retires the marketplace fields entirely.
     const totalWorkersNeeded = input.skills.reduce((sum, s) => sum + s.headcount, 0);
-    // position/requirements carry a human-readable summary of the
-    // skill×headcount breakdown for the legacy free-text fields (still read
-    // by the marketplace UI / analytics aggregate, per the architecture
-    // review's finding AR-9.7-02) — the authoritative breakdown is
-    // skill_slots, not this string.
     const positionSummary = input.skills.map((s) => `${s.headcount}x ${s.skill}`).join(', ');
 
     const { wr, slots } = await this.prisma.$transaction(async (tx) => {

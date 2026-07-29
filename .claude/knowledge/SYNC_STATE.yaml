@@ -2756,9 +2756,10 @@ context_invalidators:
       authority (CONFIRMED_REQUIREMENTS_REGISTER.md §13, "2 Cleaners + 1
       Waiter") requires a new child table (one row per skill x headcount
       line), not a single-skill JobRequest field, and confirmed
-      JobRequest.position/workers_needed/workers_confirmed must stay
-      untouched (still live for the marketplace publish/apply flow and
-      analytics' aggregate). Added: JobRequestSkillSlot model (migration
+      JobRequest.position/workers_needed/workers_confirmed must stay live
+      for the marketplace publish/apply flow and analytics' aggregate
+      (i.e. must not be removed or repurposed as broadcast-only fields).
+      Added: JobRequestSkillSlot model (migration
       20260729040000_add_job_request_skill_slot, purely additive, includes a
       confirmed_count column now for PR 9.9's future optimistic-concurrency
       target per the architecture review's recommendation);
@@ -2793,7 +2794,38 @@ context_invalidators:
       a per-PR act.
       No ADR was created or reopened; no accept/arbitration/notification/
       auto-close logic (PR 9.8/9.9/9.10's scope) was implemented.
-    authority_needed: none  # this pass's schema/service/route/test work is implementation authorized by the standing Epic 9 PR 9.7 scope in the implementation execution plan; the architecture-reviewer's schema-shape finding is an evidence-based clarification of already-ratified target requirements (CONFIRMED_REQUIREMENTS_REGISTER.md §13, TREQ-002/003/010), not a new decision; the knowledge-layer updates are synchronization exit conditions of this same PR, not new authority
+
+      Post-implementation, pre-merge correction (2026-07-29, same day, PR
+      #278 open for review): the commissioning human asked one final
+      verification question before merge -- does any code still write to
+      JobRequest.position/workers_needed for newly created broadcast
+      JobRequests, or are those fields now intentionally compatibility-only?
+      Re-inspection of raiseBroadcast() (job-requests/service.ts) found this
+      pass's own documentation (the code comment above positionSummary, the
+      MODULE_SPEC.md 0.3.4 Document Control amendment note and
+      Review-and-Change-Log row, and this record's now-corrected paragraph
+      above) had inaccurately stated the legacy fields are "left untouched"
+      by raiseBroadcast(), when in fact raiseBroadcast() DOES write
+      position/workers_needed on every broadcast row -- derived from the
+      skill_slots breakdown (position = a generated summary string,
+      workers_needed = the summed headcount), not independently authored,
+      and never read back as authoritative by any decision logic (skill_slots
+      alone is authoritative for eligibility/future arbitration). This is
+      Option B (compatibility projection) of the two choices the human
+      posed, confirmed as the intended, documented decision -- not Option A
+      (leave the legacy fields untouched/unpopulated for broadcasts). No
+      runtime behavior was changed by this correction: raiseBroadcast()'s
+      code was already writing these derived values; only the inline code
+      comment (service.ts, both at the raiseBroadcast() docblock and at the
+      positionSummary computation) and MODULE_SPEC.md (the Document Control
+      amendment note and the 0.3.4 Review-and-Change-Log row, plus the
+      MIG-GAP-05 status cell) were corrected to say so accurately.
+      workers_confirmed remains genuinely untouched by raiseBroadcast() (stays
+      at its schema default of 0; broadcast-accept incrementing it is PR
+      9.9's scope). No new SYNC entry was opened for this correction since it
+      amends this same still-open, still-uncommitted-at-record-time pass
+      rather than a separately merged one.
+    authority_needed: none  # this pass's schema/service/route/test work is implementation authorized by the standing Epic 9 PR 9.7 scope in the implementation execution plan; the architecture-reviewer's schema-shape finding is an evidence-based clarification of already-ratified target requirements (CONFIRMED_REQUIREMENTS_REGISTER.md §13, TREQ-002/003/010), not a new decision; the knowledge-layer updates are synchronization exit conditions of this same PR, not new authority; the pre-merge documentation correction was explicitly confirmed by the commissioning human as Option B (compatibility projection), a clarification of intent already implemented in code, not a new decision
     next_step: >-
       Working-tree changes only (uncommitted as of this record); the
       orchestrating session handles git add/commit. cache_state.baseline_revision
