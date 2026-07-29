@@ -671,8 +671,24 @@ not silent renumbering.
 
 #### PR 9.4 — Re-label schema off "marketplace"
 
-- **Files:** `schema.prisma` (`WorkRequest` → `JobRequest` model rename, `@@map("work_requests")`
-  retained to avoid a physical table rename — a Prisma-level rename only, not a data migration);
+- **Repository-reality correction (2026-07-29):** this section originally assumed the physical
+  table backing `WorkRequest` was already `@@map`-ed to a snake_case name (`work_requests`), and
+  said to "retain" that mapping under the new model name. Verified against the live schema: this
+  repository uses Prisma's default PascalCase physical-table naming throughout — `@@map` is not
+  used anywhere in `schema.prisma`, and the physical table is literally `"WorkRequest"` (confirmed
+  in the original migration, `20260613120000_v2_marketplace_init/migration.sql:101`). There is no
+  pre-existing `work_requests`-named table to "keep." To achieve this PR's actual stated intent —
+  "a Prisma-level rename only, not a data migration," "zero data risk" — the renamed `JobRequest`
+  model must instead map back onto the table's real current physical name via
+  `@@map("WorkRequest")`, not `@@map("work_requests")`. This produces a true no-op migration (model/
+  class/file names change; the database table itself is never touched, never renamed). The
+  alternative literal readings (mapping to `work_requests`, or adding no `@@map` at all and letting
+  the table rename to `"JobRequest"`) both produce a real `ALTER TABLE ... RENAME TO` migration,
+  contradicting this PR's own "zero data risk"/"not a data migration" framing — plan corrected to
+  match the repository's actual physical-schema convention rather than the reverse.
+- **Files:** `schema.prisma` (`WorkRequest` → `JobRequest` model rename, `@@map("WorkRequest")`
+  added so the physical table name does not change — a Prisma-level rename only, not a data
+  migration; see correction note above);
   `backend/src/modules/work-requests/` → `backend/src/modules/job-requests/` (directory rename,
   all internal references updated); `backend/src/routes/v1/index.ts` mount path
   (`/work-requests` route path itself is a public API contract — **retained unchanged** per
