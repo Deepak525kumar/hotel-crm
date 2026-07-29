@@ -173,3 +173,21 @@ export async function acceptBroadcast(
     next(error);
   }
 }
+
+// Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09).
+export async function manualCloseBroadcast(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const result = await jobRequestService.manualClose(req.params.id, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}

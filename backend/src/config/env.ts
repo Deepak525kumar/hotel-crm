@@ -196,6 +196,20 @@ const envSchema = z.object({
   GEO_RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
   GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
+
+  // Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): broadcast JobRequest
+  // 6h auto-close job on the Platform Worker, same config-driven convention
+  // as the two sweep jobs above. A tighter poll than SESSION_SWEEP's hourly
+  // default is warranted -- TREQ-006's 6h window is itself short, so a
+  // broadcast could otherwise sit unfilled-but-past-due for up to an hour
+  // before this job notices.
+  JOB_REQUEST_AUTO_CLOSE_INTERVAL_MS: z.coerce.number().int().positive().default(900000),
+  // TREQ-006: "auto-closes 6 hours after creation" -- confirmed authority,
+  // not itself configuration, but exposed as a default-6h env var (not a
+  // hardcoded literal) for the same operational-adjustability reason every
+  // other scheduled-job parameter here is.
+  JOB_REQUEST_AUTO_CLOSE_AFTER_MS: z.coerce.number().int().positive().default(21600000),
+  JOB_REQUEST_AUTO_CLOSE_BATCH_SIZE: z.coerce.number().int().positive().default(100),
 });
 
 type Env = z.infer<typeof envSchema>;

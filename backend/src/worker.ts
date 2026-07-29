@@ -12,6 +12,7 @@ import {
 } from './modules/notifications/outbox-transport.js';
 import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
 import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
+import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -35,6 +36,12 @@ import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
  * GD-14/OD-GEO-002 (SPEC-GEO-001): the geo retention sweep hard-deletes
  * WorkerGeoCheckin rows older than 6 months (GDPR Tier 1), on a
  * configuration-driven interval (default daily).
+ *
+ * Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): the job-request
+ * auto-close job closes any broadcast JobRequest still OPEN more than 6
+ * hours after creation, notifying the raising manager, on a
+ * configuration-driven interval (default every 15 minutes). Confirms
+ * ADR-057's Platform-Worker-not-BullMQ decision in code.
  */
 async function main() {
   try {
@@ -78,6 +85,13 @@ async function main() {
           intervalMs: env.GEO_RETENTION_SWEEP_INTERVAL_MS,
           batchSize: env.GEO_RETENTION_SWEEP_BATCH_SIZE,
           maxBatchesPerRun: env.GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      )
+      .register(
+        new JobRequestAutoCloseJob({
+          intervalMs: env.JOB_REQUEST_AUTO_CLOSE_INTERVAL_MS,
+          autoCloseAfterMs: env.JOB_REQUEST_AUTO_CLOSE_AFTER_MS,
+          batchSize: env.JOB_REQUEST_AUTO_CLOSE_BATCH_SIZE,
         })
       );
 
