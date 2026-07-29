@@ -73,7 +73,6 @@ export interface WorkerAssignment {
   id: string;
   work_request_id: string;
   worker_id: string;
-  application_id: string;
   status: AssignmentStatus;
   created_at: string;
   work_request?: WorkRequest;

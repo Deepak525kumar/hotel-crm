@@ -481,7 +481,6 @@ export interface Assignment {
   worker_id: string;
   hotel_id: string;
   assigned_by_id: string;
-  application_id: string;
   status: AssignmentStatus;
   confirmed_at: string;
   started_at: string | null;
