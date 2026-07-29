@@ -10,7 +10,7 @@ function makeGroupByResult<T extends string>(statuses: Array<[T, number]>) {
 }
 
 const mockPrisma = {
-  workRequest: {
+  jobRequest: {
     count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     groupBy: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -62,9 +62,9 @@ describe('Analytics rooms_completed wiring (ADR-028, OQ-ANALYTICS-03)', () => {
     jest.clearAllMocks();
     service = new AnalyticsService();
 
-    mockPrisma.workRequest.count.mockResolvedValue(0);
-    mockPrisma.workRequest.groupBy.mockResolvedValue(makeGroupByResult([]));
-    mockPrisma.workRequest.aggregate.mockResolvedValue({
+    mockPrisma.jobRequest.count.mockResolvedValue(0);
+    mockPrisma.jobRequest.groupBy.mockResolvedValue(makeGroupByResult([]));
+    mockPrisma.jobRequest.aggregate.mockResolvedValue({
       _count: { id: 0 },
       _sum: { workers_needed: 0, workers_confirmed: 0 },
     });

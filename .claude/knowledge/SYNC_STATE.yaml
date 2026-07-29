@@ -2470,6 +2470,133 @@ context_invalidators:
       repository-integrity-check.js to confirm no new blocking findings before this
       pass's changes are committed.
 
+  - id: SYNC-061
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass recording Epic 9 PR 9.4's WorkRequest ->
+      JobRequest rename (TREQ-013/MIG-GAP-12, "re-label schema off marketplace"
+      framing), implemented in this pass: backend/prisma/schema.prisma's
+      WorkRequest model renamed JobRequest with @@map("WorkRequest") added, so
+      the physical table name is unchanged -- confirmed via
+      `prisma migrate diff --from-schema-datamodel <pre-rename schema>
+      --to-schema-datamodel schema.prisma --script`, which produced "-- This is
+      an empty migration." (genuinely empty diff; no new migration file
+      created, per the plan's own "zero data risk"/"not a data migration"
+      framing). The @@map decision (map onto "WorkRequest", not "work_requests")
+      was escalated and confirmed by the human operator: this repository uses
+      Prisma's default PascalCase physical-table naming throughout, @@map is
+      not used anywhere else in schema.prisma, and the live migration history
+      confirms the physical table is literally "WorkRequest" -- IMPLEMENTATION_
+      EXECUTION_PLAN.md's PR 9.4 section already carries this correction
+      (commit 04f2b97, prior to this pass).
+      backend/src/modules/work-requests/ renamed to backend/src/modules/
+      job-requests/ (git mv, all four files); WorkRequestService/
+      workRequestService renamed JobRequestService/jobRequestService; every
+      this.prisma.workRequest accessor renamed this.prisma.jobRequest (job-
+      requests/service.ts, analytics/service.ts); Prisma.WorkRequestWhereInput/
+      WorkRequestUpdateInput type references renamed to the Prisma.JobRequest*
+      equivalents. Route handler function names (createWorkRequest etc.), DTO/
+      schema type names (WorkRequestDto, CreateWorkRequestInput, etc.),
+      WorkRequestStatus enum, work_request_id/work_request FK field names, and
+      OutboxSourceModule.WORK_REQUESTS were left unchanged -- out of this PR's
+      scope (model/module/class rename only, not a field or enum rename).
+      backend/src/routes/v1/index.ts: import path repointed to
+      modules/job-requests/routes.js; the /work-requests route mount path
+      itself is retained unchanged (public API contract, not renamed, per the
+      plan's explicit instruction).
+      Test files: work-requests.test.ts -> job-requests.test.ts and
+      work-requests-scope-authz.test.ts -> job-requests-scope-authz.test.ts
+      renamed via git mv; import paths and the mockPrisma.workRequest ->
+      mockPrisma.jobRequest mock key updated (the latter is a functional
+      necessity, not optional, since the mock must match the renamed Prisma
+      client accessor for the tests to still exercise the real code path);
+      content and assertions otherwise unchanged. Two additional test files
+      not named in the plan's test-file-rename list but exercising the same
+      renamed module/accessor were also updated for the same functional
+      reason (kept their own filenames, only import path + mock keys
+      changed): job-dispatch-envelope.test.ts and
+      analytics-rooms-completed.test.ts.
+      Knowledge layer renamed in place (same live relationship, not a
+      retirement -- distinct from the SYNC-059 retire-with-comment
+      convention): DEPENDENCY_GRAPH.yaml (backend-work-requests ->
+      backend-job-requests module node; state-work-request ->
+      state-job-request state-domain node and its state_domains row;
+      edge-work-requests-reads-hotel and edge-work-requests-reads-employment-
+      record source renamed; edge-assignments-job-request-fk and
+      edge-analytics-reads-work-request target renamed to state-job-request;
+      edge-frontend-work-requests and edge-mobile-worker-work-requests had
+      only their target field renamed, per the human operator's explicit
+      scoping -- frontend/mobile module ids and URLs are untouched; the
+      route_registration mount-table row and four contract consumer lists
+      (notification-service, prisma-schema, base-service, auth-middleware)
+      had backend-work-requests renamed to backend-job-requests; state-hotel's
+      readers list and evidence updated similarly. The edge-work-requests-
+      notifications edge id was deliberately kept stable, not renamed to
+      edge-job-requests-notifications, matching PR 9.7's own plan text noting
+      9.4 kept the module's outbox-facing identity stable by design; only its
+      source node was renamed. Purely historical/dated prose narrating past
+      Epic 5/8/9.2 states (e.g. the file-header 2026-07-20 backfill summary,
+      the permissions-middleware Epic 8 narrative, the acyclic-import-graph
+      note) was left as-is, describing what was true at that past date under
+      that date's own naming -- not a live-identifier reference requiring
+      update.
+      MODULE_REGISTRY.yaml: backend-work-requests entry renamed backend-
+      job-requests (path, evidence updated); specification bumped
+      SPEC-JOB-DISPATCH-001@0.3.2 -> @0.3.3 with an amendment note citing this
+      pass; backend-assignments' own specification field's cross-reference to
+      "backend-work-requests entry" updated to "backend-job-requests entry"
+      and its own version bumped to match (same FROZEN spec, shared amendment
+      history). Purely historical/dated prose (file-header 2026-07-20 status
+      summary, the CRM module's dated 2026-07-27 GD-05 amendment note) left
+      as-is for the same reason as above.
+      TERMINOLOGY.md: the "Work request" seed-inventory row promoted to
+      canonical as "Job request", per SPEC-JOB-DISPATCH-001's own Proposed
+      Knowledge Delta ("MODULE_SPEC.md" §"Proposed Knowledge Deltas": "promote
+      to canonical: Work request..."), applied in this PR per its own text,
+      not deferred. The sibling "Work application" row (also named in that
+      same delta) was NOT touched -- it was already correctly retired/marked
+      by SYNC-059 following PR 9.2's actual removal, and this pass's scope is
+      the WorkRequest -> JobRequest rename only.
+      STATE_OWNERSHIP_INDEX.yaml: state-work-request row renamed state-job-
+      request (model, authoritative_writer, writers, readers -- readers list
+      also gained backend-assignments, previously missing versus
+      DEPENDENCY_GRAPH.yaml's authoritative state_domains entry, corrected in
+      the same edit since this index is a "never outranks" summary of that
+      file); state-hotel and state-hotel-worker rows' backend-work-requests
+      mentions updated with an inline rename note. The cross_module_write_
+      couplings header comment's historical mention of state-work-request (an
+      Epic 9 PR 9.2-era description) left as historical, unchanged.
+      MODULE_MEMORY.yaml: ART-MEM-backend-work-requests renamed ART-MEM-
+      backend-job-requests (artifact id, module field, boundary/owned_state/
+      interfaces prose, invalidated_by); spec field intentionally left at
+      "SPEC-JOB-DISPATCH-001 v0.3.1 (FROZEN)" unbumped, since this artifact is
+      a frozen-at-capture corroborating snapshot (knowledge/README.md Rule 4),
+      not re-derived per revision -- a comment explains this explicitly. The
+      file-header 2026-07-20 backfill-narrative mention of the pre-rename
+      artifact id was left as historical, unchanged, for the same reason as
+      the DEPENDENCY_GRAPH.yaml/MODULE_REGISTRY.yaml historical-prose notes
+      above.
+      Verification evidence run in this pass: `npx tsc --noEmit` clean (zero
+      errors); `npx prisma validate` / `npx prisma generate` both clean;
+      full backend test suite green at 78/78 suites, 1211/1211 tests
+      (`npx jest --forceExit --maxWorkers=4`; the unconstrained-parallelism
+      default run showed 2 unrelated timeout flakes against the shared remote
+      RDS instance -- job-requests.test.ts and the untouched
+      analytics-scope-authz.test.ts -- both confirmed passing in isolation
+      and under bounded parallelism, not a rename regression).
+    authority_needed: none  # implements a decision already confirmed by the human operator (the @@map escalation) and an already-approved plan item (IMPLEMENTATION_EXECUTION_PLAN.md PR 9.4); no new decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record, per the
+      commissioning instruction to leave everything for the orchestrating
+      session to review); the orchestrating session handles git add/commit
+      and any PR. cache_state.baseline_revision is intentionally NOT rebound
+      by this entry since HEAD has not advanced yet, per the existing
+      SYNC-055/SYNC-056/SYNC-057/SYNC-058/SYNC-059 pattern (rebind follows a
+      HEAD change, not a working-tree edit). Run node .claude/tooling/
+      repository-integrity-check.js to confirm no new blocking findings
+      before this pass's changes are committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.

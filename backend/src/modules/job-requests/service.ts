@@ -1,4 +1,4 @@
-import { OutboxSourceModule, OutboxTransport, Prisma, WorkRequest, WorkRequestStatus } from '@prisma/client';
+import { OutboxSourceModule, OutboxTransport, Prisma, JobRequest, WorkRequestStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
@@ -32,8 +32,8 @@ const ALLOWED_TRANSITIONS: Partial<Record<WorkRequestStatus, WorkRequestStatus[]
   [WorkRequestStatus.PARTIALLY_FILLED]: [WorkRequestStatus.CANCELLED],
 };
 
-export class WorkRequestService extends BaseService {
-  private toDto(wr: WorkRequest): WorkRequestDto {
+export class JobRequestService extends BaseService {
+  private toDto(wr: JobRequest): WorkRequestDto {
     return {
       id: wr.id,
       hotel_id: wr.hotel_id,
@@ -85,7 +85,7 @@ export class WorkRequestService extends BaseService {
 
     const publishing = input.status === 'OPEN';
 
-    const wr = await this.prisma.workRequest.create({
+    const wr = await this.prisma.jobRequest.create({
       data: {
         hotel_id: input.hotel_id,
         created_by_id: actor.userId,
@@ -116,7 +116,7 @@ export class WorkRequestService extends BaseService {
     query: ListWorkRequestsQuery,
     actor: { userId: string; role: string }
   ): Promise<{ data: WorkRequestDto[]; total: number }> {
-    const where: Prisma.WorkRequestWhereInput = {
+    const where: Prisma.JobRequestWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
       ...(query.status ? { status: query.status as WorkRequestStatus } : {}),
       ...(query.position ? { position: query.position } : {}),
@@ -138,13 +138,13 @@ export class WorkRequestService extends BaseService {
     }
 
     const [records, total] = await Promise.all([
-      this.prisma.workRequest.findMany({
+      this.prisma.jobRequest.findMany({
         where,
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: [{ shift_date: 'desc' }, { created_at: 'desc' }],
       }),
-      this.prisma.workRequest.count({ where }),
+      this.prisma.jobRequest.count({ where }),
     ]);
 
     return { data: records.map((r) => this.toDto(r)), total };
@@ -154,7 +154,7 @@ export class WorkRequestService extends BaseService {
     id: string,
     actor: { userId: string; role: string }
   ): Promise<WorkRequestDto> {
-    const wr = await this.prisma.workRequest.findUnique({ where: { id } });
+    const wr = await this.prisma.jobRequest.findUnique({ where: { id } });
     if (!wr) throw new NotFoundError('Work request not found');
 
     if (actor.role !== 'admin' && actor.role !== 'manager') {
@@ -184,7 +184,7 @@ export class WorkRequestService extends BaseService {
     input: UpdateWorkRequestInput,
     actor: Actor
   ): Promise<WorkRequestDto> {
-    const wr = await this.prisma.workRequest.findUnique({ where: { id } });
+    const wr = await this.prisma.jobRequest.findUnique({ where: { id } });
     if (!wr) throw new NotFoundError('Work request not found');
 
     // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only patch work
@@ -197,7 +197,7 @@ export class WorkRequestService extends BaseService {
       }
     }
 
-    const data: Prisma.WorkRequestUpdateInput = {};
+    const data: Prisma.JobRequestUpdateInput = {};
     let statusChanged = false;
     // True only for the DRAFT -> OPEN publish transition (the transition table
     // permits OPEN exclusively from DRAFT), so unrelated PATCHes never notify.
@@ -246,16 +246,16 @@ export class WorkRequestService extends BaseService {
     // enqueue is a cheap local insert, never a synchronous external
     // network call — delivery happens later, out-of-band, via the Platform
     // Worker.
-    let updated: WorkRequest;
+    let updated: JobRequest;
     if (isPublishing) {
       const workerIds = await listEligibleWorkerIds(wr.hotel_id);
       updated = await this.prisma.$transaction(async (tx) => {
-        const wrUpdated = await tx.workRequest.update({ where: { id }, data });
+        const wrUpdated = await tx.jobRequest.update({ where: { id }, data });
         await this.enqueueRosterPublished(tx, wrUpdated, workerIds);
         return wrUpdated;
       });
     } else {
-      updated = await this.prisma.workRequest.update({ where: { id }, data });
+      updated = await this.prisma.jobRequest.update({ where: { id }, data });
     }
 
     await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
@@ -270,7 +270,7 @@ export class WorkRequestService extends BaseService {
   // the hotel roster, inside the caller's publish transaction (ADR-029 §2).
   private async enqueueRosterPublished(
     tx: DatabaseTransaction,
-    wr: WorkRequest,
+    wr: JobRequest,
     workerIds: string[]
   ): Promise<void> {
     for (const workerId of workerIds) {
@@ -284,7 +284,7 @@ export class WorkRequestService extends BaseService {
           hotelId: wr.hotel_id,
           transports: [OutboxTransport.PUSH],
           sourceModule: OutboxSourceModule.WORK_REQUESTS,
-          producerService: 'WorkRequestService',
+          producerService: 'JobRequestService',
         },
         tx
       );
@@ -292,4 +292,4 @@ export class WorkRequestService extends BaseService {
   }
 }
 
-export const workRequestService = new WorkRequestService();
+export const jobRequestService = new JobRequestService();

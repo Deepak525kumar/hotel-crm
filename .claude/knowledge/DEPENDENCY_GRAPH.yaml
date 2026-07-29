@@ -29,7 +29,7 @@ nodes:
   # 6, ADR-024 D5) — physically deleted from backend/src/modules/hotel-workers.
   # No node entry remains; see state-hotel-worker's own note below and git
   # history for the historical relationship record.
-  - { id: backend-work-requests, kind: module, owner: unassigned, source: backend/src/modules/work-requests }
+  - { id: backend-job-requests, kind: module, owner: unassigned, source: backend/src/modules/job-requests }  # renamed from backend-work-requests by Epic 9 PR 9.4 (WorkRequest -> JobRequest, TREQ-013/MIG-GAP-12); same live module/relationship, not a retirement. See SYNC-061.
   # backend-work-applications module REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
   # merged b035700; TREQ-011/ADR-058) — physically deleted from
   # backend/src/modules/work-applications; WorkApplication model + ApplicationStatus enum
@@ -146,7 +146,7 @@ nodes:
   - { id: state-hotel, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:175 (model Hotel)" }
   - { id: state-hotel-group, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:231 (model HotelGroup, added by ADR-023)" }  # added during governance audit (governance-audit-recalc, 2026-07-22); was previously missing from this list despite Hotel.hotel_group_id FK (state-hotel note below) and MODULE_REGISTRY.yaml backend-crm entry already referencing ADR-023's HotelGroup ownership
   - { id: state-hotel-worker, kind: state-domain, owner: none, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }  # owner backend-hotel-workers removed by Epic 5 PR 5.8; see state_domains note below
-  - { id: state-work-request, kind: state-domain, owner: backend-work-requests, source: "backend/prisma/schema.prisma:236 (model WorkRequest)" }
+  - { id: state-job-request, kind: state-domain, owner: backend-job-requests, source: "backend/prisma/schema.prisma:500 (model JobRequest, @@map(\"WorkRequest\"))" }  # renamed from state-work-request by Epic 9 PR 9.4 (WorkRequest -> JobRequest model rename, @@map preserves the physical table name — zero data migration). See SYNC-061.
   # state-work-application node REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
   # merged b035700; TREQ-011/ADR-058) — the WorkApplication model and ApplicationStatus
   # enum were dropped from schema.prisma (migration 20260729000000_drop_work_application);
@@ -186,13 +186,14 @@ edges:
   # Each caller imports the shared `notificationService` singleton and invokes
   # sendNotification (fire-and-forget; a delivery failure never rolls back).
   - id: edge-work-requests-notifications
-    source: backend-work-requests
+    source: backend-job-requests
     target: backend-notifications
     kind: calls
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: "backend/src/modules/work-requests/service.ts:4,240-242"
+    evidence: "backend/src/modules/job-requests/service.ts:4,240-242"
+    note: "Edge id kept stable (not renamed to edge-job-requests-notifications) — Epic 9 PR 9.7's own plan text notes 9.4 kept the module's outbox-facing identity stable by design; source node renamed backend-work-requests -> backend-job-requests. See SYNC-061."
   # edge-work-applications-notifications REMOVED by Epic 9 PR 9.2 (commits
   # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
   # was physically deleted; it no longer calls notification-service. See SYNC-059.
@@ -236,12 +237,13 @@ edges:
     status: observed
     evidence: "backend/src/middleware/auth.ts (resolveLiveAuth: prisma.user.findUnique, unconditional as of ADR-031 PR-7)"
   - id: edge-work-requests-reads-hotel
-    source: backend-work-requests
+    source: backend-job-requests
     target: state-hotel
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/work-requests/service.ts:53 (this.prisma.hotel.findUnique)"
+    evidence: "backend/src/modules/job-requests/service.ts:66 (this.prisma.hotel.findUnique)"
+    note: "source renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4. See SYNC-061."
   # Epic 5 PR 5.6 (SPEC-EMP-001): employee-management read edges. Group-grain scope
   # resolution + hire-approval group derivation read Hotel/HotelGroup (ADR-023 §4/§6);
   # profile-and-history aggregation reads Attendance/Rating within provisional caps
@@ -290,22 +292,22 @@ edges:
     evidence: "backend/src/modules/assignments/service.ts getById()/update(), via lib/roster-scope.ts"
   - id: edge-assignments-job-request-fk
     source: backend-assignments
-    target: state-work-request
+    target: state-job-request
     kind: reads-state
     compatibility: not-applicable
     status: schema-only-unpopulated
-    evidence: "backend/prisma/schema.prisma:567 (WorkerAssignment.job_request_id FK to WorkRequest, onDelete: SetNull)"
-    note: "Added by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012). Schema-only as of this edge's creation: no write path populates job_request_id yet (PR 9.5 calendar and PR 9.9 broadcast-accept are the two future writers). Forward-named ahead of PR 9.4's WorkRequest -> JobRequest rename — the relation target is still the WorkRequest model. See SYNC-060."
+    evidence: "backend/prisma/schema.prisma:568 (WorkerAssignment.job_request_id FK to JobRequest, onDelete: SetNull)"
+    note: "Added by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012). Schema-only as of this edge's creation: no write path populates job_request_id yet (PR 9.5 calendar and PR 9.9 broadcast-accept are the two future writers). Epic 9 PR 9.4 completed the WorkRequest -> JobRequest model rename (target renamed state-work-request -> state-job-request); the relation target is the JobRequest model, @@map(\"WorkRequest\") preserves the physical table (zero data migration). See SYNC-060, SYNC-061."
   # edge-work-applications-reads-employment-record REMOVED by Epic 9 PR 9.2 (commits
   # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
   # was physically deleted; it no longer reads state-employment-record. See SYNC-059.
   - id: edge-work-requests-reads-employment-record
-    source: backend-work-requests
+    source: backend-job-requests
     target: state-employment-record
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/work-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts"
+    evidence: "backend/src/modules/job-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts"
   - id: edge-users-reads-employment-record
     source: backend-users
     target: state-employment-record
@@ -374,11 +376,12 @@ edges:
   # analytics is a read-only aggregator across many owned state domains.
   - id: edge-analytics-reads-work-request
     source: backend-analytics
-    target: state-work-request
+    target: state-job-request
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/analytics/service.ts:75,76,189 (this.prisma.workRequest)"
+    evidence: "backend/src/modules/analytics/service.ts:97,98,272 (this.prisma.jobRequest)"
+    note: "target renamed state-work-request -> state-job-request, evidence accessor renamed prisma.workRequest -> prisma.jobRequest by Epic 9 PR 9.4. See SYNC-061."
   - id: edge-analytics-reads-worker-assignment
     source: backend-analytics
     target: state-worker-assignment
@@ -435,7 +438,7 @@ edges:
   # --- Client -> backend API consumption (consumes-api) ---
   # frontend-web (Next.js) via frontend/lib/api.ts apiFetch helpers.
   - { id: edge-frontend-auth, source: frontend-web, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:171,177,180 (/auth/login,/auth/me,/auth/logout)" }
-  - { id: edge-frontend-work-requests, source: frontend-web, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:202,204,207 (/work-requests)" }
+  - { id: edge-frontend-work-requests, source: frontend-web, target: backend-job-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts:202,204,207 (/work-requests)", note: "target renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4; edge id and URL both unchanged (frontend module id and public route are out of this PR's rename scope). See SYNC-061." }
   - { id: edge-frontend-work-applications, source: frontend-web, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: broken, evidence: "frontend/lib/api.ts:335-350 (/work-requests/${workRequestId}/applications, /work-requests/${workRequestId}/applications/${applicationId}); frontend/hooks/useWorkApplications.ts; frontend/app/(protected)/requests/[id]/applications/ pages", note: "TARGET REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- backend-work-applications and its route mount no longer exist, so these calls now 404/error. The caller code itself is NOT removed (confirmed live in the worktree) -- a coordinated frontend companion PR to remove it is pending, per the human operator's own prior decision on PR 9.2. This is a live, unresolved inconsistency, not a retired relationship. See SYNC-059." }
   - { id: edge-frontend-attendance, source: frontend-web, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/attendance)" }
   - { id: edge-frontend-assignments, source: frontend-web, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "frontend/lib/api.ts (/assignments)" }
@@ -443,7 +446,7 @@ edges:
   - { id: edge-frontend-crm, source: frontend-web, target: backend-crm, kind: consumes-api, compatibility: conditional, status: observed, evidence: "frontend/lib/api.ts:333 (/crm, per_page=100 vs. backend limit param, def 20)" }  # reclassified unknown->conditional by SPEC-CRM-001 dependency review (FIND-DEP-CRM-002); functions today, silently truncates past 20 active hotels -- see OD-CRM-08
   # mobile-worker (Expo) via mobile/worker-app/src/lib/api.ts
   - { id: edge-mobile-worker-auth, source: mobile-worker, target: backend-auth, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src/lib/api.ts:61 (/auth); mobile/worker-app/src (/auth)" }
-  - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-work-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)" }
+  - { id: edge-mobile-worker-work-requests, source: mobile-worker, target: backend-job-requests, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/work-requests)", note: "target renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4; edge id and URL both unchanged (mobile module id and public route are out of this PR's rename scope). See SYNC-061." }
   - { id: edge-mobile-worker-work-applications, source: mobile-worker, target: backend-work-applications, kind: consumes-api, compatibility: unknown, status: broken, evidence: "mobile/worker-app/src/lib/api.ts:285-292 (applications.apply/withdraw); mobile/worker-app/src/app/job/[id].tsx:36,57", note: "TARGET REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- backend-work-applications and its route mount no longer exist, so these calls now 404/error. The caller code itself is NOT removed (confirmed live in the worktree) -- a coordinated mobile companion PR to remove it is pending, already disclosed in PR 9.2's own description. This is a live, unresolved inconsistency, not a retired relationship. See SYNC-059." }  # added by SPEC-JOB-DISPATCH-001 dependency review (FIND-DEP-001)
   - { id: edge-mobile-worker-assignments, source: mobile-worker, target: backend-assignments, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/assignments)" }
   - { id: edge-mobile-worker-attendance, source: mobile-worker, target: backend-attendance, kind: consumes-api, compatibility: unknown, status: observed, evidence: "mobile/worker-app/src (/attendance)" }
@@ -472,7 +475,7 @@ runtime:
     - { module: backend-users, mount: "/api/v1/users", evidence: "backend/src/routes/v1/index.ts:23" }
     - { module: backend-crm, mount: "/api/v1/crm", evidence: "backend/src/routes/v1/index.ts:24" }
     # backend-hotel-workers mount REMOVED by Epic 5 PR 5.8 (route + module deleted).
-    - { module: backend-work-requests, mount: "/api/v1/work-requests", evidence: "backend/src/routes/v1/index.ts:26" }
+    - { module: backend-job-requests, mount: "/api/v1/work-requests", evidence: "backend/src/routes/v1/index.ts:29" }  # module renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4; the URL mount path itself is retained unchanged (public API contract, not renamed). See SYNC-061.
     # backend-work-applications mount REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
     # merged b035700; TREQ-011/ADR-058) -- route unmounted, module physically deleted.
     # See SYNC-059.
@@ -498,7 +501,7 @@ contracts:
     interface: "notificationService.sendNotification(userId, NotificationPayload); getNotifications; markAsRead; enqueue(EnqueueNotificationInput, tx?) -- added Epic 7 PR 7.1 (ADR-029): the sole write path for state-outbox, joins a caller-supplied DatabaseTransaction or opens its own; registerPushToken(userId, token, platform, app) -- added Epic 7 PR 7.5 (ADR-029 §4), `app` param added PR 7.8: the sole write path for state-push-token, upsert keyed by token (POST /notifications/push-tokens); `app` (PushApp WORKER|CHECKER) is required, selects the APNs topic at delivery time"
     payload_contract: "backend/src/modules/notifications/types.ts (NotificationPayload); backend/src/modules/notifications/outbox.types.ts (EnqueueNotificationInput, OutboxEnvelope, NotificationCreatedPayloadV1)"
     consumers:
-      - backend-work-requests
+      - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-attendance
       - backend-quality
     # backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits
@@ -516,7 +519,7 @@ contracts:
       - backend-auth
       - backend-users
       - backend-crm
-      - backend-work-requests
+      - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -531,7 +534,7 @@ contracts:
       - backend-auth
       - backend-users
       - backend-crm
-      - backend-work-requests
+      - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -547,7 +550,7 @@ contracts:
     consumers:
       - backend-users
       - backend-crm
-      - backend-work-requests
+      - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-assignments
       - backend-attendance
       - backend-quality
@@ -564,7 +567,7 @@ contracts:
     consumers:
       - backend-users
       - backend-crm
-      - backend-work-requests
+      - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-attendance
       - backend-quality
       - backend-hr
@@ -608,9 +611,9 @@ state_domains:
     model: Hotel
     authoritative_writer: backend-crm
     writers: [backend-crm]
-    readers: [backend-work-requests]
-    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/work-requests/service.ts:53"
-    note: "backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted)."
+    readers: [backend-job-requests]
+    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/job-requests/service.ts:66"
+    note: "backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted). backend-work-requests renamed to backend-job-requests by Epic 9 PR 9.4. See SYNC-061."
   - id: state-hotel-worker
     model: HotelWorker
     authoritative_writer: none  # backend-hotel-workers (the sole writer) was physically removed by Epic 5 PR 5.8; no module writes this table anymore.
@@ -618,13 +621,13 @@ state_domains:
     readers: []
     evidence: "backend/prisma/schema.prisma:206 (model HotelWorker) — schema-only, dormant. Read by exactly one place: backend/src/scripts/employment-record-backfill-status.ts (a read-only reporting tool, not an application consumer)."
     note: "DORMANT since Epic 5 PR 5.8 (ADR-022 roadmap step 6, ADR-024 D5). Both removal conditions held: (i) no authz reader — PR 5.5 + PR 5.7 repointed checkHotelAccess()'s worker branch off HotelWorker; (ii) no roster reader — PR 5.7 repointed all six consumer modules (backend-work-requests, backend-work-applications, backend-assignments, backend-users, backend-quality, backend-analytics) to state-employment-record via lib/roster-scope.ts, and PR 5.8 removed the FEATURE_ROSTER_CUTOVER flag entirely, making that the sole path. backend-hotel-workers (the CRUD module and sole writer) was physically deleted in the same PR. CODE-ONLY retirement per explicit human decision (2026-07-22): the table/model itself is deliberately untouched in schema.prisma — no migration, no DROP TABLE, no data loss — because ADR-022's Data Migration Plan states 'No DROP TABLE' for its original in-place-repurposing design (superseded by the PR 5.6 human decision to build a separate EmploymentRecord module instead), and no backfill of HotelWorker rows into EmploymentRecord has ever been built or run. `npm run employment-record:backfill-status` (backend/src/scripts/employment-record-backfill-status.ts) reports any ACTIVE HotelWorker rows with no corresponding EmploymentRecord, read-only, for a future human decision on the table's ultimate fate. All edge-*-reads-hotel-worker and edge-hotel-workers-reads-* entries previously recorded here have been removed (not merely deprecated) since they no longer describe a repository-observed relationship; see git history for the historical record."
-  - id: state-work-request
-    model: WorkRequest
-    authoritative_writer: backend-work-requests
-    writers: [backend-work-requests]
+  - id: state-job-request
+    model: JobRequest
+    authoritative_writer: backend-job-requests
+    writers: [backend-job-requests]
     readers: [backend-analytics, backend-assignments]
-    evidence: "work-requests writes: backend/src/modules/work-requests/service.ts:58,213; analytics reads: backend/src/modules/analytics/service.ts:75,76,189; assignments reads: backend/prisma/schema.prisma:567 (WorkerAssignment.job_request_id FK, Epic 9 PR 9.3)"
-    note: "backend-work-applications removed from writers/readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted and no longer writes/reads WorkRequest. See SYNC-059. backend-assignments added as a reader by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012): WorkerAssignment.job_request_id is a new nullable FK back onto WorkRequest, forward-named ahead of PR 9.4's WorkRequest -> JobRequest rename. No creation path writes to this column yet — it is unpopulated until PR 9.9 (broadcast-accept); PR 9.5 (calendar) is the other future writer. See SYNC-060."
+    evidence: "job-requests writes: backend/src/modules/job-requests/service.ts:88,258; analytics reads: backend/src/modules/analytics/service.ts:97,98,272; assignments reads: backend/prisma/schema.prisma:568 (WorkerAssignment.job_request_id FK, Epic 9 PR 9.3)"
+    note: "backend-work-applications removed from writers/readers by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — the module was physically deleted and no longer writes/reads WorkRequest. See SYNC-059. backend-assignments added as a reader by Epic 9 PR 9.3 (commits 58e1366/9e6c154, merged 945dba2; TREQ-012): WorkerAssignment.job_request_id is a nullable FK back onto this state domain. No creation path writes to this column yet — it is unpopulated until PR 9.9 (broadcast-accept); PR 9.5 (calendar) is the other future writer. See SYNC-060. Epic 9 PR 9.4 completed the WorkRequest -> JobRequest model rename (this node renamed from state-work-request; owner backend-work-requests -> backend-job-requests): schema-level rename only, @@map(\"WorkRequest\") preserves the physical table name, zero data migration, zero runtime risk. See SYNC-061."
   # state-work-application entry REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
   # merged b035700; TREQ-011/ADR-058) — the WorkApplication model was dropped from
   # schema.prisma and its sole writer, backend-work-applications, was physically
