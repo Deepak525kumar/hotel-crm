@@ -1,4 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const mockWorkerAssignment = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -242,6 +244,50 @@ describe('AssignmentService', () => {
       await expect(
         service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+  });
+
+  // Epic 9 PR 9.3 (TREQ-012): WorkerAssignment gains a nullable job_request_id
+  // FK, repointing it off the removed application_id (PR 9.2). No creation
+  // path writes this column yet (PR 9.9 is the first writer); this pins the
+  // schema-level fact so a future change can't silently drop or tighten it
+  // ahead of that landing. Mirrors user-permissions-column-dropped.test.ts's
+  // file-parsing convention for schema-shape assertions.
+  describe('Epic 9 PR 9.3: WorkerAssignment.job_request_id', () => {
+    it('the Prisma schema declares job_request_id as a nullable field on WorkerAssignment', () => {
+      const schemaPath = path.join(__dirname, '../../prisma/schema.prisma');
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+
+      const modelMatch = schema.match(/model WorkerAssignment \{([\s\S]*?)\n\}/);
+      expect(modelMatch).not.toBeNull();
+
+      const modelBody = modelMatch![1];
+      expect(modelBody).toMatch(/^\s*job_request_id\s+String\?\s*$/m);
+    });
+
+    it('no longer declares an application_id field on WorkerAssignment (PR 9.2)', () => {
+      const schemaPath = path.join(__dirname, '../../prisma/schema.prisma');
+      const schema = fs.readFileSync(schemaPath, 'utf8');
+
+      const modelMatch = schema.match(/model WorkerAssignment \{([\s\S]*?)\n\}/);
+      expect(modelMatch).not.toBeNull();
+
+      const modelBody = modelMatch![1];
+      expect(modelBody).not.toMatch(/^\s*application_id\b/m);
+    });
+
+    it('a migration exists that adds the job_request_id column to WorkerAssignment', () => {
+      const migrationsDir = path.join(__dirname, '../../prisma/migrations');
+      const migrationDirs = fs.readdirSync(migrationsDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+
+      const addMigration = migrationDirs.find((dir) => {
+        const sqlPath = path.join(migrationsDir, dir.name, 'migration.sql');
+        if (!fs.existsSync(sqlPath)) return false;
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+        return /ADD COLUMN\s+"job_request_id"/i.test(sql);
+      });
+
+      expect(addMigration).toBeDefined();
     });
   });
 });
