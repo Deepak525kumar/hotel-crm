@@ -640,25 +640,34 @@ not silent renumbering.
 
 #### PR 9.3 — Repoint `WorkerAssignment` to direct creation
 
-- **Files:** `schema.prisma` (`WorkerAssignment.application_id` dropped; add nullable
-  `job_request_id String?` + relation, added now so 9.9's broadcast-accept path has somewhere to
-  write without a second migration); same migration file as 9.2 (paired per the table's DB column —
-  one migration, two logically-related schema changes, to avoid a transient state where
-  `WorkerAssignment` has neither a mandatory `application_id` nor any other creation-path FK).
-  `assignments/service.ts` requires **no change** — it has never had a create path (assignments were
-  always created by `work-applications/service.ts`'s `approve()`, now deleted in 9.2); creation
-  paths land fresh in 9.5 (calendar) and 9.9 (broadcast accept).
+- **Migration note (repository-reality correction, 2026-07-29):** this section originally planned
+  `application_id`'s drop and `job_request_id`'s add as one paired migration shared with PR 9.2.
+  PR 9.2 merged first as its own standalone migration (`20260729000000_drop_work_application`,
+  commits `12b1c31`/`2e89c4f`, merged `b035700`) dropping `application_id` alone, without
+  `job_request_id` — that migration is already live on `main` and is **not** rewritten, squashed,
+  or amended (no history rewriting of a merged migration). PR 9.3 therefore authors its **own new,
+  standalone migration** adding `job_request_id`. The end-state schema is identical to what this
+  plan originally specified; only the migration-file boundary changed, from one paired migration to
+  two sequential ones — a repository-reality adaptation, not a design change.
+- **Files:** `schema.prisma` (add nullable `job_request_id String?` + relation on
+  `WorkerAssignment`, added now so 9.9's broadcast-accept path has somewhere to write without a
+  further migration); new migration under `backend/prisma/migrations/` (see note above —
+  `application_id` is already gone as of PR 9.2, nothing to drop here). `assignments/service.ts`
+  requires **no change** — it has never had a create path (assignments were always created by
+  `work-applications/service.ts`'s `approve()`, deleted in 9.2); creation paths land fresh in 9.5
+  (calendar) and 9.9 (broadcast accept).
 - **Acceptance criteria closed:** `TREQ-012` ("assignment rows exist with no application linkage;
-  creation path does not require an application").
-- **Test file:** `backend/src/__tests__/assignments.test.ts` — remove/adapt any fixture that seeds
-  a `WorkerAssignment` via `application_id` (replace with direct Prisma `create` in test setup,
-  since the service itself never created one); add a schema-level test asserting
-  `application_id` no longer exists as a required column (Prisma Client type-level, caught by
+  creation path does not require an application") — the `application_id`-removal half of this
+  criterion already closed with PR 9.2; this PR closes the remainder by giving `WorkerAssignment` a
+  forward-looking creation-path FK (`job_request_id`) with no `application_id` dependency anywhere
+  in the schema.
+- **Test file:** `backend/src/__tests__/assignments.test.ts` — no `application_id` fixture remains
+  to remove or adapt (already cleaned up in PR 9.2's post-merge hygiene pass); add a schema-level
+  test asserting `job_request_id` exists and is nullable (Prisma Client type-level, caught by
   `tsc --noEmit` in CI already, but also assert at the DB level via `migrate-harness.sh verify`).
-- **Rollback:** same migration as 9.2 — see 9.2's rollback note; the down-migration must restore
-  `application_id` as NOT NULL only if no row exists that would violate it (again: no production
-  data exists under the new schema while the flag is off, so this is safe in practice, verified
-  in CI regardless).
+- **Rollback:** new migration, additive-only (nullable column add, no data to move — no existing
+  `WorkerAssignment` row can populate `job_request_id` yet, since no creation path writes it until
+  PR 9.9). Down-migration drops the column; safe and immediate, no backfill risk.
 
 #### PR 9.4 — Re-label schema off "marketplace"
 
