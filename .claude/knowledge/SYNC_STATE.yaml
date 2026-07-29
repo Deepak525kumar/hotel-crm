@@ -2836,12 +2836,163 @@ context_invalidators:
       this PR's code changes, recorded above. PR 9.8 (skill-matched broadcast
       notification) begins after this pass is committed.
 
+  - id: SYNC-065
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass following Epic 9 PR 9.7 merge (PR #278,
+      commits 1cc2327 + 01e1354, merged cbad94e; TREQ-002/003/010,
+      MIG-GAP-04/05, plus a same-day pre-merge documentation correction on
+      the legacy-field compatibility-projection decision, Option B), run
+      before starting PR 9.8 per the commissioning human's Repository
+      Synchronization Workflow instruction. Verified the merge landed
+      correctly: JobRequestSkillSlot model present (schema.prisma:579),
+      raiseBroadcast()/getBroadcastEligibility() present in
+      job-requests/service.ts, FEATURE_JOBDISPATCH_PHASE2-gated
+      /work-requests/broadcasts routes present, both PR 9.7 commits (feature
+      + the pre-merge documentation correction) landed in the merge graph.
+      Full validation re-run clean at merge HEAD: 81 suites/1268 tests, tsc
+      clean, prisma validate/generate clean, repository-integrity-check.js
+      exit 0 (0 new blocking findings, 90 total/86 WARN/4 baselined --
+      unchanged in kind from the SYNC-064 baseline), context-loader.js
+      --validate 0 errors. MODULE_REGISTRY.yaml and SPECIFICATION_INDEX.yaml
+      were independently confirmed already correct at @0.3.4 for both
+      backend-job-requests and backend-assignments (both updated by SYNC-064
+      before commit, so no further edit was needed here) -- this pass is a
+      verification-only re-confirmation post-merge, not a new amendment.
+      No repository drift, undocumented dependency, specification
+      inconsistency, or implementation assumption was found blocking PR 9.8.
+      No ADR, application code, migration, or test file was touched by this
+      pass. No governance-register item (SIR-JOBD-006 included) was
+      reopened.
+    authority_needed: none  # pure verification pass re-confirming an already-synchronized merge; no new content, no new decision
+    next_step: >-
+      cache_state.baseline_revision rebound below to cbad94e (PR #278 merge
+      HEAD). PR 9.8 (skill-matched broadcast notification, TREQ-003
+      delivery half) begins after this pass is committed.
+
+  - id: SYNC-066
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Epic 9 PR 9.8 (skill-matched broadcast notification, TREQ-003 delivery
+      half, MIG-GAP-04) implemented atop the SYNC-065-verified PR #278 merge
+      HEAD (cbad94e). Before authoring, verified against repository reality
+      per this PR's own explicit instruction: OutboxSourceModule (confirmed
+      via `git show a69c8fd --stat` + schema.prisma read) was never touched
+      by Epic 9 PR 9.4's WorkRequest->JobRequest rename, so this PR reuses
+      OutboxSourceModule.WORK_REQUESTS unchanged, per the implementation plan's
+      own instruction, rather than adding a JOB_REQUEST_BROADCAST value to
+      that enum. A genuine plan gap was found and escalated before writing
+      code: the plan's PR 9.8 section named no NotificationType value for the
+      broadcast notification itself (the existing enum has
+      WORK_REQUEST_PUBLISHED for the marketplace publish event, nothing
+      broadcast-specific, and MODULE_SPEC.md's own MIG-GAP enumeration lists
+      several missing target NotificationType values as human/architecture-
+      gated open gaps, not something this PR's own scope authorized adding
+      speculatively). Escalated via AskUserQuestion; the commissioning human
+      selected adding a new additive NotificationType.JOB_REQUEST_BROADCAST
+      value (not reusing WORK_REQUEST_PUBLISHED), so a broadcast notification
+      stays distinguishable from a marketplace-publish notification.
+      Implemented: migration 20260729050000_add_job_request_broadcast_notification_type
+      (ALTER TYPE ... ADD VALUE, irreversible-forward, matching the
+      20260726000000_add_regional_manager_role /
+      20260727050000_add_calendar_notification_type precedent exactly,
+      including an equivalent recreate-type down.sql); schema.prisma
+      NotificationType enum gains JOB_REQUEST_BROADCAST.
+      job-requests/service.ts: PR 9.7's getBroadcastEligibility() eligibility
+      logic was factored out into a new shared private
+      computeBroadcastEligibility() (takes the JobRequest + skill_slots
+      directly, not an id + fresh findUnique, so raiseBroadcast() can call it
+      with the row it just created in the same transaction at zero extra
+      read cost) -- both the public read route and the new notification step
+      call this one method, so PR 9.8 reuses PR 9.7's eligibility computation
+      exactly as this PR's own requirement mandated, rather than
+      recalculating it. New private enqueueBroadcastNotifications(), called
+      inside raiseBroadcast()'s existing $transaction (same
+      transaction-join pattern ADR-029/Epic 7 PR 7.3 established, mirroring
+      enqueueRosterPublished()'s shape): for each skill slot's eligible-
+      worker set, enqueues one JOB_REQUEST_BROADCAST notification per worker
+      (a worker eligible on more than one skill slot of the same broadcast
+      receives one notification per matching slot -- distinct openings, not
+      deduplicated, since each slot is its own opening). Explicitly does NOT
+      implement first-accept arbitration, optimistic concurrency,
+      "requirement fulfilled" detection, or auto-close (PR 9.9/9.10's scope,
+      untouched). Test file job-requests-broadcast.test.ts extended (from
+      PR 9.7's 16 tests to 22): 6 new tests asserting an OutboxEvent/
+      Notification row is enqueued per eligible worker per matching skill
+      slot, none for ineligible/already-assigned workers, one notification
+      per slot for a worker eligible on multiple slots of the same
+      broadcast, the enqueue joins the same transaction as the JobRequest
+      create, and no crash/no notification when the hotel roster is empty.
+      Full validation clean: 81 suites/1274 tests (1268 + 6 new), tsc
+      --noEmit clean, prisma validate/generate clean,
+      repository-integrity-check.js exit 0 (0 new blocking findings, 90
+      total/86 WARN/4 baselined -- unchanged in kind from the SYNC-065
+      baseline).
+      Knowledge layer updated in this same pass: MODULE_SPEC.md
+      (docs/03-modules/job-dispatch/) bumped 0.3.4->0.3.5 with a new
+      Review-and-Change-Log row and updated TREQ-003/MIG-GAP-04 status cells
+      (TREQ-003 now fully closed across both PR 9.7's eligibility-computation
+      half and this PR's delivery half; MIG-GAP-04 now only has TREQ-005's
+      "requirement fulfilled" half remaining, PR 9.9). Per the established
+      precedent (Calendar's CALENDAR_ABSENCE_MARKED addition, which never
+      bumped SPEC-NOTIF-001's own version), SPEC-NOTIF-001 /
+      notifications/MODULE_SPEC.md is deliberately NOT amended for this
+      PR's new NotificationType value -- a consumer module adding an enum
+      value it doesn't own is logged in the consumer's own spec, not
+      SPEC-NOTIF-001's; backend-notifications' MODULE_REGISTRY.yaml entry
+      (SPEC-NOTIF-001@0.3.0) is correspondingly left untouched, confirmed
+      already the case for the prior CALENDAR_ABSENCE_MARKED precedent before
+      making this same choice here. MODULE_REGISTRY.yaml's
+      backend-job-requests and backend-assignments specification citations
+      bumped to @0.3.5 (backend-assignments' own note clarifies PR 9.8 does
+      not change that module itself, only bumps the shared spec-document
+      version citation for consistency). SPECIFICATION_INDEX.yaml's matching
+      two rows bumped to 0.3.5. DEPENDENCY_GRAPH.yaml's existing
+      edge-work-requests-notifications (backend-job-requests ->
+      backend-notifications, already registered since the marketplace
+      publish path) had its evidence citation and note extended to record
+      the new enqueueBroadcastNotifications() call site -- not a new edge,
+      since both call sites are the same already-registered module->module
+      notification-service dependency. TERMINOLOGY.md's "Broadcast (Job
+      Request)" entry (promoted by PR 9.7, SYNC-064) updated to record that
+      notification delivery is now built, not still unbuilt.
+      A pre-existing, unrelated MODULE_REGISTRY.yaml strict-YAML-parse issue
+      (confirmed via git show HEAD + python yaml.safe_load: originates at
+      line ~307's backtick-containing prose in the "unresolved:" block, a
+      section this pass never touched) surfaced as IDE diagnostics on the
+      lines this pass's edit happened to sit near; confirmed pre-existing
+      and out of scope, same class already documented by SYNC-055/062/063 as
+      known, non-blocking drift the repository's own
+      repository-integrity-check.js tooling does not strict-parse against
+      (confirmed: 0 new blocking findings before and after this pass's edit,
+      identical count). Not fixed here, consistent with the prior sessions'
+      explicit deferral of this same class of issue.
+      SIR-JOBD-006 (the MIG-GAP-01..12 enumeration) NOT touched -- same
+      standing instruction SYNC-064 already recorded: closing a register row
+      is an implementation-completion act reserved for Epic 9's own final
+      pass, not a per-PR act.
+      No ADR was created or reopened; no accept/arbitration/notification-
+      retry/auto-close logic (PR 9.9/9.10's scope) was implemented.
+    authority_needed: none  # this pass's schema/service/route/test work is implementation authorized by the standing Epic 9 PR 9.8 scope in the implementation execution plan; the NotificationType-value choice was an escalated, human-confirmed decision (Option: add JOB_REQUEST_BROADCAST), not an invented requirement; the knowledge-layer updates are synchronization exit conditions of this same PR, not new authority
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit, branch creation, push,
+      and PR open. cache_state.baseline_revision is NOT rebound by this
+      entry (still cbad94e, the PR #278 merge HEAD SYNC-065 verified) since
+      this pass's own commit has not merged yet -- the next
+      repository-synchronization pass (verifying this PR's own merge, before
+      PR 9.9) rebinds it forward. PR 9.9 (first-accept arbitration +
+      "requirement fulfilled") begins only after this PR merges and its own
+      Repository Synchronization Workflow pass runs.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: e7efebe  # rebound to HEAD e7efebe by SYNC-064 (2026-07-29, post Epic 9 PR 9.6 merge, PR #277 — WorkerAssignment.day column + re-keyed daily-exclusivity partial index); prior 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: cbad94e  # rebound to HEAD cbad94e by SYNC-065 (2026-07-29, post Epic 9 PR 9.7 merge, PR #278 — JobRequestSkillSlot + raiseBroadcast()/getBroadcastEligibility(), plus the same-day pre-merge documentation correction); prior e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }

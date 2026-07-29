@@ -194,8 +194,8 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: "backend/src/modules/job-requests/service.ts:4,240-242"
-    note: "Edge id kept stable (not renamed to edge-job-requests-notifications) — Epic 9 PR 9.7's own plan text notes 9.4 kept the module's outbox-facing identity stable by design; source node renamed backend-work-requests -> backend-job-requests. See SYNC-061."
+    evidence: "backend/src/modules/job-requests/service.ts:18,304-317 (enqueueRosterPublished(), marketplace publish); :460-475 (enqueueBroadcastNotifications(), Epic 9 PR 9.8, broadcast raise)"
+    note: "Edge id kept stable (not renamed to edge-job-requests-notifications) — Epic 9 PR 9.7's own plan text notes 9.4 kept the module's outbox-facing identity stable by design; source node renamed backend-work-requests -> backend-job-requests. See SYNC-061. Epic 9 PR 9.8 adds a second call site (enqueueBroadcastNotifications(), raiseBroadcast()'s transaction) on this same already-registered edge — not a new edge, since both call sites are the same module->module notification-service dependency; PR 9.8 reuses OutboxSourceModule.WORK_REQUESTS unchanged (confirmed against PR 9.4's actual diff: the rename never touched this enum). See SYNC-066."
   # edge-work-applications-notifications REMOVED by Epic 9 PR 9.2 (commits
   # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) — backend-work-applications
   # was physically deleted; it no longer calls notification-service. See SYNC-059.

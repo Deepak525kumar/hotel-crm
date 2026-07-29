@@ -325,13 +325,16 @@ export class JobRequestService extends BaseService {
    * transaction, published immediately (a broadcast is raised OPEN — there
    * is no DRAFT step for this path, unlike the marketplace create() flow).
    *
-   * This method does NOT notify anyone (PR 9.8), does not let anyone accept
-   * (PR 9.9), and does not register an auto-close job (PR 9.10) — it only
-   * persists the broadcast and its skill×headcount breakdown, closing
-   * TREQ-002/TRULE-002's "calendar edits never emit a broadcast" clause by
-   * construction: this is the *only* creation path that populates
-   * skill_slots, and it is never invoked by placeOnCalendar() (PR 9.5) or by
-   * the marketplace create()/update() methods above.
+   * As of Epic 9 PR 9.8, this method also notifies each eligible worker per
+   * skill slot (TREQ-003 delivery half) in the same transaction — see
+   * enqueueBroadcastNotifications() below. It still does NOT let anyone
+   * accept (PR 9.9) or register an auto-close job (PR 9.10) — this method
+   * persists the broadcast, its skill×headcount breakdown, and its
+   * notifications, closing TREQ-002/TRULE-002's "calendar edits never emit a
+   * broadcast" clause by construction: this is the *only* creation path that
+   * populates skill_slots or enqueues a JOB_REQUEST_BROADCAST notification,
+   * and it is never invoked by placeOnCalendar() (PR 9.5) or by the
+   * marketplace create()/update() methods above.
    *
    * skill_slots is the sole source of truth for a broadcast's skill×headcount
    * data. `position`/`workers_needed` ARE also written on the created row,
@@ -405,6 +408,11 @@ export class JobRequestService extends BaseService {
         },
         include: { skill_slots: true },
       });
+      // Epic 9 PR 9.8 (TREQ-003 delivery half): same transaction-join
+      // pattern enqueueRosterPublished() uses below — the notification
+      // enqueue can never be created for a broadcast that didn't commit, or
+      // be lost for one that did.
+      await this.enqueueBroadcastNotifications(tx, created, created.skill_slots);
       return { wr: created, slots: created.skill_slots };
     });
 
@@ -447,13 +455,29 @@ export class JobRequestService extends BaseService {
       }
     }
 
+    return this.computeBroadcastEligibility(wr, wr.skill_slots);
+  }
+
+  /**
+   * Epic 9 PR 9.7's eligibility computation, extracted so PR 9.8's
+   * notification step (below) can reuse the exact same eligible-worker-set
+   * logic getBroadcastEligibility() exposes via its route, rather than
+   * recalculating it with separate code. Takes the JobRequest/skill_slots
+   * directly (not an id + a fresh findUnique) so raiseBroadcast() can call
+   * this with the row it just created in the same transaction, with no
+   * extra read.
+   */
+  private async computeBroadcastEligibility(
+    wr: JobRequest,
+    skillSlots: JobRequestSkillSlot[]
+  ): Promise<BroadcastEligibilityDto> {
     const rosterWorkerIds = await listEligibleWorkerIds(wr.hotel_id);
     if (rosterWorkerIds.length === 0) {
       return {
         job_request_id: wr.id,
         hotel_id: wr.hotel_id,
         shift_date: wr.shift_date.toISOString().slice(0, 10),
-        slots: wr.skill_slots.map((slot) => ({
+        slots: skillSlots.map((slot) => ({
           skill: slot.skill,
           headcount: slot.headcount,
           confirmed_count: slot.confirmed_count,
@@ -481,7 +505,7 @@ export class JobRequestService extends BaseService {
         .map((r) => r.workerId)
     );
 
-    const slots: SkillSlotEligibilityDto[] = wr.skill_slots.map((slot) => {
+    const slots: SkillSlotEligibilityDto[] = skillSlots.map((slot) => {
       const eligibleWorkerIds = rosterWorkerIds.filter(
         (workerId) =>
           freeWorkerIds.has(workerId) && (skillsByWorker.get(workerId) ?? []).includes(slot.skill)
@@ -500,6 +524,49 @@ export class JobRequestService extends BaseService {
       shift_date: wr.shift_date.toISOString().slice(0, 10),
       slots,
     };
+  }
+
+  /**
+   * Epic 9 PR 9.8 (TREQ-003 delivery half): enqueue a JOB_REQUEST_BROADCAST
+   * notification to every eligible worker for each skill slot on a
+   * newly-raised broadcast, inside the caller's own creation transaction —
+   * same transaction-join pattern ADR-029/Epic 7 PR 7.3 established
+   * (enqueueRosterPublished() above). Reuses
+   * computeBroadcastEligibility() (PR 9.7's eligibility logic) rather than
+   * recalculating the eligible-worker set. A worker eligible for more than
+   * one skill slot on the same broadcast (e.g. holds both CLEANER and
+   * WAITER) receives one notification per matching slot — each slot is a
+   * distinct opening, not a duplicate of the same one.
+   *
+   * Does NOT implement first-accept arbitration, optimistic concurrency,
+   * "requirement fulfilled" detection, or auto-close — those are PR
+   * 9.9/9.10's scope. This method only notifies; it does not reserve or
+   * claim anything.
+   */
+  private async enqueueBroadcastNotifications(
+    tx: DatabaseTransaction,
+    wr: JobRequest,
+    skillSlots: JobRequestSkillSlot[]
+  ): Promise<void> {
+    const eligibility = await this.computeBroadcastEligibility(wr, skillSlots);
+    for (const slot of eligibility.slots) {
+      for (const workerId of slot.eligible_worker_ids) {
+        await notificationService.enqueue(
+          {
+            recipientId: workerId,
+            type: 'JOB_REQUEST_BROADCAST',
+            title: 'New Job Available',
+            message: `A ${slot.skill} shift needs coverage on ${eligibility.shift_date}.`,
+            data: { work_request_id: wr.id, hotel_id: wr.hotel_id, skill: slot.skill },
+            hotelId: wr.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.WORK_REQUESTS,
+            producerService: 'JobRequestService',
+          },
+          tx
+        );
+      }
+    }
   }
 }
 

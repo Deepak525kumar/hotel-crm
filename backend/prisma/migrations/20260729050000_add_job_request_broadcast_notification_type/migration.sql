@@ -1,0 +1,14 @@
+-- Epic 9 PR 9.8 (TREQ-003 delivery half): notify each eligible worker when a
+-- manager raises a broadcast JobRequest. Postgres requires
+-- ALTER TYPE ... ADD VALUE to run in its own transaction, separate from any
+-- statement that references the new value -- this migration does nothing
+-- else and is intentionally not reversible (matches the
+-- 20260726000000_add_regional_manager_role /
+-- 20260727050000_add_calendar_notification_type precedent).
+--
+-- OutboxSourceModule is NOT touched here -- per the implementation execution
+-- plan's explicit instruction, this PR reuses the existing WORK_REQUESTS
+-- value (confirmed against PR 9.4's actual diff: the WorkRequest -> JobRequest
+-- rename never touched OutboxSourceModule, so no JOB_REQUESTS value exists
+-- to add or reuse).
+ALTER TYPE "NotificationType" ADD VALUE 'JOB_REQUEST_BROADCAST';
