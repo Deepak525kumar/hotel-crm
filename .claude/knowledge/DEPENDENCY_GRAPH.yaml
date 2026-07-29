@@ -158,6 +158,7 @@ nodes:
   - { id: state-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:419 (model Rating)" }
   - { id: state-worker-overall-rating, kind: state-domain, owner: backend-quality, source: "backend/prisma/schema.prisma:445 (model WorkerOverallRating)" }
   - { id: state-rooms-completed-entry, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma (model RoomsCompletedEntry, added by ADR-028)" }
+  - { id: state-calendar-entry, kind: state-domain, owner: backend-assignments, source: "backend/prisma/schema.prisma:639 (model CalendarEntry, added by Epic 9 PR 9.5, commits 2c77ee0, merged 428f465; TREQ-001/TRULE-001/MIG-GAP-03)" }  # owned by backend-assignments per ADR-021's ownership boundary, NOT backend-calendar — deliberately narrow, non-overlapping with state-calendar-absence (CalendarAbsence). 1:1 with state-worker-assignment via assignment_id, created in the same transaction by placeOnCalendar(). See SYNC-063.
   - { id: state-notification, kind: state-domain, owner: backend-notifications, source: "backend/prisma/schema.prisma:466 (model Notification)" }
   - { id: state-audit-log, kind: state-domain, owner: unassigned, source: "backend/prisma/schema.prisma:494 (model AuditLog)" }
   - { id: state-password-reset-token, kind: state-domain, owner: backend-auth, source: "backend/prisma/schema.prisma (model PasswordResetToken, added by HOTFIX-AUTH-002)" }

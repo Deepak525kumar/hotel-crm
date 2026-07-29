@@ -2673,6 +2673,67 @@ context_invalidators:
       confirm no new blocking findings before this pass's changes are
       committed. PR 9.5 implementation begins after this pass is committed.
 
+  - id: SYNC-063
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository-synchronization pass following Epic 9 PR 9.5 (commits
+      2c77ee0, merged 428f465; TREQ-001/TRULE-001/MIG-GAP-03), run before
+      starting PR 9.6 per the commissioning human's Repository Synchronization
+      Workflow instruction. Verified the merge landed correctly (CalendarEntry
+      model present, WorkerAssignment.work_request_id nullable, new
+      FEATURE_JOBDISPATCH_PHASE2-gated routes present); full validation
+      re-run clean (79 suites/1236 tests including the intentional PR 9.6
+      test.todo, tsc clean, prisma validate clean).
+      DEPENDENCY_GRAPH.yaml: added the state-calendar-entry state-domain node
+      (owner backend-assignments per ADR-021, 1:1 with state-worker-assignment
+      via assignment_id) — this state domain had no node entry at all despite
+      the model existing since PR 9.5's merge, the same class of omission
+      SYNC-062 closed for the work-requests/work-applications rename/
+      retirement (a new PR's own knowledge-sync obligations not being fully
+      met by the PR itself). API_INDEX.yaml deliberately NOT given a new row
+      for /assignments/calendar-entries: this file tracks mounts at
+      top-level-route granularity only (confirmed by precedent — the
+      existing /assignments/:id/rooms-completed sub-route never received its
+      own row either), so a sub-route under the already-listed
+      /api/v1/assignments mount is correctly out of this file's scope, not an
+      oversight.
+      Separately, while correcting a version-citation drift flagged mid-pass
+      (SPEC-JOB-DISPATCH-001 cited as 0.3.3 in MODULE_REGISTRY.yaml/
+      SPECIFICATION_INDEX.yaml since SYNC-061/062, but never actually applied
+      to docs/03-modules/job-dispatch/MODULE_SPEC.md's own Document Control,
+      which still read 0.3.2), a second and older gap was discovered: the
+      spec document's Review-and-Change-Log table had NO row at all for
+      v0.3.2 (the GD-05 Hotel.accepting_jobs amendment, 2026-07-27) — only
+      narrated in Document Control prose and the spec body's RULE-014 row,
+      never logged as its own table entry, predating PR 9.4/9.5 entirely.
+      Per explicit human decision, both gaps were closed together: MODULE_SPEC.md's
+      Document Control bumped 0.3.2->0.3.3, and both the missing 0.3.2 (GD-05)
+      and 0.3.3 (Epic 9 PR 9.4 rename) rows were retroactively added to the
+      Review-and-Change-Log table, each citing that it formalizes content
+      already present elsewhere in the document rather than introducing new
+      requirement/rule/finding content — no requirement, rule, security
+      finding, or open decision was reopened or changed by either row.
+      MODULE_REGISTRY.yaml and SPECIFICATION_INDEX.yaml's existing 0.3.3
+      citations were already correct in content; only their explanatory notes
+      were extended to record that the underlying spec document now agrees.
+      Two pre-existing, unrelated YAML strict-parse issues (confirmed present
+      at baseline main before this pass, same class already noted in
+      SYNC-062: MODULE_REGISTRY.yaml backend-hr's note field, line ~307-310;
+      SPECIFICATION_INDEX.yaml backend-notifications' note field) were
+      re-confirmed unrelated to this pass's edits and left untouched.
+      No ADR, application code, migration, or test file was touched. No
+      governance-register item (SIR-JOBD-006 included) was reopened.
+    authority_needed: none  # SYNC-063's core work (state-calendar-entry node) is pure knowledge-layer sync following an already-merged code change (PR 9.5); the MODULE_SPEC.md version-history backfill was explicitly authorized by the commissioning human mid-pass (both rows formalize already-existing, already-ratified amendment content — GD-05 and Epic 9 PR 9.4 — not new decisions)
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit. cache_state.baseline_revision
+      is intentionally NOT rebound by this entry since HEAD has not advanced
+      yet (working-tree-only pass atop HEAD 428f465), per the SYNC-057/058/
+      059/061/062 pattern. Run node .claude/tooling/repository-integrity-check.js
+      to confirm no new blocking findings before this pass's changes are
+      committed. PR 9.6 implementation begins after this pass is committed.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.

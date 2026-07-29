@@ -28,7 +28,7 @@ specifications:
     release_prerequisites: 4 High security findings OPEN in code (OQ-AUTH-04/06/15, absent MFA); Critical already fixed by HOTFIX-AUTH-002; review by G8 -- NOT freeze blockers per human ruling
   - module: backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4 (commits a69c8fd, merged b0904ba; TREQ-013/MIG-GAP-12). See SYNC-061, SYNC-062.
     spec: SPEC-JOB-DISPATCH-001
-    version: 0.3.3  # was stale at 0.3.1 in this index; MODULE_REGISTRY.yaml (authoritative) already carried 0.3.3. Corrected by SYNC-062 to include both the 0.3.2 (GD-05, Hotel.accepting_jobs) and 0.3.3 (Epic 9 PR 9.4, model rename) amendments this index had missed.
+    version: 0.3.3  # was stale at 0.3.1 in this index; MODULE_REGISTRY.yaml (authoritative) already carried 0.3.3. Corrected by SYNC-062 to include both the 0.3.2 (GD-05, Hotel.accepting_jobs) and 0.3.3 (Epic 9 PR 9.4, model rename) amendments this index had missed. MODULE_SPEC.md itself was found (Epic 9 PR 9.6 sync pass) to have never received Review-and-Change-Log rows for either 0.3.2 or 0.3.3 despite both amendments' content already existing in its Document Control prose and spec body -- both rows retroactively added to the spec document in that same pass, so this index's 0.3.3 citation now matches the spec document's own Document Control, not just MODULE_REGISTRY.yaml. See SYNC-063.
     status: FROZEN
     path: docs/03-modules/job-dispatch/MODULE_SPEC.md
     frozen_at: 2026-07-15 (G2 Approval Workflow); architecture BLOCKED cleared by ADR-018 (coupling superseded-by-pivot)
