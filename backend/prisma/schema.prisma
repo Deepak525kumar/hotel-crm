@@ -120,6 +120,8 @@ enum NotificationType {
   CALENDAR_ABSENCE_MARKED    // to manager: worker marked sick/vacation
   // Job-dispatch broadcast events (Epic 9 PR 9.8, TREQ-003 delivery half)
   JOB_REQUEST_BROADCAST      // to eligible worker: a skill-matched broadcast slot is open
+  // Job-dispatch auto-close event (Epic 9 PR 9.10, TREQ-006)
+  JOB_REQUEST_CLOSED         // to the raising manager: an unfilled broadcast closed (6h auto-close or manual)
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the

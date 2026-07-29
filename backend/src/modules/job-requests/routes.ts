@@ -8,6 +8,7 @@ import {
   getBroadcastEligibility,
   getWorkRequest,
   listWorkRequests,
+  manualCloseBroadcast,
   raiseBroadcast,
   updateWorkRequest,
 } from './controller.js';
@@ -65,6 +66,28 @@ router.post('/broadcasts/:id/accept', (req, res, next) => {
   }
   acceptBroadcast(req, res, next);
 });
+
+// Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): manager manually closes
+// an unfilled broadcast before the 6h auto-close job would. RBAC mirrors
+// raiseBroadcast()'s route above (manager-initiated); the inline
+// isHotelInScope() check in the service does the scope-authz.
+router.post(
+  '/broadcasts/:id/close',
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    requireRole(['admin', 'manager'])(req, res, next);
+  },
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    manualCloseBroadcast(req, res, next);
+  }
+);
 
 // RBAC per API_SPEC_V1_PATCH_V2 §PATCH-07g.
 // Create / mutate: ADMIN, MANAGER. Read: all authenticated roles

@@ -687,6 +687,134 @@ export class JobRequestService extends BaseService {
 
     return { status: 'accepted', assignment_id: assignmentId, job_request_id: wr.id, skill };
   }
+
+  /**
+   * Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): manager manually closes
+   * an unfilled broadcast before the 6h auto-close job (below) would. Reuses
+   * the module's existing manual-transition validation shape (OPEN ->
+   * EXPIRED is intentionally NOT added to the shared ALLOWED_TRANSITIONS
+   * table used by update() — that table also governs the marketplace
+   * create()/update() flow, which has no EXPIRED-via-manual-action concept;
+   * this method validates the OPEN + is-a-broadcast precondition itself,
+   * the same wr.skill_slots.length === 0 guard getBroadcastEligibility()/
+   * acceptBroadcast() already use to detect a non-broadcast row). Notifies
+   * the raising manager (JobRequest.created_by_id) — the same recipient
+   * closeExpiredBroadcasts() (JobRequestAutoCloseJob, auto-close-job.ts)
+   * notifies, so a manager sees identical notification behavior regardless
+   * of which path closed their broadcast.
+   */
+  async manualClose(id: string, actor: Actor): Promise<WorkRequestDto> {
+    const wr = await this.prisma.jobRequest.findUnique({
+      where: { id },
+      include: { skill_slots: true },
+    });
+    if (!wr) throw new NotFoundError('Work request not found');
+    if (wr.skill_slots.length === 0) {
+      throw new ConflictError('This work request is not a broadcast (no skill slots)');
+    }
+    if (wr.status !== WorkRequestStatus.OPEN) {
+      throw new ConflictError('This broadcast is not open');
+    }
+
+    if (actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot close this broadcast');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const closed = await tx.jobRequest.update({
+        where: { id },
+        data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
+      });
+      await this.enqueueJobRequestClosed(tx, closed, 'manual');
+      return closed;
+    });
+
+    await this.logAudit(actor.userId, actor.role, 'MANUAL_CLOSE', 'WORK_REQUEST', id, {
+      from_status: wr.status,
+      to_status: updated.status,
+    });
+
+    return this.toDto(updated, wr.skill_slots);
+  }
+
+  /**
+   * Epic 9 PR 9.10 (TREQ-006, MIG-GAP-09): notify the raising manager that
+   * their unfilled broadcast has closed — shared by manualClose() above and
+   * closeExpiredBroadcasts() below, so both closure paths produce identical
+   * notification behavior. `reason` distinguishes the two in the
+   * notification payload only; it does not change delivery mechanics.
+   */
+  private async enqueueJobRequestClosed(
+    tx: DatabaseTransaction,
+    wr: JobRequest,
+    reason: 'auto' | 'manual'
+  ): Promise<void> {
+    await notificationService.enqueue(
+      {
+        recipientId: wr.created_by_id,
+        type: 'JOB_REQUEST_CLOSED',
+        title: 'Job Request Closed',
+        message:
+          reason === 'auto'
+            ? `Your ${wr.position} broadcast closed unfilled after 6 hours.`
+            : `Your ${wr.position} broadcast was closed manually.`,
+        data: { work_request_id: wr.id, hotel_id: wr.hotel_id, reason },
+        hotelId: wr.hotel_id,
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.WORK_REQUESTS,
+        producerService: 'JobRequestService',
+      },
+      tx
+    );
+  }
+
+  /**
+   * Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): closes every broadcast
+   * JobRequest still OPEN more than 6 hours after creation — the scheduled-
+   * job half of auto-close, called by JobRequestAutoCloseJob.run()
+   * (auto-close-job.ts) on the Platform Worker's Scheduler. Confirms
+   * ADR-057's Platform-Worker-not-BullMQ decision in code (no new job
+   * runtime introduced).
+   *
+   * Batched (same bounded-loop shape SessionSweepJob/GeoRetentionSweepJob
+   * already establish for the Platform Worker's other scheduled jobs) so a
+   * large backlog cannot hold one long-running query. Each row closes (and
+   * notifies) inside its own transaction, mirroring manualClose()'s shape,
+   * rather than one batch update — closing must join a notification enqueue
+   * per row (each broadcast has a distinct created_by_id to notify), so a
+   * single bulk updateMany cannot serve both purposes.
+   */
+  async closeExpiredBroadcasts(cutoff: Date, batchSize: number): Promise<number> {
+    let total = 0;
+    for (;;) {
+      const stale = await this.prisma.jobRequest.findMany({
+        where: {
+          status: WorkRequestStatus.OPEN,
+          created_at: { lt: cutoff },
+          skill_slots: { some: {} },
+        },
+        take: batchSize,
+      });
+      if (stale.length === 0) break;
+
+      for (const wr of stale) {
+        await this.prisma.$transaction(async (tx) => {
+          const closed = await tx.jobRequest.update({
+            where: { id: wr.id },
+            data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
+          });
+          await this.enqueueJobRequestClosed(tx, closed, 'auto');
+        });
+      }
+      total += stale.length;
+
+      if (stale.length < batchSize) break;
+    }
+    return total;
+  }
 }
 
 export const jobRequestService = new JobRequestService();
