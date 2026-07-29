@@ -3227,12 +3227,90 @@ context_invalidators:
       dedicated activity for this capability, distinct from and later than
       any single PR's own repository-synchronization pass.
 
+  - id: SYNC-069
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Governance/documentation closure pass following the Epic 9 (Job
+      Dispatch, PRs 9.1-9.10) Completion Audit -- the dedicated
+      implementation-completion act that SYNC-064/SYNC-068 both explicitly
+      reserved as a later, separate act (verifying each MIG-GAP's closure
+      against the governance register's own text, not just MODULE_SPEC.md's).
+      Re-fetched origin/main: tip confirmed unchanged at ca22207 (merge #281,
+      PR 9.10) -- no new commits since the audit. repository-integrity-check.js
+      re-run: 0 new blocking findings (86 pre-existing orphan-document WARN,
+      4 baselined, unchanged in kind from the SYNC-068 baseline).
+      Independently re-verified every one of the 12 MIG-GAP closures the
+      audit reported, rather than trusting its summary: git show/git log
+      confirmed all cited commit hashes (12b1c31, 58e1366, 2c77ee0, 3be6019,
+      a69c8fd, 1cc2327, 1ea934d, 8a0a4a5, e60635b, 9495c5b) exist on
+      origin/main and match their claimed content; DEPENDENCY_GRAPH.yaml's
+      own pre-existing permissions-middleware note independently confirmed
+      MIG-GAP-07's Epic-8/SIR-JOBD-002 attribution; ADR-032's own text
+      (calendar/service.ts:87-106's direct AssignmentService.update() call)
+      independently confirmed MIG-GAP-10's Calendar-module attribution, not
+      Epic 9; Epic 9 PR 9.1's own commit message (2b2d395) independently
+      confirmed it only verified MIG-GAP-07, did not build it.
+      docs/03-modules/job-dispatch/MODULE_SPEC.md corrected 0.3.7->0.3.8:
+      five stale "Target; unbuilt" TREQ status cells (TREQ-001/007/011/012/013)
+      updated to "Built" with commit citations, matching what this document's
+      own Review-and-Change-Log already narrated; the MIG-GAP-07/010/011
+      enumeration-table rows corrected to their proper attribution (Epic
+      8/SIR-JOBD-002; the Calendar module/ADR-032; Epic 1 PR 1.1/SIR-JOBD-001
+      respectively -- none built by Epic 9); the OQ-01/FIND-SEC-001 open-decision
+      row (found stale by the same re-verification, still reading
+      "OPEN -- CRITICAL" for a gap SIR-JOBD-001 already closed 2026-07-08)
+      corrected to RESOLVED in the same pass, since leaving it would have
+      recreated the identical contradiction this pass exists to fix. New
+      Review-and-Change-Log row (v0.3.8) appended; Document Control
+      version/last-modified bumped per this document's existing convention.
+      No requirement, rule, security finding, or open-decision content
+      altered; only status/attribution cells and log entries added.
+      governance/SPECIFICATION_ISSUES_REGISTER.md: SIR-JOBD-006 closed
+      "OPEN -- deferred by design" -> "RESOLVED", with full per-gap
+      attribution (10 of 12 gaps to Epic 9 PRs 9.2/9.3/9.4/9.5/9.6/9.7/9.8/
+      9.9/9.10; MIG-GAP-07 to Epic 8; MIG-GAP-10 to the Calendar module/
+      ADR-032; MIG-GAP-11 cross-referenced to the already-RESOLVED
+      SIR-JOBD-001 rather than re-litigated), following the exact RESOLVED
+      row-update convention SIR-JOBD-001/SIR-JOBD-002 already established
+      (severity qualifier, Status field, Last-verified date bumped, row
+      updated in place per the register's append/resolve/merge protocol --
+      nothing deleted). The Job Dispatch section's own "Section last
+      verified" marker updated to record this pass.
+      MODULE_REGISTRY.yaml/DEPENDENCY_GRAPH.yaml/SPECIFICATION_INDEX.yaml/
+      TERMINOLOGY.md checked for any citation of SIR-JOBD-006-as-open or a
+      stale TREQ status: none found -- every existing job-dispatch-related
+      entry in those four files already either cites MODULE_SPEC.md's
+      version generically (@0.3.7, now correctly superseded by @0.3.8 without
+      any semantic change those entries need to track) or independently
+      documents the correct Epic-8/Calendar-module attribution already (see
+      DEPENDENCY_GRAPH.yaml's permissions-middleware note, which already read
+      "Epic 8 ... SIR-JOBD-002" before this pass). No file in that set was
+      modified beyond MODULE_REGISTRY.yaml's/DEPENDENCY_GRAPH.yaml's routine
+      @0.3.7->@0.3.8 version-citation bumps (see below), since their
+      substantive content already matched the now-corrected reality.
+      Full re-validation after all edits: repository-integrity-check.js exit
+      0 (0 new blocking findings, 86 WARN/4 baselined, unchanged). No code,
+      migration, or test file touched by this pass -- documentation and
+      governance only, per this pass's explicit scope.
+    authority_needed: none  # pure documentation-accuracy correction of an internal MODULE_SPEC.md inconsistency and a governance-register closure of an already-fully-built migration-gap enumeration; every attribution independently re-verified against the repository, not a new product/architecture decision
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit. Epic 9 (Job Dispatch,
+      PRs 9.1-9.10) is now closed from both the implementation perspective
+      (SYNC-068) and the governance perspective (this entry, SIR-JOBD-006
+      RESOLVED) -- no further dedicated activity for this capability is
+      outstanding except the two items explicitly and permanently out of
+      this pass's scope: the mobile/frontend WorkApplication cleanup
+      (DEPENDENCY_GRAPH.yaml status:broken edges) and PR 9.10's 6h-boundary
+      test-coverage gap, both disclosed, neither touched.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 4131574  # rebound to HEAD 4131574 by SYNC-068 (2026-07-30, post Epic 9 PR 9.9 merge, PR #280 — acceptBroadcast(), ADR-057 addendum); prior da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: ca22207  # rebound to HEAD ca22207 by SYNC-069 (2026-07-30, Epic 9 Completion Audit governance-closure pass) — one merge more current than the prior stamp: ca22207 is PR #281's merge (Epic 9 PR 9.10, 6h auto-close job), confirmed via `git fetch origin main` as still origin/main's current tip at this pass. Prior 4131574 (SYNC-068, 2026-07-30, post Epic 9 PR 9.9 merge, PR #280 — acceptBroadcast(), ADR-057 addendum) had gone one merge stale (missing PR 9.10's own merge) — this rebind closes that gap. Prior history: da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge — schema.prisma/migration/client-type changes), 586a55d (SYNC-056, 2026-07-29, cache-key-only rebind post GD-19/20/21/22/23 governance resolution), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }
