@@ -2,7 +2,13 @@ import { Request, Response, NextFunction } from 'express';
 import { ValidationError } from '../../lib/errors.js';
 import { sendPaginated, sendSuccess } from '../../lib/http-envelope.js';
 import { assignmentService } from './service.js';
-import { ListAssignmentsQuerySchema, LogRoomsCompletedSchema, UpdateAssignmentSchema } from './types.js';
+import {
+  CreateCalendarEntrySchema,
+  ListAssignmentsQuerySchema,
+  ListCalendarEntriesQuerySchema,
+  LogRoomsCompletedSchema,
+  UpdateAssignmentSchema,
+} from './types.js';
 
 function zodDetails(error: import('zod').ZodError) {
   return error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }));
@@ -100,6 +106,64 @@ export async function logRoomsCompleted(
       scope: req.auth!.scope ?? null,
     });
     sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): manager places a worker
+// directly on the calendar for a given day — no accept/decline step.
+export async function createCalendarEntry(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = CreateCalendarEntrySchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await assignmentService.placeOnCalendar(parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listCalendarEntries(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = ListCalendarEntriesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid query parameters', zodDetails(parsed.error)));
+      return;
+    }
+    const { data, total } = await assignmentService.listCalendarEntries(parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+    });
+    const { page, per_page } = parsed.data;
+    sendPaginated(
+      res,
+      data,
+      {
+        page,
+        per_page,
+        total,
+        total_pages: Math.ceil(total / per_page),
+        has_next: page * per_page < total,
+        has_prev: page > 1,
+      },
+      { requestId: req.requestId }
+    );
   } catch (error) {
     next(error);
   }

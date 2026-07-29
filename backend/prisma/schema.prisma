@@ -289,6 +289,10 @@ model User {
   // full-day WorkerAssignment — no room-level task layer implied.
   rooms_completed_as_worker   RoomsCompletedEntry[]     @relation("rooms_completed_worker")
   rooms_completed_entered     RoomsCompletedEntry[]     @relation("rooms_completed_entered_by")
+  // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
+  // assignment — the worker placed and the manager who placed them.
+  calendar_entries_as_worker  CalendarEntry[]           @relation("calendar_entry_worker")
+  calendar_entries_placed     CalendarEntry[]           @relation("calendar_entry_placed_by")
 
   @@index([role])
   @@index([is_active])
@@ -404,6 +408,9 @@ model Hotel {
   // GD-14/OD-GEO-002 (SPEC-GEO-001): worker geofence checks against this
   // hotel's coordinates (backend-geo-owned, read-only from CRM's side).
   geo_checkins            WorkerGeoCheckin[]
+  // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
+  // assignments at this hotel.
+  calendar_entries        CalendarEntry[]
 
   @@index([country])
   @@index([is_active])
@@ -566,8 +573,17 @@ model JobRequest {
 // request it was created from, not be deleted alongside it.
 model WorkerAssignment {
   id                     String           @id @default(cuid())
-  work_request_id        String
-  work_request           JobRequest       @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
+  // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): relaxed from mandatory to nullable.
+  // A calendar-placed assignment (placeOnCalendar()) has no backing JobRequest
+  // at all (per ADR-056's ratified "no intermediating application or
+  // acceptance record required" language) and so cannot populate this column
+  // — mirrors PR 9.3's own migration-sequencing reasoning ("avoid a transient
+  // assignment-creation-invariant state"), applied here to work_request_id's
+  // parallel disposition rather than only to application_id/job_request_id.
+  // Every pre-existing row keeps its current non-null value; only the
+  // NOT NULL constraint relaxes (additive, reversible, zero data-loss).
+  work_request_id        String?
+  work_request           JobRequest?      @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
   job_request_id         String?
   job_request            JobRequest?      @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
   worker_id              String
@@ -594,6 +610,10 @@ model WorkerAssignment {
   quality_verification  QualityVerification?
   rating                Rating?
   rooms_completed_entry RoomsCompletedEntry?
+  // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): 1:1 with the CalendarEntry created by
+  // placeOnCalendar() in the same transaction — present only for
+  // calendar-placed assignments (absent for broadcast-accept rows, PR 9.9).
+  calendar_entry        CalendarEntry?
 
   // SP-5: full unique constraint removed. Active-slot double-booking is enforced
   // by the partial unique index in the migration (status IN CONFIRMED, IN_PROGRESS).
@@ -603,6 +623,45 @@ model WorkerAssignment {
   @@index([hotel_id])
   @@index([status])
   @@index([confirmed_at])
+}
+
+// Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): per-worker per-day
+// assignment-kind record for a manager's DIRECT calendar placement (no
+// worker accept/decline step). Owned by backend-assignments (ADR-021's
+// "assignment creation... remain owned by Job Dispatch/backend-assignments"),
+// NOT backend-calendar — deliberately narrow and non-overlapping with
+// Calendar's own state-calendar-absence/CalendarAbsence model (sick/vacation
+// marks, ADR-021 Correction v0.3.1): this model records only that a worker
+// has an assignment on a given day, not any leave/absence state.
+// 1:1 with WorkerAssignment, created in the same transaction by
+// placeOnCalendar() (assignments/service.ts) — mirrors RoomsCompletedEntry's
+// 1:1-per-assignment shape (schema.prisma:725-744).
+model CalendarEntry {
+  id             String           @id @default(cuid())
+  assignment_id  String           @unique
+  assignment     WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  worker_id      String
+  worker         User             @relation("calendar_entry_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  hotel_id       String
+  hotel          Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  // Date-only (no time component) — the specific day being placed, mirroring
+  // CalendarAbsence.day's own shape (schema.prisma:922-923) so both models
+  // key "one record per worker per day" identically.
+  day            DateTime         @db.Date
+  placed_by_id   String
+  placed_by      User             @relation("calendar_entry_placed_by", fields: [placed_by_id], references: [id], onDelete: Restrict)
+  created_at     DateTime         @default(now())
+  updated_at     DateTime         @updatedAt
+
+  // TRULE-001/TRULE-006 (daily exclusivity groundwork — full DB-level
+  // enforcement is PR 9.6's partial unique index re-keying; this unique
+  // constraint only guards against a duplicate CalendarEntry for the same
+  // worker/day within this PR's own creation path, not against a competing
+  // broadcast-accept assignment on the same day).
+  @@unique([worker_id, day])
+  @@index([worker_id])
+  @@index([hotel_id])
+  @@index([day])
 }
 
 // =============================================================================

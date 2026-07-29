@@ -78,3 +78,18 @@ export function isGD02MatrixEnabled(): boolean {
 export function isJobDispatchPhase1Enabled(): boolean {
   return getEnv().FEATURE_JOBDISPATCH_PHASE1;
 }
+
+/**
+ * Job Dispatch Phase 2 cutover flag (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03).
+ * When disabled (default), `POST /assignments/calendar-entries` and
+ * `GET /assignments/calendar-entries` fall through to the 404 handler,
+ * matching the "both-off = current behavior" posture (same shape as
+ * `isEmploymentRecordEnabled`'s route-mount gate in routes/v1/index.ts).
+ * Separate flag from `isJobDispatchPhase1Enabled()` — Phase 1 (WorkApplication
+ * removal, job_request_id repointing, WorkRequest->JobRequest rename) is a
+ * distinct cutover from Phase 2 (calendar direct-assignment), each gated
+ * independently per this repo's existing per-phase flag precedent.
+ */
+export function isJobDispatchPhase2Enabled(): boolean {
+  return getEnv().FEATURE_JOBDISPATCH_PHASE2;
+}

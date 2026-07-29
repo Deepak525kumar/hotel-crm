@@ -1,4 +1,4 @@
-import { Prisma, WorkerAssignment, AssignmentStatus, RoomsCompletedEntry } from '@prisma/client';
+import { Prisma, WorkerAssignment, CalendarEntry, AssignmentStatus, RoomsCompletedEntry } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
@@ -7,7 +7,10 @@ import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
 import {
   AssignmentDto,
+  CalendarEntryDto,
+  CreateCalendarEntryInput,
   ListAssignmentsQuery,
+  ListCalendarEntriesQuery,
   LogRoomsCompletedInput,
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
@@ -204,6 +207,126 @@ export class AssignmentService extends BaseService {
     });
 
     return this.toRoomsCompletedDto(entry);
+  }
+
+  private toCalendarEntryDto(c: CalendarEntry): CalendarEntryDto {
+    return {
+      id: c.id,
+      assignment_id: c.assignment_id,
+      worker_id: c.worker_id,
+      hotel_id: c.hotel_id,
+      day: c.day.toISOString().slice(0, 10),
+      placed_by_id: c.placed_by_id,
+      created_at: c.created_at.toISOString(),
+      updated_at: c.updated_at.toISOString(),
+    };
+  }
+
+  // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): manager places a worker
+  // directly on the calendar for a given day — a DIRECT assignment, no
+  // accept/decline step, no broadcast fired. Creates WorkerAssignment +
+  // CalendarEntry in one transaction. Leaves BOTH work_request_id and
+  // job_request_id null — calendar placement has no backing JobRequest at
+  // all (per ADR-056; job_request_id is reserved for the future PR 9.9
+  // broadcast-accept creation path, not this one).
+  //
+  // Daily exclusivity (TRULE-006) is only partially enforced here: the
+  // CalendarEntry(worker_id, day) unique constraint blocks a second calendar
+  // placement for the same worker/day via THIS path, but does not yet block
+  // a same-day assignment created via a different path (broadcast-accept,
+  // PR 9.9) — full DB-level daily exclusivity across both paths is PR 9.6's
+  // scope (re-keyed partial unique index on WorkerAssignment).
+  async placeOnCalendar(
+    input: CreateCalendarEntryInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<{ assignment: AssignmentDto; calendar_entry: CalendarEntryDto }> {
+    // ADR-030 D-5: regional_manager holds manager's operational capability
+    // set at hotel_group scope — isHotelInScope() is role-agnostic, so the
+    // same branch that serves 'manager' serves 'regional_manager' correctly
+    // (mirrors middleware/permissions.ts's resolveHotelAccess() precedent).
+    // Admin is unrestricted (bypass), matching logRoomsCompleted's shape.
+    if (actor.role === 'manager' || actor.role === 'regional_manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot place a worker on the calendar for this hotel');
+      }
+    }
+
+    const day = new Date(`${input.day}T00:00:00.000Z`);
+
+    let created;
+    try {
+      created = await this.prisma.$transaction(async (tx) => {
+        const assignment = await tx.workerAssignment.create({
+          data: {
+            work_request_id: null,
+            job_request_id: null,
+            worker_id: input.worker_id,
+            hotel_id: input.hotel_id,
+            assigned_by_id: actor.userId,
+            status: AssignmentStatus.CONFIRMED,
+          },
+        });
+
+        const calendarEntry = await tx.calendarEntry.create({
+          data: {
+            assignment_id: assignment.id,
+            worker_id: input.worker_id,
+            hotel_id: input.hotel_id,
+            day,
+            placed_by_id: actor.userId,
+          },
+        });
+
+        return { assignment, calendarEntry };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('Worker already has a calendar placement for this day');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'PLACE_ON_CALENDAR', 'CALENDAR_ENTRY', created.calendarEntry.id, {
+      assignment_id: created.assignment.id,
+      worker_id: input.worker_id,
+      hotel_id: input.hotel_id,
+      day: input.day,
+    });
+
+    return {
+      assignment: this.toDto(created.assignment),
+      calendar_entry: this.toCalendarEntryDto(created.calendarEntry),
+    };
+  }
+
+  async listCalendarEntries(
+    query: ListCalendarEntriesQuery,
+    actor: { userId: string; role: string }
+  ): Promise<{ data: CalendarEntryDto[]; total: number }> {
+    const where: Prisma.CalendarEntryWhereInput = {
+      ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
+    };
+
+    // Workers see only their own calendar entries; admin/manager may filter
+    // by worker_id (mirrors list()'s existing worker-scoping shape).
+    if (actor.role !== 'admin' && actor.role !== 'manager') {
+      where.worker_id = actor.userId;
+    } else if (query.worker_id) {
+      where.worker_id = query.worker_id;
+    }
+
+    const [records, total] = await Promise.all([
+      this.prisma.calendarEntry.findMany({
+        where,
+        skip: (query.page - 1) * query.per_page,
+        take: query.per_page,
+        orderBy: { day: 'desc' },
+      }),
+      this.prisma.calendarEntry.count({ where }),
+    ]);
+
+    return { data: records.map((r) => this.toCalendarEntryDto(r)), total };
   }
 }
 

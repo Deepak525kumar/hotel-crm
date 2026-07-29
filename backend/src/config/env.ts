@@ -130,6 +130,14 @@ const envSchema = z.object({
   // consume once the replacement dispatch flow lands.
   FEATURE_JOBDISPATCH_PHASE1: z.coerce.boolean().default(false),
 
+  // Job Dispatch Phase 2 cutover flag (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03).
+  // Defaults FALSE. Gates the new POST/GET /assignments/calendar-entries
+  // routes only — while off, those routes 404 (fall through), matching the
+  // "both-off = current behavior" posture every prior epic flag has used.
+  // Distinct from FEATURE_JOBDISPATCH_PHASE1 (Phase 1, PR 9.2/9.3/9.4): each
+  // phase gets its own flag per this repo's existing per-phase precedent.
+  FEATURE_JOBDISPATCH_PHASE2: z.coerce.boolean().default(false),
+
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).
   // Config-driven per ADR-029 §6/§8: the values below are the initial
