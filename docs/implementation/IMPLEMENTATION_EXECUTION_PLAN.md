@@ -713,26 +713,65 @@ not silent renumbering.
 
 #### PR 9.5 — `CalendarEntry` + Calendar direct-assignment
 
-- **Files:** `schema.prisma` (new `CalendarEntry` model — per-worker per-day assignment-kind record
+- **Repository-reality correction (2026-07-29, architecture review before implementation):** a
+  pre-implementation verification pass found `WorkerAssignment.work_request_id` (the original,
+  mandatory FK from the marketplace-era schema) has no legitimate value for a calendar-placed
+  assignment — `placeOnCalendar()` has no `JobRequest` to populate it with, and `job_request_id`
+  (added nullable by PR 9.3, intended for exactly this purpose) is the correct FK to leave populated
+  instead. No ADR, `MIG-GAP-*` entry, or prior PR in this plan proposed relaxing
+  `work_request_id`'s nullability. An independent architecture review (`architecture-reviewer`
+  agent) confirmed: (1) calendar-only assignment is already architecturally legitimate per
+  `ADR-056`'s ratified "no intermediating application or acceptance record required" language —
+  no new architecture decision is needed; (2) the frozen spec is genuinely silent on this specific
+  column's nullability consequence, not implicitly covered; (3) the correct resolution is a plan
+  correction (of the same class as the `@@map`/migration-boundary corrections already made
+  earlier in this epic for PR 9.3/9.4), not a new ADR, since this doesn't reopen any ratified
+  decision — only PR 9.3's own migration-sequencing reasoning ("avoids two transient
+  assignment-creation-invariant states") was applied to `application_id`→`job_request_id` but never
+  extended to `work_request_id`'s parallel disposition. This section is corrected accordingly.
+- **Files:** `schema.prisma` — new `CalendarEntry` model (per-worker per-day assignment-kind record
   only, explicitly **not** overlapping Calendar's own `state-calendar-absence`/`CalendarAbsence`
   per `ADR-021`'s narrowing; owned by `backend-assignments`, not `backend-calendar`, consistent
   with `ADR-021`'s "assignment creation... remain owned by Job Dispatch/backend-assignments");
-  new migration; `backend/src/modules/assignments/service.ts` gains a `placeOnCalendar()` method
-  (direct `WorkerAssignment` + `CalendarEntry` creation in one transaction, no accept step);
+  **`WorkerAssignment.work_request_id` relaxed from mandatory (`String`) to nullable (`String?`)**
+  — additive, reversible, zero data-loss (pre-launch, no production row depends on this constraint;
+  every existing row keeps its current non-null value, only the `NOT NULL` constraint relaxes).
+  New migration (adds `CalendarEntry` table + relaxes `work_request_id`'s nullability in one
+  migration, same "avoid a transient invariant state" reasoning PR 9.3 already used for
+  `application_id`/`job_request_id`). `backend/src/modules/assignments/service.ts` gains a
+  `placeOnCalendar()` method (direct `WorkerAssignment` + `CalendarEntry` creation in one
+  transaction, no accept step — leaves `work_request_id` **and** `job_request_id` both null, since
+  calendar placement has no backing `JobRequest` at all, per `ADR-056`);
   `assignments/controller.ts`/`routes.ts` gain `POST /calendar-entries`,
-  `GET /calendar-entries?worker_id=`; `assignments/types.ts` gains the DTO.
+  `GET /calendar-entries?worker_id=`; `assignments/types.ts` gains the DTO, with
+  `AssignmentDto.work_request_id` made optional/nullable to match. **`assignments/service.ts`'s
+  existing DTO mapping and `ListAssignmentsQuery.work_request_id` filter need a null-safety pass**
+  for this same reason — flagged by the architecture review as missing from this PR's original
+  file list, now added: any code path assuming `work_request_id` is always present must handle
+  calendar-placed (and, later, PR 9.9 broadcast-accept) rows where it's null.
+  **Forward-note for PR 9.9:** broadcast-accept rows will have the identical disposition
+  (`job_request_id` populated, `work_request_id` left null) — PR 9.9's own section should
+  cross-reference this correction when that PR is implemented, rather than rediscovering the same
+  gap a second time.
 - **Acceptance criteria closed:** `TREQ-001`/`TRULE-001` ("manager places workers on a calendar
   day-by-day as a DIRECT assignment — no worker accept/decline; the shift appears on the worker's
   calendar; no broadcast fires"); `MIG-GAP-03`.
 - **Feature flag:** `FEATURE_JOBDISPATCH_PHASE2` (new, default **off** — gates every Phase 2 route;
   same "additive, both-off = current behavior" posture as every prior epic's flag).
 - **Test file:** `backend/src/__tests__/calendar-entries.test.ts` — cases: manager places worker
-  (assignment + CalendarEntry created, no notification of a broadcast kind emitted); manager places
-  an already-assigned-that-day worker (blocked, see 9.6 — this PR alone does not yet enforce the
-  DB-level exclusivity, so this case is marked pending until 9.6 lands, per this table's own
-  dependency order — do not assert DB-level rejection in this PR's test file, only in 9.6's).
-- **Rollback:** migration-involved (additive new table only, unread until this PR itself, so a
-  down-migration dropping it is safe and immediate). Code + drop-table revert.
+  (assignment + CalendarEntry created, `work_request_id` and `job_request_id` both null, no
+  notification of a broadcast kind emitted); manager places an already-assigned-that-day worker
+  (blocked, see 9.6 — this PR alone does not yet enforce the DB-level exclusivity, so this case is
+  marked pending until 9.6 lands, per this table's own dependency order — do not assert DB-level
+  rejection in this PR's test file, only in 9.6's). Also extend `backend/src/__tests__/
+  assignments.test.ts`'s existing fixtures/cases to cover a `work_request_id: null` row (regression
+  guard for the null-safety pass above).
+- **Rollback:** migration-involved. The `CalendarEntry` table add is additive-only (unread until
+  this PR itself; a down-migration dropping it is safe and immediate). The `work_request_id`
+  nullability relax is also safe to reverse **only if** no row created after this migration runs has
+  a null `work_request_id` at down-migration time (mirrors the fail-closed reversibility pattern
+  already used by PR 9.2's `WorkApplication` down-migration) — document this asymmetry explicitly
+  in the PR body. Code + migration revert.
 
 #### PR 9.6 — Daily-exclusivity partial unique index
 
@@ -799,6 +838,11 @@ not silent renumbering.
 
 #### PR 9.9 — First-accept arbitration + "requirement fulfilled"
 
+- **Forward-note from PR 9.5's correction:** the `WorkerAssignment` row this PR creates leaves
+  `work_request_id` **null** (relaxed to nullable by PR 9.5's migration) and only `job_request_id`
+  populated — the identical disposition PR 9.5's calendar-placement path already established. Do
+  not rediscover this as a new gap when implementing this PR; `assignments/service.ts`'s
+  null-safety pass for `work_request_id` (added to PR 9.5's scope) already covers this row shape.
 - **Files:** `job-requests/service.ts` (new `acceptBroadcast()` — optimistic-concurrency slot claim
   via a transactional conditional `updateMany` on a per-skill headcount counter, structurally
   identical to `work-applications/service.ts`'s now-deleted (9.2) `approve()` claim
@@ -806,8 +850,8 @@ not silent renumbering.
   increment(1) } })`) — `ADR-057` names this exact precedent as the reused mechanism, so this PR's
   implementation is a structural port, not new design); on `claimed.count === 0`, return the
   "requirement fulfilled" response (`TREQ-005`) instead of throwing; on success, create
-  `WorkerAssignment` directly with `job_request_id` set (9.3's added FK) inside the same
-  transaction.
+  `WorkerAssignment` directly with `job_request_id` set (9.3's added FK) and `work_request_id` left
+  null (9.5's nullability relax) inside the same transaction.
 - **Acceptance criteria closed:** `TREQ-004`/`TRULE-003` (first-accept wins, optimistic concurrency,
   no Redis, per `ADR-057`), `TREQ-005`/`TRULE-004` ("requirement fulfilled" for losers);
   `MIG-GAP-06`.
