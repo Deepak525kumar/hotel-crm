@@ -1,4 +1,11 @@
-import { OutboxSourceModule, OutboxTransport, Prisma, JobRequest, WorkRequestStatus } from '@prisma/client';
+import {
+  OutboxSourceModule,
+  OutboxTransport,
+  Prisma,
+  JobRequest,
+  JobRequestSkillSlot,
+  WorkRequestStatus,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
@@ -7,12 +14,17 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
+import { isWorkerFreeOnDay } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
+  BroadcastEligibilityDto,
   CreateWorkRequestInput,
+  JobRequestSkillSlotDto,
   ListWorkRequestsQuery,
+  RaiseBroadcastInput,
+  SkillSlotEligibilityDto,
   UpdateWorkRequestInput,
   WorkRequestDto,
 } from './types.js';
@@ -33,7 +45,7 @@ const ALLOWED_TRANSITIONS: Partial<Record<WorkRequestStatus, WorkRequestStatus[]
 };
 
 export class JobRequestService extends BaseService {
-  private toDto(wr: JobRequest): WorkRequestDto {
+  private toDto(wr: JobRequest, skillSlots?: JobRequestSkillSlot[]): WorkRequestDto {
     return {
       id: wr.id,
       hotel_id: wr.hotel_id,
@@ -56,6 +68,18 @@ export class JobRequestService extends BaseService {
       cancellation_reason: wr.cancellation_reason,
       created_at: wr.created_at.toISOString(),
       updated_at: wr.updated_at.toISOString(),
+      ...(skillSlots && skillSlots.length > 0
+        ? { skill_slots: skillSlots.map((s) => this.toSkillSlotDto(s)) }
+        : {}),
+    };
+  }
+
+  private toSkillSlotDto(slot: JobRequestSkillSlot): JobRequestSkillSlotDto {
+    return {
+      id: slot.id,
+      skill: slot.skill,
+      headcount: slot.headcount,
+      confirmed_count: slot.confirmed_count,
     };
   }
 
@@ -154,7 +178,10 @@ export class JobRequestService extends BaseService {
     id: string,
     actor: { userId: string; role: string }
   ): Promise<WorkRequestDto> {
-    const wr = await this.prisma.jobRequest.findUnique({ where: { id } });
+    const wr = await this.prisma.jobRequest.findUnique({
+      where: { id },
+      include: { skill_slots: true },
+    });
     if (!wr) throw new NotFoundError('Work request not found');
 
     if (actor.role !== 'admin' && actor.role !== 'manager') {
@@ -162,7 +189,7 @@ export class JobRequestService extends BaseService {
       if (!eligible) throw new ForbiddenError('Cannot access this work request');
     }
 
-    const dto = this.toDto(wr);
+    const dto = this.toDto(wr, wr.skill_slots);
 
     // Epic 9 PR 9.2 (TREQ-011): WorkApplication was dropped in this same PR —
     // there is nothing left to populate `my_application` from. Per the
@@ -289,6 +316,190 @@ export class JobRequestService extends BaseService {
         tx
       );
     }
+  }
+
+  /**
+   * Epic 9 PR 9.7 (TREQ-002/TRULE-002, MIG-GAP-04/05): manager raises a
+   * standalone broadcast JobRequest specifying skill(s) and headcount per
+   * skill. Creates the JobRequest and its JobRequestSkillSlot rows in one
+   * transaction, published immediately (a broadcast is raised OPEN — there
+   * is no DRAFT step for this path, unlike the marketplace create() flow).
+   *
+   * This method does NOT notify anyone (PR 9.8), does not let anyone accept
+   * (PR 9.9), and does not register an auto-close job (PR 9.10) — it only
+   * persists the broadcast and its skill×headcount breakdown, closing
+   * TREQ-002/TRULE-002's "calendar edits never emit a broadcast" clause by
+   * construction: this is the *only* creation path that populates
+   * skill_slots, and it is never invoked by placeOnCalendar() (PR 9.5) or by
+   * the marketplace create()/update() methods above.
+   *
+   * skill_slots is the sole source of truth for a broadcast's skill×headcount
+   * data. `position`/`workers_needed` ARE also written on the created row,
+   * but only as a compatibility projection derived from skill_slots (a
+   * summary string / sum, never independently authored) so existing
+   * consumers that read those legacy columns (list()/getById()'s DTO
+   * mapping, analytics/service.ts's _sum aggregate) keep working for a
+   * broadcast row without a broadcast-aware branch in either. This is a
+   * deliberate transitional-compatibility decision (Option B, confirmed
+   * 2026-07-29 pre-merge review of PR 9.7), not an oversight — see
+   * MODULE_SPEC.md's 0.3.4 Review-and-Change-Log entry. Nothing in this
+   * service (or any future PR 9.8/9.9 logic) may read `position` back as
+   * authoritative for a broadcast; only skill_slots may be.
+   */
+  async raiseBroadcast(input: RaiseBroadcastInput, actor: Actor): Promise<WorkRequestDto> {
+    const hotel = await this.prisma.hotel.findUnique({ where: { id: input.hotel_id } });
+    if (!hotel || hotel.deleted_at) throw new NotFoundError('Hotel not found');
+
+    if (!hotel.accepting_jobs) {
+      throw new ConflictError('This hotel is not currently accepting new work requests');
+    }
+
+    // Same scope-authz shape as create()/update() above (Epic 8,
+    // SIR-JOBD-002/FIND-SEC-002): a manager may only raise a broadcast for a
+    // hotel in their scope claim. Admin keeps unconditional cross-hotel
+    // access.
+    if (actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot raise a broadcast for this hotel');
+      }
+    }
+
+    // Decision (transitional compatibility, Option B — confirmed 2026-07-29
+    // pre-merge review of PR 9.7): a broadcast row DOES populate the legacy
+    // position/workers_needed columns, derived (not manager-authored) from
+    // the skill×headcount breakdown below, alongside skill_slots. This is
+    // deliberate, not accidental: list()/getById()'s DTO mapping and
+    // analytics/service.ts's existing _sum(workers_needed/workers_confirmed)
+    // aggregate have no other field to read for a broadcast row today, and
+    // giving them a derived value keeps a broadcast visible/summable through
+    // those existing surfaces without adding a broadcast-aware branch to
+    // either. skill_slots remains the SOLE authority for any decision logic
+    // (eligibility, future arbitration) — position is a display-only
+    // derivative, never read back for behavior. Superseded once TREQ-011
+    // retires the marketplace fields entirely.
+    const totalWorkersNeeded = input.skills.reduce((sum, s) => sum + s.headcount, 0);
+    const positionSummary = input.skills.map((s) => `${s.headcount}x ${s.skill}`).join(', ');
+
+    const { wr, slots } = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.jobRequest.create({
+        data: {
+          hotel_id: input.hotel_id,
+          created_by_id: actor.userId,
+          position: positionSummary,
+          workers_needed: totalWorkersNeeded,
+          shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
+          shift_start_time: input.shift_start_time,
+          shift_end_time: input.shift_end_time,
+          hourly_rate: input.hourly_rate ?? null,
+          currency: input.currency ?? 'EUR',
+          description: input.description ?? null,
+          status: WorkRequestStatus.OPEN,
+          published_at: new Date(),
+          skill_slots: {
+            create: input.skills.map((s) => ({
+              skill: s.skill,
+              headcount: s.headcount,
+            })),
+          },
+        },
+        include: { skill_slots: true },
+      });
+      return { wr: created, slots: created.skill_slots };
+    });
+
+    await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', wr.id, {
+      hotel_id: wr.hotel_id,
+      status: wr.status,
+      skills: input.skills,
+    });
+
+    return this.toDto(wr, slots);
+  }
+
+  /**
+   * Epic 9 PR 9.7 (TREQ-003/TRULE-002/TRULE-006, MIG-GAP-04): eligibility
+   * computation for a broadcast JobRequest — per skill slot, the eligible
+   * worker set is {hotel-group roster ∩ matching skill ∩ free that day}.
+   * Reuses listEligibleWorkerIds() (roster-scope.ts) for the roster/scope
+   * dimension and isWorkerFreeOnDay() (PR 9.6, assignments/service.ts) for
+   * the daily-exclusivity dimension, rather than duplicating either.
+   *
+   * Read-only: does not notify (PR 9.8) or reserve a slot (PR 9.9).
+   */
+  async getBroadcastEligibility(
+    id: string,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<BroadcastEligibilityDto> {
+    const wr = await this.prisma.jobRequest.findUnique({
+      where: { id },
+      include: { skill_slots: true },
+    });
+    if (!wr) throw new NotFoundError('Work request not found');
+    if (wr.skill_slots.length === 0) {
+      throw new ConflictError('This work request is not a broadcast (no skill slots)');
+    }
+
+    if (actor.role === 'manager') {
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot view eligibility for this work request');
+      }
+    }
+
+    const rosterWorkerIds = await listEligibleWorkerIds(wr.hotel_id);
+    if (rosterWorkerIds.length === 0) {
+      return {
+        job_request_id: wr.id,
+        hotel_id: wr.hotel_id,
+        shift_date: wr.shift_date.toISOString().slice(0, 10),
+        slots: wr.skill_slots.map((slot) => ({
+          skill: slot.skill,
+          headcount: slot.headcount,
+          confirmed_count: slot.confirmed_count,
+          eligible_worker_ids: [],
+        })),
+      };
+    }
+
+    const rosterRecords = await this.prisma.employmentRecord.findMany({
+      where: { user_id: { in: rosterWorkerIds } },
+      select: { user_id: true, skills: true },
+    });
+    const skillsByWorker = new Map(rosterRecords.map((r) => [r.user_id, r.skills]));
+
+    const freeWorkerIds = new Set(
+      (
+        await Promise.all(
+          rosterWorkerIds.map(async (workerId) => ({
+            workerId,
+            free: await isWorkerFreeOnDay(workerId, wr.shift_date),
+          }))
+        )
+      )
+        .filter((r) => r.free)
+        .map((r) => r.workerId)
+    );
+
+    const slots: SkillSlotEligibilityDto[] = wr.skill_slots.map((slot) => {
+      const eligibleWorkerIds = rosterWorkerIds.filter(
+        (workerId) =>
+          freeWorkerIds.has(workerId) && (skillsByWorker.get(workerId) ?? []).includes(slot.skill)
+      );
+      return {
+        skill: slot.skill,
+        headcount: slot.headcount,
+        confirmed_count: slot.confirmed_count,
+        eligible_worker_ids: eligibleWorkerIds,
+      };
+    });
+
+    return {
+      job_request_id: wr.id,
+      hotel_id: wr.hotel_id,
+      shift_date: wr.shift_date.toISOString().slice(0, 10),
+      slots,
+    };
   }
 }
 

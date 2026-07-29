@@ -5,6 +5,7 @@ import { jobRequestService } from './service.js';
 import {
   CreateWorkRequestSchema,
   ListWorkRequestsQuerySchema,
+  RaiseBroadcastSchema,
   UpdateWorkRequestSchema,
 } from './types.js';
 
@@ -96,6 +97,47 @@ export async function updateWorkRequest(
       return;
     }
     const result = await jobRequestService.update(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Epic 9 PR 9.7 (TREQ-002/TRULE-002, MIG-GAP-04/05).
+export async function raiseBroadcast(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = RaiseBroadcastSchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await jobRequestService.raiseBroadcast(parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Epic 9 PR 9.7 (TREQ-003/TRULE-002/TRULE-006, MIG-GAP-04).
+export async function getBroadcastEligibility(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const result = await jobRequestService.getBroadcastEligibility(req.params.id, {
       userId: req.auth!.userId,
       role: req.auth!.role,
       scope: req.auth!.scope ?? null,

@@ -147,6 +147,7 @@ nodes:
   - { id: state-hotel-group, kind: state-domain, owner: backend-crm, source: "backend/prisma/schema.prisma:231 (model HotelGroup, added by ADR-023)" }  # added during governance audit (governance-audit-recalc, 2026-07-22); was previously missing from this list despite Hotel.hotel_group_id FK (state-hotel note below) and MODULE_REGISTRY.yaml backend-crm entry already referencing ADR-023's HotelGroup ownership
   - { id: state-hotel-worker, kind: state-domain, owner: none, source: "backend/prisma/schema.prisma:206 (model HotelWorker)" }  # owner backend-hotel-workers removed by Epic 5 PR 5.8; see state_domains note below
   - { id: state-job-request, kind: state-domain, owner: backend-job-requests, source: "backend/prisma/schema.prisma:500 (model JobRequest, @@map(\"WorkRequest\"))" }  # renamed from state-work-request by Epic 9 PR 9.4 (WorkRequest -> JobRequest model rename, @@map preserves the physical table name — zero data migration). See SYNC-061.
+  - { id: state-job-request-skill-slot, kind: state-domain, owner: backend-job-requests, source: "backend/prisma/schema.prisma (model JobRequestSkillSlot, added by Epic 9 PR 9.7, migration 20260729040000_add_job_request_skill_slot; TREQ-002/TREQ-010, MIG-GAP-04/05)" }  # 1:many with state-job-request via job_request_id (cascade delete) — one row per skill x headcount line on a broadcast JobRequest raised via raiseBroadcast(). Purely additive; no legacy JobRequest row backfilled. confirmed_count included now (default 0, unused by PR 9.7's own logic) as PR 9.9's future per-skill optimistic-concurrency target. See SYNC-064.
   # state-work-application node REMOVED by Epic 9 PR 9.2 (commits 12b1c31/2e89c4f,
   # merged b035700; TREQ-011/ADR-058) — the WorkApplication model and ApplicationStatus
   # enum were dropped from schema.prisma (migration 20260729000000_drop_work_application);
@@ -309,6 +310,14 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/job-requests/service.ts list()/getById()/notifyRosterPublished(), via lib/roster-scope.ts"
+  - id: edge-job-requests-reads-worker-assignment
+    source: backend-job-requests
+    target: state-worker-assignment
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/job-requests/service.ts getBroadcastEligibility(), via backend-assignments' exported isWorkerFreeOnDay()/ACTIVE_ASSIGNMENT_STATUSES (PR 9.6, assignments/service.ts:30-63)"
+    note: "New edge, Epic 9 PR 9.7 (TREQ-003/TRULE-006, MIG-GAP-04): getBroadcastEligibility() reuses backend-assignments' PR-9.6 daily-exclusivity read helper rather than duplicating the active-status query, so a broadcast's eligible-worker set stays in lock-step with the DB-level WorkerAssignment_active_slot_unique partial index this helper mirrors. Read-only, function-level import (no new state ownership, no shared-write)."
   - id: edge-users-reads-employment-record
     source: backend-users
     target: state-employment-record
