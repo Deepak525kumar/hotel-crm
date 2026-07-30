@@ -1,14 +1,21 @@
 # Module Specification: `geo` (backend-geo)
 
 > Specification of ONE bounded backend capability — **Geolocation / Geofencing** — for the module
-> id `backend-geo`. Unlike `attendance` or `consent`, this module has **NO current-state
-> footprint to reverse-specify**: `backend/src/modules/geo/` contains only a `.placeholder` file,
-> is not imported, not mounted, and carries zero business logic
-> (`MODULE_REGISTRY.yaml:214-224`; `DEPENDENCY_GRAPH.yaml:51,339-340,544`; `BOUNDARY_INDEX.yaml:118`;
-> `SPECIFICATION_INDEX.yaml:87-89`). This document is therefore almost entirely `[TARGET STATE]`,
-> derived from confirmed authorities, plus an explicit disclosure of the absent current state. It
-> records behavior and confirmed contract; it does not create product policy and does not resolve
-> any open decision. Nothing here is frozen: G2 freeze is reserved human authority.
+> id `backend-geo`. **CORRECTED (2026-07-30, Geo repository synchronization pass):** at authoring
+> time (v0.1.0/v0.1.1, 2026-07-14) this module genuinely had no current-state footprint —
+> `backend/src/modules/geo/` held only a `.placeholder` file, was not imported, not mounted, and
+> carried zero business logic, and the document below was written entirely as `[TARGET STATE]`
+> accordingly. Following `GD-14`'s ratification (2026-07-27) and this document's own G2 freeze the
+> same day, the module was implemented (2026-07-28): `backend/src/modules/geo/` now contains real
+> code (`service.ts`, `controller.ts`, `routes.ts`, `distance.ts`, `types.ts`,
+> `retention-sweep-job.ts`), is mounted at `/api/v1/geo`, and carries the business logic this
+> document specifies as target state. The `[CURRENT STATE]`/`[TARGET STATE]` markers below were
+> never updated after implementation landed — treat every `[CURRENT STATE]: NONE` marker in this
+> document as describing state **as of authoring time (2026-07-14), not the present repository
+> state**; see `MODULE_REGISTRY.yaml`'s `backend-geo` entry for the current, accurate
+> implementation-status record. This document's own requirements/rules/interfaces content is
+> unaffected by this correction — only the current-state framing was stale, not the specified
+> behavior itself.
 
 ## Document Control
 
@@ -29,19 +36,28 @@ confirmed-but-unbuilt distance/geofence-radius service that gates the Attendance
 Start/Close clock actions, plus the hotel-coordinate storage and coordinate-retention concerns
 that Attendance's own spec explicitly declines to claim sole ownership of.
 
-- `[CURRENT STATE]`: **NONE.** `backend/src/modules/geo/` holds only `.placeholder`
+- `[CURRENT STATE]`: **NONE, as of authoring time (2026-07-14) — SUPERSEDED by implementation,
+  2026-07-28.** At authoring time, `backend/src/modules/geo/` held only `.placeholder`
   (`MODULE_REGISTRY.yaml:217-224`: `implementation_status: unimplemented-stub`,
   `dependencies: []`, `published_events: none-observed`, `consumed_events: none-observed`,
-  `specification: UNKNOWN`). `DEPENDENCY_GRAPH.yaml:51` classifies it `lifecycle:
-  placeholder-unregistered` and states "not imported or mounted anywhere. No relationships exist."
-  `DEPENDENCY_GRAPH.yaml:339-340` lists it as an orphan module for the identical reason.
+  `specification: UNKNOWN`). `DEPENDENCY_GRAPH.yaml:51` classified it `lifecycle:
+  placeholder-unregistered` and stated "not imported or mounted anywhere. No relationships exist."
+  `DEPENDENCY_GRAPH.yaml:339-340` listed it as an orphan module for the identical reason.
   `BOUNDARY_INDEX.yaml:118`: "placeholder-unregistered stub; no footprint." ADR-003
   (`docs/14-governance/architecture-decisions/ADR-003-modular-monolith-architecture.md:27,37`)
-  independently confirms: "Two module directories exist but are empty stubs ... and are NOT
+  independently confirmed: "Two module directories exist but are empty stubs ... and are NOT
   registered in the router: `backend/src/modules/chatbot/` and `backend/src/modules/geo/`" and
-  records both as "declared-but-unimplemented stubs ... recorded as deferred Phase 2+ scope, not as
+  recorded both as "declared-but-unimplemented stubs ... recorded as deferred Phase 2+ scope, not as
   current modules." `PIVOT_DESIGN_DOCUMENT.md` §2.2 line 44 lists `geo (placeholder)` among current
-  modules, consistent with the above. There is nothing to reverse-specify.
+  modules, consistent with the above. **Corrected (2026-07-30, Geo repository synchronization
+  pass):** following `GD-14`'s 2026-07-27 ratification and this document's own G2 freeze,
+  `backend/src/modules/geo/` was built 2026-07-28 (`service.ts`, `controller.ts`, `routes.ts`,
+  `distance.ts`, `types.ts`, `retention-sweep-job.ts`), mounted at `/api/v1/geo`
+  (`backend/src/routes/v1/index.ts:19,38`), and its acceptance-audit remediation merged 2026-07-30
+  (PR #291). All of the `[TARGET STATE]` content below this line is now real, tested, mounted
+  code — see `MODULE_REGISTRY.yaml`'s `backend-geo` entry for the full implementation evidence
+  trail. This paragraph's citations above are retained as an accurate historical record of the
+  authoring-time state, not a current-state claim.
 - `[TARGET STATE]` (confirmed, entirely unbuilt — CONFIRMED §17, §25; PIVOT §4.7, §7.4, §8.3, §9.1,
   §12 M3): a **geofence distance-check service** (100 m radius from the hotel) that Attendance's
   Start/Close consumes; a **hotel-coordinate storage** concern (source of truth for hotel
@@ -384,3 +400,4 @@ identical deferral pattern:
 | 0.1.0 | 2026-07-13 | Initial authoring. Zero current-state footprint confirmed directly against the repository; all requirements derived as `[TARGET STATE]` from CONFIRMED §17/§25/§34 and PIVOT §4.7/§7.4/§8.3/§9.1/§12. Ownership split with `backend-attendance` left as explicit open decisions (OD-GEO-001, OD-GEO-002) rather than invented. Not yet reviewed (first candidate). | — | Not approved; G2 reserved to human |
 | 0.1.1 | 2026-07-13 | G4 Independent Review round (Architecture, Dependency, Consistency, Security, Performance): Architecture=`PASS_WITH_ACTIONS` (boundary coherent; OD-GEO-001/002 acceptable as open at REVIEW status, must resolve before FROZEN), Dependency=`PASS_WITH_ACTIONS` (proposed edges correct; deferred-graph-application pattern consistent with `backend-chatbot` precedent), Consistency=`PASS` (all quoted attendance lines and the OD-GEO-008 §37→§34 citation correction verified accurate against the repository), Security=`PASS_WITH_ACTIONS` (retention/access-scoping disclosure adequate; added new `OD-GEO-009` disclosing GPS-spoofing as an unresolved abuse vector, previously unflagged), Performance=`PASS` (OD-GEO-006 budget gap already adequately flagged). Correction applied: added GPS-spoofing disclosure to Failure/Security section and `OD-GEO-009` row. Zero Critical/High findings; all actions are disclosure additions, not scope changes. Status remains `REVIEW` — G2 freeze still reserved to human, all 9 Open Decisions remain OPEN. | FIND-SEC-GEO-01 (spoofing disclosure) | Not approved; G2 reserved to human |
 | 0.1.2 | 2026-07-27 | **Correction — decision recorded, no requirement text re-derived or reinterpreted.** `GD-14` (Decided, 2026-07-27, by the commissioning human): resolves `OD-GEO-001` (hotel coordinates as `Hotel` columns, option (a)), `OD-GEO-002` (`backend-geo` owns worker-coordinate columns + the 6-month retention sweep), `OD-GEO-003` (fail-closed), `OD-GEO-004` (admin-only manual coordinate entry via the existing `HotelWriteGate` MASTER-data surface), `OD-GEO-005` (admin/manager see computed distance/pass-fail only, never raw coordinates), `OD-GEO-007` (geofence pass/fail is audit-logged via `BaseService.logAudit()`). `OD-GEO-006` (performance budgets) and `OD-GEO-009` (GPS-spoofing countermeasure) remain explicitly OPEN/deferred, not silently resolved — see each row's own disposition above and `docs/implementation/GOVERNANCE_DECISIONS_REQUIRED.md` GD-14 for the full record. `OD-GEO-008` (citation correction) is unaffected. All five G4 dimensions from v0.1.1 remain valid (zero Critical/High, no requirement text changed by this pass) — this Correction resolves the human-authority blocker Architecture's own v0.1.1 finding named, per the same `SPEC-DOCUMENTS-001`/`GD-16` precedent for a decision-only Correction that freezes without re-running G4. Status: `REVIEW` → `FROZEN`. | — (decision recorded; no new finding) | **FROZEN** — approved by the commissioning human, `GD-14`, 2026-07-27 |
+| 0.1.2 (byproduct correction, recorded not versioned) | 2026-07-30 | **Documentation-synchronization correction, discovered during the Geo epic acceptance audit and repository synchronization pass — not a new governance decision, no requirement/rule/interface content re-derived or reinterpreted.** The authoring-note blockquote and the `[CURRENT STATE]: NONE` marker under Purpose and Scope still described this module as a zero-code `.placeholder` stub, unqualified by any authoring-time framing — directly contradicting this document's own Document Control (`FROZEN`, `0.1.2`, approved `GD-14` 2026-07-27) and the actual repository state: `backend/src/modules/geo/` was implemented 2026-07-28 (real `service.ts`/`controller.ts`/`routes.ts`/`distance.ts`/`types.ts`/`retention-sweep-job.ts`), mounted at `/api/v1/geo`, with acceptance-audit remediation merged 2026-07-30 (PR #291). Both passages corrected to explicitly frame the "NONE"/zero-code claim as accurate only as of authoring time (2026-07-14), superseded by implementation 2026-07-28 — the historical citations (`MODULE_REGISTRY.yaml`, `DEPENDENCY_GRAPH.yaml`, `BOUNDARY_INDEX.yaml`, `ADR-003` as they read at authoring time) are retained, not deleted, per this register's own append/resolve/merge convention. No requirement, rule, interface, or open-decision content touched by this correction. | — (documentation-synchronization correction; no new finding) | Lead Architect (2026-07-30, documentation-synchronization correction, discovered during Geo epic acceptance audit and repository synchronization pass) |

@@ -3378,12 +3378,110 @@ context_invalidators:
       implementation epic from beginning on a different module/capability;
       they are HR-specific governance debt, not repository-wide blockers.
 
+  - id: SYNC-071
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository synchronization for the Geo epic (backend-geo,
+      SPEC-GEO-001, implemented 2026-07-28 per GD-14; acceptance-audit
+      remediation merged 2026-07-30, PR #291), following the exact
+      precedent established by SYNC-070 (HR epic post-closeout sync).
+      Re-fetched origin/main and reset the local worktree to HEAD 1046c8e
+      (PR #291's merge) before this pass. Independently re-verified every
+      claim before changing anything, per this pass's own explicit
+      instruction not to trust the prior acceptance audit's findings
+      blindly: confirmed backend/src/modules/geo/ is mounted
+      (routes/v1/index.ts:19,38), confirmed the module's actual file
+      contents (service.ts/controller.ts/routes.ts/distance.ts/types.ts/
+      retention-sweep-job.ts, 481 lines total, no .placeholder remaining),
+      confirmed SPEC-GEO-001's Document Control (0.1.2, FROZEN, G2
+      2026-07-27 per GD-14), confirmed GD-14's own resolved-item list
+      (OD-GEO-001/002/003/004/005/007) against docs/03-modules/geo/
+      MODULE_SPEC.md's Open Decisions table directly, confirmed
+      Hotel.latitude/longitude and WorkerGeoCheckin exist in
+      schema.prisma, confirmed geo/service.ts:26,48 read Hotel directly
+      via Prisma (a real, previously-unrecorded cross-module state read).
+      Corrected: MODULE_REGISTRY.yaml's backend-geo entry (lifecycle
+      declared->active, implementation_status unimplemented-stub->active,
+      specification 0.1.1/REVIEW->0.1.2/FROZEN, dependencies []->
+      [backend-crm], evidence .placeholder->real file paths);
+      SPECIFICATION_INDEX.yaml's backend-geo row (0.1.1/REVIEW->
+      0.1.2/FROZEN); BOUNDARY_INDEX.yaml's backend-geo row (placeholder
+      stub->implemented, OD-GEO-001/002 open->resolved); API_INDEX.yaml
+      (added a real apis: entry for /api/v1/geo with frontend-web +
+      mobile-worker as clients, removed from unregistered);
+      STATE_OWNERSHIP_INDEX.yaml/OWNERSHIP_INDEX.yaml (added the missing
+      state-geo-checkin/WorkerGeoCheckin row -- existed in code since
+      2026-07-28 but was never registered, the same omission class
+      already found and fixed for HR's state-hr-contract/
+      state-hr-payslip-request); DEPENDENCY_GRAPH.yaml (backend-geo
+      module node lifecycle placeholder-unregistered->active, added
+      state-geo-checkin state-domain node, added edge-geo-reads-hotel
+      and edge-geo mount registration, corrected state-hotel's readers
+      list to include backend-geo, removed backend-geo from
+      orphan_modules/route_registration.unregistered, corrected
+      remaining_human_decisions' backend-geo line);
+      SPECIFICATION_ISSUES_REGISTER.md (SIR-GEO-001/002/003/004/005/007
+      corrected from OPEN to RESOLVED, matching GD-14's own already-
+      correct disposition in MODULE_SPEC.md's Open Decisions table --
+      SIR-GEO-006/009 were already correctly stated and left unchanged;
+      SIR-GEO-008 is an unaffected citation-correction item; Module: Geo
+      section's own "last verified" marker updated); docs/03-modules/geo/
+      MODULE_SPEC.md (the authoring-note blockquote and the
+      `[CURRENT STATE]: NONE` marker under Purpose and Scope both still
+      described this module as a zero-code placeholder stub with no
+      authoring-time qualification, directly contradicting the same
+      document's own Document Control -- FROZEN, 0.1.2 -- corrected to
+      explicitly frame the "NONE" claim as accurate only as of authoring
+      time 2026-07-14, superseded by implementation 2026-07-28; new
+      version-history row added, no version bump, matching the identical
+      byproduct-correction convention SYNC-070/HR's own MODULE_SPEC.md
+      correction used for OD-HR-15).
+      Full re-validation after all edits: tsc --noEmit clean, full
+      backend suite 86/86 suites (1429/1429 tests, unaffected -- no code
+      touched by this pass), repository-integrity-check.js 0 new blocking
+      findings (pre-existing orphan-document WARNs only, unchanged in
+      kind), context-loader.js --validate 0 errors.
+      Recorded, not remediated (pre-existing, out of this pass's
+      Geo-specific scope, found incidentally): API_INDEX.yaml's stale
+      backend-analytics security note (fixed in code 2026-07-17, already
+      disclosed by SYNC-070); missing backend-calendar rows in
+      OWNERSHIP_INDEX.yaml/STATE_OWNERSHIP_INDEX.yaml (state-calendar-
+      absence has no summary row either, same omission class, different
+      module); MODULE_MEMORY.yaml's historical ART-MEM-backend-hr entry
+      (unrelated, already disclosed by SYNC-070); pre-existing strict-
+      YAML-parse failures in MODULE_REGISTRY.yaml/DEPENDENCY_GRAPH.yaml/
+      SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml (confirmed present
+      before this session, already disclosed and accepted by SYNC-055).
+      No code, migration, or test file touched by this pass --
+      documentation and governance-register synchronization only,
+      matching the HR precedent's own scope boundary exactly.
+    authority_needed: none  # mechanical documentation synchronization matching already-merged, already-tested code and an already-ratified governance decision (GD-14); no new product/architecture/governance decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit/PR. The Geo epic
+      (backend-geo, SPEC-GEO-001) is now closed from the implementation
+      perspective (2026-07-28 build + PR #291 remediation merged) and
+      from the repository-synchronization perspective (this entry) --
+      remaining open items are exclusively governance/human-authority
+      actions, not further implementation or documentation work: (1)
+      OD-GEO-006 (performance budgets/SLOs) and OD-GEO-009 (GPS-spoofing
+      countermeasure) remain deliberately, explicitly deferred by GD-14
+      itself, not gaps to close; (2) owner assignment (SYNC-001) remains
+      blocked pending a named human approver, the same standing gap every
+      other module in this registry has. Neither blocks the next
+      implementation epic from beginning on a different module/capability;
+      both are Geo-specific (or platform-wide, in SYNC-001's case)
+      governance debt, not repository-wide blockers. This module is now
+      ready for an Epic Closeout identical to HR's, if the commissioning
+      session chooses to run one.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 9c1be7c  # rebound to HEAD 9c1be7c by SYNC-070 (2026-07-30, HR epic post-closeout synchronization pass) — eight merges more current than the prior stamp: 9c1be7c is PR #289's merge (HR epic acceptance-audit follow-up), confirmed via `git fetch origin main` as origin/main's current tip at this pass. The prior stamp (ca22207, SYNC-069) predated the entire HR implementation stack (PR #283-287) and its own follow-up (PR #289) -- this rebind closes that gap. Prior history: ca22207 (SYNC-069, 2026-07-30, Epic 9 Completion Audit governance-closure pass), 4131574 (SYNC-068, 2026-07-30, post Epic 9 PR 9.9 merge, PR #280), da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge), 586a55d (SYNC-056, 2026-07-29), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: 1046c8e  # rebound to HEAD 1046c8e by SYNC-071 (2026-07-30, Geo repository synchronization pass) — two merges more current than the prior stamp: 1046c8e is PR #291's merge (Geo acceptance-audit remediation), confirmed via `git fetch origin main` as origin/main's current tip at this pass. The prior stamp (9c1be7c, SYNC-070) predated PR #290 (HR post-closeout sync) and PR #291 (Geo remediation) -- this rebind closes that gap. Prior history: 9c1be7c (SYNC-070, 2026-07-30, HR epic post-closeout synchronization pass), ca22207 (SYNC-069, 2026-07-30, Epic 9 Completion Audit governance-closure pass), 4131574 (SYNC-068, 2026-07-30, post Epic 9 PR 9.9 merge, PR #280), da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge), 586a55d (SYNC-056, 2026-07-29), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }

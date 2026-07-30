@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # no code-revision move; content annotation only, SYNC-056 (Governance Resolution workflow, GD-12/ADR-032 ratified 2026-07-28) -- worker node note corrected to cite ADR-032 as the standing sync/async transport decision rather than an open "future" item; no node/edge added, removed, or reclassified (ADR-032 introduces no new transport mechanism, only ratifies the direct-call/Outbox split already observed in-content). Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
+observed_revision: 1046c8e  # rebound to HEAD 1046c8e by SYNC-071 (Geo repository synchronization pass, 2026-07-30) -- backend-geo node/lifecycle corrected (placeholder-unregistered -> active), state-geo-checkin node added, edge-geo-reads-hotel added, state-hotel's readers list gained backend-geo, orphan_modules/stub_but_registered/unregistered/remaining_human_decisions sections corrected. All findings independently re-verified against actual code (routes/v1/index.ts mount, geo/service.ts's Hotel.findUnique calls, schema.prisma's WorkerGeoCheckin model) before this pass, not assumed from the prior audit's claims. Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-056 (Governance Resolution workflow, GD-12/ADR-032 ratified 2026-07-28) -- worker node note corrected to cite ADR-032 as the standing sync/async transport decision rather than an open "future" item; no node/edge added, removed, or reclassified (ADR-032 introduces no new transport mechanism, only ratifies the direct-call/Outbox split already observed in-content). Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
 status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
 # MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
@@ -69,9 +69,9 @@ nodes:
   # (state-calendar-absence, CalendarAbsence model); /operations remains a
   # stub (unrelated capability, OD-CAL-10) -- mixed, not a pure stub.
   - { id: backend-calendar, kind: module, owner: unassigned, source: backend/src/modules/calendar, lifecycle: active-partial }
-  # backend-chatbot and backend-geo are placeholder-unregistered (only a .placeholder
-  # file); not imported or mounted anywhere. No relationships exist.
-  # backend-chatbot: SPEC-CHATBOT-001@0.1.3 (REVIEW) now exists (SYNC-029), but no
+  # backend-chatbot is placeholder-unregistered (only a .placeholder file);
+  # not imported or mounted anywhere. No relationships exist.
+  # SPEC-CHATBOT-001@0.1.3 (REVIEW) now exists (SYNC-029), but no
   # code exists yet -- the module/edge/node facts below remain unchanged (this graph
   # records only repository-observed relationships, never speculative ones for an
   # unbuilt module); the specification's own Proposed Knowledge Deltas (new
@@ -80,7 +80,12 @@ nodes:
   # zero-code deferral -- they become authoritative graph entries only once
   # backend-chatbot has real code to observe.
   - { id: backend-chatbot, kind: module, owner: unassigned, source: backend/src/modules/chatbot, lifecycle: placeholder-unregistered }
-  - { id: backend-geo, kind: module, owner: unassigned, source: backend/src/modules/geo, lifecycle: placeholder-unregistered }
+  # CORRECTED (2026-07-30, Geo repository synchronization pass): backend-geo is no
+  # longer a placeholder -- Geo implementation (2026-07-28, GD-14/SPEC-GEO-001@0.1.2
+  # FROZEN) landed IF-GEO-DISTANCE-CHECK, IF-GEO-ListCheckins/IF-GEO-GetCheckin, and
+  # GeoRetentionSweepJob (see MODULE_REGISTRY.yaml's backend-geo entry for the full
+  # evidence trail); acceptance-audit remediation merged 2026-07-30 (PR #291).
+  - { id: backend-geo, kind: module, owner: unassigned, source: backend/src/modules/geo, lifecycle: active }
 
   # Clients
   - { id: frontend-web, kind: client, owner: unassigned, source: frontend }
@@ -212,6 +217,11 @@ nodes:
   # repository-observed relationships.
   - { id: state-hr-contract, kind: state-domain, owner: backend-hr, source: "backend/prisma/schema.prisma (model Contract, added by HR implementation PR 1, migration 20260730010000_add_hr_contract_payslip_request)" }
   - { id: state-hr-payslip-request, kind: state-domain, owner: backend-hr, source: "backend/prisma/schema.prisma (model PayslipRequest, added by HR implementation PR 1, migration 20260730010000_add_hr_contract_payslip_request)" }
+  # Added 2026-07-30 (Geo repository synchronization pass): this node existed
+  # in code since Geo's 2026-07-28 implementation (GD-14) but was never
+  # added here, mirroring the identical omission just found and fixed for
+  # HR's own state-hr-contract/state-hr-payslip-request nodes.
+  - { id: state-geo-checkin, kind: state-domain, owner: backend-geo, source: "backend/prisma/schema.prisma (model WorkerGeoCheckin, added by Geo implementation, migration 20260728010000_add_worker_geo_checkin)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -293,6 +303,16 @@ edges:
     status: observed
     evidence: "backend/src/modules/job-requests/service.ts:66 (this.prisma.hotel.findUnique)"
     note: "source renamed backend-work-requests -> backend-job-requests by Epic 9 PR 9.4. See SYNC-061."
+  # Added 2026-07-30 (Geo repository synchronization pass): existed in code
+  # since Geo's 2026-07-28 implementation (GD-14, OD-GEO-001) but was never
+  # added here.
+  - id: edge-geo-reads-hotel
+    source: backend-geo
+    target: state-hotel
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/geo/service.ts:26,48 (this.prisma.hotel.findUnique, reads latitude/longitude)"
   # Epic 5 PR 5.6 (SPEC-EMP-001): employee-management read edges. Group-grain scope
   # resolution + hire-approval group derivation read Hotel/HotelGroup (ADR-023 §4/§6);
   # profile-and-history aggregation reads Attendance/Rating within provisional caps
@@ -605,12 +625,13 @@ runtime:
     - { module: backend-notifications, mount: "/api/v1/notifications", evidence: "backend/src/routes/v1/index.ts:32" }
     - { module: backend-analytics, mount: "/api/v1/analytics", evidence: "backend/src/routes/v1/index.ts:33" }
     - { module: backend-calendar, mount: "/api/v1/calendar", evidence: "backend/src/routes/v1/index.ts:34" }
+    - { module: backend-geo, mount: "/api/v1/geo", evidence: "backend/src/routes/v1/index.ts:19,38" }  # added 2026-07-30 (Geo repository synchronization pass); was previously listed under unregistered despite mounting since Geo's 2026-07-28 implementation
   middleware_registration:
     - "optionalAuthMiddleware applied to the whole v1 router (routes/v1/index.ts:20)."
     - "authMiddleware / requireRole / requirePermission / checkHotelAccess applied per-module in each module's routes.ts (backend/src/middleware/auth.ts, backend/src/middleware/permissions.ts)."
     - "requestLoggerMiddleware, CORS, errorHandler, notFoundHandler registered globally in app.ts:18,21,54,57."
   unregistered:
-    - "backend-chatbot and backend-geo are NOT imported or mounted (only a .placeholder file exists). No runtime relationship."
+    - "backend-chatbot is NOT imported or mounted (only a .placeholder file exists). No runtime relationship. (backend-geo removed from this line 2026-07-30, Geo repository synchronization pass -- it is mounted, see mounted: above.)"
 
 contracts:
   - id: notification-service
@@ -733,9 +754,9 @@ state_domains:
     model: Hotel
     authoritative_writer: backend-crm
     writers: [backend-crm]
-    readers: [backend-job-requests]
-    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; read: backend/src/modules/job-requests/service.ts:66"
-    note: "backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted). backend-work-requests renamed to backend-job-requests by Epic 9 PR 9.4. See SYNC-061."
+    readers: [backend-job-requests, backend-geo]
+    evidence: "crm writes: backend/src/modules/crm/service.ts:67,85,106; reads: backend/src/modules/job-requests/service.ts:66; backend/src/modules/geo/service.ts:26,48"
+    note: "backend-hotel-workers removed from readers by Epic 5 PR 5.8 (module physically deleted). backend-work-requests renamed to backend-job-requests by Epic 9 PR 9.4. See SYNC-061. backend-geo added as a reader (2026-07-30, Geo repository synchronization pass): reads Hotel.latitude/longitude directly via Prisma (OD-GEO-001, GD-14) -- a direct state read, no service-to-service call; was missing from this row despite existing since Geo's implementation landed 2026-07-28."
   - id: state-hotel-worker
     model: HotelWorker
     authoritative_writer: none  # backend-hotel-workers (the sole writer) was physically removed by Epic 5 PR 5.8; no module writes this table anymore.
@@ -878,7 +899,11 @@ analysis:
     note: "No backend module imports another module except the notification-service singleton (notifications imports no other module), so the static import graph is acyclic. A DATA-level bidirectional coupling HAD existed between backend-work-requests and backend-work-applications (work-requests read WorkApplication; work-applications read and wrote WorkRequest) via shared Prisma models, but this was never a code-import cycle. This coupling no longer exists as of Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058): backend-work-applications and the WorkApplication model were physically deleted, so one side of the coupling no longer exists. Corrected to historical per the commissioning human's own instruction that this note needed updating since one side no longer exists. See SYNC-059."
   orphan_modules:
     - { id: backend-chatbot, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
-    - { id: backend-geo, reason: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." }
+    # CORRECTED (2026-07-30, Geo repository synchronization pass): backend-geo
+    # removed from this list -- it is mounted (routes/v1/index.ts:19,38), has
+    # real clients (frontend-web, mobile-worker), and a real cross-module
+    # edge (edge-geo-reads-hotel, below). No longer an orphan by any of this
+    # list's own criteria.
     # CORRECTED by SYNC-055 (2026-07-27): backend-calendar's /my-absences pair
     # (GET/POST) has been real, non-stub code since PR #243 (GD-18 narrow slice);
     # this row was stale (last true when only /operations existed). The
@@ -904,5 +929,5 @@ remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
   - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs. UPDATE: this removal is now complete -- Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) physically deleted backend-work-applications and dropped the WorkApplication model. See SYNC-059."
-  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders). backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt. backend-hr is no longer a stub module as of HR implementation PR 1-5 (2026-07-30) — corrected during the HR epic acceptance audit; owner assignment (OD-HR-12/SYNC-001) remains a separate, still-open human decision."
+  - "Decide retirement or activation of backend-chatbot (unregistered placeholder; deferred post-MVP by explicit human decision, GD-19 -- do not resume). backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt. backend-hr is no longer a stub module as of HR implementation PR 1-5 (2026-07-30) — corrected during the HR epic acceptance audit; owner assignment (OD-HR-12/SYNC-001) remains a separate, still-open human decision. backend-geo is no longer a stub module as of its 2026-07-28 implementation (GD-14) — corrected during the Geo repository synchronization pass (2026-07-30); owner assignment (SYNC-001) remains a separate, still-open human decision, same standing gap every other module in this registry has."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
