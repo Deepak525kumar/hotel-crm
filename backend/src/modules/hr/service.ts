@@ -48,15 +48,20 @@
 // listPayroll (lists PayslipRequest records — ADR-039's target shape, no
 // payroll computation), createPayroll (Manager/Admin may also create a
 // request directly, per IF-HR-CreatePayroll's own actor row), and
-// fulfilPayslipRequest. On request, notifies the worker's Hotel Group's
-// Regional Manager (EVT-HR-PayslipRequested) via the existing Outbox —
-// the identical "responsible manager" resolution calendar/service.ts's own
-// notifyManager() already established (EmploymentRecord -> HotelGroup ->
-// regional_manager_user_id), same best-effort/no-fallback posture (OD-CAL-06
-// precedent: an unassigned/inactive worker has no group, no notification is
-// sent, rather than guessing a recipient). ADR-041's 3-business-day
-// auto-escalation to the manager's own manager is a separate, scheduled-job
-// concern (PR 5), not built here.
+// fulfilPayslipRequest. requestPayslip (worker self-submission only) notifies
+// the worker's Hotel Group's Regional Manager (EVT-HR-PayslipRequested) via
+// the existing Outbox — the identical "responsible manager" resolution
+// calendar/service.ts's own notifyManager() already established
+// (EmploymentRecord -> HotelGroup -> regional_manager_user_id), same
+// best-effort/no-fallback posture (OD-CAL-06 precedent: an unassigned/inactive
+// worker has no group, no notification is sent, rather than guessing a
+// recipient). createPayroll shares the record-creation logic but deliberately
+// does NOT notify — EVT-HR-PayslipRequested's spec-defined trigger
+// (RULE-HR-09, Events table) is "Worker requests a payslip," and
+// IF-HR-CreatePayroll's own interface row carries no notification
+// side-effect; see createPayroll's own comment for the full reasoning.
+// ADR-041's 3-business-day auto-escalation to the manager's own manager is a
+// separate, scheduled-job concern (PR 5), not built here.
 
 import {
   ContractStatus,
@@ -343,18 +348,7 @@ export class HrService extends BaseService {
   // req.auth for the worker-self route rather than accepting a client
   // worker_id, mirroring getContractStatus's identical self-scope shape.
   async requestPayslip(data: CreatePayslipRequestRequest): Promise<PayslipRequestDto> {
-    if (!data.worker_id || !data.period_start || !data.period_end) {
-      throw new ValidationError('worker_id, period_start, and period_end are required');
-    }
-
-    const request = await this.prisma.payslipRequest.create({
-      data: {
-        worker_id: data.worker_id,
-        period_start: new Date(`${data.period_start}T00:00:00.000Z`),
-        period_end: new Date(`${data.period_end}T00:00:00.000Z`),
-        status: PayslipRequestStatus.REQUESTED,
-      },
-    });
+    const request = await this.createPayslipRequestRecord(data);
 
     await this.notifyResponsibleManager(data.worker_id, request.id);
 
@@ -368,9 +362,38 @@ export class HrService extends BaseService {
   // no gross-salary/computation field of any kind — Manager/Admin may also
   // create a request directly on a worker's behalf, per this interface's own
   // actor row, distinct from the worker-self IF-HR-RequestPayslip route).
+  //
+  // Does NOT call notifyResponsibleManager(): EVT-HR-PayslipRequested's
+  // spec-defined trigger (docs/03-modules/hr/MODULE_SPEC.md RULE-HR-09,
+  // Events table) is "Worker requests a payslip" specifically — the
+  // notification exists so a worker's own submission surfaces to their
+  // manager. A manager/admin creating the record already IS the acting
+  // manager; there is no "responsible manager" to notify about their own
+  // action, and IF-HR-CreatePayroll's interface row lists no notification
+  // side-effect at all (unlike IF-HR-ContractExpiryReminder, which explicitly
+  // does). Firing it here would be an unrequired, spec-unsupported side effect.
   // ---------------------------------------------------------------------------
   async createPayroll(data: CreatePayslipRequestRequest): Promise<PayslipRequestDto> {
-    return this.requestPayslip(data);
+    const request = await this.createPayslipRequestRecord(data);
+
+    logger.info('hr_payroll_created', { requestId: request.id, workerId: data.worker_id });
+
+    return this.toPayslipDto(request);
+  }
+
+  private async createPayslipRequestRecord(data: CreatePayslipRequestRequest) {
+    if (!data.worker_id || !data.period_start || !data.period_end) {
+      throw new ValidationError('worker_id, period_start, and period_end are required');
+    }
+
+    return this.prisma.payslipRequest.create({
+      data: {
+        worker_id: data.worker_id,
+        period_start: new Date(`${data.period_start}T00:00:00.000Z`),
+        period_end: new Date(`${data.period_end}T00:00:00.000Z`),
+        status: PayslipRequestStatus.REQUESTED,
+      },
+    });
   }
 
   // ---------------------------------------------------------------------------

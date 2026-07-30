@@ -433,16 +433,49 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
 
-    it('createPayroll (Manager/Admin-initiated) delegates to the identical requestPayslip path', async () => {
+  });
+
+  describe('createPayroll — IF-HR-CreatePayroll (Manager/Admin-initiated, no notification)', () => {
+    it('rejects missing required fields', async () => {
+      await expect(
+        service.createPayroll({ worker_id: 'w1', period_start: '', period_end: '2026-07-31' })
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('creates the request record with the same ADR-039 shape as requestPayslip', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue(null);
 
       const result = await service.createPayroll({
         worker_id: 'w1',
         period_start: '2026-07-01',
         period_end: '2026-07-31',
       });
+
+      expect(mockPayslipRequestCreate).toHaveBeenCalledWith({
+        data: {
+          worker_id: 'w1',
+          period_start: new Date('2026-07-01T00:00:00.000Z'),
+          period_end: new Date('2026-07-31T00:00:00.000Z'),
+          status: 'REQUESTED',
+        },
+      });
       expect(result.id).toBe('p1');
+    });
+
+    it('does NOT notify the responsible manager — EVT-HR-PayslipRequested triggers on worker submission only (RULE-HR-09)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+
+      await service.createPayroll({
+        worker_id: 'w1',
+        period_start: '2026-07-01',
+        period_end: '2026-07-31',
+      });
+
+      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
 
