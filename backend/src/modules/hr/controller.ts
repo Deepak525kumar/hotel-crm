@@ -50,6 +50,56 @@ export class HrController {
     }
   }
 
+  // IF-HR-UploadSignedContract. RULE-HR-14: manager identity is req.auth
+  // only, never client-supplied — mirrors uploadDocument() below exactly.
+  async uploadSignedContract(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      if (!req.file) {
+        next(new ValidationError('A file is required', [{ field: 'file', message: 'required' }]));
+        return;
+      }
+
+      const result = await hrService.uploadSignedContract(
+        req.params.worker_id,
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // IF-HR-ConfirmContractSigned. RULE-HR-14: confirming manager identity is
+  // req.auth only, never client-supplied request data.
+  async confirmContractSigned(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.confirmContractSigned(
+        req.params.worker_id,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createPayroll(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await hrService.createPayroll(req.body);

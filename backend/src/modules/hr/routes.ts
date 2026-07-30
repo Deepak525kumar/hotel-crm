@@ -138,6 +138,28 @@ router.get(
   (req, res, next) => hrController.getContractStatus(req, res, next)
 );
 
+// IF-HR-UploadSignedContract (RULE-HR-13/OD-HR-13): Manager/Admin only, per
+// spec's own actor list; hotel-scope enforcement via checkWorkerScope(),
+// same as every other HR write route.
+router.post(
+  '/workers/:worker_id/contract-scan',
+  requireRole(['admin', 'manager']),
+  requirePermission('hr:write'),
+  checkWorkerScope(),
+  upload.single('file'),
+  handleUploadErrors(),
+  (req: Request, res: Response, next: NextFunction) => hrController.uploadSignedContract(req, res, next)
+);
+
+// IF-HR-ConfirmContractSigned (RULE-HR-03/13, OD-HR-13): Manager/Admin only.
+router.post(
+  '/workers/:worker_id/contract-confirm',
+  requireRole(['admin', 'manager']),
+  requirePermission('hr:write'),
+  checkWorkerScope(),
+  (req, res, next) => hrController.confirmContractSigned(req, res, next)
+);
+
 // Documents (contract-scan mechanism-class upload, MIG-GAP-DOC-001 — delegates
 // to backend-documents' DocumentService rather than hosting the mechanism)
 router.post(
