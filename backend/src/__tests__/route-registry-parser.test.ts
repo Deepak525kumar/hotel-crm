@@ -125,4 +125,63 @@ router.get('/a', requireRole('admin'), fn);
     expect(routes).toHaveLength(1);
     expect(routes[0].path).toBe('/a');
   });
+
+  describe('@requiresPermission annotation (role-conditional permission wrappers)', () => {
+    it('resolves a route calling an annotated wrapper function to the annotation\'s token list', () => {
+      const source = `
+// @requiresPermission hr:read hr:contract:read-own
+function requireContractReadAccess() {
+  return (req, res, next) => {};
+}
+
+router.get('/workers/:worker_id/contract-status', requireRole(['admin', 'manager', 'worker']), requireContractReadAccess(), fn);
+`;
+      const routes = parseRouteFile('hr', source);
+      expect(routes).toHaveLength(1);
+      expect(routes[0].requiredPermissions).toEqual(['hr:read', 'hr:contract:read-own']);
+    });
+
+    it('does not apply the annotation when a literal requirePermission() call is also present (literal call wins)', () => {
+      const source = `
+// @requiresPermission hr:read hr:contract:read-own
+function requireContractReadAccess() {
+  return (req, res, next) => {};
+}
+
+router.get('/x', requireRole('admin'), requirePermission('hr:write'), fn);
+`;
+      const routes = parseRouteFile('hr', source);
+      expect(routes[0].requiredPermissions).toEqual(['hr:write']);
+    });
+
+    it('tolerates additional comment lines between the annotation and the function declaration', () => {
+      const source = `
+// Some explanatory prose about why this wrapper exists,
+// spanning several lines before the annotation itself.
+//
+// @requiresPermission a:read b:write
+// One more trailing comment line after the annotation.
+function myWrapper() {
+  return (req, res, next) => {};
+}
+
+router.post('/y', myWrapper(), fn);
+`;
+      const routes = parseRouteFile('mod', source);
+      expect(routes[0].requiredPermissions).toEqual(['a:read', 'b:write']);
+    });
+
+    it('does not resolve a route that never calls the annotated function', () => {
+      const source = `
+// @requiresPermission hr:read hr:contract:read-own
+function requireContractReadAccess() {
+  return (req, res, next) => {};
+}
+
+router.get('/unrelated', requireRole('admin'), fn);
+`;
+      const routes = parseRouteFile('hr', source);
+      expect(routes[0].requiredPermissions).toBeNull();
+    });
+  });
 });

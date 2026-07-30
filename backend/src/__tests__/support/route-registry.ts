@@ -48,6 +48,29 @@
 //     modules (module is part of the key) but IS assumed unique within a
 //     module — true for every routes.ts file in this repository as of this
 //     writing.
+//   - Role-conditional permission wrappers (a named function that calls
+//     requirePermission() with a DIFFERENT token per req.auth.role, e.g.
+//     hr/routes.ts's requireContractReadAccess() — needed when
+//     requirePermission()'s array form is an AND check and cannot express
+//     "token A for role X, token B for role Y" on one route) are NOT
+//     literal `requirePermission('...')` call sites, so the argument-based
+//     parsing above cannot see them. Rather than silently missing these
+//     tokens (or worse, only picking up the first of several conditional
+//     requirePermission() calls inside the wrapper's own body — a route
+//     chunk substring-search would stop at the first match), such a
+//     wrapper MUST declare its full token set via a structured comment
+//     directly above its `function` declaration:
+//       // @requiresPermission hr:read hr:contract:read-own
+//       function requireContractReadAccess() { ... }
+//     parseRouteFile() scans the whole source once for this annotation,
+//     keyed by function name, and — when a route chunk calls that function
+//     instead of requirePermission() directly — resolves requiredPermissions
+//     to the annotation's token list (the UNION across roles, not resolved
+//     per-role: this registry only answers "does some route check this
+//     token," which every one of D-8's invariants only needs at that
+//     granularity). This is still zero JS evaluation, just reading a second
+//     kind of literal (a comment) instead of a call argument — the "no
+//     arbitrary expression evaluation" design constraint is unchanged.
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -183,7 +206,34 @@ function resolveLiteralArg(fragment: string): string[] {
   return extractStringLiterals(fragment);
 }
 
-function parseGates(chunk: string): { roles: string[] | null; permissions: string[] | null } {
+/**
+ * Scans a whole routes.ts source (not a single route chunk) for
+ * `// @requiresPermission tok1 tok2 ...` annotations immediately preceding a
+ * `function name(` declaration, returning a map of function name -> its
+ * declared token list. See this file's own header comment for the
+ * annotation convention and why it exists (role-conditional permission
+ * wrappers requirePermission()'s AND-only array form and a single
+ * requirePermission() call site cannot express).
+ */
+function scanPermissionWrapperAnnotations(source: string): Map<string, string[]> {
+  const annotations = new Map<string, string[]>();
+  // Matches the annotation comment, any amount of whitespace/further
+  // comment lines, then the function declaration it documents. `[^\n]*`
+  // keeps the token-list capture on the annotation's own line only.
+  const pattern = /\/\/\s*@requiresPermission\s+([^\n]+)\n(?:\s*\/\/[^\n]*\n)*\s*function\s+(\w+)\s*\(/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(source)) !== null) {
+    const tokens = match[1]!.trim().split(/\s+/).filter(Boolean);
+    const fnName = match[2]!;
+    annotations.set(fnName, tokens);
+  }
+  return annotations;
+}
+
+function parseGates(
+  chunk: string,
+  permissionWrapperAnnotations: Map<string, string[]>
+): { roles: string[] | null; permissions: string[] | null } {
   let roles: string[] | null = null;
   let permissions: string[] | null = null;
 
@@ -209,6 +259,21 @@ function parseGates(chunk: string): { roles: string[] | null; permissions: strin
     permissions = resolveLiteralArg(permFlaggedArgs[1]);
   }
 
+  // Role-conditional permission wrapper (e.g. requireContractReadAccess()):
+  // resolved from its own @requiresPermission annotation, not a literal
+  // requirePermission() argument. Only applies if the chunk doesn't already
+  // have a literal requirePermission()/requirePermissionFlagged() match
+  // above — a route calling both would be an unusual, currently-unseen
+  // shape this parser does not need to reconcile.
+  if (permissions === null) {
+    for (const [fnName, tokens] of permissionWrapperAnnotations) {
+      if (chunk.includes(`${fnName}(`)) {
+        permissions = tokens;
+        break;
+      }
+    }
+  }
+
   return { roles, permissions };
 }
 
@@ -219,6 +284,7 @@ function parseGates(chunk: string): { roles: string[] | null; permissions: strin
 // (multi-line calls, escaped quotes, etc.) against a fixed synthetic input.
 export function parseRouteFile(moduleName: string, source: string): ParsedRoute[] {
   const routes: ParsedRoute[] = [];
+  const permissionWrapperAnnotations = scanPermissionWrapperAnnotations(source);
   const callRegex = /router\.(get|post|put|patch|delete)\(/g;
   let match: RegExpExecArray | null;
 
@@ -234,7 +300,7 @@ export function parseRouteFile(moduleName: string, source: string): ParsedRoute[
     const routePath = pathLiterals[0];
     if (routePath === undefined) continue; // defensive; every real call site has a path literal
 
-    const { roles, permissions } = parseGates(chunk);
+    const { roles, permissions } = parseGates(chunk, permissionWrapperAnnotations);
 
     routes.push({
       module: moduleName,

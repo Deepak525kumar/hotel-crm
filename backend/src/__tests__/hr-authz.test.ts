@@ -179,13 +179,25 @@ describe('HR route authorization (ADR-030 C-10)', () => {
       expect(res.status).toBe(403);
     });
 
-    it('allows a worker to reach the route (self-scope enforced in the service, not here — mirrors documents/routes.ts, no requirePermission gate on this actor shape)', async () => {
-      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+    it('denies a manager without hr:read, even in scope (403 — requireContractReadAccess() enforces the token, not just the role)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: [], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a worker holding hr:contract:read-own to reach the route (ADR-042, enforced by requireContractReadAccess())', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: ['hr:contract:read-own'], scope: null };
       const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
       expect(res.status).toBe(200);
-      // scopeWorkerRoute() lets 'worker' straight through — checkWorkerScope()
+      // scopeWorkerRoute() lets 'worker' straight through checkWorkerScope() —
       // (and its EmploymentRecord lookup) is never invoked for this role.
       expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('denies a worker with no hr:* permission at all (403, before scopeWorkerRoute — ADR-042 is enforced, not bypassed)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(403);
     });
 
     it('denies checker (not in the actor set)', async () => {
