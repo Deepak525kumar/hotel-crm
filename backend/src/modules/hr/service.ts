@@ -69,7 +69,7 @@ import {
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
-import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
+import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
@@ -406,14 +406,42 @@ export class HrService extends BaseService {
   // ---------------------------------------------------------------------------
   // IF-HR-FulfilPayslipRequest (RULE-HR-09, EVT-HR-PayslipFulfilled)
   // ---------------------------------------------------------------------------
+  // OD-HR-13 (hotel-scoping): this route carries no worker_id path param
+  // (keyed on the request's own id instead), so checkWorkerScope() cannot
+  // gate it at the route layer the way confirmContractSigned's does. Manager
+  // scope is instead resolved here — request -> worker_id ->
+  // EmploymentRecord.hotel_group_id -> caller's scope, via the same
+  // isWorkerInGroupScope() primitive checkWorkerScope() itself calls — so a
+  // manager cannot fulfil a payslip request belonging to a worker outside
+  // their own hotel group. Admin bypasses (isWorkerInGroupScope's own
+  // scope.type === 'global' branch), matching every other HR write's
+  // Admin-unscoped behavior.
+  //
+  // RULE-HR-09: fulfilment is a one-way REQUESTED -> FULFILLED transition.
+  // Rejects re-fulfilling an already-FULFILLED request, both to prevent a
+  // stale/duplicate manager action from re-notifying the worker and to keep
+  // fulfilled_by_id/fulfilled_at as the one true completion record, not
+  // silently overwritable by a second caller.
   async fulfilPayslipRequest(
     requestId: string,
     actorId: string,
-    actorRole: string
+    actorRole: string,
+    actorScope?: UserScope | null
   ): Promise<PayslipRequestDto> {
     const request = await this.prisma.payslipRequest.findUnique({ where: { id: requestId } });
     if (!request) {
       throw new NotFoundError('Payslip request not found');
+    }
+
+    if (actorRole !== 'admin') {
+      const inScope = await isWorkerInGroupScope(actorScope ?? null, request.worker_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot fulfil a payslip request outside your scope');
+      }
+    }
+
+    if (request.status !== PayslipRequestStatus.REQUESTED) {
+      throw new ValidationError('This payslip request has already been fulfilled');
     }
 
     const updated = await this.prisma.payslipRequest.update({

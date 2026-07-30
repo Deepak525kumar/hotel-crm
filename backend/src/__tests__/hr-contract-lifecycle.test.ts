@@ -34,6 +34,7 @@ const mockDocumentServiceUpload = jest.fn() as jest.MockedFunction<(...args: any
 const mockScan = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockNotificationEnqueue = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockResolveNonAdminScopeFilter = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockIsWorkerInGroupScope = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -85,6 +86,7 @@ jest.mock('../modules/notifications/service.js', () => ({
 
 jest.mock('../lib/scope.js', () => ({
   resolveNonAdminScopeFilter: mockResolveNonAdminScopeFilter,
+  isWorkerInGroupScope: mockIsWorkerInGroupScope,
 }));
 
 import { HrService } from '../modules/hr/service.js';
@@ -148,6 +150,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     mockScan.mockResolvedValue({ clean: true });
     mockNotificationEnqueue.mockReset();
     mockResolveNonAdminScopeFilter.mockReset();
+    mockIsWorkerInGroupScope.mockReset();
   });
 
   describe('createContract — OD-HR-02b (persisted employee-management read)', () => {
@@ -478,7 +481,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     });
   });
 
-  describe('fulfilPayslipRequest — RULE-HR-09, EVT-HR-PayslipFulfilled', () => {
+  describe('fulfilPayslipRequest — RULE-HR-09, EVT-HR-PayslipFulfilled, OD-HR-13 (manager scope)', () => {
     it('rejects when the request does not exist', async () => {
       mockPayslipRequestFindUnique.mockResolvedValue(null);
       await expect(service.fulfilPayslipRequest('p1', 'm1', 'manager')).rejects.toBeInstanceOf(
@@ -487,13 +490,59 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
     });
 
-    it('marks the request fulfilled and notifies the requesting worker', async () => {
+    it('allows admin unconditionally, bypassing the scope check', async () => {
       mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow());
+      mockPayslipRequestUpdate.mockResolvedValue(
+        makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'a1', fulfilled_at: NOW })
+      );
+
+      const result = await service.fulfilPayslipRequest('p1', 'a1', 'admin');
+
+      expect(mockIsWorkerInGroupScope).not.toHaveBeenCalled();
+      expect(result.status).toBe('FULFILLED');
+    });
+
+    it('denies a manager fulfilling a request for a worker outside their hotel group (OD-HR-13)', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow({ worker_id: 'w1' }));
+      mockIsWorkerInGroupScope.mockResolvedValue(false);
+
+      await expect(
+        service.fulfilPayslipRequest('p1', 'm1', 'manager', { type: 'hotel_group', hotel_group_id: 'g1' })
+      ).rejects.toBeInstanceOf(ForbiddenError);
+
+      expect(mockIsWorkerInGroupScope).toHaveBeenCalledWith(
+        { type: 'hotel_group', hotel_group_id: 'g1' },
+        'w1'
+      );
+      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+    });
+
+    it('allows a manager fulfilling a request for a worker in their own hotel group', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow({ worker_id: 'w1' }));
+      mockIsWorkerInGroupScope.mockResolvedValue(true);
       mockPayslipRequestUpdate.mockResolvedValue(
         makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
       );
 
-      const result = await service.fulfilPayslipRequest('p1', 'm1', 'manager');
+      const result = await service.fulfilPayslipRequest('p1', 'm1', 'manager', {
+        type: 'hotel_group',
+        hotel_group_id: 'g1',
+      });
+
+      expect(result.status).toBe('FULFILLED');
+    });
+
+    it('marks the request fulfilled and notifies the requesting worker', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow());
+      mockIsWorkerInGroupScope.mockResolvedValue(true);
+      mockPayslipRequestUpdate.mockResolvedValue(
+        makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
+      );
+
+      const result = await service.fulfilPayslipRequest('p1', 'm1', 'manager', {
+        type: 'hotel_group',
+        hotel_group_id: 'g1',
+      });
 
       expect(mockPayslipRequestUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -505,6 +554,19 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         expect.objectContaining({ recipientId: 'w1', type: 'HR_PAYSLIP_FULFILLED' })
       );
       expect(result.status).toBe('FULFILLED');
+    });
+
+    it('rejects re-fulfilling an already-FULFILLED request (no duplicate fulfilment, no re-notification)', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(
+        makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
+      );
+
+      await expect(service.fulfilPayslipRequest('p1', 'a1', 'admin')).rejects.toBeInstanceOf(
+        ValidationError
+      );
+
+      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
 });

@@ -121,12 +121,14 @@ router.post(
   (req, res, next) => hrController.createPayroll(req, res, next)
 );
 
-// IF-HR-FulfilPayslipRequest (RULE-HR-09): Manager/Admin marks a request
-// emailed. Keyed on the request's own id, not a worker_id path param — no
-// checkWorkerScope() call; the request row itself carries no hotel/group
-// field to scope against (same shape as IF-HR-ConfirmContractSigned's
-// worker-scoped precondition check happening inside the service, not a
-// route-level middleware, when no clean route-level scope key exists).
+// IF-HR-FulfilPayslipRequest (RULE-HR-09, OD-HR-13): Manager/Admin marks a
+// request emailed. Keyed on the request's own id, not a worker_id path
+// param, so checkWorkerScope() cannot gate this route directly — the
+// PayslipRequest row itself carries no hotel/group field. Group-scope
+// enforcement (request -> worker_id -> EmploymentRecord.hotel_group_id ->
+// caller's scope) happens inside hrService.fulfilPayslipRequest() itself,
+// via the same isWorkerInGroupScope() primitive checkWorkerScope() calls —
+// a manager cannot fulfil another hotel group's requests.
 router.post(
   '/payroll/:request_id/fulfil',
   requireRole(['admin', 'manager']),

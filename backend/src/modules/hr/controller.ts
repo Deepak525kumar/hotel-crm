@@ -144,13 +144,17 @@ export class HrController {
   }
 
   // IF-HR-FulfilPayslipRequest. Manager/Admin marks a request emailed.
+  // OD-HR-13: req.auth.scope is passed through so the service can resolve
+  // the request's own worker_id -> hotel_group_id scope check itself — this
+  // route has no worker_id path param for checkWorkerScope() to gate on.
   async fulfilPayslipRequest(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
       const result = await hrService.fulfilPayslipRequest(
         req.params.request_id,
         req.auth.userId,
-        req.auth.role
+        req.auth.role,
+        req.auth.scope
       );
       res.status(200).json({
         status: 'success',
