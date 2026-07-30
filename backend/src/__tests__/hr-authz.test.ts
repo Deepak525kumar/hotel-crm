@@ -54,6 +54,8 @@ jest.mock('../modules/hr/controller.js', () => ({
     listContracts: ok,
     createContract: ok,
     getContractStatus: ok,
+    uploadSignedContract: ok,
+    confirmContractSigned: ok,
     listPayroll: ok,
     createPayroll: ok,
     uploadDocument: ok,
@@ -144,6 +146,46 @@ describe('HR route authorization (ADR-030 C-10)', () => {
       testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
       mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
       const res = await request(makeApp()).post('/hr/workers/w1/documents').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager in scope to POST /hr/workers/:worker_id/contract-scan', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-scan').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager outside scope on POST /hr/workers/:worker_id/contract-scan (403)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-scan').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('denies worker on POST /hr/workers/:worker_id/contract-scan (403 — manager/admin only)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-scan').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager in scope to POST /hr/workers/:worker_id/contract-confirm', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-confirm').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager outside scope on POST /hr/workers/:worker_id/contract-confirm (403)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-confirm').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('denies worker on POST /hr/workers/:worker_id/contract-confirm (403 — manager/admin only)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-confirm').send({});
       expect(res.status).toBe(403);
     });
 

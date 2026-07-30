@@ -27,6 +27,22 @@
 // (same pattern as Documents' own deferred multipart-upload/malware-scan
 // gaps), not a silent omission — confirmed with the commissioning human
 // before this PR was written.
+//
+// HR implementation PR 3 (RULE-HR-03/13/14/15, ADR-044): uploadSignedContract
+// and confirmContractSigned. Both interfaces are keyed on worker_id only
+// (no contract_id param in SPEC-HR-001's own Interfaces table) — resolved
+// against the worker's current PENDING contract, consistent with the
+// confirmed one-lifecycle-per-worker state machine
+// ((none) -> Pending -> signed/active -> extended -> permanent, State and
+// Lifecycle section) and RULE-HR-03's "no other actor may flip this status"
+// framing. Storage delegates to backend-documents' generic upload mechanism
+// (RULE-DOC-04) via a direct in-process call, same as the pre-existing
+// uploadDocument() method below — HR gains no document-lifecycle authority
+// by doing so; only contract status/confirmation semantics are HR's own.
+//
+// ADR-044's malware-scan hook (RULE-HR-13/OD-HR-14) is real control flow
+// (reject-on-detection) with a disclosed pass-through default scanner — see
+// malware-scan.ts's own header comment; no vendor/library has been chosen.
 
 import { ContractStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
@@ -34,6 +50,7 @@ import { ForbiddenError, NotFoundError, NotImplementedError, ValidationError } f
 import { logger } from '../../lib/logger.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
+import { getMalwareScanner } from './malware-scan.js';
 import type {
   CreateContractRequest,
   ContractDto,
@@ -150,6 +167,127 @@ export class HrService extends BaseService {
       orderBy: { created_at: 'desc' },
     });
     return contract ? this.toDto(contract) : null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-HR-UploadSignedContract (RULE-HR-03/13, REQ-HR-014/015, ADR-044)
+  // ---------------------------------------------------------------------------
+  // RULE-HR-14: manager identity MUST be derived from the authenticated
+  // session (actorId param below), never a client-supplied field — enforced
+  // by the controller reading req.auth, not accepting it in the request body.
+  // RULE-HR-13/ADR-044: reject on malware-scan detection, before persistence.
+  async uploadSignedContract(
+    workerId: string,
+    file: Buffer,
+    originalFilename: string,
+    mimeType: string,
+    actorId: string,
+    actorRole: string,
+    actorIp?: string
+  ): Promise<ContractDto> {
+    const contract = await this.prisma.contract.findFirst({
+      where: { worker_id: workerId, status: ContractStatus.PENDING },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!contract) {
+      throw new NotFoundError('No pending contract found for this worker to upload a scan against');
+    }
+
+    // ADR-044: synchronous scan, before the file is persisted anywhere.
+    const scanResult = await getMalwareScanner().scan(file);
+    if (!scanResult.clean) {
+      throw new ValidationError(
+        `Uploaded file failed the malware scan${scanResult.reason ? `: ${scanResult.reason}` : ''}`
+      );
+    }
+
+    // MIG-GAP-DOC-001/RULE-DOC-04: delegates storage to backend-documents,
+    // same in-process-call pattern as the pre-existing uploadDocument()
+    // method — HR gains no document-lifecycle authority by doing so.
+    const doc = await documentService.uploadDocument(
+      {
+        worker_id: workerId,
+        actor_id: actorId,
+        category: 'GENERAL',
+        original_filename: originalFilename,
+        mime_type: mimeType,
+        file_size_bytes: file.length,
+      },
+      file,
+      actorRole,
+      actorIp
+    );
+
+    const updated = await this.prisma.contract.update({
+      where: { id: contract.id },
+      data: { scanned_document_id: doc.id },
+    });
+
+    logger.info('hr_contract_scan_uploaded', { contractId: contract.id, workerId, documentId: doc.id });
+
+    return this.toDto(updated);
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-HR-ConfirmContractSigned (RULE-HR-03/05/15, REQ-HR-013/014)
+  // ---------------------------------------------------------------------------
+  // RULE-HR-14: confirming manager identity MUST be derived from req.auth
+  // (actorId param), never client-supplied — controller-enforced.
+  // REQ-HR-013/RULE-HR-15: exactly one immutable audit record per
+  // confirmation, containing confirming actor id, timestamp, worker id,
+  // contract id, and the evidence-file reference — the sole compensating
+  // control for the accepted no-signature-verification trust boundary.
+  async confirmContractSigned(
+    workerId: string,
+    actorId: string,
+    actorRole: string,
+    actorIp?: string
+  ): Promise<ContractDto> {
+    const contract = await this.prisma.contract.findFirst({
+      where: { worker_id: workerId, status: ContractStatus.PENDING },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!contract) {
+      throw new NotFoundError('No pending contract found for this worker to confirm');
+    }
+    // CRR §9 safeguard: confirmation without an uploaded file is rejected.
+    if (!contract.scanned_document_id) {
+      throw new ValidationError('Cannot confirm a contract with no uploaded signed scan');
+    }
+
+    const now = new Date();
+    // RULE-HR-05: 1-year expiry clock starts the moment status flips to ACTIVE.
+    const expiresAt = new Date(now);
+    expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
+
+    const updated = await this.prisma.contract.update({
+      where: { id: contract.id },
+      data: {
+        status: ContractStatus.ACTIVE,
+        confirmed_by_id: actorId,
+        confirmed_at: now,
+        expires_at: expiresAt,
+      },
+    });
+
+    // REQ-HR-013/RULE-HR-15: the sole compensating control for the
+    // no-signature-verification trust boundary — all five mandated fields
+    // (confirming actor id, timestamp, worker id, contract id, evidence-file
+    // reference) via BaseService.logAudit's existing schema. Immutable by
+    // construction (AuditLog has no update/delete code path anywhere).
+    await this.logAudit(
+      actorId,
+      actorRole,
+      'hr_contract.confirm_signed',
+      'Contract',
+      contract.id,
+      { worker_id: workerId, scanned_document_id: contract.scanned_document_id },
+      actorIp
+    );
+
+    logger.info('hr_contract_confirmed', { contractId: contract.id, workerId, confirmedBy: actorId });
+
+    return this.toDto(updated);
   }
 
   async createPayroll(_data: Record<string, unknown>) {
