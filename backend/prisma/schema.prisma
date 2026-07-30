@@ -129,6 +129,8 @@ enum NotificationType {
   HR_CONTRACT_EXPIRY_REMINDER // to the responsible manager: a contract nears its 1yr/2yr mark
   HR_PAYSLIP_REQUEST_ESCALATED // to the responsible manager's own manager (or Admin fallback): an unfulfilled payslip request has passed the 3-business-day window (ADR-041)
   HR_CONTRACT_LAPSED // to the requesting worker: their contract lapsed and offboarding was triggered (ADR-040/ADR-045)
+  // Consent implementation (SPEC-CONSENT-001 REQ-CONSENT-003/RULE-CONSENT-03, ADR-015/ADR-037)
+  CONSENT_DECLINED // to the worker's responsible manager: a worker declined the daily access-gate consent notice
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -161,6 +163,7 @@ enum OutboxSourceModule {
   CALENDAR
   DOCUMENTS
   HR
+  CONSENT
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
@@ -311,6 +314,9 @@ model User {
   hr_contracts_confirmed        Contract[]               @relation("hr_contract_confirmed_by")
   hr_payslip_requests           PayslipRequest[]         @relation("hr_payslip_worker")
   hr_payslip_requests_fulfilled PayslipRequest[]         @relation("hr_payslip_fulfilled_by")
+  // SPEC-CONSENT-001 (ADR-015): backend-consent owns consent lifecycle/
+  // records/versions/withdrawal/renewal/audit history exclusively.
+  consent_records               ConsentRecord[]          @relation("consent_worker")
 
   @@index([role])
   @@index([is_active])
@@ -1208,4 +1214,48 @@ model PayslipRequest {
 
   @@index([worker_id])
   @@index([status])
+}
+
+// Consent implementation (SPEC-CONSENT-001@0.2.0 FROZEN, ADR-015/ADR-037,
+// GD-17 Decided 2026-07-28). ADR-015: backend-consent is the exclusive owner
+// of consent lifecycle/records/versions/withdrawal/renewal/audit history
+// platform-wide -- no other module may persist a competing consent-state
+// model (RULE-CONSENT-09).
+//
+// OD-CONSENT-001/007 (ADR-037): "Renewed" is a distinct persisted decision
+// for the general withdrawal/renewal verb; the daily access-gate instance's
+// own grant/decline cycle stays purely date-computed -- a fresh GRANTED row
+// per calendar day, no separate "Lapsed"/"Renewed" row at that layer.
+// "Requested" is transient (a pending ask not yet answered), never a
+// persisted row.
+enum ConsentDecision {
+  GRANTED
+  DECLINED
+  WITHDRAWN
+  RENEWED
+}
+
+model ConsentRecord {
+  id             String          @id @default(cuid())
+  worker_id      String
+  worker         User            @relation("consent_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  // Consent instance identifier (RULE-CONSENT-01/06), e.g. "daily-access-gate"
+  // or "chatbot-data-processing" -- not a foreign-keyed enum, since ADR-015
+  // frames this module as owning a general consent-record model of which the
+  // daily gate is only the first confirmed instance (OD-CONSENT-002 adds the
+  // second, chatbot-data-processing).
+  consent_instance String
+  notice_version   String
+  decision         ConsentDecision
+  // RULE-CONSENT-05: every consent decision is immutable -- no update/delete
+  // code path exists anywhere in HrService-equivalent ConsentService.
+  decided_at       DateTime        @default(now())
+  created_at       DateTime        @default(now())
+
+  // RULE-CONSENT-02: the daily gate's "once per calendar day" rule is
+  // evaluated by comparing decided_at's calendar date against "today" at
+  // query time (isGrantedToday()-equivalent) -- no separate "day" column is
+  // needed since decided_at already carries this.
+  @@index([worker_id, consent_instance])
+  @@index([decided_at])
 }
