@@ -319,17 +319,16 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       );
     });
 
-    it('scopes a hotel-group manager to hotels in their group', async () => {
-      mockHotelFindMany.mockResolvedValue([{ id: 'h1' }, { id: 'h2' }]);
-
+    it('scopes a hotel-group manager to hotels in their group via a nested-relation filter (review fix: no separate hotel.findMany() round-trip)', async () => {
       await service.listCheckins(
         { page: 1, per_page: 20 },
         { userId: 'm1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
       );
 
       expect(mockWorkerGeoCheckinFindMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.objectContaining({ hotel_id: { in: ['h1', 'h2'] } }) })
+        expect.objectContaining({ where: expect.objectContaining({ hotel: { hotel_group_id: 'g1' } }) })
       );
+      expect(mockHotelFindMany).not.toHaveBeenCalled();
     });
 
     it('admin sees all check-ins with no added restriction', async () => {

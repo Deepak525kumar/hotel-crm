@@ -45,6 +45,25 @@ describe('CheckinSchema', () => {
     const result = CheckinSchema.safeParse({ hotel_id: 'h1', latitude: '52.52', longitude: 13.405 });
     expect(result.success).toBe(false);
   });
+
+  it('review fix: rejects NaN/Infinity/-Infinity latitude and longitude', () => {
+    // z.number()'s min/max comparisons against non-finite values always
+    // fail (NaN <= 90 and Infinity <= 90 are both false in JS), so this is
+    // already-correct behavior -- this test only pins it, closing a
+    // coverage gap rather than fixing a defect.
+    expect(CheckinSchema.safeParse({ hotel_id: 'h1', latitude: NaN, longitude: 13.405 }).success).toBe(
+      false
+    );
+    expect(
+      CheckinSchema.safeParse({ hotel_id: 'h1', latitude: Infinity, longitude: 13.405 }).success
+    ).toBe(false);
+    expect(
+      CheckinSchema.safeParse({ hotel_id: 'h1', latitude: -Infinity, longitude: 13.405 }).success
+    ).toBe(false);
+    expect(
+      CheckinSchema.safeParse({ hotel_id: 'h1', latitude: 52.52, longitude: Infinity }).success
+    ).toBe(false);
+  });
 });
 
 describe('ListCheckinsQuerySchema', () => {

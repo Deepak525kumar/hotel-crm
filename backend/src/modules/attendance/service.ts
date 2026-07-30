@@ -89,8 +89,17 @@ export class AttendanceService extends BaseService {
       ? Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000))
       : null;
 
-    const updated = await this.prisma.attendance.update({
-      where: { id: existing.id },
+    // Review fix: compare-and-swap via updateMany's WHERE clause (same
+    // pattern as hr/service.ts's fulfilPayslipRequest() review fix,
+    // mirroring ADR-057's first-accept-wins precedent in
+    // job-requests/service.ts). The status check above (line 52) is a
+    // fast-path rejection for the common case; this WHERE clause is what
+    // actually prevents two concurrent checkIn() calls for the same
+    // assignment from both passing the geofence gate and then both
+    // unconditionally overwriting the same Attendance row (last-write-wins,
+    // duplicate CHECK_IN audit entries).
+    const claimed = await this.prisma.attendance.updateMany({
+      where: { id: existing.id, status: AttendanceStatus.EXPECTED },
       data: {
         check_in_at: now,
         status: minutesLate && minutesLate > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
@@ -98,6 +107,11 @@ export class AttendanceService extends BaseService {
         notes: input.notes ?? existing.notes,
       },
     });
+    if (claimed.count === 0) {
+      throw new ConflictError('Already checked in');
+    }
+
+    const updated = await this.prisma.attendance.findUniqueOrThrow({ where: { id: existing.id } });
 
     await this.logAudit(
       actorId,

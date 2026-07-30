@@ -2,9 +2,11 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockAttendance = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findUniqueOrThrow: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  updateMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockWorkerAssignment = {
@@ -81,6 +83,11 @@ describe('AttendanceService', () => {
     service = new AttendanceService();
     mockVerifyGeofence.mockReset();
     mockIsGeofenceConfigured.mockReset();
+    // checkIn()'s review fix uses updateMany (compare-and-swap) + a
+    // follow-up findUniqueOrThrow instead of a plain update -- default the
+    // common-case success shape so tests that don't care about the
+    // race-condition path don't need to restate this every time.
+    mockAttendance.updateMany.mockResolvedValue({ count: 1 });
   });
 
   describe('checkIn', () => {
@@ -111,9 +118,11 @@ describe('AttendanceService', () => {
       // expected_start in the future — worker is early, so minutes_late === 0 → PRESENT
       const futureStart = new Date(Date.now() + 10 * 60000);
       mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: futureStart }));
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
       await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
-      const updateCall = mockAttendance.update.mock.calls[0][0].data;
+      const updateCall = mockAttendance.updateMany.mock.calls[0][0].data;
       expect(updateCall.status).toBe('PRESENT');
     });
 
@@ -121,11 +130,34 @@ describe('AttendanceService', () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
       const earlyStart = new Date(Date.now() - 30 * 60000); // 30 min ago
       mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: earlyStart }));
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'LATE', check_in_at: new Date(), minutes_late: 30 }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'LATE', check_in_at: new Date(), minutes_late: 30 })
+      );
       await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
-      const updateCall = mockAttendance.update.mock.calls[0][0].data;
+      const updateCall = mockAttendance.updateMany.mock.calls[0][0].data;
       expect(updateCall.status).toBe('LATE');
       expect(updateCall.minutes_late).toBeGreaterThan(0);
+    });
+
+    it('review fix (concurrency): rejects with ConflictError when a concurrent caller already checked in between the read and the compare-and-swap', async () => {
+      // Simulates the TOCTOU race this fix closes: the initial findUnique()
+      // still sees EXPECTED (a concurrent caller's write hasn't landed there
+      // yet), so the fast-path check passes -- but by the time this
+      // caller's updateMany() WHERE clause is evaluated, the row has
+      // already been flipped by the other caller, so updateMany() matches
+      // zero rows.
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord());
+      mockAttendance.updateMany.mockResolvedValue({ count: 0 });
+
+      await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+
+      expect(mockAttendance.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'att1', status: 'EXPECTED' } })
+      );
+      expect(mockAttendance.findUniqueOrThrow).not.toHaveBeenCalled();
     });
   });
 
@@ -133,14 +165,16 @@ describe('AttendanceService', () => {
     it('proceeds without calling Geo\'s distance check when no coordinates are supplied and the hotel has no geofence configured', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord());
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
       mockIsGeofenceConfigured.mockResolvedValue(false);
 
       await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
 
       expect(mockIsGeofenceConfigured).toHaveBeenCalledWith('h1');
       expect(mockVerifyGeofence).not.toHaveBeenCalled();
-      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
     it('fails closed when no coordinates are supplied but the hotel HAS a geofence configured (no permission-denial bypass)', async () => {
@@ -153,7 +187,7 @@ describe('AttendanceService', () => {
       });
 
       expect(mockVerifyGeofence).not.toHaveBeenCalled();
-      expect(mockAttendance.update).not.toHaveBeenCalled();
+      expect(mockAttendance.updateMany).not.toHaveBeenCalled();
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -167,7 +201,9 @@ describe('AttendanceService', () => {
     it('proceeds with check-in when the hotel has no coordinates configured (not_configured)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord());
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
       mockVerifyGeofence.mockResolvedValue({ status: 'not_configured' });
 
       await service.checkIn({ assignment_id: 'a1', latitude: 52.52, longitude: 13.405 }, 'w1', 'worker');
@@ -178,13 +214,15 @@ describe('AttendanceService', () => {
         'worker',
         undefined
       );
-      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
     it('proceeds with check-in when verified inside the geofence radius', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord());
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
       mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: true, distanceMeters: 5 });
 
       const result = await service.checkIn(
@@ -194,7 +232,7 @@ describe('AttendanceService', () => {
       );
 
       expect(result.status).toBe('PRESENT');
-      expect(mockAttendance.update).toHaveBeenCalledTimes(1);
+      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
     it('fails closed with ForbiddenError when verified outside the geofence radius', async () => {
@@ -206,7 +244,7 @@ describe('AttendanceService', () => {
         service.checkIn({ assignment_id: 'a1', latitude: 52.57, longitude: 13.405 }, 'w1', 'worker')
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
-      expect(mockAttendance.update).not.toHaveBeenCalled();
+      expect(mockAttendance.updateMany).not.toHaveBeenCalled();
     });
 
     it('audit-logs a denied check-in without writing the attendance record', async () => {
@@ -231,7 +269,9 @@ describe('AttendanceService', () => {
     it('passes the actor IP through to Geo for audit logging', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord());
-      mockAttendance.update.mockResolvedValue(makeRecord({ status: 'PRESENT', check_in_at: new Date() }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
       mockVerifyGeofence.mockResolvedValue({ status: 'verified', insideRadius: true, distanceMeters: 5 });
 
       await service.checkIn(
