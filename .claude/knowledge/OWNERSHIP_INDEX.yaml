@@ -41,6 +41,7 @@ state_owners:  # authoritative writer per state domain (see STATE_OWNERSHIP_INDE
   - { domain: state-audit-log, authoritative_writer: backend-auth }  # resolved by ADR-016 (Accepted, 2026-07-14); physical writes remain shared via BaseService.logAudit (unchanged by this record); backend-compliance is a read-only consumer, never a writer
   - { domain: state-hr-contract, authoritative_writer: backend-hr }  # added by HR implementation PR 1 (2026-07-30, migration 20260730010000); missing from this summary until the HR epic post-closeout synchronization pass -- see STATE_OWNERSHIP_INDEX.yaml for full writer/reader detail
   - { domain: state-hr-payslip-request, authoritative_writer: backend-hr }  # added by HR implementation PR 1 (2026-07-30, migration 20260730010000); missing from this summary until the HR epic post-closeout synchronization pass -- see STATE_OWNERSHIP_INDEX.yaml for full writer/reader detail
+  - { domain: state-geo-checkin, authoritative_writer: backend-geo }  # added by Geo implementation (2026-07-28, migration 20260728010000_add_worker_geo_checkin, GD-14); missing from this summary until the Geo repository synchronization pass (2026-07-30) -- see STATE_OWNERSHIP_INDEX.yaml for full writer/reader detail
 
 collision_flags:  # bearing-unknown ownership that G1.5 must escalate rather than silently pass
   - all module/contract owners: unassigned pending human assignment (SYNC-001)

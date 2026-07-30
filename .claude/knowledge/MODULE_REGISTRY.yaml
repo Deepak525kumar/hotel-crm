@@ -239,13 +239,13 @@ modules:
     type: backend-module
     path: backend/src/modules/geo
     owner: unassigned
-    lifecycle: declared
-    implementation_status: unimplemented-stub  # directory holds only .placeholder; not route-registered
-    dependencies: []
+    lifecycle: active
+    implementation_status: active  # Geo implementation (2026-07-28, GD-14/SPEC-GEO-001@0.1.2 FROZEN) landed IF-GEO-DISTANCE-CHECK (verifyGeofence()/isGeofenceConfigured(), consumed in-process by backend-attendance's checkIn()), IF-GEO-ListCheckins/IF-GEO-GetCheckin (self-scoped for worker, hotel/hotel_group-scoped for manager via the shared isHotelInScope() primitive, unscoped for admin), and GeoRetentionSweepJob (6-month hard-delete sweep, TREQ-GEO-005/RULE-GEO-004, registered on the Platform Worker Scheduler alongside SessionSweepJob/GeoRetentionSweepJob's siblings). WorkerGeoCheckin DTO never exposes raw latitude/longitude to any caller (distance_meters/inside_radius only, OD-GEO-005). Acceptance-audit remediation (2026-07-30, PR #291): fixed a TOCTOU race in backend-attendance's checkIn() (updateMany compare-and-swap, same pattern as HR's fulfilPayslipRequest fix) and geo/service.ts's listCheckins() manager hotel_group scope resolution (now a single nested-relation filter matching AttendanceService.list()'s existing pattern, no separate hotel.findMany() round-trip). Two items deliberately deferred, per GD-14's own explicit disposition, not silent gaps: OD-GEO-006 (performance budgets/SLOs) and OD-GEO-009 (GPS-spoofing countermeasure).
+    dependencies: [backend-crm]  # reads Hotel.latitude/longitude directly via Prisma (service.ts:26,48) -- CRM is the authoritative writer (OD-GEO-001); no service-to-service call, a direct cross-module state read, mirrored in DEPENDENCY_GRAPH.yaml's state-hotel readers list.
     published_events: none-observed
     consumed_events: none-observed
-    specification: SPEC-GEO-001@0.1.1 (REVIEW)  # G4 round complete (architecture/dependency/performance PASS, consistency PASS, security PASS_WITH_ACTIONS); G2 freeze reserved human authority, blocked on OD-GEO-001/002 (ownership split) and owner assignment (SYNC-001)
-    evidence: backend/src/modules/geo/.placeholder
+    specification: SPEC-GEO-001@0.1.2 (FROZEN)  # docs/03-modules/geo/MODULE_SPEC.md. FROZEN at G2 Specification Freeze 2026-07-27, following GD-14 ratification -- resolves OD-GEO-001/002/003/004/005/007; G4 review remains valid (zero Critical/High across all five dimensions). OD-GEO-006 (performance budgets) and OD-GEO-009 (GPS-spoofing countermeasure) are explicitly non-freeze-blocking, deliberately deferred, not silently omitted.
+    evidence: backend/src/routes/v1/index.ts:19,38; backend/src/modules/geo/{service,controller,routes,distance,types,retention-sweep-job}.ts; backend/src/worker.ts (GeoRetentionSweepJob registration); backend/prisma/migrations/20260728000000_add_hotel_coordinates/, 20260728010000_add_worker_geo_checkin/
 
   - id: frontend-web
     type: web-client
