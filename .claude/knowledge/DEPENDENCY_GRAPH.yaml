@@ -39,9 +39,16 @@ nodes:
   - { id: backend-assignments, kind: module, owner: unassigned, source: backend/src/modules/assignments }
   - { id: backend-attendance, kind: module, owner: unassigned, source: backend/src/modules/attendance }
   - { id: backend-quality, kind: module, owner: unassigned, source: backend/src/modules/quality }
-  # backend-hr and backend-calendar are mounted at runtime but every service method
-  # throws NotImplementedError; they hold no business state (stub modules).
-  - { id: backend-hr, kind: module, owner: unassigned, source: backend/src/modules/hr, lifecycle: stub }
+  # backend-hr is no longer a stub: HR implementation PR 1-5 (2026-07-30) landed
+  # createContract/listContracts/getContractStatus/uploadSignedContract/
+  # confirmContractSigned/extendContract/manualLapseContract/requestPayslip/
+  # createPayroll/listPayroll/fulfilPayslipRequest/sendExpiryReminders as real
+  # business logic against its own owned state (Contract, PayslipRequest) --
+  # corrected here (2026-07-30, HR epic acceptance audit) to match
+  # MODULE_REGISTRY.yaml's lifecycle: active/implementation_status: active-partial,
+  # which this node previously disagreed with. See that registry entry for the
+  # full PR-by-PR evidence trail.
+  - { id: backend-hr, kind: module, owner: unassigned, source: backend/src/modules/hr, lifecycle: active }
   - { id: backend-notifications, kind: module, owner: unassigned, source: backend/src/modules/notifications }
   # employee-management (Epic 5 PR 5.6, SPEC-EMP-001): dedicated module (OD-EMP-10
   # resolved 2026-07-22, human decision, to a separate module — not backend-hr).
@@ -49,8 +56,14 @@ nodes:
   - { id: backend-analytics, kind: module, owner: unassigned, source: backend/src/modules/analytics }
   # GD-16/SPEC-DOCUMENTS-001@0.1.4 (PR #245, 2026-07-27): first code registration
   # for this module — mounted at /v1/documents. Sole writer/reader of
-  # state-worker-document; no other module reads or writes WorkerDocument yet
-  # (backend-hr's own upload stub is still self-contained, MIG-GAP-DOC-001 not done).
+  # state-worker-document. CORRECTED (2026-07-30, HR epic acceptance audit):
+  # MIG-GAP-DOC-001 is resolved — backend-hr's uploadDocument()
+  # (backend/src/modules/hr/service.ts:802-820) delegates its
+  # POST /workers/:worker_id/documents route directly to this module's
+  # documentService.uploadDocument() (in-process call, RULE-DOC-04); see the
+  # edge-hr-uploads-via-documents edge below. This is distinct from HR's own
+  # uploadSignedContract() (PR 3, ADR-044 malware-scan hook), which is HR's
+  # own owned contract-scan mechanism, not a delegation to this module.
   - { id: backend-documents, kind: module, owner: unassigned, source: backend/src/modules/documents, lifecycle: active-partial }
   # 2026-07-27 (GD-18 narrow slice): GET/POST /calendar/my-absences are real
   # (state-calendar-absence, CalendarAbsence model); /operations remains a
@@ -416,8 +429,7 @@ edges:
     status: observed
     evidence: "backend/src/modules/hr/service.ts manualLapseContract() -> employeeManagementService.deactivateForContractLapse() (backend/src/modules/employee-management/service.ts)"
   # GD-16/SPEC-DOCUMENTS-001 (PR #245, 2026-07-27): backend-documents' own
-  # writes/reads of its sole state domain. No cross-module edge exists yet
-  # (MIG-GAP-DOC-001, backend-hr's stub calling into this module, is not done).
+  # writes/reads of its sole state domain.
   - id: edge-documents-writes-worker-document
     source: backend-documents
     target: state-worker-document
@@ -425,6 +437,20 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/documents/service.ts (uploadDocument: this.prisma.workerDocument.create)"
+  # CORRECTED (2026-07-30, HR epic acceptance audit): MIG-GAP-DOC-001 is
+  # resolved -- backend-hr's own uploadDocument() delegates directly (no
+  # storage/validation logic of its own) to backend-documents' service, the
+  # same in-process-call pattern as edge-hr-triggers-employment-record-
+  # deactivation above. Distinct from HR's own uploadSignedContract() (PR 3,
+  # ADR-044), which is HR's owned contract-scan mechanism, not a delegation.
+  - id: edge-hr-uploads-via-documents
+    source: backend-hr
+    target: state-worker-document
+    kind: calls
+    contract: documents-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/hr/service.ts uploadDocument() -> documentService.uploadDocument() (backend/src/modules/documents/service.ts)"
   - id: edge-documents-reads-worker-document
     source: backend-documents
     target: state-worker-document
@@ -861,11 +887,14 @@ analysis:
     # No client consumer of /my-absences has been discovered yet, so it is not
     # removed from this list outright, only corrected to state the accurate reason.
     - { id: backend-calendar, reason: "mounted at runtime (routes/v1/index.ts:34); GET/POST /my-absences (GD-18) are real, backed by state-calendar-absence, but /operations remains a stub (NotImplementedError, unrelated capability OD-CAL-10); no discovered client consumer of either surface and no cross-module edge." }
-  stub_but_registered:
-    - { id: backend-hr, note: "stub service (NotImplementedError) but consumed by mobile-worker (/hr) and mounted at runtime." }
+  stub_but_registered: []
     # CORRECTED by SYNC-055: backend-calendar is no longer a pure stub (see
     # orphan_modules correction above and state-calendar-absence node); moved
     # out of this list, which is reserved for modules where every method throws.
+    # CORRECTED (2026-07-30, HR epic acceptance audit): backend-hr is no
+    # longer a pure stub either -- HR implementation PR 1-5 landed real
+    # business logic (see the module-node correction above); moved out of
+    # this list for the same reason backend-calendar was.
   unknown_relationships:
     - "All module owners (node owner) and contract versions are UNKNOWN — human assignment required (per MODULE_REGISTRY.yaml)."
     - "state-user authoritative_writer RESOLVED backend-auth by ADR-017 (2026-07-15); backend-users is a bounded profile writer/reader (non-security fields only). Node-level accountable owner (SYNC-001) remains UNKNOWN."
@@ -875,5 +904,5 @@ remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
   - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs. UPDATE: this removal is now complete -- Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) physically deleted backend-work-applications and dropped the WorkApplication model. See SYNC-059."
-  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders) and completion of stub module backend-hr. backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt."
+  - "Decide retirement or activation of backend-chatbot and backend-geo (unregistered placeholders). backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt. backend-hr is no longer a stub module as of HR implementation PR 1-5 (2026-07-30) — corrected during the HR epic acceptance audit; owner assignment (OD-HR-12/SYNC-001) remains a separate, still-open human decision."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
