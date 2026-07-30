@@ -67,7 +67,7 @@ enum CalendarAbsenceKind {
 
 // SP-6: EXPECTED added as the initial pre-shift state; default changed to EXPECTED.
 enum AttendanceStatus {
-  EXPECTED  // record created pre-shift; worker not yet checked in
+  EXPECTED // record created pre-shift; worker not yet checked in
   PRESENT
   ABSENT
   LATE
@@ -100,28 +100,28 @@ enum NotificationType {
   WORK_REQUEST_CANCELLED
   WORK_REQUEST_EXPIRING_SOON
   // WorkApplication events
-  APPLICATION_RECEIVED       // to manager: a worker applied
-  APPLICATION_ACCEPTED       // to worker: application approved
-  APPLICATION_REJECTED       // to worker: application declined
-  APPLICATION_WITHDRAWN      // to manager: worker withdrew
+  APPLICATION_RECEIVED // to manager: a worker applied
+  APPLICATION_ACCEPTED // to worker: application approved
+  APPLICATION_REJECTED // to worker: application declined
+  APPLICATION_WITHDRAWN // to manager: worker withdrew
   // WorkerAssignment events
   ASSIGNMENT_CONFIRMED
   ASSIGNMENT_CANCELLED
-  SHIFT_REMINDER             // pre-shift reminder to worker
-  CHECK_IN_REMINDER          // sent when shift start approaches with no check-in
+  SHIFT_REMINDER // pre-shift reminder to worker
+  CHECK_IN_REMINDER // sent when shift start approaches with no check-in
   // Attendance events
-  ATTENDANCE_VERIFIED        // to worker: manager verified attendance
-  WORKER_NO_SHOW             // to manager: worker did not check in
+  ATTENDANCE_VERIFIED // to worker: manager verified attendance
+  WORKER_NO_SHOW // to manager: worker did not check in
   // Quality & Rating events
   QUALITY_VERIFICATION_SUBMITTED
   RATING_RECEIVED
-  REWORK_REQUIRED            // to worker: verification failed, rework needed
+  REWORK_REQUIRED // to worker: verification failed, rework needed
   // Calendar events (SPEC-CALENDAR-001, RULE-CAL-06)
-  CALENDAR_ABSENCE_MARKED    // to manager: worker marked sick/vacation
+  CALENDAR_ABSENCE_MARKED // to manager: worker marked sick/vacation
   // Job-dispatch broadcast events (Epic 9 PR 9.8, TREQ-003 delivery half)
-  JOB_REQUEST_BROADCAST      // to eligible worker: a skill-matched broadcast slot is open
+  JOB_REQUEST_BROADCAST // to eligible worker: a skill-matched broadcast slot is open
   // Job-dispatch auto-close event (Epic 9 PR 9.10, TREQ-006)
-  JOB_REQUEST_CLOSED         // to the raising manager: an unfilled broadcast closed (6h auto-close or manual)
+  JOB_REQUEST_CLOSED // to the raising manager: an unfilled broadcast closed (6h auto-close or manual)
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -230,14 +230,14 @@ enum SkillTag {
 // =============================================================================
 
 model User {
-  id                 String    @id @default(cuid())
-  email              String    @unique
-  password_hash      String
-  first_name         String
-  last_name          String
-  phone              String?   @unique
-  profile_photo_url  String?
-  role               UserRole  @default(WORKER)
+  id                String    @id @default(cuid())
+  email             String    @unique
+  password_hash     String
+  first_name        String
+  last_name         String
+  phone             String?   @unique
+  profile_photo_url String?
+  role              UserRole  @default(WORKER)
   // ADR-031 M-3 (PR-7): the stored permission snapshot is retired. Permissions
   // are derived request-time from ROLE_PERMISSIONS[role] (D-1); this column
   // ceased being read at PR-3, ceased being written at PR-4, and is dropped
@@ -245,58 +245,64 @@ model User {
   // see docs/implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md). A
   // pre-drop snapshot is retained for one release per the migration's own
   // down.sql / backup-table note.
-  is_active          Boolean   @default(true)
-  email_verified_at  DateTime?
-  phone_verified_at  DateTime?
-  last_login_at      DateTime?
-  deleted_at         DateTime? // GDPR soft delete — keep row, null PII via separate job
+  is_active         Boolean   @default(true)
+  email_verified_at DateTime?
+  phone_verified_at DateTime?
+  last_login_at     DateTime?
+  deleted_at        DateTime? // GDPR soft delete — keep row, null PII via separate job
   // ADR-031 M-1/D-3/D-4 (PR-2, enforced unconditionally as of PR-7): monotonic
   // revocation counter, mirrored into the access token's `token_generation`
   // claim at issuance. Incremented (never reset) by backend-auth on role
   // change / deactivation / soft delete / password reset; a mismatch against
   // the row invalidates an already-issued access token.
-  token_generation   Int       @default(0)
-  created_at         DateTime  @default(now())
-  updated_at         DateTime  @updatedAt
+  token_generation  Int       @default(0)
+  created_at        DateTime  @default(now())
+  updated_at        DateTime  @updatedAt
 
   // Relations
-  sessions                  Session[]
-  hotel_workers             HotelWorker[]
-  assignments               WorkerAssignment[]      @relation("assigned_worker")
-  assignments_managed       WorkerAssignment[]      @relation("assignment_manager")
-  attendance_records        Attendance[]            @relation("attendee")
-  attendance_verified       Attendance[]            @relation("attendance_verifier")
-  verifications_performed   QualityVerification[]   @relation("verifier")
-  ratings_received          Rating[]                @relation("rated_worker")
-  ratings_given             Rating[]                @relation("rater")
-  overall_rating            WorkerOverallRating?
-  notifications             Notification[]
-  push_tokens               PushToken[]
-  created_work_requests     JobRequest[]            @relation("request_creator")
-  audit_logs                AuditLog[]
-  password_reset_tokens     PasswordResetToken[]
-  managed_hotel_groups      HotelGroup[]            @relation("regional_manager_of_group")
-  managed_hotels            Hotel[]                 @relation("hotel_manager")
-  calendar_absences         CalendarAbsence[]       @relation("calendar_absence_worker")
+  sessions                      Session[]
+  hotel_workers                 HotelWorker[]
+  assignments                   WorkerAssignment[]       @relation("assigned_worker")
+  assignments_managed           WorkerAssignment[]       @relation("assignment_manager")
+  attendance_records            Attendance[]             @relation("attendee")
+  attendance_verified           Attendance[]             @relation("attendance_verifier")
+  verifications_performed       QualityVerification[]    @relation("verifier")
+  ratings_received              Rating[]                 @relation("rated_worker")
+  ratings_given                 Rating[]                 @relation("rater")
+  overall_rating                WorkerOverallRating?
+  notifications                 Notification[]
+  push_tokens                   PushToken[]
+  created_work_requests         JobRequest[]             @relation("request_creator")
+  audit_logs                    AuditLog[]
+  password_reset_tokens         PasswordResetToken[]
+  managed_hotel_groups          HotelGroup[]             @relation("regional_manager_of_group")
+  managed_hotels                Hotel[]                  @relation("hotel_manager")
+  calendar_absences             CalendarAbsence[]        @relation("calendar_absence_worker")
   // SPEC-DOCUMENTS-001 (GD-16): documents owned by this worker and uploads
   // performed by this user on behalf of a worker (manager contract-scan, RULE-DOC-04).
-  worker_documents            WorkerDocument[]          @relation("documents_worker")
-  documents_uploaded          WorkerDocument[]          @relation("documents_uploader")
+  worker_documents              WorkerDocument[]         @relation("documents_worker")
+  documents_uploaded            WorkerDocument[]         @relation("documents_uploader")
   // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
-  employment_record           EmploymentRecord?         @relation("employment_record")
-  blocklist_entries_authored  EmployeeBlocklistEntry[]  @relation("blocklist_author")
+  employment_record             EmploymentRecord?        @relation("employment_record")
+  blocklist_entries_authored    EmployeeBlocklistEntry[] @relation("blocklist_author")
   // GD-14/OD-GEO-002 (SPEC-GEO-001): backend-geo owns worker-coordinate
   // capture + the 6-month retention sweep (Tier 1, CRR §25).
-  geo_checkins                 WorkerGeoCheckin[]        @relation("geo_checkin_worker")
+  geo_checkins                  WorkerGeoCheckin[]       @relation("geo_checkin_worker")
   // ADR-028: manager-entered "rooms completed" daily count, per worker's
   // full-day WorkerAssignment — no room-level task layer implied.
-  rooms_completed_as_worker   RoomsCompletedEntry[]     @relation("rooms_completed_worker")
-  rooms_completed_entered     RoomsCompletedEntry[]     @relation("rooms_completed_entered_by")
+  rooms_completed_as_worker     RoomsCompletedEntry[]    @relation("rooms_completed_worker")
+  rooms_completed_entered       RoomsCompletedEntry[]    @relation("rooms_completed_entered_by")
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
   // assignment — the worker placed and the manager who placed them.
-  calendar_entries_as_worker  CalendarEntry[]           @relation("calendar_entry_worker")
-  calendar_entries_placed     CalendarEntry[]           @relation("calendar_entry_placed_by")
+  calendar_entries_as_worker    CalendarEntry[]          @relation("calendar_entry_worker")
+  calendar_entries_placed       CalendarEntry[]          @relation("calendar_entry_placed_by")
+  // SPEC-HR-001 (ADR-012/ADR-014): contract lifecycle + payslip-request
+  // capability, owned exclusively by backend-hr.
+  hr_contracts                  Contract[]               @relation("hr_contract_worker")
+  hr_contracts_confirmed        Contract[]               @relation("hr_contract_confirmed_by")
+  hr_payslip_requests           PayslipRequest[]         @relation("hr_payslip_worker")
+  hr_payslip_requests_fulfilled PayslipRequest[]         @relation("hr_payslip_fulfilled_by")
 
   @@index([role])
   @@index([is_active])
@@ -328,14 +334,14 @@ model PasswordResetToken {
   expires_at DateTime
   used_at    DateTime?
   created_at DateTime  @default(now())
-
-  @@index([user_id])
-  @@index([expires_at])
   // ADR-031 D-5 (PR-6): a partial index on `used_at IS NOT NULL` also exists
   // (migration 20260727000000), supporting the sweep job's used-token
   // cleanup branch. Not expressible in the Prisma schema DSL (no `@@index`
   // WHERE clause) — same accepted drift as WorkerAssignment's partial
   // unique index (migration 20260613120000), which is likewise raw-SQL-only.
+
+  @@index([user_id])
+  @@index([expires_at])
 }
 
 // =============================================================================
@@ -357,7 +363,7 @@ model HotelGroup {
   updated_at               DateTime @updatedAt
 
   // Relations
-  hotels Hotel[]
+  hotels             Hotel[]
   // Epic 5 PR 5.6 (ADR-023 §4): employment records associated with this group.
   employment_records EmploymentRecord[] @relation("employment_group")
 
@@ -365,29 +371,29 @@ model HotelGroup {
 }
 
 model Hotel {
-  id            String   @id @default(cuid())
-  name          String
-  city          String
-  country       String   @default("Germany")
-  address       String
-  timezone      String   @default("Europe/Berlin")
-  contact_email String?
-  contact_phone String?
-  is_active     Boolean   @default(true)
+  id             String    @id @default(cuid())
+  name           String
+  city           String
+  country        String    @default("Germany")
+  address        String
+  timezone       String    @default("Europe/Berlin")
+  contact_email  String?
+  contact_phone  String?
+  is_active      Boolean   @default(true)
   // GD-05: per-hotel "pause new jobs" toggle (REQ-CRM-008). Enforced at
   // work-request creation, not a role/scope gate — checked in addition to
   // is_active/deleted_at, not instead of them.
-  accepting_jobs Boolean  @default(true)
+  accepting_jobs Boolean   @default(true)
   // GD-14/OD-GEO-001 (SPEC-GEO-001): the hotel-coordinate source of truth,
   // kept as columns on Hotel (state-hotel, backend-crm-owned), not a
   // separate backend-geo-owned domain. Nullable: most hotels have none set
   // yet; backend-geo's distance-check fails closed (OD-GEO-003) when either
   // is null. Admin-only manual entry (OD-GEO-004) — no geocoding service.
-  latitude      Float?
-  longitude     Float?
-  deleted_at    DateTime?
-  created_at    DateTime  @default(now())
-  updated_at    DateTime  @updatedAt
+  latitude       Float?
+  longitude      Float?
+  deleted_at     DateTime?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime  @updatedAt
 
   // ADR-023: nullable until assigned ("after a hotel is created, it is assigned" — CRR §11).
   // ADR-025: nullable — dedicated Hotel Manager assigned after hotel creation (CRR §11).
@@ -398,15 +404,15 @@ model Hotel {
   manager         User?       @relation("hotel_manager", fields: [manager_user_id], references: [id], onDelete: SetNull)
 
   // Relations
-  hotel_workers    HotelWorker[]
-  work_requests    JobRequest[]
-  assignments      WorkerAssignment[]
-  attendance       Attendance[]
-  verifications    QualityVerification[]
-  ratings          Rating[]
-  notifications    Notification[]
+  hotel_workers           HotelWorker[]
+  work_requests           JobRequest[]
+  assignments             WorkerAssignment[]
+  attendance              Attendance[]
+  verifications           QualityVerification[]
+  ratings                 Rating[]
+  notifications           Notification[]
   // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-005 / RULE-EMP-07): hotel blocklist entries.
-  blocklist_entries EmployeeBlocklistEntry[] @relation("hotel_blocklist")
+  blocklist_entries       EmployeeBlocklistEntry[] @relation("hotel_blocklist")
   // ADR-028: manager-entered "rooms completed" daily counts for this hotel.
   rooms_completed_entries RoomsCompletedEntry[]
   // GD-14/OD-GEO-002 (SPEC-GEO-001): worker geofence checks against this
@@ -432,14 +438,14 @@ model HotelWorker {
   hotel       Hotel             @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   worker_id   String
   worker      User              @relation(fields: [worker_id], references: [id], onDelete: Cascade)
-  position    String            // "cleaner" | "checker" | "housekeeper" | "supervisor"
+  position    String // "cleaner" | "checker" | "housekeeper" | "supervisor"
   status      HotelWorkerStatus @default(INVITED) // SP-1/SP-2: starts INVITED, not ACTIVE
   hourly_rate Decimal?          @db.Decimal(10, 2)
   currency    String            @default("EUR")
   notes       String?
   invited_at  DateTime          @default(now()) // SP-2: set at row creation
-  joined_at   DateTime?                         // SP-2: set on INVITED → ACTIVE transition only
-  left_at     DateTime?                         // set on → REMOVED transition
+  joined_at   DateTime? // SP-2: set on INVITED → ACTIVE transition only
+  left_at     DateTime? // set on → REMOVED transition
   created_at  DateTime          @default(now())
   updated_at  DateTime          @updatedAt
 
@@ -460,23 +466,23 @@ model HotelWorker {
 // HotelGroup), nullable until hire-approval, set at Under Review -> Active.
 // ADR-025 Decision 3: deliberately hotel-tie-free — no per-hotel FK here.
 model EmploymentRecord {
-  id                String            @id @default(cuid())
-  user_id           String            @unique // account link (REQ-EMP-001: one record per account)
-  user              User              @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
-  employee_id       String            @unique // human-facing Employee ID
-  job_title         String                    // free text, provisional (OD-EMP-13)
+  id                String           @id @default(cuid())
+  user_id           String           @unique // account link (REQ-EMP-001: one record per account)
+  user              User             @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
+  employee_id       String           @unique // human-facing Employee ID
+  job_title         String // free text, provisional (OD-EMP-13)
   start_date        DateTime
-  status            EmploymentStatus  @default(INACTIVE)
-  marked_suitable   Boolean           @default(false) // probation milestone flag, not a status
-  hotel_group_id    String?                           // ADR-023 §4, group-grain, nullable until hire-approval
-  hotel_group       HotelGroup?       @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
-  skills            SkillTag[]                        // fixed set (REQ-EMP-003)
-  personal_data     Json?                             // Personalfragebogen non-special data (REQ-EMP-011)
-  konfession        String?                           // special-category (RULE-EMP-09) — never on general profile
-  disability_status String?                           // special-category (RULE-EMP-09)
-  deleted_at        DateTime?                         // soft delete (REQ-EMP-010)
-  created_at        DateTime          @default(now())
-  updated_at        DateTime          @updatedAt
+  status            EmploymentStatus @default(INACTIVE)
+  marked_suitable   Boolean          @default(false) // probation milestone flag, not a status
+  hotel_group_id    String? // ADR-023 §4, group-grain, nullable until hire-approval
+  hotel_group       HotelGroup?      @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  skills            SkillTag[] // fixed set (REQ-EMP-003)
+  personal_data     Json? // Personalfragebogen non-special data (REQ-EMP-011)
+  konfession        String? // special-category (RULE-EMP-09) — never on general profile
+  disability_status String? // special-category (RULE-EMP-09)
+  deleted_at        DateTime? // soft delete (REQ-EMP-010)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
 
   blocklist_entries EmployeeBlocklistEntry[] @relation("blocklist_of_employee")
 
@@ -488,15 +494,15 @@ model EmploymentRecord {
 // from assignment at that hotel, with a mandatory logged reason (REQ-EMP-005 /
 // RULE-EMP-07).
 model EmployeeBlocklistEntry {
-  id                    String   @id @default(cuid())
-  hotel_id              String
-  hotel                 Hotel    @relation("hotel_blocklist", fields: [hotel_id], references: [id], onDelete: Cascade)
-  employment_record_id  String
-  employment_record     EmploymentRecord @relation("blocklist_of_employee", fields: [employment_record_id], references: [id], onDelete: Cascade)
-  reason                String   // REQUIRED (RULE-EMP-07)
-  created_by_id         String
-  created_by            User     @relation("blocklist_author", fields: [created_by_id], references: [id], onDelete: Restrict)
-  created_at            DateTime @default(now())
+  id                   String           @id @default(cuid())
+  hotel_id             String
+  hotel                Hotel            @relation("hotel_blocklist", fields: [hotel_id], references: [id], onDelete: Cascade)
+  employment_record_id String
+  employment_record    EmploymentRecord @relation("blocklist_of_employee", fields: [employment_record_id], references: [id], onDelete: Cascade)
+  reason               String // REQUIRED (RULE-EMP-07)
+  created_by_id        String
+  created_by           User             @relation("blocklist_author", fields: [created_by_id], references: [id], onDelete: Restrict)
+  created_at           DateTime         @default(now())
 
   @@unique([hotel_id, employment_record_id])
   @@index([hotel_id])
@@ -518,17 +524,17 @@ model JobRequest {
   hotel               Hotel             @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   created_by_id       String
   created_by          User              @relation("request_creator", fields: [created_by_id], references: [id], onDelete: Restrict)
-  position            String            // required role for this shift
+  position            String // required role for this shift
   workers_needed      Int               @default(1)
   workers_confirmed   Int               @default(0)
   version             Int               @default(0) // SP-9: incremented on each status-changing write
   shift_date          DateTime          @db.Date
-  shift_start_time    String            // stored as HH:MM; derive full DateTime with hotel timezone
+  shift_start_time    String // stored as HH:MM; derive full DateTime with hotel timezone
   shift_end_time      String
   hourly_rate         Decimal?          @db.Decimal(10, 2)
   currency            String            @default("EUR")
   description         String?
-  requirements        String?           // free-text skill/cert requirements
+  requirements        String? // free-text skill/cert requirements
   status              WorkRequestStatus @default(DRAFT)
   published_at        DateTime?
   expires_at          DateTime?
@@ -539,11 +545,11 @@ model JobRequest {
   updated_at          DateTime          @updatedAt
 
   // Relations
-  assignments  WorkerAssignment[]
+  assignments             WorkerAssignment[]
   // Epic 9 PR 9.3: back-relation for WorkerAssignment.job_request_id (forward-
   // named ahead of PR 9.4's WorkRequest -> JobRequest rename, now completed).
   // Nullable FK; no creation path populates it until PR 9.9 (broadcast-accept).
-  job_request_assignments WorkerAssignment[] @relation("job_request_assignment")
+  job_request_assignments WorkerAssignment[]    @relation("job_request_assignment")
   // Epic 9 PR 9.7 (TREQ-002/TREQ-010, MIG-GAP-04/05): per-skill headcount
   // lines for a broadcast raised via raiseBroadcast(). `position`/
   // `workers_needed`/`workers_confirmed` above are left untouched — they
@@ -555,7 +561,7 @@ model JobRequest {
   // here instead, per CONFIRMED_REQUIREMENTS_REGISTER.md §13's "2 Cleaners +
   // 1 Waiter" example (one broadcast, multiple skill lines) — see
   // architecture review before this PR's implementation.
-  skill_slots JobRequestSkillSlot[]
+  skill_slots             JobRequestSkillSlot[]
 
   // workers_confirmed must never exceed workers_needed — CHECK constraint in migration.
   // Slot-fill race: app layer must do UPDATE ... WHERE version = $known AND workers_confirmed < workers_needed.
@@ -581,14 +587,14 @@ model JobRequest {
 // conditional-updateMany shape ADR-057 names as the reused precedent) without
 // needing its own schema-only PR before that logic lands.
 model JobRequestSkillSlot {
-  id             String     @id @default(cuid())
-  job_request_id String
-  job_request    JobRequest @relation(fields: [job_request_id], references: [id], onDelete: Cascade)
-  skill          SkillTag
-  headcount      Int
-  confirmed_count Int       @default(0)
-  created_at     DateTime   @default(now())
-  updated_at     DateTime   @updatedAt
+  id              String     @id @default(cuid())
+  job_request_id  String
+  job_request     JobRequest @relation(fields: [job_request_id], references: [id], onDelete: Cascade)
+  skill           SkillTag
+  headcount       Int
+  confirmed_count Int        @default(0)
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
 
   // confirmed_count must never exceed headcount — CHECK constraint in migration.
   @@index([job_request_id])
@@ -615,7 +621,7 @@ model JobRequestSkillSlot {
 // User.hotel_group, AuditLog.actor) — an assignment should outlive the job
 // request it was created from, not be deleted alongside it.
 model WorkerAssignment {
-  id                     String           @id @default(cuid())
+  id                     String             @id @default(cuid())
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): relaxed from mandatory to nullable.
   // A calendar-placed assignment (placeOnCalendar()) has no backing JobRequest
   // at all (per ADR-056's ratified "no intermediating application or
@@ -626,17 +632,17 @@ model WorkerAssignment {
   // Every pre-existing row keeps its current non-null value; only the
   // NOT NULL constraint relaxes (additive, reversible, zero data-loss).
   work_request_id        String?
-  work_request           JobRequest?      @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
+  work_request           JobRequest?        @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
   job_request_id         String?
-  job_request            JobRequest?      @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
+  job_request            JobRequest?        @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
   worker_id              String
-  worker                 User             @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  worker                 User               @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id               String
-  hotel                  Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  hotel                  Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   assigned_by_id         String
-  assigned_by            User             @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
-  status                 AssignmentStatus @default(CONFIRMED)
-  confirmed_at           DateTime         @default(now())
+  assigned_by            User               @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
+  status                 AssignmentStatus   @default(CONFIRMED)
+  confirmed_at           DateTime           @default(now())
   started_at             DateTime?
   completed_at           DateTime?
   cancelled_at           DateTime?
@@ -657,7 +663,7 @@ model WorkerAssignment {
   // which spans every creation path uniformly (unlike the prior
   // work_request_id-scoped index, which could not see a competing
   // calendar-placed or future broadcast-accept assignment on the same day).
-  day                    DateTime           @db.Date
+  day DateTime @db.Date
 
   // Relations — each assignment yields at most one attendance record, one QV, one rating,
   // one rooms-completed entry (ADR-028)
@@ -696,21 +702,21 @@ model WorkerAssignment {
 // placeOnCalendar() (assignments/service.ts) — mirrors RoomsCompletedEntry's
 // 1:1-per-assignment shape (schema.prisma:725-744).
 model CalendarEntry {
-  id             String           @id @default(cuid())
-  assignment_id  String           @unique
-  assignment     WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
-  worker_id      String
-  worker         User             @relation("calendar_entry_worker", fields: [worker_id], references: [id], onDelete: Cascade)
-  hotel_id       String
-  hotel          Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  id            String           @id @default(cuid())
+  assignment_id String           @unique
+  assignment    WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  worker_id     String
+  worker        User             @relation("calendar_entry_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  hotel_id      String
+  hotel         Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   // Date-only (no time component) — the specific day being placed, mirroring
   // CalendarAbsence.day's own shape (schema.prisma:922-923) so both models
   // key "one record per worker per day" identically.
-  day            DateTime         @db.Date
-  placed_by_id   String
-  placed_by      User             @relation("calendar_entry_placed_by", fields: [placed_by_id], references: [id], onDelete: Restrict)
-  created_at     DateTime         @default(now())
-  updated_at     DateTime         @updatedAt
+  day           DateTime         @db.Date
+  placed_by_id  String
+  placed_by     User             @relation("calendar_entry_placed_by", fields: [placed_by_id], references: [id], onDelete: Restrict)
+  created_at    DateTime         @default(now())
+  updated_at    DateTime         @updatedAt
 
   // TRULE-001/TRULE-006 (daily exclusivity groundwork — full DB-level
   // enforcement is PR 9.6's partial unique index re-keying; this unique
@@ -746,7 +752,7 @@ model Attendance {
   minutes_late   Int?
   minutes_worked Int?
   notes          String?
-  is_verified    Boolean          @default(false)    // SP-7: set true when manager verifies
+  is_verified    Boolean          @default(false) // SP-7: set true when manager verifies
   verified_by_id String?
   verified_by    User?            @relation("attendance_verifier", fields: [verified_by_id], references: [id], onDelete: SetNull)
   verified_at    DateTime?
@@ -757,8 +763,8 @@ model Attendance {
   @@index([hotel_id])
   @@index([status])
   @@index([check_in_at])
-  @@index([worker_id, check_in_at])    // "worker's shifts in date range"
-  @@index([hotel_id, is_verified])     // SP-7: "pending verifications" dashboard
+  @@index([worker_id, check_in_at]) // "worker's shifts in date range"
+  @@index([hotel_id, is_verified]) // SP-7: "pending verifications" dashboard
 }
 
 // =============================================================================
@@ -766,22 +772,22 @@ model Attendance {
 // =============================================================================
 
 model QualityVerification {
-  id               String             @id @default(cuid())
-  assignment_id    String             @unique // 1-to-1 with WorkerAssignment
-  assignment       WorkerAssignment   @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
-  hotel_id         String
-  hotel            Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  verified_by_id   String
-  verified_by      User               @relation("verifier", fields: [verified_by_id], references: [id], onDelete: Restrict)
-  score            Int                // 0–100; CHECK constraint in migration
-  status           VerificationStatus @default(PASSED)
-  notes            String?
-  photo_urls       String[]           // evidence uploaded to object storage
-  rework_required  Boolean            @default(false)
-  rework_notes     String?
+  id                  String             @id @default(cuid())
+  assignment_id       String             @unique // 1-to-1 with WorkerAssignment
+  assignment          WorkerAssignment   @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  hotel_id            String
+  hotel               Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  verified_by_id      String
+  verified_by         User               @relation("verifier", fields: [verified_by_id], references: [id], onDelete: Restrict)
+  score               Int // 0–100; CHECK constraint in migration
+  status              VerificationStatus @default(PASSED)
+  notes               String?
+  photo_urls          String[] // evidence uploaded to object storage
+  rework_required     Boolean            @default(false)
+  rework_notes        String?
   rework_completed_at DateTime?
-  created_at       DateTime           @default(now())
-  updated_at       DateTime           @updatedAt
+  created_at          DateTime           @default(now())
+  updated_at          DateTime           @updatedAt
 
   @@index([hotel_id])
   @@index([verified_by_id])
@@ -790,21 +796,21 @@ model QualityVerification {
 }
 
 model Rating {
-  id            String           @id @default(cuid())
-  assignment_id String           @unique // 1-to-1 with WorkerAssignment
-  assignment    WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
-  hotel_id      String
-  hotel         Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  worker_id     String
-  worker        User             @relation("rated_worker", fields: [worker_id], references: [id], onDelete: Cascade)
-  rated_by_id   String
-  rated_by      User             @relation("rater", fields: [rated_by_id], references: [id], onDelete: Restrict)
-  score         Int              // 0–100; rescaled from 1–5 stars by ADR-026; CHECK constraint in migration
-  comment       String?
+  id              String           @id @default(cuid())
+  assignment_id   String           @unique // 1-to-1 with WorkerAssignment
+  assignment      WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  hotel_id        String
+  hotel           Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  worker_id       String
+  worker          User             @relation("rated_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  rated_by_id     String
+  rated_by        User             @relation("rater", fields: [rated_by_id], references: [id], onDelete: Restrict)
+  score           Int // 0–100; rescaled from 1–5 stars by ADR-026; CHECK constraint in migration
+  comment         String?
   // Structured sub-scores; schema: { punctuality: Int, quality: Int, attitude: Int }
   criteria_scores Json?
-  created_at    DateTime         @default(now())
-  updated_at    DateTime         @updatedAt
+  created_at      DateTime         @default(now())
+  updated_at      DateTime         @updatedAt
 
   @@index([hotel_id])
   @@index([worker_id])
@@ -816,16 +822,16 @@ model Rating {
 // Materialised aggregate — updated by DB trigger after each Rating write.
 // Avoids expensive AVG() scans on marketplace listing pages.
 model WorkerOverallRating {
-  id               String    @id @default(cuid())
-  worker_id        String    @unique
-  worker           User      @relation(fields: [worker_id], references: [id], onDelete: Cascade)
-  average_score    Float     // rolling average of Rating.score
-  total_ratings    Int       @default(0)
-  total_assignments Int      @default(0)
-  completion_rate  Float     @default(0.0) // completed / total assignments
-  on_time_rate     Float     @default(0.0) // present-on-time / total assignments
-  last_worked_at   DateTime?
-  updated_at       DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  worker_id         String    @unique
+  worker            User      @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+  average_score     Float // rolling average of Rating.score
+  total_ratings     Int       @default(0)
+  total_assignments Int       @default(0)
+  completion_rate   Float     @default(0.0) // completed / total assignments
+  on_time_rate      Float     @default(0.0) // present-on-time / total assignments
+  last_worked_at    DateTime?
+  updated_at        DateTime  @updatedAt
 
   @@index([average_score])
   @@index([total_ratings])
@@ -850,7 +856,7 @@ model RoomsCompletedEntry {
   worker          User             @relation("rooms_completed_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   entered_by_id   String
   entered_by      User             @relation("rooms_completed_entered_by", fields: [entered_by_id], references: [id], onDelete: Restrict)
-  rooms_completed Int              // manager-entered count; CHECK >= 0 in migration
+  rooms_completed Int // manager-entered count; CHECK >= 0 in migration
   notes           String?
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
@@ -872,11 +878,11 @@ model Notification {
   user       User                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   hotel_id   String?
   hotel      Hotel?              @relation(fields: [hotel_id], references: [id], onDelete: SetNull)
-  type       NotificationType    // SP-8: was String
+  type       NotificationType // SP-8: was String
   channel    NotificationChannel @default(IN_APP)
   title      String
   message    String
-  data       Json?               // resource IDs for deep-linking
+  data       Json? // resource IDs for deep-linking
   is_read    Boolean             @default(false)
   read_at    DateTime?
   sent_at    DateTime?
@@ -902,21 +908,21 @@ model Notification {
 model OutboxEvent {
   id               String              @id @default(cuid())
   event_id         String              @unique @default(uuid()) // per-row idempotency key (ADR-029 §7); provider-side dedup key where the transport supports one
-  correlation_id   String              @default(uuid())         // shared across every OutboxEvent row produced by one enqueue() call (one logical notification, N transports)
+  correlation_id   String              @default(uuid()) // shared across every OutboxEvent row produced by one enqueue() call (one logical notification, N transports)
   event_type       OutboxEventType
   aggregate_type   OutboxAggregateType
-  aggregate_id     String                                       // canonical reference (e.g. the sibling Notification.id) — the Platform Worker resolves the aggregate from this column, never from payload
+  aggregate_id     String // canonical reference (e.g. the sibling Notification.id) — the Platform Worker resolves the aggregate from this column, never from payload
   source_module    OutboxSourceModule
-  producer_service String                                       // e.g. "AttendanceService" — a class-name identity, not an enum (churns on refactor; source_module is the stable identity)
+  producer_service String // e.g. "AttendanceService" — a class-name identity, not an enum (churns on refactor; source_module is the stable identity)
   transport        OutboxTransport
   status           OutboxStatus        @default(PENDING)
-  payload          Json                                         // domain body ONLY — metadata (event_id, correlation_id, aggregate_*, etc.) is column-sourced, never duplicated into this JSON (ADR-029 §9)
+  payload          Json // domain body ONLY — metadata (event_id, correlation_id, aggregate_*, etc.) is column-sourced, never duplicated into this JSON (ADR-029 §9)
   payload_version  Int                 @default(1)
-  scheduled_for    DateTime            @default(now())          // producer intent: when this event should first become eligible; immutable after creation
-  next_attempt_at  DateTime            @default(now())          // live retry clock the Platform Worker claims against; initialized to scheduled_for, advanced by backoff on retry (PR 7.2)
+  scheduled_for    DateTime            @default(now()) // producer intent: when this event should first become eligible; immutable after creation
+  next_attempt_at  DateTime            @default(now()) // live retry clock the Platform Worker claims against; initialized to scheduled_for, advanced by backoff on retry (PR 7.2)
   attempts         Int                 @default(0)
   last_error       String?
-  processed_at     DateTime?                                    // set on the terminal DELIVERED/DEAD_LETTER transition (PR 7.2); basis for delivery_latency = processed_at - created_at
+  processed_at     DateTime? // set on the terminal DELIVERED/DEAD_LETTER transition (PR 7.2); basis for delivery_latency = processed_at - created_at
   created_at       DateTime            @default(now())
   updated_at       DateTime            @updatedAt
 
@@ -961,12 +967,12 @@ model AuditLog {
   actor_id      String?
   actor         User?     @relation(fields: [actor_id], references: [id], onDelete: SetNull)
   actor_role    UserRole?
-  action        String    // "CREATE" | "READ" | "UPDATE" | "DELETE" | "APPROVE" | "REJECT" | "ASSIGN"
+  action        String // "CREATE" | "READ" | "UPDATE" | "DELETE" | "APPROVE" | "REJECT" | "ASSIGN"
   resource_id   String
-  resource_type String    // "WORK_REQUEST" | "APPLICATION" | "ASSIGNMENT" | "ATTENDANCE" | "RATING" etc.
-  old_values    Json?     // previous state snapshot for UPDATE/DELETE
-  new_values    Json?     // new state snapshot for CREATE/UPDATE
-  details       Json?     // additional freeform context
+  resource_type String // "WORK_REQUEST" | "APPLICATION" | "ASSIGNMENT" | "ATTENDANCE" | "RATING" etc.
+  old_values    Json? // previous state snapshot for UPDATE/DELETE
+  new_values    Json? // new state snapshot for CREATE/UPDATE
+  details       Json? // additional freeform context
   ip_address    String?
   user_agent    String?
   timestamp     DateTime  @default(now())
@@ -987,8 +993,8 @@ model AuditLog {
 // CRR §7 lines 97-98: the only two confirmed document sub-type distinctions.
 // No broader category taxonomy is specified by CRR/PDD (OD-DOC-005 category half).
 enum DocumentCategory {
-  GENERAL      // General onboarding/identity document (all workers)
-  WORK_PERMIT  // Residence/work-authorization document (non-EU/EEA/Swiss only, REQ-DOC-003)
+  GENERAL // General onboarding/identity document (all workers)
+  WORK_PERMIT // Residence/work-authorization document (non-EU/EEA/Swiss only, REQ-DOC-003)
 }
 
 // state-worker-document (SPEC-DOCUMENTS-001, PDD §9.3 line 389).
@@ -998,27 +1004,31 @@ enum DocumentCategory {
 // Retention tier: OD-DOC-001 (open; not yet mapped to CRR §25 tier).
 // Special-category applicability: OD-DOC-002 (no confirmed special-category doc type today).
 model WorkerDocument {
-  id                      String           @id @default(cuid())
-  worker_id               String
-  worker                  User             @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  id                String           @id @default(cuid())
+  worker_id         String
+  worker            User             @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Uploader identity — always derived from the authenticated session (RULE-DOC-08).
   // For worker self-uploads: uploaded_by_id == worker_id.
   // For manager-on-behalf uploads (contract-scan mechanism): uploaded_by_id == manager's user id.
-  uploaded_by_id          String
-  uploaded_by             User             @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
-  category                DocumentCategory
+  uploaded_by_id    String
+  uploaded_by       User             @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
+  category          DocumentCategory
   // Server-generated storage key (RULE-DOC-09): never built from client input;
   // includes a UUIDv4 segment for unpredictability (OD-DOC-017).
-  s3_key                  String           @unique
-  original_filename       String
-  mime_type               String
-  file_size_bytes         Int
+  s3_key            String           @unique
+  original_filename String
+  mime_type         String
+  file_size_bytes   Int
   // REQ-DOC-001: expiry tracking. Consequence/warning on crossing is OD-DOC-003 (open).
-  expires_at              DateTime?        @db.Date
+  expires_at        DateTime?        @db.Date
   // REQ-DOC-003: true only for non-EU/EEA/Swiss workers' work-permit documents.
-  is_work_permit          Boolean          @default(false)
-  created_at              DateTime         @default(now())
-  updated_at              DateTime         @updatedAt
+  is_work_permit    Boolean          @default(false)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
+  // SPEC-HR-001 (MIG-GAP-DOC-001): back-relation for a Contract's scanned
+  // signed copy — HR delegates storage here, does not duplicate it
+  // (RULE-DOC-04: this delegation grants HR no document-lifecycle authority).
+  hr_contract_scan  Contract?        @relation("hr_contract_scan")
 
   // OD-DOC-019 (FIND-PERF-001): compound index required at schema-creation time.
   @@index([worker_id, category])
@@ -1088,4 +1098,106 @@ model WorkerGeoCheckin {
   @@index([worker_id])
   @@index([hotel_id])
   @@index([checked_at])
+}
+
+// =============================================================================
+// HR MODULE (SPEC-HR-001, ADR-012/ADR-014 bounded context; PR 1 of the HR
+// implementation plan following the backend-hr/SPEC-EMP-001 boundary review)
+// =============================================================================
+
+// state-hr-contract (SPEC-HR-001 REQ-HR-001..007, RULE-HR-01..07). Owned
+// exclusively by backend-hr (ADR-012, Accepted 2026-07-12: contract
+// lifecycle/generation/templates/versions/signatures/manager-confirmation is
+// backend-hr's capability; Onboarding/employee-management consume, not own).
+// Contract PDF generation reads Personalfragebogen-sourced data from the
+// PERSISTED employee-management record (EmploymentRecord.personal_data),
+// not a transient Onboarding source — OD-HR-02b, resolved per the HR
+// boundary review: SPEC-EMP-001's own REQ-EMP-011 already designs
+// EmploymentRecord as that persisted store, no onboarding module exists in
+// code to read a transient source from, and CRR §6 (Personalfragebogen at
+// signup) precedes CRR §9 (contract, post-familiarization) so the data is
+// already persisted by generation time. HR reads EmploymentRecord directly
+// via Prisma (this.prisma.employmentRecord.findUnique), the same
+// already-established cross-module read pattern calendar/service.ts and
+// job-requests/service.ts already use — not a new service-layer coupling.
+enum ContractStatus {
+  PENDING // generated, awaiting scan-upload + manager confirmation (RULE-HR-01)
+  ACTIVE // manager-confirmed "signed & valid" (RULE-HR-03); 1-year clock started (RULE-HR-05)
+  EXTENDED // +1 year, no new probation (RULE-HR-06)
+  PERMANENT // open-ended, no further expiry reminders (RULE-HR-06)
+}
+
+model Contract {
+  id                   String          @id @default(cuid())
+  worker_id            String
+  worker               User            @relation("hr_contract_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  template_id          String // ADR-039: no salary/compensation field — document production only
+  position             String
+  start_date           DateTime        @db.Date
+  end_date             DateTime?       @db.Date
+  status               ContractStatus  @default(PENDING)
+  // Generated PDF reference (RULE-HR-01) and the manager-uploaded scanned
+  // signed copy (RULE-HR-03) — both S3 EU object keys (REQ-HR-008), never
+  // built from unsanitized client input (RULE-HR-13). scanned_document_id
+  // links to the WorkerDocument row created via the existing
+  // backend-documents delegation (MIG-GAP-DOC-001, hr/service.ts
+  // uploadDocument()) — HR does not duplicate document storage.
+  generated_pdf_key    String?
+  scanned_document_id  String?         @unique
+  scanned_document     WorkerDocument? @relation("hr_contract_scan", fields: [scanned_document_id], references: [id], onDelete: SetNull)
+  // Manager-confirmation event (RULE-HR-03/REQ-HR-013): who, when. Actor id
+  // MUST be derived from req.auth (RULE-HR-14), never client-supplied.
+  confirmed_by_id      String?
+  confirmed_by         User?           @relation("hr_contract_confirmed_by", fields: [confirmed_by_id], references: [id], onDelete: SetNull)
+  confirmed_at         DateTime?
+  // Expiry-clock/reminder scheduling state (RULE-HR-05/07, REQ-HR-007):
+  // populated once status flips to ACTIVE; reminders fire at 1yr/2yr marks,
+  // none once PERMANENT (RULE-HR-06).
+  expires_at           DateTime?
+  reminder_1yr_sent_at DateTime?
+  reminder_2yr_sent_at DateTime?
+  created_at           DateTime        @default(now())
+  updated_at           DateTime        @updatedAt
+
+  @@index([worker_id])
+  @@index([status])
+  @@index([expires_at])
+}
+
+// state-hr-payslip-request (SPEC-HR-001 REQ-HR-009/012, RULE-HR-09/12).
+// ADR-039: request-only tracking — zero payroll computation, no
+// gross-salary/wage-calculation field of any kind (backend-hr never
+// computes payroll; an external provider or manual process does, outside
+// this system). ADR-014 (Accepted 2026-07-13): backend-hr is the exclusive
+// owner of this capability; no standalone Payslips module exists.
+enum PayslipRequestStatus {
+  REQUESTED // worker submitted a request (RULE-HR-09)
+  FULFILLED // manager marked the request emailed to the worker (RULE-HR-09)
+}
+
+model PayslipRequest {
+  id              String               @id @default(cuid())
+  worker_id       String
+  worker          User                 @relation("hr_payslip_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  period_start    DateTime             @db.Date
+  period_end      DateTime             @db.Date
+  status          PayslipRequestStatus @default(REQUESTED)
+  fulfilled_by_id String?
+  fulfilled_by    User?                @relation("hr_payslip_fulfilled_by", fields: [fulfilled_by_id], references: [id], onDelete: SetNull)
+  fulfilled_at    DateTime?
+  // ADR-041 (2026-07-28): 3-business-day auto-escalation to the manager's
+  // own manager (or Admin fallback, pending GD-03's org-chart model) via the
+  // existing Outbox — a notification, not a new state. escalated_at is set
+  // once, not repeated, so the scheduled job can skip already-escalated rows.
+  escalated_at    DateTime?
+  // Tier-3 retention classification (REQ-HR-012; CRR §25 payroll/tax-adjacent
+  // fields, 6 years) — metadata only; no RetentionTier enum exists yet
+  // platform-wide (backend-retention is zero-code, GD-09 mapping decided but
+  // module unbuilt), matching the convention every other module's Tier-3
+  // fields use today (comment-documented, not a foreign-keyed enum).
+  created_at      DateTime             @default(now())
+  updated_at      DateTime             @updatedAt
+
+  @@index([worker_id])
+  @@index([status])
 }
