@@ -532,7 +532,7 @@ export class HrService extends BaseService {
       if (!isFirstMark && contract.reminder_2yr_sent_at) continue;
 
       await this.prisma.$transaction(async (tx) => {
-        await this.notifyResponsibleManagerOfExpiry(tx, contract.worker_id, contract.id, isFirstMark);
+        await this.notifyResponsibleManagerOfExpiry(contract.worker_id, contract.id, isFirstMark, tx);
 
         await tx.contract.update({
           where: { id: contract.id },
@@ -546,10 +546,10 @@ export class HrService extends BaseService {
   }
 
   private async notifyResponsibleManagerOfExpiry(
-    tx: DatabaseTransaction,
     workerId: string,
     contractId: string,
-    isFirstMark: boolean
+    isFirstMark: boolean,
+    tx: DatabaseTransaction
   ): Promise<void> {
     const record = await tx.employmentRecord.findUnique({
       where: { user_id: workerId },

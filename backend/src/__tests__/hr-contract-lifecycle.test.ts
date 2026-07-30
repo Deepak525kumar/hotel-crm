@@ -752,15 +752,19 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
 
-    it('review fix: does NOT mark reminder_1yr_sent_at if the transaction fails after enqueueing (no duplicate reminder on retry)', async () => {
+    it('review fix: enqueue() and contract.update() run inside the same $transaction() call', async () => {
       mockContractFindMany.mockResolvedValue([
         makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
       ]);
       mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
-      // Simulate: enqueue() (inside the tx) succeeds, but the subsequent
-      // tx.contract.update() throws -- the whole transaction must roll back
-      // so the notification is NOT left committed without its de-dup marker.
+      // Simulate tx.contract.update() throwing after enqueue() already ran.
+      // This mock can only prove BOTH calls happen inside the same
+      // this.prisma.$transaction() callback -- it cannot simulate actual
+      // database rollback (there's no real DB here). Both operations
+      // executing inside one transaction is what lets Prisma provide
+      // rollback semantics if either operation fails; that guarantee itself
+      // is Prisma's, not something this mock can verify.
       mockContractUpdate.mockRejectedValueOnce(new Error('db write failed'));
 
       await expect(service.sendExpiryReminders(86400000, 100)).rejects.toThrow('db write failed');
@@ -770,9 +774,6 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
         expect.anything()
       );
-      // both enqueue() and contract.update() ran inside the SAME
-      // this.prisma.$transaction() call -- a real Prisma transaction would
-      // roll back enqueue()'s writes too once contract.update() throws.
     });
   });
 });
