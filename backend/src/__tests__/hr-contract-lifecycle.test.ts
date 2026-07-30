@@ -26,7 +26,9 @@ const mockContractUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => 
 const mockPayslipRequestCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockPayslipRequestFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockPayslipRequestFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestFindUniqueOrThrow = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockPayslipRequestUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestUpdateMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockHotelGroupFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -62,7 +64,9 @@ const txClient = {
     create: mockPayslipRequestCreate,
     findMany: mockPayslipRequestFindMany,
     findUnique: mockPayslipRequestFindUnique,
+    findUniqueOrThrow: mockPayslipRequestFindUniqueOrThrow,
     update: mockPayslipRequestUpdate,
+    updateMany: mockPayslipRequestUpdateMany,
   },
   employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
   hotelGroup: { findUnique: mockHotelGroupFindUnique },
@@ -159,7 +163,9 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     mockPayslipRequestCreate.mockReset();
     mockPayslipRequestFindMany.mockReset();
     mockPayslipRequestFindUnique.mockReset();
+    mockPayslipRequestFindUniqueOrThrow.mockReset();
     mockPayslipRequestUpdate.mockReset();
+    mockPayslipRequestUpdateMany.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
     mockHotelGroupFindUnique.mockReset();
     mockAuditLogCreate.mockReset();
@@ -540,12 +546,13 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       await expect(service.fulfilPayslipRequest('p1', 'm1', 'manager')).rejects.toBeInstanceOf(
         NotFoundError
       );
-      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+      expect(mockPayslipRequestUpdateMany).not.toHaveBeenCalled();
     });
 
     it('allows admin unconditionally, bypassing the scope check', async () => {
       mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow());
-      mockPayslipRequestUpdate.mockResolvedValue(
+      mockPayslipRequestUpdateMany.mockResolvedValue({ count: 1 });
+      mockPayslipRequestFindUniqueOrThrow.mockResolvedValue(
         makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'a1', fulfilled_at: NOW })
       );
 
@@ -567,13 +574,14 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         { type: 'hotel_group', hotel_group_id: 'g1' },
         'w1'
       );
-      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+      expect(mockPayslipRequestUpdateMany).not.toHaveBeenCalled();
     });
 
     it('allows a manager fulfilling a request for a worker in their own hotel group', async () => {
       mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow({ worker_id: 'w1' }));
       mockIsWorkerInGroupScope.mockResolvedValue(true);
-      mockPayslipRequestUpdate.mockResolvedValue(
+      mockPayslipRequestUpdateMany.mockResolvedValue({ count: 1 });
+      mockPayslipRequestFindUniqueOrThrow.mockResolvedValue(
         makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
       );
 
@@ -585,10 +593,11 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(result.status).toBe('FULFILLED');
     });
 
-    it('marks the request fulfilled and notifies the requesting worker', async () => {
+    it('marks the request fulfilled via an atomic compare-and-swap and notifies the requesting worker', async () => {
       mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow());
       mockIsWorkerInGroupScope.mockResolvedValue(true);
-      mockPayslipRequestUpdate.mockResolvedValue(
+      mockPayslipRequestUpdateMany.mockResolvedValue({ count: 1 });
+      mockPayslipRequestFindUniqueOrThrow.mockResolvedValue(
         makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
       );
 
@@ -597,9 +606,12 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         hotel_group_id: 'g1',
       });
 
-      expect(mockPayslipRequestUpdate).toHaveBeenCalledWith(
+      // The WHERE clause conditions on status: REQUESTED -- this is the
+      // compare-and-swap that makes the transition atomic under concurrency,
+      // not just the earlier findUnique+status-check fast path.
+      expect(mockPayslipRequestUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'p1' },
+          where: { id: 'p1', status: 'REQUESTED' },
           data: expect.objectContaining({ status: 'FULFILLED', fulfilled_by_id: 'm1' }),
         })
       );
@@ -618,7 +630,29 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         ValidationError
       );
 
-      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+      expect(mockPayslipRequestUpdateMany).not.toHaveBeenCalled();
+      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
+    });
+
+    it('review fix (concurrency): rejects when a concurrent caller already flipped the row between the read and the compare-and-swap', async () => {
+      // Simulates the TOCTOU race this fix closes: the initial findUnique()
+      // still sees REQUESTED (a concurrent caller's write hasn't landed
+      // there yet), so the fast-path check passes -- but by the time this
+      // caller's updateMany() WHERE clause is evaluated, the row has
+      // already been flipped to FULFILLED by the other caller, so
+      // updateMany() matches zero rows.
+      mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow({ status: 'REQUESTED' }));
+      mockIsWorkerInGroupScope.mockResolvedValue(true);
+      mockPayslipRequestUpdateMany.mockResolvedValue({ count: 0 });
+
+      await expect(
+        service.fulfilPayslipRequest('p1', 'm1', 'manager', { type: 'hotel_group', hotel_group_id: 'g1' })
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      expect(mockPayslipRequestUpdateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'p1', status: 'REQUESTED' } })
+      );
+      expect(mockPayslipRequestFindUniqueOrThrow).not.toHaveBeenCalled();
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
@@ -690,6 +724,26 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         expect.objectContaining({ recipientId: 'w1', type: 'HR_CONTRACT_LAPSED' })
       );
       expect(result.id).toBe('c1');
+    });
+
+    it('documents the accepted non-idempotency gap (disclosed in-code, not fixed by design): a second call against the same still-ACTIVE contract re-runs every side effect', async () => {
+      // This is NOT a regression test for a bug fix -- it pins the CURRENT,
+      // explicitly-accepted behavior described in this method's own header
+      // comment. The Contract row is never mutated to a "lapsed" state
+      // (RULE-HR-06/REQ-HR-006 has no fourth state), so findFirst() matches
+      // the same contract on both calls. Per the commissioning human's
+      // explicit direction, no lapsed_at column or EmploymentRecord-status
+      // pre-check is being added -- if this test starts failing because a
+      // future change makes this idempotent, that's a deliberate change to
+      // re-document, not something this test should have silently allowed.
+      mockContractFindFirst.mockResolvedValue(makeContractRow({ status: 'ACTIVE' }));
+
+      await service.manualLapseContract('w1', 'm1', 'manager');
+      await service.manualLapseContract('w1', 'm1', 'manager');
+
+      expect(mockDeactivateForContractLapse).toHaveBeenCalledTimes(2);
+      expect(mockAuditLogCreate).toHaveBeenCalledTimes(2);
+      expect(mockNotificationEnqueue).toHaveBeenCalledTimes(2);
     });
   });
 

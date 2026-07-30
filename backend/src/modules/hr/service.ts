@@ -684,7 +684,10 @@ export class HrService extends BaseService {
   // Rejects re-fulfilling an already-FULFILLED request, both to prevent a
   // stale/duplicate manager action from re-notifying the worker and to keep
   // fulfilled_by_id/fulfilled_at as the one true completion record, not
-  // silently overwritable by a second caller.
+  // silently overwritable by a second caller. This is enforced atomically
+  // (see the updateMany() compare-and-swap below), not just by the
+  // findUnique()+status-check fast path, which alone would leave a TOCTOU
+  // window for two concurrent callers.
   async fulfilPayslipRequest(
     requestId: string,
     actorId: string,
@@ -707,14 +710,27 @@ export class HrService extends BaseService {
       throw new ValidationError('This payslip request has already been fulfilled');
     }
 
-    const updated = await this.prisma.payslipRequest.update({
-      where: { id: requestId },
+    // Review fix: compare-and-swap via updateMany's WHERE clause (ADR-057's
+    // first-accept-wins pattern, job-requests/service.ts:653 -- "the WHERE
+    // clause's ... predicate is what Postgres re-evaluates against
+    // post-lock values for any concurrent claimant on this same row, making
+    // this single UPDATE atomic without a separate version column"). The
+    // findUnique+status-check above is a fast-path rejection for the
+    // common case; this WHERE clause is what actually prevents two
+    // concurrent callers from both fulfilling the same REQUESTED row.
+    const claimed = await this.prisma.payslipRequest.updateMany({
+      where: { id: requestId, status: PayslipRequestStatus.REQUESTED },
       data: {
         status: PayslipRequestStatus.FULFILLED,
         fulfilled_by_id: actorId,
         fulfilled_at: new Date(),
       },
     });
+    if (claimed.count === 0) {
+      throw new ValidationError('This payslip request has already been fulfilled');
+    }
+
+    const updated = await this.prisma.payslipRequest.findUniqueOrThrow({ where: { id: requestId } });
 
     await notificationService.enqueue({
       recipientId: request.worker_id,
