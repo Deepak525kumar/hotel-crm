@@ -419,4 +419,54 @@ describe('EmployeeManagementService', () => {
       expect(result.skills).toEqual([{ tag: SkillTag.CLEANER, assessment_basis: 'rooms_cleaned' }]);
     });
   });
+
+  describe('deactivateForContractLapse (ADR-045, HR implementation PR 5)', () => {
+    it('is a no-op when no employment record exists for the user (best-effort)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+      await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+      expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('is idempotent when the record is already DEACTIVATED', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED })
+      );
+      await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('deactivates an ACTIVE record with no actor.role gate (internal cross-module call)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED })
+      );
+
+      await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
+
+      expect(mockPrisma.employmentRecord.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'emp_1' },
+          data: expect.objectContaining({ status: EmploymentStatus.DEACTIVATED }),
+        })
+      );
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'employee.deactivate.contract_lapse' }),
+        })
+      );
+    });
+
+    it('rejects an illegal transition (e.g. from REJECTED, matching assertTransition)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.REJECTED })
+      );
+      await expect(
+        service.deactivateForContractLapse('user_1', 'contract_lapse_manual')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+  });
 });

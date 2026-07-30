@@ -106,6 +106,40 @@ export class HrController {
     }
   }
 
+  // RULE-HR-06/07, ADR-040: manager-only confirmation, no worker veto.
+  async extendContract(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.extendContract(req.params.worker_id, req.auth.userId, req.auth.role);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ADR-040 PATH (a) only: explicit manager "do not continue" action.
+  async manualLapseContract(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.manualLapseContract(
+        req.params.worker_id,
+        req.auth.userId,
+        req.auth.role
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // IF-HR-RequestPayslip (worker-self route). OD-HR-10 (FIND-SEC-HR-03,
   // IDOR): worker_id is ALWAYS req.auth.userId here — this route never
   // accepts a client-supplied worker_id, unlike createPayroll below (the

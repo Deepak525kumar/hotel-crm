@@ -56,6 +56,8 @@ jest.mock('../modules/hr/controller.js', () => ({
     getContractStatus: ok,
     uploadSignedContract: ok,
     confirmContractSigned: ok,
+    extendContract: ok,
+    manualLapseContract: ok,
     listPayroll: ok,
     createPayroll: ok,
     requestPayslip: ok,
@@ -188,6 +190,39 @@ describe('HR route authorization (ADR-030 C-10)', () => {
     it('denies worker on POST /hr/workers/:worker_id/contract-confirm (403 — manager/admin only)', async () => {
       testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
       const res = await request(makeApp()).post('/hr/workers/w1/contract-confirm').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager in scope on POST /hr/workers/:worker_id/contract-extend (RULE-HR-06/07, ADR-040)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-extend').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager outside scope on POST /hr/workers/:worker_id/contract-extend (403)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-extend').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('denies worker on POST /hr/workers/:worker_id/contract-extend (403 — no worker-side veto/confirm, ADR-040)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-extend').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager in scope on POST /hr/workers/:worker_id/contract-lapse (ADR-040 PATH a)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-lapse').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies worker on POST /hr/workers/:worker_id/contract-lapse (403 — no worker-side veto, ADR-040)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/workers/w1/contract-lapse').send({});
       expect(res.status).toBe(403);
     });
 

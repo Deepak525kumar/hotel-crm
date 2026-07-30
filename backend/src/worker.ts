@@ -13,6 +13,7 @@ import {
 import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
 import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
+import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -42,6 +43,14 @@ import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js
  * hours after creation, notifying the raising manager, on a
  * configuration-driven interval (default every 15 minutes). Confirms
  * ADR-057's Platform-Worker-not-BullMQ decision in code.
+ *
+ * HR implementation PR 5 (IF-HR-ContractExpiryReminder, RULE-HR-07): the
+ * contract expiry reminder job notifies the responsible manager as a
+ * contract approaches its 1yr/2yr mark, on a configuration-driven interval
+ * (default daily). ADR-041's payslip-request escalation job is NOT
+ * registered here -- deferred, see hr/service.ts's own header comment: its
+ * Admin-fallback notification mechanism has no product/architecture
+ * decision behind it yet.
  */
 async function main() {
   try {
@@ -92,6 +101,12 @@ async function main() {
           intervalMs: env.JOB_REQUEST_AUTO_CLOSE_INTERVAL_MS,
           autoCloseAfterMs: env.JOB_REQUEST_AUTO_CLOSE_AFTER_MS,
           batchSize: env.JOB_REQUEST_AUTO_CLOSE_BATCH_SIZE,
+        })
+      )
+      .register(
+        new HrContractExpiryReminderJob({
+          intervalMs: env.HR_CONTRACT_EXPIRY_REMINDER_INTERVAL_MS,
+          batchSize: env.HR_CONTRACT_EXPIRY_REMINDER_BATCH_SIZE,
         })
       );
 
