@@ -727,15 +727,20 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     });
 
     it('documents the accepted non-idempotency gap (disclosed in-code, not fixed by design): a second call against the same still-ACTIVE contract re-runs every side effect', async () => {
-      // This is NOT a regression test for a bug fix -- it pins the CURRENT,
-      // explicitly-accepted behavior described in this method's own header
-      // comment. The Contract row is never mutated to a "lapsed" state
-      // (RULE-HR-06/REQ-HR-006 has no fourth state), so findFirst() matches
-      // the same contract on both calls. Per the commissioning human's
-      // explicit direction, no lapsed_at column or EmploymentRecord-status
-      // pre-check is being added -- if this test starts failing because a
-      // future change makes this idempotent, that's a deliberate change to
-      // re-document, not something this test should have silently allowed.
+      // This test asserts what the code CURRENTLY does, not what it SHOULD
+      // do -- it is a pin on present behavior, not an endorsement of it. The
+      // duplicate audit entry and duplicate worker notification this proves
+      // are a known, disclosed gap (see this method's own header comment),
+      // deferred pending a future business-concept decision (e.g. a real
+      // "lapsed" contract state), not accepted as correct or desirable.
+      // The Contract row is never mutated to a "lapsed" state (RULE-HR-06/
+      // REQ-HR-006 has no fourth state), so findFirst() matches the same
+      // contract on both calls. Per the commissioning human's explicit
+      // direction, no lapsed_at column or EmploymentRecord-status pre-check
+      // is being added here -- if this test starts failing because a future
+      // change makes this idempotent, that is the deliberate, desired
+      // outcome: update this test to match the new (better) contract rather
+      // than treating the failure as a regression to revert.
       mockContractFindFirst.mockResolvedValue(makeContractRow({ status: 'ACTIVE' }));
 
       await service.manualLapseContract('w1', 'm1', 'manager');
