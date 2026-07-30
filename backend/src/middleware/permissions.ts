@@ -6,6 +6,28 @@ import { isWorkerEligibleForHotel } from '../lib/roster-scope.js';
 import { isHotelInScope, isWorkerInGroupScope } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
+// Repository convention: `requirePermission()`'s array form is an AND check
+// (every() below) — it cannot express "token A for role X, token B for role
+// Y" on a single route. If a route needs a different permission token per
+// caller role (e.g. a worker-self-service route alongside an admin/manager
+// route at the same path), write a small named wrapper function that
+// branches on `req.auth.role` and calls `requirePermission()` with the
+// resolved token — see hr/routes.ts's `requireContractReadAccess()` for the
+// reference implementation.
+//
+// Any such wrapper MUST declare its full token set via a structured comment
+// directly above its `function` declaration, so the static D-8
+// permission-token-hygiene test (__tests__/support/route-registry.ts) can
+// discover the tokens it checks — that parser only recognizes literal
+// `requirePermission('...')` calls made directly inside a route
+// registration, and cannot see a check performed inside a named wrapper's
+// own body:
+//   // @requiresPermission hr:read hr:contract:read-own
+//   function requireContractReadAccess() { ... }
+// Omitting this annotation does not weaken runtime security (the wrapper
+// still enforces the check) — it only makes the token invisible to the
+// static hygiene test, which will then report it as an unchecked/orphaned
+// permission token.
 export function requirePermission(permissions: string | string[]) {
   return (req: Request, _res: Response, next: NextFunction): void => {
     if (!req.auth) {
