@@ -23,6 +23,49 @@ const upload = multer({
   },
 });
 
+// checkWorkerScope() allows only admin (bypass) and manager (group-scope
+// check) — every other role, including worker, is unconditionally denied.
+// IF-HR-GetContractStatus (ADR-042/OD-HR-10) requires worker self-access,
+// which checkWorkerScope() cannot express. Worker self-access is instead
+// self-scoped in the service layer (HrService.getContractStatus checks
+// actorId === workerId for the 'worker' role) — the identical
+// requireRole(['admin','manager','worker']) + scopeWorkerRoute() shape
+// documents/routes.ts's four admin/manager/worker routes already establish.
+function scopeWorkerRoute() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.auth?.role === 'worker') {
+      next();
+      return;
+    }
+    checkWorkerScope()(req, res, next);
+  };
+}
+
+// ADR-042/OD-HR-10: worker access to IF-HR-GetContractStatus MUST be gated
+// by the dedicated hr:contract:read-own token, "satisfied by construction,"
+// not left to service-layer self-scoping alone. requirePermission()'s array
+// form is an AND check (every() in permissions.ts), so a single
+// requirePermission(['hr:read', 'hr:contract:read-own']) call cannot express
+// "hr:read OR hr:contract:read-own" across roles that hold different
+// tokens for the same route -- documents/routes.ts's identical
+// admin/manager/worker shape has no dedicated worker token to enforce at
+// all (GD-16 never introduced one), so it is not a valid precedent for
+// omitting the check here. This performs the role-specific OR the AND
+// primitive cannot: admin/manager must hold hr:read; worker must hold
+// hr:contract:read-own.
+//
+// @requiresPermission hr:read hr:contract:read-own
+// (see __tests__/support/route-registry.ts's own header comment: this
+// annotation is how the static D-8 permission-token-hygiene parser
+// discovers tokens checked inside a role-conditional wrapper function
+// rather than a literal requirePermission('...') call site.)
+function requireContractReadAccess() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const requiredToken = req.auth?.role === 'worker' ? 'hr:contract:read-own' : 'hr:read';
+    requirePermission(requiredToken)(req, res, next);
+  };
+}
+
 // Translates multer's own MulterError into the platform's ValidationError
 // shape (422), mirroring documents/routes.ts's handleUploadErrors().
 function handleUploadErrors() {
@@ -77,6 +120,22 @@ router.post(
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.createPayroll(req, res, next)
+);
+
+// IF-HR-GetContractStatus (ADR-042/OD-HR-10, FIND-SEC-HR-03 IDOR guard):
+// admin/manager must hold hr:read; worker must hold hr:contract:read-own
+// (requireContractReadAccess() enforces this role-specific split). Manager
+// is additionally scoped via checkWorkerScope() (group-grain); worker is
+// self-scoped inside HrService.getContractStatus — worker_id is never
+// trusted from the path for a worker-role caller beyond that self-check.
+// scopeWorkerRoute() lets a worker through to the service's own check
+// rather than being denied by checkWorkerScope().
+router.get(
+  '/workers/:worker_id/contract-status',
+  requireRole(['admin', 'manager', 'worker']),
+  requireContractReadAccess(),
+  scopeWorkerRoute(),
+  (req, res, next) => hrController.getContractStatus(req, res, next)
 );
 
 // Documents (contract-scan mechanism-class upload, MIG-GAP-DOC-001 — delegates

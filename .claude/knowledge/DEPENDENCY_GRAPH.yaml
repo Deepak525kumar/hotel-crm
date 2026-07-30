@@ -357,6 +357,19 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/quality/service.ts getLeaderboard()"
+  # HR implementation PR 2 (backend-hr/SPEC-EMP-001 boundary review, OD-HR-02b
+  # resolved): IF-HR-CreateContract reads the persisted Personalfragebogen
+  # data (EmploymentRecord.personal_data) directly via Prisma, the same
+  # cross-module read pattern calendar/service.ts and job-requests/service.ts
+  # already establish -- not a new coupling shape, ADR-012/ADR-032-consistent
+  # (direct in-process reads are the platform standard).
+  - id: edge-hr-reads-employment-record
+    source: backend-hr
+    target: state-employment-record
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/hr/service.ts createContract() (this.prisma.employmentRecord.findUnique)"
   # GD-16/SPEC-DOCUMENTS-001 (PR #245, 2026-07-27): backend-documents' own
   # writes/reads of its sole state domain. No cross-module edge exists yet
   # (MIG-GAP-DOC-001, backend-hr's stub calling into this module, is not done).

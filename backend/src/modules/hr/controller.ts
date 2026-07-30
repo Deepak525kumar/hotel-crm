@@ -29,6 +29,27 @@ export class HrController {
     }
   }
 
+  // IF-HR-GetContractStatus. OD-HR-10 (FIND-SEC-HR-03, IDOR): worker-role
+  // scoping is enforced inside hrService.getContractStatus() itself, since
+  // this route carries no checkWorkerScope() call (worker self-read path).
+  async getContractStatus(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.getContractStatus(
+        req.params.worker_id,
+        req.auth.userId,
+        req.auth.role
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createPayroll(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await hrService.createPayroll(req.body);

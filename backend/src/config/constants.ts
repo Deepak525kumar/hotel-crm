@@ -184,6 +184,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'notifications:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): a worker may view their own profile & history (self only).
     'employees:read',
+    // ADR-042 (GD-15, OD-HR-10, 2026-07-28): a narrow, self-scoped HR token --
+    // NOT a blanket hr:read/hr:write extension. worker_id is always
+    // server-derived from the authenticated caller for WORKER-role callers,
+    // never client-supplied (FIND-SEC-HR-03 IDOR guard, satisfied by
+    // construction). Enforced on GET /hr/workers/:worker_id/contract-status
+    // via requireContractReadAccess() in hr/routes.ts.
+    'hr:contract:read-own',
   ]) as string[],
 });
 
