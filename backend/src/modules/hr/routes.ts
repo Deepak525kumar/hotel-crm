@@ -23,6 +23,30 @@ const upload = multer({
   },
 });
 
+// checkWorkerScope() allows only admin (bypass) and manager (group-scope
+// check) — every other role, including worker, is unconditionally denied.
+// IF-HR-GetContractStatus (ADR-042/OD-HR-10) requires worker self-access,
+// which checkWorkerScope() cannot express. Worker self-access is instead
+// self-scoped in the service layer (HrService.getContractStatus checks
+// actorId === workerId for the 'worker' role) — the identical
+// requireRole(['admin','manager','worker']) + scopeWorkerRoute() shape (no
+// requirePermission() call at all) already established by every one of
+// documents/routes.ts's four admin/manager/worker routes for this exact
+// actor set. requirePermission()'s array form is an AND check (every() in
+// permissions.ts), not OR, so it cannot express "hr:read OR
+// hr:contract:read-own" across roles that hold different tokens for the
+// same route — matching Documents' own precedent of using no token gate at
+// all here, not inventing a parser-invisible inline check.
+function scopeWorkerRoute() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (req.auth?.role === 'worker') {
+      next();
+      return;
+    }
+    checkWorkerScope()(req, res, next);
+  };
+}
+
 // Translates multer's own MulterError into the platform's ValidationError
 // shape (422), mirroring documents/routes.ts's handleUploadErrors().
 function handleUploadErrors() {
@@ -77,6 +101,19 @@ router.post(
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.createPayroll(req, res, next)
+);
+
+// IF-HR-GetContractStatus (ADR-042/OD-HR-10, FIND-SEC-HR-03 IDOR guard):
+// admin (unconditional), manager (checkWorkerScope, group-grain), and
+// worker (self-scoped inside HrService.getContractStatus — worker_id is
+// never trusted from the path for a worker-role caller beyond that
+// self-check). scopeWorkerRoute() lets a worker through to the service's
+// own check rather than being denied by checkWorkerScope().
+router.get(
+  '/workers/:worker_id/contract-status',
+  requireRole(['admin', 'manager', 'worker']),
+  scopeWorkerRoute(),
+  (req, res, next) => hrController.getContractStatus(req, res, next)
 );
 
 // Documents (contract-scan mechanism-class upload, MIG-GAP-DOC-001 — delegates

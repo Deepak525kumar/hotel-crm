@@ -53,6 +53,7 @@ jest.mock('../modules/hr/controller.js', () => ({
   hrController: {
     listContracts: ok,
     createContract: ok,
+    getContractStatus: ok,
     listPayroll: ok,
     createPayroll: ok,
     uploadDocument: ok,
@@ -153,6 +154,44 @@ describe('HR route authorization (ADR-030 C-10)', () => {
         expect(res.status).toBe(403);
       }
       expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /hr/workers/:worker_id/contract-status (ADR-042/OD-HR-10, mixed actor set)', () => {
+    it('allows admin unconditionally', async () => {
+      testAuth = { userId: 'a1', role: 'admin', permissions: ['hr:read'], scope: null };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(200);
+      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('allows a manager in scope (checkWorkerScope, group-grain)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager outside scope (403)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a worker to reach the route (self-scope enforced in the service, not here — mirrors documents/routes.ts, no requirePermission gate on this actor shape)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(200);
+      // scopeWorkerRoute() lets 'worker' straight through — checkWorkerScope()
+      // (and its EmploymentRecord lookup) is never invoked for this role.
+      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('denies checker (not in the actor set)', async () => {
+      testAuth = { userId: 'x1', role: 'checker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
+      expect(res.status).toBe(403);
     });
   });
 });
