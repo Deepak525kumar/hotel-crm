@@ -41,6 +41,24 @@ import type {
   ListContractsQuery,
 } from './types.js';
 
+// Architectural assumption (review note, not a defect): this service's
+// worker-scoped Contract lookups (getContractStatus, and PR 3/4/5's
+// uploadSignedContract/confirmContractSigned/extendContract/
+// manualLapseContract) resolve their target contract as
+// `findFirst({ where: { worker_id, status: ... }, orderBy: { created_at:
+// 'desc' } })` — implicitly assuming at most one PENDING (or one
+// ACTIVE/EXTENDED) contract per worker at a time. This is correct and
+// consistent with SPEC-HR-001's currently confirmed one-lifecycle-per-worker
+// state machine ((none) -> Pending -> signed/active -> extended ->
+// permanent, REQ-HR-006: "no other lifecycle values exist," no concurrent-
+// contract concept anywhere in CRR/PDD). No schema constraint enforces this
+// today (Contract carries no unique index on worker_id), so it is a
+// business-rule assumption, not a database-level invariant. If the business
+// model later allows concurrent draft/pending contracts for the same
+// worker (e.g. a renewal negotiated before the current contract expires),
+// every findFirst-by-worker-and-status call site in this file will need to
+// evolve — most likely to accept an explicit contract id rather than
+// inferring "the" contract from worker_id + status alone.
 export class HrService extends BaseService {
   // ---------------------------------------------------------------------------
   // IF-HR-CreateContract (RULE-HR-01/REQ-HR-001, generation half)
