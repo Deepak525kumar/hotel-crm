@@ -86,11 +86,17 @@ specifications:
     spec: none
     status: RETIRED (ADR-022)
   - module: backend-hr
+    spec: SPEC-HR-001
+    version: 0.2.9
+    status: REVIEW
+    path: docs/03-modules/hr/MODULE_SPEC.md
+    note: CORRECTED by the backend-hr/SPEC-EMP-001 boundary review (2026-07-30) -- this row previously cited SPEC-EMP-001 (a leftover artifact from before employee-management was split into its own dedicated module, human decision 2026-07-22; see the new employee-management row below). ADR-012 (Accepted 2026-07-12) and ADR-014 (Accepted 2026-07-13) settle backend-hr as the exclusive owner of the contract-lifecycle and payslip-request capability; SPEC-HR-001 itself was corrected 2026-07-28 to mark OD-HR-01a/OD-HR-01b RESOLVED citing those ADRs. Not FROZEN -- G2 freeze remains blocked on OD-HR-15 (auth-dependency Risk Assessment) and ordinary G2 gate progression. OD-HR-02b (Personalfragebogen data-source ambiguity) resolved by the boundary review: reads the persisted employee-management record, not a transient Onboarding source. HR implementation PR 1/2 (2026-07-30) landed Contract/PayslipRequest schema and the contract-lifecycle read/create/list/status interfaces.
+  - module: employee-management
     spec: SPEC-EMP-001
     version: 0.2.0
     status: FROZEN
     path: docs/03-modules/employee-management/MODULE_SPEC.md
-    note: FROZEN at G2 2026-07-20 (commissioning human, conditional on Security pass). Security upgraded FAIL->PASS_WITH_ACTIONS by targeted re-verification against ADR-023 (OD-EMP-05 resolved); FIND-001/FIND-002 carried forward as G8 release prerequisites, matching SPEC-AUTH-001/SPEC-ATT-001 precedent. ART-MEM-backend-hr produced. DISCOVERABILITY CROSS-REFERENCE (Repository Synchronization Workflow, 2026-07-20) -- docs/03-modules/hr/MODULE_SPEC.md (SPEC-HR-001@0.2.1, REVIEW, architecture BLOCKED) targets this same module id/code path for a different, disputed capability set (contracts/payslip-request); see MODULE_REGISTRY.yaml backend-hr `related_specification` and OD-HR-01a/OD-EMP-10. Not a second mapping for this row; SPEC-EMP-001@0.2.0 (FROZEN) remains the sole `spec` value here.
+    note: FROZEN at G2 2026-07-20 (commissioning human, conditional on Security pass). Security upgraded FAIL->PASS_WITH_ACTIONS by targeted re-verification against ADR-023 (OD-EMP-05 resolved); FIND-001/FIND-002 carried forward as G8 release prerequisites, matching SPEC-AUTH-001/SPEC-ATT-001 precedent. ART-MEM-backend-hr produced (historical name; module is now employee-management, per OD-EMP-10 resolved 2026-07-22). Added as its own row by the backend-hr/SPEC-EMP-001 boundary review (2026-07-30) -- previously this spec was cited only on the backend-hr row above, which was itself corrected in the same pass to cite SPEC-HR-001 instead (its own spec, at a different code path, backend/src/modules/employee-management).
   - module: backend-calendar
     spec: SPEC-CALENDAR-001
     version: 0.3.0

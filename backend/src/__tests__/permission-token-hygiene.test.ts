@@ -20,6 +20,19 @@ import { KNOWN_PRE_EXISTING_ORPHANED_TOKENS } from './support/known-debt.js';
 // needs its own production PR to remediate. That allowlist is pinned and
 // self-verified in `permission-token-known-debt.test.ts`, kept deliberately
 // out of this file so this invariant's assertions stay legible on their own.
+//
+// If your token fails "every non-wildcard token any role holds is checked
+// by at least one route" but IS genuinely checked at runtime: you likely
+// wrote a role-conditional permission wrapper (a route needing a different
+// token per caller role — `requirePermission()`'s array form is AND-only
+// and cannot express that). The static parser (support/route-registry.ts)
+// cannot see a check performed inside a named wrapper function's own body —
+// declare the wrapper's token set via a `@requiresPermission` comment
+// annotation above its `function` declaration instead of adding the token
+// to `KNOWN_PRE_EXISTING_ORPHANED_TOKENS` (that allowlist is for dead code,
+// not this). See `middleware/permissions.ts`'s `requirePermission()`
+// docstring and `hr/routes.ts`'s `requireContractReadAccess()` for the
+// reference convention and implementation.
 
 function isWildcard(token: string): boolean {
   return token.endsWith(':*');

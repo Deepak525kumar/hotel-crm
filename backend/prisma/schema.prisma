@@ -122,6 +122,9 @@ enum NotificationType {
   JOB_REQUEST_BROADCAST // to eligible worker: a skill-matched broadcast slot is open
   // Job-dispatch auto-close event (Epic 9 PR 9.10, TREQ-006)
   JOB_REQUEST_CLOSED // to the raising manager: an unfilled broadcast closed (6h auto-close or manual)
+  // HR implementation PR 4 (SPEC-HR-001 EVT-HR-PayslipRequested/Fulfilled)
+  HR_PAYSLIP_REQUESTED // to the requesting worker's Regional Manager: a new payslip request is outstanding
+  HR_PAYSLIP_FULFILLED // to the requesting worker: their payslip request was marked emailed
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -153,6 +156,7 @@ enum OutboxSourceModule {
   QUALITY
   CALENDAR
   DOCUMENTS
+  HR
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
