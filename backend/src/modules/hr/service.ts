@@ -44,6 +44,36 @@
 // (reject-on-detection) with a disclosed pass-through default scanner — see
 // malware-scan.ts's own header comment; no vendor/library has been chosen.
 //
+// HR implementation PR 5 (RULE-HR-06/07, ADR-040/045): extendContract/
+// manualLapseContract (manager-only continuation/lapse confirmation, no
+// worker-side veto — ADR-040 Decision §1/§3), sendExpiryReminders (scheduled
+// job, 1yr/2yr marks, REQ-HR-006/RULE-HR-07). manualLapseContract wires
+// ADR-040's PATH (a) only — an explicit manager decline — via a direct
+// in-process call to employee-management's new
+// deactivateForContractLapse() (ADR-045). PATH (b), silence past a defined
+// deadline, is explicitly NOT built here: ADR-040 ratifies that this
+// trigger exists but no document anywhere defines the deadline length
+// (unlike ADR-041's explicit 3-business-day payslip window) — confirmed
+// with the commissioning human before this PR was written; building a
+// silence-based auto-lapse job would require inventing that number
+// unrequested. This is a disclosed, deferred gap requiring its own future
+// product decision, not a silent omission.
+//
+// ADR-041's payslip-escalation scheduled job is ALSO deferred, discovered
+// while building this PR: escalation's real-world target is "the manager's
+// own manager, or Admin if no reporting-structure manager exists" — but
+// ADR-060 (org-chart, 2026-07-29) ratified a flat, hotel-scoped visibility
+// model with NO reporting-tree data structure, meaning the Admin-fallback
+// path is the ONLY path that will ever fire in practice, and no
+// "notify Admin" mechanism (broadcast, designated recipient, or otherwise)
+// exists anywhere in this codebase to build it against. Escalating instead
+// to the same Regional-Manager recipient the request/expiry-reminder paths
+// already use would silently narrow ADR-041's own intent, not implement it —
+// confirmed with the commissioning human before this PR was written; this
+// scheduled job (escalateStalePayslipRequests) is deferred pending a
+// product/architecture decision on the Admin-notification mechanism, not
+// silently substituted.
+//
 // HR implementation PR 4 (RULE-HR-09/12, ADR-039/041/042/043): requestPayslip,
 // listPayroll (lists PayslipRequest records — ADR-039's target shape, no
 // payroll computation), createPayroll (Manager/Admin may also create a
@@ -72,12 +102,14 @@ import {
   Prisma,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import type { DatabaseTransaction } from '../../lib/db.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
+import { employeeManagementService } from '../employee-management/service.js';
 import { notificationService } from '../notifications/service.js';
 import { getMalwareScanner } from './malware-scan.js';
 import type {
@@ -338,6 +370,214 @@ export class HrService extends BaseService {
     logger.info('hr_contract_confirmed', { contractId: contract.id, workerId, confirmedBy: actorId });
 
     return this.toDto(updated);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Contract continuation/permanence (RULE-HR-06/07, ADR-040): manager-only
+  // confirmation, no worker-side veto. extendContract handles both the 1yr
+  // mark (-> EXTENDED) and 2yr mark (-> PERMANENT); REQ-HR-006 confirms only
+  // these four states are reachable, so both transitions share one method
+  // rather than two near-duplicates.
+  // ---------------------------------------------------------------------------
+  async extendContract(
+    workerId: string,
+    actorId: string,
+    actorRole: string
+  ): Promise<ContractDto> {
+    const contract = await this.prisma.contract.findFirst({
+      where: { worker_id: workerId, status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED] } },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!contract) {
+      throw new NotFoundError('No active or extended contract found for this worker to extend');
+    }
+
+    // RULE-HR-06: ACTIVE (1yr mark) -> EXTENDED; EXTENDED (2yr mark) -> PERMANENT.
+    const nextStatus =
+      contract.status === ContractStatus.ACTIVE ? ContractStatus.EXTENDED : ContractStatus.PERMANENT;
+
+    const data: Prisma.ContractUpdateInput = { status: nextStatus };
+    if (nextStatus === ContractStatus.EXTENDED) {
+      // RULE-HR-06: extended one additional year from the current expiry mark.
+      const newExpiry = new Date(contract.expires_at ?? new Date());
+      newExpiry.setUTCFullYear(newExpiry.getUTCFullYear() + 1);
+      data.expires_at = newExpiry;
+    } else {
+      // RULE-HR-06: permanent, open-ended -- no further expiry reminders.
+      data.expires_at = null;
+    }
+
+    const updated = await this.prisma.contract.update({ where: { id: contract.id }, data });
+
+    await this.logAudit(
+      actorId,
+      actorRole,
+      nextStatus === ContractStatus.EXTENDED ? 'hr_contract.extend' : 'hr_contract.make_permanent',
+      'Contract',
+      contract.id,
+      { worker_id: workerId, from_status: contract.status, to_status: nextStatus }
+    );
+
+    logger.info('hr_contract_extended', { contractId: contract.id, workerId, nextStatus });
+
+    return this.toDto(updated);
+  }
+
+  // ADR-040 Decision §2, PATH (a) only: an explicit manager "do not
+  // continue" action. PATH (b) (manager silence past a defined deadline) is
+  // explicitly NOT implemented -- see this file's header comment; no
+  // document defines that deadline's length. Triggers employee-management's
+  // Deactivated transition automatically via a direct in-process call
+  // (ADR-045), and notifies the worker (ADR-040 §3: worker relationship to
+  // this transition is informational only, not decisional).
+  //
+  // Disclosed gap (review note, not fixed here): this method is NOT
+  // idempotent. Its findFirst() matches status IN
+  // (PENDING/ACTIVE/EXTENDED), and per RULE-HR-06/REQ-HR-006 a lapse
+  // deliberately does not transition Contract to a fourth "lapsed" state
+  // (see the comment inside this method) -- so nothing here prevents a
+  // second call against the same still-ACTIVE/EXTENDED contract from
+  // re-running deactivateForContractLapse(), writing a second
+  // hr_contract.lapse audit entry, and re-notifying the worker.
+  // employee-management's own deactivate step is idempotent; this call site
+  // is not. Confirmed with the commissioning human: no lapsed_at-style
+  // column or EmploymentRecord-status pre-check is being added in this PR --
+  // if idempotency is required, it should be solved via an explicit business
+  // concept (e.g. a real "lapsed" contract state or equivalent), not an
+  // implementation shortcut grafted onto the current state machine. Left as
+  // an open decision for a future product/architecture pass.
+  async manualLapseContract(
+    workerId: string,
+    actorId: string,
+    actorRole: string
+  ): Promise<ContractDto> {
+    const contract = await this.prisma.contract.findFirst({
+      where: {
+        worker_id: workerId,
+        status: { in: [ContractStatus.PENDING, ContractStatus.ACTIVE, ContractStatus.EXTENDED] },
+      },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!contract) {
+      throw new NotFoundError('No lapsable contract found for this worker');
+    }
+
+    // RULE-HR-06: lapse offboards, it does not itself transition Contract to
+    // a fourth "lapsed" state -- REQ-HR-006 confirms only pending/active/
+    // extended/permanent are reachable Contract statuses. The Contract row
+    // is left as-is (its own history is preserved); the employment-record
+    // deactivation is the actual, observable effect of a lapse.
+    await employeeManagementService.deactivateForContractLapse(workerId, 'contract_lapse_manual');
+
+    await this.logAudit(actorId, actorRole, 'hr_contract.lapse', 'Contract', contract.id, {
+      worker_id: workerId,
+      from_status: contract.status,
+    });
+
+    await notificationService.enqueue({
+      recipientId: workerId,
+      type: 'HR_CONTRACT_LAPSED',
+      title: 'Contract lapsed',
+      message: 'Your contract has lapsed. Contact your manager for details.',
+      data: { contract_id: contract.id },
+      transports: [OutboxTransport.PUSH],
+      sourceModule: OutboxSourceModule.HR,
+      producerService: 'HrService',
+    });
+
+    logger.info('hr_contract_lapsed', { contractId: contract.id, workerId, lapsedBy: actorId });
+
+    return this.toDto(contract);
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-HR-ContractExpiryReminder (RULE-HR-07, scheduled job)
+  // ---------------------------------------------------------------------------
+  // Called by HrContractExpiryReminderJob.run() (expiry-reminder-job.ts) on
+  // the Platform Worker Scheduler. Notifies the responsible manager (the
+  // worker's Hotel Group's Regional Manager -- the identical resolution
+  // notifyResponsibleManager()/calendar's notifyManager() already
+  // established) at each contract's 1yr/2yr expiry mark. PERMANENT contracts
+  // are excluded by construction (expires_at is null, RULE-HR-06) -- "no
+  // further reminders once permanent" is satisfied by the query itself, not
+  // a separate check.
+  //
+  // Review fix: notifyResponsibleManagerOfExpiry() (its lookups AND its
+  // notificationService.enqueue() call) and the reminder_*_sent_at update
+  // below now run inside one this.prisma.$transaction(), with `tx` threaded
+  // through to enqueue()'s own optional tx parameter (ADR-029 §2 join --
+  // notifications/service.ts:33-39's documented mechanism, not a new one).
+  // Previously these were two independent commits: if enqueue() succeeded
+  // but the subsequent contract.update() then threw, the notification was
+  // already durably queued but the de-dup column was never set, so the next
+  // scheduler run would re-send a duplicate reminder for the same mark.
+  async sendExpiryReminders(withinMs: number, batchSize: number): Promise<number> {
+    const cutoff = new Date(Date.now() + withinMs);
+    const contracts = await this.prisma.contract.findMany({
+      where: {
+        status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED] },
+        expires_at: { lte: cutoff, not: null },
+        OR: [{ reminder_1yr_sent_at: null }, { reminder_2yr_sent_at: null }],
+      },
+      take: batchSize,
+    });
+
+    let sent = 0;
+    for (const contract of contracts) {
+      // ACTIVE -> approaching the 1yr mark; EXTENDED -> approaching the 2yr
+      // (permanence) mark. Each fires at most once per mark (the
+      // reminder_*_sent_at columns are the de-duplication guard).
+      const isFirstMark = contract.status === ContractStatus.ACTIVE;
+      if (isFirstMark && contract.reminder_1yr_sent_at) continue;
+      if (!isFirstMark && contract.reminder_2yr_sent_at) continue;
+
+      await this.prisma.$transaction(async (tx) => {
+        await this.notifyResponsibleManagerOfExpiry(contract.worker_id, contract.id, isFirstMark, tx);
+
+        await tx.contract.update({
+          where: { id: contract.id },
+          data: isFirstMark ? { reminder_1yr_sent_at: new Date() } : { reminder_2yr_sent_at: new Date() },
+        });
+      });
+      sent++;
+    }
+
+    return sent;
+  }
+
+  private async notifyResponsibleManagerOfExpiry(
+    workerId: string,
+    contractId: string,
+    isFirstMark: boolean,
+    tx: DatabaseTransaction
+  ): Promise<void> {
+    const record = await tx.employmentRecord.findUnique({
+      where: { user_id: workerId },
+      select: { status: true, hotel_group_id: true },
+    });
+    if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
+
+    const group = await tx.hotelGroup.findUnique({
+      where: { id: record.hotel_group_id },
+      select: { regional_manager_user_id: true },
+    });
+    if (!group?.regional_manager_user_id) return;
+
+    await notificationService.enqueue(
+      {
+        recipientId: group.regional_manager_user_id,
+        type: 'HR_CONTRACT_EXPIRY_REMINDER',
+        title: isFirstMark ? 'Contract approaching 1-year mark' : 'Contract approaching 2-year mark',
+        message: isFirstMark
+          ? 'A contract is approaching its 1-year expiry -- confirm extension or lapse.'
+          : 'A contract is approaching its 2-year mark -- confirm permanence or lapse.',
+        data: { worker_id: workerId, contract_id: contractId },
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.HR,
+        producerService: 'HrService',
+      },
+      tx
+    );
   }
 
   // ---------------------------------------------------------------------------

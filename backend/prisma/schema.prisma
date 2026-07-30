@@ -125,6 +125,10 @@ enum NotificationType {
   // HR implementation PR 4 (SPEC-HR-001 EVT-HR-PayslipRequested/Fulfilled)
   HR_PAYSLIP_REQUESTED // to the requesting worker's Regional Manager: a new payslip request is outstanding
   HR_PAYSLIP_FULFILLED // to the requesting worker: their payslip request was marked emailed
+  // HR implementation PR 5 (IF-HR-ContractExpiryReminder, ADR-041 escalation)
+  HR_CONTRACT_EXPIRY_REMINDER // to the responsible manager: a contract nears its 1yr/2yr mark
+  HR_PAYSLIP_REQUEST_ESCALATED // to the responsible manager's own manager (or Admin fallback): an unfulfilled payslip request has passed the 3-business-day window (ADR-041)
+  HR_CONTRACT_LAPSED // to the requesting worker: their contract lapsed and offboarding was triggered (ADR-040/ADR-045)
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the

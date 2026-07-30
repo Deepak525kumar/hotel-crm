@@ -282,6 +282,39 @@ export class EmployeeManagementService extends BaseService {
     return toGeneralProfile(updated);
   }
 
+  // ADR-045 (2026-07-28, resolving OD-EMP-04): HR implementation PR 5. A
+  // narrow, purpose-built internal method for backend-hr's contract-lapse
+  // trigger (ADR-040: manager-confirmed "do not continue" action, or
+  // manager silence past a deadline detected by HR's own scheduled job —
+  // both call this the same way). No actor.role gate, unlike deactivate()/
+  // lifecycleSignal() above: this is an internal cross-module call, not a
+  // user-facing route, and ADR-040's manager-only/scheduled-job rules
+  // already gate the caller (backend-hr) before this method is ever
+  // reached — mirroring the same authorization-boundary shape ADR-032
+  // established for every other direct in-process cross-module call on this
+  // platform (the caller's own authz, not a second check here). Keyed by
+  // user_id (backend-hr only holds Contract.worker_id, a User.id), not
+  // employee_id like findRecordOrThrow() above -- HR has no reason to know
+  // employee-management's own human-facing employee_id.
+  async deactivateForContractLapse(userId: string, reason: string): Promise<void> {
+    const record = await this.prisma.employmentRecord.findUnique({ where: { user_id: userId } });
+    if (!record) return; // no employment record to deactivate -- nothing to do (best-effort, matches OD-CAL-06 precedent)
+    if (record.status === EmploymentStatus.DEACTIVATED) return; // idempotent -- already deactivated
+
+    assertTransition(record.status, EmploymentStatus.DEACTIVATED);
+
+    await this.prisma.employmentRecord.update({
+      where: { id: record.id },
+      data: { status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() },
+    });
+
+    await this.logAudit(null, 'system', 'employee.deactivate.contract_lapse', 'EMPLOYMENT_RECORD', record.id, {
+      reason,
+    });
+
+    logger.info('domain_event', { event: 'EVT-EMP-deactivated', employmentRecordId: record.id, reason });
+  }
+
   // ── Lifecycle signal (internal, Onboarding-driven) ──────────────────────
 
   private static readonly SIGNAL_TARGET: Record<LifecycleSignal, EmploymentStatus> = {

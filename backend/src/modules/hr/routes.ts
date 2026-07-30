@@ -184,6 +184,24 @@ router.post(
   (req, res, next) => hrController.confirmContractSigned(req, res, next)
 );
 
+// RULE-HR-06/07, ADR-040: manager-only continuation/permanence confirmation
+// (extend) and explicit-decline lapse. Both Manager/Admin only, no
+// worker-side veto (ADR-040 Decision §1/§3).
+router.post(
+  '/workers/:worker_id/contract-extend',
+  requireRole(['admin', 'manager']),
+  requirePermission('hr:write'),
+  checkWorkerScope(),
+  (req, res, next) => hrController.extendContract(req, res, next)
+);
+router.post(
+  '/workers/:worker_id/contract-lapse',
+  requireRole(['admin', 'manager']),
+  requirePermission('hr:write'),
+  checkWorkerScope(),
+  (req, res, next) => hrController.manualLapseContract(req, res, next)
+);
+
 // Documents (contract-scan mechanism-class upload, MIG-GAP-DOC-001 — delegates
 // to backend-documents' DocumentService rather than hosting the mechanism)
 router.post(

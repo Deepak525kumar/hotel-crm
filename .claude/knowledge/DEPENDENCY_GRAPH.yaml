@@ -232,11 +232,15 @@ edges:
     compatibility: unknown
     status: observed
     evidence: "backend/src/modules/quality/service.ts:4,75,191"
-  # HR implementation PR 4 (RULE-HR-09/12, EVT-HR-PayslipRequested/Fulfilled):
-  # requestPayslip()/createPayroll() notify the requesting worker's Hotel
-  # Group's Regional Manager; fulfilPayslipRequest() notifies the requesting
-  # worker. New additive NotificationType.HR_PAYSLIP_REQUESTED/FULFILLED
-  # values + OutboxSourceModule.HR, migration 20260730020000.
+  # HR implementation PR 4/5 (RULE-HR-09/12, EVT-HR-PayslipRequested/Fulfilled;
+  # RULE-HR-07/ADR-040/045, IF-HR-ContractExpiryReminder): requestPayslip()/
+  # createPayroll() and sendExpiryReminders()/notifyResponsibleManagerOfExpiry()
+  # notify the requesting worker's Hotel Group's Regional Manager;
+  # fulfilPayslipRequest()/manualLapseContract() notify the requesting worker.
+  # New additive NotificationType.HR_PAYSLIP_REQUESTED/FULFILLED values (PR 4,
+  # migration 20260730020000) + HR_CONTRACT_EXPIRY_REMINDER/
+  # HR_PAYSLIP_REQUEST_ESCALATED (unused, deferred)/HR_CONTRACT_LAPSED (PR 5,
+  # migration 20260730030000) + OutboxSourceModule.HR.
   - id: edge-hr-notifications
     source: backend-hr
     target: backend-notifications
@@ -244,7 +248,7 @@ edges:
     contract: notification-service
     compatibility: unknown
     status: observed
-    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager(), fulfilPayslipRequest()"
+    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager(), fulfilPayslipRequest(), notifyResponsibleManagerOfExpiry(), manualLapseContract()"
 
   # --- Cross-module state writes (work-applications accept-application transaction) ---
   # edge-work-applications-writes-work-request, edge-work-applications-writes-worker-assignment,
@@ -382,18 +386,35 @@ edges:
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/hr/service.ts createContract() (this.prisma.employmentRecord.findUnique); notifyResponsibleManager() (PR 4); listContracts()/listPayroll() ADR-043 scope filter (via resolveNonAdminScopeFilter's employment_record join)"
-  # HR implementation PR 4: notifyResponsibleManager() resolves the
-  # requesting worker's Hotel Group's Regional Manager, the identical
-  # "responsible manager" pattern calendar/service.ts's own notifyManager()
-  # already established.
+    evidence: "backend/src/modules/hr/service.ts createContract() (this.prisma.employmentRecord.findUnique); notifyResponsibleManager()/notifyResponsibleManagerOfExpiry() (PR 4/5); listContracts()/listPayroll() ADR-043 scope filter (via resolveNonAdminScopeFilter's employment_record join)"
+  # HR implementation PR 4/5: notifyResponsibleManager()/
+  # notifyResponsibleManagerOfExpiry() resolve the requesting worker's Hotel
+  # Group's Regional Manager, the identical "responsible manager" pattern
+  # calendar/service.ts's own notifyManager() already established.
   - id: edge-hr-reads-hotel-group
     source: backend-hr
     target: state-hotel-group
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager() (this.prisma.hotelGroup.findUnique)"
+    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager()/notifyResponsibleManagerOfExpiry() (this.prisma.hotelGroup.findUnique)"
+  # HR implementation PR 5 (ADR-045): manualLapseContract() calls
+  # employee-management's new deactivateForContractLapse() (a direct
+  # in-process call, ADR-032), which writes state-employment-record's
+  # status/deleted_at columns. This is a genuine cross-module write into a
+  # state domain HR does not own -- ADR-045 itself pre-authorizes exactly
+  # this call as the resolved offboarding-trigger mechanism (Decision §1); it
+  # does not change state-employment-record's authoritative_writer (still
+  # employee-management, whose own new method performs the write, not HR
+  # reaching into the table directly).
+  - id: edge-hr-triggers-employment-record-deactivation
+    source: backend-hr
+    target: state-employment-record
+    kind: calls
+    contract: employee-management-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/hr/service.ts manualLapseContract() -> employeeManagementService.deactivateForContractLapse() (backend/src/modules/employee-management/service.ts)"
   # GD-16/SPEC-DOCUMENTS-001 (PR #245, 2026-07-27): backend-documents' own
   # writes/reads of its sole state domain. No cross-module edge exists yet
   # (MIG-GAP-DOC-001, backend-hr's stub calling into this module, is not done).

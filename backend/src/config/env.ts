@@ -210,6 +210,29 @@ const envSchema = z.object({
   // other scheduled-job parameter here is.
   JOB_REQUEST_AUTO_CLOSE_AFTER_MS: z.coerce.number().int().positive().default(21600000),
   JOB_REQUEST_AUTO_CLOSE_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+
+  // HR implementation PR 5 (IF-HR-ContractExpiryReminder, RULE-HR-07): a
+  // daily sweep is sufficient granularity for a 1yr/2yr reminder mark (unlike
+  // JOB_REQUEST_AUTO_CLOSE's 6h window, which needs sub-hourly polling to
+  // notice in time) -- same config-driven convention as every other
+  // scheduled job above.
+  HR_CONTRACT_EXPIRY_REMINDER_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  HR_CONTRACT_EXPIRY_REMINDER_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+
+  // ADR-041 (2026-07-28, OD-HR-09): payslip-request escalation after 3
+  // business days unfulfilled -- "3 business days" is confirmed authority
+  // (ADR-041), not itself configuration, but exposed as a default env var
+  // (not a hardcoded literal) for the same operational-adjustability reason
+  // every other scheduled-job threshold here is. A daily sweep is sufficient
+  // granularity for a multi-day threshold.
+  HR_PAYSLIP_ESCALATION_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  // 3 calendar days (259200000ms), a deliberate approximation of ADR-041's
+  // "3 business days" -- a real business-day calculation needs a holiday
+  // calendar CRR/PDD never specify, and no such calendar exists elsewhere in
+  // this codebase; the calendar-day default is configurable, not a silent
+  // narrowing of the confirmed requirement.
+  HR_PAYSLIP_ESCALATION_AFTER_MS: z.coerce.number().int().positive().default(259200000),
+  HR_PAYSLIP_ESCALATION_BATCH_SIZE: z.coerce.number().int().positive().default(100),
 });
 
 type Env = z.infer<typeof envSchema>;
