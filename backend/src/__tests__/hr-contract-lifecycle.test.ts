@@ -46,23 +46,36 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
+// sendExpiryReminders() wraps notifyResponsibleManagerOfExpiry()+contract.update()
+// in one this.prisma.$transaction() (review fix). The mocked tx client reuses
+// the SAME mock fns as the outer client so existing assertions (e.g.
+// mockContractUpdate, mockEmploymentRecordFindUnique) keep working unchanged
+// whether a given code path is inside or outside the transaction.
+const txClient = {
+  contract: {
+    create: mockContractCreate,
+    findMany: mockContractFindMany,
+    findFirst: mockContractFindFirst,
+    update: mockContractUpdate,
+  },
+  payslipRequest: {
+    create: mockPayslipRequestCreate,
+    findMany: mockPayslipRequestFindMany,
+    findUnique: mockPayslipRequestFindUnique,
+    update: mockPayslipRequestUpdate,
+  },
+  employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
+  hotelGroup: { findUnique: mockHotelGroupFindUnique },
+  auditLog: { create: mockAuditLogCreate },
+};
+const mockTransaction = jest.fn((callback: (tx: typeof txClient) => Promise<unknown>) =>
+  callback(txClient)
+) as jest.MockedFunction<(...args: any[]) => any>;
+
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
-    contract: {
-      create: mockContractCreate,
-      findMany: mockContractFindMany,
-      findFirst: mockContractFindFirst,
-      update: mockContractUpdate,
-    },
-    payslipRequest: {
-      create: mockPayslipRequestCreate,
-      findMany: mockPayslipRequestFindMany,
-      findUnique: mockPayslipRequestFindUnique,
-      update: mockPayslipRequestUpdate,
-    },
-    employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
-    hotelGroup: { findUnique: mockHotelGroupFindUnique },
-    auditLog: { create: mockAuditLogCreate },
+    ...txClient,
+    $transaction: mockTransaction,
   }),
 }));
 
@@ -157,6 +170,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     mockResolveNonAdminScopeFilter.mockReset();
     mockIsWorkerInGroupScope.mockReset();
     mockDeactivateForContractLapse.mockReset();
+    mockTransaction.mockClear();
   });
 
   describe('createContract — OD-HR-02b (persisted employee-management read)', () => {
@@ -691,11 +705,13 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
       expect(sent).toBe(1);
       expect(mockNotificationEnqueue).toHaveBeenCalledWith(
-        expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' })
+        expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
+        expect.anything()
       );
       expect(mockContractUpdate).toHaveBeenCalledWith(
         expect.objectContaining({ data: { reminder_1yr_sent_at: expect.any(Date) } })
       );
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
     });
 
     it('sends a 2yr-mark reminder for an EXTENDED contract and records reminder_2yr_sent_at', async () => {
@@ -734,6 +750,29 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
       expect(sent).toBe(1); // still counted/marked sent -- de-dup guard fires regardless of delivery
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
+    });
+
+    it('review fix: does NOT mark reminder_1yr_sent_at if the transaction fails after enqueueing (no duplicate reminder on retry)', async () => {
+      mockContractFindMany.mockResolvedValue([
+        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
+      ]);
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+      // Simulate: enqueue() (inside the tx) succeeds, but the subsequent
+      // tx.contract.update() throws -- the whole transaction must roll back
+      // so the notification is NOT left committed without its de-dup marker.
+      mockContractUpdate.mockRejectedValueOnce(new Error('db write failed'));
+
+      await expect(service.sendExpiryReminders(86400000, 100)).rejects.toThrow('db write failed');
+
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
+        expect.anything()
+      );
+      // both enqueue() and contract.update() ran inside the SAME
+      // this.prisma.$transaction() call -- a real Prisma transaction would
+      // roll back enqueue()'s writes too once contract.update() throws.
     });
   });
 });

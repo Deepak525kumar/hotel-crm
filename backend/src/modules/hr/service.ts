@@ -102,6 +102,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import type { DatabaseTransaction } from '../../lib/db.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
@@ -429,6 +430,22 @@ export class HrService extends BaseService {
   // Deactivated transition automatically via a direct in-process call
   // (ADR-045), and notifies the worker (ADR-040 §3: worker relationship to
   // this transition is informational only, not decisional).
+  //
+  // Disclosed gap (review note, not fixed here): this method is NOT
+  // idempotent. Its findFirst() matches status IN
+  // (PENDING/ACTIVE/EXTENDED), and per RULE-HR-06/REQ-HR-006 a lapse
+  // deliberately does not transition Contract to a fourth "lapsed" state
+  // (see the comment inside this method) -- so nothing here prevents a
+  // second call against the same still-ACTIVE/EXTENDED contract from
+  // re-running deactivateForContractLapse(), writing a second
+  // hr_contract.lapse audit entry, and re-notifying the worker.
+  // employee-management's own deactivate step is idempotent; this call site
+  // is not. Confirmed with the commissioning human: no lapsed_at-style
+  // column or EmploymentRecord-status pre-check is being added in this PR --
+  // if idempotency is required, it should be solved via an explicit business
+  // concept (e.g. a real "lapsed" contract state or equivalent), not an
+  // implementation shortcut grafted onto the current state machine. Left as
+  // an open decision for a future product/architecture pass.
   async manualLapseContract(
     workerId: string,
     actorId: string,
@@ -484,6 +501,16 @@ export class HrService extends BaseService {
   // are excluded by construction (expires_at is null, RULE-HR-06) -- "no
   // further reminders once permanent" is satisfied by the query itself, not
   // a separate check.
+  //
+  // Review fix: notifyResponsibleManagerOfExpiry() (its lookups AND its
+  // notificationService.enqueue() call) and the reminder_*_sent_at update
+  // below now run inside one this.prisma.$transaction(), with `tx` threaded
+  // through to enqueue()'s own optional tx parameter (ADR-029 §2 join --
+  // notifications/service.ts:33-39's documented mechanism, not a new one).
+  // Previously these were two independent commits: if enqueue() succeeded
+  // but the subsequent contract.update() then threw, the notification was
+  // already durably queued but the de-dup column was never set, so the next
+  // scheduler run would re-send a duplicate reminder for the same mark.
   async sendExpiryReminders(withinMs: number, batchSize: number): Promise<number> {
     const cutoff = new Date(Date.now() + withinMs);
     const contracts = await this.prisma.contract.findMany({
@@ -504,11 +531,13 @@ export class HrService extends BaseService {
       if (isFirstMark && contract.reminder_1yr_sent_at) continue;
       if (!isFirstMark && contract.reminder_2yr_sent_at) continue;
 
-      await this.notifyResponsibleManagerOfExpiry(contract.worker_id, contract.id, isFirstMark);
+      await this.prisma.$transaction(async (tx) => {
+        await this.notifyResponsibleManagerOfExpiry(tx, contract.worker_id, contract.id, isFirstMark);
 
-      await this.prisma.contract.update({
-        where: { id: contract.id },
-        data: isFirstMark ? { reminder_1yr_sent_at: new Date() } : { reminder_2yr_sent_at: new Date() },
+        await tx.contract.update({
+          where: { id: contract.id },
+          data: isFirstMark ? { reminder_1yr_sent_at: new Date() } : { reminder_2yr_sent_at: new Date() },
+        });
       });
       sent++;
     }
@@ -517,34 +546,38 @@ export class HrService extends BaseService {
   }
 
   private async notifyResponsibleManagerOfExpiry(
+    tx: DatabaseTransaction,
     workerId: string,
     contractId: string,
     isFirstMark: boolean
   ): Promise<void> {
-    const record = await this.prisma.employmentRecord.findUnique({
+    const record = await tx.employmentRecord.findUnique({
       where: { user_id: workerId },
       select: { status: true, hotel_group_id: true },
     });
     if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
 
-    const group = await this.prisma.hotelGroup.findUnique({
+    const group = await tx.hotelGroup.findUnique({
       where: { id: record.hotel_group_id },
       select: { regional_manager_user_id: true },
     });
     if (!group?.regional_manager_user_id) return;
 
-    await notificationService.enqueue({
-      recipientId: group.regional_manager_user_id,
-      type: 'HR_CONTRACT_EXPIRY_REMINDER',
-      title: isFirstMark ? 'Contract approaching 1-year mark' : 'Contract approaching 2-year mark',
-      message: isFirstMark
-        ? 'A contract is approaching its 1-year expiry -- confirm extension or lapse.'
-        : 'A contract is approaching its 2-year mark -- confirm permanence or lapse.',
-      data: { worker_id: workerId, contract_id: contractId },
-      transports: [OutboxTransport.PUSH],
-      sourceModule: OutboxSourceModule.HR,
-      producerService: 'HrService',
-    });
+    await notificationService.enqueue(
+      {
+        recipientId: group.regional_manager_user_id,
+        type: 'HR_CONTRACT_EXPIRY_REMINDER',
+        title: isFirstMark ? 'Contract approaching 1-year mark' : 'Contract approaching 2-year mark',
+        message: isFirstMark
+          ? 'A contract is approaching its 1-year expiry -- confirm extension or lapse.'
+          : 'A contract is approaching its 2-year mark -- confirm permanence or lapse.',
+        data: { worker_id: workerId, contract_id: contractId },
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.HR,
+        producerService: 'HrService',
+      },
+      tx
+    );
   }
 
   // ---------------------------------------------------------------------------
