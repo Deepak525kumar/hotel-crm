@@ -87,19 +87,18 @@ function handleUploadErrors() {
 const router = Router();
 router.use(authMiddleware);
 
-// ADR-030 PR-1 (C-10 / OD-HR-13 / FIND-SEC-HR-04): these routes previously
-// gated on requirePermission('hr:read'/'hr:write') alone — no role gate, no
-// hotel/group-scope enforcement. The write routes below carry a worker_id
-// (body or path) and are now scoped via checkWorkerScope() (group-grain,
-// mirroring how the employment record itself is scoped). The two list routes
-// below carry no worker_id/hotel_id and no query-filter schema exists to
-// scope-filter against, so — per product decision — they stay Admin-only
-// rather than exposing a manager-visible, unscoped read; scoping them for
-// MANAGER is deferred to when the HR module has a real data model and query
-// contract to filter against.
+// ADR-030 PR-1 (C-10 / OD-HR-13 / FIND-SEC-HR-04): write routes carry a
+// worker_id (body or path) and are scoped via checkWorkerScope()
+// (group-grain, mirroring how the employment record itself is scoped).
+// ADR-043 (2026-07-28): the two list routes below extend to MANAGER, scoped
+// server-side to the caller's own hotel_group_id inside
+// hrController.listContracts()/listPayroll() themselves (checkWorkerScope()
+// cannot gate a list route with no single worker_id param) — the identical
+// resolveNonAdminScopeFilter() mechanism ADR-030 PR-4 already established
+// for users/service.ts's listUsers(), not a new authorization pattern.
 
 // Contracts
-router.get('/contracts', requireRole('admin'), requirePermission('hr:read'), (req, res, next) =>
+router.get('/contracts', requireRole(['admin', 'manager']), requirePermission('hr:read'), (req, res, next) =>
   hrController.listContracts(req, res, next)
 );
 router.post(
@@ -110,8 +109,8 @@ router.post(
   (req, res, next) => hrController.createContract(req, res, next)
 );
 
-// Payroll
-router.get('/payroll', requireRole('admin'), requirePermission('hr:read'), (req, res, next) =>
+// Payroll (lists/creates PayslipRequest records — ADR-039, no payroll computation)
+router.get('/payroll', requireRole(['admin', 'manager']), requirePermission('hr:read'), (req, res, next) =>
   hrController.listPayroll(req, res, next)
 );
 router.post(
@@ -120,6 +119,29 @@ router.post(
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.createPayroll(req, res, next)
+);
+
+// IF-HR-FulfilPayslipRequest (RULE-HR-09): Manager/Admin marks a request
+// emailed. Keyed on the request's own id, not a worker_id path param — no
+// checkWorkerScope() call; the request row itself carries no hotel/group
+// field to scope against (same shape as IF-HR-ConfirmContractSigned's
+// worker-scoped precondition check happening inside the service, not a
+// route-level middleware, when no clean route-level scope key exists).
+router.post(
+  '/payroll/:request_id/fulfil',
+  requireRole(['admin', 'manager']),
+  requirePermission('hr:write'),
+  (req, res, next) => hrController.fulfilPayslipRequest(req, res, next)
+);
+
+// IF-HR-RequestPayslip (ADR-042: hr:payslip:request, self-scoped — worker_id
+// is ALWAYS req.auth.userId, never a client-supplied field). Admin/Manager
+// use POST /payroll above to create a request on a worker's behalf instead.
+router.post(
+  '/payslip-requests',
+  requireRole('worker'),
+  requirePermission('hr:payslip:request'),
+  (req, res, next) => hrController.requestPayslip(req, res, next)
 );
 
 // IF-HR-GetContractStatus (ADR-042/OD-HR-10, FIND-SEC-HR-03 IDOR guard):

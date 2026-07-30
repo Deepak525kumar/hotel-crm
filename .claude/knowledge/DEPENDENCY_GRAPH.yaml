@@ -232,6 +232,19 @@ edges:
     compatibility: unknown
     status: observed
     evidence: "backend/src/modules/quality/service.ts:4,75,191"
+  # HR implementation PR 4 (RULE-HR-09/12, EVT-HR-PayslipRequested/Fulfilled):
+  # requestPayslip()/createPayroll() notify the requesting worker's Hotel
+  # Group's Regional Manager; fulfilPayslipRequest() notifies the requesting
+  # worker. New additive NotificationType.HR_PAYSLIP_REQUESTED/FULFILLED
+  # values + OutboxSourceModule.HR, migration 20260730020000.
+  - id: edge-hr-notifications
+    source: backend-hr
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager(), fulfilPayslipRequest()"
 
   # --- Cross-module state writes (work-applications accept-application transaction) ---
   # edge-work-applications-writes-work-request, edge-work-applications-writes-worker-assignment,
@@ -369,7 +382,18 @@ edges:
     kind: reads-state
     compatibility: not-applicable
     status: observed
-    evidence: "backend/src/modules/hr/service.ts createContract() (this.prisma.employmentRecord.findUnique)"
+    evidence: "backend/src/modules/hr/service.ts createContract() (this.prisma.employmentRecord.findUnique); notifyResponsibleManager() (PR 4); listContracts()/listPayroll() ADR-043 scope filter (via resolveNonAdminScopeFilter's employment_record join)"
+  # HR implementation PR 4: notifyResponsibleManager() resolves the
+  # requesting worker's Hotel Group's Regional Manager, the identical
+  # "responsible manager" pattern calendar/service.ts's own notifyManager()
+  # already established.
+  - id: edge-hr-reads-hotel-group
+    source: backend-hr
+    target: state-hotel-group
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager() (this.prisma.hotelGroup.findUnique)"
   # GD-16/SPEC-DOCUMENTS-001 (PR #245, 2026-07-27): backend-documents' own
   # writes/reads of its sole state domain. No cross-module edge exists yet
   # (MIG-GAP-DOC-001, backend-hr's stub calling into this module, is not done).
@@ -552,12 +576,15 @@ contracts:
       - backend-job-requests  # renamed from backend-work-requests by Epic 9 PR 9.4. See SYNC-061.
       - backend-attendance
       - backend-quality
+      - backend-hr  # HR implementation PR 4 (2026-07-30): calls enqueue() directly (not sendNotification()) -- new additive NotificationType.HR_PAYSLIP_REQUESTED/FULFILLED values + OutboxSourceModule.HR.
     # backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits
     # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically
     # deleted and no longer calls notification-service. See SYNC-059.
     # No consumer calls enqueue() yet -- the producers above still call
     # sendNotification() fire-and-forget, unchanged by PR 7.1. Producer migration
-    # to enqueue() is Epic 7 PR 7.3, out of this PR's scope.
+    # to enqueue() is Epic 7 PR 7.3, out of this PR's scope. NOTE: backend-hr
+    # (PR 4, above) is the first consumer to call enqueue() directly at
+    # introduction time, not a migration of this stale note's own claim.
   - id: prisma-schema
     version: unversioned
     owner_module: unassigned

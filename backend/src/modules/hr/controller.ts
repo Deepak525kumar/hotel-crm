@@ -16,9 +16,15 @@ export class HrController {
     }
   }
 
+  // ADR-043: Admin sees all; Manager's results are scoped to their own
+  // hotel_group_id inside hrService.listContracts() itself.
   async listContracts(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await hrService.listContracts(req.query);
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.listContracts(req.query, {
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
       res.status(200).json({
         status: 'success',
         data: result,
@@ -100,6 +106,30 @@ export class HrController {
     }
   }
 
+  // IF-HR-RequestPayslip (worker-self route). OD-HR-10 (FIND-SEC-HR-03,
+  // IDOR): worker_id is ALWAYS req.auth.userId here — this route never
+  // accepts a client-supplied worker_id, unlike createPayroll below (the
+  // separate Manager/Admin-initiated route).
+  async requestPayslip(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.requestPayslip({
+        worker_id: req.auth.userId,
+        period_start: req.body.period_start,
+        period_end: req.body.period_end,
+      });
+      res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // IF-HR-CreatePayroll (Manager/Admin-initiated, worker_id from the request
+  // body — checkWorkerScope() at the route layer enforces group scope).
   async createPayroll(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await hrService.createPayroll(req.body);
@@ -113,9 +143,34 @@ export class HrController {
     }
   }
 
+  // IF-HR-FulfilPayslipRequest. Manager/Admin marks a request emailed.
+  async fulfilPayslipRequest(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.fulfilPayslipRequest(
+        req.params.request_id,
+        req.auth.userId,
+        req.auth.role
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ADR-043: Admin sees all; Manager's results are scoped to their own
+  // hotel_group_id inside hrService.listPayroll() itself.
   async listPayroll(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await hrService.listPayroll(req.query);
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await hrService.listPayroll(req.query, {
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
       res.status(200).json({
         status: 'success',
         data: result,

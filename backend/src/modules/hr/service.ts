@@ -43,19 +43,47 @@
 // ADR-044's malware-scan hook (RULE-HR-13/OD-HR-14) is real control flow
 // (reject-on-detection) with a disclosed pass-through default scanner — see
 // malware-scan.ts's own header comment; no vendor/library has been chosen.
+//
+// HR implementation PR 4 (RULE-HR-09/12, ADR-039/041/042/043): requestPayslip,
+// listPayroll (lists PayslipRequest records — ADR-039's target shape, no
+// payroll computation), createPayroll (Manager/Admin may also create a
+// request directly, per IF-HR-CreatePayroll's own actor row), and
+// fulfilPayslipRequest. On request, notifies the worker's Hotel Group's
+// Regional Manager (EVT-HR-PayslipRequested) via the existing Outbox —
+// the identical "responsible manager" resolution calendar/service.ts's own
+// notifyManager() already established (EmploymentRecord -> HotelGroup ->
+// regional_manager_user_id), same best-effort/no-fallback posture (OD-CAL-06
+// precedent: an unassigned/inactive worker has no group, no notification is
+// sent, rather than guessing a recipient). ADR-041's 3-business-day
+// auto-escalation to the manager's own manager is a separate, scheduled-job
+// concern (PR 5), not built here.
 
-import { ContractStatus } from '@prisma/client';
+import {
+  ContractStatus,
+  PayslipRequestStatus,
+  EmploymentStatus,
+  OutboxTransport,
+  OutboxSourceModule,
+  Prisma,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { ForbiddenError, NotFoundError, NotImplementedError, ValidationError } from '../../lib/errors.js';
+import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
+import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
+import type { UserScope } from '../../lib/jwt.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
+import { notificationService } from '../notifications/service.js';
 import { getMalwareScanner } from './malware-scan.js';
 import type {
   CreateContractRequest,
   ContractDto,
   ContractStatusType,
   ListContractsQuery,
+  CreatePayslipRequestRequest,
+  PayslipRequestDto,
+  PayslipRequestStatusType,
+  ListPayslipRequestsQuery,
 } from './types.js';
 
 // Architectural assumption (review note, not a defect): this service's
@@ -130,15 +158,32 @@ export class HrService extends BaseService {
   // ---------------------------------------------------------------------------
   // IF-HR-ListContracts
   // ---------------------------------------------------------------------------
-  // OD-HR-13: route-level scoping (checkWorkerScope()/Admin-only) is enforced
-  // in routes.ts, matching every other HR route's existing pattern — this
-  // service method performs no additional actor-based filtering.
-  async listContracts(filters: ListContractsQuery = {}): Promise<ContractDto[]> {
+  // ADR-043 (OD-HR-13 list-route half): Admin unscoped; Manager's results are
+  // server-side filtered to their own hotel_group_id — the identical
+  // resolveNonAdminScopeFilter() primitive users/service.ts's listUsers()
+  // already established (ADR-030 PR-4, "filter, don't deny"), reused rather
+  // than a new mechanism. `actor` is optional so the pre-PR-4 call shape
+  // still compiles; the controller always passes it.
+  async listContracts(
+    filters: ListContractsQuery = {},
+    actor?: { role: string; scope?: UserScope | null }
+  ): Promise<ContractDto[]> {
+    const where: Prisma.ContractWhereInput = {
+      ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
+      ...(filters.status ? { status: filters.status as ContractStatus } : {}),
+    };
+
+    if (actor && actor.role !== 'admin') {
+      const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
+      if (scopeFilter.kind === 'deny') {
+        where.worker_id = '__none__';
+      } else {
+        where.worker = { employment_record: { hotel_group_id: scopeFilter.hotelGroupId } };
+      }
+    }
+
     const contracts = await this.prisma.contract.findMany({
-      where: {
-        ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
-        ...(filters.status ? { status: filters.status as ContractStatus } : {}),
-      },
+      where,
       orderBy: { created_at: 'desc' },
     });
     return contracts.map((c) => this.toDto(c));
@@ -290,12 +335,144 @@ export class HrService extends BaseService {
     return this.toDto(updated);
   }
 
-  async createPayroll(_data: Record<string, unknown>) {
-    throw new NotImplementedError('HR payslip requests are not yet implemented');
+  // ---------------------------------------------------------------------------
+  // IF-HR-RequestPayslip (RULE-HR-09, OD-HR-10/ADR-042, EVT-HR-PayslipRequested)
+  // ---------------------------------------------------------------------------
+  // OD-HR-10 (FIND-SEC-HR-03, IDOR): worker_id MUST be the caller's own
+  // identity for a worker-role caller — the controller derives it from
+  // req.auth for the worker-self route rather than accepting a client
+  // worker_id, mirroring getContractStatus's identical self-scope shape.
+  async requestPayslip(data: CreatePayslipRequestRequest): Promise<PayslipRequestDto> {
+    if (!data.worker_id || !data.period_start || !data.period_end) {
+      throw new ValidationError('worker_id, period_start, and period_end are required');
+    }
+
+    const request = await this.prisma.payslipRequest.create({
+      data: {
+        worker_id: data.worker_id,
+        period_start: new Date(`${data.period_start}T00:00:00.000Z`),
+        period_end: new Date(`${data.period_end}T00:00:00.000Z`),
+        status: PayslipRequestStatus.REQUESTED,
+      },
+    });
+
+    await this.notifyResponsibleManager(data.worker_id, request.id);
+
+    logger.info('hr_payslip_requested', { requestId: request.id, workerId: data.worker_id });
+
+    return this.toPayslipDto(request);
   }
 
-  async listPayroll(_filters?: Record<string, unknown>) {
-    throw new NotImplementedError('HR payslip requests are not yet implemented');
+  // ---------------------------------------------------------------------------
+  // IF-HR-CreatePayroll (ADR-039 target shape: pure payslip-request record,
+  // no gross-salary/computation field of any kind — Manager/Admin may also
+  // create a request directly on a worker's behalf, per this interface's own
+  // actor row, distinct from the worker-self IF-HR-RequestPayslip route).
+  // ---------------------------------------------------------------------------
+  async createPayroll(data: CreatePayslipRequestRequest): Promise<PayslipRequestDto> {
+    return this.requestPayslip(data);
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-HR-ListPayroll (ADR-039/ADR-043: lists PayslipRequest records; scoping
+  // — Admin unscoped, Manager via checkWorkerScope() — is enforced in
+  // routes.ts, matching every other HR list route's existing pattern.)
+  // ---------------------------------------------------------------------------
+  async listPayroll(
+    filters: ListPayslipRequestsQuery = {},
+    actor?: { role: string; scope?: UserScope | null }
+  ): Promise<PayslipRequestDto[]> {
+    const where: Prisma.PayslipRequestWhereInput = {
+      ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
+      ...(filters.status ? { status: filters.status as PayslipRequestStatus } : {}),
+    };
+
+    if (actor && actor.role !== 'admin') {
+      const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
+      if (scopeFilter.kind === 'deny') {
+        where.worker_id = '__none__';
+      } else {
+        where.worker = { employment_record: { hotel_group_id: scopeFilter.hotelGroupId } };
+      }
+    }
+
+    const requests = await this.prisma.payslipRequest.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+    });
+    return requests.map((r) => this.toPayslipDto(r));
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-HR-FulfilPayslipRequest (RULE-HR-09, EVT-HR-PayslipFulfilled)
+  // ---------------------------------------------------------------------------
+  async fulfilPayslipRequest(
+    requestId: string,
+    actorId: string,
+    actorRole: string
+  ): Promise<PayslipRequestDto> {
+    const request = await this.prisma.payslipRequest.findUnique({ where: { id: requestId } });
+    if (!request) {
+      throw new NotFoundError('Payslip request not found');
+    }
+
+    const updated = await this.prisma.payslipRequest.update({
+      where: { id: requestId },
+      data: {
+        status: PayslipRequestStatus.FULFILLED,
+        fulfilled_by_id: actorId,
+        fulfilled_at: new Date(),
+      },
+    });
+
+    await notificationService.enqueue({
+      recipientId: request.worker_id,
+      type: 'HR_PAYSLIP_FULFILLED',
+      title: 'Payslip sent',
+      message: 'Your requested payslip has been emailed to you.',
+      data: { payslip_request_id: requestId },
+      transports: [OutboxTransport.PUSH],
+      sourceModule: OutboxSourceModule.HR,
+      producerService: 'HrService',
+    });
+
+    logger.info('hr_payslip_fulfilled', { requestId, fulfilledBy: actorId, actorRole });
+
+    return this.toPayslipDto(updated);
+  }
+
+  // Resolves the requesting worker's Hotel Group's Regional Manager as "the
+  // responsible manager" — identical pattern to calendar/service.ts's own
+  // notifyManager() (EmploymentRecord -> HotelGroup ->
+  // regional_manager_user_id). Best-effort: an unassigned/inactive worker
+  // has no group and no notification is sent, rather than guessing a
+  // fallback recipient (same OD-CAL-06 posture; HR's own equivalent open
+  // item is EVT-HR-PayslipRequested's `[OPEN]` transport note, now wired to
+  // the existing Outbox/notification-service, matching every other module's
+  // transport convention, ADR-032).
+  private async notifyResponsibleManager(workerId: string, requestId: string): Promise<void> {
+    const record = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: workerId },
+      select: { status: true, hotel_group_id: true },
+    });
+    if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
+
+    const group = await this.prisma.hotelGroup.findUnique({
+      where: { id: record.hotel_group_id },
+      select: { regional_manager_user_id: true },
+    });
+    if (!group?.regional_manager_user_id) return;
+
+    await notificationService.enqueue({
+      recipientId: group.regional_manager_user_id,
+      type: 'HR_PAYSLIP_REQUESTED',
+      title: 'Payslip request received',
+      message: 'A worker has requested a payslip.',
+      data: { worker_id: workerId, payslip_request_id: requestId },
+      transports: [OutboxTransport.PUSH],
+      sourceModule: OutboxSourceModule.HR,
+      producerService: 'HrService',
+    });
   }
 
   // MIG-GAP-DOC-001 (RULE-DOC-04, OD-DOC-015): the contract-scan upload is
@@ -371,6 +548,32 @@ export class HrService extends BaseService {
       expires_at: contract.expires_at ? contract.expires_at.toISOString() : null,
       created_at: contract.created_at.toISOString(),
       updated_at: contract.updated_at.toISOString(),
+    };
+  }
+
+  private toPayslipDto(request: {
+    id: string;
+    worker_id: string;
+    period_start: Date;
+    period_end: Date;
+    status: PayslipRequestStatus;
+    fulfilled_by_id: string | null;
+    fulfilled_at: Date | null;
+    escalated_at: Date | null;
+    created_at: Date;
+    updated_at: Date;
+  }): PayslipRequestDto {
+    return {
+      id: request.id,
+      worker_id: request.worker_id,
+      period_start: request.period_start.toISOString().slice(0, 10),
+      period_end: request.period_end.toISOString().slice(0, 10),
+      status: request.status as PayslipRequestStatusType,
+      fulfilled_by_id: request.fulfilled_by_id,
+      fulfilled_at: request.fulfilled_at ? request.fulfilled_at.toISOString() : null,
+      escalated_at: request.escalated_at ? request.escalated_at.toISOString() : null,
+      created_at: request.created_at.toISOString(),
+      updated_at: request.updated_at.toISOString(),
     };
   }
 }

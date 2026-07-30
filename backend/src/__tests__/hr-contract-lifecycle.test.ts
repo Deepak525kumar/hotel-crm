@@ -23,10 +23,17 @@ const mockContractCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => 
 const mockContractFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockContractFindFirst = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockContractUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockPayslipRequestUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockHotelGroupFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockDocumentServiceUpload = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockScan = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockNotificationEnqueue = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockResolveNonAdminScopeFilter = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -45,7 +52,14 @@ jest.mock('../lib/db.js', () => ({
       findFirst: mockContractFindFirst,
       update: mockContractUpdate,
     },
+    payslipRequest: {
+      create: mockPayslipRequestCreate,
+      findMany: mockPayslipRequestFindMany,
+      findUnique: mockPayslipRequestFindUnique,
+      update: mockPayslipRequestUpdate,
+    },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
+    hotelGroup: { findUnique: mockHotelGroupFindUnique },
     auditLog: { create: mockAuditLogCreate },
   }),
 }));
@@ -63,6 +77,14 @@ jest.mock('../modules/documents/service.js', () => ({
 
 jest.mock('../modules/hr/malware-scan.js', () => ({
   getMalwareScanner: () => ({ scan: mockScan }),
+}));
+
+jest.mock('../modules/notifications/service.js', () => ({
+  notificationService: { enqueue: mockNotificationEnqueue },
+}));
+
+jest.mock('../lib/scope.js', () => ({
+  resolveNonAdminScopeFilter: mockResolveNonAdminScopeFilter,
 }));
 
 import { HrService } from '../modules/hr/service.js';
@@ -89,6 +111,22 @@ function makeContractRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makePayslipRequestRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'p1',
+    worker_id: 'w1',
+    period_start: new Date('2026-07-01T00:00:00.000Z'),
+    period_end: new Date('2026-07-31T00:00:00.000Z'),
+    status: 'REQUESTED',
+    fulfilled_by_id: null,
+    fulfilled_at: null,
+    escalated_at: null,
+    created_at: NOW,
+    updated_at: NOW,
+    ...overrides,
+  };
+}
+
 describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
   let service: HrService;
 
@@ -98,11 +136,18 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     mockContractFindMany.mockReset();
     mockContractFindFirst.mockReset();
     mockContractUpdate.mockReset();
+    mockPayslipRequestCreate.mockReset();
+    mockPayslipRequestFindMany.mockReset();
+    mockPayslipRequestFindUnique.mockReset();
+    mockPayslipRequestUpdate.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
+    mockHotelGroupFindUnique.mockReset();
     mockAuditLogCreate.mockReset();
     mockDocumentServiceUpload.mockReset();
     mockScan.mockReset();
     mockScan.mockResolvedValue({ clean: true });
+    mockNotificationEnqueue.mockReset();
+    mockResolveNonAdminScopeFilter.mockReset();
   });
 
   describe('createContract — OD-HR-02b (persisted employee-management read)', () => {
@@ -331,6 +376,135 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         })
       );
       expect(result.status).toBe('ACTIVE');
+    });
+  });
+
+  describe('requestPayslip — RULE-HR-09/ADR-042, EVT-HR-PayslipRequested', () => {
+    it('rejects missing required fields', async () => {
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '', period_end: '2026-07-31' })
+      ).rejects.toBeInstanceOf(ValidationError);
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('creates the request with ADR-039 shape (no gross-salary/computation field)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+
+      const result = await service.requestPayslip({
+        worker_id: 'w1',
+        period_start: '2026-07-01',
+        period_end: '2026-07-31',
+      });
+
+      expect(mockPayslipRequestCreate).toHaveBeenCalledWith({
+        data: {
+          worker_id: 'w1',
+          period_start: new Date('2026-07-01T00:00:00.000Z'),
+          period_end: new Date('2026-07-31T00:00:00.000Z'),
+          status: 'REQUESTED',
+        },
+      });
+      expect(result.id).toBe('p1');
+    });
+
+    it('notifies the worker\'s Regional Manager on request (best-effort, OD-CAL-06 posture)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+
+      await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' });
+
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'rm1', type: 'HR_PAYSLIP_REQUESTED' })
+      );
+    });
+
+    it('sends no notification for an unassigned/inactive worker (best-effort, no fallback)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null });
+
+      await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' });
+
+      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
+    });
+
+    it('createPayroll (Manager/Admin-initiated) delegates to the identical requestPayslip path', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue(null);
+
+      const result = await service.createPayroll({
+        worker_id: 'w1',
+        period_start: '2026-07-01',
+        period_end: '2026-07-31',
+      });
+      expect(result.id).toBe('p1');
+    });
+  });
+
+  describe('listPayroll — ADR-039/ADR-043 (request records, Manager group-scoped)', () => {
+    it('lists all requests for admin (unscoped)', async () => {
+      mockPayslipRequestFindMany.mockResolvedValue([makePayslipRequestRow()]);
+      const result = await service.listPayroll({}, { role: 'admin', scope: null });
+      expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} })
+      );
+      expect(result).toHaveLength(1);
+    });
+
+    it('scopes results to the manager\'s own hotel_group_id (ADR-043)', async () => {
+      mockResolveNonAdminScopeFilter.mockResolvedValue({ kind: 'group', hotelGroupId: 'g1' });
+      mockPayslipRequestFindMany.mockResolvedValue([]);
+
+      await service.listPayroll({}, { role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } });
+
+      expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { worker: { employment_record: { hotel_group_id: 'g1' } } },
+        })
+      );
+    });
+
+    it('denies (zero rows) when the manager\'s scope resolves to deny', async () => {
+      mockResolveNonAdminScopeFilter.mockResolvedValue({ kind: 'deny' });
+      mockPayslipRequestFindMany.mockResolvedValue([]);
+
+      await service.listPayroll({}, { role: 'manager', scope: null });
+
+      expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { worker_id: '__none__' } })
+      );
+    });
+  });
+
+  describe('fulfilPayslipRequest — RULE-HR-09, EVT-HR-PayslipFulfilled', () => {
+    it('rejects when the request does not exist', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(null);
+      await expect(service.fulfilPayslipRequest('p1', 'm1', 'manager')).rejects.toBeInstanceOf(
+        NotFoundError
+      );
+      expect(mockPayslipRequestUpdate).not.toHaveBeenCalled();
+    });
+
+    it('marks the request fulfilled and notifies the requesting worker', async () => {
+      mockPayslipRequestFindUnique.mockResolvedValue(makePayslipRequestRow());
+      mockPayslipRequestUpdate.mockResolvedValue(
+        makePayslipRequestRow({ status: 'FULFILLED', fulfilled_by_id: 'm1', fulfilled_at: NOW })
+      );
+
+      const result = await service.fulfilPayslipRequest('p1', 'm1', 'manager');
+
+      expect(mockPayslipRequestUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'p1' },
+          data: expect.objectContaining({ status: 'FULFILLED', fulfilled_by_id: 'm1' }),
+        })
+      );
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'w1', type: 'HR_PAYSLIP_FULFILLED' })
+      );
+      expect(result.status).toBe('FULFILLED');
     });
   });
 });

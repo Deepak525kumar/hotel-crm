@@ -58,6 +58,8 @@ jest.mock('../modules/hr/controller.js', () => ({
     confirmContractSigned: ok,
     listPayroll: ok,
     createPayroll: ok,
+    requestPayslip: ok,
+    fulfilPayslipRequest: ok,
     uploadDocument: ok,
   },
 }));
@@ -85,23 +87,23 @@ describe('HR route authorization (ADR-030 C-10)', () => {
     mockHotelFindUnique.mockReset();
   });
 
-  describe('list routes (Admin-only — no scope model to filter a manager view)', () => {
+  describe('list routes (ADR-043: Admin unscoped, Manager scoped server-side inside the service)', () => {
     it('allows admin on GET /hr/contracts', async () => {
       testAuth = { userId: 'a1', role: 'admin', permissions: ['hr:read'], scope: null };
       const res = await request(makeApp()).get('/hr/contracts');
       expect(res.status).toBe(200);
     });
 
-    it('denies manager on GET /hr/contracts (403)', async () => {
+    it('allows manager on GET /hr/contracts (result-scoping happens inside hrService.listContracts, covered by hr-contract-lifecycle.test.ts)', async () => {
       testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'global' } };
       const res = await request(makeApp()).get('/hr/contracts');
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     });
 
-    it('denies manager on GET /hr/payroll (403)', async () => {
+    it('allows manager on GET /hr/payroll (result-scoping happens inside hrService.listPayroll)', async () => {
       testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'global' } };
       const res = await request(makeApp()).get('/hr/payroll');
-      expect(res.status).toBe(403);
+      expect(res.status).toBe(200);
     });
 
     it('denies worker and checker on GET /hr/contracts (403)', async () => {
@@ -196,6 +198,48 @@ describe('HR route authorization (ADR-030 C-10)', () => {
         expect(res.status).toBe(403);
       }
       expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /hr/payslip-requests (ADR-042: hr:payslip:request, worker self-scoped)', () => {
+    it('allows a worker with hr:payslip:request', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: ['hr:payslip:request'], scope: null };
+      const res = await request(makeApp()).post('/hr/payslip-requests').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a worker without hr:payslip:request (403)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/payslip-requests').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('denies manager/admin (this route is worker-only; they use POST /hr/payroll instead)', async () => {
+      for (const role of ['admin', 'manager']) {
+        testAuth = { userId: 'x1', role, permissions: ['hr:read', 'hr:write'], scope: null };
+        const res = await request(makeApp()).post('/hr/payslip-requests').send({});
+        expect(res.status).toBe(403);
+      }
+    });
+  });
+
+  describe('POST /hr/payroll/:request_id/fulfil (IF-HR-FulfilPayslipRequest, Manager/Admin only)', () => {
+    it('allows manager', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:write'], scope: null };
+      const res = await request(makeApp()).post('/hr/payroll/req1/fulfil').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('allows admin', async () => {
+      testAuth = { userId: 'a1', role: 'admin', permissions: ['hr:write'], scope: null };
+      const res = await request(makeApp()).post('/hr/payroll/req1/fulfil').send({});
+      expect(res.status).toBe(200);
+    });
+
+    it('denies worker', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).post('/hr/payroll/req1/fulfil').send({});
+      expect(res.status).toBe(403);
     });
   });
 
