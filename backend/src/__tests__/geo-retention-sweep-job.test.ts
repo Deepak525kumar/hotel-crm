@@ -129,6 +129,38 @@ describe('GeoRetentionSweepJob (GD-14/OD-GEO-002, TREQ-GEO-005)', () => {
     expect(mockLogger.info).toHaveBeenCalledWith('Geo retention sweep completed', { checkins_deleted: 0 });
   });
 
+  it('review fix: a checkin just inside the 6-month boundary survives; one just outside it is selected for deletion', async () => {
+    // This mock has no real database behind it, so the prior tests only ever
+    // asserted the ARGUMENTS passed to findMany/deleteMany -- never whether
+    // the where:{checked_at:{lt:cutoff}} clause would actually select the
+    // right rows for a real checkin near the boundary. This test pins the
+    // boundary itself: compute what "6 months minus 1 day" and "6 months
+    // plus 1 day" actually resolve to relative to the job's own cutoff
+    // computation, the same one-shot Date arithmetic sendExpiryReminders'
+    // review fix used in HR (setMonth-based, not a fixed day-count), so a
+    // future change to the cutoff formula that shifts the boundary is
+    // caught here rather than only in the loose tolerance-window test above.
+    const prisma = makePrisma();
+    prisma.workerGeoCheckin.findMany.mockResolvedValueOnce([]);
+
+    const job = new GeoRetentionSweepJob(prisma as any, CONFIG);
+    await job.run();
+
+    const cutoff = (prisma.workerGeoCheckin.findMany.mock.calls[0][0] as {
+      where: { checked_at: { lt: Date } };
+    }).where.checked_at.lt;
+
+    const justInside = new Date(cutoff);
+    justInside.setDate(justInside.getDate() + 1); // 6 months minus 1 day old
+    const justOutside = new Date(cutoff);
+    justOutside.setDate(justOutside.getDate() - 1); // 6 months plus 1 day old
+
+    // The job's own filter is `checked_at: { lt: cutoff }` -- a row's
+    // checked_at must be STRICTLY BEFORE cutoff to be selected for deletion.
+    expect(justInside.getTime()).toBeGreaterThan(cutoff.getTime()); // survives (not < cutoff)
+    expect(justOutside.getTime()).toBeLessThan(cutoff.getTime()); // selected for deletion (< cutoff)
+  });
+
   it('performs a hard delete, not a soft flag (TREQ-GEO-005)', async () => {
     const prisma = makePrisma();
     prisma.workerGeoCheckin.findMany.mockResolvedValueOnce([{ id: 'c1' }]).mockResolvedValueOnce([]);

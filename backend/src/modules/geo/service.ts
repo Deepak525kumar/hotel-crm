@@ -140,6 +140,7 @@ export class GeoService extends BaseService {
     const where: {
       worker_id?: string;
       hotel_id?: string | { in: string[] };
+      hotel?: { hotel_group_id: string };
     } = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
     };
@@ -150,6 +151,9 @@ export class GeoService extends BaseService {
       where.worker_id = query.worker_id;
     }
 
+    // Review fix: single nested-relation filter, matching
+    // AttendanceService.list()'s identical manager hotel_group-scope shape
+    // (attendance/service.ts:159) -- no separate hotel.findMany() round-trip.
     if (actor.role === 'manager') {
       const scope = actor.scope ?? null;
       if (!scope) {
@@ -157,11 +161,7 @@ export class GeoService extends BaseService {
       } else if (scope.type === 'hotel') {
         where.hotel_id = scope.hotel_id;
       } else if (scope.type === 'hotel_group') {
-        const hotels = await this.prisma.hotel.findMany({
-          where: { hotel_group_id: scope.hotel_group_id },
-          select: { id: true },
-        });
-        where.hotel_id = { in: hotels.map((h) => h.id) };
+        where.hotel = { hotel_group_id: scope.hotel_group_id };
       }
       // scope.type === 'global' -> no added restriction.
     }

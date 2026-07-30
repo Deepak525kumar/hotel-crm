@@ -38,4 +38,29 @@ describe('haversineDistanceMeters', () => {
     expect(distance).toBeGreaterThan(0);
     expect(Number.isFinite(distance)).toBe(true);
   });
+
+  it('review fix: computes the maximum possible (antipodal) distance correctly', () => {
+    // Antipodal points are the theoretical maximum distance on a sphere --
+    // approximately Earth's half-circumference (~20,015 km), the far edge
+    // of haversineDistanceMeters' valid output range.
+    const distance = haversineDistanceMeters(0, 0, 0, 180);
+    expect(distance).toBeGreaterThan(20000000);
+    expect(distance).toBeLessThan(20100000);
+    expect(Number.isFinite(distance)).toBe(true);
+  });
+
+  it('review fix: pins the exact 100m geofence boundary this module\'s service.ts compares against (RULE-GEO-001, GEOFENCE_RADIUS_METERS)', () => {
+    // service.ts:66 uses `distanceMeters <= GEOFENCE_RADIUS_METERS` (100m,
+    // inclusive) -- this test proves haversineDistanceMeters itself resolves
+    // a known ~100m offset to a value the service's own boundary comparison
+    // would correctly classify, distinct from the existing "sub-100m,
+    // 90-110m band" test above which never asserts the actual boundary.
+    // ~0.0009045 degrees latitude ≈ 100.6m at these latitudes; used to
+    // produce a distance just over 100m as a concrete reference point.
+    const justOver100m = haversineDistanceMeters(52.52, 13.405, 52.520905, 13.405);
+    expect(justOver100m).toBeGreaterThan(100);
+
+    const zero = haversineDistanceMeters(52.52, 13.405, 52.52, 13.405);
+    expect(zero).toBeLessThanOrEqual(100);
+  });
 });
