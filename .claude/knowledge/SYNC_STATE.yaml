@@ -3476,12 +3476,142 @@ context_invalidators:
       ready for an Epic Closeout identical to HR's, if the commissioning
       session chooses to run one.
 
+  - id: SYNC-072
+    type: repository-synchronization
+    status: resolved
+    description: >-
+      Repository synchronization for the Consent epic (backend-consent,
+      SPEC-CONSENT-001, implemented 2026-07-31 per PR #293, following
+      GD-17/ADR-037's 2026-07-28 ratification and this specification's
+      own G2 Specification Freeze on 2026-07-30), following the exact
+      precedent established by SYNC-071 (Geo repository synchronization)
+      and SYNC-070 (HR epic post-closeout synchronization). Re-fetched
+      the local worktree to HEAD 0169ecb (PR #293's merge) before this
+      pass. Independently re-verified every claim before changing
+      anything: confirmed backend/src/modules/consent/ exists and is
+      mounted (routes/v1/index.ts:20,40), confirmed the module's actual
+      file contents (service.ts/controller.ts/routes.ts/types.ts, no
+      zero-code artifact remaining), confirmed SPEC-CONSENT-001's
+      Document Control (0.2.0, FROZEN, G2 2026-07-30 per GD-17/ADR-037)
+      was already accurate, confirmed ADR-037's own resolved-item list
+      (OD-CONSENT-001/002/004/006/007/009/011) against
+      docs/03-modules/consent/MODULE_SPEC.md's Open Decisions table
+      directly (all nine already read RESOLVED there, including two --
+      OD-CONSENT-003/005 -- resolved earlier by ADR-033/ADR-032 and
+      never previously reflected in the SIR register), confirmed
+      ConsentRecord/ConsentDecision exist in schema.prisma, confirmed
+      consent/service.ts:280,286 read EmploymentRecord/HotelGroup
+      directly via Prisma and consent/service.ts:292 calls
+      notificationService.enqueue() (a real, previously-unrecorded
+      cross-module dependency, the identical
+      EmploymentRecord->HotelGroup->regional_manager_user_id pattern
+      hr/service.ts and calendar/service.ts already establish). Grepped
+      frontend/ and mobile/ case-insensitively for "consent" -- zero
+      matches, confirming no client consumer exists yet (Onboarding and
+      Chatbot, the spec's own named consumers, both remain unbuilt).
+      Corrected: MODULE_REGISTRY.yaml (added a backend-consent entry --
+      was entirely absent, zero-code deferral per prior convention --
+      lifecycle/implementation_status active, dependencies
+      [employee-management, backend-crm], specification 0.2.0/FROZEN,
+      real file-path evidence; corrected the unresolved: note's stale
+      zero-code claim); SPECIFICATION_INDEX.yaml (added a backend-consent
+      row -- was entirely absent -- SPEC-CONSENT-001@0.2.0 FROZEN);
+      BOUNDARY_INDEX.yaml (backend-consent row corrected from
+      "proposed, not registered"/zero-code to "registered", implemented,
+      G2-frozen); API_INDEX.yaml (added a real apis: entry for
+      /api/v1/consent -- clients: [], no discovered consumer, matching
+      the implementation commit's own disclosure that Onboarding/Chatbot
+      integration was not built); STATE_OWNERSHIP_INDEX.yaml/
+      OWNERSHIP_INDEX.yaml (added the missing state-consent-record/
+      ConsentRecord row -- single writer/reader backend-consent, no
+      collision); DEPENDENCY_GRAPH.yaml (backend-consent module node
+      added -- was entirely absent -- lifecycle active; added
+      state-consent-record state-domain node; added
+      edge-consent-reads-employment-record, edge-consent-reads-hotel-group,
+      and edge-consent-notifications edges; added the /api/v1/consent
+      mounted-route entry; added backend-consent to notification-service's
+      consumers: list; corrected remaining_human_decisions' backend-consent
+      line); SPECIFICATION_ISSUES_REGISTER.md (SIR-CONSENT-001/002/003/
+      004/005/006/007/009/011 corrected from OPEN to RESOLVED, matching
+      ADR-037/ADR-033/ADR-032's own already-correct dispositions in
+      MODULE_SPEC.md's Open Decisions table -- SIR-CONSENT-008
+      (concurrency, explicitly disclosed as unaddressed by the
+      implementation commit itself) and SIR-CONSENT-010 (SYNC-001
+      owner-token) correctly left OPEN, requiring human authority this
+      pass cannot supply; Module: Consent section's own "last verified"
+      marker updated); docs/03-modules/consent/MODULE_SPEC.md (the
+      Authoring-note blockquote under Document Control still described
+      this module as a zero-code-footprint specification with no
+      authoring-time qualification, directly contradicting the same
+      document's own Document Control -- FROZEN, 0.2.0 -- corrected to
+      explicitly frame the zero-code claim as accurate only as of
+      authoring time 2026-07-13, superseded by implementation
+      2026-07-31; new version-history row added, no version bump,
+      matching the identical byproduct-correction convention SYNC-071/
+      Geo's own MODULE_SPEC.md correction used).
+      Full re-validation after all edits: tsc --noEmit clean, full
+      backend suite green (no code touched by this pass), YAML validity
+      confirmed for every knowledge file touched (MODULE_REGISTRY.yaml/
+      DEPENDENCY_GRAPH.yaml/SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml's
+      pre-existing strict-YAML-parse failures, accepted since SYNC-055,
+      confirmed unchanged in kind and location relative to their
+      pre-pass content -- no new failure introduced by this pass's own
+      edits).
+      Recorded, not remediated (pre-existing, out of this pass's
+      Consent-specific scope, found incidentally): docs/05-execution/
+      RELEASE_STATUS.md and EXECUTION_DASHBOARD.md both still carry a
+      stale "zero code footprint"/"SPEC-CONSENT-001@0.1.1 REVIEW" framing
+      for backend-consent -- these are execution-tracker documents, not
+      in this pass's knowledge/governance file set (mirrors SYNC-071's
+      identical scope boundary, which also left non-knowledge execution
+      trackers untouched); prisma-schema/base-service contract nodes'
+      consumers: lists in DEPENDENCY_GRAPH.yaml are missing several
+      already-active modules (backend-hr, backend-calendar, backend-geo,
+      backend-documents, not just backend-consent) -- a pre-existing,
+      broader staleness class this pass did not attempt to fix in full,
+      only the notification-service consumers: list (which SYNC-070/HR
+      had already established as the actively-maintained one); the
+      pre-existing strict-YAML-parse failures in MODULE_REGISTRY.yaml/
+      DEPENDENCY_GRAPH.yaml/SPECIFICATION_INDEX.yaml/BOUNDARY_INDEX.yaml
+      (confirmed present before this session at the same content
+      locations, already disclosed and accepted by SYNC-055).
+      No code, migration, or test file touched. Validation: tsc --noEmit
+      clean; backend suite 90/90 suites (1507/1507 tests, unaffected --
+      no code touched by this pass); repository-integrity-check.js exit
+      0, 85 WARN-level findings (orphan-document class only, including
+      three pre-existing Consent-related rows -- MODULE_SPEC.md,
+      ADR-015, ADR-037 -- unrelated to this pass's edits), confirmed
+      identical count (85) before and after this pass's changes via a
+      stash/re-run comparison, 0 ERROR/FAIL; context-loader.js --validate
+      reports 0 errors, manifests structurally valid.
+    authority_needed: none  # mechanical documentation synchronization matching already-merged, already-tested code and an already-ratified governance decision (GD-17/ADR-037); no new product/architecture/governance decision made or required by this pass
+    next_step: >-
+      Working-tree changes only (uncommitted as of this record); the
+      orchestrating session handles git add/commit. The Consent epic
+      (backend-consent, SPEC-CONSENT-001) is now closed from the
+      implementation perspective (2026-07-31 build, PR #293) and from
+      the repository-synchronization perspective (this entry) --
+      remaining open items are exclusively governance/human-authority
+      actions, not further implementation or documentation work: (1)
+      OD-CONSENT-008 (concurrency behavior for simultaneous grant/decline
+      submissions) remains genuinely, explicitly unaddressed -- disclosed
+      by the implementation commit itself, not a gap this pass can close;
+      (2) owner assignment (SYNC-001) remains blocked pending a named
+      human approver, the same standing gap every other module in this
+      registry has; (3) Onboarding and Chatbot integration (the spec's
+      own two named IF-CONSENT-* consumers) remain unbuilt -- both are
+      separate, larger epics of their own, not this module's own
+      remaining work. None of these three blocks the next implementation
+      epic from beginning on a different module/capability. This module
+      is now ready for an Epic Closeout identical to HR's/Geo's, if the
+      commissioning session chooses to run one.
+
 cache_state:
   # Per-revision Context Artifact cache validity (framework 1.2.0). Referenced by
   # constitution/CONTEXT_ARTIFACTS.md §3.3; per-session detail lives in SESSION_STATE.yaml.
   # A follow-up session inherits warm, revision-bound context from these records
   # instead of rediscovering it. Single authoritative writer: Lead Architect.
-  baseline_revision: 1046c8e  # rebound to HEAD 1046c8e by SYNC-071 (2026-07-30, Geo repository synchronization pass) — two merges more current than the prior stamp: 1046c8e is PR #291's merge (Geo acceptance-audit remediation), confirmed via `git fetch origin main` as origin/main's current tip at this pass. The prior stamp (9c1be7c, SYNC-070) predated PR #290 (HR post-closeout sync) and PR #291 (Geo remediation) -- this rebind closes that gap. Prior history: 9c1be7c (SYNC-070, 2026-07-30, HR epic post-closeout synchronization pass), ca22207 (SYNC-069, 2026-07-30, Epic 9 Completion Audit governance-closure pass), 4131574 (SYNC-068, 2026-07-30, post Epic 9 PR 9.9 merge, PR #280), da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge), 586a55d (SYNC-056, 2026-07-29), 1aa5f88 (SYNC-055, 2026-07-28)
+  baseline_revision: 0169ecb  # rebound to HEAD 0169ecb by SYNC-072 (2026-07-31, Consent repository synchronization pass) — one merge more current than the prior stamp: 0169ecb is PR #293's merge (Consent implementation). The prior stamp (1046c8e, SYNC-071) predated PR #293 (Consent implementation) -- this rebind closes that gap. Prior history: 1046c8e (SYNC-071, 2026-07-30, Geo repository synchronization pass), 9c1be7c (SYNC-070, 2026-07-30, HR epic post-closeout synchronization pass), ca22207 (SYNC-069, 2026-07-30, Epic 9 Completion Audit governance-closure pass), 4131574 (SYNC-068, 2026-07-30, post Epic 9 PR 9.9 merge, PR #280), da620d9 (SYNC-067, 2026-07-30, post Epic 9 PR 9.8 merge, PR #279), cbad94e (SYNC-065, 2026-07-29, post Epic 9 PR 9.7 merge, PR #278), e7efebe (SYNC-064, 2026-07-29, post Epic 9 PR 9.6 merge, PR #277), 945dba2 (SYNC-060, 2026-07-29, post Epic 9 PR 9.3 merge), 586a55d (SYNC-056, 2026-07-29), 1aa5f88 (SYNC-055, 2026-07-28)
   framework_version: 1.5.0
   boot_context:        { id: ART-BOOT-001, key: b658759b6fcb8d4b, valid: bound, note: "Cache key is a content DIGEST of the boot document set (.claude/context/BOOT_MANIFEST.json; CONTEXT_ARTIFACTS §8, reduced invalidation scope), not the framework-version string — a version bump that changes no boot document no longer invalidates Boot Context. context-loader.js recomputes this digest and treats Boot Context as warm iff it matches. Bound at the current baseline_revision." }
   evidence_package:    { id: ART-EVID-001, key: baseline_revision, valid: bound, bound_at: "2026-07-15" }

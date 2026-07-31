@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-observed_revision: 1046c8e  # rebound to HEAD 1046c8e by SYNC-071 (Geo repository synchronization pass, 2026-07-30) -- backend-geo node/lifecycle corrected (placeholder-unregistered -> active), state-geo-checkin node added, edge-geo-reads-hotel added, state-hotel's readers list gained backend-geo, orphan_modules/stub_but_registered/unregistered/remaining_human_decisions sections corrected. All findings independently re-verified against actual code (routes/v1/index.ts mount, geo/service.ts's Hotel.findUnique calls, schema.prisma's WorkerGeoCheckin model) before this pass, not assumed from the prior audit's claims. Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-056 (Governance Resolution workflow, GD-12/ADR-032 ratified 2026-07-28) -- worker node note corrected to cite ADR-032 as the standing sync/async transport decision rather than an open "future" item; no node/edge added, removed, or reclassified (ADR-032 introduces no new transport mechanism, only ratifies the direct-call/Outbox split already observed in-content). Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
+observed_revision: 0169ecb  # rebound to HEAD 0169ecb by SYNC-072 (Consent repository synchronization pass, 2026-07-31) -- backend-consent module node/lifecycle added (was entirely absent -> active), state-consent-record node added, edge-consent-notifications/edge-consent-reads-employment-record/edge-consent-reads-hotel-group added, mounted routes/notification-service consumers/remaining_human_decisions sections corrected. Prior: rebound to HEAD 1046c8e by SYNC-071 (Geo repository synchronization pass, 2026-07-30) -- backend-geo node/lifecycle corrected (placeholder-unregistered -> active), state-geo-checkin node added, edge-geo-reads-hotel added, state-hotel's readers list gained backend-geo, orphan_modules/stub_but_registered/unregistered/remaining_human_decisions sections corrected. All findings independently re-verified against actual code (routes/v1/index.ts mount, geo/service.ts's Hotel.findUnique calls, schema.prisma's WorkerGeoCheckin model) before this pass, not assumed from the prior audit's claims. Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-056 (Governance Resolution workflow, GD-12/ADR-032 ratified 2026-07-28) -- worker node note corrected to cite ADR-032 as the standing sync/async transport decision rather than an open "future" item; no node/edge added, removed, or reclassified (ADR-032 introduces no new transport mechanism, only ratifies the direct-call/Outbox split already observed in-content). Prior: rebound to HEAD 1aa5f88bce9ef27c9b0563363ebaa211d8aca240 by SYNC-055 (post-PR#243/#244/#245 repository-synchronization pass, 2026-07-28); content verified coherent 3254c83..1aa5f88 -- GD-18 calendar-absence narrow slice (PR #243), GD-16 decision + SPEC-DOCUMENTS-001 freeze (PR #244), backend-documents module implementation (PR #245) now reflected in-content (state-calendar-absence and state-worker-document nodes added, backend-documents module node added, stale backend-calendar orphan/stub notes corrected). Prior: rebound to HEAD 3254c83754f3660dee968c5138a32b6bc54d5578 by SYNC-054 (post-ADR-030 PR-1..PR-8 repository-synchronization pass, 2026-07-26); content verified coherent 9ca0eed..3254c83 -- ADR-030 capability-model rollout (REGIONAL_MANAGER role, capability-named gates replacing ManagerAdminGate, resolveHotelAccess/analytics regional_manager fixes) now reflected in permissions-middleware notes. Prior: rebound to HEAD 9ca0eed by SYNC-053 (post-#194 repository-synchronization + planning pass, 2026-07-23); content verified coherent 09e0b16..9ca0eed -- Epic 5/6/7/8 already reflected in-content, 367/367 backend tests green, tsc clean, repository-integrity-check.js exit 0. Prior: rebound by Repository Synchronization Workflow (Revision Rebind mode, SYNC-037) -- stamp-only, no content change; prior stamp 39fc1f5 (Package A, AUDIT-REPO-2026-07-14: edge-analytics-reads-hotel-worker applied, AUDIT-M3/FIND-DEP-001; state-hotel-worker.readers gains backend-analytics, reader-count caveat reconciled to 5, AUDIT-L2) was two merges (Package A's own merge + Package B) behind HEAD; content verified unchanged 39fc1f5..09e0b16
 status: verified-edges
 # Relationship discovery is complete for the observed revision: every module in
 # MODULE_REGISTRY.yaml is represented and every edge is repository-backed. Owners
@@ -86,6 +86,11 @@ nodes:
   # GeoRetentionSweepJob (see MODULE_REGISTRY.yaml's backend-geo entry for the full
   # evidence trail); acceptance-audit remediation merged 2026-07-30 (PR #291).
   - { id: backend-geo, kind: module, owner: unassigned, source: backend/src/modules/geo, lifecycle: active }
+  # Added 2026-07-31 (Consent repository synchronization pass): backend-consent
+  # was zero-code (no directory at all) until PR #293 (2026-07-31), which
+  # implemented SPEC-CONSENT-001@0.2.0 FROZEN (GD-17/ADR-037) the day after
+  # its own G2 freeze.
+  - { id: backend-consent, kind: module, owner: unassigned, source: backend/src/modules/consent, lifecycle: active }
 
   # Clients
   - { id: frontend-web, kind: client, owner: unassigned, source: frontend }
@@ -222,6 +227,12 @@ nodes:
   # added here, mirroring the identical omission just found and fixed for
   # HR's own state-hr-contract/state-hr-payslip-request nodes.
   - { id: state-geo-checkin, kind: state-domain, owner: backend-geo, source: "backend/prisma/schema.prisma (model WorkerGeoCheckin, added by Geo implementation, migration 20260728010000_add_worker_geo_checkin)" }
+  # Added 2026-07-31 (Consent repository synchronization pass): this node
+  # existed in code since Consent's implementation (PR #293, 2026-07-31) but
+  # was never added here, the same omission class already found and fixed
+  # for Geo's state-geo-checkin and HR's state-hr-contract/
+  # state-hr-payslip-request nodes.
+  - { id: state-consent-record, kind: state-domain, owner: backend-consent, source: "backend/prisma/schema.prisma (model ConsentRecord, added by Consent implementation, migration 20260731000000_add_consent_record)" }
 
 edges:
   # --- Backend cross-module service calls (notification fan-out) ---
@@ -272,6 +283,20 @@ edges:
     compatibility: unknown
     status: observed
     evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager(), fulfilPayslipRequest(), notifyResponsibleManagerOfExpiry(), manualLapseContract()"
+  # Consent implementation (PR #293, 2026-07-31, RULE-CONSENT-03): a DECLINED
+  # decision on the daily access-gate fires a manager notification via
+  # enqueue() (not sendNotification()), the identical pattern HR PR 4
+  # established -- new additive NotificationType.CONSENT_DECLINED value
+  # (migration 20260731010000_add_consent_notification_type) +
+  # OutboxSourceModule.CONSENT.
+  - id: edge-consent-notifications
+    source: backend-consent
+    target: backend-notifications
+    kind: calls
+    contract: notification-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/consent/service.ts:5,292 (notifyResponsibleManager(), notificationService.enqueue())"
 
   # --- Cross-module state writes (work-applications accept-application transaction) ---
   # edge-work-applications-writes-work-request, edge-work-applications-writes-worker-assignment,
@@ -431,6 +456,26 @@ edges:
     compatibility: not-applicable
     status: observed
     evidence: "backend/src/modules/hr/service.ts notifyResponsibleManager()/notifyResponsibleManagerOfExpiry() (this.prisma.hotelGroup.findUnique)"
+  # Consent implementation (PR #293, 2026-07-31): notifyResponsibleManager()
+  # resolves the declining worker's responsible regional manager via the
+  # identical EmploymentRecord -> HotelGroup -> regional_manager_user_id
+  # pattern hr/service.ts's own notifyResponsibleManager() and
+  # calendar/service.ts's notifyManager() already establish -- not a new
+  # coupling shape.
+  - id: edge-consent-reads-employment-record
+    source: backend-consent
+    target: state-employment-record
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/consent/service.ts:280 (notifyResponsibleManager(), this.prisma.employmentRecord.findUnique)"
+  - id: edge-consent-reads-hotel-group
+    source: backend-consent
+    target: state-hotel-group
+    kind: reads-state
+    compatibility: not-applicable
+    status: observed
+    evidence: "backend/src/modules/consent/service.ts:286 (notifyResponsibleManager(), this.prisma.hotelGroup.findUnique)"
   # HR implementation PR 5 (ADR-045): manualLapseContract() calls
   # employee-management's new deactivateForContractLapse() (a direct
   # in-process call, ADR-032), which writes state-employment-record's
@@ -626,6 +671,7 @@ runtime:
     - { module: backend-analytics, mount: "/api/v1/analytics", evidence: "backend/src/routes/v1/index.ts:33" }
     - { module: backend-calendar, mount: "/api/v1/calendar", evidence: "backend/src/routes/v1/index.ts:34" }
     - { module: backend-geo, mount: "/api/v1/geo", evidence: "backend/src/routes/v1/index.ts:19,38" }  # added 2026-07-30 (Geo repository synchronization pass); was previously listed under unregistered despite mounting since Geo's 2026-07-28 implementation
+    - { module: backend-consent, mount: "/api/v1/consent", evidence: "backend/src/routes/v1/index.ts:20,40" }  # added 2026-07-31 (Consent repository synchronization pass); backend-consent had no module entry at all prior to PR #293 (2026-07-31)
   middleware_registration:
     - "optionalAuthMiddleware applied to the whole v1 router (routes/v1/index.ts:20)."
     - "authMiddleware / requireRole / requirePermission / checkHotelAccess applied per-module in each module's routes.ts (backend/src/middleware/auth.ts, backend/src/middleware/permissions.ts)."
@@ -645,6 +691,7 @@ contracts:
       - backend-attendance
       - backend-quality
       - backend-hr  # HR implementation PR 4 (2026-07-30): calls enqueue() directly (not sendNotification()) -- new additive NotificationType.HR_PAYSLIP_REQUESTED/FULFILLED values + OutboxSourceModule.HR.
+      - backend-consent  # Consent implementation (PR #293, 2026-07-31, RULE-CONSENT-03): calls enqueue() directly on a DECLINED decision -- new additive NotificationType.CONSENT_DECLINED value + OutboxSourceModule.CONSENT.
     # backend-work-applications removed from consumers by Epic 9 PR 9.2 (commits
     # 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) -- the module was physically
     # deleted and no longer calls notification-service. See SYNC-059.
@@ -929,5 +976,5 @@ remaining_human_decisions:
   - "Assign an accountable owner to every module, shared contract, and state domain (all currently UNKNOWN)."
   - "RESOLVED (ADR-017, Accepted, 2026-07-15): the authoritative writer of state-user is backend-auth; backend-users is a bounded profile writer/reader (non-security profile fields only). Closes SYNC-005/SIR-GLOB-006's state-user half. Node-level accountable-owner assignment (SYNC-001) remains OPEN under the first item above."
   - "RESOLVED (ADR-018, Accepted, 2026-07-15): the cross-module write coupling in the accept-application transaction (backend-work-applications creating/mutating WorkRequest, WorkerAssignment, and Attendance records owned by other modules, backend/src/modules/work-applications/service.ts:219-283) is classified SUPERSEDED-BY-PIVOT -- the confirmed pivot retires the marketplace apply/accept flow; it is NOT adopted as an approved permanent coupling, so no sanctioned edge is added. Live-code removal is implementation work tracked against the frozen specs. UPDATE: this removal is now complete -- Epic 9 PR 9.2 (commits 12b1c31/2e89c4f, merged b035700; TREQ-011/ADR-058) physically deleted backend-work-applications and dropped the WorkApplication model. See SYNC-059."
-  - "Decide retirement or activation of backend-chatbot (unregistered placeholder; deferred post-MVP by explicit human decision, GD-19 -- do not resume). backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt. backend-hr is no longer a stub module as of HR implementation PR 1-5 (2026-07-30) — corrected during the HR epic acceptance audit; owner assignment (OD-HR-12/SYNC-001) remains a separate, still-open human decision. backend-geo is no longer a stub module as of its 2026-07-28 implementation (GD-14) — corrected during the Geo repository synchronization pass (2026-07-30); owner assignment (SYNC-001) remains a separate, still-open human decision, same standing gap every other module in this registry has."
+  - "Decide retirement or activation of backend-chatbot (unregistered placeholder; deferred post-MVP by explicit human decision, GD-19 -- do not resume). backend-calendar is no longer a pure stub as of PR #243 (GD-18 narrow slice) — corrected by SYNC-055; its /operations surface (OD-CAL-10) remains unbuilt. backend-hr is no longer a stub module as of HR implementation PR 1-5 (2026-07-30) — corrected during the HR epic acceptance audit; owner assignment (OD-HR-12/SYNC-001) remains a separate, still-open human decision. backend-geo is no longer a stub module as of its 2026-07-28 implementation (GD-14) — corrected during the Geo repository synchronization pass (2026-07-30); owner assignment (SYNC-001) remains a separate, still-open human decision, same standing gap every other module in this registry has." backend-consent is no longer zero-code as of its 2026-07-31 implementation (PR #293, following GD-17/ADR-037 and this specification's own G2 freeze on 2026-07-30) — corrected during the Consent repository synchronization pass (2026-07-31); owner assignment (SYNC-001) remains a separate, still-open human decision, same standing gap every other module in this registry has."
   - "Assign contract versions to notification-service, prisma-schema, base-service, and the middleware contracts (all currently unversioned)."
