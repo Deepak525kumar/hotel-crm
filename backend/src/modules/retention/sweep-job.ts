@@ -97,9 +97,19 @@ export class RetentionSweepJob implements ScheduledJob {
     // OD-RETENTION-07 (concurrency, open): batches are bounded (findMany
     // .take(batchSize) then deleteMany on exactly those ids) so a large
     // backlog cannot lock RetentionLog, mirroring SessionSweepJob/
-    // GeoRetentionSweepJob's identical bounded-loop shape. Overlapping-run
-    // safety beyond this bounded-batch pattern remains OD-RETENTION-07's
-    // own open item.
+    // GeoRetentionSweepJob's identical bounded-loop shape. This does NOT
+    // by itself make two overlapping sweep runs safe: findMany's read and
+    // deleteMany's write are two separate statements (only the delete+
+    // audit pair below is transactional), so two concurrent runs could
+    // both read the same batch of ids before either deletes. The audit
+    // write below is driven by deleteMany's own count, not the pre-read
+    // id list, so a run that loses that race writes zero audit entries
+    // rather than false ones -- but the underlying race (two runs
+    // splitting/duplicating work on the same batch) is not itself
+    // prevented (e.g. via an advisory lock or a claimed/leased-row
+    // pattern). That remains OD-RETENTION-07's own open item; not invented
+    // here, since no consumer exists yet to make overlapping runs a live
+    // risk in production.
     for (let batch = 0; batch < this.maxBatchesPerRun; batch++) {
       const eligible = await this.prisma.retentionLog.findMany({
         where: { category_id: category.id, deleted_at: null, tagged_at: { lt: cutoff } },
@@ -119,19 +129,32 @@ export class RetentionSweepJob implements ScheduledJob {
       // Both writes happen in one transaction so a deletion is never
       // recorded without its audit entry, matching this repository's own
       // transactional-write convention (e.g. HrService.fulfilPayslipRequest).
-      await this.prisma.$transaction(async (tx) => {
-        await tx.retentionLog.deleteMany({ where: { id: { in: ids } } });
-        await tx.retentionAuditEntry.createMany({
-          data: ids.map(() => ({
-            module_id: category.module_id,
-            category_id: category.category_id,
-            tier: category.tier,
-            deleted_at: deletedAt,
-          })),
-        });
+      //
+      // The audit-entry count is driven by deleteMany's own returned count,
+      // not by ids.length (the pre-read batch size) -- if two sweep runs
+      // ever overlap (OD-RETENTION-07, open) and both read the same ids
+      // before either deletes, the second run's deleteMany affects zero
+      // rows (the first already removed them) and must not write phantom
+      // audit entries claiming deletions that didn't happen on its behalf.
+      // This closes that specific failure mode; it does not fully resolve
+      // OD-RETENTION-07 (a batch could still legitimately split across two
+      // concurrent runs, each correctly auditing only what it deleted).
+      const deletedCount = await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.retentionLog.deleteMany({ where: { id: { in: ids } } });
+        if (count > 0) {
+          await tx.retentionAuditEntry.createMany({
+            data: Array.from({ length: count }, () => ({
+              module_id: category.module_id,
+              category_id: category.category_id,
+              tier: category.tier,
+              deleted_at: deletedAt,
+            })),
+          });
+        }
+        return count;
       });
 
-      total += ids.length;
+      total += deletedCount;
       if (eligible.length < this.batchSize) break;
     }
 

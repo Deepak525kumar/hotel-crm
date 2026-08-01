@@ -141,6 +141,47 @@ describe('RetentionSweepJob (SPEC-RETENTION-001, PR 3)', () => {
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
   });
 
+  it('review fix (concurrency): writes audit entries matching deleteMany\'s actual count, not the pre-read batch size', async () => {
+    // Simulates a losing race: this run reads 2 eligible ids, but by the
+    // time its deleteMany executes, a concurrent run already deleted one
+    // of them (e.g. an overlapping sweep tick, OD-RETENTION-07). deleteMany
+    // is idempotent on missing ids, so it reports count: 1, not 2 -- the
+    // audit write must reflect the real 1, never a phantom 2.
+    const prisma = makePrisma();
+    prisma.retentionCategory.findMany.mockResolvedValueOnce([makeCategory()]);
+    prisma.retentionLog.findMany
+      .mockResolvedValueOnce([{ id: 'log1' }, { id: 'log2' }])
+      .mockResolvedValueOnce([]);
+    prisma.retentionLog.deleteMany.mockResolvedValueOnce({ count: 1 }); // only 1 of 2 actually deleted
+
+    const job = new RetentionSweepJob(prisma, CONFIG);
+    await job.run();
+
+    expect(prisma.retentionAuditEntry.createMany).toHaveBeenCalledWith({
+      data: [{ module_id: 'attendance', category_id: 'shift_coordinate', tier: 'TIER_1', deleted_at: expect.any(Date) }],
+    });
+    expect(mockLogger.info).toHaveBeenCalledWith('retention_sweep_completed', {
+      categories_swept: 1,
+      records_deleted: 1,
+    });
+  });
+
+  it('review fix (concurrency): writes no audit entry when deleteMany affects zero rows (the batch was already deleted by another run)', async () => {
+    const prisma = makePrisma();
+    prisma.retentionCategory.findMany.mockResolvedValueOnce([makeCategory()]);
+    prisma.retentionLog.findMany.mockResolvedValueOnce([{ id: 'log1' }]);
+    prisma.retentionLog.deleteMany.mockResolvedValueOnce({ count: 0 }); // lost the race entirely
+
+    const job = new RetentionSweepJob(prisma, CONFIG);
+    await job.run();
+
+    expect(prisma.retentionAuditEntry.createMany).not.toHaveBeenCalled();
+    expect(mockLogger.info).toHaveBeenCalledWith('retention_sweep_completed', {
+      categories_swept: 1,
+      records_deleted: 0,
+    });
+  });
+
   it('the audit entry never carries the deleted record_ref or any RetentionLog field beyond category/tier/timestamp', async () => {
     const prisma = makePrisma();
     prisma.retentionCategory.findMany.mockResolvedValueOnce([makeCategory({ tier: 'TIER_3' })]);
