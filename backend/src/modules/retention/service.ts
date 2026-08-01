@@ -3,20 +3,26 @@ import { ConflictError, NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import {
   RETENTION_TIER_WINDOWS,
+  computeDueDate,
   type RegisterCategoryInput,
   type TagRecordInput,
   type GetDeletionAuditLogQuery,
+  type CheckEligibilityQuery,
+  type EligibilityResult,
   type RetentionCategoryDto,
   type RetentionLogDto,
   type RetentionAuditEntryDto,
 } from './types.js';
 
-// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). PR 2/4 of 5: RetentionService
-// interfaces -- PR 2: IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord.
-// PR 4: IF-RETENTION-GetDeletionAuditLog, a read-only query over PR 3's
-// sweep output. No route, controller, or scheduler code is introduced by
-// this PR -- route wiring is PR 5's scope, alongside IF-RETENTION-
-// CheckEligibility.
+// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). RetentionService interfaces
+// across PR 2/4/5 -- PR 2: IF-RETENTION-RegisterCategory, IF-RETENTION-
+// TagRecord. PR 4: IF-RETENTION-GetDeletionAuditLog, a read-only query over
+// PR 3's sweep output. PR 5: IF-RETENTION-CheckEligibility, plus route
+// wiring (controller.ts/routes.ts, mounted at /api/v1/retention) for both
+// PR 4 and PR 5's query interfaces -- IF-RETENTION-RegisterCategory/
+// TagRecord remain unrouted by design (PR 2's own comment: invoked only by
+// a consuming module's own trusted backend logic, never an end-user-facing
+// caller, per the spec's Trust boundaries/authorization section).
 //
 // Scope: generic retention infrastructure for consuming modules without their
 // own retention mechanism. Does not own backend-geo's Tier-1 sweep
@@ -183,6 +189,72 @@ export class RetentionService extends BaseService {
     ]);
 
     return { data: entries.map((e) => this.toAuditEntryDto(e)), total };
+  }
+
+  // ---------------------------------------------------------------------------
+  // IF-RETENTION-CheckEligibility
+  // ---------------------------------------------------------------------------
+  // Unlike registerCategory/tagRecord/getDeletionAuditLog, this interface's
+  // own spec row names Compliance as a read consumer without the same
+  // Admin-caller-class ambiguity OD-RETENTION-05 raises for
+  // GetDeletionAuditLog -- no "Admin" caller class is named for this
+  // interface at all, so there is no analogous open decision to withhold
+  // access pending. Same trust-boundary posture as the other interfaces
+  // otherwise: no actor/role parameter, caller-identity derivation is a
+  // route/PR-5-controller-layer concern (see class comment above).
+  //
+  // RULE-RETENTION-07: an unregistered category has no eligibility to
+  // compute -- returns 'not_found' (interface's own spec row: "Not found
+  // (no history) -- returns empty, not an error"), never a thrown error.
+  //
+  // record_ref supplied: resolves that specific RetentionLog row (the
+  // interface's "record reference" input). Absent or already-deleted ->
+  // 'not_found' (RULE-RETENTION-05's hard-delete leaves no row to report
+  // on once eligibility has already been acted on by the sweep -- this is
+  // the expected post-deletion state, not an error).
+  //
+  // record_ref omitted: reports the category's own eligibility posture in
+  // general, via its single oldest still-tracked (deleted_at: null)
+  // RetentionLog row -- the earliest-due record is the one that determines
+  // whether the category currently has ANY eligible backlog. If the
+  // category has no tracked rows at all (nothing tagged yet), returns
+  // 'not_found' -- there is nothing to report an eligibility date for.
+  async checkEligibility(query: CheckEligibilityQuery): Promise<EligibilityResult> {
+    const category = await this.prisma.retentionCategory.findUnique({
+      where: {
+        module_id_category_id: {
+          module_id: query.module_id,
+          category_id: query.category_id,
+        },
+      },
+    });
+
+    // RULE-RETENTION-07: an unregistered category is never swept -- and has
+    // no eligibility to compute.
+    if (!category) {
+      return { status: 'not_found' };
+    }
+
+    const log = query.record_ref
+      ? await this.prisma.retentionLog.findFirst({
+          where: { category_id: category.id, record_ref: query.record_ref, deleted_at: null },
+        })
+      : await this.prisma.retentionLog.findFirst({
+          where: { category_id: category.id, deleted_at: null },
+          orderBy: { tagged_at: 'asc' },
+        });
+
+    if (!log) {
+      return { status: 'not_found' };
+    }
+
+    const dueDate = computeDueDate(category.tier, log.tagged_at);
+    const eligible = dueDate.getTime() <= Date.now();
+
+    return {
+      status: eligible ? 'eligible' : 'not_eligible',
+      due_date: dueDate.toISOString(),
+    };
   }
 
   private toCategoryDto(category: {

@@ -3,8 +3,10 @@ import {
   RegisterCategorySchema,
   TagRecordSchema,
   GetDeletionAuditLogQuerySchema,
+  CheckEligibilityQuerySchema,
   RETENTION_TIERS,
   RETENTION_TIER_WINDOWS,
+  computeDueDate,
 } from '../modules/retention/types.js';
 import { RetentionTier } from '@prisma/client';
 
@@ -205,5 +207,78 @@ describe('GetDeletionAuditLogQuerySchema', () => {
   it('rejects an unparseable from/to value', () => {
     const result = GetDeletionAuditLogQuerySchema.safeParse({ from: 'not-a-date' });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('CheckEligibilityQuerySchema', () => {
+  it('accepts module_id + category_id without record_ref', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({
+      module_id: 'attendance',
+      category_id: 'shift_coordinate',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts module_id + category_id + record_ref', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({
+      module_id: 'attendance',
+      category_id: 'shift_coordinate',
+      record_ref: 'attendance-record-42',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects a missing module_id', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({ category_id: 'shift_coordinate' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a missing category_id', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({ module_id: 'attendance' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty-string module_id', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({
+      module_id: '',
+      category_id: 'shift_coordinate',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty-string record_ref when supplied', () => {
+    const result = CheckEligibilityQuerySchema.safeParse({
+      module_id: 'attendance',
+      category_id: 'shift_coordinate',
+      record_ref: '',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('computeDueDate — RULE-RETENTION-03', () => {
+  it('adds the tier window in calendar months for TIER_1', () => {
+    const taggedAt = new Date('2026-01-15T00:00:00.000Z');
+    const due = computeDueDate(RetentionTier.TIER_1, taggedAt);
+    expect(due.toISOString()).toBe('2026-07-15T00:00:00.000Z');
+  });
+
+  it('adds the tier window in calendar years for TIER_2', () => {
+    const taggedAt = new Date('2026-01-15T00:00:00.000Z');
+    const due = computeDueDate(RetentionTier.TIER_2, taggedAt);
+    expect(due.toISOString()).toBe('2031-01-15T00:00:00.000Z');
+  });
+
+  it('adds the tier window in calendar years for TIER_3', () => {
+    const taggedAt = new Date('2026-01-15T00:00:00.000Z');
+    const due = computeDueDate(RetentionTier.TIER_3, taggedAt);
+    expect(due.toISOString()).toBe('2032-01-15T00:00:00.000Z');
+  });
+
+  it('does not mutate the input Date', () => {
+    const taggedAt = new Date('2026-01-15T00:00:00.000Z');
+    const original = taggedAt.getTime();
+    computeDueDate(RetentionTier.TIER_1, taggedAt);
+    expect(taggedAt.getTime()).toBe(original);
   });
 });

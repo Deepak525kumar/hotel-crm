@@ -1,7 +1,9 @@
-// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). PR 2/4 of 5: RetentionService
-// interfaces -- PR 2: IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord
-// (REQ-RETENTION-013..015 / RULE-RETENTION-01..03/07). PR 4:
-// IF-RETENTION-GetDeletionAuditLog (RULE-RETENTION-06, FIND-SEC-003).
+// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). RetentionService interfaces
+// across PR 2/4/5 -- PR 2: IF-RETENTION-RegisterCategory, IF-RETENTION-
+// TagRecord (REQ-RETENTION-013..015 / RULE-RETENTION-01..03/07). PR 4:
+// IF-RETENTION-GetDeletionAuditLog (RULE-RETENTION-06, FIND-SEC-003). PR 5:
+// IF-RETENTION-CheckEligibility, plus route wiring for both PR 4 and PR 5's
+// query interfaces.
 
 import { z } from 'zod';
 import { RetentionTier } from '@prisma/client';
@@ -29,6 +31,26 @@ export const RETENTION_TIER_WINDOWS: Record<
   [RetentionTier.TIER_2]: { unit: 'years', amount: 5 },
   [RetentionTier.TIER_3]: { unit: 'years', amount: 6 },
 };
+
+// RULE-RETENTION-03: a tagged record's deletion-due date is its tagged_at
+// plus its tier's window -- the forward-looking mirror of sweep-job.ts's
+// computeCutoff() (which computes the cutoff backward from "now" to find
+// what's already eligible). Both live off RETENTION_TIER_WINDOWS as the
+// single source of truth and use the same calendar-unit arithmetic
+// (setMonth()/setFullYear(), not a fixed-duration add) so the two
+// computations can never silently diverge. Exported so both service.ts
+// (IF-RETENTION-CheckEligibility) and sweep-job.ts could share it, though
+// the sweep computes a cutoff directly rather than a per-row due date.
+export function computeDueDate(tier: RetentionTier, taggedAt: Date): Date {
+  const window = RETENTION_TIER_WINDOWS[tier];
+  const dueDate = new Date(taggedAt);
+  if (window.unit === 'months') {
+    dueDate.setMonth(dueDate.getMonth() + window.amount);
+  } else {
+    dueDate.setFullYear(dueDate.getFullYear() + window.amount);
+  }
+  return dueDate;
+}
 
 // RULE-RETENTION-02/REQ-RETENTION-014: consuming-module + category identifiers
 // are module-scoped strings (e.g. "attendance", "shift_coordinate"), matching
@@ -103,3 +125,31 @@ export interface RetentionAuditEntryDto {
   tier: RetentionTier;
   deleted_at: string;
 }
+
+// IF-RETENTION-CheckEligibility: "category identifier and/or record
+// reference" per the spec's own Interfaces and Contracts table. Unlike
+// GetDeletionAuditLog's broader browsing use case (module_id/category_id
+// independently optional, PR 4), this interface answers "is THIS specific
+// record eligible" -- record_ref alone is meaningless without knowing
+// which category it was tagged under (an opaque cross-module string could
+// collide across categories), so module_id+category_id are both required
+// together here, and record_ref is optional (querying a category's own
+// eligibility posture in general, vs. a specific tagged record).
+export const CheckEligibilityQuerySchema = z.object({
+  module_id: z.string().min(1),
+  category_id: z.string().min(1),
+  record_ref: z.string().min(1).optional(),
+});
+export type CheckEligibilityQuery = z.infer<typeof CheckEligibilityQuerySchema>;
+
+// Result shape: eligible/not-eligible/not-found (never a thrown error for
+// "no such record" -- mirrors ConsentStatus's discriminated-result pattern
+// for the identical "nothing decided yet" case, and this interface's own
+// spec row: "Not found (no history) -- returns empty, not an error").
+// due_date is always the computed value regardless of current eligibility
+// (RULE-RETENTION-03: eligibility is computed, not manually flagged), so a
+// caller can display "eligible" or "becomes eligible on <due_date>" from
+// the same response shape.
+export type EligibilityResult =
+  | { status: 'not_found' }
+  | { status: 'eligible' | 'not_eligible'; due_date: string };

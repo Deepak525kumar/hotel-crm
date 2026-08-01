@@ -2,13 +2,15 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 /**
  * SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN): service-level regression for
- * PR 2/4's scope -- IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord,
- * IF-RETENTION-GetDeletionAuditLog.
+ * RetentionService across PR 2/4/5 -- IF-RETENTION-RegisterCategory,
+ * IF-RETENTION-TagRecord, IF-RETENTION-GetDeletionAuditLog,
+ * IF-RETENTION-CheckEligibility.
  */
 
 const mockRetentionCategoryFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionCategoryCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockRetentionLogFindFirst = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionAuditEntryFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionAuditEntryCount = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
@@ -29,6 +31,7 @@ jest.mock('../lib/db.js', () => ({
     },
     retentionLog: {
       create: mockRetentionLogCreate,
+      findFirst: mockRetentionLogFindFirst,
     },
     retentionAuditEntry: {
       findMany: mockRetentionAuditEntryFindMany,
@@ -77,7 +80,7 @@ function makeAuditEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('RetentionService (SPEC-RETENTION-001, PR 2/4)', () => {
+describe('RetentionService (SPEC-RETENTION-001, PR 2/4/5)', () => {
   let service: RetentionService;
 
   beforeEach(() => {
@@ -85,6 +88,7 @@ describe('RetentionService (SPEC-RETENTION-001, PR 2/4)', () => {
     mockRetentionCategoryFindUnique.mockReset();
     mockRetentionCategoryCreate.mockReset();
     mockRetentionLogCreate.mockReset();
+    mockRetentionLogFindFirst.mockReset();
     mockRetentionAuditEntryFindMany.mockReset();
     mockRetentionAuditEntryCount.mockReset();
   });
@@ -358,6 +362,112 @@ describe('RetentionService (SPEC-RETENTION-001, PR 2/4)', () => {
       const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
 
       expect(result.data[0].deleted_at).toBe(NOW.toISOString());
+    });
+  });
+
+  describe('checkEligibility — IF-RETENTION-CheckEligibility', () => {
+    it('RULE-RETENTION-07: returns not_found when the category is not registered', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(null);
+
+      const result = await service.checkEligibility({
+        module_id: 'attendance',
+        category_id: 'unregistered',
+      });
+
+      expect(result).toEqual({ status: 'not_found' });
+      expect(mockRetentionLogFindFirst).not.toHaveBeenCalled();
+    });
+
+    it('returns not_found when record_ref is supplied but no matching tracked row exists', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory());
+      mockRetentionLogFindFirst.mockResolvedValue(null);
+
+      const result = await service.checkEligibility({
+        module_id: 'attendance',
+        category_id: 'shift_coordinate',
+        record_ref: 'attendance-record-42',
+      });
+
+      expect(result).toEqual({ status: 'not_found' });
+      expect(mockRetentionLogFindFirst).toHaveBeenCalledWith({
+        where: { category_id: 'cat1', record_ref: 'attendance-record-42', deleted_at: null },
+      });
+    });
+
+    it('returns not_eligible with a computed due_date for a record inside its tier window (TIER_1)', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory({ tier: 'TIER_1' }));
+      const taggedAt = new Date();
+      mockRetentionLogFindFirst.mockResolvedValue(makeLog({ tagged_at: taggedAt }));
+
+      const result = await service.checkEligibility({
+        module_id: 'attendance',
+        category_id: 'shift_coordinate',
+        record_ref: 'attendance-record-42',
+      });
+
+      expect(result.status).toBe('not_eligible');
+      if (result.status !== 'not_found') {
+        const expectedDue = new Date(taggedAt);
+        expectedDue.setMonth(expectedDue.getMonth() + 6);
+        expect(result.due_date).toBe(expectedDue.toISOString());
+      }
+    });
+
+    it('returns eligible when a tagged record is past its tier window (TIER_1, 7 months old)', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory({ tier: 'TIER_1' }));
+      const sevenMonthsAgo = new Date();
+      sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
+      mockRetentionLogFindFirst.mockResolvedValue(makeLog({ tagged_at: sevenMonthsAgo }));
+
+      const result = await service.checkEligibility({
+        module_id: 'attendance',
+        category_id: 'shift_coordinate',
+        record_ref: 'attendance-record-42',
+      });
+
+      expect(result.status).toBe('eligible');
+    });
+
+    it('omitting record_ref reports the category\'s own oldest still-tracked row', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory());
+      mockRetentionLogFindFirst.mockResolvedValue(makeLog());
+
+      await service.checkEligibility({ module_id: 'attendance', category_id: 'shift_coordinate' });
+
+      expect(mockRetentionLogFindFirst).toHaveBeenCalledWith({
+        where: { category_id: 'cat1', deleted_at: null },
+        orderBy: { tagged_at: 'asc' },
+      });
+    });
+
+    it('omitting record_ref returns not_found when the category has no tracked rows at all', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory());
+      mockRetentionLogFindFirst.mockResolvedValue(null);
+
+      const result = await service.checkEligibility({
+        module_id: 'attendance',
+        category_id: 'shift_coordinate',
+      });
+
+      expect(result).toEqual({ status: 'not_found' });
+    });
+
+    it('computes the due_date using the category\'s own tier, not a hardcoded window (TIER_3, 6 years)', async () => {
+      mockRetentionCategoryFindUnique.mockResolvedValue(makeCategory({ tier: 'TIER_3' }));
+      const taggedAt = new Date('2020-01-01T00:00:00.000Z');
+      mockRetentionLogFindFirst.mockResolvedValue(makeLog({ tagged_at: taggedAt }));
+
+      const result = await service.checkEligibility({
+        module_id: 'hr',
+        category_id: 'payroll_iban',
+        record_ref: 'hr-record-1',
+      });
+
+      if (result.status !== 'not_found') {
+        expect(result.due_date).toBe('2026-01-01T00:00:00.000Z');
+      } else {
+        throw new Error('expected a non-not_found result');
+      }
     });
   });
 });
