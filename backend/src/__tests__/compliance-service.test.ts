@@ -70,6 +70,13 @@ describe('ComplianceService.getAuditTrail — IF-COMPLIANCE-GetAuditTrail', () =
     expect(result).toEqual({ data: [], total: 0 });
   });
 
+  it('propagates an authService.getAuditTrail rejection unchanged, never swallowing or translating it', async () => {
+    const upstreamError = new Error('auth service unavailable');
+    mockGetAuditTrail.mockRejectedValue(upstreamError);
+
+    await expect(service.getAuditTrail({ page: 1, per_page: 20 })).rejects.toBe(upstreamError);
+  });
+
   it('RULE-COMPLIANCE-01: exposes no `prisma` property (BaseService is not extended, no direct table access is possible)', () => {
     // Structural guard: ComplianceService deliberately does NOT extend
     // BaseService (unlike RetentionService/ConsentService, which own a
