@@ -11,6 +11,11 @@ import { z } from 'zod';
 // identical guardrail for their own equivalent audit-read interfaces.
 export const AuditLogQuerySchema = z.object({
   actor_id: z.string().min(1).optional(),
+  // Free string, not z.nativeEnum(UserRole): an invalid role value simply
+  // matches zero rows (service.ts normalizes it uppercase before querying),
+  // never a validation error. Acceptable today -- if this schema is ever
+  // tightened to reject unknown values up front, switch to
+  // z.nativeEnum(UserRole) then, not before it's actually needed.
   actor_role: z.string().min(1).optional(),
   action: z.string().min(1).optional(),
   resource_type: z.string().min(1).optional(),

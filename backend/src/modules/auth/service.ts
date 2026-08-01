@@ -421,6 +421,14 @@ export class AuthService extends BaseService {
         where,
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
+        // KNOWN GAP, not fixed here: two rows sharing the exact same
+        // `timestamp` have no defined relative order (single-column sort
+        // only). Same latent gap as HR's/Consent's own `created_at`/
+        // `decided_at`-only orderBy clauses -- a repo-wide pattern, not
+        // unique to this interface. Fix would be a secondary `{ id: 'desc' }`
+        // tiebreaker; backlogged as a repo-wide pass rather than a one-off
+        // fix here, so this interface doesn't silently diverge in shape
+        // from its siblings.
         orderBy: { timestamp: 'desc' },
       }),
       this.prisma.auditLog.count({ where }),
