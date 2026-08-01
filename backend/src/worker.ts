@@ -12,6 +12,7 @@ import {
 } from './modules/notifications/outbox-transport.js';
 import { SessionSweepJob } from './modules/auth/session-sweep-job.js';
 import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
+import { RetentionSweepJob } from './modules/retention/sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
 
@@ -37,6 +38,12 @@ import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js
  * GD-14/OD-GEO-002 (SPEC-GEO-001): the geo retention sweep hard-deletes
  * WorkerGeoCheckin rows older than 6 months (GDPR Tier 1), on a
  * configuration-driven interval (default daily).
+ *
+ * SPEC-RETENTION-001 PR 3: the generic retention sweep hard-deletes
+ * RetentionLog rows once their registered category's tier window elapses,
+ * writing a RetentionAuditEntry per deletion, on a configuration-driven
+ * interval (default daily). Scope boundary disclosed in the job's own
+ * header comment (retention/sweep-job.ts).
  *
  * Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): the job-request
  * auto-close job closes any broadcast JobRequest still OPEN more than 6
@@ -94,6 +101,13 @@ async function main() {
           intervalMs: env.GEO_RETENTION_SWEEP_INTERVAL_MS,
           batchSize: env.GEO_RETENTION_SWEEP_BATCH_SIZE,
           maxBatchesPerRun: env.GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      )
+      .register(
+        new RetentionSweepJob(prisma, {
+          intervalMs: env.RETENTION_SWEEP_INTERVAL_MS,
+          batchSize: env.RETENTION_SWEEP_BATCH_SIZE,
+          maxBatchesPerRun: env.RETENTION_SWEEP_MAX_BATCHES_PER_RUN,
         })
       )
       .register(
