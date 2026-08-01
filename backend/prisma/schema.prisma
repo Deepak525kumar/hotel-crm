@@ -1259,3 +1259,149 @@ model ConsentRecord {
   @@index([worker_id, consent_instance])
   @@index([decided_at])
 }
+
+// Retention schema (SPEC-RETENTION-001@0.2.0, REVIEW -- NOT FROZEN; schema-
+// only PR 1 of the planned 5-PR implementation sequence: schema -> core
+// interfaces -> sweep engine -> audit -> eligibility API). No service,
+// controller, route, or scheduler code is introduced by this PR --
+// RetentionTier/RetentionCategory/RetentionLog/RetentionAuditEntry exist
+// only as persisted shape for later PRs to build against.
+//
+// Scope: this module is generic, reusable retention infrastructure (tier
+// registration, eligibility, scheduling framework, audit, deletion-contract
+// interfaces) for any consuming module that has not already built its own
+// retention mechanism. It does not own backend-geo's Tier-1 sweep
+// (GeoRetentionSweepJob, SIR-GEO-002/OD-GEO-002, resolved by GD-14) -- see
+// MODULE_SPEC.md's Purpose and Scope / RULE-RETENTION-08.
+//
+// RULE-RETENTION-01: exactly the three CRR §25-confirmed tiers exist as a
+// closed set; no fourth tier or alternate window. The window each tier
+// implies (6 months / 5 years / 6 years) is intentionally NOT encoded here
+// as separate enum values or columns. REQ-RETENTION-013's own acceptance
+// criterion requires each tier be "queryable as a distinct, stable tier
+// identifier with its window encoded" but does not itself say where that
+// encoding must live -- keeping the window in service-layer logic (PR 2+)
+// rather than a schema column is this PR's own implementation-time choice,
+// not something the requirement text dictates either way.
+enum RetentionTier {
+  TIER_1
+  TIER_2
+  TIER_3
+}
+
+// REQ-RETENTION-014 (MUST): "IF-RETENTION-RegisterCategory accepts a
+// consuming-module-supplied category identifier and a tier assignment, and
+// persists that mapping in RetentionLog's category-tracking state." This
+// model is that persisted category-tracking state -- the registration half
+// of what the spec's prose calls "RetentionLog" (the spec names one
+// conceptual entity; see RetentionLog below for why this PR splits it into
+// three models). Named RetentionCategory rather than e.g. "...Registration"
+// to match the spec's own Actors and Terminology vocabulary ("Retention
+// category / data category", MODULE_SPEC.md line 85) instead of its
+// "Registration / tagging" term (line 88), which names the act, not the
+// persisted entity.
+//
+// RULE-RETENTION-02: a consuming module registers/tags its own category
+// here, supplying its own tier assignment -- this module never infers it
+// (REQ-RETENTION-019/RULE-RETENTION-07).
+//
+// The unique constraint on (module_id, category_id) gives a future
+// service-layer check something to enforce against; it does NOT resolve
+// OD-RETENTION-03 (duplicate registration with a conflicting tier is still
+// an explicitly OPEN decision -- out of scope for this schema-only PR).
+model RetentionCategory {
+  id         String        @id @default(cuid())
+  // Consuming-module identifier, module-scoped (e.g. "attendance").
+  module_id  String
+  // Category identifier, scoped within module_id (e.g. "shift_coordinate").
+  category_id String
+  tier       RetentionTier
+  created_at DateTime      @default(now())
+
+  logs       RetentionLog[]
+
+  @@unique([module_id, category_id])
+}
+
+// REQ-RETENTION-015 (MUST) / RULE-RETENTION-03: tracks per-record (or
+// per-category, depending on tagging granularity -- OD-RETENTION-04 is
+// still OPEN and not resolved by this schema) deletion-eligibility state
+// prior to deletion. This is the "Tagged/Tracked -> Eligible" half of the
+// State and Lifecycle section.
+//
+// Deliberately split from RetentionCategory (registration) and from
+// RetentionAuditEntry (immutable post-deletion record) into its own model:
+// the spec names a single "RetentionLog" entity, but its two described
+// responsibilities -- eligibility tracking (queried/updated repeatedly
+// pre-deletion) vs. deletion audit (write-once, must never be updated,
+// RULE-RETENTION-06) -- have incompatible mutability characteristics. This
+// PR keeps the RetentionLog name for the pre-deletion tracking half (closest
+// to PDD §9.3's "tracks deletion eligibility per data category" framing)
+// and introduces RetentionAuditEntry as a distinct immutable audit model
+// (see below). This is a disclosed implementation-time schema-shape choice,
+// not a spec violation -- the spec does not prescribe schema granularity.
+//
+// category relation (not a denormalized module_id/category_id pair):
+// RULE-RETENTION-07 requires "unregistered categories are never swept" --
+// a foreign key to RetentionCategory structurally enforces that a
+// RetentionLog row can never exist without a registered category, which a
+// denormalized pair alone would not guarantee.
+model RetentionLog {
+  id            String            @id @default(cuid())
+  category_id   String
+  category      RetentionCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  // Opaque cross-module record reference (module-scoped id sufficient for
+  // the owning module to identify the record on its own side) -- NOT a
+  // Prisma relation/foreign key, since the referenced record lives in
+  // another module's own table, outside this module's schema ownership
+  // (Ownership and Boundaries: this module never owns/redefines another
+  // module's business record).
+  record_ref    String
+  // RULE-RETENTION-03: the clock the tier's window counts from (the
+  // record's creation/effective timestamp, per IF-RETENTION-TagRecord).
+  tagged_at     DateTime
+  // Set once the sweep (PR 3+) determines and/or executes deletion for this
+  // row. deleted_at null == still Tagged/Tracked or Eligible; non-null ==
+  // Deleted (RULE-RETENTION-05). No business logic for computing eligibility
+  // or performing deletion is implemented in this PR.
+  deleted_at    DateTime?
+  created_at    DateTime          @default(now())
+
+  @@index([category_id])
+  @@index([tagged_at])
+  @@index([deleted_at])
+}
+
+// REQ-RETENTION-018 (MUST) / RULE-RETENTION-06: every deletion performed by
+// the sweep produces an immutable audit entry recording category, tier, and
+// timestamp only -- never the deleted personal data. Kept as a distinct
+// model from RetentionLog (see reasoning above): audit rows must never be
+// updated once written, unlike RetentionLog's pre-deletion tracking rows.
+//
+// Denormalized module_id/category_id/tier (rather than a foreign key to
+// RetentionCategory) so this audit trail survives even if the originating
+// RetentionCategory or RetentionLog row is ever removed -- an audit record
+// of "what was deleted, under which tier, and when" (Purpose and Scope)
+// must remain independently readable. No personal-data field exists on this
+// model by construction, matching IF-RETENTION-GetDeletionAuditLog's
+// fixed-field output allow-list (FIND-SEC-003).
+//
+// deleted_at has no default: it must be explicitly supplied as the actual
+// deletion instant by whatever writes this row (PR 3+'s sweep). An
+// @default(now()) here would risk silently recording audit-write time
+// instead of deletion time if the write is ever delayed/retried/batched --
+// created_at (row-insertion time) already exists separately for that
+// purpose, so deleted_at is free to mean exactly what RULE-RETENTION-06's
+// "timestamp" refers to: when the delete happened, not when the audit
+// entry was written.
+model RetentionAuditEntry {
+  id           String        @id @default(cuid())
+  module_id    String
+  category_id  String
+  tier         RetentionTier
+  deleted_at   DateTime
+  created_at   DateTime      @default(now())
+
+  @@index([module_id, category_id])
+  @@index([deleted_at])
+}
