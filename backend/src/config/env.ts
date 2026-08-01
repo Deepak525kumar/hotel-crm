@@ -197,6 +197,15 @@ const envSchema = z.object({
   GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 
+  // SPEC-RETENTION-001@0.2.0 REVIEW, PR 3 of 5: the generic RetentionLog
+  // sweep (REQ-RETENTION-016, RULE-RETENTION-04), same config-driven
+  // convention as the sweep jobs above. Default interval: daily, same
+  // rationale as GEO_RETENTION_SWEEP -- this data ages out over months/
+  // years, not hours.
+  RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+  RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
+  RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
+
   // Epic 9 PR 9.10 (TREQ-006/TRULE-005, MIG-GAP-09): broadcast JobRequest
   // 6h auto-close job on the Platform Worker, same config-driven convention
   // as the two sweep jobs above. A tighter poll than SESSION_SWEEP's hourly
