@@ -19,6 +19,7 @@ import documentRoutes from '../../modules/documents/routes.js';
 import geoRoutes from '../../modules/geo/routes.js';
 import consentRoutes from '../../modules/consent/routes.js';
 import retentionRoutes from '../../modules/retention/routes.js';
+import complianceRoutes from '../../modules/compliance/routes.js';
 import employeeManagementRoutes from '../../modules/employee-management/routes.js';
 
 const router = Router();
@@ -40,6 +41,7 @@ router.use('/documents', documentRoutes);
 router.use('/geo', geoRoutes);
 router.use('/consent', consentRoutes);
 router.use('/retention', retentionRoutes);
+router.use('/compliance', complianceRoutes);
 
 // Employee-management routes (Epic 5 PR 5.6, SPEC-EMP-001) — gated by
 // FEATURE_EMPLOYMENT_RECORD (default OFF). While disabled, requests fall
@@ -79,7 +81,7 @@ router.get('/status', (req, res) => {
     data: {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
-      modules: ['auth', 'users', 'crm', 'work-requests', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'geo', 'consent', 'retention', 'notifications', 'analytics', 'quality', 'employee-management'],
+      modules: ['auth', 'users', 'crm', 'work-requests', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'geo', 'consent', 'retention', 'compliance', 'notifications', 'analytics', 'quality', 'employee-management'],
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {
