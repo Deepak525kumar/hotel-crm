@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { signTokens, verifyRefreshToken, UserScope } from '../../lib/jwt.js';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../../config/constants.js';
 import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
-import { AuthResponse } from './types.js';
+import { AuthResponse, AuditLogQuery, AuditLogEntryDto } from './types.js';
 
 // ADR-031 D-4 (PR-4): the sole seam through which `User.token_generation` may
 // be incremented. `backend-auth` is the authoritative writer (ADR-017,
@@ -383,6 +383,81 @@ export class AuthService extends BaseService {
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
     return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
+  }
+
+  // ADR-016: backend-auth is the authoritative writer of AuditLog and owns
+  // any read interface over it. Generic, caller-agnostic query -- no code
+  // path here ever calls prisma.auditLog.create/update/delete (writes stay
+  // exclusively on BaseService.logAudit's own path, used platform-wide).
+  // Bounded/paginated, matching ConsentService.getAuditHistory's and
+  // RetentionService.getDeletionAuditLog's identical guardrail. AuditLog's
+  // existing indexes (schema.prisma:995-1000: actor_id, action,
+  // resource_type, resource_id, timestamp, [resource_type, resource_id])
+  // already cover every filter combination below -- no new index required.
+  async getAuditTrail(
+    query: AuditLogQuery
+  ): Promise<{ data: AuditLogEntryDto[]; total: number }> {
+    const where = {
+      ...(query.actor_id ? { actor_id: query.actor_id } : {}),
+      // Normalized the same way BaseService.logAudit writes it -- uppercase
+      // string coerced to the UserRole enum -- so a caller-supplied lowercase
+      // role string (e.g. "admin") still matches stored rows.
+      ...(query.actor_role ? { actor_role: query.actor_role.toUpperCase() as UserRole } : {}),
+      ...(query.action ? { action: query.action } : {}),
+      ...(query.resource_type ? { resource_type: query.resource_type } : {}),
+      ...(query.resource_id ? { resource_id: query.resource_id } : {}),
+      ...(query.from || query.to
+        ? {
+            timestamp: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+    };
+
+    const [entries, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        skip: (query.page - 1) * query.per_page,
+        take: query.per_page,
+        orderBy: { timestamp: 'desc' },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      data: entries.map((e) => this.toAuditLogEntryDto(e)),
+      total,
+    };
+  }
+
+  private toAuditLogEntryDto(entry: {
+    id: string;
+    actor_id: string | null;
+    actor_role: string | null;
+    action: string;
+    resource_type: string;
+    resource_id: string;
+    old_values: unknown;
+    new_values: unknown;
+    details: unknown;
+    ip_address: string | null;
+    timestamp: Date;
+  }): AuditLogEntryDto {
+    return {
+      id: entry.id,
+      actor_id: entry.actor_id,
+      actor_role: entry.actor_role,
+      action: entry.action,
+      resource_type: entry.resource_type,
+      resource_id: entry.resource_id,
+      old_values: entry.old_values,
+      new_values: entry.new_values,
+      details: entry.details,
+      ip_address: entry.ip_address,
+      timestamp: entry.timestamp.toISOString(),
+    };
   }
 }
 
