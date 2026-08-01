@@ -2,12 +2,15 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 /**
  * SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN): service-level regression for
- * PR 2's scope -- IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord.
+ * PR 2/4's scope -- IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord,
+ * IF-RETENTION-GetDeletionAuditLog.
  */
 
 const mockRetentionCategoryFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionCategoryCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockRetentionLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockRetentionAuditEntryFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockRetentionAuditEntryCount = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -26,6 +29,10 @@ jest.mock('../lib/db.js', () => ({
     },
     retentionLog: {
       create: mockRetentionLogCreate,
+    },
+    retentionAuditEntry: {
+      findMany: mockRetentionAuditEntryFindMany,
+      count: mockRetentionAuditEntryCount,
     },
   }),
 }));
@@ -58,7 +65,19 @@ function makeLog(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('RetentionService (SPEC-RETENTION-001, PR 2)', () => {
+function makeAuditEntry(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'audit1',
+    module_id: 'attendance',
+    category_id: 'shift_coordinate',
+    tier: 'TIER_1',
+    deleted_at: NOW,
+    created_at: NOW,
+    ...overrides,
+  };
+}
+
+describe('RetentionService (SPEC-RETENTION-001, PR 2/4)', () => {
   let service: RetentionService;
 
   beforeEach(() => {
@@ -66,6 +85,8 @@ describe('RetentionService (SPEC-RETENTION-001, PR 2)', () => {
     mockRetentionCategoryFindUnique.mockReset();
     mockRetentionCategoryCreate.mockReset();
     mockRetentionLogCreate.mockReset();
+    mockRetentionAuditEntryFindMany.mockReset();
+    mockRetentionAuditEntryCount.mockReset();
   });
 
   describe('registerCategory — REQ-RETENTION-014/RULE-RETENTION-02', () => {
@@ -209,6 +230,134 @@ describe('RetentionService (SPEC-RETENTION-001, PR 2)', () => {
 
       expect(result.tagged_at).toBe(NOW.toISOString());
       expect(result.deleted_at).toBe(NOW.toISOString());
+    });
+  });
+
+  describe('getDeletionAuditLog — IF-RETENTION-GetDeletionAuditLog, RULE-RETENTION-06/FIND-SEC-003', () => {
+    it('returns audit entries and a total count', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([makeAuditEntry()]);
+      mockRetentionAuditEntryCount.mockResolvedValue(1);
+
+      const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(result.total).toBe(1);
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].id).toBe('audit1');
+    });
+
+    it('returns an empty result, not an error, when no history exists', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(result).toEqual({ data: [], total: 0 });
+    });
+
+    it('bounds the query with pagination (skip/take), never an unbounded scan', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      await service.getDeletionAuditLog({ page: 2, per_page: 10 });
+
+      expect(mockRetentionAuditEntryFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 10, take: 10 })
+      );
+    });
+
+    it('filters by module_id and category_id together when both are supplied', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      await service.getDeletionAuditLog({
+        module_id: 'attendance',
+        category_id: 'shift_coordinate',
+        page: 1,
+        per_page: 20,
+      });
+
+      expect(mockRetentionAuditEntryFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { module_id: 'attendance', category_id: 'shift_coordinate' },
+        })
+      );
+    });
+
+    it('applies no module_id/category_id filter when neither is supplied', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(mockRetentionAuditEntryFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {} })
+      );
+    });
+
+    it('bounds by date range when from/to are supplied', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      const from = new Date('2026-01-01T00:00:00.000Z');
+      const to = new Date('2026-06-01T00:00:00.000Z');
+      await service.getDeletionAuditLog({ from, to, page: 1, per_page: 20 });
+
+      expect(mockRetentionAuditEntryFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { deleted_at: { gte: from, lte: to } },
+        })
+      );
+    });
+
+    it('orders results newest-deletion-first', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([]);
+      mockRetentionAuditEntryCount.mockResolvedValue(0);
+
+      await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(mockRetentionAuditEntryFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { deleted_at: 'desc' } })
+      );
+    });
+
+    it('FIND-SEC-003: the returned DTO carries only category_id/tier/deleted_at (plus id/module_id) -- never record_ref or any other field', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([makeAuditEntry({ tier: 'TIER_3' })]);
+      mockRetentionAuditEntryCount.mockResolvedValue(1);
+
+      const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(Object.keys(result.data[0]).sort()).toEqual(
+        ['category_id', 'deleted_at', 'id', 'module_id', 'tier'].sort()
+      );
+    });
+
+    it('FIND-SEC-003 (defense in depth): the mapper strips an unexpected field even if the raw row somehow carried one', async () => {
+      // Proves the allow-list is enforced by toAuditEntryDto()'s explicit
+      // field-by-field mapping, not merely absent because the fixture
+      // never included it -- guards against a future schema-drift
+      // regression where a new column is added to RetentionAuditEntry and
+      // accidentally spread into the DTO instead of explicitly mapped.
+      mockRetentionAuditEntryFindMany.mockResolvedValue([
+        { ...makeAuditEntry(), record_ref: 'attendance-record-42', created_at: NOW },
+      ]);
+      mockRetentionAuditEntryCount.mockResolvedValue(1);
+
+      const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(result.data[0]).not.toHaveProperty('record_ref');
+      expect(result.data[0]).not.toHaveProperty('created_at');
+      expect(Object.keys(result.data[0]).sort()).toEqual(
+        ['category_id', 'deleted_at', 'id', 'module_id', 'tier'].sort()
+      );
+    });
+
+    it('serializes deleted_at as an ISO string in the returned DTO', async () => {
+      mockRetentionAuditEntryFindMany.mockResolvedValue([makeAuditEntry({ deleted_at: NOW })]);
+      mockRetentionAuditEntryCount.mockResolvedValue(1);
+
+      const result = await service.getDeletionAuditLog({ page: 1, per_page: 20 });
+
+      expect(result.data[0].deleted_at).toBe(NOW.toISOString());
     });
   });
 });

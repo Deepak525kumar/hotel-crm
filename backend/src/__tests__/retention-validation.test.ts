@@ -2,6 +2,7 @@ import { describe, it, expect } from '@jest/globals';
 import {
   RegisterCategorySchema,
   TagRecordSchema,
+  GetDeletionAuditLogQuerySchema,
   RETENTION_TIERS,
   RETENTION_TIER_WINDOWS,
 } from '../modules/retention/types.js';
@@ -152,5 +153,57 @@ describe('RETENTION_TIERS / RETENTION_TIER_WINDOWS — RULE-RETENTION-01', () =>
 
   it('has exactly one window entry per tier -- no fourth tier accidentally introduced', () => {
     expect(Object.keys(RETENTION_TIER_WINDOWS)).toHaveLength(3);
+  });
+});
+
+describe('GetDeletionAuditLogQuerySchema', () => {
+  it('accepts an empty query (no filters), defaulting page/per_page', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.page).toBe(1);
+      expect(result.data.per_page).toBe(20);
+    }
+  });
+
+  it('accepts module_id/category_id filters', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({
+      module_id: 'attendance',
+      category_id: 'shift_coordinate',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a from/to date range', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({
+      from: '2026-01-01T00:00:00.000Z',
+      to: '2026-06-01T00:00:00.000Z',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects an empty-string module_id', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({ module_id: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an empty-string category_id', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({ category_id: '' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects page below 1', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({ page: 0 });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects per_page above 100 (no unbounded full-history scan)', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({ per_page: 101 });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects an unparseable from/to value', () => {
+    const result = GetDeletionAuditLogQuerySchema.safeParse({ from: 'not-a-date' });
+    expect(result.success).toBe(false);
   });
 });

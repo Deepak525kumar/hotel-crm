@@ -1,6 +1,7 @@
-// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). PR 2 of 5: RetentionService
-// core interfaces only (IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord).
-// REQ-RETENTION-013..015 / RULE-RETENTION-01..03/07.
+// SPEC-RETENTION-001@0.2.0 REVIEW (NOT FROZEN). PR 2/4 of 5: RetentionService
+// interfaces -- PR 2: IF-RETENTION-RegisterCategory, IF-RETENTION-TagRecord
+// (REQ-RETENTION-013..015 / RULE-RETENTION-01..03/07). PR 4:
+// IF-RETENTION-GetDeletionAuditLog (RULE-RETENTION-06, FIND-SEC-003).
 
 import { z } from 'zod';
 import { RetentionTier } from '@prisma/client';
@@ -66,4 +67,39 @@ export interface RetentionLogDto {
   record_ref: string;
   tagged_at: string;
   deleted_at: string | null;
+}
+
+// IF-RETENTION-GetDeletionAuditLog: date range MUST be bounded/paginated
+// per the spec's own explicit guardrail -- no unbounded full-history scan,
+// mirroring docs/03-modules/consent/MODULE_SPEC.md's identical
+// IF-CONSENT-GetAuditHistory treatment (GetAuditHistoryQuerySchema in
+// consent/types.ts). module_id and category_id are each independently
+// optional -- the spec names only "optional category filter" and does not
+// require pairing them. A category_id-only query is permitted but spans
+// every module's namespace (category_id alone is not globally unique,
+// per IF-RETENTION-RegisterCategory's own "attendance.shift_coordinate"
+// framing) -- callers who need an unambiguous scope should supply both.
+export const GetDeletionAuditLogQuerySchema = z.object({
+  module_id: z.string().min(1).optional(),
+  category_id: z.string().min(1).optional(),
+  from: z.coerce.date().optional(),
+  to: z.coerce.date().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(20),
+});
+export type GetDeletionAuditLogQuery = z.infer<typeof GetDeletionAuditLogQuerySchema>;
+
+// FIND-SEC-003: fixed field allow-list -- category identifier, tier, and
+// deletion timestamp only, never the deleted record's own data (id/
+// module_id are structural identifiers needed to disambiguate rows, not
+// part of that personal-data-exclusion guarantee). This type is
+// structurally incapable of carrying a record_ref or any other field,
+// mirroring RetentionAuditEntry's own schema shape (PR 1) and
+// ConsentRecordDto's equivalent restriction.
+export interface RetentionAuditEntryDto {
+  id: string;
+  module_id: string;
+  category_id: string;
+  tier: RetentionTier;
+  deleted_at: string;
 }
