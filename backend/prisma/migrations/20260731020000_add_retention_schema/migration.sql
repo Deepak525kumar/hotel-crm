@@ -3,9 +3,9 @@
 -- engine -> audit -> eligibility API). Additive, pre-launch, no production
 -- data to migrate (PDD §10 Phase 3).
 --
--- Scope (human decision, 2026-07-31): generic retention infrastructure for
--- consuming modules without their own mechanism. Does not own or migrate
--- backend-geo's already-ratified Tier-1 sweep (GD-14, SIR-GEO-002).
+-- Scope: generic retention infrastructure for consuming modules without
+-- their own mechanism. Does not own backend-geo's Tier-1 sweep (GD-14,
+-- SIR-GEO-002).
 --
 -- RULE-RETENTION-01: RetentionTier is a closed three-value set (TIER_1/2/3);
 -- windows (6mo/5yr/6yr) are service-layer logic, not encoded here.

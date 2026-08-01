@@ -1267,16 +1267,12 @@ model ConsentRecord {
 // RetentionTier/RetentionCategory/RetentionLog/RetentionAuditEntry exist
 // only as persisted shape for later PRs to build against.
 //
-// Scope (human decision, 2026-07-31): this module is generic, reusable
-// retention infrastructure (tier registration, eligibility, scheduling
-// framework, audit, deletion-contract interfaces) for any consuming module
-// that has not already built its own retention mechanism. It does NOT own
-// or migrate backend-geo's already-ratified, already-shipped Tier-1 sweep
-// (GeoRetentionSweepJob, GD-14, SIR-GEO-002 RESOLVED in Geo's favor) --
-// that remains Geo's own authoritative implementation, unaffected by this
-// module's existence. Any future convergence is a separate initiative, not
-// assumed by this schema or this epic. See MODULE_SPEC.md's Purpose and
-// Scope / RULE-RETENTION-08 for the full correction record.
+// Scope: this module is generic, reusable retention infrastructure (tier
+// registration, eligibility, scheduling framework, audit, deletion-contract
+// interfaces) for any consuming module that has not already built its own
+// retention mechanism. It does not own backend-geo's Tier-1 sweep
+// (GeoRetentionSweepJob, SIR-GEO-002/OD-GEO-002, resolved by GD-14) -- see
+// MODULE_SPEC.md's Purpose and Scope / RULE-RETENTION-08.
 //
 // RULE-RETENTION-01: exactly the three CRR §25-confirmed tiers exist as a
 // closed set; no fourth tier or alternate window. The window each tier
