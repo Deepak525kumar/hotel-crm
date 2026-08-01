@@ -103,6 +103,22 @@ nodes:
   # module has registered a category yet (repository-verified by grep, see
   # observed_revision note above).
   - { id: backend-retention, kind: module, owner: unassigned, source: backend/src/modules/retention, lifecycle: active-partial }
+  # Added 2026-08-02 (SYNC-075, backend-compliance PR 4 governance-sync pass):
+  # backend-compliance was zero-code (no directory at all) until PRs 1-3
+  # (2026-08-02) implemented SPEC-COMPLIANCE-001@0.1.0 REVIEW (not frozen --
+  # implementation proceeded ahead of freeze, same precedent as backend-consent/
+  # backend-documents/backend-retention; see MODULE_REGISTRY.yaml's
+  # backend-compliance entry). Owns zero Prisma model of its own -- pure
+  # orchestration over three source modules' own published services
+  # (documentService, consentService, authService), see the
+  # edge-compliance-reads-* edges below. lifecycle: active-partial, not
+  # active -- IF-COMPLIANCE-GetAuditTrail remains in-process-only, never
+  # routed (no external caller identified); only
+  # IF-COMPLIANCE-FulfilSubjectRightsRequest is mounted.
+  # IF-COMPLIANCE-GetGovernanceReport is explicitly NOT built --
+  # OD-COMPLIANCE-002/003/006 (report shape, legal-basis mechanism, and the
+  # undefined Admin/DPO RBAC scope) remain genuinely open.
+  - { id: backend-compliance, kind: module, owner: unassigned, source: backend/src/modules/compliance, lifecycle: active-partial }
 
   # Clients
   - { id: frontend-web, kind: client, owner: unassigned, source: frontend }
@@ -322,6 +338,38 @@ edges:
     compatibility: unknown
     status: observed
     evidence: "backend/src/modules/consent/service.ts:5,292 (notifyResponsibleManager(), notificationService.enqueue())"
+  # Added 2026-08-02 (SYNC-075, backend-compliance PR 4 governance-sync pass):
+  # backend-compliance's IF-COMPLIANCE-FulfilSubjectRightsRequest (PR 3) fans
+  # out to three source modules' own published services, each a direct
+  # in-process call, mirroring edge-hr-uploads-via-documents' identical
+  # shape. IF-COMPLIANCE-GetAuditTrail (PR 1/2) is the fourth call
+  # (authService.getAuditTrail(), also used by the fan-out below) -- not a
+  # separate edge, since it targets the same state-audit-log domain the
+  # subject-rights edge below already covers.
+  - id: edge-compliance-reads-worker-document
+    source: backend-compliance
+    target: state-worker-document
+    kind: calls
+    contract: documents-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/compliance/service.ts fulfilSubjectRightsRequest() -> documentService.exportWorkerDocuments() (backend/src/modules/documents/service.ts)"
+  - id: edge-compliance-reads-consent-record
+    source: backend-compliance
+    target: state-consent-record
+    kind: calls
+    contract: consent-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/compliance/service.ts fulfilSubjectRightsRequest() -> consentService.getAuditHistory() (backend/src/modules/consent/service.ts)"
+  - id: edge-compliance-reads-audit-log
+    source: backend-compliance
+    target: state-audit-log
+    kind: calls
+    contract: auth-audit-service
+    compatibility: unknown
+    status: observed
+    evidence: "backend/src/modules/compliance/service.ts getAuditTrail()/fulfilSubjectRightsRequest() -> authService.getAuditTrail() (backend/src/modules/auth/service.ts, PR 1)"
 
   # --- Cross-module state writes (work-applications accept-application transaction) ---
   # edge-work-applications-writes-work-request, edge-work-applications-writes-worker-assignment,
@@ -698,6 +746,7 @@ runtime:
     - { module: backend-geo, mount: "/api/v1/geo", evidence: "backend/src/routes/v1/index.ts:19,38" }  # added 2026-07-30 (Geo repository synchronization pass); was previously listed under unregistered despite mounting since Geo's 2026-07-28 implementation
     - { module: backend-consent, mount: "/api/v1/consent", evidence: "backend/src/routes/v1/index.ts:20,40" }  # added 2026-07-31 (Consent repository synchronization pass); backend-consent had no module entry at all prior to PR #293 (2026-07-31)
     - { module: backend-retention, mount: "/api/v1/retention", evidence: "backend/src/routes/v1/index.ts:21,42" }  # added 2026-08-02 (Retention closeout repository-synchronization pass, SYNC-074); backend-retention had no module entry at all prior to PRs #294-#298 (2026-07-31/08-01). Only GetDeletionAuditLog/CheckEligibility are reachable via this mount -- RegisterCategory/TagRecord are in-process-only, never routed.
+    - { module: backend-compliance, mount: "/api/v1/compliance", evidence: "backend/src/routes/v1/index.ts:22,44" }  # added 2026-08-02 (SYNC-075, backend-compliance PR 4 governance-sync pass); backend-compliance had no module entry at all prior to PRs 1-3 (2026-08-02). Only IF-COMPLIANCE-FulfilSubjectRightsRequest (POST /subject-rights-export) is reachable via this mount -- IF-COMPLIANCE-GetAuditTrail is in-process-only, never routed.
   middleware_registration:
     - "optionalAuthMiddleware applied to the whole v1 router (routes/v1/index.ts:20)."
     - "authMiddleware / requireRole / requirePermission / checkHotelAccess applied per-module in each module's routes.ts (backend/src/middleware/auth.ts, backend/src/middleware/permissions.ts)."
@@ -957,7 +1006,7 @@ state_domains:
     writers: [shared-via-base-service]
     readers: [backend-compliance]
     evidence: "backend/src/lib/base-service.ts:19 (logAudit -> this.prisma.auditLog.create); inherited by every service"
-    note: "Written through the shared BaseService.logAudit by any module (unchanged by this record -- no refactor performed); authoritative_writer resolved backend-auth by ADR-016 (Accepted, 2026-07-14), closing SYNC-005/SIR-GLOB-006's state-audit-log half. backend-compliance is a read-only consumer, never a writer, per ADR-016 (docs/03-modules/compliance/MODULE_SPEC.md, zero code footprint, target-state read only)."
+    note: "Written through the shared BaseService.logAudit by any module (unchanged by this record -- no refactor performed); authoritative_writer resolved backend-auth by ADR-016 (Accepted, 2026-07-14), closing SYNC-005/SIR-GLOB-006's state-audit-log half. backend-compliance is a read-only consumer, never a writer, per ADR-016. CORRECTED (2026-08-02, SYNC-075, backend-compliance PR 4 governance-sync pass): the prior 'zero code footprint, target-state read only' framing no longer applies -- backend-compliance now reads this domain via authService.getAuditTrail() (PR 1, generic/caller-agnostic per ADR-016's own anticipated 'IF-AUTH-*/IF-AUDIT-* contract' framing) and additionally writes to it as one more shared-helper caller of BaseService.logAudit (PR 3, OD-COMPLIANCE-008's disclosed default -- not a second authoritative writer, the same shared writers: [shared-via-base-service] path every other module already uses)."
   - id: state-password-reset-token
     model: PasswordResetToken
     authoritative_writer: backend-auth
