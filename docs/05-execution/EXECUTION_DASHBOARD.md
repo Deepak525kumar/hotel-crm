@@ -5,7 +5,7 @@
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |
 | Out of scope | Production-release sign-off (see [RELEASE_STATUS.md](RELEASE_STATUS.md)) and ADR/governance-decision status (see [`GOVERNANCE_DECISIONS_REQUIRED.md`](../implementation/GOVERNANCE_DECISIONS_REQUIRED.md), [`DECISION_INDEX.md`](../../.claude/knowledge/DECISION_INDEX.md)) — this file links to both, never restates them |
 | Per-module status source | [`.claude/knowledge/MODULE_REGISTRY.yaml`](../../.claude/knowledge/MODULE_REGISTRY.yaml) `implementation_status`/`lifecycle` fields — this table summarizes, it does not duplicate the registry's evidence/specification detail |
-| Last verified | 2026-07-29, `HEAD` `586a55d` (post-GD-19/20/21/22/23 governance-resolution pass; this milestone's per-module/GD-* prose below was written the same day those decisions landed and is confirmed current — see `docs/implementation/IMPLEMENTATION_EXECUTION_PLAN.md`'s 2026-07-29 verification-pass note for the implementation-sequencing implication). Module implementation status still keyed to the 2026-07-28 SYNC-055 repository-synchronization pass (post-PR #243/#244/#245; independently re-checked against `backend/src/modules/*/service.ts`; test suite 71/71 suites, 1113/1113 tests passing; `tsc --noEmit` clean) — no code changed between SYNC-055 and this verification, only governance documentation. |
+| Last verified | 2026-08-01, `HEAD` `069f139` (SYNC-073, Retention repository synchronization pass — corrects this file's `backend-retention` row only; no other module re-verified this pass). Prior marker: 2026-07-29, `HEAD` `586a55d` (post-GD-19/20/21/22/23 governance-resolution pass; test suite 71/71 suites, 1113/1113 tests passing at that time; `tsc --noEmit` clean). |
 
 ## Current Milestone
 
@@ -30,6 +30,13 @@ merged the same day (PR #245) — see its row below for what shipped vs. what re
 (multipart upload, real S3 SDK, `MIG-GAP-DOC-001`). Repository-synchronization pass SYNC-055
 (2026-07-28) reconciled the knowledge layer against this and the two other PRs merged since GD-16
 (`#243` GD-18 calendar-absence slice, `#244` the GD-16 decision/freeze itself).
+
+**Landed since:** `backend-retention` (Retention module) built 2026-07-31/08-01 (PRs #294-#298),
+still `REVIEW`, not frozen. Full implementation summary, RBAC/cross-module-delete disposition, and
+the `record_ref` index finding live in `MODULE_REGISTRY.yaml`'s `backend-retention` entry (not
+restated here); this dashboard tracks status only. Repository-synchronization pass SYNC-073
+(2026-08-01) reconciled `MODULE_REGISTRY.yaml`, `SPECIFICATION_ISSUES_REGISTER.md`, and this
+dashboard against the five merged PRs.
 
 **Analysis, not a ratified decision:** a capability-level readiness audit (2026-07-27, per your own
 direction to decompose modules into individual requirements rather than trust one module-level
@@ -196,7 +203,7 @@ path, specification reference, and freeze/review disposition.
 | backend-geo | declared | unimplemented-stub (`.placeholder` only, not route-registered) | SPEC-GEO-001@0.1.1 REVIEW |
 | backend-consent | no module directory | zero-code | SPEC-CONSENT-001@0.1.1 REVIEW |
 | backend-compliance | no module directory | zero-code | SPEC-COMPLIANCE-001@0.1.0 REVIEW |
-| backend-retention | no module directory | zero-code | SPEC-RETENTION-001@0.2.0 REVIEW |
+| backend-retention | active-partial (landed 2026-07-31/08-01, PRs #294-#298 — see `MODULE_REGISTRY.yaml`) | active-partial | SPEC-RETENTION-001@0.2.0 REVIEW |
 | frontend-web, mobile-worker, mobile-checker | active | active | UNKNOWN (no client spec) |
 | operations (infra) | active | not-applicable | UNKNOWN |
 
@@ -288,7 +295,7 @@ every `GD-*` ID lives only in
 | backend-geo | zero code, `.placeholder` only; every requirement checked, none independent | `GD-14` (geofencing/location model) |
 | backend-consent | zero code, no module directory | `GD-17` **Decided 2026-07-28** (`ADR-037`) — chatbot consent gate resolved (Option (b): decline routes to manual onboarding, does not block), fail-closed adopted, five smaller lifecycle/RBAC items resolved. No governance blocker remains; the module's own build is now a scoping/prioritization question, not an open architecture decision. |
 | backend-compliance | zero code, no module directory | No dedicated `GD-*`; an audit finding (2026-07-27, not owner-confirmed) reads `IF-COMPLIANCE-GetAuditTrail` (read-only over the already-existing `AuditLog` table, boundary per `ADR-016`) as having no governance blocker — the rest of the module (subject-rights orchestration) is downstream of Consent/Retention/Documents |
-| backend-retention | zero code, no module directory; every requirement checked, none independent | `GD-09`'s mapping half now **Decided** (`ADR-033`, see Sync note above); module build remains gated on `OD-RETENTION-05/10/11/14/15` (RBAC scope, cross-module delete authorization, sweep query design, owner assignment, fan-out workload) and, for legal certification only (non-blocking for the build itself), `OD-RETENTION-01` tax-advisor sign-off |
+| backend-retention | Built 2026-07-31/08-01 (PRs #294-#298) — see `MODULE_REGISTRY.yaml`'s `backend-retention` entry for full evidence | `GD-09`'s mapping half now **Decided** (`ADR-033`, see Sync note above); implementation deliberately did **not** resolve `OD-RETENTION-05/10/11/14/15` — no longer implementation blockers, but remain release/G8 prerequisites per `SIR-RETENTION-003`'s reclassification (SYNC-073). `OD-RETENTION-01` tax-advisor sign-off remains open for legal certification only. See `SPECIFICATION_ISSUES_REGISTER.md` `SIR-RETENTION-003`/`004` for disposition detail. |
 | Quality rating tiers/warnings/photo policy (deferred sub-decision, not built by `GD-04`'s fix) | undecided | separate future `GD-*` (not yet assigned) |
 | ~~MFA~~ | ~~no data model or endpoint anywhere~~ | **`GD-08` Decided 2026-07-28 (`ADR-038`)** — explicitly deferred to a post-MVP hardening milestone; no mechanism selected. `TREQ-AUTH-006` remains confirmed, unimplemented, disclosed as deferred rather than a silent gap. |
 | ~~Platform event-bus formalization~~ | ~~in-process singleton only~~ | **`GD-12` Decided 2026-07-28 (`ADR-032`)** — direct in-process calls for sync effects, existing Outbox (`ADR-029`) for async/durable; no event bus exists or is introduced. Struck through per this row's own resolution, not removed; individual HR/EMP/Calendar/Consent/CRM/Documents/Chatbot build gates are unaffected by this row and remain tracked in their own rows above. |
