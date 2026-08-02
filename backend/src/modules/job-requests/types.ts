@@ -61,6 +61,18 @@ export const ListWorkRequestsQuerySchema = z.object({
   status: WorkRequestStatusEnum.optional(),
   position: z.string().optional(),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  // Filters to broadcast rows only (has skill_slots) or marketplace rows
+  // only (no skill_slots). Reuses the same `skill_slots: { some: {} }` /
+  // `{ none: {} }` discriminator closeExpiredBroadcasts() already uses
+  // server-side (service.ts). Explicit z.enum(["true","false"]) rather than
+  // z.coerce.boolean(): the latter maps ANY non-empty string, including the
+  // literal "false", to true (Boolean("false") === true) — an earlier
+  // attempt at this filter used z.coerce.boolean() and was rejected in
+  // review for exactly that reason.
+  is_broadcast: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true')),
   page: z.coerce.number().int().positive().default(1),
   per_page: z.coerce.number().int().positive().max(100).default(20),
 });

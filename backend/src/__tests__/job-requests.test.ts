@@ -317,6 +317,66 @@ describe('WorkRequestService', () => {
         expect(res.data[0].skill_slots).toBeUndefined();
       });
     });
+
+    // Follow-up to the skill_slots parity fix above: a caller can now
+    // discriminate broadcast vs marketplace rows server-side instead of
+    // fetching every row and filtering client-side.
+    describe('is_broadcast filter', () => {
+      it('is_broadcast=true filters to rows with at least one skill slot', async () => {
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+
+        await service.list(
+          { page: 1, per_page: 20, is_broadcast: true } as any,
+          { userId: 'a1', role: 'admin' }
+        );
+
+        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
+        expect(where.skill_slots).toEqual({ some: {} });
+      });
+
+      it('is_broadcast=false filters to rows with no skill slots', async () => {
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+
+        await service.list(
+          { page: 1, per_page: 20, is_broadcast: false } as any,
+          { userId: 'a1', role: 'admin' }
+        );
+
+        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
+        expect(where.skill_slots).toEqual({ none: {} });
+      });
+
+      it('omits the skill_slots where-filter when is_broadcast is not passed', async () => {
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
+
+        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
+        expect(where.skill_slots).toBeUndefined();
+      });
+
+      // Composition check: a non-admin/manager actor's roster-scope
+      // narrowing (hotel_id) and is_broadcast (skill_slots) must both land
+      // on the same where clause — neither should clear the other.
+      it('composes with worker roster scope: both skill_slots and hotel_id are set', async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findMany.mockResolvedValue([{ id: 'h1' }, { id: 'h2' }]);
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+
+        await service.list(
+          { page: 1, per_page: 20, is_broadcast: true } as any,
+          { userId: 'w1', role: 'worker' }
+        );
+
+        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
+        expect(where.skill_slots).toEqual({ some: {} });
+        expect(where.hotel_id).toEqual({ in: ['h1', 'h2'] });
+      });
+    });
   });
 
   describe('getById', () => {
