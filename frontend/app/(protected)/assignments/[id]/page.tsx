@@ -256,7 +256,14 @@ export default function AssignmentDetailPage() {
         </Card>
       </RoleGate>
 
-      <RoleGate allow={["admin", "manager", "checker"]}>
+      {/*
+        quality:write (backend/src/config/constants.ts ROLE_PERMISSIONS) is
+        held by ADMIN and CHECKER only — MANAGER/REGIONAL_MANAGER hold
+        quality:read, not quality:write. "manager" is deliberately excluded
+        here even though it's included for rooms-completed above (a
+        different action, gated by role only, not this permission token).
+      */}
+      <RoleGate allow={["admin", "checker"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600">
@@ -649,7 +656,7 @@ function CreateRatingModal({
         />
         <div className="grid grid-cols-3 gap-3">
           <Input
-            label="Punctuality"
+            label="Punctuality (0–100)"
             type="number"
             min={0}
             max={100}
@@ -657,7 +664,7 @@ function CreateRatingModal({
             onChange={(e) => setPunctuality(e.target.value)}
           />
           <Input
-            label="Quality"
+            label="Quality (0–100)"
             type="number"
             min={0}
             max={100}
@@ -665,7 +672,7 @@ function CreateRatingModal({
             onChange={(e) => setQuality(e.target.value)}
           />
           <Input
-            label="Attitude"
+            label="Attitude (0–100)"
             type="number"
             min={0}
             max={100}
