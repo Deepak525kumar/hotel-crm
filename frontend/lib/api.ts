@@ -48,6 +48,7 @@ import type {
   UpdateWorkRequestInput,
   UserDetail,
   UserSummary,
+  WorkerStats,
   WorkRequest,
   WorkerDocument,
   DocumentCategory,
@@ -516,6 +517,14 @@ export const analyticsApi = {
   /** Operational summary for a single hotel. */
   hotelSummary: (hotelId: string) =>
     apiFetch<HotelAnalyticsSummary>(`/analytics/hotel-summary/${hotelId}`),
+
+  /**
+   * GD-06: the caller's own stats (self-scoped, any authenticated role, no
+   * `analytics:read` gate). A distinct shape from `stats()`, not the same
+   * data filtered — resolves the mobile-worker dashboard's previously-
+   * silent 403 against the admin/manager-only /stats route.
+   */
+  myStats: () => apiFetch<WorkerStats>("/analytics/my-stats"),
 };
 
 /** Users API matching the backend `/users/*` routes. */

@@ -3,6 +3,7 @@
 import { useAuth, useMe } from "@/hooks/useAuth";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { AbsencesCard } from "@/components/calendar/AbsencesCard";
+import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { ConsentCard } from "@/components/consent/ConsentCard";
 import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
 import { formatDateTime } from "@/lib/format";
@@ -82,6 +83,8 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      {user.role === "worker" && <MyStatsCard />}
 
       {user.role === "worker" && <AbsencesCard />}
 

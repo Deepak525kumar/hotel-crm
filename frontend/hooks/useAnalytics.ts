@@ -25,3 +25,8 @@ export function useHotelSummary(hotelId: string | null | undefined) {
     ([, id]) => analyticsApi.hotelSummary(id),
   );
 }
+
+/** GD-06: the caller's own stats (self-scoped). */
+export function useMyStats() {
+  return useSWR(["analytics-my-stats"], () => analyticsApi.myStats());
+}
