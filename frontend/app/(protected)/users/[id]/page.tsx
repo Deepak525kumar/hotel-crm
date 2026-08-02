@@ -13,6 +13,7 @@ import { DocumentsGate, HrPayrollGate, RoleGate, UserDeactivateGate } from "@/co
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { DocumentsCard } from "@/components/documents/DocumentsCard";
 import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
+import { ContractCard } from "@/components/hr/ContractCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -156,6 +157,7 @@ function UserDetail() {
 
           {user.role === "worker" && (
             <HrPayrollGate>
+              <ContractCard workerId={id} />
               <PayslipRequestsCard workerId={id} />
             </HrPayrollGate>
           )}
