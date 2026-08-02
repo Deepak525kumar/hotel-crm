@@ -49,13 +49,17 @@ function UserDetail() {
   const deactivate = useAsyncAction();
 
   const [revokeConfirmOpen, setRevokeConfirmOpen] = useState(false);
+  const [sessionsRevokedAt, setSessionsRevokedAt] = useState<Date | null>(null);
   const revokeSessions = useAsyncAction();
 
   const isSelf = currentUser?.id === id;
 
   const onRevokeSessions = () =>
     revokeSessions.run(() => usersApi.revokeSessions(id), {
-      onSuccess: () => setRevokeConfirmOpen(false),
+      onSuccess: () => {
+        setSessionsRevokedAt(new Date());
+        setRevokeConfirmOpen(false);
+      },
     });
 
   const onDeactivate = () =>
@@ -178,9 +182,11 @@ function UserDetail() {
                     Revoke all sessions
                   </p>
                   <p className="text-sm text-gray-500">
-                    {isSelf
-                      ? "This will also sign you out — every access/refresh token for this account stops working immediately."
-                      : "Signs the account out everywhere by invalidating every existing access/refresh token. Does not deactivate the account."}
+                    {sessionsRevokedAt
+                      ? `All sessions revoked at ${formatDateTime(sessionsRevokedAt.toISOString())}.`
+                      : isSelf
+                        ? "This will also sign you out — every access/refresh token for this account stops working immediately."
+                        : "Signs the account out everywhere by invalidating every existing access/refresh token. Does not deactivate the account."}
                   </p>
                 </div>
                 <Button
