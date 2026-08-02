@@ -154,6 +154,51 @@ export interface GeoCheckin {
   checked_at: string;
 }
 
+// Job Dispatch Phase 2 (SPEC-JOB-DISPATCH-001@0.3.8, gated by
+// FEATURE_JOBDISPATCH_PHASE2): a broadcast is a WorkRequest that carries
+// skill_slots — matches backend SkillTag (prisma/schema.prisma) exactly.
+export type SkillTag = 'CLEANER' | 'PUBLIC_SERVICE' | 'KITCHEN_DISHWASHER' | 'WAITER';
+
+export interface JobRequestSkillSlot {
+  id: string;
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+}
+
+// A broadcast row as returned by GET /work-requests (list/get) — same
+// WorkRequest shape, plus skill_slots when the row is a broadcast (absent
+// on a marketplace row).
+export interface Broadcast extends WorkRequest {
+  skill_slots?: JobRequestSkillSlot[];
+}
+
+// Matches backend SkillSlotEligibilityDto exactly — the response of
+// GET /work-requests/broadcasts/:id/eligibility. eligible_worker_ids is
+// other workers' user ids; only render it to the caller for the caller's
+// own inclusion check, never render the raw list itself.
+export interface SkillSlotEligibility {
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+  eligible_worker_ids: string[];
+}
+
+export interface BroadcastEligibility {
+  job_request_id: string;
+  hotel_id: string;
+  shift_date: string; // YYYY-MM-DD
+  slots: SkillSlotEligibility[];
+}
+
+// Matches backend AcceptBroadcastResultDto exactly — the discriminated
+// response of POST /work-requests/broadcasts/:id/accept. A lost first-accept
+// race returns `requirement_fulfilled`, not an error — no assignment is
+// created, and the caller must not treat this as a failure.
+export type AcceptBroadcastResult =
+  | { status: 'accepted'; assignment_id: string; job_request_id: string; skill: SkillTag }
+  | { status: 'requirement_fulfilled'; job_request_id: string; skill: SkillTag };
+
 // Backend list endpoints return the array directly in body.data.
 // Pagination metadata (page, per_page, total) is in body.pagination but
 // is not extracted by the request() helper — use T[] for list calls.
