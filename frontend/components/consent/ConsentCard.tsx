@@ -17,7 +17,27 @@ import {
   Skeleton,
 } from "@/components/ui";
 import { DAILY_ACCESS_GATE_INSTANCE } from "@/lib/types";
-import type { ConsentNotice } from "@/lib/types";
+import type { ConsentNotice, ConsentRecord, ConsentStatus } from "@/lib/types";
+
+/**
+ * Derives the `ConsentStatus` shape a fresh `getStatus()` call would return
+ * from the `ConsentRecord` a decision/withdraw call just produced, so the
+ * SWR cache can be updated immediately instead of showing stale data for
+ * one revalidation round-trip. WITHDRAWN/RENEWED both read as `absent`
+ * (RULE-CONSENT-06's discriminated-result contract; a withdrawal is never
+ * itself a "declined" state) — mirrors ConsentService.checkStatus()'s own
+ * mapping exactly, so this can never drift into showing a status the
+ * backend wouldn't actually return next.
+ */
+function statusFromRecord(record: ConsentRecord): ConsentStatus {
+  if (record.decision === "GRANTED") {
+    return { status: "granted", notice_version: record.notice_version, decided_at: record.decided_at };
+  }
+  if (record.decision === "DECLINED") {
+    return { status: "declined", notice_version: record.notice_version, decided_at: record.decided_at };
+  }
+  return { status: "absent" };
+}
 
 /**
  * SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): the daily GDPR
@@ -39,7 +59,12 @@ export function ConsentCard() {
   const decide = useAsyncAction();
   const withdraw = useAsyncAction();
 
-  const refresh = () => mutate(["consent-status", DAILY_ACCESS_GATE_INSTANCE]);
+  // Seeds the SWR cache with the status the record we already have implies,
+  // then revalidates in the background — avoids a stale-status flash for
+  // the one round-trip a plain revalidate-only mutate() would otherwise
+  // show (e.g. "Withdraw" still visible right after a successful withdraw).
+  const applyRecord = (record: ConsentRecord) =>
+    mutate(["consent-status", DAILY_ACCESS_GATE_INSTANCE], statusFromRecord(record));
 
   const onShowNotice = () =>
     fetchNotice.run(() => consentApi.requestNotice(DAILY_ACCESS_GATE_INSTANCE), {
@@ -58,14 +83,16 @@ export function ConsentCard() {
           }),
         { key: decision },
       )
-      .finally(() => {
+      .then((record) => {
         setNotice(null);
-        refresh();
+        if (record) applyRecord(record);
       });
   };
 
   const onWithdraw = () =>
-    withdraw.run(() => consentApi.withdraw(DAILY_ACCESS_GATE_INSTANCE)).finally(refresh);
+    withdraw.run(() => consentApi.withdraw(DAILY_ACCESS_GATE_INSTANCE)).then((record) => {
+      if (record) applyRecord(record);
+    });
 
   return (
     <Card>
@@ -116,6 +143,7 @@ export function ConsentCard() {
               </Button>
             ) : (
               <div className="space-y-3 rounded-md border border-gray-200 p-4">
+                <p className="text-xs text-gray-500">Notice version: {notice.notice_version}</p>
                 <p
                   dir={notice.rtl ? "rtl" : "ltr"}
                   className="text-sm text-gray-700"
