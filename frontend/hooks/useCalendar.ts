@@ -33,3 +33,8 @@ export function useAvailability(workerId: string | null | undefined) {
     },
   );
 }
+
+/** REQ-CAL-T02: the caller's own absences (self-scoped, any authenticated role). */
+export function useOwnAbsences() {
+  return useSWR(["my-absences"], () => calendarApi.listOwnAbsences());
+}

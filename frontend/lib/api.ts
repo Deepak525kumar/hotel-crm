@@ -6,6 +6,7 @@ import type {
   Attendance,
   AuthUser,
   Availability,
+  CalendarAbsence,
   CheckInInput,
   CreateHotelGroupInput,
   CreateHotelInput,
@@ -29,6 +30,7 @@ import type {
   ListUsersQuery,
   ListWorkRequestsQuery,
   LoginResponse,
+  MarkAbsenceInput,
   Notification,
   PayslipRequest,
   RefreshResponse,
@@ -423,6 +425,13 @@ export const geoCheckinsApi = {
 export const calendarApi = {
   getAvailability: (workerId: string) =>
     apiFetch<Availability>(`/calendar/availability${toQuery({ worker_id: workerId })}`),
+
+  /** REQ-CAL-T02: the caller's own absences (self-scoped, no worker_id param). */
+  listOwnAbsences: () => apiFetch<CalendarAbsence[]>("/calendar/my-absences"),
+
+  /** REQ-CAL-T03/T04/T08: marks the caller absent for one day (self-scoped). */
+  markOwnAbsence: (input: MarkAbsenceInput) =>
+    apiFetch<CalendarAbsence>("/calendar/my-absences", { method: "POST", body: input }),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */

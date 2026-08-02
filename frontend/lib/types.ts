@@ -556,6 +556,24 @@ export interface Availability {
   available: boolean;
 }
 
+export type AbsenceKind = "SICK" | "VACATION";
+
+/** Matches backend `CalendarAbsenceDto` (calendar/types.ts) exactly, REQ-CAL-T08. */
+export interface CalendarAbsence {
+  id: string;
+  worker_id: string;
+  day: string;
+  kind: AbsenceKind;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /calendar/my-absences` (REQ-CAL-T02/T03: self-scoped, no worker_id field). */
+export interface MarkAbsenceInput {
+  day: string; // ISO date (YYYY-MM-DD)
+  kind: AbsenceKind;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Notifications                                                              */
 /* -------------------------------------------------------------------------- */
