@@ -9,6 +9,7 @@ import type {
   CheckInInput,
   CreateHotelGroupInput,
   CreateHotelInput,
+  CreatePayslipRequestInput,
   CreateUserInput,
   CreateWorkRequestInput,
   DashboardStats,
@@ -22,10 +23,12 @@ import type {
   ListGeoCheckinsQuery,
   ListHotelGroupsQuery,
   ListHotelsQuery,
+  ListPayslipRequestsQuery,
   ListUsersQuery,
   ListWorkRequestsQuery,
   LoginResponse,
   Notification,
+  PayslipRequest,
   RefreshResponse,
   UpdateAssignmentInput,
   UpdateAttendanceInput,
@@ -546,4 +549,24 @@ export const documentsApi = {
       body: form,
     });
   },
+};
+
+/**
+ * HR — Payslip Requests API matching the backend `/hr/payroll` and
+ * `/hr/payroll/:request_id/fulfil` routes (SPEC-HR-001 REVIEW @0.2.9,
+ * ADR-039: request-tracking only, no payroll computation).
+ */
+export const hrApi = {
+  listPayrollRequests: (query: ListPayslipRequestsQuery = {}) =>
+    apiFetch<PayslipRequest[]>(`/hr/payroll${toQuery({ ...query })}`),
+
+  /** Manager/Admin creates a payslip request on a worker's behalf. */
+  createPayrollRequest: (input: CreatePayslipRequestInput) =>
+    apiFetch<PayslipRequest>("/hr/payroll", { method: "POST", body: input }),
+
+  /** Marks a REQUESTED payslip request as fulfilled (payslip emailed). */
+  fulfilPayrollRequest: (requestId: string) =>
+    apiFetch<PayslipRequest>(`/hr/payroll/${requestId}/fulfil`, {
+      method: "POST",
+    }),
 };

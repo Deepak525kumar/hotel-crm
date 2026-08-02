@@ -117,6 +117,29 @@ export function DocumentsGate({
 }
 
 /**
+ * SPEC-HR-001 (REVIEW @0.2.9): payslip-request list/fulfil view. Matches
+ * `hr/routes.ts`'s own role split exactly — `/hr/payroll` and
+ * `/hr/payroll/:request_id/fulfil` are both `requireRole(['admin',
+ * 'manager'])`. `regional_manager` is deliberately EXCLUDED, same reasoning
+ * as `DocumentsGate`/`GeoCheckinsGate`: backend-hr never special-cases
+ * `regional_manager` at the route or service layer, so admitting it here
+ * would show the UI to a role the backend then 403s on every request.
+ */
+export function HrPayrollGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
+
+/**
  * SPEC-GEO-001 @0.1.2 FROZEN (GD-14): geo check-ins list/detail view.
  * Matches the backend's own role split exactly (geo/routes.ts comment:
  * "admin sees everything; manager sees only hotels within their own scope
