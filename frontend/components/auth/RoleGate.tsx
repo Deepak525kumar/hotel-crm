@@ -184,3 +184,28 @@ export function BlocklistWriteGate({
     </RoleGate>
   );
 }
+
+/**
+ * Job Dispatch Phase 2 broadcast raise/close (Epic 9 PRs 9.7/9.10,
+ * `FEATURE_JOBDISPATCH_PHASE2`). Matches `job-requests/routes.ts`'s
+ * `POST /work-requests/broadcasts` and `POST /work-requests/broadcasts/:id/close`
+ * RBAC exactly (`requireRole(['admin', 'manager'])`) — `regional_manager` is
+ * deliberately EXCLUDED, unlike `StaffingWriteGate`: this module's broadcast
+ * routes never admit it (only the separate calendar-entries route does,
+ * which stays on `StaffingWriteGate`). Widening this to match
+ * `StaffingWriteGate`/D-5 would show an RM the raise/close UI and then 403
+ * on every request.
+ */
+export function JobDispatchPhase2WriteGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}

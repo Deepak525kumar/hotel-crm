@@ -1,16 +1,21 @@
 import { API_BASE_URL } from "@/lib/config";
 import { useAuthStore } from "@/stores/auth";
 import type {
+  AcceptBroadcastInput,
+  AcceptBroadcastResultDto,
   ApiEnvelope,
   Assignment,
   Attendance,
   AuthUser,
   Availability,
+  BroadcastEligibilityDto,
   CalendarAbsence,
+  CalendarEntryDto,
   CheckInInput,
   ConsentNotice,
   ConsentRecord,
   ConsentStatus,
+  CreateCalendarEntryInput,
   CreateHotelGroupInput,
   CreateHotelInput,
   CreateContractInput,
@@ -28,6 +33,7 @@ import type {
   Contract,
   ListAssignmentsQuery,
   ListAttendanceQuery,
+  ListCalendarEntriesQuery,
   ListGeoCheckinsQuery,
   ListHotelGroupsQuery,
   ListHotelsQuery,
@@ -39,6 +45,7 @@ import type {
   MarkAbsenceInput,
   Notification,
   PayslipRequest,
+  RaiseBroadcastInput,
   Rating,
   RecordConsentDecisionInput,
   RefreshResponse,
@@ -347,6 +354,39 @@ export const workRequestsApi = {
       method: "PATCH",
       body: { status: "OPEN" },
     }),
+
+  /**
+   * Job Dispatch Phase 2 (Epic 9 PR 9.7, admin/manager only): raise a
+   * standalone broadcast specifying skill x headcount lines. Published
+   * immediately (OPEN) — there is no DRAFT step for a broadcast. Gated
+   * server-side by FEATURE_JOBDISPATCH_PHASE2 (404 while disabled).
+   */
+  raiseBroadcast: (input: RaiseBroadcastInput) =>
+    apiFetch<WorkRequest>("/work-requests/broadcasts", {
+      method: "POST",
+      body: input,
+    }),
+
+  /** Job Dispatch Phase 2 (Epic 9 PR 9.7): per-skill-slot eligible-worker breakdown. */
+  getBroadcastEligibility: (id: string) =>
+    apiFetch<BroadcastEligibilityDto>(`/work-requests/broadcasts/${id}/eligibility`),
+
+  /**
+   * Job Dispatch Phase 2 (Epic 9 PR 9.9, any authenticated role): worker
+   * accepts one skill slot. First-accept-wins; a lost race returns
+   * `{status: 'requirement_fulfilled'}`, not an error.
+   */
+  acceptBroadcast: (id: string, input: AcceptBroadcastInput) =>
+    apiFetch<AcceptBroadcastResultDto>(`/work-requests/broadcasts/${id}/accept`, {
+      method: "POST",
+      body: input,
+    }),
+
+  /** Job Dispatch Phase 2 (Epic 9 PR 9.10, admin/manager only): close an unfilled broadcast early. */
+  manualCloseBroadcast: (id: string) =>
+    apiFetch<WorkRequest>(`/work-requests/broadcasts/${id}/close`, {
+      method: "POST",
+    }),
 };
 
 /** Assignments API matching the backend `/assignments/*` routes. */
@@ -384,6 +424,21 @@ export const assignmentsApi = {
       method: "POST",
       body: input,
     }),
+
+  /**
+   * Job Dispatch Phase 2 (Epic 9 PR 9.5, admin/manager/regional_manager):
+   * places a worker directly on the calendar for a hotel+day — no broadcast/
+   * accept cycle. Gated server-side by FEATURE_JOBDISPATCH_PHASE2 (404 while
+   * disabled).
+   */
+  createCalendarEntry: (input: CreateCalendarEntryInput) =>
+    apiFetch<CalendarEntryDto>("/assignments/calendar-entries", {
+      method: "POST",
+      body: input,
+    }),
+
+  listCalendarEntries: (query: ListCalendarEntriesQuery = {}) =>
+    apiFetch<CalendarEntryDto[]>(`/assignments/calendar-entries${toQuery({ ...query })}`),
 };
 
 /**

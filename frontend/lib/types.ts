@@ -387,6 +387,12 @@ export interface WorkRequest {
   updated_at: string;
   /** Present only for worker/checker roles on the detail endpoint. */
   my_application?: { id: string; status: string; created_at: string } | null;
+  /**
+   * Present (non-empty) only for a broadcast JobRequest raised via
+   * `POST /work-requests/broadcasts` (Epic 9 PR 9.7); absent for a
+   * marketplace publish/apply row.
+   */
+  skill_slots?: JobRequestSkillSlotDto[];
 }
 
 /** Body of `POST /work-requests`. */
@@ -421,6 +427,67 @@ export interface ListWorkRequestsQuery {
   page?: number;
   per_page?: number;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Job Dispatch Phase 2 — Broadcasts (SPEC-JOB-DISPATCH-001@0.3.8,           */
+/*  Epic 9 PRs 9.7-9.10; gated by FEATURE_JOBDISPATCH_PHASE2, default off)     */
+/* -------------------------------------------------------------------------- */
+
+/** Mirrors the backend `SkillTag` enum (prisma/schema.prisma). */
+export type SkillTag = "CLEANER" | "PUBLIC_SERVICE" | "KITCHEN_DISHWASHER" | "WAITER";
+
+/** Matches backend `JobRequestSkillSlotDto` (job-requests/types.ts) exactly. */
+export interface JobRequestSkillSlotDto {
+  id: string;
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+}
+
+/** Body of `POST /work-requests/broadcasts` (admin/manager only). */
+export interface RaiseBroadcastInput {
+  hotel_id: string;
+  shift_date: string; // YYYY-MM-DD
+  shift_start_time: string; // HH:MM
+  shift_end_time: string; // HH:MM
+  hourly_rate?: number;
+  currency?: string;
+  description?: string;
+  skills: { skill: SkillTag; headcount: number }[];
+}
+
+/**
+ * Matches backend `SkillSlotEligibilityDto` (job-requests/types.ts) exactly —
+ * `GET /work-requests/broadcasts/:id/eligibility`'s per-skill-slot breakdown.
+ */
+export interface SkillSlotEligibilityDto {
+  skill: SkillTag;
+  headcount: number;
+  confirmed_count: number;
+  eligible_worker_ids: string[];
+}
+
+/** Matches backend `BroadcastEligibilityDto` exactly. */
+export interface BroadcastEligibilityDto {
+  job_request_id: string;
+  hotel_id: string;
+  shift_date: string; // YYYY-MM-DD
+  slots: SkillSlotEligibilityDto[];
+}
+
+/** Body of `POST /work-requests/broadcasts/:id/accept` (any authenticated role — worker-initiated). */
+export interface AcceptBroadcastInput {
+  skill: SkillTag;
+}
+
+/**
+ * Discriminated response of `POST /work-requests/broadcasts/:id/accept`,
+ * mirrors backend `AcceptBroadcastResultDto` exactly. `requirement_fulfilled`
+ * is a lost first-accept race (TREQ-005) — not an error, no assignment created.
+ */
+export type AcceptBroadcastResultDto =
+  | { status: "accepted"; assignment_id: string; job_request_id: string; skill: SkillTag }
+  | { status: "requirement_fulfilled"; job_request_id: string; skill: SkillTag };
 
 /* -------------------------------------------------------------------------- */
 /*  Assignments                                                               */
@@ -498,6 +565,37 @@ export interface RoomsCompletedEntry {
 export interface LogRoomsCompletedInput {
   rooms_completed: number;
   notes?: string;
+}
+
+/**
+ * Job Dispatch Phase 2 (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03): manager places a
+ * worker directly on the calendar for a hotel+day — no broadcast/accept
+ * cycle. Gated by FEATURE_JOBDISPATCH_PHASE2 (default off).
+ */
+export interface CreateCalendarEntryInput {
+  worker_id: string;
+  hotel_id: string;
+  day: string; // YYYY-MM-DD
+}
+
+/** Query params accepted by `GET /assignments/calendar-entries`. */
+export interface ListCalendarEntriesQuery {
+  worker_id?: string;
+  hotel_id?: string;
+  page?: number;
+  per_page?: number;
+}
+
+/** Matches backend `CalendarEntryDto` (assignments/types.ts) exactly. */
+export interface CalendarEntryDto {
+  id: string;
+  assignment_id: string;
+  worker_id: string;
+  hotel_id: string;
+  day: string; // YYYY-MM-DD
+  placed_by_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 /* -------------------------------------------------------------------------- */
