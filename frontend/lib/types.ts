@@ -501,6 +501,75 @@ export interface LogRoomsCompletedInput {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  Quality — Verifications & Ratings                                         */
+/* -------------------------------------------------------------------------- */
+
+export type VerificationStatus = "PASSED" | "FAILED" | "NEEDS_REWORK";
+
+/**
+ * Matches backend `QualityVerification` (Prisma model) exactly, returned
+ * raw (no DTO wrapper). `status` is derived server-side from `score`
+ * (>=70 PASSED, >=40 NEEDS_REWORK, else FAILED) — never client-supplied.
+ * One entry per assignment; a second POST 409s (ConflictError).
+ */
+export interface QualityVerification {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  verified_by_id: string;
+  score: number;
+  status: VerificationStatus;
+  notes: string | null;
+  photo_urls: string[];
+  rework_required: boolean;
+  rework_notes: string | null;
+  rework_completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /quality/verifications`. */
+export interface CreateVerificationInput {
+  assignment_id: string;
+  score: number;
+  notes?: string;
+}
+
+/** Sub-scores schema per the backend's own `Rating.criteria_scores` comment (Prisma model). */
+export interface RatingCriteriaScores {
+  punctuality?: number;
+  quality?: number;
+  attitude?: number;
+}
+
+/**
+ * Matches backend `Rating` (Prisma model) exactly, returned raw. `score` is
+ * 0-100 (rescaled from 1-5 stars by ADR-026). One entry per assignment; a
+ * second POST 409s (ConflictError).
+ */
+export interface Rating {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  worker_id: string;
+  rated_by_id: string;
+  score: number;
+  comment: string | null;
+  criteria_scores: RatingCriteriaScores | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /quality/ratings`. */
+export interface CreateRatingInput {
+  assignment_id: string;
+  worker_id: string;
+  score: number;
+  comment?: string;
+  criteria_scores?: RatingCriteriaScores;
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Attendance                                                                */
 /* -------------------------------------------------------------------------- */
 

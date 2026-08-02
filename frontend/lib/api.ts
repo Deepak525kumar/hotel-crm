@@ -15,7 +15,9 @@ import type {
   CreateHotelInput,
   CreateContractInput,
   CreatePayslipRequestInput,
+  CreateRatingInput,
   CreateUserInput,
+  CreateVerificationInput,
   CreateWorkRequestInput,
   DashboardStats,
   HotelAnalyticsSummary,
@@ -37,9 +39,11 @@ import type {
   MarkAbsenceInput,
   Notification,
   PayslipRequest,
+  Rating,
   RecordConsentDecisionInput,
   RefreshResponse,
   RoomsCompletedEntry,
+  QualityVerification,
   UpdateAssignmentInput,
   UpdateAttendanceInput,
   UpdateHotelGroupInput,
@@ -380,6 +384,22 @@ export const assignmentsApi = {
       method: "POST",
       body: input,
     }),
+};
+
+/**
+ * Quality API matching the backend `/quality/*` routes. `status` on a
+ * verification is always server-derived from `score`, never sent by this
+ * client. One entry per assignment for each endpoint — a second POST 409s.
+ */
+export const qualityApi = {
+  createVerification: (input: CreateVerificationInput) =>
+    apiFetch<QualityVerification>("/quality/verifications", {
+      method: "POST",
+      body: input,
+    }),
+
+  createRating: (input: CreateRatingInput) =>
+    apiFetch<Rating>("/quality/ratings", { method: "POST", body: input }),
 };
 
 /** Attendance API matching the backend `/attendance/*` routes. */
