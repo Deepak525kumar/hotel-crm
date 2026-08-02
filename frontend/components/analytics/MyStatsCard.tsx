@@ -7,11 +7,11 @@ import { Card, CardContent, CardHeader, CardTitle, Skeleton, StatTile } from "@/
 
 /**
  * GD-06 (`IF-ANALYTICS-GetMyStats`): a worker's own performance summary —
- * self-scoped, no `analytics:read` permission gate, distinct from the
- * manager-facing `/analytics` dashboard (`RoleGate allow={["manager",
- * "regional_manager", "admin"]}` there). Resolves the mobile-worker
- * dashboard's previously-silent 403 against that admin/manager-only route
- * (analytics/routes.ts's own comment on `/my-stats`) for the web app too.
+ * self-scoped, no `analytics:read` permission gate. Distinct from the
+ * manager-facing `/analytics` dashboard, which is already correctly
+ * `RoleGate`-restricted to `manager`/`regional_manager`/`admin` and was
+ * never reachable by a worker — this card just gives workers their own
+ * equivalent view, which had no home in the web app until now.
  */
 export function MyStatsCard() {
   const { data: stats, isLoading, error } = useMyStats();
