@@ -534,9 +534,14 @@ export const documentsApi = {
   get: (documentId: string) =>
     apiFetch<WorkerDocument>(`/documents/documents/${documentId}`),
 
-  completeness: (workerId: string) =>
+  /**
+   * `work_permit_required` has no backend source of truth (no field records
+   * whether a worker needs one) — the caller declares it at query time, same
+   * as the backend's own `IF-DOC-GetDocumentCompleteness` contract.
+   */
+  completeness: (workerId: string, workPermitRequired: boolean) =>
     apiFetch<DocumentCompleteness>(
-      `/documents/workers/${workerId}/documents/completeness`,
+      `/documents/workers/${workerId}/documents/completeness${toQuery({ work_permit_required: String(workPermitRequired) })}`,
     ),
 
   /**
