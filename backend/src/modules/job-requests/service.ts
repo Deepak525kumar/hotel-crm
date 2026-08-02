@@ -149,9 +149,6 @@ export class JobRequestService extends BaseService {
       ...(query.shift_date
         ? { shift_date: new Date(`${query.shift_date}T00:00:00.000Z`) }
         : {}),
-      // Same discriminator closeExpiredBroadcasts() uses below.
-      ...(query.is_broadcast === true ? { skill_slots: { some: {} } } : {}),
-      ...(query.is_broadcast === false ? { skill_slots: { none: {} } } : {}),
     };
 
     // PATCH-04: non-management roles only see requests for hotels where they

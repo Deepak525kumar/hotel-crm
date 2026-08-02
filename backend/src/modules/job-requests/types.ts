@@ -61,15 +61,6 @@ export const ListWorkRequestsQuerySchema = z.object({
   status: WorkRequestStatusEnum.optional(),
   position: z.string().optional(),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  // Job Dispatch Phase 2 correction (post-PR-9.7 discovery, not part of PR
-  // 9.7's own closed scope): filters to broadcast rows only (has
-  // skill_slots) or marketplace rows only (no skill_slots). Reuses the same
-  // `skill_slots: { some: {} }` discriminator closeExpiredBroadcasts()
-  // already uses server-side (service.ts), rather than requiring a caller
-  // to fetch every row and filter client-side —
-  // list() also now returns skill_slots (below) so a caller who omits this
-  // filter can still discriminate per-row.
-  is_broadcast: z.coerce.boolean().optional(),
   page: z.coerce.number().int().positive().default(1),
   per_page: z.coerce.number().int().positive().max(100).default(20),
 });

@@ -282,12 +282,13 @@ describe('WorkRequestService', () => {
       });
     });
 
-    // Job Dispatch Phase 2 follow-up: list() previously never included
+    // Job Dispatch Phase 2 correction (post-PR-9.7 discovery, not part of
+    // PR 9.7's own closed scope): list() previously never included
     // skill_slots, so a broadcast row (raiseBroadcast()) was
     // indistinguishable from a marketplace row (create()) on this endpoint —
     // getById() already included it; this brings list() to the same
     // contract WorkRequestDto documents.
-    describe('skill_slots (broadcast discriminator)', () => {
+    describe('skill_slots (list()/getById() parity)', () => {
       it('includes skill_slots in the Prisma query and maps it onto each row', async () => {
         const skillSlot = {
           id: 'slot1',
@@ -316,42 +317,6 @@ describe('WorkRequestService', () => {
         const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
 
         expect(res.data[0].skill_slots).toBeUndefined();
-      });
-
-      it('is_broadcast=true filters to rows with at least one skill slot', async () => {
-        mockWorkRequest.findMany.mockResolvedValue([]);
-        mockWorkRequest.count.mockResolvedValue(0);
-
-        await service.list(
-          { page: 1, per_page: 20, is_broadcast: true } as any,
-          { userId: 'a1', role: 'admin' }
-        );
-
-        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
-        expect(where.skill_slots).toEqual({ some: {} });
-      });
-
-      it('is_broadcast=false filters to rows with no skill slots', async () => {
-        mockWorkRequest.findMany.mockResolvedValue([]);
-        mockWorkRequest.count.mockResolvedValue(0);
-
-        await service.list(
-          { page: 1, per_page: 20, is_broadcast: false } as any,
-          { userId: 'a1', role: 'admin' }
-        );
-
-        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
-        expect(where.skill_slots).toEqual({ none: {} });
-      });
-
-      it('omits the skill_slots where-filter when is_broadcast is not passed', async () => {
-        mockWorkRequest.findMany.mockResolvedValue([]);
-        mockWorkRequest.count.mockResolvedValue(0);
-
-        await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
-
-        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
-        expect(where.skill_slots).toBeUndefined();
       });
     });
   });
