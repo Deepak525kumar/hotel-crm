@@ -339,10 +339,8 @@ export const workRequestsApi = {
     return apiFetch<WorkRequest[]>(
       `/work-requests${toQuery({
         ...rest,
-        // The backend's z.enum(["true","false"]) schema only accepts these
-        // exact literal strings — never rely on toQuery's generic
-        // String(value) coercion for a boolean here.
-        is_broadcast: is_broadcast === undefined ? undefined : String(is_broadcast) as "true" | "false",
+        // The backend accepts only the literal strings "true"/"false".
+        is_broadcast: is_broadcast === undefined ? undefined : is_broadcast ? "true" : "false",
       })}`,
     );
   },

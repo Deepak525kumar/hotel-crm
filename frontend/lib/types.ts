@@ -424,14 +424,7 @@ export interface ListWorkRequestsQuery {
   status?: WorkRequestStatus;
   position?: string;
   shift_date?: string;
-  /**
-   * Filters to broadcast rows only (true) or marketplace rows only
-   * (false). Serialized as the literal string "true"/"false" by
-   * workRequestsApi.list() — the backend's z.enum(["true","false"])
-   * schema rejects any other string, so this must never be sent as a
-   * JS-default-stringified boolean via a generic query helper without
-   * going through that serialization.
-   */
+  /** Filters to broadcast rows only (true) or marketplace rows only (false). */
   is_broadcast?: boolean;
   page?: number;
   per_page?: number;
