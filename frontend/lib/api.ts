@@ -45,6 +45,8 @@ import type {
   DocumentCategory,
   DocumentCompleteness,
   UploadDocumentInput,
+  EmployeeBlocklistEntry,
+  SetBlocklistInput,
 } from "@/lib/types";
 
 /** Error thrown by {@link apiFetch} for any non-2xx response. */
@@ -610,5 +612,24 @@ export const hrApi = {
   lapseContract: (workerId: string) =>
     apiFetch<Contract>(`/hr/workers/${workerId}/contract-lapse`, {
       method: "POST",
+    }),
+};
+
+/**
+ * Employee Management — Blocklist API matching the backend
+ * `/employees/hotels/:hotel_id/blocklist` routes (SPEC-EMP-001, REQ-EMP-005 /
+ * RULE-EMP-07). `employee_id` is employee-management's own human-facing
+ * identifier, not a `User.id` — no lookup endpoint resolves one from the
+ * other today, so callers must already know it.
+ */
+export const employeesApi = {
+  listBlocklist: (hotelId: string) =>
+    apiFetch<EmployeeBlocklistEntry[]>(`/employees/hotels/${hotelId}/blocklist`),
+
+  /** Manager/Admin blocks an employee from assignment at this hotel; `reason` is required. */
+  setBlocklist: (hotelId: string, input: SetBlocklistInput) =>
+    apiFetch<EmployeeBlocklistEntry>(`/employees/hotels/${hotelId}/blocklist`, {
+      method: "POST",
+      body: input,
     }),
 };

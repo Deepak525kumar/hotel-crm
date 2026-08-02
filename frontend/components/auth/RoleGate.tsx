@@ -161,3 +161,26 @@ export function GeoCheckinsGate({
     </RoleGate>
   );
 }
+
+/**
+ * SPEC-EMP-001 (REQ-EMP-005/RULE-EMP-07): blocklisting an employee at a
+ * hotel. Matches `employee-management/routes.ts`'s POST blocklist route
+ * exactly (`requireRole(['admin', 'manager'])`) — `regional_manager` is
+ * excluded for the same reason as `DocumentsGate`/`GeoCheckinsGate`: the
+ * route itself never admits it. Reading the blocklist is far broader
+ * (`employees:read`, held by every role) and is intentionally NOT gated —
+ * only the write action needs this.
+ */
+export function BlocklistWriteGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}

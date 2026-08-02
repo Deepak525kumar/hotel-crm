@@ -743,3 +743,28 @@ export interface CreateContractInput {
   start_date: string;
   end_date?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Employee Management — Blocklist (SPEC-EMP-001, REQ-EMP-005/RULE-EMP-07)    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Matches backend `EmployeeBlocklistEntry` (Prisma model) exactly. Keyed by
+ * `employee_id` — employee-management's own human-facing identifier
+ * (`EmploymentRecord.employee_id`), distinct from and not derivable from a
+ * `User.id`; no lookup endpoint exists to resolve one from the other today.
+ */
+export interface EmployeeBlocklistEntry {
+  id: string;
+  hotel_id: string;
+  employment_record_id: string;
+  reason: string;
+  created_by_id: string;
+  created_at: string;
+}
+
+/** Body of `POST /employees/hotels/:hotel_id/blocklist` (RULE-EMP-07: reason required). */
+export interface SetBlocklistInput {
+  employee_id: string;
+  reason: string;
+}
