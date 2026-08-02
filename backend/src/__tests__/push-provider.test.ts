@@ -21,7 +21,7 @@ function decodeJwt(jwt: string): { header: Record<string, unknown>; payload: Rec
 describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
   let server: http2.Http2Server;
   let baseUrl: string;
-  let lastRequest: { path: string; headers: http2.IncomingHttpHeaders } | null = null;
+  let lastRequest: { path: string; headers: http2.IncomingHttpHeaders; body: string } | null = null;
   let nextResponse: { status: number; body: string } = { status: 200, body: '' };
 
   const { privateKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
@@ -30,10 +30,10 @@ describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
 
   beforeAll(async () => {
     server = http2.createServer((req, res) => {
-      lastRequest = { path: req.url ?? '', headers: req.headers };
       let body = '';
       req.on('data', (chunk) => (body += chunk));
       req.on('end', () => {
+        lastRequest = { path: req.url ?? '', headers: req.headers, body };
         res.writeHead(nextResponse.status);
         res.end(nextResponse.body);
       });
@@ -65,6 +65,51 @@ describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
     expect(header).toMatchObject({ alg: 'ES256', typ: 'JWT', kid: 'KEY123' });
     expect(payload).toMatchObject({ iss: 'TEAM456' });
     expect(typeof payload.iat).toBe('number');
+  });
+
+  it('sends no custom data keys when input.data is omitted (existing callers unaffected)', async () => {
+    nextResponse = { status: 200, body: '' };
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' });
+
+    const sent = JSON.parse(lastRequest!.body);
+    expect(Object.keys(sent)).toEqual(['aps']);
+  });
+
+  it('places custom data keys outside aps, at the payload top level', async () => {
+    nextResponse = { status: 200, body: '' };
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await client.send({
+      token: 't',
+      title: 'New Job Available',
+      body: 'A CLEANER shift needs coverage',
+      topic: 'com.hotelcrm.workerapp',
+      data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' },
+    });
+
+    const sent = JSON.parse(lastRequest!.body);
+    expect(sent.aps).toEqual({ alert: { title: 'New Job Available', body: 'A CLEANER shift needs coverage' } });
+    expect(sent.work_request_id).toBe('jr1');
+    expect(sent.hotel_id).toBe('h1');
+    expect(sent.skill).toBe('CLEANER');
+    // Confirms these keys are siblings of aps, not nested inside it.
+    expect(sent.aps.work_request_id).toBeUndefined();
+  });
+
+  it('rejects a payload that exceeds the 4KB APNs size limit rather than sending it truncated', async () => {
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await expect(
+      client.send({
+        token: 't',
+        title: 'Hi',
+        body: 'B',
+        topic: 'com.hotelcrm.workerapp',
+        data: { oversized: 'x'.repeat(4096) },
+      })
+    ).rejects.toThrow(/exceeds the 4KB APNs size limit/);
   });
 
   it('throws InvalidTokenError on a 410 (Unregistered) response', async () => {
@@ -192,6 +237,43 @@ describe('FcmProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
     expect(sendBody.message).toEqual({
       token: 'device-token-abc',
       notification: { title: 'Hi', body: 'You have a new shift' },
+    });
+  });
+
+  it('omits the data field entirely when input.data is not supplied (existing callers unaffected)', async () => {
+    mockFetchSequence([
+      { ok: true, json: { access_token: 'access-token-xyz', expires_in: 3600 } },
+      { ok: true, json: {} },
+    ]);
+    const client = new FcmProviderClient(serviceAccountKeyBase64, 'hotelcrm-app');
+
+    await client.send({ token: 'device-token-abc', title: 'Hi', body: 'You have a new shift' });
+
+    const [, sendInit] = (global.fetch as jest.Mock).mock.calls[1] as [string, RequestInit];
+    const sendBody = JSON.parse(sendInit.body as string);
+    expect(sendBody.message).not.toHaveProperty('data');
+  });
+
+  it('sends data as a sibling of notification, not nested inside it', async () => {
+    mockFetchSequence([
+      { ok: true, json: { access_token: 'access-token-xyz', expires_in: 3600 } },
+      { ok: true, json: {} },
+    ]);
+    const client = new FcmProviderClient(serviceAccountKeyBase64, 'hotelcrm-app');
+
+    await client.send({
+      token: 'device-token-abc',
+      title: 'New Job Available',
+      body: 'A CLEANER shift needs coverage',
+      data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' },
+    });
+
+    const [, sendInit] = (global.fetch as jest.Mock).mock.calls[1] as [string, RequestInit];
+    const sendBody = JSON.parse(sendInit.body as string);
+    expect(sendBody.message.data).toEqual({ work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' });
+    expect(sendBody.message.notification).toEqual({
+      title: 'New Job Available',
+      body: 'A CLEANER shift needs coverage',
     });
   });
 
