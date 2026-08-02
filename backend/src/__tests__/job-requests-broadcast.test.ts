@@ -457,7 +457,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
 
     expect(dto.slots).toHaveLength(1);
     expect(dto.slots[0].skill).toBe('CLEANER');
-    expect(dto.slots[0].eligible_worker_ids).toEqual(['w1']);
+    expect(dto.slots[0].eligible_count).toBe(1);
   });
 
   it('excludes already-assigned-that-day workers from the eligible set', async () => {
@@ -476,7 +476,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
-    expect(dto.slots[0].eligible_worker_ids).toEqual(['w2']);
+    expect(dto.slots[0].eligible_count).toBe(1);
   });
 
   it('computes a distinct eligible set per skill slot on a multi-skill broadcast', async () => {
@@ -499,8 +499,8 @@ describe('JobRequestService.getBroadcastEligibility', () => {
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
-    expect(dto.slots.find((s) => s.skill === 'CLEANER')?.eligible_worker_ids).toEqual(['w1']);
-    expect(dto.slots.find((s) => s.skill === 'WAITER')?.eligible_worker_ids).toEqual(['w2']);
+    expect(dto.slots.find((s) => s.skill === 'CLEANER')?.eligible_count).toBe(1);
+    expect(dto.slots.find((s) => s.skill === 'WAITER')?.eligible_count).toBe(1);
   });
 
   it('returns an empty eligible set per slot when the hotel roster is empty (no ungrouped-hotel crash)', async () => {
@@ -509,7 +509,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
-    expect(dto.slots[0].eligible_worker_ids).toEqual([]);
+    expect(dto.slots[0].eligible_count).toBe(0);
     expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
   });
 
@@ -526,5 +526,71 @@ describe('JobRequestService.getBroadcastEligibility', () => {
       service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' })
     ).rejects.toMatchObject({ name: 'ConflictError' });
     expect(mockJobRequest.create).not.toHaveBeenCalled();
+  });
+
+  // Role-scoped response correction: this route has no requireRole gate
+  // (a worker must be able to call it), so the response itself must never
+  // leak other workers' user ids to a worker/checker caller — only their
+  // own inclusion. admin/manager get a count only (both existing UI
+  // consumers only ever rendered a count, never the raw list).
+  describe('role-scoped response', () => {
+    const twoEligibleWorkersSetup = () => {
+      mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+        .mockResolvedValueOnce([
+          { user_id: 'w1', skills: ['CLEANER'] },
+          { user_id: 'w2', skills: ['CLEANER'] },
+        ]);
+      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    };
+
+    it('admin never receives eligible_worker_ids or an eligible field', async () => {
+      twoEligibleWorkersSetup();
+      const dto = await service.getBroadcastEligibility('jr1', { userId: 'admin1', role: 'admin' });
+
+      expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');
+      expect(dto.slots[0]).not.toHaveProperty('eligible');
+      expect(dto.slots[0].eligible_count).toBe(2);
+    });
+
+    it('a worker in the eligible set receives eligible: true, never the id list', async () => {
+      twoEligibleWorkersSetup();
+      const dto = await service.getBroadcastEligibility('jr1', { userId: 'w1', role: 'worker' });
+
+      expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');
+      expect(dto.slots[0].eligible).toBe(true);
+      expect(dto.slots[0].eligible_count).toBe(2);
+    });
+
+    it('a worker NOT in the eligible set receives eligible: false, never the id list', async () => {
+      twoEligibleWorkersSetup();
+      const dto = await service.getBroadcastEligibility('jr1', { userId: 'w3', role: 'worker' });
+
+      expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');
+      expect(dto.slots[0].eligible).toBe(false);
+    });
+
+    it('a checker gets the same self-scoped shape as a worker', async () => {
+      twoEligibleWorkersSetup();
+      const dto = await service.getBroadcastEligibility('jr1', { userId: 'w2', role: 'checker' });
+
+      expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');
+      expect(dto.slots[0].eligible).toBe(true);
+    });
+
+    it('a manager (like admin) never receives eligible_worker_ids or an eligible field', async () => {
+      twoEligibleWorkersSetup();
+      const dto = await service.getBroadcastEligibility('jr1', {
+        userId: 'mgr1',
+        role: 'manager',
+        scope: { type: 'hotel', hotel_id: 'h1' },
+      });
+
+      expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');
+      expect(dto.slots[0]).not.toHaveProperty('eligible');
+      expect(dto.slots[0].eligible_count).toBe(2);
+    });
   });
 });

@@ -461,12 +461,18 @@ export interface RaiseBroadcastInput {
 /**
  * Matches backend `SkillSlotEligibilityDto` (job-requests/types.ts) exactly —
  * `GET /work-requests/broadcasts/:id/eligibility`'s per-skill-slot breakdown.
+ * Role-scoped: the backend route has no requireRole gate, so the response
+ * itself never carries other workers' user ids (no `eligible_worker_ids`
+ * field exists on the wire at all) — only an aggregate `eligible_count`
+ * (present for every caller) and, for a worker/checker caller only, their
+ * own `eligible` inclusion.
  */
 export interface SkillSlotEligibilityDto {
   skill: SkillTag;
   headcount: number;
   confirmed_count: number;
-  eligible_worker_ids: string[];
+  eligible_count: number;
+  eligible?: boolean;
 }
 
 /** Matches backend `BroadcastEligibilityDto` exactly. */

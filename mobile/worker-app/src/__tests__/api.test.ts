@@ -366,7 +366,7 @@ describe('workRequests.getBroadcastEligibility', () => {
       job_request_id: 'jr1',
       hotel_id: 'h1',
       shift_date: '2026-08-10',
-      slots: [{ skill: 'CLEANER', headcount: 2, confirmed_count: 1, eligible_worker_ids: ['w1', 'w2'] }],
+      slots: [{ skill: 'CLEANER', headcount: 2, confirmed_count: 1, eligible_count: 2, eligible: true }],
     };
     mockFetch.mockResolvedValueOnce(res(200, { data: eligibility }));
 

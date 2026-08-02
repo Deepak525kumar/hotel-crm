@@ -69,10 +69,11 @@ export function useBroadcasts(query: ListWorkRequestsQuery = {}) {
 
 /**
  * Job Dispatch Phase 2 (Epic 9 PRs 9.7-9.9, MIG-GAP-04/05/06): per-skill-slot
- * eligibility for one broadcast. Pass `null` for a viewer who must not
- * receive `eligible_worker_ids` (other workers' user ids) — the backend
- * route has no requireRole gate, so the caller is the only enforcement
- * point; see the security note in requests/broadcasts/[id]/page.tsx.
+ * eligibility for one broadcast. The backend route has no requireRole gate,
+ * but its response is role-scoped server-side (no eligible_worker_ids field
+ * exists on the wire for anyone). Pass `null` for a viewer this UI simply
+ * doesn't show the eligibility section to (a UX/scope choice, not a
+ * data-exposure control) — see requests/broadcasts/[id]/page.tsx.
  */
 export function useBroadcastEligibility(id: string | null | undefined) {
   return useSWR(
