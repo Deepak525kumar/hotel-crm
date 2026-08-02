@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { qualityService } from './service.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
-import { CreateQualityVerificationSchema, CreateRatingSchema } from './types.js';
+import { CreateQualityVerificationSchema, CreateRatingSchema, ListLeaderboardQuerySchema } from './types.js';
 
 export class QualityController {
   async createVerification(req: Request, res: Response, next: NextFunction) {
@@ -47,10 +47,17 @@ export class QualityController {
   async getLeaderboard(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
-      const result = await qualityService.getLeaderboard(req.params.hotel_id || '');
+      const parsed = ListLeaderboardQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
+      const { leaderboard, pagination } = await qualityService.getLeaderboard(
+        req.params.hotel_id || '',
+        parsed.data.page,
+        parsed.data.per_page
+      );
       res.status(200).json({
         status: 'success',
-        data: result,
+        data: leaderboard,
+        pagination,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
       });
     } catch (error) {

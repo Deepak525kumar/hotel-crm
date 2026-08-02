@@ -33,6 +33,7 @@ const mockOutboxEvent = {
 const mockWorkerOverallRating = {
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockHotel = {
@@ -557,6 +558,7 @@ describe('Quality getLeaderboard — hotel_id filter', () => {
     jest.clearAllMocks();
     service = new QualityService();
     mockWorkerOverallRating.findMany.mockResolvedValue([]);
+    mockWorkerOverallRating.count.mockResolvedValue(0);
   });
 
   it('applies no filter when hotelId is empty', async () => {
@@ -580,6 +582,44 @@ describe('Quality getLeaderboard — hotel_id filter', () => {
     const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
     expect(where).toEqual({
       worker: { employment_record: { hotel_group_id: '__none__', status: 'ACTIVE' } },
+    });
+  });
+});
+
+describe('Quality getLeaderboard — pagination (ADR-035)', () => {
+  let service: QualityService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new QualityService();
+    mockWorkerOverallRating.findMany.mockResolvedValue([]);
+    mockWorkerOverallRating.count.mockResolvedValue(0);
+  });
+
+  it('defaults to page 1, per_page 25', async () => {
+    await service.getLeaderboard('');
+    const args = mockWorkerOverallRating.findMany.mock.calls[0][0];
+    expect(args.skip).toBe(0);
+    expect(args.take).toBe(25);
+  });
+
+  it('computes skip from page and per_page', async () => {
+    await service.getLeaderboard('', 3, 10);
+    const args = mockWorkerOverallRating.findMany.mock.calls[0][0];
+    expect(args.skip).toBe(20);
+    expect(args.take).toBe(10);
+  });
+
+  it('returns pagination metadata derived from the total count', async () => {
+    mockWorkerOverallRating.count.mockResolvedValue(52);
+    const result = await service.getLeaderboard('', 2, 25);
+    expect(result.pagination).toEqual({
+      page: 2,
+      per_page: 25,
+      total: 52,
+      total_pages: 3,
+      has_next: true,
+      has_prev: true,
     });
   });
 });

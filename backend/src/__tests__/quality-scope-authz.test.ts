@@ -71,7 +71,7 @@ jest.mock('../lib/db.js', () => ({
       findUnique: async () => null,
       create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
     },
-    workerOverallRating: { findMany: async () => [] },
+    workerOverallRating: { findMany: async () => [], count: async () => 0 },
     hotel: {
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
     },
