@@ -3,6 +3,7 @@
 import { useAuth, useMe } from "@/hooks/useAuth";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { AbsencesCard } from "@/components/calendar/AbsencesCard";
+import { ConsentCard } from "@/components/consent/ConsentCard";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -82,6 +83,8 @@ export default function ProfilePage() {
       )}
 
       {user.role === "worker" && <AbsencesCard />}
+
+      <ConsentCard />
 
       {isLoading && (
         <p className="text-center text-xs text-gray-500">Refreshing…</p>
