@@ -30,10 +30,12 @@ import type {
   ListUsersQuery,
   ListWorkRequestsQuery,
   LoginResponse,
+  LogRoomsCompletedInput,
   MarkAbsenceInput,
   Notification,
   PayslipRequest,
   RefreshResponse,
+  RoomsCompletedEntry,
   UpdateAssignmentInput,
   UpdateAttendanceInput,
   UpdateHotelGroupInput,
@@ -359,6 +361,18 @@ export const assignmentsApi = {
     assignmentsApi.update(id, {
       status: "CANCELLED",
       ...(reason ? { cancellation_reason: reason } : {}),
+    }),
+
+  /**
+   * ADR-028: logs the manager-entered rooms-completed count for this
+   * assignment. No GET counterpart exists backend-side — the created entry
+   * is only ever known from this call's own response, not re-fetchable.
+   * A second call for the same assignment 409s (ConflictError).
+   */
+  logRoomsCompleted: (id: string, input: LogRoomsCompletedInput) =>
+    apiFetch<RoomsCompletedEntry>(`/assignments/${id}/rooms-completed`, {
+      method: "POST",
+      body: input,
     }),
 };
 

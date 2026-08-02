@@ -457,6 +457,30 @@ export interface UpdateAssignmentInput {
   cancellation_reason?: string;
 }
 
+/**
+ * Matches backend `RoomsCompletedEntryDto` (assignments/types.ts) exactly,
+ * ADR-028: manager-entered count for a worker's full-day assignment — not a
+ * per-room/per-task record. One entry per assignment (backend enforces via a
+ * unique constraint; a second POST 409s).
+ */
+export interface RoomsCompletedEntry {
+  id: string;
+  assignment_id: string;
+  hotel_id: string;
+  worker_id: string;
+  entered_by_id: string;
+  rooms_completed: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /assignments/:id/rooms-completed`. */
+export interface LogRoomsCompletedInput {
+  rooms_completed: number;
+  notes?: string;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Attendance                                                                */
 /* -------------------------------------------------------------------------- */
