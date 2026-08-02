@@ -260,7 +260,7 @@ export class QualityService extends BaseService {
     return rating;
   }
 
-  async getLeaderboard(hotelId: string) {
+  async getLeaderboard(hotelId: string, page = 1, perPage = 25) {
     let where: Record<string, unknown> = {};
     if (hotelId) {
       const hotel = await this.prisma.hotel.findUnique({
@@ -274,16 +274,31 @@ export class QualityService extends BaseService {
       };
     }
 
-    return this.prisma.workerOverallRating.findMany({
-      where,
-      include: {
-        worker: {
-          select: { id: true, first_name: true, last_name: true, email: true },
+    const skip = (page - 1) * perPage;
+    const [leaderboard, total] = await Promise.all([
+      this.prisma.workerOverallRating.findMany({
+        where,
+        include: {
+          worker: {
+            select: { id: true, first_name: true, last_name: true, email: true },
+          },
         },
+        orderBy: { average_score: 'desc' },
+        skip,
+        take: perPage,
+      }),
+      this.prisma.workerOverallRating.count({ where }),
+    ]);
+
+    return {
+      leaderboard,
+      pagination: {
+        page, per_page: perPage, total,
+        total_pages: Math.ceil(total / perPage),
+        has_next: page * perPage < total,
+        has_prev: page > 1,
       },
-      orderBy: { average_score: 'desc' },
-      take: 50,
-    });
+    };
   }
 }
 

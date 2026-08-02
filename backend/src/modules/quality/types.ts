@@ -27,3 +27,11 @@ export interface CreateRatingRequest {
   comment?: string;
   criteria_scores?: Record<string, number>;
 }
+
+// ADR-035 (GD-11): leaderboard pagination is a MUST, default 25, max 100.
+export const ListLeaderboardQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(100).default(25),
+});
+
+export type ListLeaderboardQuery = z.infer<typeof ListLeaderboardQuerySchema>;
