@@ -55,6 +55,7 @@ import type {
   UploadDocumentInput,
   EmployeeBlocklistEntry,
   SetBlocklistInput,
+  SubjectRightsBundle,
 } from "@/lib/types";
 
 /** Error thrown by {@link apiFetch} for any non-2xx response. */
@@ -701,5 +702,18 @@ export const consentApi = {
     apiFetch<ConsentRecord>("/consent/withdraw", {
       method: "POST",
       body: { consent_instance: consentInstance },
+    }),
+};
+
+/**
+ * Compliance API matching the backend `/compliance/*` routes
+ * (SPEC-COMPLIANCE-001@0.1.0 REVIEW). Self-scoped only — no Admin/DPO-on-
+ * behalf-of-worker caller class exists for this interface.
+ */
+export const complianceApi = {
+  /** GDPR subject-rights export: the caller's own documents, consent history, and audit trail. */
+  exportMyData: () =>
+    apiFetch<SubjectRightsBundle>("/compliance/subject-rights-export", {
+      method: "POST",
     }),
 };

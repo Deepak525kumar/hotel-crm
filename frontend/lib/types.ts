@@ -859,3 +859,47 @@ export interface ConsentRecord {
   decision: "GRANTED" | "DECLINED" | "WITHDRAWN" | "RENEWED";
   decided_at: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Compliance — Subject Rights Export (SPEC-COMPLIANCE-001@0.1.0 REVIEW)      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Matches backend `SubjectRightsSourceResult<T>` (compliance/types.ts)
+ * exactly. One source module failing (e.g. storage unavailable) does not
+ * fail the whole export — `status: "unavailable"` alongside `data: null` is
+ * an expected, displayable outcome, not an error to throw on (OD-COMPLIANCE-005).
+ */
+export interface SubjectRightsSourceResult<T> {
+  status: "ok" | "unavailable";
+  data: T | null;
+}
+
+/** A single audit-log entry, as embedded in the subject-rights bundle (backend-auth's own DTO). */
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string | null;
+  actor_role: string | null;
+  action: string;
+  resource_type: string;
+  resource_id: string;
+  old_values: unknown;
+  new_values: unknown;
+  details: unknown;
+  ip_address: string | null;
+  timestamp: string;
+}
+
+/**
+ * Matches backend `SubjectRightsBundle` (compliance/types.ts) exactly.
+ * `POST /compliance/subject-rights-export` — self-scoped, no request body.
+ * Retention is deliberately absent (it has no per-worker export interface,
+ * only category/tier-metadata queries) — not an omission in this type.
+ */
+export interface SubjectRightsBundle {
+  worker_id: string;
+  generated_at: string;
+  documents: SubjectRightsSourceResult<WorkerDocument[]>;
+  consent_history: SubjectRightsSourceResult<{ data: ConsentRecord[]; total: number }>;
+  audit_trail: SubjectRightsSourceResult<{ data: AuditLogEntry[]; total: number }>;
+}
