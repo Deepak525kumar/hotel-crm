@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { mutate } from "swr";
-import { useWorkerDocuments } from "@/hooks/useDocuments";
+import { useDocumentCompleteness, useWorkerDocuments } from "@/hooks/useDocuments";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { documentsApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -92,6 +92,13 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
 export function DocumentsCard({ workerId }: { workerId: string }) {
   const { data: documents, isLoading, error } = useWorkerDocuments(workerId);
   const [uploadOpen, setUploadOpen] = useState(false);
+  // No backend field records whether a worker needs a work permit — this
+  // toggle is the caller's own declaration, matching the backend's
+  // `IF-DOC-GetDocumentCompleteness` query-param contract exactly. Defaults
+  // to off so the completeness check starts out asking only for the
+  // GENERAL category, the same as omitting the param entirely.
+  const [workPermitRequired, setWorkPermitRequired] = useState(false);
+  const { data: completeness } = useDocumentCompleteness(workerId, workPermitRequired);
 
   return (
     <>
@@ -103,6 +110,21 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+            <Checkbox
+              label="Work permit required"
+              checked={workPermitRequired}
+              onChange={(e) => setWorkPermitRequired(e.target.checked)}
+            />
+            {completeness && (
+              <Badge tone={completeness.is_complete ? "success" : "warning"}>
+                {completeness.is_complete
+                  ? "Complete"
+                  : `Missing ${completeness.missing_categories.map((c) => CATEGORY_LABEL[c]).join(", ")}`}
+              </Badge>
+            )}
+          </div>
+
           {error ? (
             <p className="py-6 text-center text-sm text-red-600">
               Failed to load documents.
