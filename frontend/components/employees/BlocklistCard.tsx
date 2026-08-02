@@ -155,6 +155,7 @@ function AddBlocklistEntryModal({
       <div className="space-y-4">
         <Input
           label="Employee ID"
+          hint="The Employee Management employee ID (EmploymentRecord.employee_id) — not this person's account/user ID."
           value={employeeId}
           onChange={(e) => setEmployeeId(e.target.value)}
         />
