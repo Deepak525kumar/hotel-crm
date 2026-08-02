@@ -9,9 +9,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAvailability } from "@/hooks/useCalendar";
 import { usersApi } from "@/lib/api";
-import { DocumentsGate, RoleGate, UserDeactivateGate } from "@/components/auth/RoleGate";
+import { DocumentsGate, HrPayrollGate, RoleGate, UserDeactivateGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { DocumentsCard } from "@/components/documents/DocumentsCard";
+import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -152,6 +153,12 @@ function UserDetail() {
           <DocumentsGate>
             <DocumentsCard workerId={id} />
           </DocumentsGate>
+
+          {user.role === "worker" && (
+            <HrPayrollGate>
+              <PayslipRequestsCard workerId={id} />
+            </HrPayrollGate>
+          )}
 
           <UserDeactivateGate>
             {user.is_active && (

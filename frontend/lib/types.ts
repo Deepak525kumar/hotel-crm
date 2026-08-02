@@ -674,3 +674,40 @@ export interface UploadDocumentInput {
   is_work_permit?: boolean;
   expires_at?: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  HR — Payslip Requests (SPEC-HR-001 REVIEW @0.2.9, ADR-039)                 */
+/* -------------------------------------------------------------------------- */
+
+export type PayslipRequestStatus = "REQUESTED" | "FULFILLED";
+
+/**
+ * Matches backend `PayslipRequestDto` (hr/types.ts) exactly. ADR-039:
+ * request-tracking only — backend-hr never computes or stores payroll
+ * amounts, so this shape carries no salary/wage field.
+ */
+export interface PayslipRequest {
+  id: string;
+  worker_id: string;
+  period_start: string;
+  period_end: string;
+  status: PayslipRequestStatus;
+  fulfilled_by_id: string | null;
+  fulfilled_at: string | null;
+  escalated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Query params accepted by `GET /hr/payroll`. */
+export interface ListPayslipRequestsQuery {
+  worker_id?: string;
+  status?: PayslipRequestStatus;
+}
+
+/** Body of `POST /hr/payroll` (Manager/Admin creates a request on a worker's behalf). */
+export interface CreatePayslipRequestInput {
+  worker_id: string;
+  period_start: string;
+  period_end: string;
+}
