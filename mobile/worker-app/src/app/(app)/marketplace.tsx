@@ -1,4 +1,4 @@
-import { StyleSheet, FlatList, TextInput, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, FlatList, TextInput, Pressable, ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
@@ -44,11 +44,17 @@ function JobCard({ item, onPress }: { item: WorkRequest; onPress: () => void }) 
 
 // Job Dispatch Phase 2 (SPEC-JOB-DISPATCH-001@0.3.8): a broadcast offer.
 // Distinct card from JobCard — a broadcast has no single workers_needed
-// count, only per-skill headcount/confirmed_count in skill_slots.
+// count, only per-skill headcount/confirmed_count in skill_slots. Styled
+// distinctly (accent border + badge), not just a different background
+// shade, so a worker immediately recognizes this as a targeted dispatch
+// offer (first-accept-wins) rather than an ordinary marketplace listing.
 function OfferCard({ item, onPress }: { item: Broadcast; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
-      <ThemedView type="backgroundSelected" style={styles.card}>
+      <ThemedView type="backgroundSelected" style={[styles.card, styles.offerCard]}>
+        <View style={styles.offerBadge}>
+          <ThemedText type="small" style={styles.offerBadgeText}>OFFER</ThemedText>
+        </View>
         {item.hotel && (
           <ThemedText type="small" themeColor="textSecondary">{item.hotel.name}</ThemedText>
         )}
@@ -174,6 +180,9 @@ const styles = StyleSheet.create({
   list: { gap: Spacing.two, paddingBottom: Spacing.six },
   sectionLabel: { marginTop: Spacing.two, marginBottom: Spacing.one },
   card: { borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one, marginBottom: Spacing.two },
+  offerCard: { borderLeftWidth: 4, borderLeftColor: '#3182CE' },
+  offerBadge: { alignSelf: 'flex-start', backgroundColor: '#3182CE', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  offerBadgeText: { color: '#ffffff', fontSize: 11, letterSpacing: 0.6 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   position: { flex: 1 },
   empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center', marginTop: Spacing.four },
