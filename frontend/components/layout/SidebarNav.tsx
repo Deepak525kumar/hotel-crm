@@ -19,6 +19,12 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/requests", label: "Work requests" },
+  // Job Dispatch Phase 2 (Epic 9 PRs 9.7/9.9/9.10, FEATURE_JOBDISPATCH_PHASE2):
+  // broadcasts are a distinct JobRequest shape (skill x headcount, no
+  // apply/approve step) from the marketplace `/requests` flow above — kept
+  // as its own nav entry rather than a tab on `/requests` so the two
+  // creation/detail flows don't get conflated.
+  { href: "/requests/broadcasts", label: "Broadcasts" },
   { href: "/assignments", label: "Assignments" },
   { href: "/attendance", label: "Attendance" },
   // SPEC-GEO-001 (GD-14): matches backend-geo's own admin/manager-only role

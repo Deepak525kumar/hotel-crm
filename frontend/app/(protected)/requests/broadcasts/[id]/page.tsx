@@ -1,0 +1,211 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useWorkRequest, useBroadcastEligibility } from "@/hooks/useWorkRequests";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { ApiError, workRequestsApi } from "@/lib/api";
+import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
+import { useAuthStore } from "@/stores/auth";
+import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
+import { formatDateTime } from "@/lib/format";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  DataList,
+  DataRow,
+  FormError,
+  PageHeader,
+  Skeleton,
+  TextLink,
+} from "@/components/ui";
+
+const SKILL_LABELS: Record<string, string> = {
+  CLEANER: "Cleaner",
+  PUBLIC_SERVICE: "Public service",
+  KITCHEN_DISHWASHER: "Kitchen dishwasher",
+  WAITER: "Waiter",
+};
+
+export default function BroadcastDetailPage() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+
+  // The backend's eligibility route (GET /work-requests/broadcasts/:id/
+  // eligibility) has no requireRole gate — any authenticated role can call
+  // it. It returns eligible_worker_ids (other workers' user ids), which a
+  // non-admin/manager viewer must never receive at all, not just avoid
+  // rendering. Gating only the display would still leak the full array to
+  // a worker's browser (network response, SWR cache) — the fetch itself
+  // must be conditioned on role, matching JobDispatchPhase2WriteGate's
+  // admin/manager scope below.
+  const role = useAuthStore((s) => s.user?.role);
+  const canSeeEligibility = role === "admin" || role === "manager";
+
+  const { data: request, isLoading, error, mutate } = useWorkRequest(id);
+  const {
+    data: eligibility,
+    isLoading: eligibilityLoading,
+    error: eligibilityError,
+  } = useBroadcastEligibility(canSeeEligibility ? id : null);
+  const close = useAsyncAction();
+
+  const onClose = () =>
+    close.run(() => workRequestsApi.manualCloseBroadcast(id), {
+      onSuccess: (updated) => mutate(updated, { revalidate: false }),
+      errorMessage: "Failed to close this broadcast. Please try again.",
+    });
+
+  if (isLoading) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4">
+        <Skeleton className="h-4 w-40" />
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error || !request || !request.skill_slots || request.skill_slots.length === 0) {
+    return (
+      <div className="space-y-4">
+        <TextLink href="/requests/broadcasts" className="text-sm">
+          ← Back to broadcasts
+        </TextLink>
+        <Card>
+          <CardContent className="text-sm text-red-600">
+            {error instanceof ApiError && error.status === 404
+              ? "This broadcast was not found."
+              : "Failed to load this broadcast."}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const eligibilityBySkill = new Map(
+    (eligibility?.slots ?? []).map((slot) => [slot.skill, slot]),
+  );
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div>
+        <TextLink href="/requests/broadcasts" className="text-sm">
+          ← Back to broadcasts
+        </TextLink>
+        <PageHeader
+          className="mt-2"
+          title={
+            <span className="flex items-center gap-3">
+              Broadcast
+              <WorkRequestStatusBadge status={request.status} />
+            </span>
+          }
+        />
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Shift details</CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Shift date" value={request.shift_date} />
+            <DataRow
+              label="Time"
+              value={`${request.shift_start_time}–${request.shift_end_time}`}
+            />
+            <DataRow
+              label="Hourly rate"
+              value={
+                request.hourly_rate != null
+                  ? `${request.hourly_rate} ${request.currency}`
+                  : "—"
+              }
+            />
+            <DataRow
+              label="Published"
+              value={request.published_at ? formatDateTime(request.published_at) : "—"}
+            />
+          </DataList>
+        </CardContent>
+      </Card>
+
+      {request.description && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Description</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm text-gray-700">
+            <p className="whitespace-pre-wrap">{request.description}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{canSeeEligibility ? "Skills & eligibility" : "Skills"}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {canSeeEligibility && eligibilityError ? (
+            <p className="text-sm text-red-600">
+              Failed to load eligibility for this broadcast.
+            </p>
+          ) : (
+            request.skill_slots.map((slot) => {
+              const eligibleCount =
+                !canSeeEligibility || eligibilityLoading
+                  ? null
+                  : (eligibilityBySkill.get(slot.skill)?.eligible_worker_ids.length ?? 0);
+              const filled = slot.confirmed_count >= slot.headcount;
+              return (
+                <div
+                  key={slot.id}
+                  className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {SKILL_LABELS[slot.skill] ?? slot.skill}
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      {slot.confirmed_count}/{slot.headcount} confirmed
+                      {eligibleCount !== null && !filled
+                        ? ` · ${eligibleCount} eligible worker${eligibleCount === 1 ? "" : "s"}`
+                        : ""}
+                    </p>
+                  </div>
+                  {filled && (
+                    <span className="text-sm font-medium text-green-700">Filled</span>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <JobDispatchPhase2WriteGate>
+        {request.status === "OPEN" && (
+          <Card>
+            <CardContent className="flex items-center justify-between gap-4">
+              <div className="text-sm text-gray-600">
+                Close this broadcast early if you no longer need it filled.
+              </div>
+              <Button variant="outline" onClick={onClose} loading={close.pending}>
+                Close broadcast
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </JobDispatchPhase2WriteGate>
+
+      <FormError>{close.error}</FormError>
+    </div>
+  );
+}
