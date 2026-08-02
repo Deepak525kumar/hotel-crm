@@ -141,7 +141,18 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
       }
     >
       <div className="space-y-4">
-        <Input label="Date" type="date" value={day} onChange={(e) => setDay(e.target.value)} />
+        <Input
+          label="Date"
+          type="date"
+          // Best-effort guard only, using the browser's local date — the
+          // backend's own timezone-aware check (ConflictError, "Cannot mark
+          // a past day sick or vacation") remains the authoritative one and
+          // is surfaced via FormError below if this client-side check
+          // somehow disagrees with it (e.g. a stale local clock).
+          min={new Date().toISOString().slice(0, 10)}
+          value={day}
+          onChange={(e) => setDay(e.target.value)}
+        />
         <Select
           label="Type"
           value={kind}
