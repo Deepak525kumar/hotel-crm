@@ -530,6 +530,17 @@ export const usersApi = {
   /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
   remove: (id: string) =>
     apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
+
+  /**
+   * ADR-031 D-4: admin-only incident-response action. Bumps the account's
+   * token_generation so every existing access/refresh token stops
+   * validating — deliberately distinct from `remove()` (deactivate), which
+   * this leaves untouched. Doesn't touch Session rows; that's logout's job.
+   */
+  revokeSessions: (id: string) =>
+    apiFetch<{ message: string }>(`/users/${id}/revoke-sessions`, {
+      method: "POST",
+    }),
 };
 
 /**

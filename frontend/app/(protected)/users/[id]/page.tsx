@@ -48,7 +48,15 @@ function UserDetail() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
 
+  const [revokeConfirmOpen, setRevokeConfirmOpen] = useState(false);
+  const revokeSessions = useAsyncAction();
+
   const isSelf = currentUser?.id === id;
+
+  const onRevokeSessions = () =>
+    revokeSessions.run(() => usersApi.revokeSessions(id), {
+      onSuccess: () => setRevokeConfirmOpen(false),
+    });
 
   const onDeactivate = () =>
     deactivate.run(
@@ -162,6 +170,30 @@ function UserDetail() {
             </HrPayrollGate>
           )}
 
+          <RoleGate allow={["admin"]}>
+            <Card>
+              <CardContent className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Revoke all sessions
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {isSelf
+                      ? "This will also sign you out — every access/refresh token for this account stops working immediately."
+                      : "Signs the account out everywhere by invalidating every existing access/refresh token. Does not deactivate the account."}
+                  </p>
+                </div>
+                <Button
+                  variant="danger"
+                  onClick={() => setRevokeConfirmOpen(true)}
+                  className="shrink-0"
+                >
+                  Revoke sessions
+                </Button>
+              </CardContent>
+            </Card>
+          </RoleGate>
+
           <UserDeactivateGate>
             {user.is_active && (
               <Card className="border-red-100">
@@ -217,6 +249,45 @@ function UserDetail() {
           . You can reactivate the account from the edit screen.
         </p>
         <FormError className="mt-3">{deactivate.error}</FormError>
+      </Modal>
+
+      <Modal
+        open={revokeConfirmOpen}
+        onClose={() => !revokeSessions.pending && setRevokeConfirmOpen(false)}
+        title="Revoke all sessions"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setRevokeConfirmOpen(false)}
+              disabled={revokeSessions.pending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={onRevokeSessions}
+              loading={revokeSessions.pending}
+            >
+              Revoke sessions
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          {isSelf ? (
+            "This will sign you out immediately, along with every other active session for your account."
+          ) : (
+            <>
+              This immediately signs out{" "}
+              <span className="font-medium">
+                {user?.first_name} {user?.last_name}
+              </span>{" "}
+              everywhere. Their account stays active — they can sign back in right away.
+            </>
+          )}
+        </p>
+        <FormError className="mt-3">{revokeSessions.error}</FormError>
       </Modal>
     </div>
   );
