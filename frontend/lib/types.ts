@@ -711,3 +711,35 @@ export interface CreatePayslipRequestInput {
   period_start: string;
   period_end: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  HR — Contracts (SPEC-HR-001 REVIEW @0.2.9, ADR-039/ADR-040/ADR-044)        */
+/* -------------------------------------------------------------------------- */
+
+export type ContractStatus = "PENDING" | "ACTIVE" | "EXTENDED" | "PERMANENT";
+
+/** Matches backend `ContractDto` (hr/types.ts) exactly. */
+export interface Contract {
+  id: string;
+  worker_id: string;
+  template_id: string;
+  position: string;
+  start_date: string;
+  end_date: string | null;
+  status: ContractStatus;
+  scanned_document_id: string | null;
+  confirmed_by_id: string | null;
+  confirmed_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /hr/contracts` (REQ-HR-001; no salary/compensation field, ADR-039). */
+export interface CreateContractInput {
+  worker_id: string;
+  template_id: string;
+  position: string;
+  start_date: string;
+  end_date?: string;
+}

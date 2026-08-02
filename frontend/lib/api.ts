@@ -9,6 +9,7 @@ import type {
   CheckInInput,
   CreateHotelGroupInput,
   CreateHotelInput,
+  CreateContractInput,
   CreatePayslipRequestInput,
   CreateUserInput,
   CreateWorkRequestInput,
@@ -18,6 +19,7 @@ import type {
   GeoCheckin,
   Hotel,
   HotelGroup,
+  Contract,
   ListAssignmentsQuery,
   ListAttendanceQuery,
   ListGeoCheckinsQuery,
@@ -567,6 +569,46 @@ export const hrApi = {
   /** Marks a REQUESTED payslip request as fulfilled (payslip emailed). */
   fulfilPayrollRequest: (requestId: string) =>
     apiFetch<PayslipRequest>(`/hr/payroll/${requestId}/fulfil`, {
+      method: "POST",
+    }),
+
+  /**
+   * IF-HR-GetContractStatus: the worker's most recent contract, or `null`
+   * if none has been created yet. Worker self-access and Manager group-scope
+   * are both enforced backend-side (OD-HR-10 / FIND-SEC-HR-03).
+   */
+  getContractStatus: (workerId: string) =>
+    apiFetch<Contract | null>(`/hr/workers/${workerId}/contract-status`),
+
+  /** Manager/Admin creates a contract (REQ-HR-001); requires a recorded Personalfragebogen. */
+  createContract: (input: CreateContractInput) =>
+    apiFetch<Contract>("/hr/contracts", { method: "POST", body: input }),
+
+  /** IF-HR-UploadSignedContract: attaches the scanned signed contract file. */
+  uploadSignedContract: (workerId: string, file: File) => {
+    const form = new FormData();
+    form.set("file", file);
+    return apiFetch<Contract>(`/hr/workers/${workerId}/contract-scan`, {
+      method: "POST",
+      body: form,
+    });
+  },
+
+  /** IF-HR-ConfirmContractSigned: Manager/Admin confirms the scanned contract, activating it. */
+  confirmContractSigned: (workerId: string) =>
+    apiFetch<Contract>(`/hr/workers/${workerId}/contract-confirm`, {
+      method: "POST",
+    }),
+
+  /** RULE-HR-06/ADR-040: confirms continuation/permanence (PENDING/ACTIVE → EXTENDED/PERMANENT). */
+  extendContract: (workerId: string) =>
+    apiFetch<Contract>(`/hr/workers/${workerId}/contract-extend`, {
+      method: "POST",
+    }),
+
+  /** RULE-HR-07/ADR-040 path (a): explicit manager "do not continue" action. */
+  lapseContract: (workerId: string) =>
+    apiFetch<Contract>(`/hr/workers/${workerId}/contract-lapse`, {
       method: "POST",
     }),
 };
