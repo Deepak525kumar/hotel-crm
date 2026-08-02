@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useBroadcasts } from "@/hooks/useWorkRequests";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
@@ -9,6 +10,7 @@ import {
   Card,
   CardContent,
   EmptyState,
+  Pager,
   PageHeader,
   Table,
   THead,
@@ -20,11 +22,16 @@ import {
   TextLink,
 } from "@/components/ui";
 
+const PER_PAGE = 20;
 const COLUMNS = 4;
 
 export default function BroadcastsPage() {
-  // Not paginated — see useBroadcasts()'s own doc comment for why.
-  const { broadcasts, isLoading, error, truncated } = useBroadcasts();
+  const [page, setPage] = useState(1);
+
+  const { broadcasts, isLoading, error, hasNext } = useBroadcasts({
+    page,
+    per_page: PER_PAGE,
+  });
 
   return (
     <div className="space-y-6">
@@ -98,12 +105,7 @@ export default function BroadcastsPage() {
         </CardContent>
       </Card>
 
-      {truncated && (
-        <p className="text-sm text-gray-500">
-          Showing the most recent 100 job requests. Older broadcasts may not be listed here —
-          use a direct link if you have one.
-        </p>
-      )}
+      <Pager page={page} hasNext={hasNext} onPageChange={setPage} disabled={isLoading} />
     </div>
   );
 }

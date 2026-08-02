@@ -334,8 +334,16 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 /** Work requests API matching the backend `/work-requests/*` routes. */
 export const workRequestsApi = {
-  list: (query: ListWorkRequestsQuery = {}) =>
-    apiFetch<WorkRequest[]>(`/work-requests${toQuery({ ...query })}`),
+  list: (query: ListWorkRequestsQuery = {}) => {
+    const { is_broadcast, ...rest } = query;
+    return apiFetch<WorkRequest[]>(
+      `/work-requests${toQuery({
+        ...rest,
+        // The backend accepts only the literal strings "true"/"false".
+        is_broadcast: is_broadcast === undefined ? undefined : is_broadcast ? "true" : "false",
+      })}`,
+    );
+  },
 
   get: (id: string) => apiFetch<WorkRequest>(`/work-requests/${id}`),
 

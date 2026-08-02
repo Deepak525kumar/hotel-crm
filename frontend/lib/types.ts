@@ -424,6 +424,8 @@ export interface ListWorkRequestsQuery {
   status?: WorkRequestStatus;
   position?: string;
   shift_date?: string;
+  /** Filters to broadcast rows only (true) or marketplace rows only (false). */
+  is_broadcast?: boolean;
   page?: number;
   per_page?: number;
 }
