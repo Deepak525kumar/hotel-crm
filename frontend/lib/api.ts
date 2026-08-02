@@ -8,6 +8,9 @@ import type {
   Availability,
   CalendarAbsence,
   CheckInInput,
+  ConsentNotice,
+  ConsentRecord,
+  ConsentStatus,
   CreateHotelGroupInput,
   CreateHotelInput,
   CreateContractInput,
@@ -34,6 +37,7 @@ import type {
   MarkAbsenceInput,
   Notification,
   PayslipRequest,
+  RecordConsentDecisionInput,
   RefreshResponse,
   RoomsCompletedEntry,
   UpdateAssignmentInput,
@@ -670,5 +674,32 @@ export const employeesApi = {
     apiFetch<EmployeeBlocklistEntry>(`/employees/hotels/${hotelId}/blocklist`, {
       method: "POST",
       body: input,
+    }),
+};
+
+/**
+ * Consent API matching the backend `/consent/*` routes (SPEC-CONSENT-001@0.2.0
+ * FROZEN, ADR-015/ADR-037, GD-17). Every write is self-scoped — worker_id is
+ * always the authenticated caller, never a client-supplied field.
+ */
+export const consentApi = {
+  getStatus: (consentInstance: string) =>
+    apiFetch<ConsentStatus>(`/consent/status${toQuery({ consent_instance: consentInstance })}`),
+
+  /** Fetches the current notice to present before a decision (no decision is recorded). */
+  requestNotice: (consentInstance: string, language?: string) =>
+    apiFetch<ConsentNotice>("/consent/request", {
+      method: "POST",
+      body: { consent_instance: consentInstance, ...(language ? { language } : {}) },
+    }),
+
+  recordDecision: (input: RecordConsentDecisionInput) =>
+    apiFetch<ConsentRecord>("/consent/decisions", { method: "POST", body: input }),
+
+  /** Immediately supersedes today's grant — the next status check reads as `absent`. */
+  withdraw: (consentInstance: string) =>
+    apiFetch<ConsentRecord>("/consent/withdraw", {
+      method: "POST",
+      body: { consent_instance: consentInstance },
     }),
 };

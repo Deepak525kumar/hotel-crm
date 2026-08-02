@@ -810,3 +810,52 @@ export interface SetBlocklistInput {
   employee_id: string;
   reason: string;
 }
+
+/* -------------------------------------------------------------------------- */
+/*  Consent (SPEC-CONSENT-001@0.2.0 FROZEN, ADR-015/ADR-037, GD-17)             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The recurring daily GDPR access-gate instance (RULE-CONSENT-01). The
+ * other named instance, `chatbot-data-processing`, has no consuming module
+ * yet (Chatbot is out of MVP scope) and is deliberately not surfaced here.
+ */
+export const DAILY_ACCESS_GATE_INSTANCE = "daily-access-gate";
+
+/**
+ * Matches backend `ConsentStatus` (consent/types.ts) exactly — a
+ * discriminated result, not a thrown error for "no decision yet"
+ * (RULE-CONSENT-06). `granted`/`declined` reflect the day's own decision;
+ * a decision from a prior day or a superseded notice version reads as
+ * `absent` again (RULE-CONSENT-02, evaluated server-side).
+ */
+export type ConsentStatus =
+  | { status: "granted"; notice_version: string; decided_at: string }
+  | { status: "declined"; notice_version: string; decided_at: string }
+  | { status: "absent" };
+
+/** Response of `POST /consent/request` — the current notice to present before a decision. */
+export interface ConsentNotice {
+  consent_instance: string;
+  notice_version: string;
+  notice_content: string;
+  language: string;
+  rtl: boolean;
+}
+
+/** Body of `POST /consent/decisions` (self-scoped; worker_id is never client-supplied). */
+export interface RecordConsentDecisionInput {
+  consent_instance: string;
+  decision: "GRANTED" | "DECLINED";
+  notice_version: string;
+}
+
+/** Matches backend `ConsentRecordDto` (consent/types.ts) exactly, RULE-CONSENT-05. */
+export interface ConsentRecord {
+  id: string;
+  worker_id: string;
+  consent_instance: string;
+  notice_version: string;
+  decision: "GRANTED" | "DECLINED" | "WITHDRAWN" | "RENEWED";
+  decided_at: string;
+}
