@@ -282,12 +282,10 @@ describe('WorkRequestService', () => {
       });
     });
 
-    // Job Dispatch Phase 2 correction (post-PR-9.7 discovery, not part of
-    // PR 9.7's own closed scope): list() previously never included
-    // skill_slots, so a broadcast row (raiseBroadcast()) was
-    // indistinguishable from a marketplace row (create()) on this endpoint —
-    // getById() already included it; this brings list() to the same
-    // contract WorkRequestDto documents.
+    // Regression correction: list() previously omitted skill_slots, making
+    // broadcast job requests indistinguishable from marketplace requests.
+    // getById() already returned this field; list() now matches that
+    // behavior.
     describe('skill_slots (list()/getById() parity)', () => {
       it('includes skill_slots in the Prisma query and maps it onto each row', async () => {
         const skillSlot = {

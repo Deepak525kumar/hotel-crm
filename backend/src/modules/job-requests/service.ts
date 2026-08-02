@@ -169,12 +169,10 @@ export class JobRequestService extends BaseService {
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: [{ shift_date: 'desc' }, { created_at: 'desc' }],
-        // Job Dispatch Phase 2 follow-up: without this, every list() row
-        // silently dropped skill_slots regardless of whether the underlying
-        // JobRequest is a broadcast — getById() already includes it (below),
-        // this brings list() to the same contract so a caller can
-        // discriminate broadcast vs marketplace rows per WorkRequestDto's
-        // own documented skill_slots field.
+        // Regression correction: list() previously omitted skill_slots,
+        // making broadcast job requests indistinguishable from marketplace
+        // requests. getById() already returned this field; list() now
+        // matches that behavior.
         include: { skill_slots: true },
       }),
       this.prisma.jobRequest.count({ where }),
