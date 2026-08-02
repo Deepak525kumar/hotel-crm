@@ -8,6 +8,7 @@ import { useHotel, useHotelGroup } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
+import { BlocklistCard } from "@/components/employees/BlocklistCard";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -139,6 +140,8 @@ export default function HotelDetailPage() {
               </DataList>
             </CardContent>
           </Card>
+
+          <BlocklistCard hotelId={id} />
 
           <HotelWriteGate>
             {hotel.is_active && (
