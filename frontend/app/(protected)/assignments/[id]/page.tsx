@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { ApiError, assignmentsApi } from "@/lib/api";
+import { RoleGate } from "@/components/auth/RoleGate";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
 import { formatDateTime } from "@/lib/format";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -16,12 +18,14 @@ import {
   DataList,
   DataRow,
   FormError,
+  Input,
   Modal,
   PageHeader,
   Skeleton,
   Textarea,
   TextLink,
 } from "@/components/ui";
+import type { RoomsCompletedEntry } from "@/lib/types";
 
 export default function AssignmentDetailPage() {
   const params = useParams<{ id: string }>();
@@ -32,6 +36,14 @@ export default function AssignmentDetailPage() {
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const action = useAsyncAction();
+
+  // No GET endpoint exists for rooms-completed entries (ADR-028) — the
+  // logged entry is only ever known from this page's own POST response, not
+  // re-fetchable on reload. Session-local only, intentionally.
+  const [roomsCompletedOpen, setRoomsCompletedOpen] = useState(false);
+  const [loggedRoomsCompleted, setLoggedRoomsCompleted] = useState<RoomsCompletedEntry | null>(
+    null,
+  );
 
   const start = () =>
     action.run(() => assignmentsApi.start(id), {
@@ -213,6 +225,29 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
+      <RoleGate allow={["admin", "manager"]}>
+        <Card>
+          <CardContent className="flex items-center justify-between gap-4">
+            <div className="text-sm text-gray-600">
+              {loggedRoomsCompleted
+                ? `Logged ${loggedRoomsCompleted.rooms_completed} rooms completed.`
+                : "Log the rooms completed count for this assignment."}
+            </div>
+            {loggedRoomsCompleted ? (
+              <Badge tone="success">Logged</Badge>
+            ) : (
+              <Button
+                variant="outline"
+                onClick={() => setRoomsCompletedOpen(true)}
+                className="shrink-0"
+              >
+                Log rooms completed
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </RoleGate>
+
       <FormError>{action.error}</FormError>
 
       <Modal
@@ -249,6 +284,103 @@ export default function AssignmentDetailPage() {
           placeholder="Share why this assignment was cancelled."
         />
       </Modal>
+
+      <LogRoomsCompletedModal
+        assignmentId={id}
+        open={roomsCompletedOpen}
+        onClose={() => setRoomsCompletedOpen(false)}
+        onLogged={setLoggedRoomsCompleted}
+      />
     </div>
+  );
+}
+
+function LogRoomsCompletedModal({
+  assignmentId,
+  open,
+  onClose,
+  onLogged,
+}: {
+  assignmentId: string;
+  open: boolean;
+  onClose: () => void;
+  onLogged: (entry: RoomsCompletedEntry) => void;
+}) {
+  const [roomsCompleted, setRoomsCompleted] = useState("");
+  const [notes, setNotes] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const log = useAsyncAction();
+
+  const reset = () => {
+    setRoomsCompleted("");
+    setNotes("");
+    setFieldError(null);
+  };
+
+  const handleClose = () => {
+    if (log.pending) return;
+    reset();
+    onClose();
+  };
+
+  const onSubmit = () => {
+    setFieldError(null);
+    const parsed = Number(roomsCompleted);
+    if (roomsCompleted === "" || !Number.isInteger(parsed) || parsed < 0) {
+      setFieldError("Rooms completed must be a whole number of 0 or more.");
+      return;
+    }
+
+    log.run(
+      () =>
+        assignmentsApi.logRoomsCompleted(assignmentId, {
+          rooms_completed: parsed,
+          notes: notes.trim() || undefined,
+        }),
+      {
+        onSuccess: (entry) => {
+          onLogged(entry);
+          reset();
+          onClose();
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Log rooms completed"
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={log.pending}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={log.pending}>
+            Log
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Input
+          label="Rooms completed"
+          type="number"
+          min={0}
+          step={1}
+          value={roomsCompleted}
+          onChange={(e) => setRoomsCompleted(e.target.value)}
+        />
+        <Textarea
+          label="Notes (optional)"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          maxLength={1000}
+          rows={3}
+        />
+        <FormError>{fieldError ?? log.error}</FormError>
+      </div>
+    </Modal>
   );
 }
