@@ -149,6 +149,9 @@ export class JobRequestService extends BaseService {
       ...(query.shift_date
         ? { shift_date: new Date(`${query.shift_date}T00:00:00.000Z`) }
         : {}),
+      // Same discriminator closeExpiredBroadcasts() uses below.
+      ...(query.is_broadcast === true ? { skill_slots: { some: {} } } : {}),
+      ...(query.is_broadcast === false ? { skill_slots: { none: {} } } : {}),
     };
 
     // PATCH-04: non-management roles only see requests for hotels where they
@@ -169,11 +172,18 @@ export class JobRequestService extends BaseService {
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: [{ shift_date: 'desc' }, { created_at: 'desc' }],
+        // Job Dispatch Phase 2 follow-up: without this, every list() row
+        // silently dropped skill_slots regardless of whether the underlying
+        // JobRequest is a broadcast — getById() already includes it (below),
+        // this brings list() to the same contract so a caller can
+        // discriminate broadcast vs marketplace rows per WorkRequestDto's
+        // own documented skill_slots field.
+        include: { skill_slots: true },
       }),
       this.prisma.jobRequest.count({ where }),
     ]);
 
-    return { data: records.map((r) => this.toDto(r)), total };
+    return { data: records.map((r) => this.toDto(r, r.skill_slots)), total };
   }
 
   async getById(
