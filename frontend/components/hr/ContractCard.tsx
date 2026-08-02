@@ -255,6 +255,10 @@ function CreateContractModal({
       }
     >
       <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          Requires this worker&apos;s Personalfragebogen data to already be recorded — creation
+          fails otherwise.
+        </p>
         <Input
           label="Template ID"
           value={templateId}
