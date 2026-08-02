@@ -404,55 +404,6 @@ export interface ListWorkRequestsQuery {
 }
 
 /* -------------------------------------------------------------------------- */
-/*  Work Applications                                                         */
-/* -------------------------------------------------------------------------- */
-
-/**
- * Application lifecycle. Mirrors the backend `ApplicationStatus` enum
- * (prisma/schema.prisma). The review UI only ever transitions a PENDING
- * application to ACCEPTED or REJECTED; WITHDRAWN is worker-driven and
- * EXPIRED is set by scheduled jobs — both are read-only here.
- */
-export type ApplicationStatus =
-  | "PENDING"
-  | "ACCEPTED"
-  | "REJECTED"
-  | "WITHDRAWN"
-  | "EXPIRED";
-
-/**
- * A work application as returned by
- * `GET /work-requests/:id/applications` and the PATCH review endpoint.
- * Shape mirrors the backend `WorkApplicationDto`.
- */
-export interface WorkApplication {
-  id: string;
-  work_request_id: string;
-  worker_id: string;
-  reviewed_by_id: string | null;
-  status: ApplicationStatus;
-  cover_note: string | null;
-  worker_rating_snapshot: number | null;
-  reviewed_at: string | null;
-  rejection_reason: string | null;
-  applied_at: string;
-  updated_at: string;
-}
-
-/** Query params accepted by `GET /work-requests/:id/applications`. */
-export interface ListApplicationsQuery {
-  status?: ApplicationStatus;
-  page?: number;
-  per_page?: number;
-}
-
-/** Body of `PATCH /work-requests/:id/applications/:applicationId`. */
-export interface UpdateApplicationInput {
-  status?: "ACCEPTED" | "REJECTED" | "WITHDRAWN";
-  rejection_reason?: string;
-}
-
-/* -------------------------------------------------------------------------- */
 /*  Assignments                                                               */
 /* -------------------------------------------------------------------------- */
 

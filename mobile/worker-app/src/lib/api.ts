@@ -2,7 +2,6 @@ import type {
   User,
   AuthResponse,
   WorkRequest,
-  WorkApplication,
   WorkerAssignment,
   Attendance,
   Notification,
@@ -281,18 +280,6 @@ export const api = {
       return request<WorkRequest[]>(`/work-requests${q ? `?${q}` : ''}`);
     },
     get: (id: string) => request<WorkRequest>(`/work-requests/${id}`),
-  },
-  applications: {
-    apply: (workRequestId: string) =>
-      request<WorkApplication>(`/work-requests/${workRequestId}/applications`, {
-        method: 'POST',
-        body: JSON.stringify({}),
-      }),
-    withdraw: (workRequestId: string, applicationId: string) =>
-      request<WorkApplication>(`/work-requests/${workRequestId}/applications/${applicationId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'WITHDRAWN' }),
-      }),
   },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
