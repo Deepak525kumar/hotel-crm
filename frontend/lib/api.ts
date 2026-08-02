@@ -334,8 +334,18 @@ function toQuery(params: Record<string, string | number | undefined>): string {
 
 /** Work requests API matching the backend `/work-requests/*` routes. */
 export const workRequestsApi = {
-  list: (query: ListWorkRequestsQuery = {}) =>
-    apiFetch<WorkRequest[]>(`/work-requests${toQuery({ ...query })}`),
+  list: (query: ListWorkRequestsQuery = {}) => {
+    const { is_broadcast, ...rest } = query;
+    return apiFetch<WorkRequest[]>(
+      `/work-requests${toQuery({
+        ...rest,
+        // The backend's z.enum(["true","false"]) schema only accepts these
+        // exact literal strings — never rely on toQuery's generic
+        // String(value) coercion for a boolean here.
+        is_broadcast: is_broadcast === undefined ? undefined : String(is_broadcast) as "true" | "false",
+      })}`,
+    );
+  },
 
   get: (id: string) => apiFetch<WorkRequest>(`/work-requests/${id}`),
 
