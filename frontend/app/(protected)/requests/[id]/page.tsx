@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -149,21 +148,6 @@ export default function WorkRequestDetailPage() {
           </CardContent>
         </Card>
       )}
-
-      <StaffingWriteGate>
-        {request.status !== "DRAFT" && (
-          <Card>
-            <CardContent className="flex items-center justify-between gap-4">
-              <div className="text-sm text-gray-600">
-                Review the workers who have applied to this shift.
-              </div>
-              <Link href={`/requests/${id}/applications`}>
-                <Button variant="outline">View applications</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </StaffingWriteGate>
 
       <StaffingWriteGate>
         {request.status === "DRAFT" && (

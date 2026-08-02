@@ -95,7 +95,7 @@ export default function AssignmentsPage() {
                         description={
                           status
                             ? "Try adjusting your filters."
-                            : "Assignments appear once applications are accepted."
+                            : "Assignments appear once workers are placed on a shift."
                         }
                       />
                     </TD>
