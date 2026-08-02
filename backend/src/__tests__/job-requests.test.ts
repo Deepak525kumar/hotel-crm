@@ -357,6 +357,25 @@ describe('WorkRequestService', () => {
         const where = mockWorkRequest.findMany.mock.calls[0][0].where;
         expect(where.skill_slots).toBeUndefined();
       });
+
+      // Composition check: a non-admin/manager actor's roster-scope
+      // narrowing (hotel_id) and is_broadcast (skill_slots) must both land
+      // on the same where clause — neither should clear the other.
+      it('composes with worker roster scope: both skill_slots and hotel_id are set', async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findMany.mockResolvedValue([{ id: 'h1' }, { id: 'h2' }]);
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+
+        await service.list(
+          { page: 1, per_page: 20, is_broadcast: true } as any,
+          { userId: 'w1', role: 'worker' }
+        );
+
+        const where = mockWorkRequest.findMany.mock.calls[0][0].where;
+        expect(where.skill_slots).toEqual({ some: {} });
+        expect(where.hotel_id).toEqual({ in: ['h1', 'h2'] });
+      });
     });
   });
 
