@@ -286,10 +286,9 @@ export const api = {
     },
     get: (id: string) => request<WorkRequest>(`/work-requests/${id}`),
     // Job Dispatch Phase 2: per-skill-slot eligibility for one broadcast.
-    // No requireRole gate backend-side — any authenticated caller can read
-    // eligible_worker_ids (other workers' user ids) for a hotel roster.
-    // Callers must only use this to check the current user's own
-    // inclusion, never render the raw id list.
+    // No requireRole gate backend-side, but the response is role-scoped
+    // server-side — a worker/checker caller only ever receives their own
+    // `eligible` inclusion per slot, never another worker's id.
     getBroadcastEligibility: (id: string) =>
       request<BroadcastEligibility>(`/work-requests/broadcasts/${id}/eligibility`),
     // Worker accepts one skill slot on a broadcast. First-accept wins; a

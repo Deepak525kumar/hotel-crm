@@ -117,16 +117,29 @@ export interface JobRequestSkillSlotDto {
   confirmed_count: number;
 }
 
-// Read-only: the set of workers eligible for one skill slot on a broadcast
-// (skill match ∧ free that day, TREQ-003/TRULE-006). Populated only for a
-// broadcast JobRequest (one that has skill_slots); this PR computes and
-// returns this set but does not notify anyone (PR 9.8) or let anyone accept
-// (PR 9.9).
+// Read-only: eligibility for one skill slot on a broadcast (skill match ∧
+// free that day, TREQ-003/TRULE-006). Populated only for a broadcast
+// JobRequest (one that has skill_slots); this PR computes and returns this
+// set but does not notify anyone (PR 9.8) or let anyone accept (PR 9.9).
+//
+// Role-scoped correction (post-Epic-9 discovery, not part of any closed
+// PR): the original shape returned eligible_worker_ids — every eligible
+// worker's user id — to ANY authenticated caller, since this route has no
+// requireRole gate (a worker calling it needs a response, so admin/manager
+// -only was never viable). That leaked the full roster's user ids to any
+// worker who called the route directly. eligible_worker_ids is removed:
+// eligible_count (a headcount, safe for anyone, matches what both existing
+// UI consumers actually rendered — a count, never the raw list) replaces
+// it for every caller; eligible (this caller's own inclusion) is added for
+// a worker/checker caller only, computed server-side from the same set
+// this DTO used to expose wholesale.
 export interface SkillSlotEligibilityDto {
   skill: SkillTag;
   headcount: number;
   confirmed_count: number;
-  eligible_worker_ids: string[];
+  eligible_count: number;
+  /** Present only when the caller's role is worker/checker — their own eligibility for this slot. */
+  eligible?: boolean;
 }
 
 export interface BroadcastEligibilityDto {

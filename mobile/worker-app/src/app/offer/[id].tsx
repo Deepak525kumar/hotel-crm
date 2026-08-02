@@ -7,7 +7,6 @@ import { ThemedView } from '@/components/themed-view';
 import { api, ApiError } from '@/lib/api';
 import { resolveMySlots } from '@/lib/broadcast-eligibility';
 import { Spacing } from '@/constants/theme';
-import { useAuthStore } from '@/stores/auth-store';
 import type { Broadcast, BroadcastEligibility, SkillTag } from '@/types/api';
 
 const SKILL_LABELS: Record<string, string> = {
@@ -29,7 +28,6 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 export default function OfferDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const currentUserId = useAuthStore((s) => s.user?.id);
 
   const [offer, setOffer] = useState<Broadcast | null>(null);
   const [eligibility, setEligibility] = useState<BroadcastEligibility | null>(null);
@@ -94,7 +92,7 @@ export default function OfferDetailScreen() {
     );
   }
 
-  const mySlots = resolveMySlots(offer, eligibility, currentUserId);
+  const mySlots = resolveMySlots(offer, eligibility);
   const closed = offer.status !== 'OPEN';
 
   return (

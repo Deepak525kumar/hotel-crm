@@ -35,12 +35,11 @@ export default function BroadcastDetailPage() {
 
   // The backend's eligibility route (GET /work-requests/broadcasts/:id/
   // eligibility) has no requireRole gate — any authenticated role can call
-  // it. It returns eligible_worker_ids (other workers' user ids), which a
-  // non-admin/manager viewer must never receive at all, not just avoid
-  // rendering. Gating only the display would still leak the full array to
-  // a worker's browser (network response, SWR cache) — the fetch itself
-  // must be conditioned on role, matching JobDispatchPhase2WriteGate's
-  // admin/manager scope below.
+  // it, but the response itself is now role-scoped server-side (no
+  // eligible_worker_ids field exists on the wire for anyone; see
+  // SkillSlotEligibilityDto's doc comment) — so this gate is a UX/scope
+  // choice (only admin/manager act on this section), not a data-exposure
+  // control the way it was before that fix.
   const role = useAuthStore((s) => s.user?.role);
   const canSeeEligibility = role === "admin" || role === "manager";
 
@@ -162,7 +161,7 @@ export default function BroadcastDetailPage() {
               const eligibleCount =
                 !canSeeEligibility || eligibilityLoading
                   ? null
-                  : (eligibilityBySkill.get(slot.skill)?.eligible_worker_ids.length ?? 0);
+                  : (eligibilityBySkill.get(slot.skill)?.eligible_count ?? 0);
               const filled = slot.confirmed_count >= slot.headcount;
               return (
                 <div

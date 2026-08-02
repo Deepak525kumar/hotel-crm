@@ -174,14 +174,16 @@ export interface Broadcast extends WorkRequest {
 }
 
 // Matches backend SkillSlotEligibilityDto exactly — the response of
-// GET /work-requests/broadcasts/:id/eligibility. eligible_worker_ids is
-// other workers' user ids; only render it to the caller for the caller's
-// own inclusion check, never render the raw list itself.
+// GET /work-requests/broadcasts/:id/eligibility. Role-scoped server-side:
+// the route has no requireRole gate, so no eligible_worker_ids field
+// exists on the wire at all — a worker/checker caller instead gets
+// `eligible`, their own inclusion for this slot only.
 export interface SkillSlotEligibility {
   skill: SkillTag;
   headcount: number;
   confirmed_count: number;
-  eligible_worker_ids: string[];
+  eligible_count: number;
+  eligible?: boolean;
 }
 
 export interface BroadcastEligibility {

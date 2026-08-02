@@ -26,7 +26,6 @@ import {
   JobRequestSkillSlotDto,
   ListWorkRequestsQuery,
   RaiseBroadcastInput,
-  SkillSlotEligibilityDto,
   UpdateWorkRequestInput,
   WorkRequestDto,
 } from './types.js';
@@ -443,6 +442,16 @@ export class JobRequestService extends BaseService {
    * dimension and isWorkerFreeOnDay() (PR 9.6, assignments/service.ts) for
    * the daily-exclusivity dimension, rather than duplicating either.
    *
+   * Role-scoped correction (post-Epic-9 discovery): this route has no
+   * requireRole gate (a worker must be able to call it to know whether they
+   * can accept), so the response itself is now scoped by caller role
+   * instead of exposing the full eligible_worker_ids roster to everyone —
+   * see SkillSlotEligibilityDto's own doc comment. admin/manager get
+   * eligible_count per slot (a headcount — both existing UI consumers only
+   * ever rendered a count, never the raw ids); worker/checker additionally
+   * get `eligible: boolean`, their own inclusion only, never any other
+   * worker's id.
+   *
    * Read-only: does not notify (PR 9.8) or reserve a slot (PR 9.9).
    */
   async getBroadcastEligibility(
@@ -465,7 +474,21 @@ export class JobRequestService extends BaseService {
       }
     }
 
-    return this.computeBroadcastEligibility(wr, wr.skill_slots);
+    const internal = await this.computeBroadcastEligibility(wr, wr.skill_slots);
+    const isWorkerLike = actor.role === 'worker' || actor.role === 'checker';
+
+    return {
+      job_request_id: internal.job_request_id,
+      hotel_id: internal.hotel_id,
+      shift_date: internal.shift_date,
+      slots: internal.slots.map((slot) => ({
+        skill: slot.skill,
+        headcount: slot.headcount,
+        confirmed_count: slot.confirmed_count,
+        eligible_count: slot.eligible_worker_ids.length,
+        ...(isWorkerLike ? { eligible: slot.eligible_worker_ids.includes(actor.userId) } : {}),
+      })),
+    };
   }
 
   /**
@@ -476,11 +499,21 @@ export class JobRequestService extends BaseService {
    * directly (not an id + a fresh findUnique) so raiseBroadcast() can call
    * this with the row it just created in the same transaction, with no
    * extra read.
+   *
+   * INTERNAL ONLY: returns the raw eligible_worker_ids per slot —
+   * enqueueBroadcastNotifications() (below) needs the actual ids to notify.
+   * Never return this shape directly from a public route; getBroadcastEligibility()
+   * projects it into the role-scoped SkillSlotEligibilityDto before responding.
    */
   private async computeBroadcastEligibility(
     wr: JobRequest,
     skillSlots: JobRequestSkillSlot[]
-  ): Promise<BroadcastEligibilityDto> {
+  ): Promise<{
+    job_request_id: string;
+    hotel_id: string;
+    shift_date: string;
+    slots: { skill: JobRequestSkillSlot['skill']; headcount: number; confirmed_count: number; eligible_worker_ids: string[] }[];
+  }> {
     const rosterWorkerIds = await listEligibleWorkerIds(wr.hotel_id);
     if (rosterWorkerIds.length === 0) {
       return {
@@ -515,7 +548,7 @@ export class JobRequestService extends BaseService {
         .map((r) => r.workerId)
     );
 
-    const slots: SkillSlotEligibilityDto[] = skillSlots.map((slot) => {
+    const slots = skillSlots.map((slot) => {
       const eligibleWorkerIds = rosterWorkerIds.filter(
         (workerId) =>
           freeWorkerIds.has(workerId) && (skillsByWorker.get(workerId) ?? []).includes(slot.skill)
