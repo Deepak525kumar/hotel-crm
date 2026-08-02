@@ -37,9 +37,14 @@ export default function AssignmentDetailPage() {
   const [cancelReason, setCancelReason] = useState("");
   const action = useAsyncAction();
 
-  // No GET endpoint exists for rooms-completed entries (ADR-028) — the
-  // logged entry is only ever known from this page's own POST response, not
-  // re-fetchable on reload. Session-local only, intentionally.
+  // TODO(ADR-028): session-local only, not a caching shortcut. No GET
+  // endpoint exists for rooms-completed entries and AssignmentDto doesn't
+  // embed one either, so this state is the *only* place the logged value
+  // lives on the frontend today — it does not survive a reload. Once the
+  // backend exposes a read path (a GET route, or embedding the entry on
+  // Assignment), switch this to an SWR-backed read (mirroring
+  // useWorkerContract/useHotelBlocklist) and delete this local state
+  // entirely, rather than layering a fetch on top of it.
   const [roomsCompletedOpen, setRoomsCompletedOpen] = useState(false);
   const [loggedRoomsCompleted, setLoggedRoomsCompleted] = useState<RoomsCompletedEntry | null>(
     null,
