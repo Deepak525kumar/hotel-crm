@@ -169,11 +169,16 @@ export class JobRequestService extends BaseService {
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: [{ shift_date: 'desc' }, { created_at: 'desc' }],
+        // Regression correction: list() previously omitted skill_slots,
+        // making broadcast job requests indistinguishable from marketplace
+        // requests. getById() already returned this field; list() now
+        // matches that behavior.
+        include: { skill_slots: true },
       }),
       this.prisma.jobRequest.count({ where }),
     ]);
 
-    return { data: records.map((r) => this.toDto(r)), total };
+    return { data: records.map((r) => this.toDto(r, r.skill_slots)), total };
   }
 
   async getById(
