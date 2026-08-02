@@ -92,11 +92,17 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
 export function DocumentsCard({ workerId }: { workerId: string }) {
   const { data: documents, isLoading, error } = useWorkerDocuments(workerId);
   const [uploadOpen, setUploadOpen] = useState(false);
-  // No backend field records whether a worker needs a work permit — this
-  // toggle is the caller's own declaration, matching the backend's
-  // `IF-DOC-GetDocumentCompleteness` query-param contract exactly. Defaults
-  // to off so the completeness check starts out asking only for the
-  // GENERAL category, the same as omitting the param entirely.
+  // TODO(SPEC-DOCUMENTS-001): temporary workaround, not a real per-worker
+  // setting. No backend field records whether a worker actually needs a
+  // work permit — IF-DOC-GetDocumentCompleteness takes it as a caller-
+  // declared query param, so this toggle re-runs the *evaluation*, not a
+  // property of the worker. Two viewers can flip it differently for the
+  // same worker and see different "complete" verdicts — that's expected
+  // given the current contract, not a bug in this component. Replace with
+  // a read from a real backend-owned field once one exists (e.g. on
+  // EmploymentRecord), and drop the toggle entirely. Defaults to off so
+  // the check starts out asking only for the GENERAL category, same as
+  // omitting the param entirely.
   const [workPermitRequired, setWorkPermitRequired] = useState(false);
   const { data: completeness } = useDocumentCompleteness(workerId, workPermitRequired);
 
@@ -112,7 +118,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
         <CardContent>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
             <Checkbox
-              label="Work permit required"
+              label="Evaluate with work permit required"
               checked={workPermitRequired}
               onChange={(e) => setWorkPermitRequired(e.target.checked)}
             />
