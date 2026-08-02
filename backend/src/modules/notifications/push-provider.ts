@@ -37,7 +37,31 @@ export interface PushSendInput {
    * self-identifying, so Android has no equivalent per-send constraint.
    */
   topic?: string;
+  /**
+   * Deep-link/routing data, mirrors Notification.data (job-requests/service.ts
+   * and friends already populate this for in-app display; it was never
+   * threaded through to the push payload itself until now). Values must be
+   * strings — both APNs' custom-payload keys and FCM's `data` field require
+   * string values (FCM rejects a non-string value outright; APNs would accept
+   * one but the client can't rely on it round-tripping identically across
+   * platforms), so PushTransportHandler stringifies every value before
+   * calling send(). Omit when there's nothing to route on (a generic
+   * notification with no target screen).
+   */
+  data?: Record<string, string>;
 }
+
+/**
+ * APNs payload size cap (4KB for a standard alert per Apple's docs,
+ * https://developer.apple.com/documentation/usernotifications/
+ * generating-a-remote-notification). ApnsProviderClient.send() rejects a
+ * payload that exceeds this rather than truncating it or sending malformed
+ * JSON. This module never receives arbitrary caller-supplied blobs — `data`
+ * is always a handful of short id/type strings (e.g. work_request_id,
+ * skill) — so hitting this limit in practice would indicate a caller bug,
+ * not a case expected to occur in normal operation.
+ */
+const APNS_PAYLOAD_SIZE_LIMIT_BYTES = 4096;
 
 export interface PushProviderClient {
   send(input: PushSendInput): Promise<void>;
@@ -163,7 +187,18 @@ export class ApnsProviderClient implements PushProviderClient {
         });
         req.on('error', reject);
 
-        req.end(JSON.stringify({ aps: { alert: { title: input.title, body: input.body } } }));
+        // Custom keys live outside `aps`, at the payload's top level (APNs
+        // convention) — never inside `aps` itself, which is reserved for
+        // Apple's own alert/sound/badge/etc. keys.
+        const payload = JSON.stringify({
+          aps: { alert: { title: input.title, body: input.body } },
+          ...(input.data ?? {}),
+        });
+        if (Buffer.byteLength(payload, 'utf8') > APNS_PAYLOAD_SIZE_LIMIT_BYTES) {
+          reject(new Error('ApnsProviderClient: payload exceeds the 4KB APNs size limit'));
+          return;
+        }
+        req.end(payload);
       });
     } finally {
       session?.close();
@@ -233,7 +268,15 @@ export class FcmProviderClient implements PushProviderClient {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        message: { token: input.token, notification: { title: input.title, body: input.body } },
+        message: {
+          token: input.token,
+          notification: { title: input.title, body: input.body },
+          // FCM's `data` field: sibling of `notification`, not nested inside
+          // it. Every value must already be a string (enforced by
+          // PushSendInput's own type + PushTransportHandler's stringify
+          // step) — FCM rejects a non-string data value outright.
+          ...(input.data ? { data: input.data } : {}),
+        },
       }),
     });
 

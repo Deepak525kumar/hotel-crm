@@ -193,6 +193,28 @@ export function resolveEmailTransportHandler(
 }
 
 /**
+ * Coerces Notification.data (Prisma Json?, an untyped column every producer
+ * writes a plain object literal of resource ids/strings into — e.g.
+ * job-requests/service.ts's `{ work_request_id, hotel_id, skill }`) into the
+ * Record<string, string> both push providers require. Every producer today
+ * only ever writes string/number/boolean primitives, but this column has no
+ * schema enforcement, so a malformed or non-object value is handled
+ * defensively rather than assumed impossible: null/non-object collapses to
+ * undefined (no data payload sent — the notification still delivers, just
+ * without deep-link data, matching this pipeline's existing "degrade, don't
+ * fail delivery" posture for every other partial-failure case), and each
+ * primitive value is stringified rather than dropped.
+ */
+function stringifyNotificationData(data: unknown): Record<string, string> | undefined {
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) return undefined;
+  const entries = Object.entries(data as Record<string, unknown>).filter(
+    ([, value]) => value !== null && value !== undefined && typeof value !== 'object'
+  );
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries.map(([key, value]) => [key, String(value)]));
+}
+
+/**
  * PUSH transport handler (Epic 7 PR 7.5, ADR-029 §4). Resolves the
  * notification the same way EmailTransportHandler does (via
  * `event.aggregate_id`), then fans out to every `PushToken` registered for
@@ -328,6 +350,7 @@ export class PushTransportHandler implements TransportHandler {
           title: notification.title,
           body: notification.message,
           topic,
+          data: stringifyNotificationData(notification.data),
         });
         successCount += 1;
       } catch (error) {

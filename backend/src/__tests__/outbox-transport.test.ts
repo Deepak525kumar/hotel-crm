@@ -268,6 +268,87 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
     expect(mockFcmClient.send).toHaveBeenCalledWith({ token: 'android-token', title: 'New Shift', body: 'You have a new shift' });
   });
 
+  describe('notification.data forwarding', () => {
+    it('forwards notification.data, stringified, to both providers', async () => {
+      mockNotificationFindUnique.mockResolvedValue({
+        ...notification,
+        data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' },
+      });
+      mockPushTokenFindMany.mockResolvedValue([
+        { id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' },
+        { id: 'pt2', token: 'android-token', platform: 'ANDROID', app: 'WORKER', user_id: 'user1' },
+      ]);
+      mockApnsClient.send.mockResolvedValue(undefined);
+      mockFcmClient.send.mockResolvedValue(undefined);
+      const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+      await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+      expect(mockApnsClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' } })
+      );
+      expect(mockFcmClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' } })
+      );
+    });
+
+    it('stringifies a non-string primitive value (number/boolean) rather than dropping it', async () => {
+      mockNotificationFindUnique.mockResolvedValue({
+        ...notification,
+        data: { headcount: 2, urgent: true },
+      });
+      mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
+      mockApnsClient.send.mockResolvedValue(undefined);
+      const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+      await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+      expect(mockApnsClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { headcount: '2', urgent: 'true' } })
+      );
+    });
+
+    it('omits data entirely (undefined) when notification.data is null', async () => {
+      mockNotificationFindUnique.mockResolvedValue({ ...notification, data: null });
+      mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
+      mockApnsClient.send.mockResolvedValue(undefined);
+      const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+      await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+      const call = mockApnsClient.send.mock.calls[0][0];
+      expect(call.data).toBeUndefined();
+    });
+
+    it('omits data entirely when notification.data is an empty object', async () => {
+      mockNotificationFindUnique.mockResolvedValue({ ...notification, data: {} });
+      mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
+      mockApnsClient.send.mockResolvedValue(undefined);
+      const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+      await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+      const call = mockApnsClient.send.mock.calls[0][0];
+      expect(call.data).toBeUndefined();
+    });
+
+    it('drops a nested object/array value rather than passing a non-string through', async () => {
+      mockNotificationFindUnique.mockResolvedValue({
+        ...notification,
+        data: { work_request_id: 'jr1', nested: { oops: true }, list: [1, 2, 3] },
+      });
+      mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
+      mockApnsClient.send.mockResolvedValue(undefined);
+      const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+      await handler.deliver(makeEvent(OutboxTransport.PUSH));
+
+      expect(mockApnsClient.send).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { work_request_id: 'jr1' } })
+      );
+    });
+  });
+
   // Epic 7 PR 7.8: the core scenario this PR exists for — one user, two apps, two iOS tokens.
   it('sends the correct distinct APNs topic for each app when one user holds tokens for both', async () => {
     mockPushTokenFindMany.mockResolvedValue([
