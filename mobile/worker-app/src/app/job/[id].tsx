@@ -1,10 +1,10 @@
-import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View } from 'react-native';
+import { StyleSheet, ScrollView, Pressable, ActivityIndicator, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkRequest } from '@/types/api';
 
@@ -22,50 +22,11 @@ export default function JobDetailScreen() {
   const router = useRouter();
   const [job, setJob] = useState<WorkRequest | null>(null);
   const [loading, setLoading] = useState(true);
-  const [applying, setApplying] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     api.workRequests.get(id).then(setJob).finally(() => setLoading(false));
   }, [id]);
-
-  const handleApply = async () => {
-    if (!job) return;
-    setApplying(true);
-    try {
-      await api.applications.apply(job.id);
-      const updated = await api.workRequests.get(job.id);
-      setJob(updated);
-      Alert.alert('Applied!', 'Your application has been submitted.');
-    } catch (err) {
-      Alert.alert('Error', err instanceof ApiError ? err.message : 'Failed to apply.');
-    } finally {
-      setApplying(false);
-    }
-  };
-
-  const handleWithdraw = async () => {
-    if (!job?.my_application) return;
-    Alert.alert('Withdraw Application', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Withdraw',
-        style: 'destructive',
-        onPress: async () => {
-          setApplying(true);
-          try {
-            await api.applications.withdraw(job.id, job.my_application!.id);
-            const updated = await api.workRequests.get(job.id);
-            setJob(updated);
-          } catch (err) {
-            Alert.alert('Error', err instanceof ApiError ? err.message : 'Failed to withdraw.');
-          } finally {
-            setApplying(false);
-          }
-        },
-      },
-    ]);
-  };
 
   if (loading) {
     return (
@@ -82,9 +43,6 @@ export default function JobDetailScreen() {
       </ThemedView>
     );
   }
-
-  const applied = !!job.my_application;
-  const canApply = job.status === 'OPEN' || job.status === 'PARTIALLY_FILLED';
 
   return (
     <ThemedView style={styles.container}>
@@ -128,39 +86,10 @@ export default function JobDetailScreen() {
             </>
           ) : null}
 
-          {applied ? (
-            <>
-              <View style={styles.appliedBanner}>
-                <ThemedText type="small" style={styles.appliedText}>
-                  Application: {job.my_application?.status.replace(/_/g, ' ')}
-                </ThemedText>
-              </View>
-              {job.my_application?.status === 'PENDING' && (
-                <Pressable
-                  onPress={handleWithdraw}
-                  disabled={applying}
-                  style={({ pressed }) => [styles.withdrawBtn, { opacity: pressed || applying ? 0.7 : 1 }]}
-                >
-                  {applying ? <ActivityIndicator color="#fff" /> : (
-                    <ThemedText type="smallBold" style={styles.btnText}>Withdraw</ThemedText>
-                  )}
-                </Pressable>
-              )}
-            </>
-          ) : canApply ? (
-            <Pressable
-              onPress={handleApply}
-              disabled={applying}
-              style={({ pressed }) => [styles.applyBtn, { opacity: pressed || applying ? 0.7 : 1 }]}
-            >
-              {applying ? <ActivityIndicator color="#fff" /> : (
-                <ThemedText type="smallBold" style={styles.btnText}>Apply Now</ThemedText>
-              )}
-            </Pressable>
-          ) : (
+          {job.status !== 'OPEN' && job.status !== 'PARTIALLY_FILLED' && (
             <ThemedView type="backgroundElement" style={styles.closedBanner}>
               <ThemedText type="small" themeColor="textSecondary">
-                This job is no longer accepting applications.
+                This job is no longer open.
               </ThemedText>
             </ThemedView>
           )}
@@ -183,10 +112,5 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: '#E0E1E6', marginHorizontal: Spacing.three },
   sectionLabel: { marginBottom: Spacing.two, textTransform: 'uppercase', letterSpacing: 0.8 },
   descCard: { borderRadius: Spacing.two, padding: Spacing.three, marginBottom: Spacing.three },
-  appliedBanner: { backgroundColor: '#2B6CB0', borderRadius: Spacing.two, padding: Spacing.three, marginBottom: Spacing.two },
-  appliedText: { color: '#fff', textAlign: 'center' },
-  applyBtn: { backgroundColor: '#3182CE', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
-  withdrawBtn: { backgroundColor: '#E53E3E', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.three },
   closedBanner: { borderRadius: Spacing.two, padding: Spacing.three, alignItems: 'center' },
-  btnText: { color: '#fff' },
 });

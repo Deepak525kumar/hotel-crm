@@ -27,19 +27,8 @@ export interface ApiResponse<T> {
 }
 
 export type WorkRequestStatus = 'DRAFT' | 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'EXPIRED';
-export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'WITHDRAWN' | 'EXPIRED';
 export type AssignmentStatus = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'NO_SHOW' | 'CANCELLED' | 'REASSIGNED';
 export type AttendanceStatus = 'EXPECTED' | 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL' | 'EXCUSED';
-
-// Lightweight projection of the requesting worker's own application, as
-// (optionally) embedded on a WorkRequest payload. Intentionally narrower than
-// WorkApplication: only the fields the worker-app consumes (apply state,
-// status banner, withdraw action) are modeled here.
-export interface MyApplicationSummary {
-  id: string;
-  status: ApplicationStatus;
-  created_at: string;
-}
 
 export interface WorkRequest {
   id: string;
@@ -55,18 +44,6 @@ export interface WorkRequest {
   hourly_rate?: number;
   status: WorkRequestStatus;
   created_at: string;
-  // Present only when the backend embeds the requesting worker's application.
-  // Optional/null until the work-requests endpoint projects it.
-  my_application?: MyApplicationSummary | null;
-}
-
-export interface WorkApplication {
-  id: string;
-  work_request_id: string;
-  worker_id: string;
-  status: ApplicationStatus;
-  created_at: string;
-  work_request?: WorkRequest;
 }
 
 export interface WorkerAssignment {
@@ -134,7 +111,6 @@ export interface DashboardStats {
   completed_shifts: number;
   upcoming_shifts: number;
   average_rating?: number;
-  pending_applications: number;
 }
 
 // GD-06: matches backend WorkerStats (analytics/types.ts) exactly — the
