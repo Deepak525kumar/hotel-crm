@@ -355,3 +355,77 @@ describe('ApiError', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Job Dispatch Phase 2 — broadcasts
+// ---------------------------------------------------------------------------
+
+describe('workRequests.getBroadcastEligibility', () => {
+  it('fetches eligibility for a broadcast id', async () => {
+    const eligibility = {
+      job_request_id: 'jr1',
+      hotel_id: 'h1',
+      shift_date: '2026-08-10',
+      slots: [{ skill: 'CLEANER', headcount: 2, confirmed_count: 1, eligible_worker_ids: ['w1', 'w2'] }],
+    };
+    mockFetch.mockResolvedValueOnce(res(200, { data: eligibility }));
+
+    const result = await api.workRequests.getBroadcastEligibility('jr1');
+
+    expect(result).toEqual(eligibility);
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain('/work-requests/broadcasts/jr1/eligibility');
+  });
+});
+
+describe('workRequests.acceptBroadcast', () => {
+  it('returns {status: "accepted", ...} on a successful claim', async () => {
+    const result = { status: 'accepted', assignment_id: 'a1', job_request_id: 'jr1', skill: 'CLEANER' };
+    mockFetch.mockResolvedValueOnce(res(201, { data: result }));
+
+    const accepted = await api.workRequests.acceptBroadcast('jr1', 'CLEANER');
+
+    expect(accepted).toEqual(result);
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/work-requests/broadcasts/jr1/accept');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body as string)).toEqual({ skill: 'CLEANER' });
+  });
+
+  it('returns {status: "requirement_fulfilled", ...} without throwing on a lost race', async () => {
+    const result = { status: 'requirement_fulfilled', job_request_id: 'jr1', skill: 'CLEANER' };
+    mockFetch.mockResolvedValueOnce(res(200, { data: result }));
+
+    await expect(api.workRequests.acceptBroadcast('jr1', 'CLEANER')).resolves.toEqual(result);
+  });
+
+  it('surfaces a 4xx failure as ApiError', async () => {
+    mockFetch.mockResolvedValueOnce(res(409, { error: { code: 'CONFLICT', message: 'Already assigned that day' } }));
+
+    await expect(api.workRequests.acceptBroadcast('jr1', 'CLEANER')).rejects.toMatchObject({
+      name: 'ApiError',
+      code: 'CONFLICT',
+      status: 409,
+    });
+  });
+});
+
+describe('workRequests.list — is_broadcast', () => {
+  it('serializes is_broadcast as the literal string "true"', async () => {
+    mockFetch.mockResolvedValueOnce(res(200, { data: [] }));
+
+    await api.workRequests.list({ is_broadcast: true });
+
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).toContain('is_broadcast=true');
+  });
+
+  it('omits is_broadcast from the query when not passed', async () => {
+    mockFetch.mockResolvedValueOnce(res(200, { data: [] }));
+
+    await api.workRequests.list({});
+
+    const [url] = mockFetch.mock.calls[0] as [string];
+    expect(url).not.toContain('is_broadcast');
+  });
+});

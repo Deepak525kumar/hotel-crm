@@ -14,6 +14,9 @@ import type {
   PushToken,
   PushPlatform,
   PushApp,
+  SkillTag,
+  BroadcastEligibility,
+  AcceptBroadcastResult,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -271,15 +274,31 @@ export const api = {
     me: () => request<User>('/auth/me'),
   },
   workRequests: {
-    list: (params?: { status?: string; page?: number; limit?: number }) => {
+    list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {
       const qs = new URLSearchParams();
       if (params?.status) qs.set('status', params.status);
       if (params?.page) qs.set('page', String(params.page));
       if (params?.limit) qs.set('limit', String(params.limit));
+      // The backend accepts only the literal strings "true"/"false".
+      if (params?.is_broadcast !== undefined) qs.set('is_broadcast', params.is_broadcast ? 'true' : 'false');
       const q = qs.toString();
       return request<WorkRequest[]>(`/work-requests${q ? `?${q}` : ''}`);
     },
     get: (id: string) => request<WorkRequest>(`/work-requests/${id}`),
+    // Job Dispatch Phase 2: per-skill-slot eligibility for one broadcast.
+    // No requireRole gate backend-side — any authenticated caller can read
+    // eligible_worker_ids (other workers' user ids) for a hotel roster.
+    // Callers must only use this to check the current user's own
+    // inclusion, never render the raw id list.
+    getBroadcastEligibility: (id: string) =>
+      request<BroadcastEligibility>(`/work-requests/broadcasts/${id}/eligibility`),
+    // Worker accepts one skill slot on a broadcast. First-accept wins; a
+    // lost race returns {status: 'requirement_fulfilled'}, not an error.
+    acceptBroadcast: (id: string, skill: SkillTag) =>
+      request<AcceptBroadcastResult>(`/work-requests/broadcasts/${id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ skill }),
+      }),
   },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
