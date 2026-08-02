@@ -112,17 +112,17 @@ module_memory:
     open_prerequisites: [OD-CRM-01 (dedicated-Hotel-Manager facet), OD-CRM-02, OD-CRM-03, OD-CRM-04, OD-CRM-05 (implementation), OD-CRM-06, OD-CRM-07, OD-CRM-08, OD-CRM-09, OD-CRM-10, OD-CRM-11/SYNC-001, OD-CRM-12, OD-CRM-13, OD-CRM-14, OD-CRM-15, OD-CRM-16, OD-CRM-17]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
   - artifact: ART-MEM-backend-notifications
     module: backend-notifications
-    freeze_revision: efde2a9f0393cccc2168cd1d2d89ea9cbc21033a  # HEAD at G4 completion; backend/src/modules/notifications unchanged since
-    spec: SPEC-NOTIF-001 v0.2.0 (FROZEN)
+    freeze_revision: efde2a9f0393cccc2168cd1d2d89ea9cbc21033a  # STALE since Epic 7 (predates this note; not re-derived in full here, out of bounded scope) -- HEAD at G4 completion, module has changed materially since (Epic 7 Outbox/Worker/transport-handler build, spec now v0.3.1 not v0.2.0). This entry's owned_contracts line was corrected 2026-08-02 (sendEmail/sendPushNotification deleted as dead code) as a narrow byproduct fix; a full re-derivation against current code/spec is a separate, larger sync task not performed here.
+    spec: SPEC-NOTIF-001 v0.2.0 (FROZEN)  # STALE -- spec is actually v0.3.1 (ADR-033, 2026-07-28); not corrected here, out of bounded scope for this pass
     summary:
       boundary: Notification create/list/read-tracking and the notification-service in-process contract exposed to four producer modules and three clients. Current state is persist-only (IN_APP-default); target state is push-only (APNs/FCM) plus at least 8 new confirmed trigger categories, almost entirely unbuilt.
       owned_state: [state-notification]  # Notification model, schema.prisma:466-488; sole owner backend-notifications. NotificationType/NotificationChannel enums functionally owned (referenced only by this model).
-      owned_contracts: [notification-service]  # notificationService.sendNotification/getNotifications/markAsRead/sendEmail/sendPushNotification, in-process TS contract, not HTTP/event-bus
+      owned_contracts: [notification-service]  # notificationService.enqueue/sendNotification/getNotifications/markAsRead/registerPushToken, in-process TS contract, not HTTP/event-bus. sendEmail/sendPushNotification DELETED 2026-08-02 (dead code, zero call sites; superseded by enqueue() + Platform Worker transport handlers, ADR-029).
       interfaces: ["GET /notifications", "POST /notifications/:notification_id/read"]  # both behind authMiddleware only, no role gate (REQ-006); ownership-scoped at the service layer (RULE-001)
       key_rules: [RULE-001, RULE-002, RULE-003, RULE-004, RULE-005, RULE-006, RULE-007]
     authority: corroborating
     invalidated_by: [new frozen spec for backend-notifications, owned-state/contract change, OQ-NOTIF-01 resolution (NotificationChannel enum shape)]
-    open_prerequisites: [OQ-NOTIF-01 (Decision Record REQUIRED before TREQ-002/TREQ-012 implementation planning), OQ-NOTIF-02, OQ-NOTIF-03, OQ-NOTIF-04, OQ-NOTIF-05, OQ-NOTIF-06, OQ-NOTIF-07, OQ-NOTIF-08, OQ-NOTIF-09, SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
+    open_prerequisites: [OQ-NOTIF-01 (Decision Record REQUIRED before TREQ-002/TREQ-012 implementation planning), OQ-NOTIF-02, OQ-NOTIF-03, OQ-NOTIF-04, OQ-NOTIF-05, OQ-NOTIF-06 (RESOLVED ADR-029, push transport live), OQ-NOTIF-07 (RESOLVED ADR-029 + DELETED 2026-08-02, email transport live via enqueue()/Worker, dead stub removed), OQ-NOTIF-08, OQ-NOTIF-09, SYNC-001]  # release/impl prerequisites reviewed by G8, not freeze blockers; recorded so consumers do not re-derive them
   - artifact: ART-MEM-backend-quality
     module: backend-quality
     freeze_revision: 8baad9efa37a0de935344e5621043382d2ab2183  # HEAD after PR #306 (2026-08-02, SIR-QUAL-007/ADR-035 leaderboard pagination); backend/src/modules/quality unchanged since. Prior freeze_revision 6e404ab (G4 completion) invalidated by this owned-contract change.

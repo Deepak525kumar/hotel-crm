@@ -302,11 +302,12 @@ export class AuthService extends BaseService {
 
     await this.logAudit(user.id, user.role, 'MODIFY', 'USER', user.id, { action: 'password_reset_requested' }, ip);
 
-    // Delivering `rawToken` to the account holder's inbox depends on the
-    // email-transport capability, which is not yet implemented anywhere in
-    // the platform (NotificationService.sendEmail throws NotImplementedError;
-    // tracked separately as SIR-NOTIF-007 / SIR-AUTH-005). Wiring that
-    // transport is out of this hotfix's bounded scope (backend-auth only).
+    // Delivering `rawToken` to the account holder's inbox requires backend-auth
+    // to become an OutboxEvent producer (notificationService.enqueue()) — the
+    // EMAIL transport itself is live (Epic 7, ADR-029), but auth does not yet
+    // call enqueue() here (tracked separately as SIR-NOTIF-007 / SIR-AUTH-005).
+    // Wiring that producer call is out of this hotfix's bounded scope
+    // (backend-auth only).
   }
 
   // HOTFIX-AUTH-002 (SIR-AUTH-001): step 2 of 2. Requires the raw token issued

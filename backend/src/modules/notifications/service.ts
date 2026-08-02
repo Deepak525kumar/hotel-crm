@@ -12,7 +12,7 @@ import {
 import crypto from 'node:crypto';
 import { BaseService } from '../../lib/base-service.js';
 import { DatabaseTransaction } from '../../lib/db.js';
-import { ForbiddenError, NotFoundError, NotImplementedError } from '../../lib/errors.js';
+import { ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { EnqueueNotificationInput } from './outbox.types.js';
 import { NotificationPayload } from './types.js';
 
@@ -140,14 +140,6 @@ export class NotificationService extends BaseService {
       update: { user_id: userId, platform, app },
       create: { token, platform, app, user_id: userId },
     });
-  }
-
-  async sendEmail(_email: string, _subject: string, _body: string) {
-    throw new NotImplementedError('Email delivery is not yet implemented');
-  }
-
-  async sendPushNotification(_userId: string, _title: string, _body: string) {
-    throw new NotImplementedError('Push notifications are not yet implemented');
   }
 }
 
