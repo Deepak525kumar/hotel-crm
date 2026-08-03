@@ -836,3 +836,69 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// hrService.listPayroll — worker IDOR guard (OD-HR-10, FIND-SEC-HR-03, ADR-042)
+// ---------------------------------------------------------------------------
+// Service-level tests for the IDOR guard added in PR 1 (backend:
+// hr:payslip:read-own). The route-level token check (requirePayslipReadAccess)
+// is covered by hr-authz.test.ts; these tests verify that a worker cannot
+// circumvent the guard by manipulating the worker_id query param.
+describe('HrService.listPayroll — worker IDOR guard (OD-HR-10/FIND-SEC-HR-03)', () => {
+  let service: HrService;
+
+  beforeEach(() => {
+    service = new HrService();
+    mockPayslipRequestFindMany.mockReset();
+    mockResolveNonAdminScopeFilter.mockReset();
+  });
+
+  it('returns only the worker\'s own requests when worker_id matches their userId', async () => {
+    const row = makePayslipRequestRow({ worker_id: 'w1' });
+    mockPayslipRequestFindMany.mockResolvedValue([row]);
+
+    const result = await service.listPayroll(
+      { worker_id: 'w1' },
+      { role: 'worker', userId: 'w1' }
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0].worker_id).toBe('w1');
+    // resolveNonAdminScopeFilter is never called for a worker-role caller —
+    // the IDOR guard short-circuits before that branch.
+    expect(mockResolveNonAdminScopeFilter).not.toHaveBeenCalled();
+    // Prisma was called with the forced worker_id filter.
+    expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ worker_id: 'w1' }) })
+    );
+  });
+
+  it('throws ForbiddenError when a worker passes another worker\'s worker_id (IDOR denial)', async () => {
+    await expect(
+      service.listPayroll(
+        { worker_id: 'w2' }, // attacker passes a different worker's ID
+        { role: 'worker', userId: 'w1' }
+      )
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    // The DB must never be reached — the guard fires before any Prisma call.
+    expect(mockPayslipRequestFindMany).not.toHaveBeenCalled();
+  });
+
+  it('forces worker_id to the caller\'s own userId when the query param is omitted', async () => {
+    const row = makePayslipRequestRow({ worker_id: 'w1' });
+    mockPayslipRequestFindMany.mockResolvedValue([row]);
+
+    const result = await service.listPayroll(
+      {}, // no worker_id supplied
+      { role: 'worker', userId: 'w1' }
+    );
+
+    expect(result).toHaveLength(1);
+    // Prisma must have been called with the forced filter, not an open query.
+    expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ worker_id: 'w1' }) })
+    );
+    expect(mockResolveNonAdminScopeFilter).not.toHaveBeenCalled();
+  });
+});

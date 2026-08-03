@@ -194,6 +194,13 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // enforced on POST /hr/payslip-requests (HR implementation PR 4).
     'hr:contract:read-own',
     'hr:payslip:request',
+    // ADR-042 (GD-15, OD-HR-10, 2026-08-04): narrow self-read token for
+    // GET /hr/payroll when called by a worker. Worker sees only their own
+    // PayslipRequest records — enforced in hrService.listPayroll via the same
+    // actorId-override IDOR guard getContractStatus already uses (FIND-SEC-HR-03).
+    // hr:read (held by admin/manager) is the broader token for the same route;
+    // requirePayslipReadAccess() in hr/routes.ts enforces the role-specific split.
+    'hr:payslip:read-own',
   ]) as string[],
 });
 

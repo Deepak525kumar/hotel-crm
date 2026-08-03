@@ -8,6 +8,12 @@ export interface AuthContext {
   scope?: UserScope | null;
 }
 
+export interface ServiceActor {
+  role: string;
+  userId?: string;
+  scope?: UserScope | null;
+}
+
 export interface ApiResponse<T = unknown> {
   status: 'success' | 'error';
   data?: T;

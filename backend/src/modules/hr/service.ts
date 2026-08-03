@@ -107,6 +107,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors
 import { logger } from '../../lib/logger.js';
 import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
+import type { ServiceActor } from '../../lib/types.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
 import { employeeManagementService } from '../employee-management/service.js';
@@ -203,7 +204,7 @@ export class HrService extends BaseService {
   // still compiles; the controller always passes it.
   async listContracts(
     filters: ListContractsQuery = {},
-    actor?: { role: string; scope?: UserScope | null }
+    actor?: ServiceActor
   ): Promise<ContractDto[]> {
     const where: Prisma.ContractWhereInput = {
       ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
@@ -638,19 +639,34 @@ export class HrService extends BaseService {
 
   // ---------------------------------------------------------------------------
   // IF-HR-ListPayroll (ADR-039/ADR-043: lists PayslipRequest records; scoping
-  // — Admin unscoped, Manager via checkWorkerScope() — is enforced in
-  // routes.ts, matching every other HR list route's existing pattern.)
+  // — Admin unscoped, Manager via resolveNonAdminScopeFilter (ADR-043), Worker
+  // self-scoped via actorId-override IDOR guard below (OD-HR-10/FIND-SEC-HR-03).)
   // ---------------------------------------------------------------------------
   async listPayroll(
     filters: ListPayslipRequestsQuery = {},
-    actor?: { role: string; scope?: UserScope | null }
+    actor?: ServiceActor
   ): Promise<PayslipRequestDto[]> {
+    // OD-HR-10 (FIND-SEC-HR-03, IDOR guard): a worker-role caller MUST be
+    // scoped to their own PayslipRequest records only — the client-supplied
+    // worker_id query param is never trusted for this role. Mirrors
+    // getContractStatus's actorId !== workerId → ForbiddenError pattern exactly.
+    // Worker callers never reach the resolveNonAdminScopeFilter branch below.
+    if (actor?.role === 'worker') {
+      if (!actor.userId) throw new ForbiddenError();
+      if (filters.worker_id && filters.worker_id !== actor.userId) {
+        throw new ForbiddenError();
+      }
+      // Force the filter regardless of whether the caller supplied worker_id,
+      // so an omitted param also returns only the caller's own data.
+      filters = { ...filters, worker_id: actor.userId };
+    }
+
     const where: Prisma.PayslipRequestWhereInput = {
       ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
       ...(filters.status ? { status: filters.status as PayslipRequestStatus } : {}),
     };
 
-    if (actor && actor.role !== 'admin') {
+    if (actor && actor.role !== 'admin' && actor.role !== 'worker') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
       if (scopeFilter.kind === 'deny') {
         where.worker_id = '__none__';
@@ -665,6 +681,7 @@ export class HrService extends BaseService {
     });
     return requests.map((r) => this.toPayslipDto(r));
   }
+
 
   // ---------------------------------------------------------------------------
   // IF-HR-FulfilPayslipRequest (RULE-HR-09, EVT-HR-PayslipFulfilled)

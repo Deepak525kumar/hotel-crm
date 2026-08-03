@@ -66,6 +66,21 @@ function requireContractReadAccess() {
   };
 }
 
+// ADR-042/OD-HR-10: worker access to IF-HR-ListPayroll MUST be gated by the
+// dedicated hr:payslip:read-own token — NOT hr:read (which WORKER doesn't
+// hold), and NOT hr:payslip:request (a write capability, not a read). Same
+// role-conditional OR pattern as requireContractReadAccess() above.
+// requirePermission()'s array form is AND-only and cannot express this
+// cross-role split.
+//
+// @requiresPermission hr:read hr:payslip:read-own
+function requirePayslipReadAccess() {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const requiredToken = req.auth?.role === 'worker' ? 'hr:payslip:read-own' : 'hr:read';
+    requirePermission(requiredToken)(req, res, next);
+  };
+}
+
 // Translates multer's own MulterError into the platform's ValidationError
 // shape (422), mirroring documents/routes.ts's handleUploadErrors().
 function handleUploadErrors() {
@@ -110,7 +125,11 @@ router.post(
 );
 
 // Payroll (lists/creates PayslipRequest records — ADR-039, no payroll computation)
-router.get('/payroll', requireRole(['admin', 'manager']), requirePermission('hr:read'), (req, res, next) =>
+// IF-HR-ListPayroll: admin/manager see hotel-group-scoped results (ADR-043,
+// via resolveNonAdminScopeFilter inside the service). Worker sees only their
+// own requests — self-scope enforced in hrService.listPayroll (FIND-SEC-HR-03
+// IDOR guard, actorId-override pattern mirroring getContractStatus).
+router.get('/payroll', requireRole(['admin', 'manager', 'worker']), requirePayslipReadAccess(), (req, res, next) =>
   hrController.listPayroll(req, res, next)
 );
 router.post(
