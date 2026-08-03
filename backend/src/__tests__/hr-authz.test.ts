@@ -327,4 +327,42 @@ describe('HR route authorization (ADR-030 C-10)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  describe('GET /hr/payroll (ADR-042: hr:payslip:read-own for worker self-read)', () => {
+    it('allows admin (hr:read)', async () => {
+      testAuth = { userId: 'a1', role: 'admin', permissions: ['hr:read'], scope: null };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows manager (hr:read; result-scoping happens inside hrService.listPayroll)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'global' } };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows a worker holding hr:payslip:read-own (ADR-042, enforced by requirePayslipReadAccess())', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: ['hr:payslip:read-own'], scope: null };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a worker with no hr:* permission at all (403, ADR-042 enforced — not bypassed by role admission)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a worker holding only hr:payslip:request but not hr:payslip:read-own (403 — write token does not imply read)', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: ['hr:payslip:request'], scope: null };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(403);
+    });
+
+    it('denies checker (not in the actor set for this route)', async () => {
+      testAuth = { userId: 'x1', role: 'checker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(403);
+    });
+  });
 });

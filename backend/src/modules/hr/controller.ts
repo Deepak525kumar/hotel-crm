@@ -201,13 +201,16 @@ export class HrController {
   }
 
   // ADR-043: Admin sees all; Manager's results are scoped to their own
-  // hotel_group_id inside hrService.listPayroll() itself.
+  // hotel_group_id inside hrService.listPayroll() itself. Worker is self-scoped
+  // via the IDOR guard in hrService.listPayroll (OD-HR-10/FIND-SEC-HR-03) —
+  // userId is passed so the service can enforce it without trusting query params.
   async listPayroll(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
       const result = await hrService.listPayroll(req.query, {
         role: req.auth.role,
         scope: req.auth.scope,
+        userId: req.auth.userId,
       });
       res.status(200).json({
         status: 'success',

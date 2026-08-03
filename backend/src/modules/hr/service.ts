@@ -638,19 +638,34 @@ export class HrService extends BaseService {
 
   // ---------------------------------------------------------------------------
   // IF-HR-ListPayroll (ADR-039/ADR-043: lists PayslipRequest records; scoping
-  // — Admin unscoped, Manager via checkWorkerScope() — is enforced in
-  // routes.ts, matching every other HR list route's existing pattern.)
+  // — Admin unscoped, Manager via resolveNonAdminScopeFilter (ADR-043), Worker
+  // self-scoped via actorId-override IDOR guard below (OD-HR-10/FIND-SEC-HR-03).)
   // ---------------------------------------------------------------------------
   async listPayroll(
     filters: ListPayslipRequestsQuery = {},
-    actor?: { role: string; scope?: UserScope | null }
+    actor?: { role: string; scope?: UserScope | null; userId?: string }
   ): Promise<PayslipRequestDto[]> {
+    // OD-HR-10 (FIND-SEC-HR-03, IDOR guard): a worker-role caller MUST be
+    // scoped to their own PayslipRequest records only — the client-supplied
+    // worker_id query param is never trusted for this role. Mirrors
+    // getContractStatus's actorId !== workerId → ForbiddenError pattern exactly.
+    // Worker callers never reach the resolveNonAdminScopeFilter branch below.
+    if (actor?.role === 'worker') {
+      if (!actor.userId) throw new ForbiddenError('Worker identity unknown');
+      if (filters.worker_id && filters.worker_id !== actor.userId) {
+        throw new ForbiddenError('Workers may only list their own payslip requests');
+      }
+      // Force the filter regardless of whether the caller supplied worker_id,
+      // so an omitted param also returns only the caller's own data.
+      filters = { ...filters, worker_id: actor.userId };
+    }
+
     const where: Prisma.PayslipRequestWhereInput = {
       ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
       ...(filters.status ? { status: filters.status as PayslipRequestStatus } : {}),
     };
 
-    if (actor && actor.role !== 'admin') {
+    if (actor && actor.role !== 'admin' && actor.role !== 'worker') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
       if (scopeFilter.kind === 'deny') {
         where.worker_id = '__none__';
@@ -665,6 +680,7 @@ export class HrService extends BaseService {
     });
     return requests.map((r) => this.toPayslipDto(r));
   }
+
 
   // ---------------------------------------------------------------------------
   // IF-HR-FulfilPayslipRequest (RULE-HR-09, EVT-HR-PayslipFulfilled)
