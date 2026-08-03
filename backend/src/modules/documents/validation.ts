@@ -20,7 +20,9 @@ export const uploadDocumentSchema = z.object({
   category: z.enum(['GENERAL', 'WORK_PERMIT']),
   original_filename: z.string().min(1).max(255),
   mime_type: z.enum(ALLOWED_MIME_TYPES as unknown as [string, ...string[]]),
-  is_work_permit: z.boolean().optional(),
+  is_work_permit: z
+    .preprocess((val) => (val === 'true' ? true : val === 'false' ? false : val), z.boolean())
+    .optional(),
   expires_at: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'expires_at must be YYYY-MM-DD')
