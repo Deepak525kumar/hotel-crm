@@ -20,6 +20,11 @@ function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
+  // Security Review FINDING: Remove token from URL to prevent referer leakage
+  if (typeof window !== "undefined" && token) {
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
