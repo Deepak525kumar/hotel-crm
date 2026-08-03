@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { usePaginatedList } from "@/hooks/usePaginatedList";
 import { assignmentsApi } from "@/lib/api";
-import type { ListAssignmentsQuery } from "@/lib/types";
+import type { ListAssignmentsQuery, ListCalendarEntriesQuery } from "@/lib/types";
 
 /**
  * Lists assignments for the given filters via SWR.
@@ -33,4 +33,19 @@ export function useAssignment(id: string | null | undefined) {
     id ? ["assignment", id] : null,
     ([, assignmentId]) => assignmentsApi.get(assignmentId),
   );
+}
+
+/**
+ * Job Dispatch Phase 2 (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03): lists calendar
+ * entries (direct worker placements, no broadcast/accept cycle) for the
+ * given filters. Same pagination shape as {@link useAssignments}.
+ */
+export function useCalendarEntries(query: ListCalendarEntriesQuery = {}) {
+  const perPage = query.per_page ?? 20;
+  const { items, hasNext, ...swr } = usePaginatedList(
+    ["calendar-entries", { ...query, per_page: perPage }],
+    () => assignmentsApi.listCalendarEntries({ ...query, per_page: perPage }),
+    perPage,
+  );
+  return { ...swr, calendarEntries: items, hasNext };
 }
