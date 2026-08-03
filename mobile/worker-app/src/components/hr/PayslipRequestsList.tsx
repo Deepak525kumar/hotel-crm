@@ -5,6 +5,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import type { PayslipRequestDto } from '@/types/api';
 
+const STATUS_COLOR: Record<PayslipRequestDto['status'], string> = {
+  REQUESTED: '#D69E2E',
+  FULFILLED: '#38A169',
+};
+
 export function PayslipRequestsList({
   requests,
   loading,
@@ -45,7 +50,7 @@ export function PayslipRequestsList({
               <ThemedText 
                 type="smallBold" 
                 style={{ 
-                  color: item.status === 'FULFILLED' ? '#38A169' : '#D69E2E',
+                  color: STATUS_COLOR[item.status],
                   textTransform: 'capitalize'
                 }}
               >

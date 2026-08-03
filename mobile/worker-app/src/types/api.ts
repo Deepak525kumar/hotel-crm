@@ -311,7 +311,6 @@ export interface PayslipRequestDto {
 }
 
 export interface CreatePayslipRequestRequest {
-  worker_id: string;
   period_start: string;
   period_end: string;
 }

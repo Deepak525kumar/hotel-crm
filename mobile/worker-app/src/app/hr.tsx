@@ -70,7 +70,6 @@ export default function HRScreen() {
           onPress: async () => {
             try {
               await api.hr.requestPayslip({
-                worker_id: user.id,
                 period_start: start,
                 period_end: end
               });
