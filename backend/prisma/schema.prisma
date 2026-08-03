@@ -108,6 +108,8 @@ enum NotificationType {
   ASSIGNMENT_CONFIRMED
   ASSIGNMENT_CANCELLED
   SHIFT_REMINDER // pre-shift reminder to worker
+  SYSTEM // system-level notifications
+
   CHECK_IN_REMINDER // sent when shift start approaches with no check-in
   // Attendance events
   ATTENDANCE_VERIFIED // to worker: manager verified attendance
@@ -164,6 +166,7 @@ enum OutboxSourceModule {
   DOCUMENTS
   HR
   CONSENT
+  AUTH
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim

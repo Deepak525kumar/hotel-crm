@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { Prisma, PrismaClient, UserRole } from '@prisma/client';
+import { Prisma, PrismaClient, UserRole, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { signTokens, verifyRefreshToken, UserScope } from '../../lib/jwt.js';
 import {
@@ -324,11 +324,11 @@ export class AuthService extends BaseService {
 
       await notificationService.enqueue({
         recipientId: user.id,
-        type: 'SYSTEM',
+        type: NotificationType.SYSTEM,
         title: 'Password Reset Request',
         message: `You have requested to reset your password. Click this link to reset it: ${resetUrl}\n\nIf you did not request this, please ignore this email.`,
-        transports: ['EMAIL'],
-        sourceModule: 'auth',
+        transports: [OutboxTransport.EMAIL],
+        sourceModule: OutboxSourceModule.AUTH,
         producerService: 'AuthService',
       }, tx);
     });
