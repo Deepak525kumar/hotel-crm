@@ -209,3 +209,29 @@ export function JobDispatchPhase2WriteGate({
     </RoleGate>
   );
 }
+
+/**
+ * Worker onboarding (create EmploymentRecord + drive its lifecycle signal to
+ * Active). Matches `employee-management/routes.ts`'s create/lifecycle-signal
+ * routes exactly (`requireRole('admin')`) — narrower than `DocumentsGate`/
+ * `HrPayrollGate`: `manager` is deliberately EXCLUDED here, unlike those
+ * gates, because this module's write routes never admit it (OD-EMP-08
+ * restricts creation/bulk-import/lifecycle-signal to Admin only). The
+ * read-side lookup (`getByUserId`) uses the broader `employees:read`
+ * permission, but this gate stays Admin-only since every *action* the card
+ * behind it exposes (create, submit-for-review, approve, reject) is
+ * Admin-only at the route.
+ */
+export function WorkerOnboardingGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}

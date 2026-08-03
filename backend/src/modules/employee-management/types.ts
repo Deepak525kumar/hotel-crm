@@ -62,6 +62,14 @@ export const OrgChartParamsSchema = z.object({
   hotel_group_id: z.string().min(1),
 });
 
+// IF-EMP-GetByUserId / v0: resolves a User's EmploymentRecord (or absence of
+// one) by the account id, the join key every other module already uses
+// (roster-scope.ts, scope.ts, hr/service.ts, etc.) — distinct from this
+// module's own `employee_id`-keyed routes.
+export const ByUserParamsSchema = z.object({
+  user_id: z.string().min(1),
+});
+
 // IF-EMP-LifecycleSignal / v0 (internal, Onboarding-driven).
 export const LifecycleSignalSchema = z.object({
   signal: z.enum(['submitted_for_review', 'approved', 'rejected']),

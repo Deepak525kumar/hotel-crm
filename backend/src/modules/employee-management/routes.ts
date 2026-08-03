@@ -12,6 +12,15 @@ router.use(authMiddleware);
 router.post('/', requireRole('admin'), requirePermission('employees:write'), ...controller.createEmployee);
 router.post('/bulk-import', requireRole('admin'), requirePermission('employees:write'), ...controller.bulkImport);
 
+// By-user lookup — resolves whether a `User` already has an EmploymentRecord
+// (and its current status/employee_id) without the caller needing to already
+// know the employee-management-owned `employee_id`. Read-only; returns `null`
+// (not 404) when no record exists yet, since "not yet onboarded" is an
+// expected state for a freshly-created worker, not an error (mirrors
+// `HrService.getContractStatus`'s `ContractDto | null` convention). Visibility
+// enforced service-side, same as the profile/skills reads below.
+router.get('/by-user/:user_id', requirePermission('employees:read'), ...controller.getByUserId);
+
 // Profile / skills reads — visibility (self / group-scope / admin) enforced
 // service-side (RULE-EMP-08 / REQ-EMP-013).
 router.get('/:employee_id/profile', requirePermission('employees:read'), ...controller.getProfileHistory);

@@ -469,4 +469,68 @@ describe('EmployeeManagementService', () => {
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
   });
+
+  describe('getByUserId (IF-EMP-GetByUserId)', () => {
+    it('returns the general profile when a record exists for the user', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ konfession: 'x', disability_status: 'y' })
+      );
+
+      const result = await service.getByUserId(admin, 'user_1');
+
+      expect(mockPrisma.employmentRecord.findUnique).toHaveBeenCalledWith({ where: { user_id: 'user_1' } });
+      expect(result).not.toBeNull();
+      expect(result).not.toHaveProperty('konfession');
+      expect(result).not.toHaveProperty('disability_status');
+      expect(result?.employee_id).toBe('E-001');
+    });
+
+    it('returns null (not an error) when no record exists for the user', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+
+      const result = await service.getByUserId(admin, 'user_no_record');
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null for a soft-deleted record instead of resurfacing deactivated history', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() })
+      );
+
+      const result = await service.getByUserId(admin, 'user_1');
+
+      expect(result).toBeNull();
+    });
+
+    it('rejects a worker looking up another user\'s record', async () => {
+      const worker = { userId: 'user_2', email: 'w@x.com', role: 'worker', permissions: [], scope: null };
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ user_id: 'user_1' }));
+
+      await expect(service.getByUserId(worker, 'user_1')).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('allows a worker looking up their own record', async () => {
+      const worker = { userId: 'user_1', email: 'w@x.com', role: 'worker', permissions: [], scope: null };
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ user_id: 'user_1' }));
+
+      const result = await service.getByUserId(worker, 'user_1');
+      expect(result?.employee_id).toBe('E-001');
+    });
+
+    it('rejects a manager whose scope does not cover the record\'s hotel group', async () => {
+      const manager = {
+        userId: 'mgr_1',
+        email: 'm@x.com',
+        role: 'manager',
+        permissions: [],
+        scope: { type: 'hotel_group' as const, hotel_group_id: 'group_a' },
+      };
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ hotel_group_id: 'group_b' })
+      );
+
+      await expect(service.getByUserId(manager, 'user_1')).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+  });
 });

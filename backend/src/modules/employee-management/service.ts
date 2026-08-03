@@ -492,6 +492,29 @@ export class EmployeeManagementService extends BaseService {
     };
   }
 
+  // ── By-user lookup (IF-EMP-GetByUserId) ─────────────────────────────────
+
+  // Resolves whether `userId` already has an EmploymentRecord, keyed by the
+  // FK every other module already joins on (roster-scope.ts, scope.ts,
+  // hr/service.ts, etc.) rather than this module's own `employee_id`. Returns
+  // `null` (not a 404) when no record exists — "not yet onboarded" is the
+  // expected state for a freshly-created worker, matching
+  // `HrService.getContractStatus`'s `ContractDto | null` convention for the
+  // same "may legitimately not exist yet" shape. Excludes soft-deleted
+  // records (`deleted_at`) so a deactivated employment history doesn't
+  // resurface as if it were still live — same invariant `findRecordOrThrow`
+  // now enforces below.
+  async getByUserId(
+    actor: AuthContext,
+    userId: string
+  ): Promise<Omit<EmploymentRecord, 'konfession' | 'disability_status'> | null> {
+    const record = await this.prisma.employmentRecord.findUnique({ where: { user_id: userId } });
+    if (!record || record.deleted_at) return null;
+
+    await this.assertVisibility(actor, record);
+    return toGeneralProfile(record);
+  }
+
   // ── Shared helpers ───────────────────────────────────────────────────────
 
   private async findRecordOrThrow(employeeId: string): Promise<EmploymentRecord> {
