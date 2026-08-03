@@ -19,7 +19,6 @@ import type {
   AcceptBroadcastResult,
   WorkerDocument,
   DocumentCategory,
-  DocumentCompleteness,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -400,17 +399,14 @@ export const api = {
     // SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16): worker self-upload/list.
     // worker_id is always the authenticated caller — self-scope is the
     // authorization, enforced server-side (documents/routes.ts
-    // scopeWorkerRoute()). Only list/completeness/upload are ported here —
-    // this worker-app screen has no use for get()/export() (both exist on
-    // frontend/lib/api.ts's documentsApi, unported here since nothing on
-    // mobile calls a single document by id or exports the full set yet).
+    // scopeWorkerRoute()). Only list/upload are ported here — this worker-app
+    // screen has no use for completeness()/get()/export() (all exist on
+    // frontend/lib/api.ts's documentsApi); add whichever is needed when a
+    // screen actually consumes it, rather than porting the full contract
+    // speculatively.
     list: (workerId: string, category?: DocumentCategory) =>
       request<WorkerDocument[]>(
         `/documents/workers/${workerId}/documents${category ? `?category=${category}` : ''}`
-      ),
-    completeness: (workerId: string, workPermitRequired: boolean) =>
-      request<DocumentCompleteness>(
-        `/documents/workers/${workerId}/documents/completeness?work_permit_required=${workPermitRequired ? 'true' : 'false'}`
       ),
     // Takes the raw picker-asset shape (uri/name/mimeType, as returned by
     // expo-document-picker; `size` deliberately not accepted here — the
@@ -421,12 +417,10 @@ export const api = {
     // not `mimeType` — a documented divergence from the picker's own field
     // name).
     //
-    // KNOWN ISSUE (pre-existing, shared with frontend/lib/api.ts's identical
-    // documentsApi.upload — not introduced here): the backend's
-    // uploadDocumentSchema (documents/validation.ts) declares
-    // `is_work_permit: z.boolean().optional()`, but multipart form fields are
-    // always strings — Zod's plain z.boolean() rejects "true"/"false" string
-    // values (verified: `z.boolean().optional().safeParse('true')` fails).
+    // KNOWN BACKEND LIMITATION (pre-existing, shared with frontend/lib/api.ts's
+    // identical documentsApi.upload — not introduced here): multipart form
+    // fields arrive as strings while uploadDocumentSchema
+    // (documents/validation.ts) expects is_work_permit as a real boolean.
     // Sending is_work_permit=true here likely 422s until the backend schema
     // is fixed (e.g. z.preprocess or z.enum(['true','false']).transform(...)).
     // Not fixed in this PR — backend scope, affects web identically.

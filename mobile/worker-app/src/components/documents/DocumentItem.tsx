@@ -2,6 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { formatBytes } from '@/lib/format-bytes';
 import { openDocument } from './open-document';
 import type { WorkerDocument, DocumentCategory } from '@/types/api';
 
@@ -10,10 +11,16 @@ const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   WORK_PERMIT: 'Work permit',
 };
 
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+// expires_at is YYYY-MM-DD (date-only); parsing/formatting as UTC avoids a
+// local-timezone off-by-one when the device's own timezone differs (same
+// reasoning as lib/calendar-dates.ts's formatDay).
+function formatExpiry(expiresAt: string): string {
+  return new Date(`${expiresAt}T00:00:00.000Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 }
 
 export function DocumentItem({ document }: { document: WorkerDocument }) {
@@ -26,7 +33,7 @@ export function DocumentItem({ document }: { document: WorkerDocument }) {
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {formatBytes(document.file_size_bytes)} · {CATEGORY_LABEL[document.category]}
-            {document.expires_at && ` · Expires ${document.expires_at}`}
+            {document.expires_at && ` · Expires ${formatExpiry(document.expires_at)}`}
           </ThemedText>
         </ThemedView>
         {document.presigned_url ? (

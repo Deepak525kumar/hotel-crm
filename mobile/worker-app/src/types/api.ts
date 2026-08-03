@@ -232,11 +232,3 @@ export interface WorkerDocument {
   created_at: string;
   updated_at: string;
 }
-
-export interface DocumentCompleteness {
-  worker_id: string;
-  work_permit_required: boolean;
-  is_complete: boolean;
-  missing_categories: DocumentCategory[];
-  document_count: number;
-}

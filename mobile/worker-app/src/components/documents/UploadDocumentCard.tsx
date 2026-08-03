@@ -33,6 +33,13 @@ export function UploadDocumentCard({
     }
   );
 
+  // Category always has a valid default; the one field that can be malformed
+  // is the free-text expiry date. Disabling on a clearly-invalid value here
+  // is a UX nicety, not a security boundary — the backend's own regex
+  // (documents/validation.ts) remains the authoritative check.
+  const expiresAtIsValid = !expiresAt || /^\d{4}-\d{2}-\d{2}$/.test(expiresAt);
+  const canSubmit = !uploading && expiresAtIsValid;
+
   const onSubmit = () =>
     upload({
       category,
@@ -113,10 +120,10 @@ export function UploadDocumentCard({
 
           <Pressable
             onPress={onSubmit}
-            disabled={uploading}
+            disabled={!canSubmit}
             style={({ pressed }) => [
               styles.uploadButton,
-              { backgroundColor: theme.text, opacity: pressed || uploading ? 0.7 : 1 },
+              { backgroundColor: theme.text, opacity: pressed || !canSubmit ? 0.7 : 1 },
             ]}
           >
             {uploading ? (
