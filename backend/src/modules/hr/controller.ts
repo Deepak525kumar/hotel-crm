@@ -24,6 +24,7 @@ export class HrController {
       const result = await hrService.listContracts(req.query, {
         role: req.auth.role,
         scope: req.auth.scope,
+        userId: req.auth.userId,
       });
       res.status(200).json({
         status: 'success',

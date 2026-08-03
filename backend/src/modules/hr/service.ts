@@ -204,7 +204,7 @@ export class HrService extends BaseService {
   // still compiles; the controller always passes it.
   async listContracts(
     filters: ListContractsQuery = {},
-    actor?: { role: string; scope?: UserScope | null }
+    actor?: ServiceActor
   ): Promise<ContractDto[]> {
     const where: Prisma.ContractWhereInput = {
       ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
