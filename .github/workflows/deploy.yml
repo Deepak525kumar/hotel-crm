@@ -31,10 +31,17 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Add EC2 to known_hosts
+      - name: Debug SSH connectivity
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          echo "HOST=${{ secrets.EC2_HOST }}"
+
+          which ssh-keyscan
+
+          ssh-keyscan -v -T 10 ${{ secrets.EC2_HOST }}
+
+          nc -vz ${{ secrets.EC2_HOST }} 22 || true
+
+          ping -c 3 ${{ secrets.EC2_HOST }} || true
 
       - name: Deploy
         env:
