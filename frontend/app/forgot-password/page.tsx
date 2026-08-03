@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
 import Link from "next/link";
 import { authApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui";
 
 export default function ForgotPasswordPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
