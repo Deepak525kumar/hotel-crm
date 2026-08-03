@@ -107,6 +107,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors
 import { logger } from '../../lib/logger.js';
 import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
+import type { ServiceActor } from '../../lib/types.js';
 import { documentService } from '../documents/service.js';
 import { generateStorageKey } from '../documents/storage.js';
 import { employeeManagementService } from '../employee-management/service.js';
@@ -643,7 +644,7 @@ export class HrService extends BaseService {
   // ---------------------------------------------------------------------------
   async listPayroll(
     filters: ListPayslipRequestsQuery = {},
-    actor?: { role: string; scope?: UserScope | null; userId?: string }
+    actor?: ServiceActor
   ): Promise<PayslipRequestDto[]> {
     // OD-HR-10 (FIND-SEC-HR-03, IDOR guard): a worker-role caller MUST be
     // scoped to their own PayslipRequest records only — the client-supplied
@@ -651,9 +652,9 @@ export class HrService extends BaseService {
     // getContractStatus's actorId !== workerId → ForbiddenError pattern exactly.
     // Worker callers never reach the resolveNonAdminScopeFilter branch below.
     if (actor?.role === 'worker') {
-      if (!actor.userId) throw new ForbiddenError('Worker identity unknown');
+      if (!actor.userId) throw new ForbiddenError();
       if (filters.worker_id && filters.worker_id !== actor.userId) {
-        throw new ForbiddenError('Workers may only list their own payslip requests');
+        throw new ForbiddenError();
       }
       // Force the filter regardless of whether the caller supplied worker_id,
       // so an omitted param also returns only the caller's own data.
