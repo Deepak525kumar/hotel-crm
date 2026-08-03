@@ -79,6 +79,15 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Pressable
+          onPress={() => router.push('/consent')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+            <ThemedText type="smallBold">View Consent</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <Pressable
           onPress={handleLogout}
           disabled={isLoggingOut}
           style={({ pressed }) => [{ opacity: pressed || isLoggingOut ? 0.7 : 1 }]}

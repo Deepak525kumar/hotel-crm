@@ -19,6 +19,10 @@ import type {
   AcceptBroadcastResult,
   WorkerDocument,
   DocumentCategory,
+  ConsentStatus,
+  ConsentNotice,
+  ConsentRecord,
+  RecordConsentDecisionInput,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -452,5 +456,33 @@ export const api = {
         body: form,
       });
     },
+  },
+  consent: {
+    // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is
+    // self-scoped — worker_id is always the authenticated caller, enforced
+    // server-side, never a client-supplied field.
+    getStatus: (consentInstance: string) =>
+      request<ConsentStatus>(`/consent/status?consent_instance=${encodeURIComponent(consentInstance)}`),
+
+    // Fetches the current notice to present before a decision — does not
+    // itself record a decision.
+    requestNotice: (consentInstance: string, language?: string) =>
+      request<ConsentNotice>('/consent/request', {
+        method: 'POST',
+        body: JSON.stringify({ consent_instance: consentInstance, ...(language ? { language } : {}) }),
+      }),
+
+    recordDecision: (input: RecordConsentDecisionInput) =>
+      request<ConsentRecord>('/consent/decisions', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    // Immediately supersedes today's grant — the next status check reads as `absent`.
+    withdraw: (consentInstance: string) =>
+      request<ConsentRecord>('/consent/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ consent_instance: consentInstance }),
+      }),
   },
 };
