@@ -320,6 +320,20 @@ export const authApi = {
       method: "POST",
       body: refreshToken ? { refresh_token: refreshToken } : {},
     }),
+
+  requestPasswordReset: (email: string) =>
+    apiFetch<{ message: string }>("/auth/password-reset", {
+      method: "POST",
+      auth: false,
+      body: { email },
+    }),
+
+  confirmPasswordReset: (token: string, new_password: string) =>
+    apiFetch<{ message: string }>("/auth/password-reset/confirm", {
+      method: "POST",
+      auth: false,
+      body: { token, new_password },
+    }),
 };
 
 /**

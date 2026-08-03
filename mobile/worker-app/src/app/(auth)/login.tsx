@@ -15,6 +15,7 @@ import { Spacing } from '@/constants/theme';
 import { APP_NAME, ALLOWED_ROLES } from '@/constants/app-config';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
+import * as WebBrowser from 'expo-web-browser';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -52,6 +53,11 @@ export default function LoginScreen() {
         setError('Login failed. Please try again.');
       }
     }
+  };
+
+  const handleForgotPassword = async () => {
+    const frontendUrl = process.env.EXPO_PUBLIC_FRONTEND_URL ?? 'http://localhost:3000';
+    await WebBrowser.openBrowserAsync(`${frontendUrl}/forgot-password`);
   };
 
   return (
@@ -123,6 +129,12 @@ export default function LoginScreen() {
               )}
             </ThemedView>
           </Pressable>
+
+          <Pressable onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.forgotPasswordText}>
+              Forgot Password?
+            </ThemedText>
+          </Pressable>
         </ThemedView>
       </KeyboardAvoidingView>
     </ThemedView>
@@ -169,5 +181,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: Spacing.two,
+  },
+  forgotPasswordContainer: {
+    alignItems: 'center',
+    marginTop: Spacing.two,
+  },
+  forgotPasswordText: {
+    textDecorationLine: 'underline',
   },
 });
