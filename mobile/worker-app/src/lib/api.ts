@@ -23,6 +23,9 @@ import type {
   ConsentNotice,
   ConsentRecord,
   RecordConsentDecisionInput,
+  ContractDto,
+  PayslipRequestDto,
+  CreatePayslipRequestRequest,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -483,6 +486,19 @@ export const api = {
       request<ConsentRecord>('/consent/withdraw', {
         method: 'POST',
         body: JSON.stringify({ consent_instance: consentInstance }),
+      }),
+  },
+  hr: {
+    getContractStatus: (workerId: string) =>
+      request<ContractDto | null>(`/hr/workers/${encodeURIComponent(workerId)}/contract-status`),
+
+    listPayroll: () =>
+      request<PayslipRequestDto[]>('/hr/payroll'),
+
+    requestPayslip: (input: CreatePayslipRequestRequest) =>
+      request<PayslipRequestDto>('/hr/payslip-requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
       }),
   },
 };

@@ -64,7 +64,7 @@ export default function ProfileScreen() {
           onPress={() => router.push('/ratings')}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
-          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
             <ThemedText type="smallBold">View Leaderboard</ThemedText>
           </ThemedView>
         </Pressable>
@@ -73,7 +73,7 @@ export default function ProfileScreen() {
           onPress={() => router.push('/documents')}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
-          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
             <ThemedText type="smallBold">View Documents</ThemedText>
           </ThemedView>
         </Pressable>
@@ -82,8 +82,17 @@ export default function ProfileScreen() {
           onPress={() => router.push('/consent')}
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
-          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
             <ThemedText type="smallBold">View Consent</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/hr')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
+            <ThemedText type="smallBold">View HR & Payroll</ThemedText>
           </ThemedView>
         </Pressable>
 
@@ -92,7 +101,7 @@ export default function ProfileScreen() {
           disabled={isLoggingOut}
           style={({ pressed }) => [{ opacity: pressed || isLoggingOut ? 0.7 : 1 }]}
         >
-          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
             {isLoggingOut ? (
               <ActivityIndicator color={theme.text} />
             ) : (
@@ -138,7 +147,7 @@ const styles = StyleSheet.create({
   roleText: {
     textTransform: 'capitalize',
   },
-  logoutButton: {
+  actionButton: {
     height: 48,
     borderRadius: Spacing.two,
     justifyContent: 'center',
