@@ -1,11 +1,15 @@
 name: Deploy to EC2
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "deploy.sh"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy.yml"
 
 permissions:
   contents: read
@@ -16,16 +20,13 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy to EC2
-
-    # Only deploy if CI succeeded on main
-    if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main'
-
+    name: Deploy Backend to EC2
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Start SSH Agent
         uses: webfactory/ssh-agent@v0.9.0
         with:
@@ -36,9 +37,9 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Deploy
+      - name: Deploy to EC2
         env:
-          DEPLOY_SHA: ${{ github.event.workflow_run.head_sha }}
+          DEPLOY_SHA: ${{ github.sha }}
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
             set -e
