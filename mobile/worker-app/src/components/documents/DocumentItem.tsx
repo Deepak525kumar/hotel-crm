@@ -2,7 +2,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { formatBytes } from '@/lib/format-bytes';
+import { formatBytes, formatExpiry } from '@/lib/document-formatting';
 import { openDocument } from './open-document';
 import type { WorkerDocument, DocumentCategory } from '@/types/api';
 
@@ -10,18 +10,6 @@ const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   GENERAL: 'General',
   WORK_PERMIT: 'Work permit',
 };
-
-// expires_at is YYYY-MM-DD (date-only); parsing/formatting as UTC avoids a
-// local-timezone off-by-one when the device's own timezone differs (same
-// reasoning as lib/calendar-dates.ts's formatDay).
-function formatExpiry(expiresAt: string): string {
-  return new Date(`${expiresAt}T00:00:00.000Z`).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-}
 
 export function DocumentItem({ document }: { document: WorkerDocument }) {
   return (

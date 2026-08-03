@@ -117,6 +117,11 @@ export function UploadDocumentCard({
             editable={!uploading}
             style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
           />
+          {!expiresAtIsValid && (
+            <ThemedText type="small" style={styles.errorText}>
+              Expiry date must use YYYY-MM-DD.
+            </ThemedText>
+          )}
 
           <Pressable
             onPress={onSubmit}
