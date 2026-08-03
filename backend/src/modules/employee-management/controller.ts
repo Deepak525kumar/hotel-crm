@@ -3,6 +3,7 @@ import { employeeManagementService } from './service.js';
 import {
   BlocklistQuerySchema,
   BulkImportSchema,
+  ByUserParamsSchema,
   CreateEmployeeSchema,
   LifecycleSignalSchema,
   OrgChartParamsSchema,
@@ -39,6 +40,23 @@ export class EmployeeManagementController {
         if (!req.auth) throw new UnauthorizedError();
         const result = await employeeManagementService.bulkImport(req.auth, req.body.rows);
         res.status(201).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  getByUserId = [
+    validateParams(ByUserParamsSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.getByUserId(req.auth, req.params['user_id']!);
+        res.status(200).json({
           status: 'success',
           data: result,
           meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

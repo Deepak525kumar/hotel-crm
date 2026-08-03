@@ -66,6 +66,9 @@ import type {
   DocumentCompleteness,
   UploadDocumentInput,
   EmployeeBlocklistEntry,
+  EmploymentRecord,
+  CreateEmploymentInput,
+  LifecycleSignalInput,
   SetBlocklistInput,
   SubjectRightsBundle,
 } from "@/lib/types";
@@ -752,13 +755,29 @@ export const hrApi = {
 };
 
 /**
- * Employee Management — Blocklist API matching the backend
- * `/employees/hotels/:hotel_id/blocklist` routes (SPEC-EMP-001, REQ-EMP-005 /
- * RULE-EMP-07). `employee_id` is employee-management's own human-facing
- * identifier, not a `User.id` — no lookup endpoint resolves one from the
- * other today, so callers must already know it.
+ * Employee Management API (SPEC-EMP-001). `employee_id` is
+ * employee-management's own human-facing identifier, distinct from a
+ * `User.id` — `getByUserId` is the one lookup that resolves a `User.id` to
+ * its `EmploymentRecord` (or `null` if the worker hasn't been onboarded yet);
+ * every other method here is keyed by `employee_id`, which callers must
+ * already know (e.g. from a prior `getByUserId`/`create` response).
  */
 export const employeesApi = {
+  /** Resolves a user's EmploymentRecord, or `null` if none exists yet (not a 404). Any role holding `employees:read` may call this; per-record visibility (self / group-scope / admin) is enforced service-side. */
+  getByUserId: (userId: string) =>
+    apiFetch<EmploymentRecord | null>(`/employees/by-user/${userId}`),
+
+  /** Creates the EmploymentRecord for an existing worker `User` (Admin-only). Starts `INACTIVE`. */
+  create: (input: CreateEmploymentInput) =>
+    apiFetch<EmploymentRecord>(`/employees`, { method: "POST", body: input }),
+
+  /** Drives the employment lifecycle state machine (Admin-only, stand-in for the unbuilt Onboarding module). */
+  lifecycleSignal: (employeeId: string, input: LifecycleSignalInput) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/lifecycle-signal`, {
+      method: "POST",
+      body: input,
+    }),
+
   listBlocklist: (hotelId: string) =>
     apiFetch<EmployeeBlocklistEntry[]>(`/employees/hotels/${hotelId}/blocklist`),
 

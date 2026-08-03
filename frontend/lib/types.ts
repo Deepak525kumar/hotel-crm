@@ -987,8 +987,9 @@ export interface CreateContractInput {
 /**
  * Matches backend `EmployeeBlocklistEntry` (Prisma model) exactly. Keyed by
  * `employee_id` — employee-management's own human-facing identifier
- * (`EmploymentRecord.employee_id`), distinct from and not derivable from a
- * `User.id`; no lookup endpoint exists to resolve one from the other today.
+ * (`EmploymentRecord.employee_id`), distinct from a `User.id`. Use
+ * `employeesApi.getByUserId` to resolve a `User.id` to its `employee_id` when
+ * one is available; this entry shape itself still carries only `employee_id`.
  */
 export interface EmployeeBlocklistEntry {
   id: string;
@@ -1003,6 +1004,46 @@ export interface EmployeeBlocklistEntry {
 export interface SetBlocklistInput {
   employee_id: string;
   reason: string;
+}
+
+/** Mirrors the backend `EmploymentStatus` enum (prisma/schema.prisma). */
+export type EmploymentStatus = "INACTIVE" | "UNDER_REVIEW" | "ACTIVE" | "REJECTED" | "DEACTIVATED";
+
+/**
+ * General-profile view of `EmploymentRecord` (special-category fields
+ * `konfession`/`disability_status` never included — REQ-EMP-007/RULE-EMP-09).
+ * Returned by `GET /employees/by-user/:user_id` (`null` when no record exists
+ * yet for that user — not a 404, matching `ContractDto | null`'s convention
+ * for the same "may legitimately not exist" shape).
+ */
+export interface EmploymentRecord {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  job_title: string;
+  start_date: string;
+  status: EmploymentStatus;
+  marked_suitable: boolean;
+  hotel_group_id: string | null;
+  skills: SkillTag[];
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `POST /employees` (Admin-only, REQ-EMP-001). */
+export interface CreateEmploymentInput {
+  user_id: string;
+  employee_id: string;
+  job_title: string;
+  start_date: string;
+  skills?: SkillTag[];
+}
+
+/** Body of `POST /employees/:employee_id/lifecycle-signal`. */
+export interface LifecycleSignalInput {
+  signal: "submitted_for_review" | "approved" | "rejected";
+  /** Explicit fallback only — normally auto-resolved from the approving admin's own scope (ADR-023 §4). */
+  hotel_group_id?: string;
 }
 
 /* -------------------------------------------------------------------------- */

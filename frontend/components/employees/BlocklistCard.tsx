@@ -35,8 +35,10 @@ function BlocklistRow({ entry }: { entry: EmployeeBlocklistEntry }) {
 /**
  * SPEC-EMP-001 (REQ-EMP-005/RULE-EMP-07): a hotel's employee blocklist.
  * `employee_id` is employee-management's own human-facing identifier, not a
- * `User.id` — no lookup endpoint resolves one from the other today, so the
- * add-entry form takes it as free text (same posture as HR's `template_id`).
+ * `User.id`. `employeesApi.getByUserId` can resolve one from the other when
+ * the caller already has a `User.id` in hand (e.g. from the worker's own
+ * profile page), but this form has no such context to start from — it takes
+ * `employee_id` as free text (same posture as HR's `template_id`).
  * Rendering this is safe for any role — the backend (`checkHotelAccess()`,
  * `employees:read`) is the authoritative enforcement point — but the add
  * action is wrapped in `BlocklistWriteGate` so a read-only viewer doesn't
