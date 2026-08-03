@@ -23,6 +23,12 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  notification: {
+    create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  outboxEvent: {
+    create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   // PR 5.4 (ADR-023 §6 / ADR-025 §4): AuthService.resolveScope reads these
   // read-only association tables when issuing an access token. Default to
   // "no association" (null) so existing tests that don't care about scope
@@ -65,6 +71,8 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.notification.create.mockResolvedValue({ id: 'fake-notification-id' });
+    mockPrisma.outboxEvent.create.mockResolvedValue({});
     service = new AuthService();
   });
 
