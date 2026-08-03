@@ -65,6 +65,28 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
 }
 
 /**
+ * Resolves the in-app route a tapped push notification should open, from
+ * its `data` payload — `type` is always present (composed by
+ * PushTransportHandler.deliver() in
+ * backend/src/modules/notifications/outbox-transport.ts, alongside
+ * whatever Notification.data itself carries, e.g. work_request_id for a
+ * JOB_REQUEST_BROADCAST). Extracted as a pure function so the routing
+ * decision is independently testable without mocking expo-notifications'
+ * listener plumbing.
+ *
+ * Falls back to the Alerts tab for any notification type this function
+ * doesn't recognize (including a payload with no `type` at all, or a
+ * `type` this app version predates) — the safe default this app already
+ * had for every notification before per-type routing existed.
+ */
+export function resolvePushTapRoute(data: Record<string, unknown> | undefined | null): string {
+  if (data?.type === 'JOB_REQUEST_BROADCAST' && typeof data.work_request_id === 'string') {
+    return `/offer/${data.work_request_id}`;
+  }
+  return '/notifications';
+}
+
+/**
  * Foreground display + tap-through routing for incoming push notifications.
  *
  * Backend delivery (Platform Worker -> APNs/FCM, PR 7.5) was already real
@@ -82,9 +104,10 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
  * Duplicated verbatim in mobile/checker-app/src/lib/push-notifications.ts
  * (two independent Expo apps, no shared package between them today). Not
  * worth extracting yet for one call site each. If a future change adds
- * per-type deep links, notification categories, or other behavior beyond
- * this, consider extracting a shared mobile package at that point rather
- * than editing both copies again.
+ * more per-type deep links, notification categories, or other behavior
+ * beyond this, consider extracting a shared mobile package at that point
+ * rather than editing both copies again — the checker app has no
+ * broadcast/offer concept and is deliberately NOT updated by this change.
  */
 export function subscribeToPushNotifications(router: Router): () => void {
   // Foreground behavior: show the OS banner/sound/badge even while the app
@@ -101,13 +124,12 @@ export function subscribeToPushNotifications(router: Router): () => void {
   });
 
   // Tapping a delivered notification (from the tray, or the in-app banner
-  // above) navigates to the Alerts tab, where the tapped notification is
-  // already listed and can be marked read -- deliberately not a per-type
-  // deep link: the backend's NotificationType/data payload isn't yet rich
-  // enough to route to every producer's specific detail screen, and
-  // guessing at that shape now would be a speculative abstraction.
-  const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
-    router.push('/notifications');
+  // above) routes per resolvePushTapRoute() -- a recognized
+  // JOB_REQUEST_BROADCAST payload opens that offer directly; anything else
+  // falls back to the Alerts tab, same as before per-type routing existed.
+  const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+    const route = resolvePushTapRoute(response.notification.request.content.data);
+    router.push(route as Parameters<Router['push']>[0]);
   });
 
   return () => {
