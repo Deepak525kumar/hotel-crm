@@ -94,21 +94,21 @@ export default function ConsentScreen() {
     setActionError(null);
     setWithdrawing(true);
     try {
-      const record = await api.consent.withdraw(DAILY_ACCESS_GATE_INSTANCE);
-      // withdrawConsent() always produces a WITHDRAWN record on success
-      // (backend consent/service.ts); mapped through the same
-      // WITHDRAWN/RENEWED -> absent rule ConsentService.checkStatus() itself
-      // uses, rather than assuming the outcome without inspecting the
-      // response — mirrors onDecide's derive-from-response pattern below.
-      setStatus(
-        record.decision === 'WITHDRAWN' || record.decision === 'RENEWED' ? { status: 'absent' } : status
-      );
+      // withdrawConsent() has exactly one code path and always produces a
+      // WITHDRAWN record on success (backend consent/service.ts:198-205,
+      // hardcoded, no branch) — branching on the response here would defend
+      // against a state the contract cannot produce. The await itself is
+      // still the confirmation: a thrown error skips this line entirely and
+      // is handled in the catch block below, so status is never set ahead
+      // of the server actually confirming the withdrawal.
+      await api.consent.withdraw(DAILY_ACCESS_GATE_INSTANCE);
+      setStatus({ status: 'absent' });
     } catch (error) {
       setActionError(error instanceof ApiError ? error.message : 'Could not withdraw consent.');
     } finally {
       setWithdrawing(false);
     }
-  }, [status]);
+  }, []);
 
   return (
     <ThemedView style={styles.container}>

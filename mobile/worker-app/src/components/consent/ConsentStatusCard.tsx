@@ -2,8 +2,21 @@ import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { statusAction, statusColor, statusDescription, statusLabel } from '@/lib/consent-status';
+import { statusAction, statusDescription, statusLabel } from '@/lib/consent-status';
 import type { ConsentStatus } from '@/types/api';
+
+// Colocated with the component that renders it, matching this app's existing
+// convention for status-color maps (e.g. shifts.tsx's STATUS_COLOR,
+// absences.tsx's KIND_COLOR) — the theme only defines neutral tokens
+// (text/background/backgroundElement/backgroundSelected/textSecondary), no
+// semantic success/error/warning tokens exist yet, so every status color in
+// this app is a local, colocated hex map like this one, not a shared lib
+// function.
+const STATUS_COLOR: Record<ConsentStatus['status'], string> = {
+  granted: '#38A169',
+  declined: '#E53E3E',
+  absent: '#DD6B20',
+};
 
 /**
  * Renders the current daily-access-gate status and the one action valid for
@@ -45,7 +58,7 @@ export function ConsentStatusCard({
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.row} type="backgroundElement">
         <ThemedView style={styles.info} type="backgroundElement">
-          <ThemedText type="smallBold" style={{ color: statusColor(status) }}>
+          <ThemedText type="smallBold" style={{ color: STATUS_COLOR[status.status] }}>
             {statusLabel(status)}
           </ThemedText>
           {description && (

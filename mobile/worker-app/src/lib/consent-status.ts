@@ -11,17 +11,6 @@ export function statusLabel(status: ConsentStatus): string {
   }
 }
 
-export function statusColor(status: ConsentStatus): string {
-  switch (status.status) {
-    case 'granted':
-      return '#38A169';
-    case 'declined':
-      return '#E53E3E';
-    case 'absent':
-      return '#DD6B20';
-  }
-}
-
 export function statusDescription(status: ConsentStatus): string | null {
   switch (status.status) {
     case 'granted':
