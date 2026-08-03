@@ -186,8 +186,14 @@ export class DocumentService extends BaseService {
   // RULE-DOC-03; Documents does not own nationality).
   async getDocumentCompleteness(
     workerId: string,
-    isWorkPermitRequired: boolean
+    isWorkPermitRequired: boolean,
+    actorId?: string,
+    actorRole?: string
   ): Promise<DocumentCompleteness> {
+    if (actorRole === 'worker' && actorId !== workerId) {
+      throw new ForbiddenError('Workers may only view their own documents');
+    }
+
     const docs = await this.prisma.workerDocument.findMany({
       where: { worker_id: workerId },
       select: { category: true },

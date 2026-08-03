@@ -106,7 +106,9 @@ export class DocumentController {
       const isWorkPermitRequired = req.query.work_permit_required === 'true';
       const result = await documentService.getDocumentCompleteness(
         req.params.worker_id,
-        isWorkPermitRequired
+        isWorkPermitRequired,
+        req.auth.userId,
+        req.auth.role
       );
       res.status(200).json({
         status: 'success',

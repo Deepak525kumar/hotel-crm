@@ -1,7 +1,7 @@
 # Hotel CRM — MVP Handoff
 
 Last updated: 2026-08-04
-Current branch: `feat/worker-mobile-hr` (investigation only, zero code changes — safe to delete or reuse)
+Current status: **MVP Feature Complete** (Stabilization Phase)
 
 ## How to resume
 
@@ -53,51 +53,34 @@ Do not skip steps 1–3 to "just start coding" — every deviation from this seq
 
 ---
 
-## What's left for MVP
+### PR #333 — Worker Mobile HR Self-Service (Backend)
+- Added `hr:payslip:read-own` permission token to allow workers to list their own payslip requests via `GET /hr/payroll`.
+- Implemented IDOR guard (`actor.role === 'worker' && actor.userId !== worker_id`) in `hrService.listPayroll`.
+- Full tests written and 4-gate review passed.
 
-### 1. Worker Mobile HR Self-Service — IN PROGRESS, investigation complete, blocked pending a decision
+### PR #334 — Worker Mobile HR Self-Service (Mobile)
+- Added `hr.tsx` stack screen to `worker-app`, reached via Profile.
+- Reads `Contract` (read-only) and allows users to request a new payslip and view past payslip requests.
+- Mirrors the backend `api.hr` layer in mobile.
 
-**Status**: fully investigated. A backend gap was found and the user (project lead) has already decided how to proceed — **do not re-litigate this decision, just execute it.**
+### PR #335 — Password Reset
+- Implemented backend token generation and outbox enqueueing inside a `prisma.$transaction`.
+- Built web `/forgot-password` and `/reset-password` UI.
+- Mobile delegates password reset to web via `expo-web-browser`.
 
-**The decision**: build a small, additive backend change FIRST (its own PR), then build the mobile HR screen as a second PR — not a combined PR, not mobile-only with a degraded UX.
+---
 
-**Evidence already gathered** (don't re-investigate, this is settled):
-- Backend `backend/src/modules/hr/routes.ts` has exactly two worker-usable routes:
-  - `GET /hr/workers/:worker_id/contract-status` — worker self-access via `hr:contract:read-own` permission token, self-scope double-checked in `hr/service.ts:243-245` (`getContractStatus`). Returns `ContractDto | null`. **This one already works for workers, no backend change needed.**
-  - `POST /hr/payslip-requests` — worker-only (`requireRole('worker')`, `hr:payslip:request` token), body `{period_start, period_end}` only, `worker_id` always server-derived. **Already works.**
-- **The gap**: there is no route letting a worker list their own past payslip requests. `GET /hr/payroll` (the only list endpoint for `PayslipRequestDto`) is hard-gated `requireRole(['admin', 'manager'])` at the route layer (`hr/routes.ts:113`). The service method (`hrService.listPayroll`, `hr/service.ts:644-667`) already has `worker_id`-filtering logic that *could* self-scope — the route guard is the only thing blocking it. A worker can create a payslip request but never see whether it was fulfilled.
-- Web has **no** worker-self-service HR UI at all (confirmed: `hrApi` has no method calling `POST /hr/payslip-requests`; `ContractCard`/`PayslipRequestsCard` are both admin/manager-only via `HrPayrollGate = allow: ["admin","manager"]`, viewing *a worker's* data, not the worker's own view). **This means the mobile HR screen is new UI construction, not a port** — unlike Documents/Consent, there's no existing web pattern to mirror for the worker-facing interaction. Use the web components' *data shapes* (`Contract`/`PayslipRequest` types in `frontend/lib/types.ts:925-972`) as a shape reference only, not their UX.
+## What's left for MVP (Stabilization)
 
-**Immediate next task — PR 1 (backend)**:
-1. Add a new permission token (`hr:payslip:read-own`, following the exact naming/precedent of `hr:contract:read-own` — see `backend/src/config/constants.ts` around line 191-196, and the `ADR-042` comment there explaining why a dedicated narrower token was created for the contract-read case).
-2. Widen `GET /hr/payroll`'s route guard to also admit `worker`, using the same `requireContractReadAccess()`-style role-specific-token pattern already established in `hr/routes.ts:62-67` for contract-status (worker needs `hr:payslip:read-own`, not `hr:read`).
-3. Self-scope the worker's results — the service already supports filtering by `worker_id`; ensure a worker caller is forced to their own `worker_id` (mirroring `getContractStatus`'s `actorId !== workerId → ForbiddenError` pattern) rather than trusting a query param, to avoid an IDOR (a worker must not be able to pass another worker's `worker_id` and see their payslip history).
-4. Add backend tests for the new worker-self-read path (both the happy path and the IDOR-denial path), following this module's existing test conventions in `backend/src/__tests__/`.
-5. Same 4-gate review process (architecture/dependency/security/consistency via parallel subagents) before merge — this is a real permission/authorization change, treat it with full rigor even though it's small.
-
-**Then — PR 2 (mobile)**, scope confirmed by the user:
-- **Contract section** (read-only): status, position, start date, end date. No contract type field exists in the backend DTO — don't invent one; the actual fields are exactly what `ContractDto` has (`hr/types.ts:17-33`).
-- **Payslips section**: request payslip (period start/end date inputs), list of previous requests with Pending/Fulfilled badge and request date.
-- **Explicitly excluded** (all are `requireRole(['admin','manager'])`-only in the backend, no worker self-action exists for any of these): upload signed contract, confirm contract, extend contract, lapse contract, payroll/payslip management (creating requests *for* a worker, marking fulfilled).
-- Follow the exact established mobile conventions above (no hook unless genuinely needed, no optimistic updates, colocated status colors, Profile-linked stack screen, pure-function test extraction for anything needing native-module-free testing).
-
-**Do not start PR 2's mobile code until PR 1 (backend) is merged to `main`.**
-
-### 2. Password reset (deprioritized behind HR)
-- Token generation exists server-side (`backend/src/modules/auth/service.ts`) but the `enqueue()` call to actually email the reset token was never wired — tracked as `SIR-NOTIF-007`/`SIR-AUTH-005` in code comments. Verify these tracking IDs still describe the current state before starting; things may have changed.
-- No frontend forgot-password/reset-password page exists either (web or mobile).
-- Lower urgency — admin-mediated password resets remain a viable interim path for users who get locked out.
-- **Not yet investigated in depth this session** — before implementing, do the same investigate-first pass: read the backend auth module fully, check for any existing partial frontend work, check mobile's login screen for hooks that might already assume a "forgot password" link exists.
-
-### 3. Employment Record verification audit (not a feature — a repo-wide audit)
+### 1. Employment Record verification audit (not a feature — a repo-wide audit)
 - User's framing: verify every worker-facing flow now correctly uses the `EmploymentRecord` model (introduced by the Onboarding PR #330's underlying backend work) and that no code still assumes the old marketplace-era model.
 - Not started. Do this as a read-only audit (grep + targeted file reads across backend modules that reference worker eligibility/scope), not a coding task, unless it finds something that needs fixing.
 
-### 4. MVP stabilization pass (do this LAST, after 1–3 are done)
+### 2. MVP stabilization pass
 - Full worker journey walkthrough (mobile app, start to finish).
-- Mobile ↔ web parity audit.
+- Mobile ↔ web parity audit (Completed: Parity achieved, ExportMyData intentionally omitted from Mobile).
 - Loading-state consistency, error-handling consistency, theme consistency, navigation review across all mobile screens.
-- API contract verification (spot-check that every mobile `api.*` call still matches its backend route — especially worth doing given the `is_work_permit` bug found in PR #331, which suggests other silent contract mismatches may exist).
+- API contract verification.
 - Regression testing.
 - The user explicitly expects this phase to surface more real issues than another feature PR would — treat it as seriously as a feature, not a checkbox pass.
 
@@ -151,4 +134,4 @@ Do not skip steps 1–3 to "just start coding" — every deviation from this seq
 
 ## Immediate next action
 
-Do **not** resume mid-investigation. Start fresh at the top of this file's "Worker Mobile HR Self-Service" section: **implement PR 1 (backend `hr:payslip:read-own` capability)** — plan it explicitly (file list, exact route/permission changes, test plan), get it approved, then build it. Only after that PR is merged, start PR 2 (mobile HR screen).
+The MVP feature phase is formally complete! Proceed to execute the **MVP stabilization pass** (API contract verification, finding UI inconsistencies, and the Employment Record verification audit) and fix the found issues.
