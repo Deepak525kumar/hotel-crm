@@ -410,6 +410,111 @@ describe('workRequests.acceptBroadcast', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Content-Type: FormData bodies must not carry the JSON default
+// ---------------------------------------------------------------------------
+
+describe('request — FormData body', () => {
+  it('omits Content-Type for a FormData body, letting the runtime set its own boundary', async () => {
+    mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
+
+    const form = new FormData();
+    form.append('category', 'GENERAL');
+    await api.documents.upload('worker1', { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' }, { category: 'GENERAL' });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+  });
+
+  it('still defaults Content-Type to application/json for an ordinary JSON body', async () => {
+    mockFetch.mockResolvedValueOnce(res(200, { data: mockUser }));
+
+    await api.auth.login('a@b.com', 'pw');
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect((init.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// documents.upload — picker-asset -> FormData field mapping
+// ---------------------------------------------------------------------------
+
+describe('documents.upload', () => {
+  it('maps the picker asset (uri/name/mimeType) onto the file part as {uri, name, type}', async () => {
+    mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
+    const appendSpy = jest.spyOn(FormData.prototype, 'append');
+
+    await api.documents.upload(
+      'worker1',
+      { uri: 'file:///doc.pdf', name: 'passport.pdf', mimeType: 'application/pdf' },
+      { category: 'GENERAL' },
+    );
+
+    // The field key that carries the actual file must be named "file" (the
+    // backend's multer middleware is `upload.single('file')`), and its value
+    // must remap the picker's `mimeType` field to `type` — a documented
+    // divergence from expo-document-picker's own asset shape, easy to get
+    // silently wrong if either field is ever renamed.
+    const fileCall = appendSpy.mock.calls.find(([field]) => field === 'file');
+    expect(fileCall).toBeDefined();
+    expect(fileCall?.[1]).toMatchObject({
+      uri: 'file:///doc.pdf',
+      name: 'passport.pdf',
+      type: 'application/pdf',
+    });
+
+    appendSpy.mockRestore();
+  });
+
+  it('falls back to application/octet-stream when the picker returns no mimeType', async () => {
+    mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
+    const appendSpy = jest.spyOn(FormData.prototype, 'append');
+
+    await api.documents.upload(
+      'worker1',
+      { uri: 'file:///doc', name: 'doc' },
+      { category: 'GENERAL' },
+    );
+
+    const fileCall = appendSpy.mock.calls.find(([field]) => field === 'file');
+    expect(fileCall?.[1]).toMatchObject({ type: 'application/octet-stream' });
+
+    appendSpy.mockRestore();
+  });
+
+  it('sends is_work_permit and expires_at only when provided', async () => {
+    mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
+    const appendSpy = jest.spyOn(FormData.prototype, 'append');
+
+    await api.documents.upload(
+      'worker1',
+      { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' },
+      { category: 'WORK_PERMIT', is_work_permit: true, expires_at: '2027-01-01' },
+    );
+
+    const fields = Object.fromEntries(appendSpy.mock.calls.map(([k, v]) => [k, v]));
+    expect(fields['is_work_permit']).toBe('true');
+    expect(fields['expires_at']).toBe('2027-01-01');
+
+    appendSpy.mockRestore();
+  });
+
+  it('posts to /documents/workers/:worker_id/documents', async () => {
+    mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
+
+    await api.documents.upload(
+      'worker1',
+      { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' },
+      { category: 'GENERAL' },
+    );
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/documents/workers/worker1/documents');
+    expect(init.method).toBe('POST');
+  });
+});
+
 describe('workRequests.list — is_broadcast', () => {
   it('serializes is_broadcast as the literal string "true"', async () => {
     mockFetch.mockResolvedValueOnce(res(200, { data: [] }));

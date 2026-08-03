@@ -212,3 +212,23 @@ export interface BackendPagination {
   has_next: boolean;
   has_prev: boolean;
 }
+
+// SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16). Matches backend WorkerDocumentDto
+// exactly (backend/src/modules/documents/types.ts).
+export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT';
+
+export interface WorkerDocument {
+  id: string;
+  worker_id: string;
+  uploaded_by_id: string;
+  category: DocumentCategory;
+  // null when URL generation is deferred/unavailable in this environment.
+  presigned_url: string | null;
+  original_filename: string;
+  mime_type: string;
+  file_size_bytes: number;
+  expires_at: string | null;
+  is_work_permit: boolean;
+  created_at: string;
+  updated_at: string;
+}

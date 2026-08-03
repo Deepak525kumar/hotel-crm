@@ -17,6 +17,8 @@ import type {
   SkillTag,
   BroadcastEligibility,
   AcceptBroadcastResult,
+  WorkerDocument,
+  DocumentCategory,
 } from '@/types/api';
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
@@ -144,9 +146,24 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
   return body.data as { access_token: string; refresh_token: string };
 }
 
+// Duck-typed rather than `instanceof FormData` — RN's FormData polyfill has
+// historically diverged from the global under some bundler/engine
+// configurations, so an identity check is a safer signal than a class check
+// here (same reasoning React Native's own codebase applies to this type).
+function isFormDataLike(value: unknown): value is FormData {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { append?: unknown }).append === 'function'
+  );
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    // A FormData body must NOT carry an explicit Content-Type — the runtime
+    // sets its own `multipart/form-data; boundary=...`. Every existing call
+    // site sends a JSON body, so this default is unchanged for them.
+    ...(isFormDataLike(options?.body) ? {} : { 'Content-Type': 'application/json' }),
     ...(options?.headers as Record<string, string>),
   };
 
@@ -377,5 +394,63 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  },
+  documents: {
+    // SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16): worker self-upload/list.
+    // worker_id is always the authenticated caller — self-scope is the
+    // authorization, enforced server-side (documents/routes.ts
+    // scopeWorkerRoute()). Only list/upload are ported here — this worker-app
+    // screen has no use for completeness()/get()/export() (all exist on
+    // frontend/lib/api.ts's documentsApi); add whichever is needed when a
+    // screen actually consumes it, rather than porting the full contract
+    // speculatively.
+    list: (workerId: string, category?: DocumentCategory) =>
+      request<WorkerDocument[]>(
+        `/documents/workers/${workerId}/documents${category ? `?category=${category}` : ''}`
+      ),
+    // Takes the raw picker-asset shape (uri/name/mimeType, as returned by
+    // expo-document-picker; `size` deliberately not accepted here — the
+    // backend derives file_size_bytes server-side from the parsed file,
+    // never a client field, RULE-DOC-09) rather than a pre-built FormData —
+    // multipart construction is this module's own concern, not the caller's.
+    // RN's FormData file-part contract is {uri, name, type} (note: `type`,
+    // not `mimeType` — a documented divergence from the picker's own field
+    // name).
+    //
+    // KNOWN BACKEND LIMITATION (pre-existing, shared with frontend/lib/api.ts's
+    // identical documentsApi.upload — not introduced here): multipart form
+    // fields arrive as strings while uploadDocumentSchema
+    // (documents/validation.ts) expects is_work_permit as a real boolean.
+    // Sending is_work_permit=true here likely 422s until the backend schema
+    // is fixed (e.g. z.preprocess or z.enum(['true','false']).transform(...)).
+    // Not fixed in this PR — backend scope, affects web identically.
+    upload: (
+      workerId: string,
+      asset: { uri: string; name: string; mimeType?: string },
+      input: {
+        category: DocumentCategory;
+        is_work_permit?: boolean;
+        expires_at?: string;
+      }
+    ) => {
+      const form = new FormData();
+      form.append('file', {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType ?? 'application/octet-stream',
+      } as unknown as Blob);
+      form.append('category', input.category);
+      form.append('original_filename', asset.name);
+      form.append('mime_type', asset.mimeType ?? 'application/octet-stream');
+      if (input.is_work_permit !== undefined) {
+        form.append('is_work_permit', String(input.is_work_permit));
+      }
+      if (input.expires_at) form.append('expires_at', input.expires_at);
+
+      return request<WorkerDocument>(`/documents/workers/${workerId}/documents`, {
+        method: 'POST',
+        body: form,
+      });
+    },
   },
 };
