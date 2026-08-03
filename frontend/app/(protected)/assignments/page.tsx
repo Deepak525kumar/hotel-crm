@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAssignments } from "@/hooks/useAssignments";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { formatDate } from "@/lib/format";
 import {
   Card,
@@ -55,6 +56,13 @@ export default function AssignmentsPage() {
       <PageHeader
         title="Assignments"
         description="Confirmed workers and the shifts they are staffed on."
+        actions={
+          <StaffingWriteGate>
+            <TextLink href="/assignments/calendar-entries" className="text-sm">
+              Calendar placements →
+            </TextLink>
+          </StaffingWriteGate>
+        }
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
