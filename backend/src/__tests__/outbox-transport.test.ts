@@ -206,7 +206,13 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
   const mockApnsClient = { send: jest.fn() as jest.MockedFunction<(...args: any[]) => any> };
   const mockFcmClient = { send: jest.fn() as jest.MockedFunction<(...args: any[]) => any> };
 
-  const notification = { id: 'notif1', user_id: 'user1', title: 'New Shift', message: 'You have a new shift' };
+  const notification = {
+    id: 'notif1',
+    user_id: 'user1',
+    title: 'New Shift',
+    message: 'You have a new shift',
+    type: 'ASSIGNMENT_CONFIRMED',
+  };
 
   // Epic 7 PR 7.8: both apps configured, matching a deployment with both bundle IDs set.
   const BOTH_TOPICS = { WORKER: 'com.hotelcrm.workerapp', CHECKER: 'com.hotelcrm.checkerapp' };
@@ -263,9 +269,15 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       title: 'New Shift',
       body: 'You have a new shift',
       topic: 'com.hotelcrm.workerapp',
+      data: { type: 'ASSIGNMENT_CONFIRMED' },
     });
     // Android is untouched by PR 7.8: no topic field reaches the FCM client at all.
-    expect(mockFcmClient.send).toHaveBeenCalledWith({ token: 'android-token', title: 'New Shift', body: 'You have a new shift' });
+    expect(mockFcmClient.send).toHaveBeenCalledWith({
+      token: 'android-token',
+      title: 'New Shift',
+      body: 'You have a new shift',
+      data: { type: 'ASSIGNMENT_CONFIRMED' },
+    });
   });
 
   describe('notification.data forwarding', () => {
@@ -285,10 +297,14 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
       expect(mockApnsClient.send).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' } })
+        expect.objectContaining({
+          data: { type: 'ASSIGNMENT_CONFIRMED', work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' },
+        })
       );
       expect(mockFcmClient.send).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' } })
+        expect.objectContaining({
+          data: { type: 'ASSIGNMENT_CONFIRMED', work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' },
+        })
       );
     });
 
@@ -304,11 +320,15 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
       expect(mockApnsClient.send).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { headcount: '2', urgent: 'true' } })
+        expect.objectContaining({ data: { type: 'ASSIGNMENT_CONFIRMED', headcount: '2', urgent: 'true' } })
       );
     });
 
-    it('omits data entirely (undefined) when notification.data is null', async () => {
+    // notification.type is always present (a required column, unlike the
+    // optional Json? data column) — so `data` on the wire is never fully
+    // absent even when there's nothing else to send; it degrades to
+    // {type} only, not undefined.
+    it('sends data: {type} only (not undefined) when notification.data is null', async () => {
       mockNotificationFindUnique.mockResolvedValue({ ...notification, data: null });
       mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
       mockApnsClient.send.mockResolvedValue(undefined);
@@ -317,10 +337,10 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
       const call = mockApnsClient.send.mock.calls[0][0];
-      expect(call.data).toBeUndefined();
+      expect(call.data).toEqual({ type: 'ASSIGNMENT_CONFIRMED' });
     });
 
-    it('omits data entirely when notification.data is an empty object', async () => {
+    it('sends data: {type} only when notification.data is an empty object', async () => {
       mockNotificationFindUnique.mockResolvedValue({ ...notification, data: {} });
       mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'WORKER', user_id: 'user1' }]);
       mockApnsClient.send.mockResolvedValue(undefined);
@@ -329,7 +349,7 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
       const call = mockApnsClient.send.mock.calls[0][0];
-      expect(call.data).toBeUndefined();
+      expect(call.data).toEqual({ type: 'ASSIGNMENT_CONFIRMED' });
     });
 
     it('drops a nested object/array value rather than passing a non-string through', async () => {
@@ -344,7 +364,7 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
       await handler.deliver(makeEvent(OutboxTransport.PUSH));
 
       expect(mockApnsClient.send).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { work_request_id: 'jr1' } })
+        expect.objectContaining({ data: { type: 'ASSIGNMENT_CONFIRMED', work_request_id: 'jr1' } })
       );
     });
   });

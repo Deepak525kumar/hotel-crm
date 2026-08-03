@@ -200,10 +200,12 @@ export function resolveEmailTransportHandler(
  * only ever writes string/number/boolean primitives, but this column has no
  * schema enforcement, so a malformed or non-object value is handled
  * defensively rather than assumed impossible: null/non-object collapses to
- * undefined (no data payload sent — the notification still delivers, just
- * without deep-link data, matching this pipeline's existing "degrade, don't
- * fail delivery" posture for every other partial-failure case), and each
- * primitive value is stringified rather than dropped.
+ * undefined (this function's own contribution is then empty — the caller
+ * still always sends `type`, per deliver()'s own comment, so a payload is
+ * never fully absent even when this returns undefined; the notification
+ * degrades to routing-signal-only, matching this pipeline's existing
+ * "degrade, don't fail delivery" posture for every other partial-failure
+ * case), and each primitive value is stringified rather than dropped.
  */
 function stringifyNotificationData(data: unknown): Record<string, string> | undefined {
   if (data === null || typeof data !== 'object' || Array.isArray(data)) return undefined;
@@ -350,7 +352,16 @@ export class PushTransportHandler implements TransportHandler {
           title: notification.title,
           body: notification.message,
           topic,
-          data: stringifyNotificationData(notification.data),
+          // `type` (Notification.type, a separate column from `data`) is
+          // composed in here rather than folded into
+          // stringifyNotificationData() itself, which stays a pure
+          // Json-coercion concern with no notion of the row it came from.
+          // A push consumer needs `type` to know how to interpret the rest
+          // of the payload (e.g. mobile routes a tapped
+          // JOB_REQUEST_BROADCAST to its offer screen using
+          // data.work_request_id) — always present, since every
+          // Notification has a type.
+          data: { type: notification.type, ...stringifyNotificationData(notification.data) },
         });
         successCount += 1;
       } catch (error) {

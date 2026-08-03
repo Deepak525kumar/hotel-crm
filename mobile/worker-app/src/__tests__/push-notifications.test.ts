@@ -14,7 +14,7 @@ jest.mock('@/lib/api', () => ({
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { api } from '@/lib/api';
-import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
+import { registerForPushNotificationsAsync, subscribeToPushNotifications, resolvePushTapRoute } from '@/lib/push-notifications';
 
 const mockNotifications = Notifications as unknown as {
   getPermissionsAsync: jest.Mock;
@@ -129,9 +129,45 @@ describe('registerForPushNotificationsAsync', () => {
   });
 });
 
+// Job Dispatch Phase 2: resolvePushTapRoute() is the pure routing decision
+// extracted from the listener callback — tested directly here without
+// mocking expo-notifications' response shape.
+describe('resolvePushTapRoute', () => {
+  it('routes a JOB_REQUEST_BROADCAST payload to its offer detail screen', () => {
+    const route = resolvePushTapRoute({ type: 'JOB_REQUEST_BROADCAST', work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' });
+    expect(route).toBe('/offer/jr1');
+  });
+
+  it('falls back to the Alerts tab for a JOB_REQUEST_BROADCAST payload missing work_request_id', () => {
+    const route = resolvePushTapRoute({ type: 'JOB_REQUEST_BROADCAST' });
+    expect(route).toBe('/notifications');
+  });
+
+  it('falls back to the Alerts tab for a recognized-but-different type', () => {
+    const route = resolvePushTapRoute({ type: 'ASSIGNMENT_CONFIRMED', assignment_id: 'a1' });
+    expect(route).toBe('/notifications');
+  });
+
+  it('falls back to the Alerts tab when data is undefined', () => {
+    expect(resolvePushTapRoute(undefined)).toBe('/notifications');
+  });
+
+  it('falls back to the Alerts tab when data is null', () => {
+    expect(resolvePushTapRoute(null)).toBe('/notifications');
+  });
+
+  it('falls back to the Alerts tab when data is an empty object', () => {
+    expect(resolvePushTapRoute({})).toBe('/notifications');
+  });
+});
+
 describe('subscribeToPushNotifications', () => {
   const mockRemove = jest.fn();
   const mockRouter = { push: jest.fn() } as unknown as Parameters<typeof subscribeToPushNotifications>[0];
+
+  function makeResponse(data?: Record<string, unknown>) {
+    return { notification: { request: { content: { data } } } } as any;
+  }
 
   beforeEach(() => {
     mockRemove.mockReset();
@@ -147,13 +183,22 @@ describe('subscribeToPushNotifications', () => {
     );
   });
 
-  it('navigates to the Alerts tab when a delivered notification is tapped', () => {
+  it('navigates to the Alerts tab when a delivered notification with no recognized data is tapped', () => {
     subscribeToPushNotifications(mockRouter);
 
     const onResponse = mockNotifications.addNotificationResponseReceivedListener.mock.calls[0][0];
-    onResponse();
+    onResponse(makeResponse(undefined));
 
     expect(mockRouter.push).toHaveBeenCalledWith('/notifications');
+  });
+
+  it('navigates directly to the offer screen when a JOB_REQUEST_BROADCAST notification is tapped', () => {
+    subscribeToPushNotifications(mockRouter);
+
+    const onResponse = mockNotifications.addNotificationResponseReceivedListener.mock.calls[0][0];
+    onResponse(makeResponse({ type: 'JOB_REQUEST_BROADCAST', work_request_id: 'jr1', hotel_id: 'h1', skill: 'CLEANER' }));
+
+    expect(mockRouter.push).toHaveBeenCalledWith('/offer/jr1');
   });
 
   it('returns an unsubscribe function that removes the response listener', () => {
