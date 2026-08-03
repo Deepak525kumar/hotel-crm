@@ -10,8 +10,10 @@ import {
   ForbiddenError,
 } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../../config/constants.js';
+import { getEnv } from '../../config/env.js';
 import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
 import { AuthResponse, AuditLogQuery, AuditLogEntryDto } from './types.js';
+import { notificationService } from '../notifications/service.js';
 
 // ADR-031 D-4 (PR-4): the sole seam through which `User.token_generation` may
 // be incremented. `backend-auth` is the authoritative writer (ADR-017,
@@ -282,32 +284,54 @@ export class AuthService extends BaseService {
       return;
     }
 
-    // Invalidate any still-outstanding tokens from earlier requests so at
-    // most one reset token is ever valid for an account at a time (security
-    // review FIND-02: shrinks standing attack surface from stale tokens).
-    await this.prisma.passwordResetToken.deleteMany({
-      where: { user_id: user.id, used_at: null },
-    });
-
     const rawToken = crypto.randomBytes(32).toString('hex');
     const token_hash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    await this.prisma.passwordResetToken.create({
-      data: {
-        user_id: user.id,
-        token_hash,
-        expires_at: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000),
-      },
-    });
-
-    await this.logAudit(user.id, user.role, 'MODIFY', 'USER', user.id, { action: 'password_reset_requested' }, ip);
-
     // Delivering `rawToken` to the account holder's inbox requires backend-auth
     // to become an OutboxEvent producer (notificationService.enqueue()) — the
-    // EMAIL transport itself is live (Epic 7, ADR-029), but auth does not yet
-    // call enqueue() here (tracked separately as SIR-NOTIF-007 / SIR-AUTH-005).
-    // Wiring that producer call is out of this hotfix's bounded scope
-    // (backend-auth only).
+    // EMAIL transport itself is live (Epic 7, ADR-029).
+    const resetUrl = `${getEnv().FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${rawToken}`;
+
+    await this.prisma.$transaction(async (tx) => {
+      // Invalidate any still-outstanding tokens from earlier requests so at
+      // most one reset token is ever valid for an account at a time (security
+      // review FIND-02: shrinks standing attack surface from stale tokens).
+      await tx.passwordResetToken.deleteMany({
+        where: { user_id: user.id, used_at: null },
+      });
+
+      await tx.passwordResetToken.create({
+        data: {
+          user_id: user.id,
+          token_hash,
+          expires_at: new Date(Date.now() + PASSWORD_RESET_TOKEN_TTL_MINUTES * 60 * 1000),
+        },
+      });
+
+      const normalizedRole = user.role ? (user.role.toUpperCase() as UserRole) : null;
+      await tx.auditLog.create({
+        data: {
+          actor_id: user.id,
+          actor_role: normalizedRole,
+          action: 'MODIFY',
+          resource_type: 'USER',
+          resource_id: user.id,
+          details: { action: 'password_reset_requested' } as Prisma.InputJsonValue,
+          ip_address: ip || null,
+          timestamp: new Date(),
+        },
+      });
+
+      await notificationService.enqueue({
+        recipientId: user.id,
+        type: 'SYSTEM',
+        title: 'Password Reset Request',
+        message: `You have requested to reset your password. Click this link to reset it: ${resetUrl}\n\nIf you did not request this, please ignore this email.`,
+        transports: ['EMAIL'],
+        sourceModule: 'auth',
+        producerService: 'AuthService',
+      }, tx);
+    });
   }
 
   // HOTFIX-AUTH-002 (SIR-AUTH-001): step 2 of 2. Requires the raw token issued
