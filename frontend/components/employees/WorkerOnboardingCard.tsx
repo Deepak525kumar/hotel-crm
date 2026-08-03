@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { mutate } from "swr";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
+import { useHotelGroups } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { employeesApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
@@ -19,10 +20,16 @@ import {
   FormError,
   Input,
   Modal,
+  Select,
   Skeleton,
 } from "@/components/ui";
 import type { EmploymentStatus, SkillTag } from "@/lib/types";
 
+// Mirrors the backend `SkillTag` Prisma enum (schema.prisma) — a fixed,
+// schema-level enum (REQ-EMP-003), not an admin-managed lookup table, so it
+// can only change via a migration that would also require updating this
+// list. No API currently exposes the skill catalog for the frontend to
+// source this from instead; follow up if that changes.
 const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
   { value: "CLEANER", label: "Cleaner" },
   { value: "PUBLIC_SERVICE", label: "Public service" },
@@ -61,6 +68,13 @@ const STATUS_LABEL: Record<EmploymentStatus, string> = {
  * same stopgap). Kept as two explicit actions ("Confirm onboarding complete"
  * then "Approve for work") rather than one combined button so the UI doesn't
  * imply a review took place when nothing was reviewed.
+ *
+ * TEMPORARY ORCHESTRATION UI, not the long-term owner of onboarding: once a
+ * real Onboarding module exists and drives these transitions itself (via
+ * `IF-EMP-LifecycleSignal`, unchanged), this card should become mostly
+ * read-only — reflecting onboarding progress driven elsewhere rather than
+ * performing the actions. Do not build further orchestration logic on top of
+ * this card; extend the future Onboarding module instead.
  */
 export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const { data: record, isLoading, error } = useEmploymentRecord(userId);
@@ -297,6 +311,7 @@ function ApproveModal({
   onClose: () => void;
 }) {
   const [hotelGroupId, setHotelGroupId] = useState("");
+  const { groups } = useHotelGroups();
   const approve = useAsyncAction();
 
   const reset = () => setHotelGroupId("");
@@ -342,13 +357,18 @@ function ApproveModal({
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-500">
-          The hotel group is normally detected automatically from your own scope. Only set this
-          if the worker should be assignable at a specific group you don&apos;t directly manage.
+          Hotel group is auto-detected when a Regional Manager or Hotel Manager approves — it
+          isn&apos;t for an Admin account, so this must be set here or the worker becomes active
+          but unassignable to any hotel.
         </p>
-        <Input
-          label="Hotel group ID (only if not auto-detected)"
+        <Select
+          label="Hotel group"
           value={hotelGroupId}
           onChange={(e) => setHotelGroupId(e.target.value)}
+          options={[
+            { value: "", label: "Select a hotel group…" },
+            ...groups.map((g) => ({ value: g.id, label: g.name })),
+          ]}
         />
         <FormError>{approve.error}</FormError>
       </div>
