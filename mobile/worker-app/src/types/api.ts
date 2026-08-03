@@ -275,3 +275,43 @@ export interface ConsentRecord {
   decision: 'GRANTED' | 'DECLINED' | 'WITHDRAWN' | 'RENEWED';
   decided_at: string;
 }
+
+// HR / Payroll / Contract
+export type ContractStatusType = 'PENDING' | 'ACTIVE' | 'EXTENDED' | 'PERMANENT';
+
+export interface ContractDto {
+  id: string;
+  worker_id: string;
+  template_id: string;
+  position: string;
+  start_date: string;
+  end_date: string | null;
+  status: ContractStatusType;
+  scanned_document_id: string | null;
+  confirmed_by_id: string | null;
+  confirmed_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PayslipRequestStatusType = 'REQUESTED' | 'FULFILLED';
+
+export interface PayslipRequestDto {
+  id: string;
+  worker_id: string;
+  period_start: string;
+  period_end: string;
+  status: PayslipRequestStatusType;
+  fulfilled_by_id: string | null;
+  fulfilled_at: string | null;
+  escalated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreatePayslipRequestRequest {
+  worker_id: string;
+  period_start: string;
+  period_end: string;
+}
