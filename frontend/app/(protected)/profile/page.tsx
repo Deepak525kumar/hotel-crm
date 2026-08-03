@@ -6,6 +6,9 @@ import { AbsencesCard } from "@/components/calendar/AbsencesCard";
 import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { ConsentCard } from "@/components/consent/ConsentCard";
 import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
+import { DocumentsCard } from "@/components/documents/DocumentsCard";
+import { ContractCard } from "@/components/hr/ContractCard";
+import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -87,6 +90,12 @@ export default function ProfilePage() {
       {user.role === "worker" && <MyStatsCard />}
 
       {user.role === "worker" && <AbsencesCard />}
+
+      {user.role === "worker" && <DocumentsCard workerId={user.id} />}
+
+      {user.role === "worker" && <ContractCard workerId={user.id} />}
+
+      {user.role === "worker" && <PayslipRequestsCard workerId={user.id} />}
 
       <ConsentCard />
 
