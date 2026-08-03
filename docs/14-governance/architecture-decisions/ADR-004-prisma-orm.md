@@ -26,7 +26,7 @@ Current-state facts:
 - The Prisma schema declares the `prisma-client-js` generator (`backend/prisma/schema.prisma:9-11`).
 - `@prisma/client` (^5.12.0) is a runtime dependency and `prisma` (^5.12.0) is a dev dependency (`backend/package.json:26,45`).
 - `postinstall` runs `prisma generate`; `migrate:deploy` runs `prisma migrate deploy`; additional scripts cover `migrate dev`, `db push`, `studio`, and `seed` (`backend/package.json:8,14-18`).
-- The production deploy workflow runs `npx prisma migrate deploy` as a gated step (`.github/workflows/deploy-production.yml:66-70`).
+- The production deploy script runs `npx --no-install prisma migrate deploy` (`scripts/deploy.sh:30`), invoked from the `.github/workflows/deploy.yml` deploy job.
 
 ## Decision
 
@@ -39,7 +39,7 @@ Scope: applies to backend persistence access and migrations. Generated Prisma cl
 Positive:
 
 - Type-safe queries generated from a single schema source reduce data-layer errors.
-- Migrations are version-controlled and applied deterministically in CI via `prisma migrate deploy` (`.github/workflows/deploy-production.yml:66-70`).
+- Migrations are version-controlled and applied deterministically on deploy via `prisma migrate deploy` (`scripts/deploy.sh:30`).
 
 Negative:
 
@@ -49,7 +49,7 @@ Negative:
 Neutral / operational:
 
 - Prisma version is pinned by constraint at ^5.12.0 for both client and CLI (`backend/package.json:26,45`).
-- The deploy workflow's migration-status handling depends on Prisma 5.x behavior (`.github/workflows/deploy-production.yml:43-62`).
+- `prisma migrate deploy` behavior (including migration-status handling) depends on the pinned Prisma 5.x CLI (`backend/package.json:45`).
 
 ## Alternatives Considered
 
@@ -64,7 +64,8 @@ Neutral / operational:
 
 - [Prisma schema](../../../backend/prisma/schema.prisma)
 - [Backend package manifest](../../../backend/package.json)
-- [Production deploy workflow](../../../.github/workflows/deploy-production.yml)
+- [Deploy workflow](../../../.github/workflows/deploy.yml)
+- [Deploy script](../../../scripts/deploy.sh)
 - [Project README](../../../README.md)
 - [ADR-005: PostgreSQL Database](ADR-005-postgresql-database.md)
 - [ADR-003: Modular Monolith Architecture](ADR-003-modular-monolith-architecture.md)
@@ -79,7 +80,7 @@ Neutral / operational:
 | `prisma` ^5.12.0 is a dev dependency | Confirmed | `backend/package.json:45` |
 | `postinstall` runs `prisma generate` | Confirmed | `backend/package.json:8` |
 | `migrate:deploy` runs `prisma migrate deploy`; migrate/push/studio/seed scripts exist | Confirmed | `backend/package.json:14-18` |
-| Production deploy runs `npx prisma migrate deploy` | Confirmed | `.github/workflows/deploy-production.yml:66-70` |
+| Production deploy runs `npx prisma migrate deploy` | Confirmed | `scripts/deploy.sh:30` |
 | Owner / accountable party for this decision | UNKNOWN | No CODEOWNERS; `backend/package.json:23` author empty |
 
 ## Open Questions
