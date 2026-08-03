@@ -70,6 +70,15 @@ export default function ProfileScreen() {
         </Pressable>
 
         <Pressable
+          onPress={() => router.push('/documents')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.logoutButton}>
+            <ThemedText type="smallBold">View Documents</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <Pressable
           onPress={handleLogout}
           disabled={isLoggingOut}
           style={({ pressed }) => [{ opacity: pressed || isLoggingOut ? 0.7 : 1 }]}
