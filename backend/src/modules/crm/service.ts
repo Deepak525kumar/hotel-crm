@@ -7,6 +7,7 @@ import {
   ListHotelGroupsQuery,
 } from './types.js';
 import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope.js';
+import { bumpTokenGeneration } from '../auth/service.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
@@ -241,24 +242,87 @@ export class CrmService extends BaseService {
     return hotelGroup;
   }
 
+  // Lock-ordering follow-up (post-#339 review, paired with the identical fix
+  // in users/service.ts#updateUserRole): this is the RM-transfer path, so it
+  // now locks User rows (the outgoing and incoming RM, for the
+  // token_generation bump below) in addition to the HotelGroup row it always
+  // locked. It MUST acquire in the same order updateUserRole does — User
+  // first, then HotelGroup — or a demote racing a transfer deadlocks instead
+  // of cleanly serializing. See updateUserRole's comment for the full
+  // race/deadlock analysis; this is the other half of that pair.
   async updateHotelGroup(hotelGroupId: string, data: UpdateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
-    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
-    if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+    const existing = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!existing) throw new NotFoundError('Hotel group not found');
+
+    const nextRegionalManagerUserId = data.regional_manager_user_id ?? existing.regional_manager_user_id;
+    const isTransfer =
+      data.regional_manager_user_id !== undefined &&
+      data.regional_manager_user_id !== existing.regional_manager_user_id;
 
     if (data.regional_manager_user_id !== undefined) {
       await this.assertRegionalManagerExists(data.regional_manager_user_id);
     }
 
-    const updated = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: {
-        name: data.name ?? hotelGroup.name,
-        billing_info: data.billing_info ?? hotelGroup.billing_info,
-        regional_manager_user_id: data.regional_manager_user_id ?? hotelGroup.regional_manager_user_id,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Lock BOTH RM user rows before the outgoing RM's HotelGroup row, so a
+      // concurrent updateUserRole() demotion of either user blocks until this
+      // transaction commits (and re-reads a consistent state, not a stale
+      // pre-transfer snapshot). Fixed order across both ids (existing, then
+      // new) avoids a third deadlock class: two concurrent transfers of the
+      // SAME PAIR of users in opposite directions.
+      const lockIds = [existing.regional_manager_user_id, nextRegionalManagerUserId]
+        .filter((id, i, arr) => arr.indexOf(id) === i)
+        .sort();
+      for (const id of lockIds) {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+      }
+
+      // Re-check under lock: the D12 assertion above ran outside the
+      // transaction, so re-verify the new RM still holds the role and the
+      // group row hasn't changed underneath us since the initial read.
+      const hotelGroup = await tx.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+      if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+      const result = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: {
+          name: data.name ?? hotelGroup.name,
+          billing_info: data.billing_info ?? hotelGroup.billing_info,
+          regional_manager_user_id: nextRegionalManagerUserId,
+        },
+      });
+
+      if (isTransfer) {
+        // Both the outgoing RM (loses access to this group) and the incoming
+        // RM (whose scope claim must now resolve to this group, not
+        // whatever they had before) need their already-issued tokens
+        // invalidated — otherwise a live token keeps carrying the stale
+        // `scope` claim (minted at login/refresh, never re-derived
+        // per-request, middleware/auth.ts) for up to JWT_ACCESS_EXPIRY.
+        await bumpTokenGeneration(tx, existing.regional_manager_user_id);
+        await bumpTokenGeneration(tx, nextRegionalManagerUserId);
+      }
+
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
+    if (isTransfer) {
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'MODIFY',
+        'HOTEL_GROUP',
+        hotelGroupId,
+        {
+          action: 'token_generation_bumped',
+          reason: 'regional_manager_transfer',
+          outgoing_user_id: existing.regional_manager_user_id,
+          incoming_user_id: nextRegionalManagerUserId,
+        },
+        ip
+      );
+    }
     return updated;
   }
 
