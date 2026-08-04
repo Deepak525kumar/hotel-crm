@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/permissions.js';
+import { requireRole, requirePermission } from '../../middleware/permissions.js';
 import { isJobDispatchPhase2Enabled } from '../../config/feature-flags.js';
 import {
   createCalendarEntry,
@@ -64,6 +64,15 @@ router.patch('/:id', updateAssignment);
 // check in the service (assignment_id, not hotel_id, is the path param here,
 // so checkHotelAccess() can't read hotel_id off the URL — same shape as
 // quality/routes.ts POST /verifications and /ratings).
-router.post('/:id/rooms-completed', requireRole(['admin', 'manager']), logRoomsCompleted);
+// `regional_manager` added per ADR-030 §3 C-24 (Manage assignments — RM
+// `✓ᶜ`, token `staffing:write`). The sibling POST /calendar-entries on this
+// same router already admitted it, and the service's own guard already handles
+// RM — the route gate was the sole blocker.
+router.post(
+  '/:id/rooms-completed',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('staffing:write'),
+  logRoomsCompleted
+);
 
 export default router;

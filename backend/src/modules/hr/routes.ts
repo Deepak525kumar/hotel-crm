@@ -25,12 +25,25 @@ const upload = multer({
 
 // checkWorkerScope() allows only admin (bypass) and manager (group-scope
 // check) — every other role, including worker, is unconditionally denied.
+// `regional_manager` appears in every role gate in this module per ADR-030 §3
+// C-29 (Manage HR contracts / payroll) and C-30 (View HR records), both of which
+// grant RM `✓ᶜ` with the `hr:write`/`hr:read` tokens RM already holds
+// (config/constants.ts). It was previously absent from all of them, so an RM
+// was denied the entire HR surface despite holding the ratified tokens.
+//
+// Two layers had to change together: these role lists, AND
+// middleware/permissions.ts's resolveWorkerScope(), which had no RM branch and
+// so denied every checkWorkerScope()-guarded route below even once the role gate
+// passed. The role-conditional wrappers (requireContractReadAccess,
+// requirePayslipReadAccess) needed no change — they branch on
+// `role === 'worker'`, so an RM resolves to `hr:read`, which it holds.
+//
 // IF-HR-GetContractStatus (ADR-042/OD-HR-10) requires worker self-access,
 // which checkWorkerScope() cannot express. Worker self-access is instead
 // self-scoped in the service layer (HrService.getContractStatus checks
 // actorId === workerId for the 'worker' role) — the identical
-// requireRole(['admin','manager','worker']) + scopeWorkerRoute() shape
-// documents/routes.ts's four admin/manager/worker routes already establish.
+// requireRole(['admin','manager','regional_manager','worker']) +
+// scopeWorkerRoute() shape documents/routes.ts's four routes already establish.
 function scopeWorkerRoute() {
   return (req: Request, res: Response, next: NextFunction) => {
     if (req.auth?.role === 'worker') {
@@ -113,12 +126,12 @@ router.use(authMiddleware);
 // for users/service.ts's listUsers(), not a new authorization pattern.
 
 // Contracts
-router.get('/contracts', requireRole(['admin', 'manager']), requirePermission('hr:read'), (req, res, next) =>
+router.get('/contracts', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('hr:read'), (req, res, next) =>
   hrController.listContracts(req, res, next)
 );
 router.post(
   '/contracts',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.createContract(req, res, next)
@@ -129,12 +142,12 @@ router.post(
 // via resolveNonAdminScopeFilter inside the service). Worker sees only their
 // own requests — self-scope enforced in hrService.listPayroll (FIND-SEC-HR-03
 // IDOR guard, actorId-override pattern mirroring getContractStatus).
-router.get('/payroll', requireRole(['admin', 'manager', 'worker']), requirePayslipReadAccess(), (req, res, next) =>
+router.get('/payroll', requireRole(['admin', 'manager', 'regional_manager', 'worker']), requirePayslipReadAccess(), (req, res, next) =>
   hrController.listPayroll(req, res, next)
 );
 router.post(
   '/payroll',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.createPayroll(req, res, next)
@@ -150,7 +163,7 @@ router.post(
 // a manager cannot fulfil another hotel group's requests.
 router.post(
   '/payroll/:request_id/fulfil',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   (req, res, next) => hrController.fulfilPayslipRequest(req, res, next)
 );
@@ -175,7 +188,7 @@ router.post(
 // rather than being denied by checkWorkerScope().
 router.get(
   '/workers/:worker_id/contract-status',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireContractReadAccess(),
   scopeWorkerRoute(),
   (req, res, next) => hrController.getContractStatus(req, res, next)
@@ -186,7 +199,7 @@ router.get(
 // same as every other HR write route.
 router.post(
   '/workers/:worker_id/contract-scan',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   upload.single('file'),
@@ -197,7 +210,7 @@ router.post(
 // IF-HR-ConfirmContractSigned (RULE-HR-03/13, OD-HR-13): Manager/Admin only.
 router.post(
   '/workers/:worker_id/contract-confirm',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.confirmContractSigned(req, res, next)
@@ -208,14 +221,14 @@ router.post(
 // worker-side veto (ADR-040 Decision §1/§3).
 router.post(
   '/workers/:worker_id/contract-extend',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.extendContract(req, res, next)
 );
 router.post(
   '/workers/:worker_id/contract-lapse',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   (req, res, next) => hrController.manualLapseContract(req, res, next)
@@ -225,7 +238,7 @@ router.post(
 // to backend-documents' DocumentService rather than hosting the mechanism)
 router.post(
   '/workers/:worker_id/documents',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('hr:write'),
   checkWorkerScope(),
   upload.single('file'),

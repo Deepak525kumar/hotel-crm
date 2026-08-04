@@ -365,4 +365,83 @@ describe('HR route authorization (ADR-030 C-10)', () => {
       expect(res.status).toBe(403);
     });
   });
+
+  // ADR-030 §3 C-29 (Manage HR contracts / payroll) and C-30 (View HR records)
+  // both grant Regional Manager `✓ᶜ` with the `hr:write`/`hr:read` tokens RM
+  // already held. Every HR route nonetheless omitted `regional_manager` from its
+  // requireRole list, AND middleware/permissions.ts's resolveWorkerScope() had
+  // no RM branch — so an RM was denied twice over, at the role gate and again at
+  // the worker-scope gate. Both layers are fixed; these cases pin both.
+  describe('regional_manager (ADR-030 C-29/C-30)', () => {
+    it('allows a regional_manager on GET /hr/contracts', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: ['hr:read'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/hr/contracts');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows a regional_manager on GET /hr/payroll', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: ['hr:read'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/hr/payroll');
+      expect(res.status).toBe(200);
+    });
+
+    // Exercises resolveWorkerScope()'s new regional_manager branch: the worker's
+    // EmploymentRecord group must match the RM's hotel_group claim.
+    it('allows a regional_manager to create a contract for a worker in their group', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: ['hr:write'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/contracts').send({ worker_id: 'w1' });
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a regional_manager creating a contract for a worker outside their group (403)', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: ['hr:write'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g_other' });
+      const res = await request(makeApp()).post('/hr/contracts').send({ worker_id: 'w1' });
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a regional_manager with no scope claim (403, deny-by-default)', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: ['hr:write'],
+        scope: null,
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/hr/contracts').send({ worker_id: 'w1' });
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a regional_manager lacking the hr:write token (403)', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).post('/hr/contracts').send({ worker_id: 'w1' });
+      expect(res.status).toBe(403);
+    });
+  });
 });

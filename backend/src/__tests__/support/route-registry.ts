@@ -100,6 +100,73 @@ function modulesDir(): string {
 }
 
 /**
+ * Replaces the CONTENT of every `//` line comment and block comment with
+ * spaces, preserving the source's exact length and line structure (newlines are
+ * kept) so every index and line number is unchanged.
+ *
+ * Needed because the scanners below treat `'`, `"` and backtick as string
+ * delimiters. An apostrophe in prose ("the manager's scope") is not a string
+ * opener, but a character-level scanner cannot tell the difference — so a
+ * comment could silently consume the parens of the following route
+ * registration. Blanking comment bodies removes that entire failure class
+ * rather than relying on comment prose avoiding apostrophes.
+ *
+ * String literals are tracked here too, so a `//` inside a string (e.g. a
+ * `'https://…'` path literal) is correctly NOT treated as a comment start.
+ */
+function stripComments(src: string): string {
+  const out = src.split('');
+  let inString: string | null = null;
+  let i = 0;
+
+  const blank = (from: number, to: number): void => {
+    for (let k = from; k < to && k < out.length; k++) {
+      if (out[k] !== '\n') out[k] = ' ';
+    }
+  };
+
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (inString) {
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      i++;
+      continue;
+    }
+
+    if (ch === "'" || ch === '"' || ch === '`') {
+      inString = ch;
+      i++;
+      continue;
+    }
+
+    if (ch === '/' && src[i + 1] === '/') {
+      const end = src.indexOf('\n', i);
+      const stop = end === -1 ? src.length : end;
+      blank(i, stop);
+      i = stop;
+      continue;
+    }
+
+    if (ch === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      blank(i, stop);
+      i = stop;
+      continue;
+    }
+
+    i++;
+  }
+
+  return out.join('');
+}
+
+/**
  * Extracts the substring of `src` starting at `startIdx` (which must point at
  * the opening '(' of a call) through its matching closing ')', inclusive.
  * Tracks nested parens, brackets and quoted strings so it does not stop early
@@ -284,7 +351,16 @@ function parseGates(
 // (multi-line calls, escaped quotes, etc.) against a fixed synthetic input.
 export function parseRouteFile(moduleName: string, source: string): ParsedRoute[] {
   const routes: ParsedRoute[] = [];
+  // Annotations are scanned from the ORIGINAL source: stripComments() below
+  // removes the `// @requiresPermission ...` lines this depends on.
   const permissionWrapperAnnotations = scanPermissionWrapperAnnotations(source);
+  // Comments are blanked before any bracket/quote scanning. extractBalancedParens()
+  // treats `'` as a string delimiter, so an ordinary apostrophe in English prose
+  // ("§1's original statement", "manager's scope") would open a phantom string and
+  // swallow the parens of the next router.<method>( call, throwing "Unbalanced
+  // parens". That was a latent bug: it only bit once a comment containing an
+  // apostrophe happened to sit close enough above a route-registration call.
+  source = stripComments(source);
   const callRegex = /router\.(get|post|put|patch|delete)\(/g;
   let match: RegExpExecArray | null;
 

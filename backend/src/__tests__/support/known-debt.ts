@@ -24,13 +24,23 @@
 //   - notifications:read/write: only the admin-only outbox-admin routes
 //     (`requireRole('admin')`) and the unguarded read/mark-read/push-token
 //     routes exist; none checks `requirePermission('notifications:read'/'write')`.
+//   - hotels:operate: added to ROLE_PERMISSIONS to match ADR-030 §3 C-04
+//     (Operate hotel — Admin/RM/Manager `✓ᶜ`), but C-04's own surface (the
+//     GD-05 pause toggle) is not built, so no route checks it yet. Unlike the
+//     entries above this is NOT dead: it is a ratified grant awaiting its
+//     route, and the entry should be removed — not the token deleted — when
+//     that route lands. Distinct from `org_chart:read`, the other C-33 token
+//     added in the same pass, which IS consumed
+//     (employee-management/routes.ts's org-chart route) and so is absent here.
 export const KNOWN_PRE_EXISTING_ORPHANED_TOKENS = new Set([
+  'hotels:operate',
   'rooms:read',
   'rooms:write',
   'tasks:read',
   'tasks:write',
+  // `staffing:write` is NOT here: it is now checked by the C-23/C-24/C-25/C-26
+  // routes. `staffing:read` remains orphaned — no route checks it.
   'staffing:read',
-  'staffing:write',
   'notifications:read',
   'notifications:write',
   'audit:read',

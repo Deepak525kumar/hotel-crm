@@ -172,4 +172,20 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
       .send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(200);
   });
+
+  // ADR-030 §3 C-24 grants regional_manager `✓ᶜ` on assignments. This suite
+  // covered `manager` but never `regional_manager`, which is precisely why
+  // update()'s `actorRole !== 'admin' && actorRole !== 'manager'` guard survived
+  // the first authorization sweep: an RM MATCHED it and was routed through the
+  // worker-roster eligibility check (an individual-grain model) instead of being
+  // treated as management. With no membership rows it would 403.
+  it('allows a regional_manager regardless of ownership/membership (200)', async () => {
+    testAuth = { userId: 'rm_other', role: 'regional_manager' };
+    currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
+    membershipHotelIds = [];
+    const res = await request(makeApp())
+      .patch('/assignments/a1')
+      .send({ status: 'IN_PROGRESS' });
+    expect(res.status).toBe(200);
+  });
 });

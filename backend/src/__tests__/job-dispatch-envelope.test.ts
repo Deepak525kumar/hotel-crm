@@ -203,7 +203,7 @@ function expectPaginatedEnvelope(body: any) {
 
 describe('Job-dispatch response envelope (Epic 9 PR 9.1)', () => {
   beforeEach(() => {
-    testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+    testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
   });
 
   describe('work-requests', () => {

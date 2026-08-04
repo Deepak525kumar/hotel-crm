@@ -131,11 +131,64 @@ describe('Documents route authorization (SPEC-DOCUMENTS-001, GD-16)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('bare document-id lookup allows any of the three roles through the route gate', async () => {
-    for (const role of ['admin', 'manager', 'worker']) {
+  it('bare document-id lookup allows any of the four roles through the route gate', async () => {
+    for (const role of ['admin', 'manager', 'regional_manager', 'worker']) {
       testAuth = { userId: 'x1', role, permissions: [], scope: null };
       const res = await request(makeApp()).get('/documents/documents/doc1');
       expect(res.status).toBe(200);
     }
+  });
+
+  // GOVERNANCE: `regional_manager` was added to this module's five role gates by
+  // explicit project-owner decision (2026-08-04), REVERSING `OD-DOC-007`/`GD-16`
+  // ("broader Regional-Manager access explicitly not adopted") in favour of
+  // `ADR-030` D-5 / PDD §5.4 ("all Hotel-Manager actions across the group").
+  // OD-DOC-007 must be superseded by a Decision Record in the documentation-sync
+  // PR; see documents/routes.ts's governance note. Behaviour mirrors the
+  // manager-upload cases above exactly — group-scoped via resolveWorkerScope(),
+  // which gained its RM branch in the same change.
+  describe('regional_manager (owner decision 2026-08-04, supersedes OD-DOC-007)', () => {
+    it('allows a regional_manager uploading for a worker in their group scope', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/documents/workers/w1/documents').send({});
+      expect(res.status).toBe(201);
+    });
+
+    it('denies a regional_manager uploading for a worker outside their group scope (403)', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+      const res = await request(makeApp()).post('/documents/workers/w1/documents').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a regional_manager with no scope claim (403, deny-by-default)', async () => {
+      testAuth = { userId: 'rm1', role: 'regional_manager', permissions: [], scope: null };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).post('/documents/workers/w1/documents').send({});
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a regional_manager to list documents for a worker in their group', async () => {
+      testAuth = {
+        userId: 'rm1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const res = await request(makeApp()).get('/documents/workers/w1/documents');
+      expect(res.status).toBe(200);
+    });
   });
 });

@@ -142,6 +142,32 @@ describe('Attendance scope authorization (ATT OQ-02 / SIR-ATT-002)', () => {
       expect(res.body.error).toBe('ForbiddenError');
     });
 
+    // C-26 write path: an RM may correct attendance for a hotel in its group,
+    // and must be denied outside it. Previously the `role === 'manager'` guard
+    // skipped the scope check for an RM, and the `isWorker` computation below it
+    // evaluated TRUE for an RM — so an RM was treated as a worker on write too.
+    it('allows a regional_manager to update an in-group record (200)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).patch('/attendance/att_h1').send({ notes: 'ok' });
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a regional_manager updating an out-of-group record (403)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
+      };
+      const res = await request(makeApp()).patch('/attendance/att_h1').send({ notes: 'nope' });
+      expect(res.status).toBe(403);
+    });
+
     it('allows an admin to update any record (200)', async () => {
       testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
       const res = await request(makeApp()).patch('/attendance/att_h2').send({ notes: 'ok' });
@@ -190,6 +216,31 @@ describe('Attendance scope authorization (ATT OQ-02 / SIR-ATT-002)', () => {
       expect(res.status).toBe(200);
       expect(capturedListWhere.hotel_id).toBeUndefined();
       expect(capturedListWhere.hotel).toBeUndefined();
+    });
+
+    // Regression: `role !== 'admin' && role !== 'manager' && role !== 'checker'`
+    // MATCHED regional_manager, self-scoping an RM to its own attendance rows,
+    // while the `role === 'manager'` group filter skipped it — a 200 with the
+    // wrong rows. ADR-030 §3 C-26 grants RM `✓ᶜ` on attendance.
+    it('constrains a regional_manager list to their hotel_group, not to their own rows (C-26)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/attendance');
+      expect(res.status).toBe(200);
+      expect(capturedListWhere.hotel).toEqual({ hotel_group_id: 'g1' });
+      // The self-scoping regression would have set this to the actor's own id.
+      expect(capturedListWhere.worker_id).toBeUndefined();
+    });
+
+    it('denies rows for a regional_manager with no scope (empty-in)', async () => {
+      testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/attendance');
+      expect(res.status).toBe(200);
+      expect(capturedListWhere.hotel_id).toEqual({ in: [] });
     });
   });
 });

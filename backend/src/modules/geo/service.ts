@@ -2,6 +2,11 @@ import { WorkerGeoCheckin } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+// Imported from lib/scope.js rather than the middleware re-export: these are
+// pure role predicates with no I/O, and suites that jest.mock the permissions
+// middleware (to stub isHotelInScope's DB read) would otherwise have to stub
+// them too, coupling every such suite to this module's import list.
+import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { haversineDistanceMeters } from './distance.js';
 import { GEOFENCE_RADIUS_METERS } from './types.js';
@@ -145,7 +150,15 @@ export class GeoService extends BaseService {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
     };
 
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    // isSelfScopedRole()/isScopedManagerRole() rather than literal role strings:
+    // a `role !== 'admin' && role !== 'manager'` test MATCHED regional_manager,
+    // silently narrowing an RM to its own check-ins, while the
+    // `role === 'manager'` scope filter below SKIPPED it — so an RM received a
+    // 200 with the wrong rows on both counts. ADR-030 §3 grants RM the same
+    // operational capability set as Manager at group scope (D-5), and
+    // isHotelInScope()/the nested hotel_group filter already serve a
+    // hotel_group claim correctly.
+    if (isSelfScopedRole(actor.role)) {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
@@ -154,7 +167,7 @@ export class GeoService extends BaseService {
     // Review fix: single nested-relation filter, matching
     // AttendanceService.list()'s identical manager hotel_group-scope shape
     // (attendance/service.ts:159) -- no separate hotel.findMany() round-trip.
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const scope = actor.scope ?? null;
       if (!scope) {
         where.hotel_id = { in: [] };
@@ -186,11 +199,11 @@ export class GeoService extends BaseService {
     const record = await this.prisma.workerGeoCheckin.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Geofence check-in not found');
 
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    if (isSelfScopedRole(actor.role)) {
       if (record.worker_id !== actor.userId) {
         throw new ForbiddenError('Cannot access this geofence check-in');
       }
-    } else if (actor.role === 'manager') {
+    } else if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, record.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot access this geofence check-in');

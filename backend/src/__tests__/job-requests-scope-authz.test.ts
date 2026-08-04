@@ -172,20 +172,20 @@ describe('Work-request scope authorization', () => {
 
   describe('CREATE (SIR-JOBD-002 / FIND-SEC-002)', () => {
     it('allows a manager to create a work request for an in-scope hotel (201)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp()).post('/work-requests').send(createBody);
       expect(res.status).toBe(201);
     });
 
     it('denies a manager creating a work request for an out-of-scope hotel (403)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp()).post('/work-requests').send({ ...createBody, hotel_id: 'h2' });
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
     });
 
     it('allows an admin to create a work request cross-hotel (201)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
       const res = await request(makeApp()).post('/work-requests').send({ ...createBody, hotel_id: 'h2' });
       expect(res.status).toBe(201);
     });
@@ -193,7 +193,7 @@ describe('Work-request scope authorization', () => {
 
   describe('PATCH (SIR-JOBD-002 / FIND-SEC-002)', () => {
     it('allows a manager to patch a work request for an in-scope hotel (200)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .patch('/work-requests/wr_h1')
         .send({ status: 'CANCELLED', cancellation_reason: 'no demand' });
@@ -201,7 +201,7 @@ describe('Work-request scope authorization', () => {
     });
 
     it('denies a manager patching a work request for an out-of-scope hotel (403)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .patch('/work-requests/wr_h2')
         .send({ status: 'CANCELLED', cancellation_reason: 'no demand' });
@@ -210,7 +210,7 @@ describe('Work-request scope authorization', () => {
     });
 
     it('allows an admin to patch a work request cross-hotel (200)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
       const res = await request(makeApp())
         .patch('/work-requests/wr_h2')
         .send({ status: 'CANCELLED', cancellation_reason: 'no demand' });

@@ -106,17 +106,25 @@ export const PAGINATION = {
 // REGIONAL_MANAGER row) — fixed here as MANAGER's set plus `hotel_groups:read`
 // (D-5: RM sees its own group; no MASTER-data token, per D-2/D-3).
 // ADR-030 D-5: Regional Manager holds Hotel Manager's full operational
-// capability set at group scope, plus nothing else (no MASTER-data token,
-// per D-2/D-3) — defined once here so REGIONAL_MANAGER below can reuse it
-// verbatim rather than drifting out of sync with a second copy. Frozen
-// because MANAGER and REGIONAL_MANAGER share this exact array by reference
-// (not a copy): a mutation like `ROLE_PERMISSIONS.MANAGER.push(...)` would
-// silently also grant REGIONAL_MANAGER the same token. If RM ever needs a
-// token MANAGER doesn't have, don't push onto this array — give
-// REGIONAL_MANAGER its own literal below, e.g.
-// `[...MANAGER_PERMISSIONS, 'new:token']`.
+// capability set at group scope — defined once here so REGIONAL_MANAGER below
+// can build on it rather than drifting out of sync with a second copy. Frozen
+// so a mutation like `ROLE_PERMISSIONS.MANAGER.push(...)` throws instead of
+// silently granting REGIONAL_MANAGER the same token.
+//
+// REGIONAL_MANAGER is NO LONGER a bare alias of this array: per ADR-060 it also
+// holds `org_chart:read` (C-33 — org chart is RM + Admin only, Manager `✗`),
+// so it is spelled `[...MANAGER_PERMISSIONS, 'org_chart:read']` below — exactly
+// the extension shape this comment previously prescribed for that case.
 const MANAGER_PERMISSIONS = Object.freeze([
   'hotels:read',
+  // ADR-030 §3 C-04 (Operate hotel — class O, e.g. the GD-05 pause toggle).
+  // Distinct from `hotels:write`, which stays Admin-only MASTER data (C-01/C-02,
+  // D-3): operating a hotel one already manages is not editing the hotel
+  // record. No route consumes this token yet — C-04's own surface (the pause
+  // toggle) is not built — so it is granted here to match the ratified matrix
+  // rather than left absent; `permission-token-known-debt.ts` records it as
+  // orphaned until that route exists.
+  'hotels:operate',
   // C-08: a manager may view (only) the hotel group their own hotel
   // belongs to — enforced by scope filtering in-service (ADR-030 PR-4),
   // not by this token, which merely gates the route.
@@ -153,6 +161,8 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'admin:*',
     'users:read', 'users:write',
     'hotels:read', 'hotels:write',
+    // ADR-030 §3 C-04 — see MANAGER_PERMISSIONS' note on this token.
+    'hotels:operate',
     'hotel_groups:read', 'hotel_groups:write',
     'rooms:read', 'rooms:write',
     'tasks:read', 'tasks:write',
@@ -166,7 +176,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
   ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
-  REGIONAL_MANAGER: MANAGER_PERMISSIONS,
+  // ADR-060 / ADR-030 §3 C-33: RM = Manager's operational set plus
+  // `org_chart:read`. This is the ONE capability where RM legitimately diverges
+  // from Manager (CRR §1:23 — the org chart is visible ONLY to Regional Manager
+  // and Admin), so it must not be folded back into MANAGER_PERMISSIONS.
+  REGIONAL_MANAGER: Object.freeze([...MANAGER_PERMISSIONS, 'org_chart:read']) as string[],
   CHECKER: Object.freeze([
     'hotels:read',
     'rooms:read',

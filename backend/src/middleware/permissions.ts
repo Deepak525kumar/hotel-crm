@@ -3,7 +3,7 @@ import { ForbiddenError, UnauthorizedError } from '../lib/errors.js';
 import { logger } from '../lib/logger.js';
 import { isGD02MatrixEnabled } from '../config/feature-flags.js';
 import { isWorkerEligibleForHotel } from '../lib/roster-scope.js';
-import { isHotelInScope, isWorkerInGroupScope } from '../lib/scope.js';
+import { isHotelInScope, isWorkerInGroupScope, isScopedManagerRole } from '../lib/scope.js';
 import type { UserScope } from '../lib/jwt.js';
 
 // Repository convention: `requirePermission()`'s array form is an AND check
@@ -158,6 +158,11 @@ export type HotelAccessDecision =
 // primitive). Existing call sites (`attendance/service.ts`,
 // `quality/service.ts`) keep importing it from here unchanged.
 export { isHotelInScope } from '../lib/scope.js';
+// NOTE: isScopedManagerRole/isSelfScopedRole (lib/scope.js) are deliberately
+// NOT re-exported here. They are pure predicates with no I/O, and several
+// suites jest.mock this module to stub isHotelInScope's DB read — a re-export
+// would force each of those suites to stub the predicates as well. Service
+// modules import them straight from lib/scope.js instead.
 
 // Single role->scope resolution seam for hotel-level access (Epic 3 / Execution
 // Plan §2 "Shared authorization centralization seam"). Every consumer of
@@ -188,7 +193,7 @@ export async function resolveHotelAccess(
   // both wrongly deny an RM within their own group and wrongly allow one
   // outside it via incidental EmploymentRecord rows (security review finding
   // on PR-7's analytics regional_manager/analytics:read fix).
-  if (role === 'manager' || role === 'regional_manager') {
+  if (isScopedManagerRole(role)) {
     if (!hotelId) {
       return { allowed: false, reason: 'missing_hotel_id' };
     }
@@ -269,12 +274,21 @@ export type WorkerAccessDecision =
 
 // Worker-id-keyed counterpart to resolveHotelAccess()/checkHotelAccess(), for
 // routes whose payload carries a worker_id rather than a hotel_id (ADR-030
-// PR-1, C-10 — HR contracts/payroll/documents). Admin bypasses; manager is
-// scope-bound via isWorkerInGroupScope() (group-grain, matching how the
-// employment record itself is scoped, REQ-EMP-012); every other role denies —
-// no role other than admin/manager currently holds any hr:* permission, so
-// this is defense-in-depth against a future grant, not a live restriction
-// today.
+// PR-1, C-10 — HR contracts/payroll/documents). Admin bypasses; the scope-bound
+// manager roles are constrained via isWorkerInGroupScope() (group-grain,
+// matching how the employment record itself is scoped, REQ-EMP-012); every
+// other role denies.
+//
+// `regional_manager` is included via isScopedManagerRole(). It was previously
+// absent, and the comment here justified the omission with "no role other than
+// admin/manager currently holds any hr:* permission" — which was false once
+// ROLE_PERMISSIONS aliased REGIONAL_MANAGER to MANAGER_PERMISSIONS
+// (config/constants.ts), giving RM `hr:read`/`hr:write`. The effect was that an
+// RM holding the ratified C-29/C-30 tokens was hard-denied on every
+// checkWorkerScope()-guarded HR and Documents route, even inside its own group
+// — the exact defect shape SIR-AUTH-021 recorded for resolveHotelAccess().
+// isWorkerInGroupScope() is role-agnostic and group-grain, so it serves an RM's
+// hotel_group claim correctly with no further change.
 export async function resolveWorkerScope(
   role: string,
   workerId: string | undefined,
@@ -283,7 +297,7 @@ export async function resolveWorkerScope(
   if (role === 'admin') return { allowed: true };
   if (!workerId) return { allowed: false, reason: 'missing_worker_id' };
 
-  if (role === 'manager') {
+  if (isScopedManagerRole(role)) {
     const inScope = await isWorkerInGroupScope(scope, workerId);
     return inScope ? { allowed: true } : { allowed: false, reason: 'out_of_scope' };
   }

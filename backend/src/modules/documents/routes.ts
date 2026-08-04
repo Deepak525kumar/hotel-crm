@@ -26,11 +26,21 @@ const upload = multer({
   },
 });
 
-// checkWorkerScope() (permissions.ts resolveWorkerScope) allows only
-// admin (bypass) and manager (group-scope check) — every other role,
-// including worker, is unconditionally denied. It was built for
-// backend-hr's admin/manager-only contract-scan routes and cannot express
-// GD-16's worker-self-service requirement. Applying it in front of a
+// GOVERNANCE NOTE — `regional_manager` added to all five role gates in this
+// module by explicit project-owner decision (2026-08-04, Regional Manager V1
+// scoping). This REVERSES `OD-DOC-007`/`GD-16`, which recorded broader
+// Regional-Manager document access as "explicitly not adopted". The owner was
+// shown the direct conflict between that record and `ADR-030` D-5 / PDD §5.4
+// ("Regional Manager | All Hotel-Manager actions across the group") and chose
+// D-5. `OD-DOC-007` must be superseded by a new Decision Record — tracked as
+// PR6's documentation-synchronization step; until that record exists this
+// comment is the authority trail for the change, not a substitute for it.
+//
+// checkWorkerScope() (permissions.ts resolveWorkerScope) allows admin (bypass)
+// and the scope-bound manager roles (group-scope check via
+// isScopedManagerRole) — every other role, including worker, is
+// unconditionally denied. It was built for backend-hr's contract-scan routes
+// and cannot express GD-16's worker-self-service requirement. Applying it in front of a
 // worker's own request would deny GD-16's mandated actor, so it is only
 // applied for the admin/manager path; worker self-access is instead
 // self-scoped in the service layer (DocumentService checks actor_id ===
@@ -72,7 +82,7 @@ router.use(authMiddleware);
 
 router.post(
   '/workers/:worker_id/documents',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   scopeWorkerRoute(),
   upload.single('file'),
   handleUploadErrors(),
@@ -81,21 +91,21 @@ router.post(
 
 router.get(
   '/workers/:worker_id/documents',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   scopeWorkerRoute(),
   (req, res, next) => documentController.listWorkerDocuments(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/completeness',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   scopeWorkerRoute(),
   (req, res, next) => documentController.getDocumentCompleteness(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/export',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   scopeWorkerRoute(),
   (req, res, next) => documentController.exportWorkerDocuments(req, res, next)
 );
@@ -104,7 +114,7 @@ router.get(
 // DocumentService.getDocument, not by a worker_id-keyed scope middleware.
 router.get(
   '/documents/:document_id',
-  requireRole(['admin', 'manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   (req, res, next) => documentController.getDocument(req, res, next)
 );
 

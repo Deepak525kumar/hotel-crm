@@ -39,12 +39,35 @@ function makePrisma({
     $transaction: transaction,
   } as any;
 
-  return { prisma, userUpdate, auditLogCreate };
+  return { prisma, userUpdate, auditLogCreate, transaction };
+}
+
+/**
+ * Asserts the role update and its AuditLog snapshot were submitted as ONE
+ * `$transaction([...])` batch, not merely that both eventually ran.
+ *
+ * The mock above resolves each op it is handed, so a script rewritten to call
+ * `user.update(...)` and `auditLog.create(...)` sequentially — losing atomicity
+ * and allowing a promotion with no audit row if the second write failed — would
+ * still satisfy the existing "was update called / was auditLog called"
+ * assertions. This checks the shape ADR-030 M-3 actually requires: both
+ * promises present in a single array argument.
+ */
+function expectAtomicBatch(
+  transaction: jest.MockedFunction<(...args: any[]) => any>,
+  callIndex: number
+): void {
+  const args = transaction.mock.calls[callIndex];
+  expect(args).toBeDefined();
+  const ops = args![0];
+  expect(Array.isArray(ops)).toBe(true);
+  // One role update + one audit row, submitted together.
+  expect(ops).toHaveLength(2);
 }
 
 describe('promoteRegionalManagers (ADR-030 M-3)', () => {
   it('promotes a MANAGER referenced as a group RM to REGIONAL_MANAGER', async () => {
-    const { prisma, userUpdate, auditLogCreate } = makePrisma({
+    const { prisma, userUpdate, auditLogCreate, transaction } = makePrisma({
       groups: [{ id: 'g1', regional_manager_user_id: 'u1' }],
       users: { u1: { id: 'u1', role: 'MANAGER' } },
     });
@@ -65,6 +88,12 @@ describe('promoteRegionalManagers (ADR-030 M-3)', () => {
         }),
       })
     );
+    // ADR-030 M-3 requires the promotion and its audit snapshot to be atomic:
+    // a promoted user with no audit row (or vice versa) is an unacceptable
+    // partial state for a migration that doubles as the pre-migration
+    // (user_id, role) snapshot.
+    expect(transaction).toHaveBeenCalledTimes(1);
+    expectAtomicBatch(transaction, 0);
   });
 
   it('is idempotent — skips a user already promoted to REGIONAL_MANAGER', async () => {

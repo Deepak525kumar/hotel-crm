@@ -3,6 +3,9 @@ import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+// From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
+// pure predicates, so suites mocking the permissions middleware need not stub them.
+import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import { getPrisma } from '../../lib/db.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
@@ -90,8 +93,11 @@ export class AssignmentService extends BaseService {
       ...(query.status ? { status: query.status } : {}),
     };
 
-    // Workers see only their own assignments
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    // Workers (and any other self-scoped role) see only their own assignments.
+    // isSelfScopedRole() rather than `role !== 'admin' && role !== 'manager'`,
+    // which MATCHED regional_manager and silently narrowed an RM to its own
+    // rows — see lib/scope.ts for this defect class.
+    if (isSelfScopedRole(actor.role)) {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
@@ -117,7 +123,7 @@ export class AssignmentService extends BaseService {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    if (isSelfScopedRole(actor.role)) {
       if (assignment.worker_id !== actor.userId) {
         const eligible = await isWorkerEligibleForHotel(actor.userId, assignment.hotel_id);
         if (!eligible) throw new ForbiddenError('Cannot access this assignment');
@@ -136,7 +142,11 @@ export class AssignmentService extends BaseService {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (actorRole !== 'admin' && actorRole !== 'manager') {
+    // isSelfScopedRole() rather than `actorRole !== 'admin' && actorRole !==
+    // 'manager'`: that shape MATCHED regional_manager, routing an RM through the
+    // worker-roster eligibility check (an individual-grain model) instead of
+    // treating it as management. ADR-030 §3 C-24 grants RM `✓ᶜ` on assignments.
+    if (isSelfScopedRole(actorRole)) {
       if (assignment.worker_id !== actorId) {
         const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
         if (!eligible) throw new ForbiddenError('Cannot access this assignment');
@@ -216,7 +226,12 @@ export class AssignmentService extends BaseService {
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (actor.role === 'manager') {
+    // isScopedManagerRole: ADR-030 §3 C-24 grants regional_manager `✓ᶜ` on
+    // assignments and the route gate now admits it — so an RM MUST be
+    // scope-checked here. A bare `role === 'manager'` test would have skipped
+    // this check entirely for an RM, letting it log rooms completed for any
+    // hotel in the platform. isHotelInScope() resolves its hotel_group claim.
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot log rooms completed for this hotel');
@@ -286,7 +301,7 @@ export class AssignmentService extends BaseService {
     // same branch that serves 'manager' serves 'regional_manager' correctly
     // (mirrors middleware/permissions.ts's resolveHotelAccess() precedent).
     // Admin is unrestricted (bypass), matching logRoomsCompleted's shape.
-    if (actor.role === 'manager' || actor.role === 'regional_manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot place a worker on the calendar for this hotel');
@@ -360,7 +375,7 @@ export class AssignmentService extends BaseService {
 
     // Workers see only their own calendar entries; admin/manager may filter
     // by worker_id (mirrors list()'s existing worker-scoping shape).
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    if (isSelfScopedRole(actor.role)) {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;

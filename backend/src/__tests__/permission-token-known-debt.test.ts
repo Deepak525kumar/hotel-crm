@@ -22,10 +22,17 @@ describe('ADR-030 D-8 known-debt allowlist (permission-token-hygiene.test.ts exc
     'tasks:read',
     'tasks:write',
     'staffing:read',
-    'staffing:write',
     'notifications:read',
     'notifications:write',
     'audit:read',
+    // ADR-030 §3 C-04: granted to match the ratified matrix, but C-04's surface
+    // (the GD-05 pause toggle) is not built, so no route checks it yet. See
+    // support/known-debt.ts for why this differs in kind from the dead tokens
+    // above — it is a ratified grant awaiting its route, not a token to delete.
+    'hotels:operate',
+    // NOTE: `staffing:write` was removed from this list — it is now checked by
+    // the C-23/C-24/C-25/C-26 routes (job-requests, assignments, calendar,
+    // attendance). `staffing:read` remains orphaned: no route checks it.
   ].sort();
 
   it('is exactly the expected, reviewed set of tokens', () => {

@@ -7,6 +7,7 @@ import {
   ValidationError,
 } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
+import { isScopedManagerRole } from '../../lib/scope.js';
 import type { AuthContext } from '../../lib/types.js';
 import {
   assertTransition,
@@ -535,9 +536,17 @@ export class EmployeeManagementService extends BaseService {
   }
 
   // REQ-EMP-013 / RULE-EMP-08: deny-by-default visibility. Worker sees only
-  // self; Admin sees all; Manager/Checker are bound to their PR 5.4 JWT
-  // `scope` claim (group-grain, per REQ-EMP-012 — never filtered by hotel
-  // directly).
+  // self; Admin sees all; Manager/Regional Manager/Checker are bound to their
+  // PR 5.4 JWT `scope` claim (group-grain, per REQ-EMP-012 — never filtered by
+  // hotel directly).
+  //
+  // `regional_manager` reaches the scope branch via isScopedManagerRole().
+  // It was previously absent from this list, so an RM fell through to the
+  // terminal throw and was denied on `/employees/:id/profile`, `/skills` and
+  // `/by-user/:user_id` for employees in its OWN group — contradicting
+  // ADR-030 §3 C-19 (RM `✓ᶜ`), which this same class already honours for the
+  // org chart a few methods above. isRecordInScope() is role-agnostic and
+  // group-grain, so it serves an RM's hotel_group claim with no change.
   private async assertVisibility(actor: AuthContext, record: EmploymentRecord): Promise<void> {
     if (actor.role === 'worker') {
       if (record.user_id !== actor.userId) {
@@ -546,7 +555,7 @@ export class EmployeeManagementService extends BaseService {
       return;
     }
     if (actor.role === 'admin') return;
-    if (actor.role === 'manager' || actor.role === 'checker') {
+    if (isScopedManagerRole(actor.role) || actor.role === 'checker') {
       const allowed = await this.isRecordInScope(actor, record);
       if (!allowed) throw new ForbiddenError('Record is outside your scope');
       return;
