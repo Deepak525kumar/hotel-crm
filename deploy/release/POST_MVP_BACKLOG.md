@@ -7,11 +7,14 @@ business priority (that call belongs to the user).
 
 ## Deployment / operability
 
-1. **Add a demote path for the Regional Manager promotion script** — client support for
-   `regional_manager` already exists and works (frontend and both mobile apps). The only
-   remaining item is `backend/src/scripts/run-regional-manager-promotion.ts` having no
-   corresponding demote script, making the promotion a one-way operation. Build that before
-   enabling `FEATURE_RM_ROLE` in production.
+1. **~~Add a demote path for the Regional Manager promotion script~~ — DONE (PR #339, 2026-08-05).**
+   `backend/src/scripts/regional-manager-demotion.ts` + `npm run rm-role:demote` exist, guarded by
+   the same Decision-11 group-ownership check `updateUserRole` enforces live, and by a row lock
+   closing the TOCTOU race an earlier PR-#339 review round found between this script's
+   check-then-act sequence and a concurrent group transfer. Kept here, struck through, per this
+   file's own "extracted from repository evidence" convention — remove entirely at the next full
+   resynchronization pass rather than silently deleting a line a future reader might otherwise
+   wonder about.
 2. **Fix `scripts/rotate-secrets.sh` to match the reconciled PM2 topology** — it still targets
    `/etc/hotel-crm/.env` (the running processes now load env from `backend/.env`) and reloads
    only `hotel-crm-api` (missing `hotel-crm-worker`). Update both before relying on this script
