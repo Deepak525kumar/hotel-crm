@@ -56,6 +56,14 @@ Last synchronized 2026-08-04 (Release Candidate documentation pass). Companion t
 
 ## Feature flags
 
+- [ ] **All 5 feature flags below use a canonical boolean value: `true`, `false`, `1`, or `0`.**
+      As of the release-readiness fix (`env.ts#strictBooleanFlag`), any other spelling —
+      `TRUE`, `False`, `yes`, `no`, `on`, `off`, or anything not in that exact set —
+      now **fails application startup** with a validation error, rather than being silently
+      miscoerced the way `z.coerce.boolean()` previously treated any non-empty string
+      (including the literal string `"false"`) as `true`. Check every environment's actual
+      `.env` file for the literal values, not just that a flag "looks set" — this is a real
+      behavior change from the previous release, not merely a hardening note.
 - [ ] `FEATURE_EMPLOYMENT_RECORD=true`
 - [ ] `FEATURE_GD02_MATRIX=true`
 - [ ] `FEATURE_JOBDISPATCH_PHASE2=true`
