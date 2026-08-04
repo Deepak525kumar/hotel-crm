@@ -25,7 +25,20 @@ router.use(authMiddleware);
 // hotels in its own group; this also left the frontend analytics hotel-scope
 // selector (populated from this route) empty for an RM. Service-side scope
 // filtering narrows the result set (resolveNonAdminScopeFilter).
-router.get('/hotels', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('hotels:read'), ...crmController.listHotels);
+// `checker`/`worker` added per ADR-030 §3 C-05 (View hotels — ALL five roles
+// `✓ᶜ`; every role holds `hotels:read`). Previously the LIST route admitted
+// only admin/manager/regional_manager while the DETAIL route
+// (`GET /hotels/:hotel_id`, checkHotelAccess()) already admitted all five —
+// a checker/worker could read any individual hotel by id but not list them.
+// Pinned as `C-05:checker`/`C-05:worker` in
+// __tests__/support/capability-violations.ts until this fix; product
+// decision (2026-08-05) was to widen the list to match the detail route
+// and the ratified matrix, not narrow the matrix. `listHotels` now
+// group-scopes a `worker`'s results the same way `checkHotelAccess()`
+// group-scopes their per-hotel detail reads; `checker` keeps its documented
+// cross-hotel bypass (PATCH-04 §4c, `resolveHotelAccess()`), matching the
+// detail route exactly.
+router.get('/hotels', requireRole(['admin', 'manager', 'regional_manager', 'checker', 'worker']), requirePermission('hotels:read'), ...crmController.listHotels);
 router.post('/hotels', requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.createHotel);
 router.get('/hotels/:hotel_id', checkHotelAccess(), requirePermission('hotels:read'), (req, res, next) => crmController.getHotel(req, res, next));
 router.patch('/hotels/:hotel_id', checkHotelAccess(), requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.updateHotel);

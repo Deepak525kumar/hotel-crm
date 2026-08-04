@@ -4,6 +4,32 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { parseBackoffScheduleMs } from '../modules/notifications/outbox-backoff.js';
 
+// Release-audit fix: `z.coerce.boolean()` coerces ANY non-empty string —
+// including the literal string `"false"` and `"0"` — to `true` (it's
+// `Boolean(str)`, not a parse of the string's meaning). Every one of this
+// repo's 5 feature flags previously used it, so `FEATURE_RM_ROLE=false` in an
+// env file silently ENABLED the flag rather than disabling it — the exact
+// opposite of what an operator typing that line intends, with no error, no
+// warning, nothing to signal the mistake. `strictBooleanFlag` instead parses
+// the env var's actual textual meaning: `"true"`/`"1"` → true, `"false"`/`"0"`
+// → false, unset → the given default, anything else → a validation error
+// (fails startup loudly rather than silently guessing).
+function strictBooleanFlag(defaultValue: boolean) {
+  return z
+    .string()
+    .optional()
+    .transform((val, ctx) => {
+      if (val === undefined || val === '') return defaultValue;
+      if (val === 'true' || val === '1') return true;
+      if (val === 'false' || val === '0') return false;
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `must be "true", "false", "1", "0", or unset — got ${JSON.stringify(val)}`,
+      });
+      return z.NEVER;
+    });
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'staging', 'production', 'test']).default('development'),
   PORT: z.coerce.number().default(3001),
@@ -95,7 +121,7 @@ const envSchema = z.object({
   // Employment-record module cutover flag (Epic 5 PR 5.6, SPEC-EMP-001).
   // Defaults FALSE: the new employee-management routes 404 until explicitly
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
-  FEATURE_EMPLOYMENT_RECORD: z.coerce.boolean().default(false),
+  FEATURE_EMPLOYMENT_RECORD: strictBooleanFlag(false),
 
   // Regional Manager role cutover flag (ADR-030 §6 PR-2, D-6).
   // Defaults FALSE: the REGIONAL_MANAGER enum value exists (M-1, additive and
@@ -104,7 +130,7 @@ const envSchema = z.object({
   // "both-off = current behavior" posture. Must not be enabled in production
   // before PR-3 ships (ADR-030 §6 ordering constraint: the mobile/frontend
   // role-union widening and the hotel-group RM-picker fix, F-3).
-  FEATURE_RM_ROLE: z.coerce.boolean().default(false),
+  FEATURE_RM_ROLE: strictBooleanFlag(false),
 
   // GD-02/GD-03 capability-matrix cutover flag (ADR-030 §6 PR-5).
   // Defaults FALSE: while off, hotel-groups routes keep requiring the legacy
@@ -118,7 +144,7 @@ const envSchema = z.object({
   // request-time-derived from ROLE_PERMISSIONS and retired that backfill
   // script (PR-7) — this flag's own legacy-token-vs-split-token behavior is
   // unaffected and still gates independently.
-  FEATURE_GD02_MATRIX: z.coerce.boolean().default(false),
+  FEATURE_GD02_MATRIX: strictBooleanFlag(false),
 
   // ADR-031 §7 PR-7: FEATURE_DERIVED_PERMISSIONS and
   // FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired — both
@@ -128,7 +154,7 @@ const envSchema = z.object({
   // Gates nothing in PR 9.2 itself (WorkApplication removal is unconditional
   // in this PR) — it exists for PR 9.3/9.4 and the mobile companion PR to
   // consume once the replacement dispatch flow lands.
-  FEATURE_JOBDISPATCH_PHASE1: z.coerce.boolean().default(false),
+  FEATURE_JOBDISPATCH_PHASE1: strictBooleanFlag(false),
 
   // Job Dispatch Phase 2 cutover flag (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03).
   // Defaults FALSE. Gates the new POST/GET /assignments/calendar-entries
@@ -136,7 +162,7 @@ const envSchema = z.object({
   // "both-off = current behavior" posture every prior epic flag has used.
   // Distinct from FEATURE_JOBDISPATCH_PHASE1 (Phase 1, PR 9.2/9.3/9.4): each
   // phase gets its own flag per this repo's existing per-phase precedent.
-  FEATURE_JOBDISPATCH_PHASE2: z.coerce.boolean().default(false),
+  FEATURE_JOBDISPATCH_PHASE2: strictBooleanFlag(false),
 
   // ---------------------------------------------------------------------------
   // Platform Worker / Transactional Outbox (ADR-029, GD-01 — Epic 7 PR 7.2).

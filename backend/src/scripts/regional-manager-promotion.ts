@@ -20,6 +20,19 @@
  * as one AuditLog row per promoted user rather than a new table — AuditLog is
  * already the append-only, never-mutated snapshot mechanism (ADR-016) this
  * repository uses for exactly this purpose.
+ *
+ * RACE FIX (review follow-up on #339, deferred there, closed here): the
+ * original shape read `group.regional_manager_user_id` from an unlocked
+ * `findMany`, then separately checked and wrote the user row — a window in
+ * which a concurrent `PATCH /hotel-groups/:id` (transferring this group to a
+ * different manager) could land between the read and the write, promoting a
+ * MANAGER who no longer owns the group by the time the promotion commits.
+ * Fixed with the same shape `regional-manager-demotion.ts` uses: the group's
+ * CURRENT `regional_manager_user_id` is re-read inside a per-group
+ * transaction, after a `SELECT ... FOR UPDATE` lock on that user row — same
+ * lock order (User row, then the re-read) as `users/service.ts#updateUserRole`
+ * and `crm/service.ts#updateHotelGroup`, so a concurrent transfer serializes
+ * against this script rather than racing or deadlocking it.
  */
 import { PrismaClient, UserRole } from '@prisma/client';
 
@@ -39,25 +52,40 @@ export async function promoteRegionalManagers(
   let skippedAlreadyPromoted = 0;
 
   for (const group of groups) {
-    const user = await prisma.user.findUnique({
-      where: { id: group.regional_manager_user_id },
-      select: { id: true, role: true },
-    });
+    // Whole check-and-promote runs as ONE transaction per group, not a
+    // pre-transaction read followed by a separate write — see this file's
+    // header comment for the race this closes.
+    const outcome = await prisma.$transaction(async (tx) => {
+      // Row lock on the candidate user FIRST — blocks a concurrent transfer's
+      // own User-row lock (crm/service.ts#updateHotelGroup) until this
+      // transaction commits or rolls back.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${group.regional_manager_user_id} FOR UPDATE`;
 
-    if (!user) continue;
-    if (user.role !== UserRole.MANAGER) {
-      // Already REGIONAL_MANAGER (idempotent re-run) or some other role
-      // (e.g. ADMIN acting as a group's nominal RM) — never touched.
-      skippedAlreadyPromoted += 1;
-      continue;
-    }
+      // Re-read the group's CURRENT regional manager under the lock — the
+      // outer `groups` snapshot can be stale by the time we reach here.
+      const currentGroup = await tx.hotelGroup.findUnique({
+        where: { id: group.id },
+        select: { regional_manager_user_id: true },
+      });
+      if (!currentGroup) return { kind: 'skip' as const };
 
-    await prisma.$transaction([
-      prisma.user.update({
+      const user = await tx.user.findUnique({
+        where: { id: currentGroup.regional_manager_user_id },
+        select: { id: true, role: true },
+      });
+
+      if (!user) return { kind: 'skip' as const };
+      if (user.role !== UserRole.MANAGER) {
+        // Already REGIONAL_MANAGER (idempotent re-run) or some other role
+        // (e.g. ADMIN acting as a group's nominal RM) — never touched.
+        return { kind: 'skip' as const };
+      }
+
+      await tx.user.update({
         where: { id: user.id },
         data: { role: UserRole.REGIONAL_MANAGER },
-      }),
-      prisma.auditLog.create({
+      });
+      await tx.auditLog.create({
         data: {
           actor_id: null,
           actor_role: null,
@@ -69,10 +97,17 @@ export async function promoteRegionalManagers(
           details: { hotel_group_id: group.id, migration: 'ADR-030-M-3' },
           timestamp: new Date(),
         },
-      }),
-    ]);
+      });
 
-    promoted.push({ user_id: user.id, hotel_group_id: group.id });
+      return { kind: 'promoted' as const, user_id: user.id };
+    });
+
+    if (outcome.kind === 'skip') {
+      skippedAlreadyPromoted += 1;
+      continue;
+    }
+
+    promoted.push({ user_id: outcome.user_id, hotel_group_id: group.id });
   }
 
   return { promoted, skippedAlreadyPromoted };

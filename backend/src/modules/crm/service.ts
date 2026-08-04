@@ -8,12 +8,13 @@ import {
 } from './types.js';
 import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope.js';
 import { bumpTokenGeneration } from '../auth/service.js';
+import { listEligibleHotelIds } from '../../lib/roster-scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
   // ── Hotels ─────────────────────────────────────────────────────────────────
 
-  async listHotels(query: ListHotelsQuery, actorRole: string) {
+  async listHotels(query: ListHotelsQuery, actorRole: string, actorId?: string) {
     const { page, limit, search, is_active, country } = query;
     const skip = (page - 1) * limit;
 
@@ -33,6 +34,20 @@ export class CrmService extends BaseService {
     // must — it was omitted from this allowlist while `manager` was present.
     if (actorRole !== 'admin' && !isScopedManagerRole(actorRole)) {
       where['is_active'] = true;
+    }
+
+    // `worker` is roster-scoped to their eligible hotels (ADR-022/024, the
+    // same group-grain model `resolveHotelAccess()`'s worker-roster branch
+    // uses for the DETAIL route) — without this, widening the route's role
+    // gate to admit `worker` (product decision, 2026-08-05, C-05) would leak
+    // every active hotel on the platform to every worker, a strictly worse
+    // outcome than the 403 it replaces. `checker` is NOT scoped here,
+    // matching its documented cross-hotel bypass on the detail route
+    // (`resolveHotelAccess()`, PATCH-04 §4c) — checker sees every hotel on
+    // both routes, by design.
+    if (actorRole === 'worker') {
+      const eligibleHotelIds = actorId ? await listEligibleHotelIds(actorId) : [];
+      where['id'] = { in: eligibleHotelIds };
     }
 
     const [hotels, total] = await Promise.all([
