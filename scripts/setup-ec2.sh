@@ -8,7 +8,7 @@ set -euo pipefail
 ENV="${1:-production}"
 APP_DIR="/opt/hotel-crm"
 SECRET_DIR="/etc/hotel-crm"
-LOG_DIR="/var/log/hotel-crm"
+LOG_DIR="/home/ubuntu/.pm2/logs"
 DEPLOY_USER="deploy"
 
 echo "==> [1/9] System update"
@@ -114,7 +114,8 @@ EMAIL_SERVICE=sendgrid
 APNS_PRIVATE_KEY_BASE64=base64-encoded-p8-key
 APNS_KEY_ID=XXXXXXXXXX
 APNS_TEAM_ID=XXXXXXXXXX
-APNS_BUNDLE_ID=com.zirove.hotelcrm
+APNS_BUNDLE_ID_WORKER=com.hotelcrm.workerapp
+APNS_BUNDLE_ID_CHECKER=com.hotelcrm.checkerapp
 
 FIREBASE_PROJECT_ID=hotel-crm-xxxxx
 

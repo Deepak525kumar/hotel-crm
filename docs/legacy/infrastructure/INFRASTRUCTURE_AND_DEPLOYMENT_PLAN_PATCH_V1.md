@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Historical Context:** This document describes a legacy architecture where the frontend (hotel-crm-web) was deployed on EC2. In the current production architecture, the frontend is hosted on Vercel, and EC2 only runs the backend API and worker processes.
+
 # INFRASTRUCTURE_AND_DEPLOYMENT_PLAN_PATCH_V1
 
 **Type:** Consistency Audit & Patch  

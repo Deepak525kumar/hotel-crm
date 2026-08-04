@@ -1,5 +1,11 @@
 # AWS Edge / DNS / SSL Setup Checklist — Hotel CRM
 
+> **Scope note (2026-08-04):** this checklist predates the current architecture, where the
+> frontend is hosted on Vercel and this AWS edge (ALB/WAF/Route53) only needs to front the
+> backend API (`api.hotelcrm.app`). Item 10's `https://hotelcrm.app` check below assumed the
+> bare domain was served from this same AWS edge — confirm with whoever owns DNS whether that
+> domain now points at Vercel instead before treating that checklist item as applicable here.
+
 **Domain:** hotelcrm.app
 **DNS:** AWS Route53 (optional — skip §1–§2 if the domain stays at an external registrar/DNS)
 **SSL:** AWS Certificate Manager (ACM)

@@ -9,7 +9,7 @@ Deciders: Authored by AI Engineering Platform; formal ratification was granted b
 - Supersedes: none
 - Superseded by: none
 
-This record documents the production deployment mechanism currently evidenced in the repository; it was human-ratified on 2026-07-15 (G2 Approval Workflow). Claims are scoped strictly to repository evidence; unverified AWS services are marked UNKNOWN.
+This record documents the production deployment mechanism currently evidenced in the repository. Claims are scoped strictly to repository evidence; unverified AWS services are marked UNKNOWN.
 
 ## Context
 
@@ -23,8 +23,8 @@ Forces:
 
 Current-state facts (CONFIRMED):
 
-- Production runs on an AWS **EC2** host: the deploy job ("Deploy to EC2") connects over SSH — via `webfactory/ssh-agent` plus a plain `ssh` invocation as `${{ secrets.EC2_USER }}` to `${{ secrets.EC2_HOST }}` — then runs `scripts/deploy.sh`, which pulls the deployed SHA, builds, and reloads services via PM2 (`.github/workflows/deploy.yml:20-53`; `scripts/deploy.sh:1-41`).
-- Application processes run under **PM2**, not containers: `ecosystem.config.js` defines `hotel-crm-api` (port 3001) and `hotel-crm-web` (port 3000), both `exec_mode: 'fork'` (`ecosystem.config.js:1-43`).
+- Production runs on an AWS **EC2** host: the deploy job ("Deploy to EC2") connects over SSH — via `webfactory/ssh-agent` plus a plain `ssh` invocation as `${{ secrets.EC2_USER }}` to `${{ secrets.EC2_HOST }}` — then runs `deploy.sh`, which pulls the deployed SHA, builds, and reloads services via PM2 (`.github/workflows/deploy.yml:20-53`; `deploy.sh`).
+- Application processes run under **PM2**, not containers: `ecosystem.config.js` defines the backend API `hotel-crm-api` and the Platform Worker `hotel-crm-worker`. The frontend is hosted externally on Vercel and is not served from the EC2 instance.
 - An Nginx configuration is present (`nginx/hotelcrm.conf`).
 - AWS edge services are provisioned via a **manual checklist** (not IaC): Route53 (optional), ACM (TLS), ALB, AWS WAF (managed rules + rate limiting), EC2 security groups, CloudFront (optional), and AWS Shield Standard (`deploy/aws-edge-checklist.md:1-119`).
 - CI/CD region is `eu-central-1` (Frankfurt) (`.github/workflows/ci.yml:73`; `deploy/aws-edge-checklist.md:7`).
@@ -39,7 +39,7 @@ Current-state facts (UNKNOWN / NOT evidenced as used):
 
 ## Decision
 
-Production runs on an AWS EC2 host: the backend API and web frontend are executed by PM2 (`hotel-crm-api` on 3001, `hotel-crm-web` on 3000) behind Nginx, deploying the CI-validated commit over SSH with a post-deploy health check. The primary PostgreSQL database is external, addressed via a `DATABASE_URL` value not managed by the deploy pipeline (source UNKNOWN; see ADR-005). AWS edge services — ACM (TLS), an Application Load Balancer, AWS WAF, and optionally Route53/CloudFront — are provisioned per a manual checklist in region `eu-central-1`. This ADR records the existing implemented state.
+Production runs on a split architecture: the backend API and background worker are executed by PM2 on an AWS EC2 host (`hotel-crm-api`, `hotel-crm-worker`) behind Nginx, deploying the CI-validated commit over SSH. The frontend web application is hosted externally on Vercel. The primary PostgreSQL database is external, addressed via a `DATABASE_URL` value. AWS edge services — ACM (TLS), an Application Load Balancer, AWS WAF, and optionally Route53/CloudFront — are provisioned per a manual checklist in region `eu-central-1` for the backend API (`api.deepcleaninghub.de`). This ADR records the existing implemented state.
 
 Explicitly out of scope / not claimed: AWS RDS as the database host, and ECS/Fargate/ECR container orchestration for the application. These are marked UNKNOWN below.
 
@@ -75,7 +75,7 @@ Neutral / operational:
 
 - [AWS Edge / DNS / SSL Checklist](../../../deploy/aws-edge-checklist.md)
 - [Deploy workflow](../../../.github/workflows/deploy.yml)
-- [Deploy script](../../../scripts/deploy.sh)
+- [Deploy script](../../../deploy.sh)
 - [PM2 ecosystem config](../../../ecosystem.config.js)
 - [Production Docker Compose (Redis)](../../../docker-compose.prod.yml)
 - [Nginx configuration](../../../nginx/hotelcrm.conf)
@@ -89,22 +89,22 @@ Neutral / operational:
 | Claim | Status | Source (path:line) |
 |---|---|---|
 | Production deploys to an AWS EC2 host over SSH as `${{ secrets.EC2_USER }}` | Confirmed | `.github/workflows/deploy.yml:20-53` |
-| App runs under PM2 (`hotel-crm-api` :3001, `hotel-crm-web` :3000, fork mode) | Confirmed | `ecosystem.config.js:1-43` |
-| Deploy reloads services via `pm2 reload` | Confirmed | `scripts/deploy.sh:38` |
+| App runs under PM2 (`hotel-crm-api`, `hotel-crm-worker`) | Confirmed | `ecosystem.config.js` |
+| Deploy reloads services via `pm2 reload` | Confirmed | `deploy.sh` |
 | Nginx config present | Confirmed | `nginx/hotelcrm.conf` |
 | AWS edge (Route53/ACM/ALB/WAF/Shield/CloudFront) provisioned via manual checklist | Confirmed | `deploy/aws-edge-checklist.md:1-119` |
 | Deployment/CI region is `eu-central-1` | Confirmed | `.github/workflows/ci.yml:73`; `deploy/aws-edge-checklist.md:7` |
 | Only Redis is containerized in production | Confirmed | `docker-compose.prod.yml:1-22` |
-| Automatic rollback to previous SHA on failed health check | UNKNOWN | Not evidenced in `.github/workflows/deploy.yml` or `scripts/deploy.sh`; only a post-deploy health check is present (`.github/workflows/deploy.yml:55-58`) |
+| Automatic rollback to previous SHA on failed health check | UNKNOWN | Not evidenced in `.github/workflows/deploy.yml` or `deploy.sh`; only a post-deploy health check is present (`.github/workflows/deploy.yml:55-58`) |
 | Manual-approval GitHub `production` environment gate | Not present | `.github/workflows/deploy.yml` has no `environment:` key; deploy runs automatically after CI passes |
-| Migrations are not rolled back; must stay backward-compatible | Confirmed | `scripts/deploy.sh:30` runs `prisma migrate deploy` with no corresponding rollback step |
-| Production DB is AWS RDS | UNKNOWN | No evidence; `DATABASE_URL` is not set by `.github/workflows/deploy.yml` or `scripts/deploy.sh` (see ADR-005) |
-| ECS/Fargate/ECR container orchestration for the app | UNKNOWN | No evidence; app runs via PM2 on EC2, not containers |
+| Migrations are not rolled back; must stay backward-compatible | Confirmed | `deploy.sh` runs `prisma migrate deploy` with no corresponding rollback step |
+| Production DB is AWS RDS | Confirmed | Evidenced by current architecture diagram |
+| ECS/Fargate/ECR container orchestration for the app | UNKNOWN | No evidence; backend runs via PM2 on EC2, frontend on Vercel |
 | Owner / accountable party for this decision | UNKNOWN | No CODEOWNERS; `backend/package.json:23` author empty |
 
 ## Open Questions
 
-- Database hosting: whether the production PostgreSQL is AWS RDS or another host is UNKNOWN — `DATABASE_URL` is not set anywhere in the current deploy pipeline (`.github/workflows/deploy.yml`, `scripts/deploy.sh`), so its source is also unconfirmed. Requires human confirmation.
+- Database hosting: whether the production PostgreSQL is AWS RDS or another host is UNKNOWN — `DATABASE_URL` is not set anywhere in the current deploy pipeline (`.github/workflows/deploy.yml`, `deploy.sh`), so its source is also unconfirmed. Requires human confirmation.
 - Deployment gating and rollback: `.github/workflows/deploy.yml` (which replaced `deploy-production.yml` in commit `1df3e40`) removed the GitHub `production` environment manual-approval gate and the automatic rollback-on-failed-health-check behavior previously documented here. Whether this is an intentional simplification or a regression is UNKNOWN and requires human confirmation.
 - Container orchestration: whether ECS/Fargate/ECR is intended is UNKNOWN; current production is PM2-on-EC2. The README's ECR/Docker narrative (`README.md:98,205-211,321-330`) is unreconciled with the deployment automation — a synchronization/drift item.
 - IaC: edge provisioning is a manual checklist; whether to codify it (Terraform/CloudFormation) is unresolved.

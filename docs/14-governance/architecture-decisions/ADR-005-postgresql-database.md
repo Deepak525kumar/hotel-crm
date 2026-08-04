@@ -25,7 +25,7 @@ Current-state facts:
 
 - The Prisma datasource sets `provider = "postgresql"` with `url = env("DATABASE_URL")` (`backend/prisma/schema.prisma:13-16`).
 - Local development provisions PostgreSQL 15 via Docker Compose (`postgres:15-alpine`) (`docker-compose.yml:2-7`).
-- Production's `DATABASE_URL` is no longer injected by the deploy workflow (`.github/workflows/deploy.yml`); the current deploy script (`scripts/deploy.sh`) runs migrations without setting it, implying it is supplied by the environment already present on the EC2 host (e.g. a `.env` file). The concrete source is UNKNOWN — no repository evidence identifies it.
+- Production's `DATABASE_URL` is no longer injected by the deploy workflow (`.github/workflows/deploy.yml`); the current deploy script (`deploy.sh`) runs migrations without setting it, implying it is supplied by the environment already present on the EC2 host (e.g. a `.env` file). The concrete source is UNKNOWN — no repository evidence identifies it.
 
 ## Decision
 
@@ -47,7 +47,7 @@ Negative:
 Neutral / operational:
 
 - The production database is addressed via a `DATABASE_URL` secret; the concrete hosting form of that instance is not asserted here (see Open Questions and ADR-006).
-- Migrations are applied against production via Prisma Migrate during deploy (`scripts/deploy.sh:30`).
+- Migrations are applied against production via Prisma Migrate during deploy (`deploy.sh:30`).
 
 ## Alternatives Considered
 
@@ -64,7 +64,7 @@ Neutral / operational:
 - [Prisma schema](../../../backend/prisma/schema.prisma)
 - [Docker Compose (development services)](../../../docker-compose.yml)
 - [Deploy workflow](../../../.github/workflows/deploy.yml)
-- [Deploy script](../../../scripts/deploy.sh)
+- [Deploy script](../../../deploy.sh)
 - [Project README](../../../README.md)
 - [ADR-004: Prisma ORM](ADR-004-prisma-orm.md)
 - [ADR-006: AWS Deployment Architecture](ADR-006-aws-deployment-architecture.md)
@@ -75,7 +75,7 @@ Neutral / operational:
 |---|---|---|
 | Prisma datasource provider is `postgresql`, url from `DATABASE_URL` | Confirmed | `backend/prisma/schema.prisma:13-16` |
 | Development runs PostgreSQL 15 via `postgres:15-alpine` in Docker Compose | Confirmed | `docker-compose.yml:2-7` |
-| Production `DATABASE_URL` is injected from a CI secret | UNKNOWN | `.github/workflows/deploy.yml` and `scripts/deploy.sh` do not set `DATABASE_URL`; source is presumed to be host-side environment, unconfirmed |
+| Production `DATABASE_URL` is injected from a CI secret | UNKNOWN | `.github/workflows/deploy.yml` and `deploy.sh` do not set `DATABASE_URL`; source is presumed to be host-side environment, unconfirmed |
 | Supabase rejected to avoid vendor lock-in | Confirmed | `README.md:196-198` |
 | Concrete production Postgres hosting (managed vs. self-hosted, e.g. RDS) | UNKNOWN | Production DB reached only via `DATABASE_URL` secret; no infrastructure evidence identifies the host |
 | Owner / accountable party for this decision | UNKNOWN | No CODEOWNERS; `backend/package.json:23` author empty |

@@ -24,6 +24,9 @@ jobs:
   deploy:
     name: Deploy Backend to EC2
     runs-on: ubuntu-latest
+    # workflow_run fires on every CI completion (success, failure, or
+    # cancelled) — without this guard, a failing CI run still deploys.
+    if: github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Checkout repository
@@ -58,4 +61,4 @@ jobs:
       - name: Verify deployment
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "curl -fsS http://localhost:3001/api/v1/health"
+            "curl -fsS http://localhost:3001/api/v1/health/ready"

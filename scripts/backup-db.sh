@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/backup-db.sh
 # Weekly PostgreSQL logical export to AWS S3.
-# Schedule via cron: 0 3 * * 0  /opt/hotel-crm/scripts/backup-db.sh >> /var/log/hotel-crm/backup.log 2>&1
+# Schedule via cron: 0 3 * * 0  /opt/hotel-crm/scripts/backup-db.sh >> /home/ubuntu/.pm2/logs/backup.log 2>&1
 #
 # Auth: prefer the EC2 instance role (no static keys). If AWS_ACCESS_KEY_ID /
 # AWS_SECRET_ACCESS_KEY are present in the env file they are used as a fallback.

@@ -40,7 +40,7 @@ This section describes exactly what exists in code today, per the codebase audit
 - **Backend:** Node.js + TypeScript, Express 4, ESM modules. Modular monolith under `backend/src/modules/`. Prisma 5 ORM against PostgreSQL.
 - **Frontend:** Next.js 16 / React 19, App Router, SWR for data fetching, Zustand for state, Tailwind v4.
 - **Mobile:** Two Expo / React Native apps — `checker-app` and `worker-app`.
-- **Infra:** AWS EC2 + RDS PostgreSQL, Nginx reverse proxy, PM2 process manager, GitHub Actions CI/CD (staging + production), Winston logging.
+- **Infra:** AWS EC2 (Backend/Worker) + Vercel (Frontend) + RDS PostgreSQL, Nginx reverse proxy (API), PM2 process manager (API/Worker), GitHub Actions CI/CD, Winston logging.
 ## 2.2 Current modules
 `auth`, `users`, `crm`, `hr`, `quality`, `geo` (placeholder), `chatbot` (placeholder), `calendar`, `analytics`, `attendance`, `assignments`, `notifications`, `work-requests`, `work-applications`, `hotel-workers`. Each module follows a `controller.ts / service.ts / routes.ts / types.ts` layout.
 ## 2.3 Current data model (marketplace era)
@@ -63,7 +63,7 @@ Manager/algorithm selects → WorkerAssignment created → Attendance → Qualit
 ## 2.5 API response shape
 Defined as a TypeScript interface in `lib/types.ts` (`{ status, data?, error?, meta }` and a `PaginatedResponse`). The **error path is centralized** in `middleware/errorHandler.ts` and is the canonical implementation. The **success path is not** — 16 controllers construct the envelope inline. A naming mismatch exists: `PaginationParams` uses `per_page` while `utils.parsePaginationParams` returns `limit`.
 ## 2.6 Current deployment flow
-GitHub Actions → build/test → deploy to staging or production on AWS EC2; Nginx fronts the app; PM2 supervises the Node process; RDS PostgreSQL is the database; secrets via environment files.
+GitHub Actions → build/test → deploy to AWS EC2 (Backend) and Vercel (Frontend); Nginx fronts the backend API; PM2 supervises the Node API and Worker processes; RDS PostgreSQL is the database; secrets via environment files.
 ## 2.7 Current dependencies (backend, audit-relevant)
 `@prisma/client ^5.12`, `express ^4.18`, `bcryptjs ^2.4`, `jsonwebtoken ^9.0`, `winston ^3.11`, `zod ^3.22`, `dotenv ^16.3`. Tests via `ts-jest` ESM preset (13 test files).
 ---
@@ -158,7 +158,7 @@ The system remains a **modular monolith** on the existing stack. This is a delib
 | Layer | Technology | Responsibility |
 |---|---|---|
 | Clients | Employee App, Checker App (Expo/RN); Web app (Next.js) | UI, capture location at clock-in/out, render calendar, run consent gate |
-| Edge | Nginx + Cloudflare | TLS, reverse proxy, rate limiting at edge |
+| Edge | Vercel (Frontend) + Nginx/Cloudflare (Backend) | TLS, reverse proxy, rate limiting at edge |
 | API | Express modular monolith | Auth, business logic, validation, response envelope |
 | Data | PostgreSQL (RDS) | System of record |
 | Cache | Redis (non-critical) | Cache, broadcast slot locks, rate-limit counters |
@@ -206,8 +206,9 @@ graph TB
         WEB[Web App\nNext.js 16]
     end
     subgraph Edge
+        VER[Vercel\nFrontend Host]
         CF[Cloudflare]
-        NX[Nginx + PM2]
+        NX[Nginx + PM2\nBackend Host]
     end
     subgraph Backend["Modular Monolith - Express/TS"]
         AUTH[auth + RBAC/scope]
@@ -241,7 +242,8 @@ graph TB
     end
     EA --> CF
     CA --> CF
-    WEB --> CF
+    WEB --> VER
+    VER --> CF
     CF --> NX --> AUTH
     AUTH --> ONB & SCHED & JOBS & ASSIGN & ATT & QUAL & HRM & NOTIF & CONS & ANALYTICS
     ONB --> CLD

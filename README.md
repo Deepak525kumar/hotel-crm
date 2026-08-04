@@ -1,8 +1,13 @@
 # Hotel CRM - Modular Monolith Architecture
 
 **Version**: 1.0.0 (MVP - Phase 1)  
-**Status**: Architecture finalized, implementation in progress  
-**Deployment**: AWS (eu-central-1 / Frankfurt, Europe-only)
+**Status**: Release Candidate — engineering implementation complete; `ecosystem.config.js`/
+`deploy.sh` verified consistent with live GitHub Actions deploy history (not with direct host
+access — see `deploy/release/RELEASE_SUMMARY.md`'s Repository Status row for what's verified vs.
+what's intended architecture). See [`deploy/release/RELEASE_SUMMARY.md`](deploy/release/RELEASE_SUMMARY.md)
+for current release status and remaining operational tasks.  
+**Deployment**: Backend + worker on a single EC2 instance (eu-central-1 / Frankfurt) via PM2, no
+containers. Frontend deployed separately on Vercel.
 
 ## Architecture Overview
 
@@ -203,12 +208,15 @@ npm run test:coverage     # Coverage report
 - Falls back to PostgreSQL queries
 
 ### Deployment
-✅ **Chosen**: AWS
-- Single EC2 instance MVP
-- eu-central-1 (Frankfurt) region (EU compliance)
-- Docker containers, image stored in AWS ECR
+✅ **Chosen and implemented**: AWS (backend) + Vercel (frontend)
+- Backend + worker: single EC2 instance, eu-central-1 (Frankfurt) region (EU compliance)
+- **No containers** — PM2 process manager runs the built Node.js output directly
+  (`ecosystem.config.js`: `hotel-crm-api` on port 3001, `hotel-crm-worker` for the notification
+  outbox, no HTTP port). This supersedes an earlier planned Docker/ECR path that was never built.
 - RDS PostgreSQL for the database, S3 for uploads/documents
-- Scale horizontally behind an Application Load Balancer when needed
+- Frontend: deployed separately on Vercel, not part of the EC2/PM2 stack
+- Scale horizontally behind an Application Load Balancer when needed (not yet provisioned — see
+  `deploy/aws-edge-checklist.md`)
 
 ## Migration Path to Microservices (Phase 2+)
 
@@ -312,22 +320,25 @@ All endpoints must check permissions. See `RBAC_PERMISSION_MATRIX.md` in `/docs/
 
 ## Deployment
 
+The actual, current, production-verified deployment is PM2-on-EC2 with no containers, plus the
+frontend deployed separately on Vercel. See `deploy/release/DEPLOYMENT_GUIDE.md` for the full,
+current, evidence-verified procedure. Summary:
+
 ### Development
 ```bash
-docker-compose up -d
+docker-compose up -d   # local Postgres/Redis/Adminer/MailHog only — dev-only, not used in prod
 npm run dev
 ```
 
-### Production (AWS)
-```bash
-docker build -t hotel-crm:latest .
-# Authenticate to ECR, then push
-aws ecr get-login-password --region eu-central-1 \
-  | docker login --username AWS --password-stdin <account-id>.dkr.ecr.eu-central-1.amazonaws.com
-docker tag hotel-crm:latest <account-id>.dkr.ecr.eu-central-1.amazonaws.com/hotel-crm/backend:latest
-docker push <account-id>.dkr.ecr.eu-central-1.amazonaws.com/hotel-crm/backend:latest
-# Deploy to EC2 (pull image + restart). See AWS_DEPLOYMENT_GUIDE.md
-```
+### Production
+
+Backend + worker: automated via `.github/workflows/deploy.yml` on push to `main` (path-filtered
+to backend changes) — SSHes into the EC2 host and runs `deploy.sh` (repository root), which pulls
+the latest code, runs `prisma migrate deploy`, builds, and reloads both PM2 processes
+(`hotel-crm-api`, `hotel-crm-worker`) via `ecosystem.config.js`. See
+`deploy/release/DEPLOYMENT_GUIDE.md` for the exact sequence and manual-deploy fallback.
+
+Frontend: deployed separately via Vercel's own pipeline — not part of this repository's CI/CD.
 
 ## Troubleshooting
 
@@ -354,43 +365,42 @@ docker push <account-id>.dkr.ecr.eu-central-1.amazonaws.com/hotel-crm/backend:la
 
 ## Phase 1 - MVP Scope
 
-### Included
-- Authentication
-- Hotels & Rooms
-- Task management
-- Worker assignments
-- Quality verification
-- Rating system
-- Leaderboard
-- HR basics (contracts, documents)
-- Notifications
-- Daily operations
+### Included (implemented and shipped)
+- Authentication, RBAC/permission matrix
+- Hotels, hotel-groups, employment records
+- Job dispatch (assignments, broadcast offers, calendar direct-assignments)
+- Quality verification and rating system, leaderboard
+- HR (contracts, documents, payslip requests — payslip fulfillment sub-feature check pending,
+  see `deploy/release/KNOWN_LIMITATIONS.md`)
+- Notifications (push + email via a transactional outbox)
+- Worker geolocation check-in (`backend-geo` — implemented, not deferred)
+- Consent and compliance (subject-rights export) — implemented; compliance's governance-report
+  interface specifically remains deferred, see Post-MVP backlog
+- Retention (audit log, eligibility, scheduled sweep) — implemented, spec still under review
 
-### Deferred (Phase 2+)
-- AI chatbot
-- Geolocation tracking
-- Full offline-first sync
-- Kubernetes deployment
-- Microservices
-- Advanced analytics
-- Multi-region deployment
+### Explicitly out of MVP scope
+
+The full, current list (with reasons) lives in `deploy/release/POST_MVP_BACKLOG.md` — do not
+duplicate it here. Notable items: AI chatbot (zero code, `.placeholder` only, deliberately
+deferred), Regional Manager role rollout (code complete, held on a promotion-script risk
+decision), frontend automated test coverage, offline-first sync, compliance governance report,
+advanced analytics beyond what's shipped, multi-region deployment, Kubernetes/microservices
+(this MVP is a modular monolith by design — see "Migration Path to Microservices" above).
 
 ## Documentation
 
-- `MASTER_ARCHITECTURE.md` — Architecture decisions & rationale
-- `CLAUDE_CONTEXT.md` — Operational context for Claude
-- `/docs/API_STANDARDS.md` — API contract guidelines
-- `/docs/RBAC_PERMISSION_MATRIX.md` — Permission rules
-- `/docs/DATABASE_SCHEMA.md` — Data model documentation
-- `/docs/EVENT_FLOW_MAPPING.md` — User workflows
+- [`HANDOFF.md`](HANDOFF.md) — current project handoff: what's done, what's left, operating rules
+- [`deploy/release/`](deploy/release/) — the full release package: execution plan, launch
+  checklist, UAT checklist, deployment/rollback guides, known limitations, post-MVP backlog,
+  release summary
+- [`docs/05-execution/`](docs/05-execution/) — release status and execution dashboard
+- [`docs/03-modules/`](docs/03-modules/) — per-module specifications
+- [`docs/14-governance/architecture-decisions/`](docs/14-governance/architecture-decisions/) —
+  ADRs
+- [`.claude/knowledge/`](.claude/knowledge/) — module registry and knowledge graph
+- [`.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`](.claude/governance/SPECIFICATION_ISSUES_REGISTER.md)
+  — tracked specification issues
 
 ## License
 
 Proprietary - Zirove/Hotel CRM Project
-
-## Support
-
-For questions about architecture or implementation, refer to:
-1. MASTER_ARCHITECTURE.md (decisions & rationale)
-2. CLAUDE_CONTEXT.md (operational context)
-3. Module README files in each service folder
