@@ -17,6 +17,16 @@
  *
  * Snapshot: one AuditLog row per demoted user, mirroring M-3's own snapshot
  * convention (AuditLog as the append-only (user_id, role) record, ADR-016).
+ *
+ * RACE/DEADLOCK FIX (review follow-up on #339, previously deferred): the
+ * ownership check now runs INSIDE a per-user transaction, after a
+ * `SELECT ... FOR UPDATE` lock on that user's row — the identical fix
+ * `users/service.ts#updateUserRole` and `crm/service.ts#updateHotelGroup`
+ * apply, and the identical lock order (User row, then HotelGroup read), so a
+ * concurrent group assignment via the API cannot land in the gap between this
+ * script's check and its write, and a concurrent updateUserRole()/
+ * updateHotelGroup() call on the same user cannot deadlock against this
+ * script (same order, so Postgres serializes rather than deadlocks).
  */
 import { PrismaClient, UserRole } from '@prisma/client';
 
@@ -37,26 +47,31 @@ export async function demoteRegionalManagers(
   let skippedStillOwnsGroup = 0;
 
   for (const user of regionalManagers) {
-    const ownedGroup = await prisma.hotelGroup.findUnique({
-      where: { regional_manager_user_id: user.id },
-      select: { id: true },
-    });
+    // Whole check-and-demote runs as ONE transaction per user, not a
+    // pre-transaction read followed by a separate write — see this file's
+    // header comment for the race this closes.
+    const wasDemoted = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR UPDATE`;
 
-    if (ownedGroup) {
-      // Decision 11: a group must always have exactly one assigned RM.
-      // Demoting this user would either violate that invariant or strand the
-      // group with an acting RM whose role no longer grants any authority.
-      // Transfer the group to a successor first (PATCH /hotel-groups/:id).
-      skippedStillOwnsGroup += 1;
-      continue;
-    }
+      const ownedGroup = await tx.hotelGroup.findUnique({
+        where: { regional_manager_user_id: user.id },
+        select: { id: true },
+      });
 
-    await prisma.$transaction([
-      prisma.user.update({
+      if (ownedGroup) {
+        // Decision 11: a group must always have exactly one assigned RM.
+        // Demoting this user would either violate that invariant or strand
+        // the group with an acting RM whose role no longer grants any
+        // authority. Transfer the group to a successor first
+        // (PATCH /hotel-groups/:id).
+        return false;
+      }
+
+      await tx.user.update({
         where: { id: user.id },
         data: { role: UserRole.MANAGER },
-      }),
-      prisma.auditLog.create({
+      });
+      await tx.auditLog.create({
         data: {
           actor_id: null,
           actor_role: null,
@@ -68,10 +83,16 @@ export async function demoteRegionalManagers(
           details: { reason: 'no_owned_hotel_group' },
           timestamp: new Date(),
         },
-      }),
-    ]);
+      });
 
-    demoted.push(user.id);
+      return true;
+    });
+
+    if (wasDemoted) {
+      demoted.push(user.id);
+    } else {
+      skippedStillOwnsGroup += 1;
+    }
   }
 
   return { demoted, skippedStillOwnsGroup };

@@ -309,6 +309,29 @@ describe('CrmService - Hotel Groups', () => {
       expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
+    // Race-closure follow-up (second-review pass on #339): assertRegionalManagerExists
+    // (the D12 check) runs BEFORE the transaction/row-lock, so its result can
+    // be stale by the time the lock is actually held — a concurrent
+    // updateUserRole() demotion could commit in that exact gap. This asserts
+    // the role is RE-CHECKED under the lock, not just before it: simulates the
+    // target's role having changed between the outer assertion and the
+    // in-transaction re-read (mockResolvedValueOnce for the first call, a
+    // different value for the second — both resolve through the same mock
+    // since $transaction hands the callback `mockPrisma` itself as `tx`).
+    it('re-checks the new RM still holds the role INSIDE the transaction, not only before it', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' }) // outer assertRegionalManagerExists — passes
+        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'MANAGER' }); // in-transaction re-check — demoted concurrently, must now fail
+
+      await expect(
+        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+
+      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
     // Deadlock-avoidance follow-up (post-#339 review): updateUserRole()
     // (users/service.ts) locks the target User row FIRST, then reads
     // HotelGroup. A concurrent transfer here must lock in the SAME order —

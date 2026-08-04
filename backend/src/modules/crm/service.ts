@@ -277,9 +277,36 @@ export class CrmService extends BaseService {
         await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
       }
 
-      // Re-check under lock: the D12 assertion above ran outside the
-      // transaction, so re-verify the new RM still holds the role and the
-      // group row hasn't changed underneath us since the initial read.
+      // Re-check under lock: the D12 assertion above (assertRegionalManagerExists)
+      // ran BEFORE the transaction and BEFORE the row lock, so its result can
+      // be stale by the time we hold the lock. Concretely:
+      //   1. This call passes assertRegionalManagerExists(u2) — u2 is RM.
+      //   2. A concurrent updateUserRole() locks u2's User row first, finds u2
+      //      owns no group (true — this transaction hasn't written yet),
+      //      demotes u2 to MANAGER, commits.
+      //   3. This transaction now acquires its own lock on u2's row and, with
+      //      only the STALE outer-scope assertion to go on, writes
+      //      regional_manager_user_id = u2 anyway — a HotelGroup pointing at a
+      //      MANAGER, the exact invariant violation both fixes exist to
+      //      prevent, just via a different interleaving (review follow-up on
+      //      #339, second-review pass).
+      // Re-reading the new RM's role HERE, after the lock, closes it: by the
+      // time this read runs, updateUserRole()'s transaction has either fully
+      // committed (role is genuinely MANAGER now, so this correctly throws)
+      // or is blocked waiting for the same row lock (so it cannot demote out
+      // from under this transaction after this point).
+      if (isTransfer) {
+        const newManager = await tx.user.findUnique({
+          where: { id: nextRegionalManagerUserId },
+          select: { role: true, deleted_at: true },
+        });
+        if (!newManager || newManager.deleted_at || newManager.role !== 'REGIONAL_MANAGER') {
+          throw new ValidationError('regional_manager_user_id must reference a user already holding the Regional Manager role', [
+            { field: 'regional_manager_user_id', message: 'User is not a Regional Manager' },
+          ]);
+        }
+      }
+
       const hotelGroup = await tx.hotelGroup.findUnique({ where: { id: hotelGroupId } });
       if (!hotelGroup) throw new NotFoundError('Hotel group not found');
 
