@@ -83,7 +83,7 @@ describe('resolveScopeGroupFilter', () => {
 /**
  * Direct unit coverage for the role-classification predicates.
  *
- * These became the platform's root of trust for scope classification: ~40
+ * These became the platform's central authorization primitive: ~40
  * authorization sites across middleware and nine service modules now branch on
  * them instead of comparing role strings inline. Every other suite exercises
  * them only INDIRECTLY (through a route or service), so a wrong result here
@@ -149,7 +149,7 @@ describe('isSelfScopedRole (worker-fallback classification)', () => {
   // regional_manager, narrowing an RM to its own rows and returning 200 with
   // the wrong data. If this ever flips to true, geo/attendance/job-requests/
   // assignments all silently mis-scope an RM again.
-  it('NEVER classifies regional_manager as self-scoped (the silent-narrowing defect)', () => {
+  it('regional_manager is never self-scoped (the silent-narrowing defect)', () => {
     expect(isSelfScopedRole('regional_manager')).toBe(false);
     expect(isSelfScopedRole('regional_manager', { checkerIsSelfScoped: false })).toBe(false);
     expect(isSelfScopedRole('regional_manager', { checkerIsSelfScoped: true })).toBe(false);
