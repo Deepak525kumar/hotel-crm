@@ -42,32 +42,19 @@ const VIOLATIONS: readonly CapabilityViolation[] = Object.freeze([
   // C-33 `org_chart:read`: created and wired onto the org-chart route
   // (employee-management/routes.ts). Conforms.
   //
-  // The C-05 (hotel LIST), C-22, C-23, C-24, C-25, C-29 and C-30
-  // regional_manager route-gate violations were all closed in the same pass
-  // that added `resolveWorkerScope`'s RM branch. Conform.
+  // C-05 (hotel LIST): previously omitted checker/worker while the ratified
+  // matrix grants all five roles the equivalent access and the sibling detail
+  // route (GET /hotels/:hotel_id) already admitted them. Product decision
+  // (2026-08-05): widen the list route to match the matrix and the detail
+  // route, rather than narrow the matrix. Fixed — crm/routes.ts's
+  // GET /hotels gate now includes checker/worker, and listHotels()
+  // roster-scopes a worker's results (checker keeps its documented
+  // cross-hotel bypass, matching the detail route). Conforms.
+  //
+  // C-22, C-23, C-24, C-25, C-29 and C-30 regional_manager route-gate
+  // violations were all closed in the same pass that added
+  // resolveWorkerScope's RM branch. Conform.
   // ---------------------------------------------------------------------
-
-  // Pre-existing, NOT Regional-Manager scope. C-05 grants every role `✓ᶜ`
-  // ("View hotels"), and the detail read `GET /hotels/:hotel_id` is
-  // permission-only so checker/worker reach it correctly. The role-gated LIST
-  // omits them. Recorded because this suite asserts the violation set exactly
-  // and silence would misrepresent it as conforming; remediation is outside
-  // the approved Regional Manager roadmap and needs its own decision (is the
-  // hotel LIST deliberately manager-and-above, or is C-05 overbroad?).
-  {
-    key: 'C-05:checker@crm:GET /hotels',
-    reason:
-      "`requireRole(['admin','manager','regional_manager'])` omits checker, which C-05 grants `\u2713\u1D9C` and which holds `hotels:read`. The detail route `GET /hotels/:hotel_id` correctly admits it.",
-    authority: 'ADR-030 §3 C-05',
-    owner: 'Out of Regional Manager scope — needs its own decision (C-05 list vs detail)',
-  },
-  {
-    key: 'C-05:worker@crm:GET /hotels',
-    reason:
-      "`requireRole(['admin','manager','regional_manager'])` omits worker, which C-05 grants `\u2713\u1D9C` and which holds `hotels:read`. The detail route `GET /hotels/:hotel_id` correctly admits it.",
-    authority: 'ADR-030 §3 C-05',
-    owner: 'Out of Regional Manager scope — needs its own decision (C-05 list vs detail)',
-  },
 ]);
 
 export const CAPABILITY_VIOLATIONS: ReadonlyMap<string, CapabilityViolation> = new Map(

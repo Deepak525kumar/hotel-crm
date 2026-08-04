@@ -6,12 +6,12 @@ on:
       - CI
     types:
       - completed
-    paths:
-      - "backend/**"
-      - "deploy.sh"
-      - "package.json"
-      - "package-lock.json"
-      - ".github/workflows/deploy.yml"
+    # NOTE: `paths:` is NOT a valid filter under `workflow_run` — GitHub only
+    # honors it for `push`/`pull_request` events, so any list here is silently
+    # ignored (release-audit finding, confirmed against GitHub's own
+    # documented trigger-filter support matrix). Do not re-add one expecting
+    # it to scope anything; branch scoping is enforced by the job-level `if:`
+    # below instead.
 
 permissions:
   contents: read
@@ -24,9 +24,17 @@ jobs:
   deploy:
     name: Deploy Backend to EC2
     runs-on: ubuntu-latest
-    # workflow_run fires on every CI completion (success, failure, or
-    # cancelled) — without this guard, a failing CI run still deploys.
-    if: github.event.workflow_run.conclusion == 'success'
+    # Release-audit fix (Critical): `ci.yml` runs CI on push to
+    # `feature/**`/`fix/**`/`develop`/`main` (its own `on.push.branches`).
+    # Without the `head_branch` guard below, a green CI run on ANY of those
+    # branches triggered a production deploy — and `deploy.sh` always resets
+    # to `origin/main` regardless of what triggered it, so a feature-branch
+    # push could redeploy whatever `main` currently was, migrations included,
+    # with zero relation to what was actually tested. Both conditions are
+    # required: the run must have succeeded AND it must have run against `main`.
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
 
     steps:
       - name: Checkout repository

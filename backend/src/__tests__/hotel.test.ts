@@ -25,6 +25,14 @@ jest.mock('../config/env.js', () => ({
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
+// C-05 fix (2026-08-05): listHotels() roster-scopes a `worker`'s results via
+// lib/roster-scope.js#listEligibleHotelIds, which is not reachable through
+// `this.prisma` (it calls getPrisma() internally) — mocked directly.
+const mockListEligibleHotelIds = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+jest.mock('../lib/roster-scope.js', () => ({
+  listEligibleHotelIds: (...args: unknown[]) => mockListEligibleHotelIds(...args),
+}));
+
 import { CrmService } from '../modules/crm/service.js';
 
 describe('CrmService - Hotels', () => {
@@ -53,11 +61,57 @@ describe('CrmService - Hotels', () => {
     it('only shows active hotels for workers', async () => {
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.hotel.count.mockResolvedValue(0);
+      mockListEligibleHotelIds.mockResolvedValue(['h1']);
 
-      await service.listHotels({ page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined }, 'worker');
+      await service.listHotels({ page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined }, 'worker', 'w1');
 
       const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { is_active?: boolean } }>;
       expect(findManyCall[0]?.where.is_active).toBe(true);
+    });
+
+    // C-05 fix (2026-08-05): ADR-030 §3 grants `worker` C-05 ("View hotels")
+    // ✓ᶜ, and the sibling detail route (GET /hotels/:hotel_id) already
+    // roster-scopes a worker via isWorkerEligibleForHotel(). Widening the
+    // LIST route's role gate to admit `worker` without also roster-scoping
+    // its results would have leaked every active hotel on the platform to
+    // every worker — a strictly worse outcome than the 403 it replaced. This
+    // pins that the list is scoped identically to the detail route.
+    it('scopes a worker\'s hotel list to their roster-eligible hotels (C-05)', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+      mockListEligibleHotelIds.mockResolvedValue(['h1', 'h2']);
+
+      await service.listHotels({ page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined }, 'worker', 'w1');
+
+      expect(mockListEligibleHotelIds).toHaveBeenCalledWith('w1');
+      const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: { in: string[] } } }>;
+      expect(findManyCall[0]?.where.id).toEqual({ in: ['h1', 'h2'] });
+    });
+
+    it('denies (empty-in) a worker\'s hotel list when the roster resolves to zero hotels', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+      mockListEligibleHotelIds.mockResolvedValue([]);
+
+      await service.listHotels({ page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined }, 'worker', 'w_orphan');
+
+      const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: { in: string[] } } }>;
+      expect(findManyCall[0]?.where.id).toEqual({ in: [] });
+    });
+
+    // Matches resolveHotelAccess()'s documented cross-hotel bypass for
+    // checker on the DETAIL route (PATCH-04 §4c) — the list must not be
+    // roster-scoped for checker, or it would be narrower than the detail
+    // route it's supposed to match.
+    it('does NOT roster-scope a checker\'s hotel list (matches the detail-route cross-hotel bypass)', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+
+      await service.listHotels({ page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined }, 'checker', 'c1');
+
+      expect(mockListEligibleHotelIds).not.toHaveBeenCalled();
+      const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
+      expect(findManyCall[0]?.where.id).toBeUndefined();
     });
   });
 

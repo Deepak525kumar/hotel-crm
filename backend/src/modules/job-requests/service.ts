@@ -15,7 +15,7 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
-import { isWorkerFreeOnDay } from '../assignments/service.js';
+import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -544,18 +544,25 @@ export class JobRequestService extends BaseService {
     });
     const skillsByWorker = new Map(rosterRecords.map((r) => [r.user_id, r.skills]));
 
-    const freeWorkerIds = new Set(
-      (
-        await Promise.all(
-          rosterWorkerIds.map(async (workerId) => ({
-            workerId,
-            free: await isWorkerFreeOnDay(workerId, wr.shift_date),
-          }))
-        )
-      )
-        .filter((r) => r.free)
-        .map((r) => r.workerId)
-    );
+    // Release-audit fix (High): previously one Promise.all-fanned-out
+    // isWorkerFreeOnDay() call PER roster worker — a separate `findFirst`
+    // query per worker, hitting the default Prisma connection pool
+    // (num_cpus*2+1, unconfigured) with N concurrent connection requests. A
+    // 500-worker roster fires 500 simultaneous queries; under real load this
+    // exhausts the pool and produces P2024 timeouts across every other
+    // concurrent request, not just this one. Single batched query instead —
+    // `busyWorkerIds` is the set of workers with an active assignment that
+    // day; every roster worker NOT in it is free.
+    const busyAssignments = await this.prisma.workerAssignment.findMany({
+      where: {
+        worker_id: { in: rosterWorkerIds },
+        day: wr.shift_date,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+      },
+      select: { worker_id: true },
+    });
+    const busyWorkerIds = new Set(busyAssignments.map((a) => a.worker_id));
+    const freeWorkerIds = new Set(rosterWorkerIds.filter((workerId) => !busyWorkerIds.has(workerId)));
 
     const slots = skillSlots.map((slot) => {
       const eligibleWorkerIds = rosterWorkerIds.filter(

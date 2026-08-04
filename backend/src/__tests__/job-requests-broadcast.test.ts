@@ -36,6 +36,11 @@ const mockEmploymentRecord = {
 
 const mockWorkerAssignment = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // computeBroadcastEligibility() (release-audit fix, 2026-08-05) batches the
+  // per-worker isWorkerFreeOnDay() fan-out into one findMany() query; the
+  // single-worker acceptBroadcast() path still uses findFirst() via
+  // isWorkerFreeOnDay() directly.
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockNotification = {
@@ -272,7 +277,7 @@ describe('JobRequestService.raiseBroadcast', () => {
           { user_id: 'w1', skills: ['CLEANER'] },
           { user_id: 'w2', skills: ['WAITER'] },
         ]);
-      mockWorkerAssignment.findFirst.mockResolvedValue(null); // both free that day
+      mockWorkerAssignment.findMany.mockResolvedValue([]); // both free that day
 
       await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
 
@@ -300,7 +305,7 @@ describe('JobRequestService.raiseBroadcast', () => {
       mockEmploymentRecord.findMany
         .mockResolvedValueOnce([{ user_id: 'w1' }])
         .mockResolvedValueOnce([{ user_id: 'w1', skills: ['WAITER'] }]);
-      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
 
       await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
 
@@ -318,7 +323,7 @@ describe('JobRequestService.raiseBroadcast', () => {
       mockEmploymentRecord.findMany
         .mockResolvedValueOnce([{ user_id: 'w1' }])
         .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER'] }]);
-      mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'existing-assignment' }); // already assigned
+      mockWorkerAssignment.findMany.mockResolvedValue([{ worker_id: 'w1' }]); // already assigned
 
       await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
 
@@ -352,7 +357,7 @@ describe('JobRequestService.raiseBroadcast', () => {
       mockEmploymentRecord.findMany
         .mockResolvedValueOnce([{ user_id: 'w1' }])
         .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER', 'WAITER'] }]);
-      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
 
       await service.raiseBroadcast(multiSkillInput, { userId: 'mgr1', role: 'admin' });
 
@@ -375,7 +380,7 @@ describe('JobRequestService.raiseBroadcast', () => {
       mockEmploymentRecord.findMany
         .mockResolvedValueOnce([{ user_id: 'w1' }])
         .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER'] }]);
-      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
 
       await service.raiseBroadcast(baseBroadcastInput, { userId: 'mgr1', role: 'admin' });
 
@@ -451,7 +456,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
         { user_id: 'w1', skills: ['CLEANER'] },
         { user_id: 'w2', skills: ['WAITER'] },
       ]);
-    mockWorkerAssignment.findFirst.mockResolvedValue(null); // both free that day
+    mockWorkerAssignment.findMany.mockResolvedValue([]); // both free that day
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
@@ -470,9 +475,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
         { user_id: 'w2', skills: ['CLEANER'] },
       ]);
     // w1 already has an active assignment that day; w2 is free.
-    mockWorkerAssignment.findFirst.mockImplementation(async ({ where }: any) =>
-      where.worker_id === 'w1' ? { id: 'existing-assignment' } : null
-    );
+    mockWorkerAssignment.findMany.mockResolvedValue([{ worker_id: 'w1' }]);
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
@@ -495,7 +498,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
         { user_id: 'w1', skills: ['CLEANER'] },
         { user_id: 'w2', skills: ['WAITER'] },
       ]);
-    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockWorkerAssignment.findMany.mockResolvedValue([]);
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
@@ -543,7 +546,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
           { user_id: 'w1', skills: ['CLEANER'] },
           { user_id: 'w2', skills: ['CLEANER'] },
         ]);
-      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
     };
 
     it('admin never receives eligible_worker_ids or an eligible field', async () => {
