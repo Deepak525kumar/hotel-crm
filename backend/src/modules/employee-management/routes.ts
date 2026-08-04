@@ -75,7 +75,14 @@ router.get(
 router.post(
   '/hotels/:hotel_id/blocklist',
   checkHotelAccess(),
-  requireRole(['admin', 'manager']),
+  // ADR-030 §3 C-22 (Manage hotel blocklist) grants Regional Manager `✓ᶜ`, and
+  // config/constants.ts's own note on the `employees:write` grant already said
+  // "Hotel/Regional Manager may view/blocklist within scope" — the route gate
+  // contradicted it. checkHotelAccess() above is group-aware for an RM
+  // (resolveHotelAccess -> isHotelInScope), so scope narrowing already works;
+  // only the role literal was missing. The paired GET is permission-only and
+  // already admitted RM correctly, so read/write were inconsistent.
+  requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('employees:write'),
   ...controller.setBlocklist
 );
@@ -83,9 +90,16 @@ router.post(
 // Org chart (REQ-EMP-013 / RULE-EMP-08) — Regional Manager (their own
 // group) and Admin only; group-ownership scoping enforced service-side
 // (same pattern as getProfileHistory/getSkills above), not at the route.
+//
+// Gated on `org_chart:read` (ADR-060, ADR-030 §3 C-33), not `employees:read`:
+// the latter is held by every role including MANAGER and WORKER, so it could
+// never express C-33's "RM + Admin only" (CRR §1:23's ONLY). Before this, the
+// restriction rested solely on the in-service role check in
+// service.ts#getOrgChart — correct, but one deleted `if` away from exposing
+// every group's org chart to any employees:read holder. Now both layers agree.
 router.get(
   '/hotel-groups/:hotel_group_id/org-chart',
-  requirePermission('employees:read'),
+  requirePermission('org_chart:read'),
   ...controller.getOrgChart
 );
 

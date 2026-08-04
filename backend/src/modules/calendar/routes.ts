@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { checkHotelAccess, requireRole } from '../../middleware/permissions.js';
+import { checkHotelAccess, requireRole, requirePermission } from '../../middleware/permissions.js';
 import { calendarController } from './controller.js';
 
 const router = Router();
@@ -11,15 +11,24 @@ router.use(authMiddleware);
 // path (and the read path) for what CRR §19 documents as manager-entered
 // reception/operations data. Adds the missing role gate; checkHotelAccess()'s
 // existing hotel-scope behavior for admin/manager is unchanged.
+//
+// `regional_manager` added per ADR-050 D-1, which ratified RM calendar editing
+// at hotel-group scope (resolved via HotelGroup.regional_manager_user_id), and
+// ADR-030 §3 C-25 (token `staffing:write`). Calendar's own MODULE_SPEC still
+// records this as OD-CAL-07 `[OPEN]`; ADR-050 superseded that and the spec body
+// was never updated — see PR6's documentation sync. checkHotelAccess() is
+// already group-aware for an RM via resolveHotelAccess().
 router.get(
   '/hotels/:hotel_id/operations',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('staffing:write'),
   checkHotelAccess(),
   (req, res, next) => calendarController.getDailyOperations(req, res, next)
 );
 router.post(
   '/hotels/:hotel_id/operations',
-  requireRole(['admin', 'manager']),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('staffing:write'),
   checkHotelAccess(),
   (req, res, next) => calendarController.createDailyOperation(req, res, next)
 );

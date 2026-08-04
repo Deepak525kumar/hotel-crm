@@ -126,6 +126,63 @@ router.get('/a', requireRole('admin'), fn);
     expect(routes[0].path).toBe('/a');
   });
 
+  // Regression: the bracket/quote scanners treat `'` as a string delimiter, so
+  // an ordinary apostrophe in a comment ("§1's original statement") opened a
+  // phantom string and swallowed the parens of the NEXT router.<method>( call,
+  // throwing "Unbalanced parens starting at index N". Latent for as long as no
+  // comment apostrophe happened to sit above a route registration — then a
+  // routine comment edit broke every suite that builds the registry.
+  // parseRouteFile() now blanks comment bodies before scanning.
+  describe('comment handling (apostrophes, block comments, // inside strings)', () => {
+    it('parses a route whose preceding comment contains an apostrophe', () => {
+      const src = `
+// MANAGER has never held \`hotels:write\` (§1's original Problem statement:
+// the manager's scope claim isn't consulted here).
+router.get('/hotels', requireRole(['admin', 'manager']), requirePermission('hotels:read'), listHotels);
+`;
+      const routes = parseRouteFile('crm', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]).toMatchObject({
+        method: 'GET',
+        path: '/hotels',
+        requiredRoles: ['admin', 'manager'],
+        requiredPermissions: ['hotels:read'],
+      });
+    });
+
+    it('parses a route preceded by a block comment containing an apostrophe', () => {
+      const src = `
+/*
+ * The actor's scope claim is resolved in-service; don't gate it here.
+ */
+router.post('/hotels', requireRole('admin'), createHotel);
+`;
+      const routes = parseRouteFile('crm', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]).toMatchObject({ method: 'POST', path: '/hotels', requiredRoles: ['admin'] });
+    });
+
+    it('does not treat a // inside a string literal as a comment', () => {
+      const src = `
+router.get('/callback//double', requireRole('admin'), handler);
+`;
+      const routes = parseRouteFile('crm', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.path).toBe('/callback//double');
+      expect(routes[0]?.requiredRoles).toEqual(['admin']);
+    });
+
+    it('ignores a router call that appears only inside a comment', () => {
+      const src = `
+// router.get('/commented-out', requireRole('admin'), handler);
+router.get('/real', requireRole('admin'), handler);
+`;
+      const routes = parseRouteFile('crm', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.path).toBe('/real');
+    });
+  });
+
   describe('@requiresPermission annotation (role-conditional permission wrappers)', () => {
     it('resolves a route calling an annotated wrapper function to the annotation\'s token list', () => {
       const source = `

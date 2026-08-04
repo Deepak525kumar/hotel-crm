@@ -107,7 +107,7 @@ describe('Rooms-completed scope authorization (ADR-028, OQ-ANALYTICS-03)', () =>
 
   describe('WRITE scope (manager hotel-bound, admin unrestricted)', () => {
     it('allows a manager to log rooms completed for an in-scope assignment (201)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/assignments/asg_h1/rooms-completed')
         .send({ rooms_completed: 10 });
@@ -116,7 +116,7 @@ describe('Rooms-completed scope authorization (ADR-028, OQ-ANALYTICS-03)', () =>
     });
 
     it('denies a manager logging rooms completed for an out-of-scope assignment (403)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/assignments/asg_h2/rooms-completed')
         .send({ rooms_completed: 10 });
@@ -124,8 +124,46 @@ describe('Rooms-completed scope authorization (ADR-028, OQ-ANALYTICS-03)', () =>
       expect(res.body.error).toBe('ForbiddenError');
     });
 
+      // ADR-030 §3 C-24 grants regional_manager `✓ᶜ`, and the route gate now
+      // admits it — so the service MUST scope-check an RM. The guard here was
+      // `role === 'manager'`, which would have SKIPPED the check for an RM
+      // entirely, letting it log rooms completed for any hotel on the platform.
+      it('allows a regional_manager to log rooms completed for an in-group assignment (201)', async () => {
+        testAuth = {
+          userId: 'rm_1',
+          role: 'regional_manager',
+          permissions: ['staffing:write'],
+          scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+        };
+        const res = await request(makeApp())
+          .post('/assignments/asg_h1/rooms-completed')
+          .send({ rooms_completed: 10 });
+        expect(res.status).toBe(201);
+      });
+
+      it('denies a regional_manager logging rooms completed for an out-of-group assignment (403)', async () => {
+        testAuth = {
+          userId: 'rm_1',
+          role: 'regional_manager',
+          permissions: ['staffing:write'],
+          scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
+        };
+        const res = await request(makeApp())
+          .post('/assignments/asg_h1/rooms-completed')
+          .send({ rooms_completed: 10 });
+        expect(res.status).toBe(403);
+      });
+
+      it('denies a regional_manager with no scope claim (403)', async () => {
+        testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['staffing:write'], scope: null };
+        const res = await request(makeApp())
+          .post('/assignments/asg_h1/rooms-completed')
+          .send({ rooms_completed: 10 });
+        expect(res.status).toBe(403);
+      });
+
     it('allows an admin to log rooms completed for any hotel (201)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
       const res = await request(makeApp())
         .post('/assignments/asg_h2/rooms-completed')
         .send({ rooms_completed: 3 });
@@ -135,7 +173,7 @@ describe('Rooms-completed scope authorization (ADR-028, OQ-ANALYTICS-03)', () =>
 
   describe('validation', () => {
     it('rejects a negative rooms_completed (422, ValidationError)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
       const res = await request(makeApp())
         .post('/assignments/asg_h1/rooms-completed')
         .send({ rooms_completed: -1 });
@@ -144,7 +182,7 @@ describe('Rooms-completed scope authorization (ADR-028, OQ-ANALYTICS-03)', () =>
     });
 
     it('rejects a missing assignment (404)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: null };
       const res = await request(makeApp())
         .post('/assignments/asg_missing/rooms-completed')
         .send({ rooms_completed: 5 });

@@ -20,7 +20,12 @@ router.use(authMiddleware);
 // so flag-off and flag-on both already 403 a manager here today. Narrowed
 // anyway for clean, documented semantics and to close the dead role-gate
 // entry (D-8 hygiene).
-router.get('/hotels', requireRole(['admin', 'manager']), requirePermission('hotels:read'), ...crmController.listHotels);
+// `regional_manager` added per ADR-030 §3 C-05 (View hotels — RM `✓ᶜ`). An RM
+// holds `hotels:read` but was denied at the role gate, so it could not list the
+// hotels in its own group; this also left the frontend analytics hotel-scope
+// selector (populated from this route) empty for an RM. Service-side scope
+// filtering narrows the result set (resolveNonAdminScopeFilter).
+router.get('/hotels', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('hotels:read'), ...crmController.listHotels);
 router.post('/hotels', requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.createHotel);
 router.get('/hotels/:hotel_id', checkHotelAccess(), requirePermission('hotels:read'), (req, res, next) => crmController.getHotel(req, res, next));
 router.patch('/hotels/:hotel_id', checkHotelAccess(), requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.updateHotel);

@@ -28,9 +28,19 @@ const mockCalendarEntry = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// `lib/scope.ts`'s isHotelInScope() resolves a hotel_group-scoped claim by
+// reading the target hotel's own group (one findUnique), so a test exercising a
+// realistic regional_manager claim needs this model mocked. Without it the
+// hotel_group branch throws and the only way to make an RM case pass is to hand
+// it `{type:'global'}` — a scope resolveScope() never mints for a non-admin.
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
+  hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -175,16 +185,46 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
-    it('regional_manager in scope (hotel_group claim) succeeds — mirrors manager branch (ADR-030 D-5)', async () => {
+    // A regional_manager's real claim is `{type:'hotel_group'}` — resolveScope()
+    // (auth/service.ts) mints `global` for role 'admin' ONLY, so an RM case
+    // asserted with a global scope proves nothing about the RM branch: it
+    // short-circuits isHotelInScope() before the group comparison runs. Both
+    // directions are asserted here against a genuine hotel_group claim.
+    it('regional_manager in scope (hotel_group claim matches the hotel\'s group) succeeds — ADR-030 D-5', async () => {
       mockWorkerAssignment.create.mockResolvedValue(makeAssignmentRow());
       mockCalendarEntry.create.mockResolvedValue(makeCalendarEntryRow());
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
 
       await expect(
         service.placeOnCalendar(
           { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
-          { userId: 'rm1', role: 'regional_manager', scope: { type: 'global' } }
+          { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
         )
       ).resolves.toBeDefined();
+    });
+
+    it('regional_manager out of scope (hotel belongs to another group) is denied', async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g_other' });
+
+      await expect(
+        service.placeOnCalendar(
+          { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
+          { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        )
+      ).rejects.toThrow('Cannot place a worker on the calendar for this hotel');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('regional_manager with a null scope claim is denied (deny-by-default)', async () => {
+      await expect(
+        service.placeOnCalendar(
+          { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
+          { userId: 'rm1', role: 'regional_manager', scope: null }
+        )
+      ).rejects.toThrow('Cannot place a worker on the calendar for this hotel');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('translates a P2002 unique-constraint violation into ConflictError (duplicate calendar placement)', async () => {

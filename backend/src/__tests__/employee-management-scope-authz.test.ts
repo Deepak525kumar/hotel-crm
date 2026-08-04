@@ -248,7 +248,7 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       testAuth = {
         userId: 'rm_1',
         role: 'regional_manager',
-        permissions: ['employees:read'],
+        permissions: ['employees:read', 'org_chart:read'],
         scope: { type: 'hotel_group', hotel_group_id: 'g1' },
       };
       const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
@@ -268,7 +268,7 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       testAuth = {
         userId: 'rm_2',
         role: 'regional_manager',
-        permissions: ['employees:read'],
+        permissions: ['employees:read', 'org_chart:read'],
         scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
       };
       const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
@@ -277,7 +277,7 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
     });
 
     it('denies a regional_manager with no scope claim (403)', async () => {
-      testAuth = { userId: 'rm_3', role: 'regional_manager', permissions: ['employees:read'], scope: null };
+      testAuth = { userId: 'rm_3', role: 'regional_manager', permissions: ['employees:read', 'org_chart:read'], scope: null };
       const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
       expect(res.status).toBe(403);
     });
@@ -293,6 +293,26 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       expect(res.status).toBe(403);
     });
 
+    // ADR-060 / ADR-030 §3 C-33 / CRR §1:23: the org chart is visible ONLY to
+    // Regional Manager and Admin. This route previously gated on
+    // `employees:read` — held by every role, MANAGER and WORKER included — so
+    // the restriction rested entirely on the in-service role check. It is now
+    // gated on `org_chart:read`, which MANAGER does not hold, giving two
+    // independent layers. The case below pins the ROUTE layer specifically: a
+    // manager carrying a hotel_group scope that WOULD satisfy the service's
+    // ownership check is still denied, because the token stops it first.
+    it('denies a hotel manager at the route gate even with a matching group scope (org_chart:read, ADR-060)', async () => {
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:read'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
     it('denies a worker outright (403)', async () => {
       testAuth = { userId: 'user_1', role: 'worker', permissions: ['employees:read'], scope: null };
       const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
@@ -300,19 +320,19 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
     });
 
     it('allows an admin to view any group\'s org chart regardless of scope (200)', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read', 'org_chart:read'], scope: null };
       const res = await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
       expect(res.status).toBe(200);
     });
 
     it('returns 404 for a hotel group that does not exist', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read', 'org_chart:read'], scope: null };
       const res = await request(makeApp()).get('/employees/hotel-groups/missing/org-chart');
       expect(res.status).toBe(404);
     });
 
     it('audit-logs the org chart view', async () => {
-      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read'], scope: null };
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:read', 'org_chart:read'], scope: null };
       await request(makeApp()).get('/employees/hotel-groups/g1/org-chart');
       expect(auditCalls.some((c) => c.data.action === 'employee.org_chart.view')).toBe(true);
     });

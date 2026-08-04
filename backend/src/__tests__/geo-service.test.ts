@@ -331,6 +331,34 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       expect(mockHotelFindMany).not.toHaveBeenCalled();
     });
 
+    // Regression: `role !== 'admin' && role !== 'manager'` MATCHED
+    // regional_manager, so an RM was silently narrowed to `where.worker_id =
+    // self` while the `role === 'manager'` group filter below skipped it — a 200
+    // carrying the wrong rows rather than a 403. ADR-030 §3 D-5 gives RM the same
+    // operational capability set as Manager at hotel_group scope.
+    it('scopes a regional_manager to their hotel group, NOT to their own check-ins (ADR-030 D-5)', async () => {
+      await service.listCheckins(
+        { page: 1, per_page: 20 },
+        { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      );
+
+      const arg = mockWorkerGeoCheckinFindMany.mock.calls[0]?.[0] as any;
+      expect(arg.where).toEqual(expect.objectContaining({ hotel: { hotel_group_id: 'g1' } }));
+      // The self-scoping regression would have set this to the actor's own id.
+      expect(arg.where.worker_id).toBeUndefined();
+    });
+
+    it('denies a regional_manager with no scope claim (empty-in matches no rows)', async () => {
+      await service.listCheckins(
+        { page: 1, per_page: 20 },
+        { userId: 'rm1', role: 'regional_manager', scope: null }
+      );
+
+      expect(mockWorkerGeoCheckinFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ hotel_id: { in: [] } }) })
+      );
+    });
+
     it('admin sees all check-ins with no added restriction', async () => {
       await service.listCheckins({ page: 1, per_page: 20 }, { userId: 'a1', role: 'admin' });
 

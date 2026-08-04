@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
-import { requireRole } from '../../middleware/permissions.js';
+import { requireRole, requirePermission } from '../../middleware/permissions.js';
 import { isJobDispatchPhase2Enabled } from '../../config/feature-flags.js';
 import {
   acceptBroadcast,
@@ -24,9 +24,12 @@ router.use(authMiddleware);
 // Gated by FEATURE_JOBDISPATCH_PHASE2 (default OFF) — while disabled, both
 // routes fall through to the 404 handler, matching this repo's existing
 // "both-off = current behavior" posture.
-// RBAC: admin/manager per this module's existing create()/update() RBAC
-// shape (API_SPEC_V1_PATCH_V2 §PATCH-07g); the inline isHotelInScope() check
-// in the service does the scope-authz.
+// RBAC: admin/manager/regional_manager per ADR-030 §3 C-23 (Manage work
+// requests — RM `✓ᶜ`, token `staffing:write`); the inline isHotelInScope()
+// check in the service does the scope-authz. `regional_manager` and the
+// `staffing:write` gate were both absent: RM was denied at the role gate
+// despite holding the ratified token, and the token itself was checked by no
+// route anywhere (tracked as known debt in __tests__/support/known-debt.ts).
 router.post(
   '/broadcasts',
   (req, res, next) => {
@@ -34,7 +37,14 @@ router.post(
       next();
       return;
     }
-    requireRole(['admin', 'manager'])(req, res, next);
+    requireRole(['admin', 'manager', 'regional_manager'])(req, res, next);
+  },
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    requirePermission('staffing:write')(req, res, next);
   },
   (req, res, next) => {
     if (!isJobDispatchPhase2Enabled()) {
@@ -78,7 +88,14 @@ router.post(
       next();
       return;
     }
-    requireRole(['admin', 'manager'])(req, res, next);
+    requireRole(['admin', 'manager', 'regional_manager'])(req, res, next);
+  },
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    requirePermission('staffing:write')(req, res, next);
   },
   (req, res, next) => {
     if (!isJobDispatchPhase2Enabled()) {
@@ -89,12 +106,13 @@ router.post(
   }
 );
 
-// RBAC per API_SPEC_V1_PATCH_V2 §PATCH-07g.
-// Create / mutate: ADMIN, MANAGER. Read: all authenticated roles
-// (results are scoped to roster membership for non-management in the service).
-router.post('/', requireRole(['admin', 'manager']), createWorkRequest);
+// RBAC per API_SPEC_V1_PATCH_V2 §PATCH-07g, extended to ADR-030 §3 C-23.
+// Create / mutate: ADMIN, MANAGER, REGIONAL_MANAGER (+ `staffing:write`).
+// Read: all authenticated roles (results are scoped to roster membership for
+// non-management in the service).
+router.post('/', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('staffing:write'), createWorkRequest);
 router.get('/', listWorkRequests);
 router.get('/:id', getWorkRequest);
-router.patch('/:id', requireRole(['admin', 'manager']), updateWorkRequest);
+router.patch('/:id', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('staffing:write'), updateWorkRequest);
 
 export default router;

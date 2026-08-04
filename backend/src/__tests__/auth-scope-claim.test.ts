@@ -122,7 +122,39 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(mockPrisma.hotel.findFirst).not.toHaveBeenCalled();
     });
 
-    it('Regional Manager (non-admin, HotelGroup.regional_manager_user_id match) → { type: "hotel_group", hotel_group_id }', async () => {
+    // `resolveScope()` is role-agnostic below the admin short-circuit: it
+    // resolves by ASSOCIATION (HotelGroup.regional_manager_user_id, then
+    // Hotel.manager_user_id), not by role string. Both cases below therefore
+    // matter and neither substitutes for the other: a group-associated MANAGER
+    // row is what M-3 promotes FROM, and a REGIONAL_MANAGER row is what every
+    // live RM actually presents after promotion. This suite previously covered
+    // the group-association branch only with `role: 'MANAGER'`, leaving scope
+    // issuance for an actual REGIONAL_MANAGER row unexercised.
+    it('Regional Manager (REGIONAL_MANAGER row, HotelGroup.regional_manager_user_id match) → { type: "hotel_group", hotel_group_id }', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({
+          id: 'rm_1',
+          email: 'rm@test.com',
+          role: 'REGIONAL_MANAGER',
+          password_hash: realPasswordHash,
+        })
+      );
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_42' });
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'rm@test.com', password: 'password123' });
+      const payload = decodeAccessToken(result.access_token);
+
+      expect(payload.role).toBe('regional_manager');
+      expect(payload.scope).toEqual({ type: 'hotel_group', hotel_group_id: 'group_42' });
+      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
+        where: { regional_manager_user_id: 'rm_1' },
+        select: { id: true },
+      });
+    });
+
+    it('group-associated MANAGER row (the pre-M-3 shape) → { type: "hotel_group", hotel_group_id }', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'rm_1', email: 'rm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
@@ -133,11 +165,36 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       const result = await service.login({ email: 'rm@test.com', password: 'password123' });
       const payload = decodeAccessToken(result.access_token);
 
+      expect(payload.role).toBe('manager');
       expect(payload.scope).toEqual({ type: 'hotel_group', hotel_group_id: 'group_42' });
-      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
-        where: { regional_manager_user_id: 'rm_1' },
-        select: { id: true },
-      });
+    });
+
+    // An RM row with no HotelGroup association is reachable in production: an
+    // Admin can mint one via `PUT /users/:id/role` without appointing them to
+    // a group (appointment is a separate, hotel-group-owned write). Scope
+    // resolves to `null` and every scope primitive then fails closed
+    // (`isHotelInScope`/`resolveScopeGroupFilter` deny on a null claim), so
+    // such an RM authenticates successfully and is denied everywhere — pinned
+    // here so that stays deliberate rather than becoming an accident.
+    it('REGIONAL_MANAGER row with no group and no hotel association → scope null (fails closed downstream)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({
+          id: 'rm_orphan',
+          email: 'orphan@test.com',
+          role: 'REGIONAL_MANAGER',
+          password_hash: realPasswordHash,
+        })
+      );
+      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'orphan@test.com', password: 'password123' });
+      const payload = decodeAccessToken(result.access_token);
+
+      expect(payload.role).toBe('regional_manager');
+      expect(payload.scope).toBeNull();
     });
 
     it('Hotel Manager (non-admin, hotelGroup miss, Hotel.manager_user_id match) → { type: "hotel", hotel_id }', async () => {

@@ -18,6 +18,9 @@ import {
 import { isWorkerFreeOnDay } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+// From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
+// pure predicates, so suites mocking the permissions middleware need not stub them.
+import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import {
   AcceptBroadcastResultDto,
@@ -98,10 +101,12 @@ export class JobRequestService extends BaseService {
       throw new ConflictError('This hotel is not currently accepting new work requests');
     }
 
-    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only create work
-    // requests for hotels in their scope claim (retired M-4).
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a scope-bound manager (Hotel or Regional)
+    // may only create work requests for hotels in their scope claim (retired
+    // M-4). ADR-030 §3 C-23 grants RM `✓ᶜ`; isHotelInScope() resolves its
+    // hotel_group claim, so the same branch serves both roles.
     // Admin keeps unconditional cross-hotel access (unchanged, by design).
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot create a work request for this hotel');
@@ -154,8 +159,11 @@ export class JobRequestService extends BaseService {
     };
 
     // PATCH-04: non-management roles only see requests for hotels where they
-    // hold an ACTIVE roster membership.
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    // hold an ACTIVE roster membership. isSelfScopedRole() rather than
+    // `role !== 'admin' && role !== 'manager'`, which MATCHED regional_manager
+    // and silently roster-scoped an RM as if it were a worker (a 200 with the
+    // wrong rows) while the manager scope filters above skipped it entirely.
+    if (isSelfScopedRole(actor.role)) {
       const hotelIds = await listEligibleHotelIds(actor.userId);
       if (hotelIds.length === 0) return { data: [], total: 0 };
       where.hotel_id = query.hotel_id
@@ -193,7 +201,7 @@ export class JobRequestService extends BaseService {
     });
     if (!wr) throw new NotFoundError('Work request not found');
 
-    if (actor.role !== 'admin' && actor.role !== 'manager') {
+    if (isSelfScopedRole(actor.role)) {
       const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
       if (!eligible) throw new ForbiddenError('Cannot access this work request');
     }
@@ -223,10 +231,11 @@ export class JobRequestService extends BaseService {
     const wr = await this.prisma.jobRequest.findUnique({ where: { id } });
     if (!wr) throw new NotFoundError('Work request not found');
 
-    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a manager may only patch work
-    // requests belonging to a hotel in their scope claim (retired M-4).
+    // Epic 8 (SIR-JOBD-002 / FIND-SEC-002): a scope-bound manager (Hotel or Regional)
+    // may only patch work requests belonging to a hotel in their scope claim
+    // (retired M-4). ADR-030 §3 C-23.
     // Admin keeps unconditional cross-hotel access (unchanged).
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot modify this work request');
@@ -367,10 +376,10 @@ export class JobRequestService extends BaseService {
     }
 
     // Same scope-authz shape as create()/update() above (Epic 8,
-    // SIR-JOBD-002/FIND-SEC-002): a manager may only raise a broadcast for a
-    // hotel in their scope claim. Admin keeps unconditional cross-hotel
+    // SIR-JOBD-002/FIND-SEC-002): a scope-bound manager (Hotel or Regional) may
+    // only raise a broadcast for a hotel in their scope claim (ADR-030 C-23). Admin keeps unconditional cross-hotel
     // access.
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, input.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot raise a broadcast for this hotel');
@@ -467,7 +476,7 @@ export class JobRequestService extends BaseService {
       throw new ConflictError('This work request is not a broadcast (no skill slots)');
     }
 
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot view eligibility for this work request');
@@ -757,7 +766,7 @@ export class JobRequestService extends BaseService {
       throw new ConflictError('This broadcast is not open');
     }
 
-    if (actor.role === 'manager') {
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot close this broadcast');

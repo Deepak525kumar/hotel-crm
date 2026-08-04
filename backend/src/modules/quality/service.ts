@@ -10,6 +10,9 @@ import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+// From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
+// pure predicates, so suites mocking the permissions middleware need not stub them.
+import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
 
@@ -85,9 +88,16 @@ export class QualityService extends BaseService {
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager may only verify
-    // attendance for hotels in their scope claim. Admin/checker unchanged.
-    if (actor.role === 'manager') {
+    // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
+    // verify attendance for hotels in their scope claim. Admin/checker unchanged.
+    //
+    // isScopedManagerRole() covers regional_manager as defense-in-depth, not as
+    // a live grant: ADR-030 §3 C-27 denies RM `quality:write`, so an RM cannot
+    // currently reach this method at all. Written this way because a bare
+    // `role === 'manager'` test would SILENTLY no-op the scope check if C-27 were
+    // ever widened — failing open on a security boundary. Same posture as
+    // resolveWorkerScope()'s deny-by-default tail.
+    if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot verify attendance for this hotel');
@@ -195,9 +205,11 @@ export class QualityService extends BaseService {
         throw new ForbiddenError('worker_id does not match the assignment worker');
       }
 
-      // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager may only rate for
-      // hotels in their scope claim. Admin/checker unchanged.
-      if (actor.role === 'manager') {
+      // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
+      // rate for hotels in their scope claim. Admin/checker unchanged.
+      // regional_manager included as defense-in-depth — see verifyAttendance()
+      // above for why (C-27 denies RM `quality:write` today).
+      if (isScopedManagerRole(actor.role)) {
         const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
         if (!inScope) {
           throw new ForbiddenError('Cannot rate for this hotel');

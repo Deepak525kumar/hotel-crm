@@ -95,19 +95,19 @@ describe('Calendar route authorization (ADR-030 C-13)', () => {
   });
 
   it('allows a manager with in-scope hotel access to read operations', async () => {
-    testAuth = { userId: 'm1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+    testAuth = { userId: 'm1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
     const res = await request(makeApp()).get('/calendar/hotels/h1/operations');
     expect(res.status).toBe(200);
   });
 
   it('denies a manager with out-of-scope hotel access (403)', async () => {
-    testAuth = { userId: 'm1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h_other' } };
+    testAuth = { userId: 'm1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h_other' } };
     const res = await request(makeApp()).get('/calendar/hotels/h1/operations');
     expect(res.status).toBe(403);
   });
 
   it('allows an admin unconditionally', async () => {
-    testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
+    testAuth = { userId: 'a1', role: 'admin', permissions: ['staffing:write'], scope: null };
     const res = await request(makeApp()).post('/calendar/hotels/h1/operations').send({});
     expect(res.status).toBe(200);
   });

@@ -13,6 +13,67 @@ import { getPrisma } from './db.js';
 import { logger } from './logger.js';
 import type { UserScope } from './jwt.js';
 
+/**
+ * Role predicates for the scope-bound manager classes (ADR-030 D-5).
+ *
+ * `requireRole()` and every service-layer guard compare `actor.role` by exact
+ * string (middleware/permissions.ts), with no hierarchy and no aliasing. So
+ * `REGIONAL_MANAGER` — which holds MANAGER's entire token set by reference
+ * (config/constants.ts) — has to be named literally at every comparison site,
+ * and a site that names only `'manager'` fails in one of two ways:
+ *
+ *   1. `role === 'manager'` scope branches SKIP the scope check for an RM.
+ *   2. `role !== 'admin' && role !== 'manager'` worker fallbacks MATCH an RM,
+ *      silently narrowing it to its own rows and returning 200 with the wrong
+ *      data — worse than a 403, because nothing signals the error.
+ *
+ * Both shapes shipped to production and were caught only by human security
+ * review: `SIR-AUTH-021` (High — `resolveHotelAccess()` had no RM branch) and
+ * `SIR-ANLY-015` (Medium — analytics role admission and token grant not
+ * extended in lockstep). See `.claude/governance/
+ * SPECIFICATION_ISSUES_REGISTER.md`.
+ *
+ * These predicates exist so the next role added to the platform is a change to
+ * this file rather than a hunt through a dozen `===` comparisons. Prefer them
+ * over literal role strings in any new scope guard.
+ *
+ * NOTE these answer "which authorization CLASS is this actor in", not "may this
+ * actor reach this resource" — the latter is `isHotelInScope` /
+ * `isWorkerInGroupScope` / `resolveScopeGroupFilter` below.
+ */
+
+/**
+ * True for the two scope-bound manager roles: Hotel Manager (hotel scope) and
+ * Regional Manager (hotel-group scope). Both hold the same operational
+ * capability set (ADR-030 D-5) and differ only in the breadth of their `scope`
+ * claim, which the scope primitives resolve — so a guard that scope-checks a
+ * manager must scope-check an RM identically.
+ */
+export function isScopedManagerRole(role: string): boolean {
+  return role === 'manager' || role === 'regional_manager';
+}
+
+/**
+ * True for roles whose reads/writes are narrowed to their OWN records — i.e.
+ * neither an admin (unrestricted) nor a scope-bound manager.
+ *
+ * Replaces the `role !== 'admin' && role !== 'manager'` shape, which
+ * misclassified a Regional Manager as a worker. `checker` is NOT included: it
+ * is cross-hotel by present behaviour at several call sites, so callers that
+ * treat checker as non-self must say so explicitly (see
+ * `isSelfScopedRole(role, { checkerIsSelfScoped: false })`).
+ */
+export function isSelfScopedRole(
+  role: string,
+  opts: { checkerIsSelfScoped?: boolean } = {}
+): boolean {
+  const { checkerIsSelfScoped = true } = opts;
+  if (role === 'admin') return false;
+  if (isScopedManagerRole(role)) return false;
+  if (role === 'checker') return checkerIsSelfScoped;
+  return true;
+}
+
 // Evaluates whether a manager's PR 5.4 JWT `scope` claim grants access to the
 // given hotel (Epic 5 PR 5.5, ADR-024). null scope denies; global allows; hotel
 // scope allows only the matching hotel; hotel_group scope allows any hotel whose

@@ -6,7 +6,7 @@ import {
   CreateHotelGroupRequest, UpdateHotelGroupRequest,
   ListHotelGroupsQuery,
 } from './types.js';
-import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
@@ -26,8 +26,11 @@ export class CrmService extends BaseService {
       ];
     }
 
-    // Non-admins/managers see only active hotels
-    if (!['admin', 'manager'].includes(actorRole)) {
+    // Non-admins/managers see only active hotels. `regional_manager` counts as
+    // a manager here (ADR-030 §3 C-05, D-5): an RM administers its group's
+    // hotels and must see an inactive one for the same reason a Hotel Manager
+    // must — it was omitted from this allowlist while `manager` was present.
+    if (actorRole !== 'admin' && !isScopedManagerRole(actorRole)) {
       where['is_active'] = true;
     }
 

@@ -4,6 +4,9 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.j
 import { notificationService } from '../notifications/service.js';
 import { geoService } from '../geo/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+// From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
+// pure predicates, so suites mocking the permissions middleware need not stub them.
+import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
 
@@ -139,16 +142,25 @@ export class AttendanceService extends BaseService {
       ...(query.is_verified !== undefined ? { is_verified: query.is_verified } : {}),
     };
 
-    if (actor.role !== 'admin' && actor.role !== 'manager' && actor.role !== 'checker') {
+    // `checkerIsSelfScoped: false` preserves this module's existing behaviour —
+    // checker is cross-hotel here, unchanged. The change is that
+    // regional_manager no longer matches the self-scoped branch: the previous
+    // `role !== 'admin' && role !== 'manager' && role !== 'checker'` test
+    // narrowed an RM to its own attendance rows, while the
+    // `role === 'manager'` filter below skipped its hotel_group narrowing —
+    // a 200 with the wrong rows in both directions. ADR-030 §3 C-26 grants RM
+    // `✓ᶜ` on attendance.
+    if (isSelfScopedRole(actor.role, { checkerIsSelfScoped: false })) {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
     }
 
-    // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager's list is constrained to
-    // the hotels in their PR 5.4 `scope` claim. Admin and checker remain
-    // cross-hotel (unchanged); worker is already own-worker-scoped above.
-    if (actor.role === 'manager') {
+    // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager's list is
+    // constrained to the hotels in their PR 5.4 `scope` claim — hotel scope for
+    // a Hotel Manager, hotel_group for a Regional Manager. Admin and checker
+    // remain cross-hotel (unchanged); worker is already own-worker-scoped above.
+    if (isScopedManagerRole(actor.role)) {
       const scope = actor.scope ?? null;
       if (!scope) {
         // No scope claim -> deny everything (empty-in matches no rows).
@@ -181,7 +193,7 @@ export class AttendanceService extends BaseService {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
 
-    if (actor.role !== 'admin' && actor.role !== 'manager' && actor.role !== 'checker') {
+    if (isSelfScopedRole(actor.role, { checkerIsSelfScoped: false })) {
       if (record.worker_id !== actor.userId) {
         throw new ForbiddenError('Cannot access this attendance record');
       }
@@ -200,17 +212,17 @@ export class AttendanceService extends BaseService {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
 
-    // Epic 5 PR 5.5 (ADR-024, retired M-4): a manager may only mutate
-    // attendance for hotels in their scope claim. Checked before any
+    // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
+    // mutate attendance for hotels in their scope claim. Checked before any
     // mutation. Admin/checker/worker branches below are unchanged.
-    if (actorRole === 'manager') {
+    if (isScopedManagerRole(actorRole)) {
       const inScope = await isHotelInScope(actorScope, record.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot access this attendance record');
       }
     }
 
-    const isWorker = actorRole !== 'admin' && actorRole !== 'manager' && actorRole !== 'checker';
+    const isWorker = isSelfScopedRole(actorRole, { checkerIsSelfScoped: false });
 
     if (isWorker) {
       if (record.worker_id !== actorId) {
