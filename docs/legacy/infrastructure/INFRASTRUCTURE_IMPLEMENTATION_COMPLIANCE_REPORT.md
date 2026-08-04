@@ -1,3 +1,6 @@
+> [!WARNING]
+> **Historical Context:** This document describes a legacy architecture where the frontend (hotel-crm-web) was deployed on EC2. In the current production architecture, the frontend is hosted on Vercel, and EC2 only runs the backend API and worker processes.
+
 # INFRASTRUCTURE IMPLEMENTATION COMPLIANCE REPORT
 
 **Scope:** All infrastructure artifacts created on branch `claude/focused-cannon-qwznmo`  
@@ -314,7 +317,7 @@ The `workflow_call` trigger is absent from ci.yml's `on:` block. GitHub Actions 
 2. **`aws` CLI not installed.** Needs `awscli` or `python3-pip && pip install awscli`. Will fail immediately on first run.
 3. **AWS credentials not configured.** The `aws s3 cp` command needs `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` (which map to DO Spaces keys). While `DO_SPACES_KEY` and `DO_SPACES_SECRET` are loaded from the .env file, the aws CLI expects them as `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. The script uses `DO_SPACES_KEY` variable names which aws CLI does not read. An `aws configure` step or variable mapping (`AWS_ACCESS_KEY_ID=$DO_SPACES_KEY`) is missing.
 4. **`DO_SPACES_BUCKET_BACKUPS` is undocumented.** The script references this variable but it appears in neither `.env.example` nor `.env.staging`. The fallback default `hotelcrm-backups` works, but the variable name mismatch with `DO_SPACES_BUCKET` (the upload bucket) could cause confusion or the wrong bucket being used.
-5. **No failure notification.** PATCH_V1 MINOR-3 specifically flags that silently failing background jobs are a GDPR compliance risk. If pg_dump or the S3 upload fails, the cron job exits non-zero and logs to `/var/log/hotel-crm/backup.log` — but no alert is raised. A failed weekly backup unnoticed for weeks means the RPO guarantee is void.
+5. **No failure notification.** PATCH_V1 MINOR-3 specifically flags that silently failing background jobs are a GDPR compliance risk. If pg_dump or the S3 upload fails, the cron job exits non-zero and logs to `/home/ubuntu/.pm2/logs/backup.log` — but no alert is raised. A failed weekly backup unnoticed for weeks means the RPO guarantee is void.
 6. **No backup verification.** The script does not check file size, validate the dump is non-zero, or attempt a test restore. The plan's Phase 4 DR hardening section requires a monthly restore drill; no automation artifact exists for it.
 7. **Cron job not installed** by any artifact.
 

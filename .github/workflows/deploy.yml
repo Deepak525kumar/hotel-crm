@@ -58,4 +58,4 @@ jobs:
       - name: Verify deployment
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} \
-            "curl -fsS http://localhost:3001/api/v1/health"
+            "curl -fsS http://localhost:3001/api/v1/health/ready"

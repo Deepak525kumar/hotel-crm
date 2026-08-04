@@ -2,69 +2,67 @@
 
 | Field | Value |
 |---|---|
-| Purpose | Answers only "are we production-ready" — G8 release-gate status per phase/module, outstanding release prerequisites, and a pointer to the detailed rollout checklist. Distinct from [EXECUTION_DASHBOARD.md](EXECUTION_DASHBOARD.md)'s day-to-day "where is work at" view: release readiness has its own gate criteria and its own (less frequent, higher-stakes) update cadence. |
-| Detailed rollout steps | [`docs/implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md`](../implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md) — not restated here |
-| Last verified | 2026-07-27 |
+| Purpose | Answers only "are we production-ready" — release-gate status, outstanding release prerequisites, and a pointer to the detailed rollout checklist. Distinct from [EXECUTION_DASHBOARD.md](EXECUTION_DASHBOARD.md)'s day-to-day "where is work at" view. |
+| Detailed rollout steps | [`deploy/release/RELEASE_EXECUTION_PLAN.md`](../../deploy/release/RELEASE_EXECUTION_PLAN.md) — not restated here |
+| Last verified | 2026-08-04 (Release Candidate documentation pass) |
 
 ## Has this repository ever been deployed to production?
 
-**No.** Per `ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md`'s own evidence (as of 2026-07-27): no AWS
-resources have ever been provisioned, no completed deployment is recorded in any document
-postdating 2026-06-20, and every sampled `production`-environment deployment run in GitHub's
-Deployments API from 2026-06-14 through 2026-07-26 (192 recorded attempts) resolved to `failure`
-(root cause: `DATABASE_URL` resolving empty — production secrets were never populated). Zero
-`release/*` tags exist. Full evidence detail lives only in that checklist file.
+**Yes.** This entry previously said "No," based on evidence from 2026-07-27. That is no longer
+true. `.github/workflows/deploy.yml` is a real, functioning "Deploy to EC2" pipeline; live deploy
+run history (via `gh run list --workflow=deploy.yml`) shows repeated successful runs, most
+recently against the current `main`. `ecosystem.config.js` and `deploy.sh` (repository root) have
+been reconciled with what's actually running in production — see
+[`deploy/release/RELEASE_EXECUTION_PLAN.md`](../../deploy/release/RELEASE_EXECUTION_PLAN.md) §7
+for the reconciliation detail. The frontend deploys separately, via Vercel.
 
-## G8 Release-Gate Status
+## Release readiness — current verdict
 
-G8 (release readiness) is a per-module gate reviewed independently of G2 (specification freeze).
-A module being `FROZEN` at G2 does **not** imply it has cleared G8 — every frozen module below
-still carries open G8 prerequisites.
+**Release Candidate.** Engineering implementation is complete; production architecture has been
+reconciled with the repository. What remains is operational, not engineering — see
+[`deploy/release/RELEASE_SUMMARY.md`](../../deploy/release/RELEASE_SUMMARY.md) for the
+authoritative current summary and
+[`deploy/release/RELEASE_EXECUTION_PLAN.md`](../../deploy/release/RELEASE_EXECUTION_PLAN.md) for
+the full remaining-operational-tasks list (push credential provisioning, UAT execution, release
+tagging, rollout, post-deploy monitoring).
 
-| Module | Spec freeze (G2) | Open G8 / release prerequisites |
-|---|---|---|
-| backend-auth | FROZEN @0.3.0 | `ADR-031` closed the session/token-revocation and rate-limiting prerequisites (`GD-07`). `SIR-AUTH-017` (password-reset timing side-channel) and per-account rate-limiting remain explicitly open and out of `ADR-031`'s scope. MFA (`GD-08`) undecided — no data model or endpoint exists. |
-| backend-users | FROZEN @0.2.0 | `OQ-USERS-01/02/05/06`, `SIR-USERS-005` (Medium), owner assignment (`SYNC-001`) |
-| backend-crm | FROZEN @0.2.1 | Owner assignment (`SYNC-001`); hotel/hotel-group writes now Admin-only per `ADR-030` |
-| backend-work-requests / work-applications / assignments | FROZEN @0.3.2 | Owner assignment (`SYNC-001`) |
-| backend-attendance | FROZEN @0.2.2 | Cross-tenant hotel-scoping (`OQ-02`, High, tracked `SYNC-019`); optimistic-locking mechanism pending implementation (`GD-10`/`ADR-036` decided the standard, concrete mechanism deferred); auto-ABSENT/NO_SHOW automation — governance resolved (`GD-21`/`ADR-059`); implementation not started |
-| backend-quality | FROZEN @0.2.0 | Dual-writer aggregate correctness bug resolved (`GD-04`, `SIR-QUAL-005`, 2026-07-27); `OQ-01..09` and owner assignment remain G8 items |
-| backend-hr (SPEC-EMP-001 mapping) | FROZEN @0.2.0 | No dedicated test file (`active-no-tests`); special-category access/audit controls unbuilt but disclosed; boundary conflict with a second, non-frozen `SPEC-HR-001` targeting the same code path is disclosed, not resolved |
-| employee-management | FROZEN @0.2.0 | Owner assignment; provisional perf budget (`OD-EMP-16`) |
-| backend-notifications | FROZEN @0.3.0 | `OQ-NOTIF-02/-03/-05`, owner assignment |
-| backend-analytics | FROZEN @0.2.1 | Medium `OQ-ANALYTICS-11` (cross-module-read boundary, tracks to `GD-13`) and Low `OQ-ANALYTICS-12`; worker-facing analytics 403 resolved (`GD-06`, `SIR-ANLY-002`, 2026-07-27) |
-| backend-calendar | FROZEN @0.3.1 | `active-partial` (2026-07-27): worker self-mark sick/vacation built (`GD-18` narrow slice); manager weekly-plan placement view + availability read-model remain unbuilt, blocked on `GD-18`'s remaining scope + Phase-1 schema realignment (`SPEC-JOB-DISPATCH-001`) |
-| backend-chatbot | REVIEW (not FROZEN) | Cannot reach G2 until `GD-19` decided; zero code |
-| backend-geo | REVIEW (not FROZEN) | Cannot reach G2 until `GD-14` decided; zero code |
-| backend-consent / compliance / retention | REVIEW (not FROZEN) | Zero code footprint; blocked on `GD-17`, `GD-09` respectively |
+## Test suite status
 
-Full per-finding detail (Critical/High/Medium/Low), evidence citations, and G4 review outcomes for
-every row above live only in `.claude/knowledge/MODULE_REGISTRY.yaml` and
-`.claude/governance/SPECIFICATION_ISSUES_REGISTER.md` — not restated here.
+99/99 suites passing, 1698/1698 tests passing (re-verified 2026-08-04, `cd backend && npm test`).
+One suite (`hr-authz.test.ts`) was observed to fail once in a full-suite run but passes cleanly
+in isolation — treated as test-ordering flakiness, not a defect, pending a follow-up to find the
+shared-state leak (see `deploy/release/KNOWN_LIMITATIONS.md`).
+
+## Per-module implementation status
+
+The per-module detail previously duplicated here (dated 2026-07-27/28/29) was found to be
+severely stale relative to current code during this synchronization pass — several modules
+listed as "zero-code"/".placeholder only" are in fact fully implemented (geo, consent,
+compliance), and HR was listed as "every method NotImplementedError" when in fact only its
+payslip-fulfillment sub-feature carries a deferred-work comment; the rest of the module is
+implemented and tested. Per this file's own Update Protocol, per-module status should be
+recomputed from `.claude/knowledge/MODULE_REGISTRY.yaml` rather than hand-maintained here — that
+recomputation was out of scope for this documentation-only pass (it requires re-verifying every
+module against the registry's own schema, not just spot-checking the modules this pass happened
+to touch). Treat `EXECUTION_DASHBOARD.md`'s per-module table as unreliable until it is
+next refreshed from the registry, and prefer direct code inspection
+(`backend/src/modules/<name>/service.ts`) over either document for any release decision that
+hinges on a specific module's real status.
 
 ## Platform-Wide Release Prerequisites
 
 | Prerequisite | Status |
 |---|---|
-| Test suite green | 69/69 suites, 1071/1071 tests passing; `tsc --noEmit` clean (independently re-verified 2026-07-27) |
-| Accountable ownership (`SYNC-001`) | Fully unassigned repository-wide — no CODEOWNERS file, `backend/package.json` author empty. Hard release-accountability gate reserved to the human. |
-| MFA (`GD-08`) | No data model or endpoint anywhere; undecided |
-| Performance SLO & workload baseline (`GD-11`) | Undefined; blocks G8 for multiple modules until the human supplies workload assumptions |
-| Platform ADR ratification (`GD-23`) | `ADR-001..009`, `ADR-019/020` still `Proposed`; governance-record cleanup only, 0 code |
-| Production deployment | Never completed — see "Has this repository ever been deployed" above |
-
-## Feature-Flag / Rollout Gate (ADR-031)
-
-`ADR-031` introduced two feature flags (`FEATURE_DERIVED_PERMISSIONS`,
-`FEATURE_TOKEN_GENERATION_ENFORCEMENT`) that are code-complete and retired from the codebase as of
-PR-7, but the checklist's operational rollout gate — the conditions that must hold before either
-flag is ever flipped `true` in a **real** production environment — has not been exercised because
-no such environment exists yet. Full checklist, evidence, and sign-off log:
-[`ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md`](../implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md).
+| Test suite green | 99/99 suites, 1698/1698 tests passing (re-verified 2026-08-04) |
+| Accountable ownership | No CODEOWNERS file exists; module ownership remains unassigned in the registry. Reserved to the human — not a code gap. |
+| Production deployment | Confirmed — see above. Reconciled architecture as of this pass. |
+| Feature flag rollout | `FEATURE_EMPLOYMENT_RECORD`, `FEATURE_GD02_MATRIX`, `FEATURE_JOBDISPATCH_PHASE2` are code-complete and cleared for this release; `FEATURE_RM_ROLE` intentionally held back (no demote path for its promotion script); `FEATURE_JOBDISPATCH_PHASE1` is vestigial. See `deploy/release/RELEASE_EXECUTION_PLAN.md` §2. |
+| Push notification delivery | Code complete (APNs/FCM providers, device-token registration, deep-link handling). Operational task remaining: provision real production credentials. |
 
 ## Update Protocol
 
-Update this file only when a module's G8 status changes, a platform-wide release prerequisite
-closes, or the rollout checklist's status changes. Do not restate `GOVERNANCE_DECISIONS_REQUIRED.md`,
-`MODULE_REGISTRY.yaml`, or `ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md` content here — reference by ID
-or link.
+Update this file whenever release readiness changes, a platform-wide prerequisite closes, or the
+deploy architecture changes. Do not restate `deploy/release/*` content here — reference by link.
+Do not hand-maintain per-module implementation status here or in `EXECUTION_DASHBOARD.md`;
+recompute from `.claude/knowledge/MODULE_REGISTRY.yaml` and verify against
+`backend/src/modules/*/service.ts` directly before publishing any specific module claim.

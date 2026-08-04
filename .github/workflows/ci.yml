@@ -115,7 +115,8 @@ jobs:
           APNS_PRIVATE_KEY_BASE64: dGVzdA==
           APNS_KEY_ID: TESTKEY123
           APNS_TEAM_ID: TESTTEAM123
-          APNS_BUNDLE_ID: com.zirove.hotelcrm.test
+          APNS_BUNDLE_ID_WORKER: com.hotelcrm.workerapp.test
+          APNS_BUNDLE_ID_CHECKER: com.hotelcrm.checkerapp.test
           FIREBASE_PROJECT_ID: test-project
           AWS_REGION: eu-central-1
           S3_BUCKET: test-bucket
