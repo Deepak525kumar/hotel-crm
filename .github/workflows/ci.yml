@@ -4,7 +4,25 @@ on:
   push:
     branches: ['feature/**', 'fix/**', 'develop', 'main']
   pull_request:
-    branches: ['develop', 'main']
+    # No `branches:` filter: a PR stacked on another feature branch (e.g.
+    # feat/regional-manager-lifecycle onto feat/regional-manager-authorization,
+    # while the latter's own PR to main was still open) has a base ref that
+    # isn't develop/main, and previously got ZERO CI coverage — only Vercel's
+    # unconditional per-PR check ran, silently. That gap went undetected in
+    # this repo's own history (PR #339) until the base was retargeted to main
+    # after the underlying PR merged. Filtering by base branch encodes "which
+    # branch is currently the merge target," but that's exactly the property
+    # that's in flux for a stacked PR — so don't filter on it.
+    #
+    # `types:` deliberately omits `edited`: that event also fires on a plain
+    # title/description/label edit, and this workflow is expensive (a
+    # Postgres service container, three separate `npm ci` installs, a mobile
+    # matrix) — running it on every metadata tweak would be a real cost for a
+    # base-branch-retarget case this repo hits rarely. Retargeting a PR's base
+    # (as #339 needed once its stacked-on PR merged) does not itself produce a
+    # `synchronize` event; re-run the workflow manually (Actions tab -> Re-run
+    # jobs) or push any commit after retargeting to pick up default coverage.
+    types: [opened, synchronize, reopened]
   workflow_call:
 
 # Least-privilege default token for every job; CI only needs to read the repo.

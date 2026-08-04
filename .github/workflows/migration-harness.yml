@@ -15,7 +15,13 @@ on:
       - 'backend/scripts/migrate-harness.sh'
       - '.github/workflows/migration-harness.yml'
   pull_request:
-    branches: ['develop', 'main']
+    # No `branches:` filter — see ci.yml's identical fix for the full
+    # rationale: a PR stacked on another feature branch (base ref not
+    # develop/main) previously got zero migration-harness coverage even when
+    # it touched the migration chain directly, which PR #339 did (the RM
+    # unique-constraint migration). `types:` intentionally omits `edited` for
+    # the same cost reason as ci.yml.
+    types: [opened, synchronize, reopened]
     paths:
       - 'backend/prisma/migrations/**'
       - 'backend/prisma/harness/**'
