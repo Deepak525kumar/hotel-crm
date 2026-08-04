@@ -48,6 +48,22 @@ import type { UserScope } from './jwt.js';
  * capability set (ADR-030 D-5) and differ only in the breadth of their `scope`
  * claim, which the scope primitives resolve — so a guard that scope-checks a
  * manager must scope-check an RM identically.
+ *
+ * DELIBERATELY enumerates role names rather than deriving from
+ * `ROLE_PERMISSIONS` (e.g. "holds `staffing:write`"). Organizational position
+ * and permission set coincide TODAY (D-5 gives RM Manager's tokens plus
+ * `org_chart:read`), but that is an implementation coincidence, not the intent.
+ * Deriving scope classification from the permission map would mean any future
+ * token grant silently changes which branch a role takes in every guard below —
+ * exactly the coupling that let a permission change (RM aliasing
+ * MANAGER_PERMISSIONS) invalidate resolveWorkerScope's stated assumption and
+ * produce SIR-AUTH-021. Keep this expressing "which scope class is this role",
+ * and let the permission map answer "what may it do".
+ *
+ * `role` is `string`, not a union: it originates in a JWT claim
+ * (`lib/jwt.ts`, `AuthContext.role`) and so is untrusted input that may hold
+ * any value. Callers must therefore treat a `false` result as "not a scoped
+ * manager" (deny/narrow), never as "must be a worker".
  */
 export function isScopedManagerRole(role: string): boolean {
   return role === 'manager' || role === 'regional_manager';

@@ -172,6 +172,53 @@ router.get('/callback//double', requireRole('admin'), handler);
       expect(routes[0]?.requiredRoles).toEqual(['admin']);
     });
 
+    // Review item 11: character-by-character scanners are fragile, so the
+    // adjacent constructs that could also desynchronize the quote/bracket state
+    // are pinned explicitly. All of these pass today; they exist so a future
+    // change to stripComments() cannot regress them silently.
+    it('handles a template literal containing // and quote characters', () => {
+      const src = "const x = `http://a 'b' ${y}`;\nrouter.get('/t', requireRole('admin'), h);\n";
+      const routes = parseRouteFile('m', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.requiredRoles).toEqual(['admin']);
+    });
+
+    it('handles a regex literal containing a quote and a slash', () => {
+      const src = "const re = /['\\/]+/g;\nrouter.get('/r', requireRole('admin'), h);\n";
+      const routes = parseRouteFile('m', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.path).toBe('/r');
+    });
+
+    it('handles an escaped quote inside a string literal', () => {
+      const src = "const s = 'it\\'s';\nrouter.get('/e', requireRole('admin'), h);\n";
+      const routes = parseRouteFile('m', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.path).toBe('/e');
+    });
+
+    // JS block comments do not nest: the outer comment ends at the FIRST `*/`.
+    it('treats a so-called nested block comment the way JS does', () => {
+      const src = "/* a /* b */\nrouter.get('/n', requireRole('admin'), h);\n";
+      const routes = parseRouteFile('m', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.path).toBe('/n');
+    });
+
+    it('does not throw on an unterminated block comment', () => {
+      const src = "/* oops\nrouter.get('/u', requireRole('admin'), h);\n";
+      expect(() => parseRouteFile('m', src)).not.toThrow();
+    });
+
+    it('parses a MULTI-LINE route call preceded by an apostrophe comment', () => {
+      const src =
+        "// the manager's list\nrouter.get(\n  '/ml',\n  requireRole(['admin', 'manager']),\n  requirePermission('hotels:read'),\n  h\n);\n";
+      const routes = parseRouteFile('m', src);
+      expect(routes).toHaveLength(1);
+      expect(routes[0]?.requiredRoles).toEqual(['admin', 'manager']);
+      expect(routes[0]?.requiredPermissions).toEqual(['hotels:read']);
+    });
+
     it('ignores a router call that appears only inside a comment', () => {
       const src = `
 // router.get('/commented-out', requireRole('admin'), handler);

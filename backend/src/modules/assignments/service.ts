@@ -142,7 +142,11 @@ export class AssignmentService extends BaseService {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (actorRole !== 'admin' && actorRole !== 'manager') {
+    // isSelfScopedRole() rather than `actorRole !== 'admin' && actorRole !==
+    // 'manager'`: that shape MATCHED regional_manager, routing an RM through the
+    // worker-roster eligibility check (an individual-grain model) instead of
+    // treating it as management. ADR-030 §3 C-24 grants RM `✓ᶜ` on assignments.
+    if (isSelfScopedRole(actorRole)) {
       if (assignment.worker_id !== actorId) {
         const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
         if (!eligible) throw new ForbiddenError('Cannot access this assignment');
