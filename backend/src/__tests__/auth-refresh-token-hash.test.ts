@@ -31,7 +31,8 @@ const mockPrisma = {
   // (unmocked) resolution returns undefined→null scope, which leaves this
   // suite's refresh-token-hash assertions unaffected.
   hotelGroup: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // findUnique, not findFirst — see auth.test.ts's identical note.
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,

@@ -19,6 +19,7 @@
     "hotel-group:backfill-status": "tsx src/scripts/run-hotel-group-backfill-status.ts",
     "employment-record:backfill-status": "tsx src/scripts/run-employment-record-backfill-status.ts",
     "rm-role:promote": "tsx src/scripts/run-regional-manager-promotion.ts",
+    "rm-role:demote": "tsx src/scripts/run-regional-manager-demotion.ts",
     "test": "jest --forceExit",
     "test:coverage": "jest --coverage --forceExit"
   },

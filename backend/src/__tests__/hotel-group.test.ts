@@ -29,9 +29,22 @@ const mockPrisma = {
   },
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // updateHotelGroup()'s transfer path bumps token_generation on both the
+    // outgoing and incoming RM (post-#339 review fix).
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // updateHotelGroup() now runs inside a transaction (lock-ordering fix,
+  // post-#339 review): it takes a row lock on the RM user id(s) via
+  // `SELECT ... FOR UPDATE` before re-reading/writing the HotelGroup row, in
+  // the same User-before-HotelGroup order users/service.ts#updateUserRole
+  // uses, so the two can never deadlock against each other.
+  $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  $transaction: jest.fn(async (arg: unknown) => {
+    if (Array.isArray(arg)) return Promise.all(arg);
+    return (arg as (tx: unknown) => Promise<unknown>)(mockPrisma);
+  }) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -56,8 +69,8 @@ describe('CrmService - Hotel Groups', () => {
   });
 
   describe('createHotelGroup', () => {
-    it('creates and returns a hotel group when the regional manager exists', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null });
+    it('creates and returns a hotel group when the regional manager exists and already holds the role', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null, role: 'REGIONAL_MANAGER' });
       const fake = { id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1', created_at: new Date(), updated_at: new Date() };
       mockPrisma.hotelGroup.create.mockResolvedValue(fake);
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -79,10 +92,23 @@ describe('CrmService - Hotel Groups', () => {
     });
 
     it('rejects when regional_manager_user_id references a soft-deleted user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: new Date() });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: new Date(), role: 'REGIONAL_MANAGER' });
 
       await expect(
         service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
+    });
+
+    // Regional Manager V1 Decision 12: the target must already hold
+    // REGIONAL_MANAGER. Previously assertRegionalManagerExists only checked
+    // the user existed, so a WORKER/MANAGER row could be written into
+    // regional_manager_user_id with no actual RM authority ever granted.
+    it('rejects when regional_manager_user_id references a user who is not yet a Regional Manager', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_1', deleted_at: null, role: 'MANAGER' });
+
+      await expect(
+        service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'mgr_1' }, 'admin_1', 'admin')
       ).rejects.toMatchObject({ name: 'ValidationError' });
       expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
     });
@@ -224,9 +250,9 @@ describe('CrmService - Hotel Groups', () => {
   });
 
   describe('updateHotelGroup', () => {
-    it('updates the regional manager when the new user exists', async () => {
+    it('updates the regional manager when the new user exists and already holds the role', async () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
       mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -235,6 +261,115 @@ describe('CrmService - Hotel Groups', () => {
       expect(result.regional_manager_user_id).toBe('rm_2');
       const updateCall = (mockPrisma.hotelGroup.update as jest.Mock).mock.calls[0] as Array<{ data: { regional_manager_user_id: string } }>;
       expect(updateCall[0]?.data.regional_manager_user_id).toBe('rm_2');
+    });
+
+    // Post-#339 review finding: a transfer previously left both RMs' access
+    // tokens carrying a stale `scope` claim (minted at login/refresh, never
+    // re-derived per-request) for up to JWT_ACCESS_EXPIRY — the outgoing RM
+    // kept acting on the old group, the incoming RM couldn't act on the new
+    // one until they refreshed. Both must be invalidated in the SAME
+    // transaction as the group write.
+    it('bumps token_generation for BOTH the outgoing and incoming RM on transfer', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'rm_1' },
+        data: { token_generation: { increment: 1 } },
+      });
+      expect(mockPrisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'rm_2' },
+        data: { token_generation: { increment: 1 } },
+      });
+      expect(mockPrisma.user.update).toHaveBeenCalledTimes(2);
+    });
+
+    it('does NOT bump token_generation for a non-RM field change (name only)', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Munich Group', regional_manager_user_id: 'rm_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotelGroup('hg_1', { name: 'Munich Group' }, 'admin_1', 'admin');
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('does NOT bump token_generation when regional_manager_user_id is set to its current value (no-op)', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null, role: 'REGIONAL_MANAGER' });
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin');
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // Race-closure follow-up (second-review pass on #339): assertRegionalManagerExists
+    // (the D12 check) runs BEFORE the transaction/row-lock, so its result can
+    // be stale by the time the lock is actually held — a concurrent
+    // updateUserRole() demotion could commit in that exact gap. This asserts
+    // the role is RE-CHECKED under the lock, not just before it: simulates the
+    // target's role having changed between the outer assertion and the
+    // in-transaction re-read (mockResolvedValueOnce for the first call, a
+    // different value for the second — both resolve through the same mock
+    // since $transaction hands the callback `mockPrisma` itself as `tx`).
+    it('re-checks the new RM still holds the role INSIDE the transaction, not only before it', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique
+        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' }) // outer assertRegionalManagerExists — passes
+        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'MANAGER' }); // in-transaction re-check — demoted concurrently, must now fail
+
+      await expect(
+        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+
+      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // Deadlock-avoidance follow-up (post-#339 review): updateUserRole()
+    // (users/service.ts) locks the target User row FIRST, then reads
+    // HotelGroup. A concurrent transfer here must lock in the SAME order —
+    // User before HotelGroup — or the two operations deadlock instead of
+    // cleanly serializing under Postgres. This asserts the row lock
+    // ($queryRaw ... FOR UPDATE) is taken before the HotelGroup write.
+    it('locks the RM user row(s) before writing the HotelGroup row (deadlock-avoidance lock order)', async () => {
+      const callOrder: string[] = [];
+      mockPrisma.$queryRaw.mockImplementation(async () => {
+        callOrder.push('user-lock');
+        return [];
+      });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
+      mockPrisma.hotelGroup.update.mockImplementation(async () => {
+        callOrder.push('hotelgroup-write');
+        return { id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' };
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
+
+      // Locks BOTH RM user rows (outgoing rm_1, incoming rm_2) before the
+      // HotelGroup write — see updateHotelGroup's own comment on why both,
+      // not just one, must be locked.
+      expect(callOrder).toEqual(['user-lock', 'user-lock', 'hotelgroup-write']);
+    });
+
+    // Regional Manager V1 Decision 12: this is the live "transfer" path — the
+    // successor must already hold REGIONAL_MANAGER, not merely exist.
+    it('rejects transferring to a user who is not yet a Regional Manager', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_2', deleted_at: null, role: 'MANAGER' });
+
+      await expect(
+        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'mgr_2' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
     });
 
     it('rejects reassignment to a nonexistent user without writing', async () => {

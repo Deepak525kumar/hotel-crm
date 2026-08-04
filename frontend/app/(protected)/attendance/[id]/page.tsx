@@ -210,7 +210,10 @@ export default function AttendanceDetailPage() {
         </Card>
       )}
 
-      <RoleGate allow={["manager", "admin", "checker"]}>
+      {/* attendance/service.ts#update() has no route-level gate — authorization
+          is service-only, via isScopedManagerRole() (admin/manager/
+          regional_manager) plus checker's separate cross-hotel allowance. */}
+      <RoleGate allow={["manager", "regional_manager", "admin", "checker"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600">

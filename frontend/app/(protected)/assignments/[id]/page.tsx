@@ -233,7 +233,9 @@ export default function AssignmentDetailPage() {
         </Card>
       )}
 
-      <RoleGate allow={["admin", "manager"]}>
+      {/* rooms-completed route now includes regional_manager (ADR-030 §3
+          C-24, staffing:write) alongside admin/manager. */}
+      <RoleGate allow={["admin", "manager", "regional_manager"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600">

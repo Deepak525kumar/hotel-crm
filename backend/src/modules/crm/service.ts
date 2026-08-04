@@ -7,6 +7,7 @@ import {
   ListHotelGroupsQuery,
 } from './types.js';
 import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope.js';
+import { bumpTokenGeneration } from '../auth/service.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
@@ -140,11 +141,22 @@ export class CrmService extends BaseService {
   // hotel_group_id/manager_user_id for authorization scoping yet — that lands
   // at PR 5.4 (scope-claim issuance) / PR 5.5 (authz flip), per ADR-024.
 
+  // Regional Manager V1 Decision 12: the target must ALREADY hold
+  // REGIONAL_MANAGER before being assigned to a group. Previously this only
+  // checked the user existed, so a WORKER/MANAGER row could be written into
+  // regional_manager_user_id with no actual RM authority ever granted (their
+  // JWT role stays whatever it was) — an assignment that promotes nothing.
+  // Promotion (PUT /users/:id/role) is a separate, ordered, prior step.
   private async assertRegionalManagerExists(regionalManagerUserId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: regionalManagerUserId } });
     if (!user || user.deleted_at) {
       throw new ValidationError('regional_manager_user_id does not reference an existing user', [
         { field: 'regional_manager_user_id', message: 'User not found' },
+      ]);
+    }
+    if (user.role !== 'REGIONAL_MANAGER') {
+      throw new ValidationError('regional_manager_user_id must reference a user already holding the Regional Manager role', [
+        { field: 'regional_manager_user_id', message: 'User is not a Regional Manager' },
       ]);
     }
   }
@@ -230,24 +242,114 @@ export class CrmService extends BaseService {
     return hotelGroup;
   }
 
+  // Lock-ordering follow-up (post-#339 review, paired with the identical fix
+  // in users/service.ts#updateUserRole): this is the RM-transfer path, so it
+  // now locks User rows (the outgoing and incoming RM, for the
+  // token_generation bump below) in addition to the HotelGroup row it always
+  // locked. It MUST acquire in the same order updateUserRole does — User
+  // first, then HotelGroup — or a demote racing a transfer deadlocks instead
+  // of cleanly serializing. See updateUserRole's comment for the full
+  // race/deadlock analysis; this is the other half of that pair.
   async updateHotelGroup(hotelGroupId: string, data: UpdateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
-    const hotelGroup = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
-    if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+    const existing = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+    if (!existing) throw new NotFoundError('Hotel group not found');
+
+    const nextRegionalManagerUserId = data.regional_manager_user_id ?? existing.regional_manager_user_id;
+    const isTransfer =
+      data.regional_manager_user_id !== undefined &&
+      data.regional_manager_user_id !== existing.regional_manager_user_id;
 
     if (data.regional_manager_user_id !== undefined) {
       await this.assertRegionalManagerExists(data.regional_manager_user_id);
     }
 
-    const updated = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: {
-        name: data.name ?? hotelGroup.name,
-        billing_info: data.billing_info ?? hotelGroup.billing_info,
-        regional_manager_user_id: data.regional_manager_user_id ?? hotelGroup.regional_manager_user_id,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      // Lock BOTH RM user rows before the outgoing RM's HotelGroup row, so a
+      // concurrent updateUserRole() demotion of either user blocks until this
+      // transaction commits (and re-reads a consistent state, not a stale
+      // pre-transfer snapshot). Fixed order across both ids (existing, then
+      // new) avoids a third deadlock class: two concurrent transfers of the
+      // SAME PAIR of users in opposite directions.
+      const lockIds = [existing.regional_manager_user_id, nextRegionalManagerUserId]
+        .filter((id, i, arr) => arr.indexOf(id) === i)
+        .sort();
+      for (const id of lockIds) {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+      }
+
+      // Re-check under lock: the D12 assertion above (assertRegionalManagerExists)
+      // ran BEFORE the transaction and BEFORE the row lock, so its result can
+      // be stale by the time we hold the lock. Concretely:
+      //   1. This call passes assertRegionalManagerExists(u2) — u2 is RM.
+      //   2. A concurrent updateUserRole() locks u2's User row first, finds u2
+      //      owns no group (true — this transaction hasn't written yet),
+      //      demotes u2 to MANAGER, commits.
+      //   3. This transaction now acquires its own lock on u2's row and, with
+      //      only the STALE outer-scope assertion to go on, writes
+      //      regional_manager_user_id = u2 anyway — a HotelGroup pointing at a
+      //      MANAGER, the exact invariant violation both fixes exist to
+      //      prevent, just via a different interleaving (review follow-up on
+      //      #339, second-review pass).
+      // Re-reading the new RM's role HERE, after the lock, closes it: by the
+      // time this read runs, updateUserRole()'s transaction has either fully
+      // committed (role is genuinely MANAGER now, so this correctly throws)
+      // or is blocked waiting for the same row lock (so it cannot demote out
+      // from under this transaction after this point).
+      if (isTransfer) {
+        const newManager = await tx.user.findUnique({
+          where: { id: nextRegionalManagerUserId },
+          select: { role: true, deleted_at: true },
+        });
+        if (!newManager || newManager.deleted_at || newManager.role !== 'REGIONAL_MANAGER') {
+          throw new ValidationError('regional_manager_user_id must reference a user already holding the Regional Manager role', [
+            { field: 'regional_manager_user_id', message: 'User is not a Regional Manager' },
+          ]);
+        }
+      }
+
+      const hotelGroup = await tx.hotelGroup.findUnique({ where: { id: hotelGroupId } });
+      if (!hotelGroup) throw new NotFoundError('Hotel group not found');
+
+      const result = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: {
+          name: data.name ?? hotelGroup.name,
+          billing_info: data.billing_info ?? hotelGroup.billing_info,
+          regional_manager_user_id: nextRegionalManagerUserId,
+        },
+      });
+
+      if (isTransfer) {
+        // Both the outgoing RM (loses access to this group) and the incoming
+        // RM (whose scope claim must now resolve to this group, not
+        // whatever they had before) need their already-issued tokens
+        // invalidated — otherwise a live token keeps carrying the stale
+        // `scope` claim (minted at login/refresh, never re-derived
+        // per-request, middleware/auth.ts) for up to JWT_ACCESS_EXPIRY.
+        await bumpTokenGeneration(tx, existing.regional_manager_user_id);
+        await bumpTokenGeneration(tx, nextRegionalManagerUserId);
+      }
+
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
+    if (isTransfer) {
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'MODIFY',
+        'HOTEL_GROUP',
+        hotelGroupId,
+        {
+          action: 'token_generation_bumped',
+          reason: 'regional_manager_transfer',
+          outgoing_user_id: existing.regional_manager_user_id,
+          incoming_user_id: nextRegionalManagerUserId,
+        },
+        ip
+      );
+    }
     return updated;
   }
 

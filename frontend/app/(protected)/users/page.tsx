@@ -32,6 +32,7 @@ const ROLE_FILTERS = [
   { value: "worker", label: "Worker" },
   { value: "checker", label: "Checker" },
   { value: "manager", label: "Manager" },
+  { value: "regional_manager", label: "Regional Manager" },
   { value: "admin", label: "Admin" },
 ];
 

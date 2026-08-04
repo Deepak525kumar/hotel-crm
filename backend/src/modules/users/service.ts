@@ -150,7 +150,7 @@ export class UserService extends BaseService {
     }
 
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
-    const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
+    const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
 
     // ADR-031 D-1/D-4 (PR-4): permissions are derived request-time from
     // ROLE_PERMISSIONS[role] — this write path no longer computes or
@@ -326,10 +326,47 @@ export class UserService extends BaseService {
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
 
-    // ADR-031 D-4 (C-5): the bump commits in the same transaction as the
-    // role write, so a demotion can never be committed without also
-    // invalidating the demoted user's already-issued access token.
+    // ADR-031 D-4 (C-5): the token_generation bump commits in the same
+    // transaction as the role write, so a demotion can never be committed
+    // without also invalidating the demoted user's already-issued access
+    // token.
+    //
+    // Regional Manager V1 Decision 11 (supersedes the earlier "transfer OR
+    // remove" wording of Decision 6) / lock-ordering follow-up (post-#339
+    // review): a Hotel Group must always have exactly one assigned Regional
+    // Manager. The ownership check MUST run inside this transaction, after
+    // taking a row lock on the target User via `SELECT ... FOR UPDATE` —
+    // checking it beforehand (as a separate, unlocked read) is a TOCTOU race:
+    // `PATCH /hotel-groups/:id` could assign this user to a new group in the
+    // gap between an unlocked check and this transaction's commit, leaving a
+    // HotelGroup row pointing at a now-demoted MANAGER with no actual RM
+    // authority.
+    //
+    // Lock order is User FIRST, then HotelGroup — always, in both this method
+    // and `crm/service.ts#updateHotelGroup` (the transfer path, which now also
+    // locks the outgoing/incoming RM's User rows for its own token_generation
+    // bump). Two operations that both touch User and HotelGroup but disagree
+    // on ordering is exactly how a demote-vs-transfer race becomes a
+    // deadlock instead of a clean serialization; both call sites acquire in
+    // this same order so Postgres always serializes them, never deadlocks.
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Row lock on the target user — blocks a concurrent transfer's own
+      // User-row lock (crm/service.ts) until this transaction commits or
+      // rolls back, closing the race window entirely.
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
+
+      if (user.role === 'REGIONAL_MANAGER' && newRole !== 'REGIONAL_MANAGER') {
+        const ownedGroup = await tx.hotelGroup.findUnique({
+          where: { regional_manager_user_id: userId },
+          select: { id: true, name: true },
+        });
+        if (ownedGroup) {
+          throw new ConflictError(
+            `Cannot change role: user still manages hotel group "${ownedGroup.name}". Transfer the group to another Regional Manager first.`
+          );
+        }
+      }
+
       const result = await tx.user.update({
         where: { id: userId },
         data: { role: newRole },

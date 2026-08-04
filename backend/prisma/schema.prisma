@@ -374,7 +374,7 @@ model HotelGroup {
   id                       String   @id @default(cuid())
   name                     String
   billing_info             String?
-  regional_manager_user_id String
+  regional_manager_user_id String   @unique
   regional_manager         User     @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
   created_at               DateTime @default(now())
   updated_at               DateTime @updatedAt

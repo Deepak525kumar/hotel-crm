@@ -53,7 +53,11 @@ export class AuthService extends BaseService {
       return { type: 'global' };
     }
 
-    const group = await this.prisma.hotelGroup.findFirst({
+    // findUnique, not findFirst: HotelGroup.regional_manager_user_id is a
+    // unique FK (Regional Manager V1 Decision 1 — one group per RM), so at
+    // most one row can ever match. Before this constraint existed, findFirst
+    // silently picked one of an RM's groups arbitrarily if they held several.
+    const group = await this.prisma.hotelGroup.findUnique({
       where: { regional_manager_user_id: userId },
       select: { id: true },
     });

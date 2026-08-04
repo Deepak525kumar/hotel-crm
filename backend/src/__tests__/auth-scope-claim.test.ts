@@ -33,7 +33,10 @@ const mockPrisma = {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotelGroup: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // findUnique, not findFirst: Regional Manager V1 Decision 1 made
+    // regional_manager_user_id a unique FK, so resolveScope() switched
+    // lookups accordingly (auth/service.ts).
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -118,7 +121,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.permissions).toBeUndefined();
 
       // Admin short-circuits before any association lookup.
-      expect(mockPrisma.hotelGroup.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.hotelGroup.findUnique).not.toHaveBeenCalled();
       expect(mockPrisma.hotel.findFirst).not.toHaveBeenCalled();
     });
 
@@ -139,7 +142,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
           password_hash: realPasswordHash,
         })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_42' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_42' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -148,7 +151,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
 
       expect(payload.role).toBe('regional_manager');
       expect(payload.scope).toEqual({ type: 'hotel_group', hotel_group_id: 'group_42' });
-      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
+      expect(mockPrisma.hotelGroup.findUnique).toHaveBeenCalledWith({
         where: { regional_manager_user_id: 'rm_1' },
         select: { id: true },
       });
@@ -158,7 +161,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'rm_1', email: 'rm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_42' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_42' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -185,7 +188,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
           password_hash: realPasswordHash,
         })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue(null);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -201,7 +204,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_1', email: 'hm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_7' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -220,7 +223,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'w_1', email: 'worker@test.com', role: 'WORKER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue(null);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -235,7 +238,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'c_1', email: 'checker@test.com', role: 'CHECKER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue(null);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -250,7 +253,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'both_1', email: 'both@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'group_99' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_99' });
       mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_99' });
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -269,7 +272,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.create.mockResolvedValue(
         baseUser({ id: 'new_worker_1', email: 'newworker@test.com', role: 'WORKER' })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue(null);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -285,7 +288,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.scope).toBeNull();
       // resolveScope is still invoked for uniformity, even though it
       // short-circuits to null for a fresh signup with no associations.
-      expect(mockPrisma.hotelGroup.findFirst).toHaveBeenCalledWith({
+      expect(mockPrisma.hotelGroup.findUnique).toHaveBeenCalledWith({
         where: { regional_manager_user_id: 'new_worker_1' },
         select: { id: true },
       });
@@ -311,7 +314,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'hm_refresh_1', email: 'hmrefresh@test.com', role: 'MANAGER' })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_55' });
       mockPrisma.session.update.mockResolvedValue({});
 

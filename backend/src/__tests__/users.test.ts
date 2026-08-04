@@ -4,6 +4,12 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Regional Manager V1 Decision 11: updateUserRole() checks whether the target
+// still owns a hotel group before permitting demotion.
+const mockHotelGroup = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -13,7 +19,13 @@ const mockPrisma = {
     count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: mockHotel,
+  hotelGroup: mockHotelGroup,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // updateUserRole()'s Decision-11 race fix (post-#339 review) takes a
+  // `SELECT ... FOR UPDATE` row lock inside the transaction before the
+  // ownership check — a no-op against this mock (no real DB, no concurrent
+  // transaction to block), but tx.$queryRaw must exist and resolve.
+  $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
   // ADR-031 PR-4: token_generation bumps commit inside a transaction whose
   // callback receives mockPrisma itself, so tx.user.update etc. resolve
   // against the same mocks as the non-transactional calls in this file.
@@ -444,6 +456,111 @@ describe('UserService', () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'u_worker' }, data: { token_generation: { increment: 1 } } })
       );
+    });
+
+    // Regional Manager V1 Decision 11 (supersedes the earlier "transfer OR
+    // remove" wording of Decision 6): a Hotel Group must always have exactly
+    // one assigned RM, so demoting an RM who still owns a group must be
+    // rejected — the group must be transferred to a successor first.
+    describe('Decision 11 — demoting a Regional Manager who still owns a group', () => {
+      it('rejects demoting a regional_manager who still owns a hotel group', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', name: 'North Region' });
+
+        await expect(
+          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin')
+        ).rejects.toThrow(/still manages hotel group "North Region"/);
+
+        // Post-#339 review (TOCTOU fix): the ownership check now runs INSIDE
+        // the transaction, after a row lock on the target user, to close the
+        // race between this check and a concurrent group transfer
+        // (crm/service.ts#updateHotelGroup). $transaction IS therefore called
+        // — to acquire the lock and run the check — but the throw inside it
+        // rolls the transaction back before user.update ever runs.
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+      });
+
+      it('allows demoting a regional_manager who owns NO hotel group', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockHotelGroup.findUnique.mockResolvedValue(null);
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'rm1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+          phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await expect(
+          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin')
+        ).resolves.toBeDefined();
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'rm1' }, data: expect.objectContaining({ role: 'MANAGER' }) })
+        );
+      });
+
+      it('does not run the ownership check when the new role is also regional_manager (no-op re-assignment)', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'rm1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+          phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await service.updateUserRole('rm1', { role: 'regional_manager' }, 'admin_actor', 'admin');
+
+        expect(mockHotelGroup.findUnique).not.toHaveBeenCalled();
+      });
+
+      it('does not run the ownership check for a non-RM target (unaffected roles)', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'w1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'w1', email: 'w@test.com', first_name: 'W', last_name: 'K',
+          phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await service.updateUserRole('w1', { role: 'manager' }, 'admin_actor', 'admin');
+
+        expect(mockHotelGroup.findUnique).not.toHaveBeenCalled();
+      });
+
+      // Deadlock-avoidance follow-up (post-#339 review): this method locks
+      // the target User row FIRST (`SELECT ... FOR UPDATE`), then reads
+      // HotelGroup. crm/service.ts#updateHotelGroup (the transfer path) must
+      // lock in the SAME order — User before HotelGroup — or the two
+      // operations deadlock instead of cleanly serializing under Postgres.
+      it('locks the user row before reading HotelGroup ownership (deadlock-avoidance lock order)', async () => {
+        const callOrder: string[] = [];
+        mockPrisma.$queryRaw.mockImplementation(async () => {
+          callOrder.push('user-lock');
+          return [];
+        });
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockHotelGroup.findUnique.mockImplementation(async () => {
+          callOrder.push('hotelgroup-read');
+          return null;
+        });
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'rm1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+          phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin');
+
+        expect(callOrder).toEqual(['user-lock', 'hotelgroup-read']);
+      });
     });
   });
 
