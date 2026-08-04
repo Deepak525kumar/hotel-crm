@@ -98,7 +98,7 @@ Neutral / operational:
 | AWS edge (Route53/ACM/ALB/WAF/Shield/CloudFront) provisioned via manual checklist | Confirmed | `deploy/aws-edge-checklist.md:1-119` |
 | Deployment/CI region is `eu-central-1` | Confirmed | `.github/workflows/ci.yml:73`; `deploy/aws-edge-checklist.md:7` |
 | Only Redis is containerized in production | Confirmed | `docker-compose.prod.yml:1-22` |
-| Automatic rollback to previous SHA on failed health check | UNKNOWN | Not evidenced in `.github/workflows/deploy.yml` or `scripts/deploy.sh`; only a post-deploy health check is present (`.github/workflows/deploy.yml:55-58`) |
+| Automatic rollback to previous SHA on failed health check | UNKNOWN | Not evidenced in `.github/workflows/deploy.yml` or `deploy.sh`; only a post-deploy health check is present (`.github/workflows/deploy.yml:55-58`) |
 | Manual-approval GitHub `production` environment gate | Not present | `.github/workflows/deploy.yml` has no `environment:` key; deploy runs automatically after CI passes |
 | Migrations are not rolled back; must stay backward-compatible | Confirmed | `deploy.sh` runs `prisma migrate deploy` with no corresponding rollback step |
 | Production DB is AWS RDS | Confirmed | Evidenced by current architecture diagram |
@@ -107,7 +107,7 @@ Neutral / operational:
 
 ## Open Questions
 
-- Database hosting: whether the production PostgreSQL is AWS RDS or another host is UNKNOWN — `DATABASE_URL` is not set anywhere in the current deploy pipeline (`.github/workflows/deploy.yml`, `scripts/deploy.sh`), so its source is also unconfirmed. Requires human confirmation.
+- Database hosting: whether the production PostgreSQL is AWS RDS or another host is UNKNOWN — `DATABASE_URL` is not set anywhere in the current deploy pipeline (`.github/workflows/deploy.yml`, `deploy.sh`), so its source is also unconfirmed. Requires human confirmation.
 - Deployment gating and rollback: `.github/workflows/deploy.yml` (which replaced `deploy-production.yml` in commit `1df3e40`) removed the GitHub `production` environment manual-approval gate and the automatic rollback-on-failed-health-check behavior previously documented here. Whether this is an intentional simplification or a regression is UNKNOWN and requires human confirmation.
 - Container orchestration: whether ECS/Fargate/ECR is intended is UNKNOWN; current production is PM2-on-EC2. The README's ECR/Docker narrative (`README.md:98,205-211,321-330`) is unreconciled with the deployment automation — a synchronization/drift item.
 - IaC: edge provisioning is a manual checklist; whether to codify it (Terraform/CloudFormation) is unresolved.
