@@ -34,8 +34,10 @@ cd ..
 echo "Building project..."
 npm run build
 
-echo "Reloading PM2..."
-pm2 reload hotelcrm-backend --update-env
+echo "==> [5/6] Start/reload application"
+cd "$PROJECT_DIR"
+pm2 reload ecosystem.config.js --env production --update-env || pm2 start ecosystem.config.js --env production
 pm2 save
 
+echo "==> [6/6] Health check"
 echo "===== Deployment Successful ====="
