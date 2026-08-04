@@ -377,7 +377,10 @@ export class EmployeeManagementService extends BaseService {
   }
 
   private async resolveApprovalGroupId(actor: AuthContext, explicitGroupId?: string): Promise<string | null> {
-    const ownGroup = await this.prisma.hotelGroup.findFirst({
+    // findUnique, not findFirst: regional_manager_user_id is a unique FK
+    // (Regional Manager V1 Decision 1) — the same reasoning as
+    // auth/service.ts#resolveScope.
+    const ownGroup = await this.prisma.hotelGroup.findUnique({
       where: { regional_manager_user_id: actor.userId },
       select: { id: true },
     });

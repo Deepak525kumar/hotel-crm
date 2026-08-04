@@ -10,3 +10,11 @@ export function useEmploymentRecord(userId: string | null | undefined) {
     ([, id]) => employeesApi.getByUserId(id),
   );
 }
+
+/** A hotel group's org chart (Admin + Regional Manager own-group only, ADR-060). */
+export function useOrgChart(hotelGroupId: string | null | undefined) {
+  return useSWR(
+    hotelGroupId ? ["org-chart", hotelGroupId] : null,
+    ([, id]) => employeesApi.getOrgChart(id),
+  );
+}

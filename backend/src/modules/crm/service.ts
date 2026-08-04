@@ -140,11 +140,22 @@ export class CrmService extends BaseService {
   // hotel_group_id/manager_user_id for authorization scoping yet — that lands
   // at PR 5.4 (scope-claim issuance) / PR 5.5 (authz flip), per ADR-024.
 
+  // Regional Manager V1 Decision 12: the target must ALREADY hold
+  // REGIONAL_MANAGER before being assigned to a group. Previously this only
+  // checked the user existed, so a WORKER/MANAGER row could be written into
+  // regional_manager_user_id with no actual RM authority ever granted (their
+  // JWT role stays whatever it was) — an assignment that promotes nothing.
+  // Promotion (PUT /users/:id/role) is a separate, ordered, prior step.
   private async assertRegionalManagerExists(regionalManagerUserId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({ where: { id: regionalManagerUserId } });
     if (!user || user.deleted_at) {
       throw new ValidationError('regional_manager_user_id does not reference an existing user', [
         { field: 'regional_manager_user_id', message: 'User not found' },
+      ]);
+    }
+    if (user.role !== 'REGIONAL_MANAGER') {
+      throw new ValidationError('regional_manager_user_id must reference a user already holding the Regional Manager role', [
+        { field: 'regional_manager_user_id', message: 'User is not a Regional Manager' },
       ]);
     }
   }

@@ -92,15 +92,16 @@ export function UserDeactivateGate({
 /**
  * SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16): worker document upload/view.
  * GD-16's actor model is self-upload (worker) + manager-upload only. Unlike
- * `StaffingWriteGate`, `regional_manager` is deliberately EXCLUDED here: the
- * backend's own `resolveWorkerScope()` (middleware/permissions.ts) only
- * special-cases `admin` and `manager` — every other role, including
- * `regional_manager`, falls through to `{ allowed: false }` — and
- * `documents/routes.ts`'s route-level `requireRole(['admin', 'manager',
- * 'worker'])` doesn't list `regional_manager` either. Widening this gate to
- * match the `StaffingWriteGate`/D-5 precedent would let an RM see this UI
- * and then get a 403 on every request — do not "fix" this to match that
- * precedent without first widening the backend.
+ * `regional_manager` INCLUDED per an explicit project-owner decision
+ * (2026-08-04, Regional Manager V1 scoping) that reverses `OD-DOC-007`/`GD-16`
+ * ("broader Regional-Manager access explicitly not adopted") in favour of
+ * ADR-030 D-5 / PDD §5.4. The backend now admits it at every layer:
+ * `documents/routes.ts`'s five role gates, and `resolveWorkerScope()`
+ * (middleware/permissions.ts) special-cases `regional_manager` alongside
+ * `manager` via `isScopedManagerRole()`. See documents/routes.ts's governance
+ * note; `OD-DOC-007` still needs a superseding Decision Record (tracked for
+ * the documentation-synchronization PR) — this comment is the authority trail
+ * until that record exists, not a substitute for it.
  */
 export function DocumentsGate({
   fallback = null,
@@ -110,7 +111,7 @@ export function DocumentsGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -118,12 +119,12 @@ export function DocumentsGate({
 
 /**
  * SPEC-HR-001 (REVIEW @0.2.9): payslip-request list/fulfil view. Matches
- * `hr/routes.ts`'s own role split exactly — `/hr/payroll` and
- * `/hr/payroll/:request_id/fulfil` are both `requireRole(['admin',
- * 'manager'])`. `regional_manager` is deliberately EXCLUDED, same reasoning
- * as `DocumentsGate`/`GeoCheckinsGate`: backend-hr never special-cases
- * `regional_manager` at the route or service layer, so admitting it here
- * would show the UI to a role the backend then 403s on every request.
+ * `hr/routes.ts`'s own role split — `/hr/payroll` and
+ * `/hr/payroll/:request_id/fulfil` now both include `regional_manager`
+ * (ADR-030 §3 C-29/C-30), with `resolveWorkerScope()` (middleware/
+ * permissions.ts) special-casing it alongside `manager` via
+ * `isScopedManagerRole()`. `GeoCheckinsGate` below remains admin/manager-only
+ * by contrast — SPEC-GEO-001/GD-14 named only those two roles, unlike HR.
  */
 export function HrPayrollGate({
   fallback = null,
@@ -133,7 +134,7 @@ export function HrPayrollGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -141,12 +142,12 @@ export function HrPayrollGate({
 
 /**
  * SPEC-GEO-001 @0.1.2 FROZEN (GD-14): geo check-ins list/detail view.
- * Matches the backend's own role split exactly (geo/routes.ts comment:
- * "admin sees everything; manager sees only hotels within their own scope
- * claim") — `regional_manager` is deliberately EXCLUDED, same reasoning as
- * `DocumentsGate`: backend-geo's route/service layer never special-cases
- * `regional_manager`, so admitting it here would show the UI to a role the
- * backend then 403s on every request.
+ * `regional_manager` INCLUDED per Regional Manager V1 Decision 3 (grant at
+ * group scope): `geo/service.ts` now special-cases it alongside `manager` via
+ * `isScopedManagerRole()`/`isSelfScopedRole()` — previously an RM was
+ * silently misclassified as a worker there (self-scoped to its own
+ * check-ins, a 200 with the wrong data, not a 403). There is no route-level
+ * gate in `geo/routes.ts`; authorization is entirely service-layer.
  */
 export function GeoCheckinsGate({
   fallback = null,
@@ -156,7 +157,7 @@ export function GeoCheckinsGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -164,12 +165,11 @@ export function GeoCheckinsGate({
 
 /**
  * SPEC-EMP-001 (REQ-EMP-005/RULE-EMP-07): blocklisting an employee at a
- * hotel. Matches `employee-management/routes.ts`'s POST blocklist route
- * exactly (`requireRole(['admin', 'manager'])`) — `regional_manager` is
- * excluded for the same reason as `DocumentsGate`/`GeoCheckinsGate`: the
- * route itself never admits it. Reading the blocklist is far broader
- * (`employees:read`, held by every role) and is intentionally NOT gated —
- * only the write action needs this.
+ * hotel. Matches `employee-management/routes.ts`'s POST blocklist route,
+ * which now includes `regional_manager` (ADR-030 §3 C-22 — `employees:write`
+ * grants RM `✓ᶜ`, and `checkHotelAccess()` is already group-aware for it).
+ * Reading the blocklist is far broader (`employees:read`, held by every role)
+ * and is intentionally NOT gated — only the write action needs this.
  */
 export function BlocklistWriteGate({
   fallback = null,
@@ -179,7 +179,7 @@ export function BlocklistWriteGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -189,12 +189,9 @@ export function BlocklistWriteGate({
  * Job Dispatch Phase 2 broadcast raise/close (Epic 9 PRs 9.7/9.10,
  * `FEATURE_JOBDISPATCH_PHASE2`). Matches `job-requests/routes.ts`'s
  * `POST /work-requests/broadcasts` and `POST /work-requests/broadcasts/:id/close`
- * RBAC exactly (`requireRole(['admin', 'manager'])`) — `regional_manager` is
- * deliberately EXCLUDED, unlike `StaffingWriteGate`: this module's broadcast
- * routes never admit it (only the separate calendar-entries route does,
- * which stays on `StaffingWriteGate`). Widening this to match
- * `StaffingWriteGate`/D-5 would show an RM the raise/close UI and then 403
- * on every request.
+ * RBAC, which now includes `regional_manager` (ADR-030 §3 C-23 —
+ * `staffing:write`), consistent with `StaffingWriteGate` below and the
+ * calendar-entries route this module also owns.
  */
 export function JobDispatchPhase2WriteGate({
   fallback = null,
@@ -204,7 +201,7 @@ export function JobDispatchPhase2WriteGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );

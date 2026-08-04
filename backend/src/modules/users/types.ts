@@ -6,7 +6,11 @@ export const CreateUserSchema = z.object({
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
   phone: z.string().optional(),
-  role: z.enum(['worker', 'checker', 'manager', 'admin']).default('worker'),
+  // `regional_manager` added (Regional Manager V1 lifecycle PR): POST /users
+  // is requireRole('admin')-only, so no elevation-guard exercise like
+  // updateUser's role !== 'admin' check applies — every caller who reaches
+  // this schema is already an admin.
+  role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']).default('worker'),
 });
 
 // LEGACY — used only while FEATURE_GD02_MATRIX is off (rollback path). This

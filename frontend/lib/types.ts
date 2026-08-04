@@ -116,13 +116,24 @@ export interface CreateUserInput {
   role?: Role;
 }
 
-/** Body of `PUT /users/:id` (admin/manager). */
+/**
+ * Body of `PUT /users/:id` (admin/manager/regional_manager, profile fields
+ * only). `role` is NOT sent here: backend/src/modules/users/types.ts's
+ * ADR-030 D-4a split makes this the profile-only route — under
+ * FEATURE_GD02_MATRIX it validates against UpdateUserProfileSchema.strict(),
+ * which rejects a `role` key at the schema boundary (400) rather than
+ * silently ignoring it. Use `usersApi.updateRole()` for a role change.
+ */
 export interface UpdateUserInput {
   first_name?: string;
   last_name?: string;
   phone?: string;
-  role?: Role;
   is_active?: boolean;
+}
+
+/** Body of `PUT /users/:id/role` (admin-only, ADR-030 D-4a). */
+export interface UpdateUserRoleInput {
+  role: Role;
 }
 
 /** Query params accepted by `GET /users`. */
@@ -1028,6 +1039,41 @@ export interface EmploymentRecord {
   skills: SkillTag[];
   created_at: string;
   updated_at: string;
+}
+
+/** Minimal user reference shape returned inline by GetOrgChart. */
+export interface OrgChartUserRef {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
+/**
+ * Response of `GET /employees/hotel-groups/:hotel_group_id/org-chart`
+ * (REQ-EMP-013/RULE-EMP-08, ADR-060, ADR-030 §3 C-33). Admin + Regional
+ * Manager only (own group); gated on `org_chart:read`.
+ *
+ * Flat, not a reporting tree (ADR-060 — no `reports_to` field is modeled):
+ * the group's RM, its hotels each with their Hotel Manager, and its
+ * employees, listed once at group grain (REQ-EMP-012 — EmploymentRecord has
+ * no hotel_id, so an employee is not nested under any one hotel entry).
+ */
+export interface OrgChart {
+  hotel_group_id: string;
+  name: string;
+  regional_manager: OrgChartUserRef | null;
+  hotels: Array<{
+    id: string;
+    name: string;
+    manager: OrgChartUserRef | null;
+  }>;
+  employees: Array<{
+    employee_id: string;
+    job_title: string;
+    status: EmploymentStatus;
+    user: { id: string; first_name: string; last_name: string };
+  }>;
 }
 
 /** Body of `POST /employees` (Admin-only, REQ-EMP-001). */

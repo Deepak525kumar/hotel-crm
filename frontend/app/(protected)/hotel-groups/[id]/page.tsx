@@ -77,11 +77,18 @@ export default function HotelGroupDetailPage() {
           <PageHeader
             title={group.name}
             actions={
-              <RoleGate allow={["admin"]}>
-                <Link href={`/hotel-groups/${id}/edit`}>
-                  <Button variant="outline">Edit</Button>
-                </Link>
-              </RoleGate>
+              <div className="flex gap-2">
+                <RoleGate allow={["admin", "regional_manager"]}>
+                  <Link href={`/hotel-groups/${id}/org-chart`}>
+                    <Button variant="outline">Org chart</Button>
+                  </Link>
+                </RoleGate>
+                <RoleGate allow={["admin"]}>
+                  <Link href={`/hotel-groups/${id}/edit`}>
+                    <Button variant="outline">Edit</Button>
+                  </Link>
+                </RoleGate>
+              </div>
             }
           />
 

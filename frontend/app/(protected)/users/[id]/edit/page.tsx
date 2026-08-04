@@ -28,11 +28,19 @@ function EditUser() {
       first_name: values.first_name,
       last_name: values.last_name,
       phone: values.phone,
-      role: values.role,
       is_active: values.is_active,
     };
     try {
-      const updated = await usersApi.update(id, payload);
+      // Two separate requests, not one: PUT /users/:id is the profile-only
+      // route (ADR-030 D-4a) — sending `role` there is rejected at the schema
+      // boundary once FEATURE_GD02_MATRIX is on, and the legacy schema it
+      // falls back to when the flag is off doesn't accept `regional_manager`
+      // at all. The dedicated PUT /users/:id/role is Admin-only, which this
+      // page already requires (RoleGate allow={["admin"]} below).
+      let updated = await usersApi.update(id, payload);
+      if (values.role !== user?.role) {
+        updated = await usersApi.updateRole(id, { role: values.role });
+      }
       await Promise.all([
         globalMutate(["user", id], updated, false),
         globalMutate((key) => Array.isArray(key) && key[0] === "users"),

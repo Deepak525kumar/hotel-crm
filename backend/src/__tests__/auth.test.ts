@@ -34,7 +34,10 @@ const mockPrisma = {
   // "no association" (null) so existing tests that don't care about scope
   // are unaffected; dedicated coverage lives in auth-scope-claim.test.ts.
   hotelGroup: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // findUnique, not findFirst — Regional Manager V1 Decision 1 made
+    // regional_manager_user_id a unique FK; resolveScope() (auth/service.ts)
+    // switched lookups accordingly.
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,

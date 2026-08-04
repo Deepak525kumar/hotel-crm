@@ -30,7 +30,8 @@ const mockPrisma = {
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotelGroup: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // findUnique, not findFirst — see auth.test.ts's identical note.
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   attendance: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -356,7 +357,7 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.UNDER_REVIEW, hotel_group_id: null })
       );
-      mockPrisma.hotelGroup.findFirst.mockResolvedValue({ id: 'g1' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.ACTIVE, hotel_group_id: 'g1' })
       );

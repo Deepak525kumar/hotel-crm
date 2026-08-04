@@ -150,7 +150,7 @@ export class UserService extends BaseService {
     }
 
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
-    const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN';
+    const role = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
 
     // ADR-031 D-1/D-4 (PR-4): permissions are derived request-time from
     // ROLE_PERMISSIONS[role] — this write path no longer computes or
@@ -325,6 +325,28 @@ export class UserService extends BaseService {
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
+
+    // Regional Manager V1 Decision 11 (supersedes the earlier "transfer OR
+    // remove" wording of Decision 6): a Hotel Group must always have exactly
+    // one assigned Regional Manager (no unassigned state; Decision 11 keeps
+    // regional_manager_user_id non-nullable). Demoting an RM who still owns a
+    // group would either violate that invariant or silently strand the group
+    // on a user whose JWT role no longer grants any operational authority —
+    // the group would functionally have no acting RM. Demotion is only
+    // permitted after the group has been transferred to a successor
+    // (PATCH /hotel-groups/:id, which Decision 12 now requires point at
+    // another REGIONAL_MANAGER-role user first).
+    if (user.role === 'REGIONAL_MANAGER' && newRole !== 'REGIONAL_MANAGER') {
+      const ownedGroup = await this.prisma.hotelGroup.findUnique({
+        where: { regional_manager_user_id: userId },
+        select: { id: true, name: true },
+      });
+      if (ownedGroup) {
+        throw new ConflictError(
+          `Cannot change role: user still manages hotel group "${ownedGroup.name}". Transfer the group to another Regional Manager first.`
+        );
+      }
+    }
 
     // ADR-031 D-4 (C-5): the bump commits in the same transaction as the
     // role write, so a demotion can never be committed without also

@@ -1,0 +1,195 @@
+"use client";
+
+import { useParams } from "next/navigation";
+import { useOrgChart } from "@/hooks/useEmployment";
+import { RoleGate } from "@/components/auth/RoleGate";
+import type { EmploymentStatus } from "@/lib/types";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  PageHeader,
+  Skeleton,
+  Table,
+  TBody,
+  TD,
+  TH,
+  THead,
+  TR,
+  TextLink,
+} from "@/components/ui";
+
+const STATUS_TONE: Record<EmploymentStatus, "warning" | "success" | "neutral" | "danger"> = {
+  INACTIVE: "warning",
+  UNDER_REVIEW: "warning",
+  ACTIVE: "success",
+  REJECTED: "danger",
+  DEACTIVATED: "neutral",
+};
+
+const STATUS_LABEL: Record<EmploymentStatus, string> = {
+  INACTIVE: "Onboarding started",
+  UNDER_REVIEW: "Ready for approval",
+  ACTIVE: "Active",
+  REJECTED: "Rejected",
+  DEACTIVATED: "Deactivated",
+};
+
+function OrgChart() {
+  const params = useParams<{ id: string }>();
+  const id = params.id;
+
+  const { data: chart, isLoading, error } = useOrgChart(id);
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-6">
+      <TextLink href={`/hotel-groups/${id}`} className="text-sm">
+        ← Back to hotel group
+      </TextLink>
+
+      {error ? (
+        <Card>
+          <CardContent className="py-10 text-center text-sm text-red-600">
+            {/* CRR §1:23 / ADR-060 — visible only to the group's own Regional
+                Manager and Admin; a scope mismatch surfaces as a 403 here. */}
+            Failed to load this org chart. You may not have access to this
+            group.
+          </CardContent>
+        </Card>
+      ) : isLoading || !chart ? (
+        <Card>
+          <CardContent className="space-y-3">
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-32 w-full" />
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <PageHeader title={`${chart.name} — org chart`} />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Regional Manager</CardTitle>
+            </CardHeader>
+            <CardContent className="py-2 text-sm">
+              {chart.regional_manager ? (
+                <>
+                  {chart.regional_manager.first_name}{" "}
+                  {chart.regional_manager.last_name}{" "}
+                  <span className="text-gray-500">
+                    ({chart.regional_manager.email})
+                  </span>
+                </>
+              ) : (
+                <span className="text-gray-500">Unassigned</span>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Hotels ({chart.hotels.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              {chart.hotels.length === 0 ? (
+                <EmptyState
+                  title="No hotels in this group"
+                  description="Assign hotels to this group from a hotel's edit screen."
+                />
+              ) : (
+                <Table aria-label="Hotels in this group">
+                  <THead>
+                    <TR>
+                      <TH>Hotel</TH>
+                      <TH>Manager</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {chart.hotels.map((h) => (
+                      <TR key={h.id}>
+                        <TD>{h.name}</TD>
+                        <TD>
+                          {h.manager ? (
+                            `${h.manager.first_name} ${h.manager.last_name}`
+                          ) : (
+                            <span className="text-gray-500">Unassigned</span>
+                          )}
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Group-grain (REQ-EMP-012): employees are listed once here, not
+              nested under any one hotel in the table above — the data model
+              has no hotel_id on an EmploymentRecord. */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Employees ({chart.employees.length})</CardTitle>
+            </CardHeader>
+            <CardContent className="py-2">
+              {chart.employees.length === 0 ? (
+                <EmptyState
+                  title="No employees in this group"
+                  description="Employees appear here once they have an EmploymentRecord in one of this group's hotels."
+                />
+              ) : (
+                <Table aria-label="Employees in this group">
+                  <THead>
+                    <TR>
+                      <TH>Name</TH>
+                      <TH>Job title</TH>
+                      <TH>Status</TH>
+                    </TR>
+                  </THead>
+                  <TBody>
+                    {chart.employees.map((e) => (
+                      <TR key={e.employee_id}>
+                        <TD>
+                          {e.user.first_name} {e.user.last_name}
+                        </TD>
+                        <TD>{e.job_title}</TD>
+                        <TD>
+                          <Badge tone={STATUS_TONE[e.status]}>
+                            {STATUS_LABEL[e.status]}
+                          </Badge>
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function OrgChartPage() {
+  return (
+    // CRR §1:23 / ADR-060 / ADR-030 §3 C-33: org chart visible ONLY to
+    // Regional Manager (their own group, enforced service-side) and Admin.
+    <RoleGate
+      allow={["admin", "regional_manager"]}
+      fallback={
+        <div className="mx-auto max-w-3xl">
+          <Card>
+            <CardContent className="text-sm text-gray-500">
+              Only Admins and Regional Managers can view org charts.
+            </CardContent>
+          </Card>
+        </div>
+      }
+    >
+      <OrgChart />
+    </RoleGate>
+  );
+}

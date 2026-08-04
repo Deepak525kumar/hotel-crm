@@ -56,8 +56,8 @@ describe('CrmService - Hotel Groups', () => {
   });
 
   describe('createHotelGroup', () => {
-    it('creates and returns a hotel group when the regional manager exists', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null });
+    it('creates and returns a hotel group when the regional manager exists and already holds the role', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null, role: 'REGIONAL_MANAGER' });
       const fake = { id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1', created_at: new Date(), updated_at: new Date() };
       mockPrisma.hotelGroup.create.mockResolvedValue(fake);
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -79,10 +79,23 @@ describe('CrmService - Hotel Groups', () => {
     });
 
     it('rejects when regional_manager_user_id references a soft-deleted user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: new Date() });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: new Date(), role: 'REGIONAL_MANAGER' });
 
       await expect(
         service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
+    });
+
+    // Regional Manager V1 Decision 12: the target must already hold
+    // REGIONAL_MANAGER. Previously assertRegionalManagerExists only checked
+    // the user existed, so a WORKER/MANAGER row could be written into
+    // regional_manager_user_id with no actual RM authority ever granted.
+    it('rejects when regional_manager_user_id references a user who is not yet a Regional Manager', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_1', deleted_at: null, role: 'MANAGER' });
+
+      await expect(
+        service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'mgr_1' }, 'admin_1', 'admin')
       ).rejects.toMatchObject({ name: 'ValidationError' });
       expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
     });
@@ -224,9 +237,9 @@ describe('CrmService - Hotel Groups', () => {
   });
 
   describe('updateHotelGroup', () => {
-    it('updates the regional manager when the new user exists', async () => {
+    it('updates the regional manager when the new user exists and already holds the role', async () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
       mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -235,6 +248,18 @@ describe('CrmService - Hotel Groups', () => {
       expect(result.regional_manager_user_id).toBe('rm_2');
       const updateCall = (mockPrisma.hotelGroup.update as jest.Mock).mock.calls[0] as Array<{ data: { regional_manager_user_id: string } }>;
       expect(updateCall[0]?.data.regional_manager_user_id).toBe('rm_2');
+    });
+
+    // Regional Manager V1 Decision 12: this is the live "transfer" path — the
+    // successor must already hold REGIONAL_MANAGER, not merely exist.
+    it('rejects transferring to a user who is not yet a Regional Manager', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_2', deleted_at: null, role: 'MANAGER' });
+
+      await expect(
+        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'mgr_2' }, 'admin_1', 'admin')
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
     });
 
     it('rejects reassignment to a nonexistent user without writing', async () => {

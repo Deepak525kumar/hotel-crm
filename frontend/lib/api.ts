@@ -56,6 +56,7 @@ import type {
   UpdateHotelGroupInput,
   UpdateHotelInput,
   UpdateUserInput,
+  UpdateUserRoleInput,
   UpdateWorkRequestInput,
   UserDetail,
   UserSummary,
@@ -67,6 +68,7 @@ import type {
   UploadDocumentInput,
   EmployeeBlocklistEntry,
   EmploymentRecord,
+  OrgChart,
   CreateEmploymentInput,
   LifecycleSignalInput,
   SetBlocklistInput,
@@ -637,9 +639,18 @@ export const usersApi = {
   create: (input: CreateUserInput) =>
     apiFetch<UserDetail>("/users", { method: "POST", body: input }),
 
-  /** Update a user. The backend route is a PUT, not a PATCH. */
+  /** Update a user's profile fields. The backend route is a PUT, not a PATCH. */
   update: (id: string, input: UpdateUserInput) =>
     apiFetch<UserDetail>(`/users/${id}`, { method: "PUT", body: input }),
+
+  /**
+   * Assign/change a user's role — the dedicated Admin-only endpoint
+   * (ADR-030 D-4a). Distinct from `update()`: sending `role` to `PUT /users/:id`
+   * is rejected at the backend's schema boundary once FEATURE_GD02_MATRIX is
+   * on, and doesn't reach `regional_manager` even when it's off.
+   */
+  updateRole: (id: string, input: UpdateUserRoleInput) =>
+    apiFetch<UserDetail>(`/users/${id}/role`, { method: "PUT", body: input }),
 
   /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
   remove: (id: string) =>
@@ -794,6 +805,10 @@ export const employeesApi = {
 
   listBlocklist: (hotelId: string) =>
     apiFetch<EmployeeBlocklistEntry[]>(`/employees/hotels/${hotelId}/blocklist`),
+
+  /** Admin + Regional Manager (own group) only, gated on `org_chart:read` (ADR-060). */
+  getOrgChart: (hotelGroupId: string) =>
+    apiFetch<OrgChart>(`/employees/hotel-groups/${hotelGroupId}/org-chart`),
 
   /** Manager/Admin blocks an employee from assignment at this hotel; `reason` is required. */
   setBlocklist: (hotelId: string, input: SetBlocklistInput) =>
