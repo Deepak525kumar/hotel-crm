@@ -1,8 +1,10 @@
 # Hotel CRM - Modular Monolith Architecture
 
 **Version**: 1.0.0 (MVP - Phase 1)  
-**Status**: Release Candidate — engineering implementation complete; production architecture
-reconciled with the repository. See [`deploy/release/RELEASE_SUMMARY.md`](deploy/release/RELEASE_SUMMARY.md)
+**Status**: Release Candidate — engineering implementation complete; `ecosystem.config.js`/
+`deploy.sh` verified consistent with live GitHub Actions deploy history (not with direct host
+access — see `deploy/release/RELEASE_SUMMARY.md`'s Repository Status row for what's verified vs.
+what's intended architecture). See [`deploy/release/RELEASE_SUMMARY.md`](deploy/release/RELEASE_SUMMARY.md)
 for current release status and remaining operational tasks.  
 **Deployment**: Backend + worker on a single EC2 instance (eu-central-1 / Frankfurt) via PM2, no
 containers. Frontend deployed separately on Vercel.
@@ -318,7 +320,6 @@ All endpoints must check permissions. See `RBAC_PERMISSION_MATRIX.md` in `/docs/
 
 ## Deployment
 
-**This section previously described a planned Docker/ECR deployment path. That was never built.**
 The actual, current, production-verified deployment is PM2-on-EC2 with no containers, plus the
 frontend deployed separately on Vercel. See `deploy/release/DEPLOYMENT_GUIDE.md` for the full,
 current, evidence-verified procedure. Summary:
@@ -364,9 +365,6 @@ Frontend: deployed separately via Vercel's own pipeline — not part of this rep
 
 ## Phase 1 - MVP Scope
 
-This section previously listed "Daily operations" as included and "Geolocation tracking" as
-deferred — both were wrong as of the current codebase and have been corrected below.
-
 ### Included (implemented and shipped)
 - Authentication, RBAC/permission matrix
 - Hotels, hotel-groups, employment records
@@ -391,10 +389,6 @@ advanced analytics beyond what's shipped, multi-region deployment, Kubernetes/mi
 
 ## Documentation
 
-The six files previously listed here (`MASTER_ARCHITECTURE.md`, `CLAUDE_CONTEXT.md`, and four
-files under `/docs/`) do not exist in this repository and were never created — corrected below to
-point at what actually exists:
-
 - [`HANDOFF.md`](HANDOFF.md) — current project handoff: what's done, what's left, operating rules
 - [`deploy/release/`](deploy/release/) — the full release package: execution plan, launch
   checklist, UAT checklist, deployment/rollback guides, known limitations, post-MVP backlog,
@@ -410,10 +404,3 @@ point at what actually exists:
 ## License
 
 Proprietary - Zirove/Hotel CRM Project
-
-## Support
-
-For questions about architecture or implementation, refer to:
-1. MASTER_ARCHITECTURE.md (decisions & rationale)
-2. CLAUDE_CONTEXT.md (operational context)
-3. Module README files in each service folder

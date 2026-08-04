@@ -1,11 +1,15 @@
 # Release Execution Plan — Hotel CRM MVP
 
 Last synchronized 2026-08-04 (Release Candidate documentation pass). Engineering implementation
-is complete. Production architecture has been reconciled with this repository — the PM2 process
-topology, deploy script, and deploy pipeline all now agree with each other and with live
-production evidence. This plan sequences deployment of code already merged to `main`, plus the
-operational configuration (feature flags, push credentials) needed to turn on what's already
-built. No new features are introduced by this plan.
+is complete. The PM2 process topology (`ecosystem.config.js`), deploy script (`deploy.sh`), and
+deploy pipeline (`.github/workflows/deploy.yml`) now agree with each other, and were rewritten to
+match the process names and paths observed in live GitHub Actions deploy logs — **verified by
+reading those logs during this pass** (`gh run list`/`gh run view --log`), not by direct EC2 host
+access. No one has run `pm2 list` on the real host to confirm the two processes are actually
+running under these exact names right now; that remains open (see `KNOWN_LIMITATIONS.md`). This
+plan sequences deployment of code already merged to `main`, plus the operational configuration
+(feature flags, push credentials) needed to turn on what's already built. No new features are
+introduced by this plan.
 
 ---
 
@@ -197,23 +201,3 @@ the existing no-op fallback behavior.
    together via `pm2 reload ecosystem.config.js`. This resolves what was previously an open,
    unconfirmed risk in this plan.
 
-## Known gaps not fixed in this pass (documentation-only task; these require a code decision)
-
-- **`scripts/rotate-secrets.sh` targets the wrong env file and misses one process.** It edits
-  `/etc/hotel-crm/.env`, but the running processes load env from `backend/.env` (relative to
-  `cwd`) per `ecosystem.config.js`'s current `node_args`. It also reloads only `hotel-crm-api`,
-  leaving `hotel-crm-worker` on stale secrets. Rotating a secret with this script today would not
-  reach either running process as intended. Needs a code fix in a future pass, not documented as
-  resolved here.
-- **`nginx/hotelcrm.conf` still carries a full server block proxying the bare domain
-  (`hotelcrm.app`/`www.hotelcrm.app`) to `127.0.0.1:3000`.** Nothing in `ecosystem.config.js` or
-  `deploy.sh` runs anything on port 3000 — the frontend is deployed separately on Vercel. This
-  nginx block is vestigial, left over from an earlier PM2-hosted-frontend design. It should
-  either be removed or explicitly annotated as dead configuration; not done here since it's a
-  config decision, not a doc fix.
-- **`scripts/setup-ec2.sh` (new-host provisioning) was not part of this reconciliation and still
-  disagrees with the now-reconciled `deploy.sh`/`ecosystem.config.js`.** It provisions
-  `/opt/hotel-crm` under a `deploy` user with secrets at `/etc/hotel-crm/.env`; the reconciled
-  tooling uses `/home/ubuntu/apps/hotel-crm` and `backend/.env`. If a new host is ever
-  provisioned from this script as currently written, confirm and reconcile these paths before
-  relying on the automated deploy pipeline against it.

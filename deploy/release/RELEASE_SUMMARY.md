@@ -2,14 +2,38 @@
 
 Last synchronized: 2026-08-04 (Release Candidate documentation pass)
 
+## How this package is organized
+
+This is the entry point. Read in this order — each document below links back rather than
+restating the last one's detail:
+
+```
+RELEASE_SUMMARY.md          (you are here — status, verdict, links out)
+    ↓
+RELEASE_EXECUTION_PLAN.md   (the "how to ship it" sequence: flags, migrations, checkpoints)
+    ↓
+DEPLOYMENT_GUIDE.md         (the canonical reference for topology, trigger, and what
+                              actually runs on each deploy — cited by the two files above
+                              rather than re-explained)
+    ↓
+PRODUCTION_LAUNCH_CHECKLIST.md   (exhaustive box-checking against the real environment)
+```
+
+`RELEASE_NOTES.md`, `ROLLBACK_GUIDE.md`, `UAT_CHECKLIST.md`, `KNOWN_LIMITATIONS.md`, and
+`POST_MVP_BACKLOG.md` are siblings addressing one specific concern each (what changed, how to
+undo it, how to test it, what's accepted-as-is, what's deliberately deferred) — they assume the
+four documents above as background rather than repeating them. If you find the same fact stated
+with different wording in two of these files, that's drift to fix, not two independent truths —
+`DEPLOYMENT_GUIDE.md`'s Topology section is the one to trust for process names/paths/triggers.
+
 | Field | Value |
 |---|---|
 | **Project Name** | Hotel CRM |
 | **Release Version** | 1.0.0 (MVP) |
 | **Release Status** | **Release Candidate** |
-| **Repository Status** | Engineering implementation complete. Production deployment architecture reconciled with the repository. |
-| **Infrastructure Status** | Backend + notification worker on EC2 via PM2 (no containers), frontend on Vercel, RDS Postgres, S3 for uploads. Edge (ALB/WAF/Route53) provisioning tracked separately — see `deploy/aws-edge-checklist.md`. |
-| **Deployment Status** | Automated backend deploy pipeline (`.github/workflows/deploy.yml` → `deploy.sh`) confirmed working against live production via repeated successful GitHub Actions runs. Frontend deploys automatically via Vercel's own pipeline. |
+| **Repository Status** | Engineering implementation complete. `ecosystem.config.js`/`deploy.sh` now match the process names and paths observed in live deploy logs — **verified** by reading GitHub Actions run output (`gh run list`/`gh run view --log`), not by direct host access. No one has SSH'd into the EC2 host during this pass to run `pm2 list` and confirm the two processes are running exactly as declared right now — that remains the one open item in `KNOWN_LIMITATIONS.md`. |
+| **Infrastructure Status** | **Intended architecture, consistent with what's verified so far**: backend + notification worker on EC2 via PM2 (no containers), frontend on Vercel, RDS Postgres, S3 for uploads. Edge (ALB/WAF/Route53) provisioning tracked separately — see `deploy/aws-edge-checklist.md`, which is a checklist of steps to confirm, not a confirmation itself. |
+| **Deployment Status** | **Verified**: the automated pipeline (`.github/workflows/deploy.yml` → `deploy.sh`) has multiple successful runs in GitHub Actions history, directly observed via `gh run list --workflow=deploy.yml` during this pass — most recently a run against the current `main` HEAD. This confirms the pipeline executes and its post-deploy health check passes; it does not by itself confirm every long-term operational assumption (e.g. secret rotation, log aggregation) discussed elsewhere in this package. Frontend deploys automatically via Vercel's own pipeline — not independently verified in this pass, taken on the user's word from an earlier conversation turn. |
 | **Outstanding Operational Tasks** | See dedicated section below — none are engineering work. |
 | **Known Limitations** | See dedicated section below and `KNOWN_LIMITATIONS.md` for full detail. |
 | **Post-MVP Scope** | See dedicated section below and `POST_MVP_BACKLOG.md` for full detail. |

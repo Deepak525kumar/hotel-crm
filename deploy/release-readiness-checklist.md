@@ -1,11 +1,26 @@
-# Release Readiness Checklist — Hotel CRM MVP
+# Release Readiness Checklist — Hotel CRM MVP (SUPERSEDED)
+
+> **⚠ This document is superseded and kept only as a historical record of the 2026-08-04 MVP
+> audit's first pass.** Two later reconciliation passes on the same day changed facts this
+> document still states as current:
+> - The runtime environment file is `backend/.env` (loaded by PM2 via `ecosystem.config.js`'s
+>   `node_args`), **not** `/etc/hotel-crm/.env` as stated throughout this file. See
+>   `deploy/release/DEPLOYMENT_GUIDE.md` for the current, correct path.
+> - `FEATURE_RM_ROLE` is **held back this release**, not "safe to enable" as §1's table below
+>   claims — its promotion script has no demote path. See
+>   `deploy/release/RELEASE_EXECUTION_PLAN.md` §2 for the current, correct recommendation.
+>
+> **Do not act on this file.** For current release status, start at
+> `deploy/release/RELEASE_SUMMARY.md`.
+
+---
 
 Generated from the 2026-08-04 MVP audit and its follow-up verification pass. This checklist
-covers the **operational** items confirmed by repository evidence — no code changes are
-required for any item below; every referenced feature is already implemented and merged to
-`main`. What remains is deployment configuration, decided and applied outside this repository
-(on the EC2 host's `/etc/hotel-crm/.env` or AWS Secrets Manager — neither is visible from the
-repo, so each box below must be checked against the real deployed environment, not this file).
+covers the **operational** items confirmed by repository evidence at that time — no code changes
+were required for any item below; every referenced feature was already implemented and merged to
+`main`. What remained was deployment configuration, decided and applied outside this repository
+(on the EC2 host's env file or AWS Secrets Manager — neither is visible from the repo, so each
+box below had to be checked against the real deployed environment, not this file).
 
 ---
 

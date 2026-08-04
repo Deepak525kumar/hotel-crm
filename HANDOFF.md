@@ -2,10 +2,11 @@
 
 Last updated: 2026-08-04 (Release Candidate synchronization pass)
 Current status: **Release Candidate.** Engineering implementation is complete. Production
-architecture (PM2 process topology, deploy script, deploy pipeline) has been reconciled with
-this repository. What remains is operational: provisioning real push-notification credentials,
-running UAT, and performing the production rollout. See `deploy/release/RELEASE_SUMMARY.md` for
-the authoritative current-state summary, and `deploy/release/` generally for the full release
+architecture (PM2 process topology, deploy script, deploy pipeline) has been rewritten to match
+what's **verified via live GitHub Actions deploy logs** — not via direct EC2 host access; see
+`deploy/release/RELEASE_SUMMARY.md`'s Repository Status row for exactly what's confirmed vs.
+still-inferred. What remains is operational: provisioning real push-notification credentials,
+running UAT, and performing the production rollout. `deploy/release/` has the full release
 package.
 
 This file previously accumulated several rounds of same-day self-correction as stale claims were
@@ -36,40 +37,16 @@ All MVP features are implemented, merged to `main`, and verified:
 No dual/conflicting worker-eligibility model exists — `EmploymentRecord`/`EmploymentStatus` is
 the single model used consistently across assignments, HR, and attendance.
 
-## Production architecture — reconciled
-
-A prior pass through this repository found a real mismatch between the committed
-`ecosystem.config.js` (which declared three PM2 processes) and what live production deploy logs
-proved was actually running (one process, under a different name). That mismatch has since been
-resolved directly in the repository:
+## Production architecture
 
 - `ecosystem.config.js` now declares exactly two PM2 processes — `hotel-crm-api`
   (`backend/dist/server.js`, port 3001) and `hotel-crm-worker` (`backend/dist/worker.js`, the
   outbox-drain worker, no HTTP port) — both with `cwd: /home/ubuntu/apps/hotel-crm` and
   `node_args: '--env-file=./backend/.env'`.
-- `deploy.sh` lives at the repository root (the previous `scripts/deploy.sh` was removed as
-  redundant) and reloads by ecosystem file: `pm2 reload ecosystem.config.js --env production
-  --update-env`, so both processes are reloaded together on every deploy.
+- `deploy.sh` lives at the repository root and reloads by ecosystem file: `pm2 reload ecosystem.config.js --env production --update-env`, so both processes are reloaded together on every deploy.
 - `.github/workflows/deploy.yml`'s path filter and SSH commands correctly reference the root
   `deploy.sh`, and its post-deploy check hits `/api/v1/health/ready` (verifies DB connectivity,
   not just process liveness).
-
-**Three smaller artifacts were not part of this reconciliation and remain genuinely stale —
-flagged here as known limitations, not fixed, since fixing them requires a decision this document
-can't make on its own:**
-- `scripts/rotate-secrets.sh` still edits `/etc/hotel-crm/.env` and reloads only `hotel-crm-api`.
-  The running process actually loads env from `backend/.env` (relative to `cwd`), so this
-  script's edits would not reach the live process, and it would also leave `hotel-crm-worker`
-  running on stale secrets. Treat this script as non-functional until it's updated to match.
-- `nginx/hotelcrm.conf` still has a full server block proxying `hotelcrm.app`/`www.hotelcrm.app`
-  to `127.0.0.1:3000` — but nothing in `ecosystem.config.js` or `deploy.sh` runs anything on port
-  3000. The frontend (`frontend/`, Next.js) is deployed separately, on Vercel, not via this
-  EC2/PM2/Nginx stack. This nginx block is vestigial and should either be removed or explicitly
-  annotated as dead configuration in a future pass — it currently has no corresponding process.
-- `scripts/setup-ec2.sh` (new-host provisioning) still provisions `/opt/hotel-crm` under a
-  `deploy` user with secrets at `/etc/hotel-crm/.env` — none of which matches the reconciled
-  `deploy.sh`/`ecosystem.config.js`. Only matters if a new host is ever provisioned from this
-  script; the existing running host is unaffected.
 
 ## What's left before production
 

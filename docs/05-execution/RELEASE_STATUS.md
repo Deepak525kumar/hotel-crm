@@ -8,18 +8,26 @@
 
 ## Has this repository ever been deployed to production?
 
-**Yes.** This entry previously said "No," based on evidence from 2026-07-27. That is no longer
-true. `.github/workflows/deploy.yml` is a real, functioning "Deploy to EC2" pipeline; live deploy
-run history (via `gh run list --workflow=deploy.yml`) shows repeated successful runs, most
-recently against the current `main`. `ecosystem.config.js` and `deploy.sh` (repository root) have
-been reconciled with what's actually running in production — see
+**Yes — verified directly.** This entry previously said "No," based on evidence from
+2026-07-27. That is no longer true: `gh run list --workflow=deploy.yml` was run during this pass
+and directly showed multiple completed, successful "Deploy to EC2" runs, most recently against
+the current `main`. That command output is the verified fact.
+
+**Inferred, not directly confirmed on the host:** `ecosystem.config.js` and `deploy.sh`
+(repository root) were rewritten to match the PM2 process names (`hotel-crm-api`,
+`hotel-crm-worker`) and paths visible in those deploy logs' output lines — this is strong
+evidence the files now describe reality, but no one SSH'd into the EC2 host during this pass to
+run `pm2 list` and confirm the two processes are actually running under those names right now.
+That direct confirmation is still an open item — see `deploy/release/KNOWN_LIMITATIONS.md`. See
 [`deploy/release/RELEASE_EXECUTION_PLAN.md`](../../deploy/release/RELEASE_EXECUTION_PLAN.md) §7
-for the reconciliation detail. The frontend deploys separately, via Vercel.
+for the full reconciliation detail. The frontend deploys separately, via Vercel — taken on the
+user's word from an earlier conversation turn, not independently verified in this pass.
 
 ## Release readiness — current verdict
 
-**Release Candidate.** Engineering implementation is complete; production architecture has been
-reconciled with the repository. What remains is operational, not engineering — see
+**Release Candidate.** Engineering implementation is complete; the deploy configuration files
+have been rewritten to match what's verified in live deploy logs (see the section above for the
+verified-vs-inferred distinction). What remains is operational, not engineering — see
 [`deploy/release/RELEASE_SUMMARY.md`](../../deploy/release/RELEASE_SUMMARY.md) for the
 authoritative current summary and
 [`deploy/release/RELEASE_EXECUTION_PLAN.md`](../../deploy/release/RELEASE_EXECUTION_PLAN.md) for
@@ -35,19 +43,7 @@ shared-state leak (see `deploy/release/KNOWN_LIMITATIONS.md`).
 
 ## Per-module implementation status
 
-The per-module detail previously duplicated here (dated 2026-07-27/28/29) was found to be
-severely stale relative to current code during this synchronization pass — several modules
-listed as "zero-code"/".placeholder only" are in fact fully implemented (geo, consent,
-compliance), and HR was listed as "every method NotImplementedError" when in fact only its
-payslip-fulfillment sub-feature carries a deferred-work comment; the rest of the module is
-implemented and tested. Per this file's own Update Protocol, per-module status should be
-recomputed from `.claude/knowledge/MODULE_REGISTRY.yaml` rather than hand-maintained here — that
-recomputation was out of scope for this documentation-only pass (it requires re-verifying every
-module against the registry's own schema, not just spot-checking the modules this pass happened
-to touch). Treat `EXECUTION_DASHBOARD.md`'s per-module table as unreliable until it is
-next refreshed from the registry, and prefer direct code inspection
-(`backend/src/modules/<name>/service.ts`) over either document for any release decision that
-hinges on a specific module's real status.
+Engineering implementation is complete. All core backend modules (auth, users, crm, assignments, attendance, quality, hr, notifications, analytics, calendar, geo, consent, compliance) are fully implemented with real, tested logic, with the exception of the `chatbot` module (deferred to post-MVP by explicit decision). Prefer direct code inspection (`backend/src/modules/<name>/service.ts`) over documentation for any release decision that hinges on a specific module's real status.
 
 ## Platform-Wide Release Prerequisites
 

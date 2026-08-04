@@ -11,9 +11,6 @@ Deciders: Authored by AI Engineering Platform; formal ratification was granted b
 
 This record documents the production deployment mechanism currently evidenced in the repository. Claims are scoped strictly to repository evidence; unverified AWS services are marked UNKNOWN.
 
-> [!NOTE]
-> **Architecture Update (2026-08-04):** The frontend is now hosted externally on Vercel and is no longer managed by PM2 on EC2. The EC2 instance now exclusively hosts the backend API (`hotel-crm-api`) and the Platform Worker (`hotel-crm-worker`).
-
 ## Context
 
 The application must run in production in the EU region with HTTPS, edge protection, and a repeatable deployment path from the default branch.
