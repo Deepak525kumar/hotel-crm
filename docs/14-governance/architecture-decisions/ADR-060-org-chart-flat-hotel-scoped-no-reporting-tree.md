@@ -112,3 +112,21 @@ This settles only the org-chart/reporting-relationship data model and closes `GD
 author Job-Dispatch's (Epic 9) PR sequence or implementation plan — that is a distinct, later,
 dedicated implementation-planning pass. It does not reopen `ADR-030`'s permission-set decision or
 any other resolved `GD-*` item.
+
+## Addendum (2026-08-05, PR6 documentation synchronization)
+
+The Compatibility section's "no org-chart endpoint... exists yet" is now stale as a statement of
+current repository fact — it was accurate when this record was ratified (2026-07-29) and remains
+accurate as a description of what *this ADR itself* authorized (still nothing; see "No code changes
+are made or authorized by this record" above). A route implementing the flat, hotel-scoped model
+this ADR settled was subsequently built under the Regional Manager V1 authorization work
+(`GET /hotel-groups/:hotel_group_id/org-chart`, `backend/src/modules/employee-management/routes.ts`,
+gated on the `org_chart:read` token this record's data-model decision made meaningful, shipped in
+PR #338) and a corresponding frontend page under PR #339
+(`frontend/app/(protected)/hotel-groups/[id]/org-chart/`). That implementation conforms to this
+ADR's flat/no-reporting-tree model — no `reports_to` field, no hierarchy, group-grain employee
+listing exactly as described in this record's body — so it required no new architecture decision to
+build, consistent with this record's own framing as "architecturally eligible" work. This addendum
+is appended rather than editing the original Compatibility text, per this repository's append-only
+convention for correcting a ratified record (the same pattern applied to `documents/MODULE_SPEC.md`'s
+Change Log).

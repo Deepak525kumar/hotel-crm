@@ -6,13 +6,24 @@ silently discovered later.
 
 ## Product / functional
 
-- **Regional Manager role is built (server and client) but disabled.** `FEATURE_RM_ROLE` code is
-  complete — frontend and both mobile apps already handle `regional_manager` deliberately (nav
-  visibility, role gates, allowed-roles lists), per ADR-030 PR-3, which has shipped. The reason to
-  hold this flag: `backend/src/scripts/run-regional-manager-promotion.ts` mutates `User.role`
-  directly with no corresponding demote script anywhere in the repo — once a manager is promoted,
-  disabling the flag does not revert it. Held for a future release pending a decision on whether
-  that one-way promotion is an acceptable risk, or needs a demote path first.
+- **`FEATURE_RM_ROLE` is not load-bearing for Regional Manager authorization** and should not be
+  read as an "RM disabled" switch — a prior version of this note claimed RM was "built but disabled"
+  behind this flag; that was inaccurate even before the lifecycle work below shipped. No middleware,
+  route, service, or token-issuance path reads `FEATURE_RM_ROLE` (verified by repository-wide search,
+  PR #338); it gates only the M-3 bulk-promotion script's rollout ordering. An admin has always been
+  able to create or promote a live, fully-authorized `regional_manager` user with the flag off, via
+  `POST /users` or `PUT /users/:id/role`. Consider retiring the flag or making it genuinely
+  load-bearing — the current middle state (real but unflagged behavior, a flag that gates nothing it
+  claims to) is itself a minor operational hazard, not a safety net.
+- **Regional Manager lifecycle (promote/assign/transfer/demote) is fully built**, including a demote
+  path (`backend/src/scripts/regional-manager-demotion.ts` + `npm run rm-role:demote`) that a prior
+  version of this note said was missing — that gap is closed (PR #339). One hotel group per RM is a
+  DB-enforced invariant (`HotelGroup.regional_manager_user_id` is `@unique`); demoting an RM who
+  still owns a group is rejected until the group is transferred to a successor
+  (`updateUserRole`/`ConflictError`, Regional Manager V1 Decision 11). Both the promotion→demotion
+  check-then-act sequence and the group-transfer path are transaction-locked against each other
+  (`SELECT ... FOR UPDATE`, consistent lock order) to close a TOCTOU race an earlier review round
+  found and fixed before merge — see PR #339's review history for the race analysis.
 - **Push notifications degrade silently if credentials are absent or a delivery fails.** Most
   notification types (job dispatch, shift reminders, attendance, calendar, HR, consent) are
   PUSH-only with no EMAIL fallback. If push is unconfigured, the only signal is a WARN-level log
