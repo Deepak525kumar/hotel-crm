@@ -28,8 +28,15 @@ export const CreateCalendarEntrySchema = z.object({
 export const ListCalendarEntriesQuerySchema = z.object({
   worker_id: z.string().optional(),
   hotel_id: z.string().optional(),
+  // Calendar grid view: an optional bounded day range, so a week/month view
+  // doesn't have to page through every placement ever made. Both or neither —
+  // a lone `from`/`to` would silently produce an unbounded-on-one-side query.
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD').optional(),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD').optional(),
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(20),
+}).refine((v) => (v.from == null) === (v.to == null), {
+  message: 'from and to must be provided together',
 });
 
 // ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count for a

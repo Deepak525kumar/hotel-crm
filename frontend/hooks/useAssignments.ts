@@ -49,3 +49,18 @@ export function useCalendarEntries(query: ListCalendarEntriesQuery = {}) {
   );
   return { ...swr, calendarEntries: items, hasNext };
 }
+
+/**
+ * Calendar grid view: every placement within a bounded day range in one
+ * fetch (the backend max page size, 100, comfortably covers a week/month of
+ * placements for a single scoped team) — unlike {@link useCalendarEntries},
+ * this is not paginated, since the grid renders the whole range at once.
+ */
+export function useCalendarEntriesInRange(
+  range: { from: string; to: string; hotel_id?: string; worker_id?: string } | null,
+) {
+  return useSWR(
+    range ? ["calendar-entries-range", range] : null,
+    ([, r]) => assignmentsApi.listCalendarEntries({ ...r, per_page: 100 }),
+  );
+}

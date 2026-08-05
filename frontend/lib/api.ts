@@ -31,6 +31,7 @@ import type {
   Hotel,
   HotelGroup,
   Contract,
+  ListAbsencesQuery,
   ListAssignmentsQuery,
   ListAttendanceQuery,
   ListCalendarEntriesQuery,
@@ -554,6 +555,14 @@ export const calendarApi = {
   /** REQ-CAL-T03/T04/T08: marks the caller absent for one day (self-scoped). */
   markOwnAbsence: (input: MarkAbsenceInput) =>
     apiFetch<CalendarAbsence>("/calendar/my-absences", { method: "POST", body: input }),
+
+  /**
+   * Calendar grid view (admin/manager/regional_manager, view-only): absences
+   * across the caller's scoped team for a bounded date range. No write path —
+   * absence marking stays self-service only (see markOwnAbsence above).
+   */
+  listAbsences: (query: ListAbsencesQuery) =>
+    apiFetch<CalendarAbsence[]>(`/calendar/absences${toQuery({ ...query })}`),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */

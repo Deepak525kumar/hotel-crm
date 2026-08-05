@@ -371,6 +371,9 @@ export class AssignmentService extends BaseService {
   ): Promise<{ data: CalendarEntryDto[]; total: number }> {
     const where: Prisma.CalendarEntryWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
+      ...(query.from && query.to
+        ? { day: { gte: new Date(`${query.from}T00:00:00.000Z`), lte: new Date(`${query.to}T00:00:00.000Z`) } }
+        : {}),
     };
 
     // Workers see only their own calendar entries; admin/manager may filter

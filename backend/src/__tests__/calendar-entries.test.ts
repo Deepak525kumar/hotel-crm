@@ -57,6 +57,7 @@ jest.mock('../config/env.js', () => ({
 }));
 
 import { AssignmentService } from '../modules/assignments/service.js';
+import { ListCalendarEntriesQuerySchema } from '../modules/assignments/types.js';
 
 const makeAssignmentRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'a1',
@@ -319,6 +320,55 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
 
       const callArg = mockCalendarEntry.findMany.mock.calls[0]?.[0] as any;
       expect(callArg.where.worker_id).toBeUndefined();
+    });
+
+    it('calendar grid view: applies a day-range filter when both from and to are provided', async () => {
+      mockCalendarEntry.findMany.mockResolvedValue([]);
+      mockCalendarEntry.count.mockResolvedValue(0);
+
+      await service.listCalendarEntries(
+        { from: '2026-08-01', to: '2026-08-07', page: 1, per_page: 100 } as any,
+        { userId: 'admin1', role: 'admin' }
+      );
+
+      const callArg = mockCalendarEntry.findMany.mock.calls[0]?.[0] as any;
+      expect(callArg.where.day.gte).toBeInstanceOf(Date);
+      expect(callArg.where.day.lte).toBeInstanceOf(Date);
+    });
+
+    it('calendar grid view: applies no day-range filter when from/to are absent', async () => {
+      mockCalendarEntry.findMany.mockResolvedValue([]);
+      mockCalendarEntry.count.mockResolvedValue(0);
+
+      await service.listCalendarEntries({ page: 1, per_page: 20 } as any, {
+        userId: 'admin1',
+        role: 'admin',
+      });
+
+      const callArg = mockCalendarEntry.findMany.mock.calls[0]?.[0] as any;
+      expect(callArg.where.day).toBeUndefined();
+    });
+  });
+
+  describe('ListCalendarEntriesQuerySchema: calendar grid view day-range validation', () => {
+    it('accepts both from and to', () => {
+      const result = ListCalendarEntriesQuerySchema.safeParse({ from: '2026-08-01', to: '2026-08-07' });
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts neither from nor to', () => {
+      const result = ListCalendarEntriesQuerySchema.safeParse({});
+      expect(result.success).toBe(true);
+    });
+
+    it('rejects from without to', () => {
+      const result = ListCalendarEntriesQuerySchema.safeParse({ from: '2026-08-01' });
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects to without from', () => {
+      const result = ListCalendarEntriesQuerySchema.safeParse({ to: '2026-08-07' });
+      expect(result.success).toBe(false);
     });
   });
 });
