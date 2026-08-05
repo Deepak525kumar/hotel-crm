@@ -9,9 +9,20 @@ import { Badge } from "@/components/ui";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { cn } from "@/lib/cn";
 
-/** `collapsed` swaps the full wordmark for just the initial, matching the icon-only rail. */
+/**
+ * `collapsed` swaps the full wordmark for just the initial, matching the
+ * icon-only rail. Padding/alignment is conditional the same way
+ * SidebarNav's links are, so the "H" centers in the same 64px column the
+ * nav icons center in below it, rather than sitting at a fixed `px-6`
+ * inset that only lines up once expanded.
+ */
 const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
-  <div className="flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 px-6 font-semibold text-gray-900">
+  <div
+    className={cn(
+      "flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 font-semibold text-gray-900 transition-[padding] duration-200",
+      collapsed ? "justify-center px-0" : "px-6",
+    )}
+  >
     {collapsed ? "H" : "Hotel CRM"}
   </div>
 );
@@ -20,7 +31,20 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [sidebarHovered, setSidebarHovered] = useState(false);
+  // Two independent booleans, not one shared flag: mouse hover and keyboard
+  // focus have different lifetimes and must not cancel each other. A single
+  // shared flag caused two real bugs -- tabbing into a link (focus expands
+  // the rail) then moving the mouse out of it collapsed the rail via
+  // onMouseLeave while that link still held focus (its label vanishing out
+  // from under an active focus ring); and tabbing out while the pointer
+  // happened to be resting on the rail left it stuck expanded/collapsed
+  // until the next real pointer crossing, since mouseenter/mouseleave don't
+  // re-fire on their own. OR-ing two independent booleans for the expanded
+  // state fixes both: each input source's own enter/leave event only ever
+  // touches its own boolean.
+  const [sidebarMouseHovered, setSidebarMouseHovered] = useState(false);
+  const [sidebarFocusWithin, setSidebarFocusWithin] = useState(false);
+  const sidebarExpanded = sidebarMouseHovered || sidebarFocusWithin;
   const drawerRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -74,29 +98,26 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-gray-50">
       {/* Desktop sidebar — an icon-only rail by default, expanding smoothly
-          to show labels on hover. `w-16`/`w-60` bracket the transition;
+          to show labels on hover OR keyboard focus (independently tracked,
+          see the state comment above). `w-16`/`w-60` bracket the transition;
           `overflow-hidden` on children clips labels mid-expand so they don't
-          bleed into the main content area before the width animates open.
-          `onFocus`/`onBlur` (not just mouse hover) expand it too, so a
-          keyboard user tabbing into a link sees its label, not just an icon —
-          `sidebarHovered` name kept for the mouse case; focus is handled by
-          the same boolean since both mean "show the expanded rail." */}
+          bleed into the main content area before the width animates open. */}
       <aside
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-        onFocus={() => setSidebarHovered(true)}
+        onMouseEnter={() => setSidebarMouseHovered(true)}
+        onMouseLeave={() => setSidebarMouseHovered(false)}
+        onFocus={() => setSidebarFocusWithin(true)}
         onBlur={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-            setSidebarHovered(false);
+            setSidebarFocusWithin(false);
           }
         }}
         className={cn(
           "hidden shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 md:flex",
-          sidebarHovered ? "w-60" : "w-16",
+          sidebarExpanded ? "w-60" : "w-16",
         )}
       >
-        <BrandMark collapsed={!sidebarHovered} />
-        <SidebarNav collapsed={!sidebarHovered} />
+        <BrandMark collapsed={!sidebarExpanded} />
+        <SidebarNav collapsed={!sidebarExpanded} />
       </aside>
 
       {/* Mobile drawer */}

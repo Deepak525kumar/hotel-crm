@@ -9,6 +9,7 @@ import {
   Users as UsersIcon,
   CalendarDays,
   ClipboardCheck,
+  Clock,
   MapPin,
   BarChart3,
   Building2,
@@ -47,7 +48,7 @@ export const NAV: NavItem[] = [
   // set until the flag is on, matching the "not visible to me, not an error" pattern
   // this app already uses elsewhere).
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+  { href: "/attendance", label: "Attendance", icon: Clock },
   // SPEC-GEO-001 (GD-14): regional_manager added per Regional Manager V1
   // Decision 3 (grant at group scope) — see GeoCheckinsGate for the backend
   // change this now matches.
@@ -98,15 +99,25 @@ export function SidebarNav({
             aria-current={active ? "page" : undefined}
             title={collapsed ? item.label : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium",
+              "flex items-center rounded-md py-2 text-sm font-medium",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-              collapsed ? "justify-center" : "justify-between",
+              // Collapsed: no horizontal padding/gap at all, so the 20px
+              // icon has the full 64px rail (minus the outer `nav` padding)
+              // to center in -- `px-3` on top of that would leave only
+              // 16px, clipping the icon on every render of the (default,
+              // most-common) collapsed state.
+              collapsed ? "justify-center px-0" : "justify-between gap-3 px-3",
               active
                 ? "bg-blue-50 text-blue-700"
                 : "text-gray-700 hover:bg-gray-100",
             )}
           >
-            <span className="flex items-center gap-3 overflow-hidden">
+            <span
+              className={cn(
+                "flex items-center overflow-hidden",
+                collapsed ? "gap-0" : "gap-3",
+              )}
+            >
               <Icon className="h-5 w-5 shrink-0" aria-hidden />
               <span
                 className={cn(
