@@ -343,11 +343,15 @@ describe('CrmService - Hotel Groups', () => {
     // HotelGroup. A concurrent transfer here must lock in the SAME order —
     // User before HotelGroup — or the two operations deadlock instead of
     // cleanly serializing under Postgres. This asserts the row lock
-    // ($queryRaw ... FOR UPDATE) is taken before the HotelGroup write.
-    it('locks the RM user row(s) before writing the HotelGroup row (deadlock-avoidance lock order)', async () => {
+    // ($queryRaw ... FOR UPDATE) is taken before the HotelGroup write, AND
+    // that the HotelGroup row itself is also explicitly locked (not just
+    // re-read) before that write -- closing the same
+    // concurrent-write-on-the-same-row race fixed for Hotel in updateHotel().
+    it('locks the RM user row(s), then the HotelGroup row itself, before writing the HotelGroup row (deadlock-avoidance lock order)', async () => {
       const callOrder: string[] = [];
-      mockPrisma.$queryRaw.mockImplementation(async () => {
-        callOrder.push('user-lock');
+      mockPrisma.$queryRaw.mockImplementation(async (query: unknown) => {
+        const sql = String(query);
+        callOrder.push(sql.includes('"HotelGroup"') ? 'hotelgroup-lock' : 'user-lock');
         return [];
       });
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
@@ -360,10 +364,9 @@ describe('CrmService - Hotel Groups', () => {
 
       await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
 
-      // Locks BOTH RM user rows (outgoing rm_1, incoming rm_2) before the
-      // HotelGroup write — see updateHotelGroup's own comment on why both,
-      // not just one, must be locked.
-      expect(callOrder).toEqual(['user-lock', 'user-lock', 'hotelgroup-write']);
+      // Locks BOTH RM user rows (outgoing rm_1, incoming rm_2), THEN the
+      // HotelGroup row itself, all before the HotelGroup write.
+      expect(callOrder).toEqual(['user-lock', 'user-lock', 'hotelgroup-lock', 'hotelgroup-write']);
     });
 
     // Regional Manager V1 Decision 12: this is the live "transfer" path — the
@@ -394,6 +397,84 @@ describe('CrmService - Hotel Groups', () => {
       await expect(
         service.updateHotelGroup('nonexistent', { name: 'New Name' }, 'admin_1', 'admin')
       ).rejects.toMatchObject({ name: 'NotFoundError' });
+    });
+
+    // Multi-hop chain (A -> B -> C): verifies the history table ends up with
+    // exactly two CLOSED rows (A, B — each unassigned_at set, no overlap) and
+    // one OPEN row (C — unassigned_at still null), rather than trusting each
+    // hop's call shape in isolation. Uses a stateful fake in place of the
+    // jest.fn mock so `updateMany`/`create` actually mutate a shared array,
+    // the same way Postgres would.
+    it('produces a clean, non-overlapping history chain across A -> B -> C reassignment', async () => {
+      const rows: Array<{
+        hotel_group_id: string; regional_manager_user_id: string;
+        assigned_at: Date; unassigned_at: Date | null; unassigned_by_id: string | null; reason: string | null;
+      }> = [];
+      const fakeHistory = {
+        create: jest.fn(async ({ data }: { data: typeof rows[number] }) => {
+          rows.push({ ...data, unassigned_at: null, unassigned_by_id: null, reason: null });
+          return data;
+        }),
+        updateMany: jest.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+          let count = 0;
+          for (const row of rows) {
+            if (
+              row.hotel_group_id === where['hotel_group_id'] &&
+              row.regional_manager_user_id === where['regional_manager_user_id'] &&
+              row.unassigned_at === null
+            ) {
+              Object.assign(row, data);
+              count += 1;
+            }
+          }
+          return { count };
+        }),
+      };
+      mockPrisma.regionalManagerAssignmentHistory = fakeHistory as unknown as typeof mockPrisma.regionalManagerAssignmentHistory;
+
+      let group: { id: string; name: string; billing_info: string | null; regional_manager_user_id: string } = {
+        id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_a',
+      };
+      mockPrisma.hotelGroup.findUnique.mockImplementation(async () => group);
+      mockPrisma.hotelGroup.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+        group = { ...group, ...data } as typeof group;
+        return group;
+      });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'x', deleted_at: null, role: 'REGIONAL_MANAGER' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      // A -> B
+      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_b' }, 'admin_1', 'admin');
+      // B -> C
+      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_c' }, 'admin_1', 'admin');
+
+      // rm_a's assignment pre-dates this test's fake history table (it was
+      // never `create`d through this service — it's the group's initial
+      // state, same as a pre-existing HotelGroup this migration's backfill
+      // never wrote a history row for) — so rm_a produces no row at all
+      // (its updateMany no-ops, matching-nothing, rather than erroring).
+      // Only rm_b (created on the first hop, closed on the second) and rm_c
+      // (created on the second hop, still open) are fully observed here.
+      expect(rows).toHaveLength(2);
+      const rowB = rows.find((r) => r.regional_manager_user_id === 'rm_b')!;
+      const rowC = rows.find((r) => r.regional_manager_user_id === 'rm_c')!;
+      expect(rowB).toBeDefined();
+      expect(rowC).toBeDefined();
+      expect(rowB.unassigned_at).not.toBeNull();
+      expect(rowC.unassigned_at).toBeNull(); // still the current RM
+      // No overlap: B's assignment must not have been recorded as unassigned
+      // before it was ever created (a real overlap bug would show up as an
+      // unassigned_at earlier than or equal to its own assigned_at).
+      expect(rowB.unassigned_at!.getTime()).toBeGreaterThanOrEqual(rowB.assigned_at.getTime());
+      // And B's close must not postdate C's own open (no window where BOTH
+      // rows are simultaneously open, i.e. no overlapping "current" RM).
+      expect(rowB.unassigned_at!.getTime()).toBeLessThanOrEqual(rowC.assigned_at.getTime());
+      expect(group.regional_manager_user_id).toBe('rm_c');
+
+      mockPrisma.regionalManagerAssignmentHistory = {
+        create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+        updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+      };
     });
   });
 

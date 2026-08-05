@@ -397,7 +397,7 @@ describe('CrmService - Hotels', () => {
         expect(mockPrisma.user.update).not.toHaveBeenCalled();
       });
 
-      it('locks the affected manager user row(s) before writing', async () => {
+      it('locks the affected manager user row(s), then the Hotel row itself, before writing', async () => {
         const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
         mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
         mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_new', role: 'MANAGER', deleted_at: null });
@@ -406,7 +406,10 @@ describe('CrmService - Hotels', () => {
 
         await service.updateHotel('h1', { manager_user_id: 'u_new' }, 'admin_1', 'admin');
 
-        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
+        // 2 manager user-row locks (u_old, u_new) + 1 Hotel-row lock, in that
+        // order -- User-then-Hotel, matching updateUserRole/updateHotelGroup's
+        // shared lock-ordering invariant (see the method's own comment).
+        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(3);
       });
     });
   });

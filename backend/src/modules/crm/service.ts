@@ -104,17 +104,22 @@ export class CrmService extends BaseService {
   }
 
   // Lock-ordering follow-up (post-#339 review, mirroring updateHotelGroup's
-  // RM-transfer fix below and users/service.ts#updateUserRole): a manager
-  // change locks the affected User row(s) — outgoing/incoming — BEFORE
-  // writing Hotel, and re-checks the incoming manager's role under that
-  // lock. Without this, `assertHotelManagerExists` (run outside the
-  // transaction, before the lock) can pass against a user who is
-  // concurrently demoted by updateUserRole() before this transaction
-  // commits, leaving Hotel.manager_user_id pointing at a non-MANAGER whose
-  // stale association still resolves a scope claim (auth/service.ts
-  // #resolveScope matches by association, not by re-checking role). Lock
-  // order is User first, then Hotel — same order updateUserRole and
-  // updateHotelGroup already use, so this can never deadlock against either.
+  // RM-transfer fix below and users/service.ts#updateUserRole): candidate
+  // manager User row(s) are locked FIRST (before the Hotel row), computed
+  // from the pre-transaction snapshot below -- same shape updateHotelGroup
+  // already uses for RM transfers. User-then-Hotel is the invariant every
+  // call site in this codebase that touches both tables shares (see
+  // updateUserRole's own comment for the deadlock class this avoids: two
+  // operations that both touch User and Hotel but disagree on lock order
+  // would deadlock instead of cleanly serializing under Postgres). The
+  // Hotel row is ALSO locked+re-read here (a fix beyond the original
+  // User-row-only version): without it, two concurrent PATCH
+  // /crm/hotels/:id calls on the SAME hotel would each compute their
+  // manager-change bookkeeping off a stale pre-transaction `hotel` snapshot
+  // -- the second transaction's "close the outgoing manager's history row"
+  // step would target a manager who is no longer actually assigned (the
+  // first transaction already replaced them), corrupting the history chain
+  // instead of erroring or serializing.
   async updateHotel(hotelId: string, data: UpdateHotelRequest, actorId: string, actorRole: string, ip?: string) {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
     if (!hotel) throw new NotFoundError('Hotel not found');
@@ -122,28 +127,42 @@ export class CrmService extends BaseService {
     if (data.hotel_group_id !== undefined && data.hotel_group_id !== null) {
       await this.assertHotelGroupExists(data.hotel_group_id);
     }
-    const isManagerChange =
-      data.manager_user_id !== undefined && data.manager_user_id !== hotel.manager_user_id;
     if (data.manager_user_id !== undefined && data.manager_user_id !== null) {
       await this.assertHotelManagerExists(data.manager_user_id);
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      if (isManagerChange) {
-        // Lock BOTH manager user rows (deduped, sorted) before touching
-        // Hotel, so a concurrent updateUserRole() demotion of either one
-        // blocks until this transaction commits.
-        const lockIds = [hotel.manager_user_id, data.manager_user_id]
-          .filter((id): id is string => id != null)
-          .filter((id, i, arr) => arr.indexOf(id) === i)
-          .sort();
-        for (const id of lockIds) {
-          await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
-        }
+      // Lock candidate manager User row(s) (deduped, sorted, from the
+      // pre-transaction snapshot) BEFORE the Hotel row -- User-then-Hotel,
+      // matching updateUserRole/updateHotelGroup's shared invariant.
+      const lockIds = [hotel.manager_user_id, data.manager_user_id]
+        .filter((id): id is string => id != null)
+        .filter((id, i, arr) => arr.indexOf(id) === i)
+        .sort();
+      for (const id of lockIds) {
+        await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+      }
 
+      // Lock and re-read Hotel AFTER the User row(s) -- closes the
+      // concurrent-PATCH-on-the-same-hotel race described above.
+      await tx.$queryRaw`SELECT id FROM "Hotel" WHERE id = ${hotelId} FOR UPDATE`;
+      const currentHotel = await tx.hotel.findUnique({ where: { id: hotelId } });
+      if (!currentHotel) throw new NotFoundError('Hotel not found');
+
+      const currentIsManagerChange =
+        data.manager_user_id !== undefined && data.manager_user_id !== currentHotel.manager_user_id;
+
+      if (currentIsManagerChange) {
         // Re-check under lock: the assertHotelManagerExists() call above ran
-        // BEFORE this lock, so its result can be stale by the time we hold
-        // it (see method-level comment for the exact interleaving).
+        // BEFORE any lock, so its result can be stale by the time we hold
+        // one (see method-level comment for the exact interleaving). If the
+        // CURRENT outgoing manager differs from the pre-transaction
+        // snapshot's (a concurrent change landed first), the lockIds set
+        // computed above may not include it -- but that concurrent
+        // transaction would itself hold this same Hotel row's lock until
+        // its commit, so by the time we reach here that possibility has
+        // already been resolved: currentHotel reflects it, and any further
+        // concurrent change is blocked by the Hotel-row lock we now hold.
         if (data.manager_user_id) {
           const newManager = await tx.user.findUnique({
             where: { id: data.manager_user_id },
@@ -161,36 +180,36 @@ export class CrmService extends BaseService {
       const result = await tx.hotel.update({
         where: { id: hotelId },
         data: {
-          name: data.name ?? hotel.name,
-          city: data.city ?? hotel.city,
-          country: data.country ?? hotel.country,
-          address: data.address ?? hotel.address,
-          timezone: data.timezone ?? hotel.timezone,
-          is_active: data.is_active ?? hotel.is_active,
-          accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs,
+          name: data.name ?? currentHotel.name,
+          city: data.city ?? currentHotel.city,
+          country: data.country ?? currentHotel.country,
+          address: data.address ?? currentHotel.address,
+          timezone: data.timezone ?? currentHotel.timezone,
+          is_active: data.is_active ?? currentHotel.is_active,
+          accepting_jobs: data.accepting_jobs ?? currentHotel.accepting_jobs,
           // `undefined` (field omitted) leaves the existing value; `null`
           // (field explicitly sent) clears the assignment.
-          hotel_group_id: data.hotel_group_id === undefined ? hotel.hotel_group_id : data.hotel_group_id,
-          manager_user_id: data.manager_user_id === undefined ? hotel.manager_user_id : data.manager_user_id,
-          ...(isManagerChange
+          hotel_group_id: data.hotel_group_id === undefined ? currentHotel.hotel_group_id : data.hotel_group_id,
+          manager_user_id: data.manager_user_id === undefined ? currentHotel.manager_user_id : data.manager_user_id,
+          ...(currentIsManagerChange
             ? {
                 manager_assigned_at: data.manager_user_id ? now : null,
                 manager_vacated_at: data.manager_user_id ? null : now,
                 manager_vacancy_reason: data.manager_user_id ? null : (data.manager_vacancy_reason ?? 'NOT_ASSIGNED'),
               }
             : {}),
-          latitude: data.latitude ?? hotel.latitude,
-          longitude: data.longitude ?? hotel.longitude,
+          latitude: data.latitude ?? currentHotel.latitude,
+          longitude: data.longitude ?? currentHotel.longitude,
         },
       });
 
-      if (isManagerChange) {
+      if (currentIsManagerChange) {
         // Close out the outgoing manager's open history row and open a new
         // one for the incoming manager, if any -- mirrors
         // updateHotelGroup's RM-transfer history bookkeeping.
-        if (hotel.manager_user_id) {
+        if (currentHotel.manager_user_id) {
           await tx.hotelManagerAssignmentHistory.updateMany({
-            where: { hotel_id: hotelId, manager_user_id: hotel.manager_user_id, unassigned_at: null },
+            where: { hotel_id: hotelId, manager_user_id: currentHotel.manager_user_id, unassigned_at: null },
             data: { unassigned_at: now, unassigned_by_id: actorId, reason: data.manager_vacancy_reason ?? 'NOT_ASSIGNED' },
           });
         }
@@ -212,22 +231,25 @@ export class CrmService extends BaseService {
         // just removed from) and the incoming manager (whose existing token,
         // if any, was minted before this assignment and carries a stale/null
         // scope), mirroring updateHotelGroup's RM-transfer token bump above.
-        if (hotel.manager_user_id) {
-          await bumpTokenGeneration(tx, hotel.manager_user_id);
+        if (currentHotel.manager_user_id) {
+          await bumpTokenGeneration(tx, currentHotel.manager_user_id);
         }
         if (data.manager_user_id) {
           await bumpTokenGeneration(tx, data.manager_user_id);
         }
       }
 
-      return result;
+      return { result, currentIsManagerChange, outgoingManagerUserId: currentHotel.manager_user_id };
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { fields: Object.keys(data) }, ip);
-    if (isManagerChange) {
+    if (updated.currentIsManagerChange) {
       // Symmetric with updateHotelGroup's RM-transfer audit entry: names
       // which accounts had their sessions forcibly invalidated, since the
       // fields-only entry above doesn't record who was actually logged out.
+      // Uses the in-transaction outgoing manager (re-read under lock), not
+      // the pre-transaction `hotel` snapshot, for the same staleness reason
+      // documented on the transaction above.
       await this.logAudit(
         actorId,
         actorRole,
@@ -237,13 +259,13 @@ export class CrmService extends BaseService {
         {
           action: 'token_generation_bumped',
           reason: 'hotel_manager_change',
-          outgoing_user_id: hotel.manager_user_id,
+          outgoing_user_id: updated.outgoingManagerUserId,
           incoming_user_id: data.manager_user_id,
         },
         ip
       );
     }
-    return updated;
+    return updated.result;
   }
 
   // Epic 5 PR 5.3 (ADR-023): validates a hotel-group assignment references an
@@ -476,6 +498,14 @@ export class CrmService extends BaseService {
         }
       }
 
+      // Lock the HotelGroup row itself too (after the User row(s) above,
+      // preserving User-then-other ordering) -- otherwise two concurrent
+      // updateHotelGroup() calls on the SAME group (e.g. one transferring
+      // the RM, another editing billing_info) race on this re-read with no
+      // serialization guarantee beyond Postgres's default read-committed
+      // isolation, which is not sufficient to prevent one transaction's
+      // write being silently based on the other's pre-commit snapshot.
+      await tx.$queryRaw`SELECT id FROM "HotelGroup" WHERE id = ${hotelGroupId} FOR UPDATE`;
       const hotelGroup = await tx.hotelGroup.findUnique({ where: { id: hotelGroupId } });
       if (!hotelGroup) throw new NotFoundError('Hotel group not found');
 

@@ -14,6 +14,16 @@
 -- -- Postgres permits multiple NULL rows under a unique index, so several
 -- groups can be vacant at once while a non-null value still names at most
 -- one group.
+--
+-- KNOWN LIMITATION: this migration does NOT backfill history rows for
+-- currently-assigned managers/RMs (only the vacancy fields on Hotel/
+-- HotelGroup themselves get backfilled, below). The history tables start
+-- genuinely empty and only gain rows from the FIRST assign/unassign that
+-- happens after this migration lands -- a manager/RM assigned before this
+-- migration has no opening row until they are next reassigned or demoted.
+-- This was a deliberate choice: fabricating a history row from the same
+-- unreliable proxy timestamps discussed below would produce fake-precision
+-- history entries, which is worse than an honestly incomplete table.
 
 CREATE TYPE "ManagerVacancyReason" AS ENUM (
   'NOT_ASSIGNED',
@@ -44,11 +54,16 @@ ALTER TABLE "HotelGroup" ADD COLUMN "regional_manager_assigned_at" TIMESTAMP(3);
 ALTER TABLE "HotelGroup" ADD COLUMN "regional_manager_vacated_at" TIMESTAMP(3);
 ALTER TABLE "HotelGroup" ADD COLUMN "regional_manager_vacancy_reason" "ManagerVacancyReason";
 
--- Backfill: every HotelGroup existing today already has an RM assigned
--- (the column was NOT NULL until the ALTER above) -- record that assignment
--- as having started at the group's creation, the earliest defensible
--- timestamp available (the true original assignment time was never
--- recorded before this migration).
+-- Backfill: every HotelGroup existing today already has an RM assigned --
+-- regional_manager_user_id was NOT NULL until the ALTER above, so the
+-- group could not have existed for even one moment without one. created_at
+-- is therefore a genuine lower bound on the true assignment time (assignment
+-- happened AT creation, since there was no other way to create the row),
+-- not merely an approximation -- unlike Hotel.manager_assigned_at below,
+-- which is deliberately left NULL because no equivalent guarantee holds
+-- there (manager_user_id was already nullable, assigned later via a
+-- separate PATCH, so the hotel's own timestamps say nothing reliable about
+-- when that assignment happened).
 UPDATE "HotelGroup" SET "regional_manager_assigned_at" = "created_at" WHERE "regional_manager_user_id" IS NOT NULL;
 
 -- ── Hotel: add vacancy fields (manager_user_id was already nullable) ──
@@ -57,12 +72,19 @@ ALTER TABLE "Hotel" ADD COLUMN "manager_assigned_at" TIMESTAMP(3);
 ALTER TABLE "Hotel" ADD COLUMN "manager_vacated_at" TIMESTAMP(3);
 ALTER TABLE "Hotel" ADD COLUMN "manager_vacancy_reason" "ManagerVacancyReason";
 
--- Backfill: any hotel already carrying a manager_user_id (the PR #348 write
--- path landed same-day) similarly gets its assignment dated from the
--- hotel's own updated_at, the closest available proxy for "when this was
--- last written" (created_at would be wrong -- the assignment happened via a
--- later PATCH, not at creation).
-UPDATE "Hotel" SET "manager_assigned_at" = "updated_at" WHERE "manager_user_id" IS NOT NULL;
+-- Deliberately NOT backfilled from updated_at: unlike HotelGroup.created_at
+-- above (a genuine lower bound -- the column was NOT NULL at creation, so
+-- assignment truly happened no later than creation), Hotel.updated_at is a
+-- generic @updatedAt column bumped by ANY field write (name, address,
+-- is_active, accepting_jobs, coordinates, ...), not specifically the
+-- manager assignment. Backfilling from it would fabricate a plausible-
+-- looking but false date whenever an unrelated edit landed after the real
+-- assignment (assign manager -> unrelated phone-number edit a year later ->
+-- this migration -> manager_assigned_at reads as "a year later", not the
+-- true assignment date). The true assignment time was never recorded
+-- before this migration and cannot be reconstructed; leaving it NULL for
+-- pre-existing assignments is honest about that, and the going-forward
+-- writes in updateHotel() are exact from this point on.
 
 -- ── History tables ──
 
