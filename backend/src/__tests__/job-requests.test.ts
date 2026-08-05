@@ -178,12 +178,43 @@ describe('WorkRequestService', () => {
 
     it('cancels with a reason', async () => {
       mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
-      mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
+      mockWorkRequest.update.mockResolvedValue(
+        makeRow({ status: 'CANCELLED', cancellation_reason: 'no demand' })
+      );
       await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'no demand' }, { userId: 'mgr1', role: 'admin' });
       const data = mockWorkRequest.update.mock.calls[0][0].data;
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
       expect(data.cancellation_reason).toBe('no demand');
+    });
+
+    // Audit-trail fix (2026-08-05): cancellation_reason was saved to the row
+    // but never surfaced in the audit log's details -- an admin reviewing
+    // the log could see a request was cancelled, but not why.
+    it('includes cancellation_reason in the audit log details when cancelling', async () => {
+      mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
+      mockWorkRequest.update.mockResolvedValue(
+        makeRow({ status: 'CANCELLED', cancellation_reason: 'no demand' })
+      );
+      await service.update('wr1', { status: 'CANCELLED', cancellation_reason: 'no demand' }, { userId: 'mgr1', role: 'admin' });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'UPDATE',
+            details: expect.objectContaining({ cancellation_reason: 'no demand' }),
+          }),
+        })
+      );
+    });
+
+    it('does not include a cancellation_reason key in the audit log details for a non-cancelling status change', async () => {
+      mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'DRAFT' }));
+      mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'OPEN' }));
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockEmploymentRecord.findMany.mockResolvedValue([]);
+      await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'admin' });
+      const call = mockPrisma.auditLog.create.mock.calls.find((c: any) => c[0].data.action === 'UPDATE');
+      expect(call?.[0].data.details).not.toHaveProperty('cancellation_reason');
     });
 
     it('does not edit terms once the request is OPEN', async () => {

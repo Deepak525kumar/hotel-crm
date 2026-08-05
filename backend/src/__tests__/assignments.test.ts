@@ -30,6 +30,10 @@ const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockJobRequestSkillSlot = {
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
@@ -37,6 +41,7 @@ const mockPrisma = {
   rating: mockRating,
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
+  jobRequestSkillSlot: mockJobRequestSkillSlot,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -82,6 +87,7 @@ describe('AssignmentService', () => {
     mockWorkerAssignment.findFirst.mockResolvedValue(null);
     mockAttendance.count.mockResolvedValue(0 as never);
     mockWorkerOverallRating.upsert.mockResolvedValue({});
+    mockJobRequestSkillSlot.update.mockResolvedValue({});
   });
 
   describe('update', () => {
@@ -121,7 +127,9 @@ describe('AssignmentService', () => {
 
     it('cancels with reason and sets cancelled_at', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
-      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      mockWorkerAssignment.update.mockResolvedValue(
+        makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+      );
       await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
         type: 'global',
       });
@@ -129,6 +137,69 @@ describe('AssignmentService', () => {
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
       expect(data.cancellation_reason).toBe('sick');
+    });
+
+    // Audit-trail fix (2026-08-05): cancellation_reason was saved to the row
+    // but never surfaced in the audit log's details.
+    it('includes cancellation_reason in the audit log details when cancelling', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(
+        makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+      );
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'UPDATE_ASSIGNMENT',
+            details: expect.objectContaining({ cancellation_reason: 'sick' }),
+          }),
+        })
+      );
+    });
+
+    it('does not include a cancellation_reason key in the audit log details for a non-cancelling transition', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      const call = mockPrisma.auditLog.create.mock.calls.find(
+        (c: any) => c[0].data.action === 'UPDATE_ASSIGNMENT'
+      );
+      expect(call?.[0].data.details).not.toHaveProperty('cancellation_reason');
+    });
+
+    // Job-dispatch lifecycle audit fix (2026-08-05): cancelling a
+    // broadcast-accept assignment must free up the slot it claimed, or a
+    // headcount-N slot gets stuck permanently "full" after a cancellation.
+    it('decrements JobRequestSkillSlot.confirmed_count when cancelling a broadcast-accept assignment (skill_slot_id set)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ skill_slot_id: 'slot1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED', skill_slot_id: 'slot1' }));
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockJobRequestSkillSlot.update).toHaveBeenCalledWith({
+        where: { id: 'slot1' },
+        data: { confirmed_count: { decrement: 1 } },
+      });
+    });
+
+    it('does not touch JobRequestSkillSlot when cancelling a calendar-placed assignment (skill_slot_id null)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ skill_slot_id: null }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+    });
+
+    it('does not decrement JobRequestSkillSlot.confirmed_count on completion, only on cancellation', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(
+        makeAssignment({ status: 'IN_PROGRESS', skill_slot_id: 'slot1' })
+      );
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED', skill_slot_id: 'slot1' }));
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
     });
 
     // GD-04: this endpoint mutates the fields WorkerOverallRating derives

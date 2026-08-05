@@ -306,6 +306,12 @@ export class JobRequestService extends BaseService {
     await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
       from_status: wr.status,
       to_status: updated.status,
+      // cancellation_reason was saved to the row (line 264) but never
+      // surfaced in the audit trail -- an admin reviewing the log couldn't
+      // see WHY a request was cancelled, only that it was.
+      ...(updated.status === WorkRequestStatus.CANCELLED
+        ? { cancellation_reason: updated.cancellation_reason }
+        : {}),
     });
 
     return this.toDto(updated);
@@ -717,6 +723,7 @@ export class JobRequestService extends BaseService {
           data: {
             work_request_id: null,
             job_request_id: wr.id,
+            skill_slot_id: slot.id,
             worker_id: actor.userId,
             hotel_id: wr.hotel_id,
             assigned_by_id: wr.created_by_id,
@@ -734,6 +741,14 @@ export class JobRequestService extends BaseService {
     }
 
     if (assignmentId === null) {
+      // Lost the first-accept-wins race -- no WorkerAssignment was created,
+      // so there's no WORKER_ASSIGNMENT resource to attach an audit entry
+      // to, but the attempt itself is worth a record (an admin investigating
+      // "why didn't this worker get the shift" should be able to see the
+      // attempt, not just silence). Logged against the WORK_REQUEST instead.
+      await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST_LOST_RACE', 'WORK_REQUEST', wr.id, {
+        skill,
+      });
       return { status: 'requirement_fulfilled', job_request_id: wr.id, skill };
     }
 
@@ -864,6 +879,15 @@ export class JobRequestService extends BaseService {
             data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
           });
           await this.enqueueJobRequestClosed(tx, closed, 'auto');
+        });
+        // Audit gap: manualClose() logs MANUAL_CLOSE, but this scheduled
+        // path previously logged nothing at all -- a broadcast could expire
+        // with zero audit trail. `logAudit(null, 'system', ...)` matches the
+        // existing convention for scheduled-job-initiated actions (see
+        // employee-management/service.ts's contract-lapse deactivation).
+        await this.logAudit(null, 'system', 'AUTO_CLOSE', 'WORK_REQUEST', wr.id, {
+          from_status: wr.status,
+          to_status: WorkRequestStatus.EXPIRED,
         });
       }
       total += stale.length;

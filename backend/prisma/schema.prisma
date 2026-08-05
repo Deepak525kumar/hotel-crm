@@ -613,6 +613,9 @@ model JobRequestSkillSlot {
   created_at      DateTime   @default(now())
   updated_at      DateTime   @updatedAt
 
+  // Back-reference for WorkerAssignment.skill_slot_id (2026-08-05 lifecycle fix).
+  claimed_by      WorkerAssignment[]
+
   // confirmed_count must never exceed headcount — CHECK constraint in migration.
   @@index([job_request_id])
   @@index([skill])
@@ -652,6 +655,18 @@ model WorkerAssignment {
   work_request           JobRequest?        @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
   job_request_id         String?
   job_request            JobRequest?        @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
+  // Job-dispatch lifecycle audit fix (2026-08-05): records exactly which
+  // skill slot a broadcast-accept assignment claimed. A multi-skill
+  // broadcast (e.g. "2 Cleaners + 1 Waiter") has several
+  // JobRequestSkillSlot rows on the same job_request_id, and a worker
+  // holding more than one of the requested skills makes worker_id +
+  // job_request_id alone ambiguous as to which slot's confirmed_count to
+  // decrement on cancellation. Null for every creation path except
+  // acceptBroadcast() (calendar-placed and pre-existing rows have no slot to
+  // reference) -- additive, no backfill possible or needed for historical
+  // rows since the information was never recorded.
+  skill_slot_id          String?
+  skill_slot             JobRequestSkillSlot? @relation(fields: [skill_slot_id], references: [id], onDelete: SetNull)
   worker_id              String
   worker                 User               @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id               String

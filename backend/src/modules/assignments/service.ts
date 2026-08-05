@@ -200,12 +200,30 @@ export class AssignmentService extends BaseService {
         await refreshWorkerOverallRating(tx, assignment.worker_id);
       }
 
+      // Job-dispatch lifecycle audit fix (2026-08-05): a cancelled
+      // broadcast-accept assignment previously left its
+      // JobRequestSkillSlot.confirmed_count permanently incremented, even
+      // though the slot is open again -- a headcount-3 slot could get stuck
+      // showing 3/3 filled forever after a single cancellation, silently
+      // blocking any backfill. skill_slot_id is only ever set by
+      // acceptBroadcast(), so this is a no-op for calendar-placed
+      // assignments (skill_slot_id null) and never fires for COMPLETED.
+      if (next === AssignmentStatus.CANCELLED && assignment.skill_slot_id) {
+        await tx.jobRequestSkillSlot.update({
+          where: { id: assignment.skill_slot_id },
+          data: { confirmed_count: { decrement: 1 } },
+        });
+      }
+
       return result;
     });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ASSIGNMENT', 'WORKER_ASSIGNMENT', id, {
       from_status: assignment.status,
       to_status: next,
+      // cancellation_reason was saved to the row above but never surfaced
+      // in the audit trail.
+      ...(next === AssignmentStatus.CANCELLED ? { cancellation_reason: updated.cancellation_reason } : {}),
     });
 
     return this.toDto(updated);
