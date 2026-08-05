@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +27,20 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // `onClose` is typically a fresh inline function on every parent render
+  // (e.g. a handleClose closing over other state). Reading it via ref keeps
+  // it out of the effect's deps, so typing in a form inside the modal can't
+  // re-run the focus-management effect below and steal focus back to the
+  // close button after every keystroke. Written from a layout effect, not
+  // during render, since a render that never commits (e.g. one interrupted
+  // by React's concurrent scheduler) would otherwise leave the ref pointing
+  // at a stale closure; useLayoutEffect (vs. useEffect) keeps it current
+  // before any same-tick keydown/click handler could read it.
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   // Close on Escape, lock body scroll, manage focus (trap + restore).
   useEffect(() => {
     if (!open) return;
@@ -36,7 +50,7 @@ export function Modal({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -76,7 +90,7 @@ export function Modal({
       // Restore focus to whatever opened the dialog.
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
