@@ -32,9 +32,10 @@ export function Modal({
   // it out of the effect's deps, so typing in a form inside the modal can't
   // re-run the focus-management effect below and steal focus back to the
   // close button after every keystroke. Written from a layout effect, not
-  // during render -- refs must not be mutated in the render body itself
-  // (react-hooks/refs); useLayoutEffect (vs. useEffect) keeps the ref
-  // current before any same-tick keydown/click handler could read it.
+  // during render, since a render that never commits (e.g. one interrupted
+  // by React's concurrent scheduler) would otherwise leave the ref pointing
+  // at a stale closure; useLayoutEffect (vs. useEffect) keeps it current
+  // before any same-tick keydown/click handler could read it.
   const onCloseRef = useRef(onClose);
   useLayoutEffect(() => {
     onCloseRef.current = onClose;
@@ -120,7 +121,7 @@ export function Modal({
             </h2>
             <button
               type="button"
-              onClick={() => onCloseRef.current()}
+              onClick={onClose}
               aria-label="Close"
               className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
             >
