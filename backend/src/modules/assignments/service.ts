@@ -138,7 +138,8 @@ export class AssignmentService extends BaseService {
     id: string,
     input: UpdateAssignmentInput,
     actorId: string,
-    actorRole: string
+    actorRole: string,
+    actorScope?: UserScope | null
   ): Promise<AssignmentDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
@@ -151,6 +152,20 @@ export class AssignmentService extends BaseService {
       if (assignment.worker_id !== actorId) {
         const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
         if (!eligible) throw new ForbiddenError('Cannot access this assignment');
+      }
+    }
+
+    // Product decision, 2026-08-05: a manager/regional_manager may only
+    // drive the lifecycle (start/complete/cancel) of an assignment at a
+    // hotel within their own scope -- previously unrestricted platform-wide
+    // (FIND-SEC-001/OQ-01's original fix explicitly allowed this; this
+    // narrows it to match placeOnCalendar()/moveCalendarEntry()'s scoping,
+    // the same isScopedManagerRole + isHotelInScope pair used there). Admin
+    // remains unrestricted.
+    if (isScopedManagerRole(actorRole)) {
+      const inScope = await isHotelInScope(actorScope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot access this assignment');
       }
     }
 

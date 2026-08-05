@@ -94,7 +94,9 @@ describe('AssignmentService', () => {
 
     it('rejects illegal transition COMPLETED -> IN_PROGRESS', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
-      await expect(service.update('a1', { status: 'IN_PROGRESS' }, 'mgr1', 'manager')).rejects.toMatchObject({
+      await expect(
+        service.update('a1', { status: 'IN_PROGRESS' }, 'mgr1', 'manager', { type: 'global' })
+      ).rejects.toMatchObject({
         name: 'ConflictError',
       });
     });
@@ -120,7 +122,9 @@ describe('AssignmentService', () => {
     it('cancels with reason and sets cancelled_at', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
-      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager');
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
       const data = mockWorkerAssignment.update.mock.calls[0][0].data;
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
@@ -141,7 +145,9 @@ describe('AssignmentService', () => {
     it('refreshes WorkerOverallRating when a transition cancels the assignment', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'CONFIRMED', worker_id: 'w1' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
-      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager');
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
       expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
       expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     });
@@ -157,7 +163,9 @@ describe('AssignmentService', () => {
     // see SIR-JOBD-007 for why this makes the GD-04 recompute condition safe.
     it('rejects a same-status update, so completed_at cannot change without also recomputing the aggregate', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED', worker_id: 'w1' }));
-      await expect(service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager')).rejects.toMatchObject({
+      await expect(
+        service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager', { type: 'global' })
+      ).rejects.toMatchObject({
         name: 'ConflictError',
       });
       expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
