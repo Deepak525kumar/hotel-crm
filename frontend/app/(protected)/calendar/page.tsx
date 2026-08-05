@@ -72,6 +72,7 @@ export default function CalendarGridPage() {
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [addDay, setAddDay] = useState<string | null>(null);
+  const [editingEntry, setEditingEntry] = useState<CalendarEntryDto | null>(null);
 
   // Month view always renders a fixed 6-week (42-day) grid; week view
   // renders exactly 7. Both are cheap to render outright (42 lightweight
@@ -234,6 +235,7 @@ export default function CalendarGridPage() {
                 movingEntryId={movingEntryId}
                 onAdd={() => setAddDay(key)}
                 onMoveEntry={onMoveEntry}
+                onSelectEntry={setEditingEntry}
               />
             );
           })}
@@ -241,6 +243,15 @@ export default function CalendarGridPage() {
       )}
 
       {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
+      {editingEntry && (
+        <EditEntryModal
+          entry={editingEntry}
+          range={{ from, to }}
+          workerName={workerNameById.get(editingEntry.worker_id) ?? editingEntry.worker_id}
+          canWrite={canWrite}
+          onClose={() => setEditingEntry(null)}
+        />
+      )}
     </div>
   );
 }
@@ -275,6 +286,7 @@ function DayCell({
   movingEntryId,
   onAdd,
   onMoveEntry,
+  onSelectEntry,
 }: {
   date: Date;
   dayKey: string;
@@ -288,6 +300,7 @@ function DayCell({
   movingEntryId: string | null;
   onAdd: () => void;
   onMoveEntry: (entryId: string, newDay: string) => void;
+  onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
   const isToday = dayKey === toDateKey(new Date());
   const isMonth = view === "month";
@@ -298,7 +311,7 @@ function DayCell({
   // fixed-height row (the actual data is never truncated, only the display).
   const items = isMonth
     ? [
-        ...entries.map((e) => ({ type: "entry" as const, id: e.id, workerId: e.worker_id })),
+        ...entries.map((e) => ({ type: "entry" as const, id: e.id, workerId: e.worker_id, entry: e })),
         ...absences.map((a) => ({ type: "absence" as const, id: a.id, workerId: a.worker_id, kind: a.kind })),
       ]
     : null;
@@ -361,11 +374,12 @@ function DayCell({
               item.type === "entry" ? (
                 <PlacementTag
                   key={item.id}
-                  entryId={item.id}
+                  entry={item.entry}
                   label={workerNameById.get(item.workerId) ?? item.workerId}
                   draggable={canWrite}
                   moving={movingEntryId === item.id}
                   size="sm"
+                  onSelect={onSelectEntry}
                 />
               ) : (
                 <div key={item.id} className="truncate rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
@@ -380,11 +394,12 @@ function DayCell({
             {entries.map((e) => (
               <PlacementTag
                 key={e.id}
-                entryId={e.id}
+                entry={e}
                 label={workerNameById.get(e.worker_id) ?? e.worker_id}
                 draggable={canWrite}
                 moving={movingEntryId === e.id}
                 size="md"
+                onSelect={onSelectEntry}
               />
             ))}
             {absences.map((a) => (
@@ -403,31 +418,39 @@ function DayCell({
   );
 }
 
-/** A single placement tag. Draggable (native HTML5 DnD) when `draggable` —
+/**
+ * A single placement tag. Draggable (native HTML5 DnD) when `draggable` —
  * gated on the same StaffingWriteGate role set as the add-entry button,
- * since dragging is just another form of scheduling write. */
+ * since dragging is just another form of scheduling write. Clicking opens
+ * the entry's detail/cancel modal for anyone who can see the grid, whether
+ * or not they can write.
+ */
 function PlacementTag({
-  entryId,
+  entry,
   label,
   draggable,
   moving,
   size,
+  onSelect,
 }: {
-  entryId: string;
+  entry: CalendarEntryDto;
   label: string;
   draggable: boolean;
   moving: boolean;
   size: "sm" | "md";
+  onSelect: (entry: CalendarEntryDto) => void;
 }) {
   return (
-    <div
+    <button
+      type="button"
       draggable={draggable}
+      onClick={() => onSelect(entry)}
       onDragStart={(e) => {
-        e.dataTransfer.setData(PLACEMENT_DRAG_TYPE, entryId);
+        e.dataTransfer.setData(PLACEMENT_DRAG_TYPE, entry.id);
         e.dataTransfer.effectAllowed = "move";
       }}
       className={[
-        "truncate rounded bg-blue-50 font-medium text-blue-700",
+        "block w-full truncate rounded bg-blue-50 text-left font-medium text-blue-700 hover:bg-blue-100",
         size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
         draggable ? "cursor-grab active:cursor-grabbing" : undefined,
         moving ? "opacity-50" : undefined,
@@ -436,7 +459,7 @@ function PlacementTag({
         .join(" ")}
     >
       {label}
-    </div>
+    </button>
   );
 }
 
@@ -615,6 +638,89 @@ function AddEntryModal({
           </p>
         )}
         <Input label="Day" type="date" value={day} readOnly disabled />
+        <FormError>{error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Inline-edit affordance for an existing placement: shows its details and
+ * offers to cancel it. Hotel and worker are never editable here (day-only
+ * move is what drag/drop already covers, per the same product decision) --
+ * this modal's only write is the existing generic assignment-cancel path
+ * (PATCH /assignments/:id, status: CANCELLED), reused as-is rather than
+ * building a calendar-specific delete endpoint.
+ */
+function EditEntryModal({
+  entry,
+  range,
+  workerName,
+  canWrite,
+  onClose,
+}: {
+  entry: CalendarEntryDto;
+  range: { from: string; to: string };
+  workerName: string;
+  canWrite: boolean;
+  onClose: () => void;
+}) {
+  const { hotels } = useHotelOptions();
+  const hotelName = hotels.find((h) => h.id === entry.hotel_id)?.name ?? entry.hotel_id;
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onCancelPlacement = async () => {
+    setError(null);
+    setCancelling(true);
+    try {
+      await assignmentsApi.cancel(entry.assignment_id);
+      await mutate(
+        ["calendar-entries-range", range],
+        (current: CalendarEntryDto[] = []) => current.filter((e) => e.id !== entry.id),
+        { revalidate: false },
+      );
+      onClose();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to cancel this placement. Please try again.");
+      setCancelling(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Placement details"
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={cancelling}>
+            Close
+          </Button>
+          {canWrite && (
+            <Button variant="danger" onClick={onCancelPlacement} loading={cancelling}>
+              Cancel placement
+            </Button>
+          )}
+        </>
+      }
+    >
+      <div className="space-y-3 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Worker</span>
+          <span className="font-medium text-gray-900">{workerName}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Hotel</span>
+          <span className="font-medium text-gray-900">{hotelName}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Day</span>
+          <span className="font-medium text-gray-900">{entry.day}</span>
+        </div>
+        <p className="text-xs text-gray-400">
+          To move this placement to a different day, drag it to the destination day cell.
+        </p>
         <FormError>{error}</FormError>
       </div>
     </Modal>
