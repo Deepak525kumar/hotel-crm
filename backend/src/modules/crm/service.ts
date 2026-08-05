@@ -94,6 +94,8 @@ export class CrmService extends BaseService {
         country: data.country,
         address: data.address,
         timezone: data.timezone,
+        latitude: data.latitude,
+        longitude: data.longitude,
       },
     });
 

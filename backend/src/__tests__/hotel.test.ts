@@ -126,6 +126,24 @@ describe('CrmService - Hotels', () => {
       expect(result.name).toBe('Test Hotel');
       expect(mockPrisma.hotel.create).toHaveBeenCalledTimes(1);
     });
+
+    it('GD-14/OD-GEO-001/004: persists latitude/longitude when provided on create', async () => {
+      const fake = { id: 'h1', name: 'Test Hotel', city: 'Munich', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', is_active: true, latitude: 52.52, longitude: 13.405, created_at: new Date(), updated_at: new Date() };
+      mockPrisma.hotel.create.mockResolvedValue(fake);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.createHotel(
+        { name: 'Test Hotel', city: 'Munich', country: 'Germany', address: 'Addr', timezone: 'Europe/Berlin', latitude: 52.52, longitude: 13.405 },
+        'actor_1',
+        'admin',
+      );
+
+      expect(result.latitude).toBe(52.52);
+      expect(result.longitude).toBe(13.405);
+      const createCall = (mockPrisma.hotel.create as jest.Mock).mock.calls[0] as Array<{ data: { latitude: number; longitude: number } }>;
+      expect(createCall[0]?.data.latitude).toBe(52.52);
+      expect(createCall[0]?.data.longitude).toBe(13.405);
+    });
   });
 
   describe('updateHotel', () => {

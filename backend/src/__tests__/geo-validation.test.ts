@@ -88,8 +88,8 @@ describe('ListCheckinsQuerySchema', () => {
 });
 
 describe('constants', () => {
-  it('GEOFENCE_RADIUS_METERS matches CRR §17 (100m)', () => {
-    expect(GEOFENCE_RADIUS_METERS).toBe(100);
+  it('GEOFENCE_RADIUS_METERS matches the current product decision (30m)', () => {
+    expect(GEOFENCE_RADIUS_METERS).toBe(30);
   });
 
   it('RETENTION_MONTHS matches CRR §25 Tier 1 (6 months)', () => {
