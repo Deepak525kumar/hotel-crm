@@ -289,7 +289,68 @@ describe('UserService', () => {
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
-    it('does not scope a checker actor (documented cross-hotel bypass)', async () => {
+    it('allows a manager to view their own profile (self-read exemption)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'manager_actor', role: 'MANAGER', first_name: 'Self', last_name: 'Mgr',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.getUser('manager_actor', 'manager_actor', 'manager', { type: 'global' });
+      expect(result.id).toBe('manager_actor');
+      expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('denies a manager with no scope claim from viewing an in-group worker', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'some_group' });
+
+      await expect(
+        service.getUser('u_worker', 'manager_actor', 'manager', null)
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('allows a regional_manager to view a worker within their hotel group scope', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'my_group' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.getUser(
+        'u_worker', 'rm_actor', 'regional_manager', { type: 'hotel_group', hotel_group_id: 'my_group' }
+      );
+      expect(result.id).toBe('u_worker');
+    });
+
+    it('forbids a regional_manager from viewing a worker outside their hotel group scope', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'other_group' });
+
+      await expect(
+        service.getUser('u_worker', 'rm_actor', 'regional_manager', { type: 'hotel_group', hotel_group_id: 'my_group' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    // NOTE: `checker` does not actually hold `users:read` (ROLE_PERMISSIONS.CHECKER
+    // has no users:* entry) and can never reach this route in practice — the
+    // route-level `requirePermission('users:read')` gate rejects it with a 403
+    // before this service method is ever called. This test only pins the
+    // service's own in-isolation behavior (defense-in-depth / regression guard
+    // if a permission is ever added), not a reachable IDOR the way the
+    // manager/RM cases above are.
+    it('does not scope a checker actor at the service level (unreachable at the route today)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
         phone: null, profile_photo_url: null, is_active: true,
@@ -491,6 +552,72 @@ describe('UserService', () => {
       ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can modify manager or admin accounts' });
       expect(mockPrisma.user.update).not.toHaveBeenCalled();
       expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('allows a manager to modify their own profile (self-edit exemption)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'manager_actor', role: 'MANAGER', first_name: 'Self', last_name: 'Mgr',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'manager_actor', email: 'mgr@test.com', first_name: 'Changed', last_name: 'Mgr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUser(
+        'manager_actor', { first_name: 'Changed' }, 'manager_actor', 'manager', { type: 'global' }
+      );
+      expect(result.first_name).toBe('Changed');
+      expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('denies a manager with no scope claim from modifying an in-group worker', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'some_group' });
+
+      await expect(
+        service.updateUser('u_worker', { first_name: 'Changed' }, 'manager_actor', 'manager', null)
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('allows a regional_manager to modify a worker within their hotel group scope', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'my_group' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUser(
+        'u_worker', { first_name: 'Changed' }, 'rm_actor', 'regional_manager',
+        { type: 'hotel_group', hotel_group_id: 'my_group' }
+      );
+      expect(result.first_name).toBe('Changed');
+    });
+
+    it('forbids a regional_manager from modifying a worker outside their hotel group scope', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'other_group' });
+
+      await expect(
+        service.updateUser(
+          'u_worker', { first_name: 'Changed' }, 'rm_actor', 'regional_manager',
+          { type: 'hotel_group', hotel_group_id: 'my_group' }
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
     // Regression: phone is @unique-but-nullable. An empty string is a real,

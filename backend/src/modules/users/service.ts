@@ -10,7 +10,7 @@ import {
   UpdateUserRoleRequest,
   ListUsersQuery,
 } from './types.js';
-import { resolveNonAdminScopeFilter, isWorkerInGroupScope } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
@@ -133,7 +133,10 @@ export class UserService extends BaseService {
     // IDOR), holding `users:read` with no route-level scope gate. `checker`
     // is deliberately left unscoped here, matching its documented
     // cross-hotel bypass elsewhere in this module (isSelfScopedRole).
-    if (actorRole === 'manager' || actorRole === 'regional_manager') {
+    // Self-read is exempt (a manager viewing their OWN profile, e.g. the
+    // /users/:id detail page they now have a nav link to) — same exemption
+    // as updateUser's target-role/scope check.
+    if (isScopedManagerRole(actorRole) && userId !== actorId) {
       if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
         throw new ForbiddenError('User not in your scope');
       }
@@ -229,7 +232,15 @@ export class UserService extends BaseService {
     // already on their group's roster (an EmploymentRecord assigned to a
     // hotel_group) — never another admin/manager/RM, and never a worker who
     // hasn't been onboarded yet (that's an Admin-only action until then).
-    if (actorRole !== 'admin') {
+    // Self-edit is exempt from the target-role/scope check below (a manager
+    // editing their OWN name/phone isn't "modifying a manager account" in
+    // the sense that rule is guarding against) — `data.role`/elevation are
+    // already blocked above regardless of actor/target.
+    // Kept as `actorRole !== 'admin'` (deny-list), not isScopedManagerRole
+    // (allow-list): this route is admin/manager/RM-only today, but a
+    // deny-list fails safe if a future role were ever added to it, where an
+    // allow-list would silently skip the check for that new role.
+    if (actorRole !== 'admin' && userId !== actorId) {
       if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
         throw new ForbiddenError('Only admins can modify manager or admin accounts');
       }

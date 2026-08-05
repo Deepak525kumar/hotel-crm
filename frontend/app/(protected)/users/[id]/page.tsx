@@ -118,14 +118,21 @@ function UserDetail() {
             description={user.email}
             actions={
               // Edit now admits in-scope manager/RM too (2026-08-06 scope
-              // fix to updateUser) -- the edit page itself still hides the
-              // Role selector for non-admins (PUT /users/:id/role stays
-              // admin-only).
-              <RoleGate allow={["admin", "manager", "regional_manager"]}>
-                <Link href={`/users/${id}/edit`}>
-                  <Button variant="outline">Edit</Button>
-                </Link>
-              </RoleGate>
+              // fix to updateUser) -- but the backend only ever permits a
+              // manager/RM to edit a worker/checker target or themselves,
+              // never a fellow manager/admin. Hide the button rather than
+              // linking to a page that will 403 on submit (or, for a
+              // non-worker/checker target, on load).
+              currentUser?.role === "admin" ||
+              isSelf ||
+              user.role === "worker" ||
+              user.role === "checker" ? (
+                <RoleGate allow={["admin", "manager", "regional_manager"]}>
+                  <Link href={`/users/${id}/edit`}>
+                    <Button variant="outline">Edit</Button>
+                  </Link>
+                </RoleGate>
+              ) : null
             }
           />
 
