@@ -236,7 +236,10 @@ export class CalendarService extends BaseService {
       where: { id: record.hotel_group_id },
       select: { id: true, regional_manager_user_id: true },
     });
-    if (!group) return;
+    // Vacancy model (2026-08-06): regional_manager_user_id can now be null
+    // if the group is between RMs -- no one to notify, best-effort skip
+    // (matches this method's own no-op-on-missing-record convention above).
+    if (!group || !group.regional_manager_user_id) return;
 
     await notificationService.enqueue({
       recipientId: group.regional_manager_user_id,

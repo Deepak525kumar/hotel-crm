@@ -56,6 +56,13 @@ export async function promoteRegionalManagers(
     // pre-transaction read followed by a separate write — see this file's
     // header comment for the race this closes.
     const outcome = await prisma.$transaction(async (tx) => {
+      // Vacancy model (2026-08-06): a group can now have no RM assigned at
+      // all -- nothing to lock or promote. Guarding here rather than
+      // filtering the outer `groups` query keeps this file's own re-read
+      // (not the stale outer snapshot) as the source of truth, per this
+      // file's header comment.
+      if (!group.regional_manager_user_id) return { kind: 'skip' as const };
+
       // Row lock on the candidate user FIRST — blocks a concurrent transfer's
       // own User-row lock (crm/service.ts#updateHotelGroup) until this
       // transaction commits or rolls back.
@@ -67,7 +74,7 @@ export async function promoteRegionalManagers(
         where: { id: group.id },
         select: { regional_manager_user_id: true },
       });
-      if (!currentGroup) return { kind: 'skip' as const };
+      if (!currentGroup || !currentGroup.regional_manager_user_id) return { kind: 'skip' as const };
 
       const user = await tx.user.findUnique({
         where: { id: currentGroup.regional_manager_user_id },

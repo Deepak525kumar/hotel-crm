@@ -157,6 +157,7 @@ export class CrmService extends BaseService {
         }
       }
 
+      const now = new Date();
       const result = await tx.hotel.update({
         where: { id: hotelId },
         data: {
@@ -171,12 +172,39 @@ export class CrmService extends BaseService {
           // (field explicitly sent) clears the assignment.
           hotel_group_id: data.hotel_group_id === undefined ? hotel.hotel_group_id : data.hotel_group_id,
           manager_user_id: data.manager_user_id === undefined ? hotel.manager_user_id : data.manager_user_id,
+          ...(isManagerChange
+            ? {
+                manager_assigned_at: data.manager_user_id ? now : null,
+                manager_vacated_at: data.manager_user_id ? null : now,
+                manager_vacancy_reason: data.manager_user_id ? null : (data.manager_vacancy_reason ?? 'NOT_ASSIGNED'),
+              }
+            : {}),
           latitude: data.latitude ?? hotel.latitude,
           longitude: data.longitude ?? hotel.longitude,
         },
       });
 
       if (isManagerChange) {
+        // Close out the outgoing manager's open history row and open a new
+        // one for the incoming manager, if any -- mirrors
+        // updateHotelGroup's RM-transfer history bookkeeping.
+        if (hotel.manager_user_id) {
+          await tx.hotelManagerAssignmentHistory.updateMany({
+            where: { hotel_id: hotelId, manager_user_id: hotel.manager_user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actorId, reason: data.manager_vacancy_reason ?? 'NOT_ASSIGNED' },
+          });
+        }
+        if (data.manager_user_id) {
+          await tx.hotelManagerAssignmentHistory.create({
+            data: {
+              hotel_id: hotelId,
+              manager_user_id: data.manager_user_id,
+              assigned_at: now,
+              assigned_by_id: actorId,
+            },
+          });
+        }
+
         // manager_user_id is the sole source of a Hotel Manager's JWT scope
         // claim (auth/service.ts#resolveScope reads it on every
         // login/refresh) — bump both the outgoing manager (so a live token
@@ -352,12 +380,25 @@ export class CrmService extends BaseService {
   async createHotelGroup(data: CreateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
     await this.assertRegionalManagerExists(data.regional_manager_user_id);
 
-    const hotelGroup = await this.prisma.hotelGroup.create({
-      data: {
-        name: data.name,
-        billing_info: data.billing_info,
-        regional_manager_user_id: data.regional_manager_user_id,
-      },
+    const hotelGroup = await this.prisma.$transaction(async (tx) => {
+      const assignedAt = new Date();
+      const created = await tx.hotelGroup.create({
+        data: {
+          name: data.name,
+          billing_info: data.billing_info,
+          regional_manager_user_id: data.regional_manager_user_id,
+          regional_manager_assigned_at: assignedAt,
+        },
+      });
+      await tx.regionalManagerAssignmentHistory.create({
+        data: {
+          hotel_group_id: created.id,
+          regional_manager_user_id: data.regional_manager_user_id,
+          assigned_at: assignedAt,
+          assigned_by_id: actorId,
+        },
+      });
+      return created;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroup.id, { action: 'create', name: hotelGroup.name }, ip);
@@ -376,12 +417,17 @@ export class CrmService extends BaseService {
     const existing = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
     if (!existing) throw new NotFoundError('Hotel group not found');
 
-    const nextRegionalManagerUserId = data.regional_manager_user_id ?? existing.regional_manager_user_id;
-    const isTransfer =
+    // Nullable RM (2026-08-06 vacancy model): `undefined` (field omitted)
+    // leaves the existing assignment; `null` (field explicitly sent) or a
+    // new id both count as a change worth locking/re-checking/recording.
+    const nextRegionalManagerUserId =
+      data.regional_manager_user_id === undefined ? existing.regional_manager_user_id : data.regional_manager_user_id;
+    const isChange =
       data.regional_manager_user_id !== undefined &&
       data.regional_manager_user_id !== existing.regional_manager_user_id;
+    const isTransfer = isChange && existing.regional_manager_user_id !== null && nextRegionalManagerUserId !== null;
 
-    if (data.regional_manager_user_id !== undefined) {
+    if (data.regional_manager_user_id !== undefined && data.regional_manager_user_id !== null) {
       await this.assertRegionalManagerExists(data.regional_manager_user_id);
     }
 
@@ -393,6 +439,7 @@ export class CrmService extends BaseService {
       // new) avoids a third deadlock class: two concurrent transfers of the
       // SAME PAIR of users in opposite directions.
       const lockIds = [existing.regional_manager_user_id, nextRegionalManagerUserId]
+        .filter((id): id is string => id != null)
         .filter((id, i, arr) => arr.indexOf(id) === i)
         .sort();
       for (const id of lockIds) {
@@ -417,7 +464,7 @@ export class CrmService extends BaseService {
       // committed (role is genuinely MANAGER now, so this correctly throws)
       // or is blocked waiting for the same row lock (so it cannot demote out
       // from under this transaction after this point).
-      if (isTransfer) {
+      if (isChange && nextRegionalManagerUserId) {
         const newManager = await tx.user.findUnique({
           where: { id: nextRegionalManagerUserId },
           select: { role: true, deleted_at: true },
@@ -432,31 +479,62 @@ export class CrmService extends BaseService {
       const hotelGroup = await tx.hotelGroup.findUnique({ where: { id: hotelGroupId } });
       if (!hotelGroup) throw new NotFoundError('Hotel group not found');
 
+      const now = new Date();
       const result = await tx.hotelGroup.update({
         where: { id: hotelGroupId },
         data: {
           name: data.name ?? hotelGroup.name,
           billing_info: data.billing_info ?? hotelGroup.billing_info,
           regional_manager_user_id: nextRegionalManagerUserId,
+          ...(isChange
+            ? {
+                regional_manager_assigned_at: nextRegionalManagerUserId ? now : null,
+                regional_manager_vacated_at: nextRegionalManagerUserId ? null : now,
+                regional_manager_vacancy_reason: nextRegionalManagerUserId ? null : (data.regional_manager_vacancy_reason ?? 'NOT_ASSIGNED'),
+              }
+            : {}),
         },
       });
 
-      if (isTransfer) {
+      if (isChange) {
+        // Close out the outgoing RM's open history row (unassigned_at was
+        // never set on it) and open a new one for the incoming RM, if any.
+        if (existing.regional_manager_user_id) {
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: hotelGroupId, regional_manager_user_id: existing.regional_manager_user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actorId, reason: data.regional_manager_vacancy_reason ?? 'NOT_ASSIGNED' },
+          });
+        }
+        if (nextRegionalManagerUserId) {
+          await tx.regionalManagerAssignmentHistory.create({
+            data: {
+              hotel_group_id: hotelGroupId,
+              regional_manager_user_id: nextRegionalManagerUserId,
+              assigned_at: now,
+              assigned_by_id: actorId,
+            },
+          });
+        }
+
         // Both the outgoing RM (loses access to this group) and the incoming
         // RM (whose scope claim must now resolve to this group, not
         // whatever they had before) need their already-issued tokens
         // invalidated — otherwise a live token keeps carrying the stale
         // `scope` claim (minted at login/refresh, never re-derived
         // per-request, middleware/auth.ts) for up to JWT_ACCESS_EXPIRY.
-        await bumpTokenGeneration(tx, existing.regional_manager_user_id);
-        await bumpTokenGeneration(tx, nextRegionalManagerUserId);
+        if (existing.regional_manager_user_id) {
+          await bumpTokenGeneration(tx, existing.regional_manager_user_id);
+        }
+        if (nextRegionalManagerUserId) {
+          await bumpTokenGeneration(tx, nextRegionalManagerUserId);
+        }
       }
 
       return result;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
-    if (isTransfer) {
+    if (isChange) {
       await this.logAudit(
         actorId,
         actorRole,
@@ -465,7 +543,7 @@ export class CrmService extends BaseService {
         hotelGroupId,
         {
           action: 'token_generation_bumped',
-          reason: 'regional_manager_transfer',
+          reason: isTransfer ? 'regional_manager_transfer' : 'regional_manager_vacancy_change',
           outgoing_user_id: existing.regional_manager_user_id,
           incoming_user_id: nextRegionalManagerUserId,
         },

@@ -35,6 +35,12 @@ const mockPrisma = {
   },
   hotel: mockHotel,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // Vacancy-history model (2026-08-06): createHotelGroup()/updateHotelGroup()
+  // record RM assign/unassign transitions in this table.
+  regionalManagerAssignmentHistory: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+  },
   // updateHotelGroup() now runs inside a transaction (lock-ordering fix,
   // post-#339 review): it takes a row lock on the RM user id(s) via
   // `SELECT ... FOR UPDATE` before re-reading/writing the HotelGroup row, in

@@ -1,5 +1,19 @@
 import { z } from 'zod';
 
+// Manager-vacancy model (2026-08-06): shared by Hotel.manager_user_id and
+// HotelGroup.regional_manager_user_id clears. NOT_ASSIGNED is the server's
+// own default when a clear is sent with no explicit reason (e.g. an
+// automated demotion path) -- callers requesting a specific reason should
+// send one of the other five values.
+export const ManagerVacancyReasonSchema = z.enum([
+  'NOT_ASSIGNED',
+  'DEMOTED',
+  'RESIGNED',
+  'TERMINATED',
+  'TRANSFERRED',
+  'TEMPORARY',
+]);
+
 export const CreateHotelSchema = z.object({
   name: z.string().min(1).max(200),
   city: z.string().min(1).max(100),
@@ -34,6 +48,9 @@ export const UpdateHotelSchema = z.object({
   // Manager's JWT scope claim (auth/service.ts#resolveScope). `null` clears
   // the assignment.
   manager_user_id: z.string().min(1).nullable().optional(),
+  // Only read when manager_user_id is explicitly cleared to null; ignored
+  // otherwise (an assignment overwrites any prior vacancy state outright).
+  manager_vacancy_reason: ManagerVacancyReasonSchema.optional(),
   // GD-14/OD-GEO-001/004 (SPEC-GEO-001): hotel-coordinate source of truth,
   // admin-only manual entry (this route is already admin-only per
   // requireRoleFlagged(['admin','manager'], 'admin') in routes.ts — no new
@@ -67,7 +84,13 @@ export const CreateHotelGroupSchema = z.object({
 export const UpdateHotelGroupSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   billing_info: z.string().max(2000).optional(),
-  regional_manager_user_id: z.string().min(1).optional(),
+  // Nullable (2026-08-06 vacancy model): a group may be demoted to no RM
+  // rather than requiring an immediate replacement. `null` clears the
+  // assignment; omitting the field leaves it unchanged.
+  regional_manager_user_id: z.string().min(1).nullable().optional(),
+  // Only read when regional_manager_user_id is explicitly cleared to null;
+  // ignored otherwise.
+  regional_manager_vacancy_reason: ManagerVacancyReasonSchema.optional(),
 });
 
 export const ListHotelGroupsQuerySchema = z.object({

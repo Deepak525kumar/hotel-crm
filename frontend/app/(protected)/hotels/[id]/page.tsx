@@ -131,7 +131,13 @@ export default function HotelDetailPage() {
                         {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-500">Unassigned</span>
+                      <span className="text-gray-500">
+                        Vacant
+                        {hotel.manager_vacated_at && ` since ${formatDateTime(hotel.manager_vacated_at)}`}
+                        {hotel.manager_vacancy_reason &&
+                          hotel.manager_vacancy_reason !== "NOT_ASSIGNED" &&
+                          ` (${hotel.manager_vacancy_reason.toLowerCase()})`}
+                      </span>
                     )
                   }
                 />

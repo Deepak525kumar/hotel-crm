@@ -101,9 +101,20 @@ export default function HotelGroupDetailPage() {
                 <DataRow
                   label="Regional manager"
                   value={
-                    manager
-                      ? `${manager.first_name} ${manager.last_name}`
-                      : group.regional_manager_user_id
+                    manager ? (
+                      `${manager.first_name} ${manager.last_name}`
+                    ) : group.regional_manager_user_id ? (
+                      group.regional_manager_user_id
+                    ) : (
+                      <span className="text-gray-500">
+                        Vacant
+                        {group.regional_manager_vacated_at &&
+                          ` since ${formatDateTime(group.regional_manager_vacated_at)}`}
+                        {group.regional_manager_vacancy_reason &&
+                          group.regional_manager_vacancy_reason !== "NOT_ASSIGNED" &&
+                          ` (${group.regional_manager_vacancy_reason.toLowerCase()})`}
+                      </span>
+                    )
                   }
                 />
                 <DataRow

@@ -19,6 +19,12 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // Vacancy-history model (2026-08-06): updateHotel() records manager
+  // assign/unassign transitions in this table.
+  hotelManagerAssignmentHistory: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+  },
   // updateHotel()'s manager-change path takes a row lock on the affected
   // user(s) before writing, mirroring updateHotelGroup's RM-transfer fix.
   $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
