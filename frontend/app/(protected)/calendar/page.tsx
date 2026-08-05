@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { mutate } from "swr";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { useUserOptions } from "@/hooks/useHotels";
 import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
@@ -231,6 +232,10 @@ function AddEntryModal({ day, onClose }: { day: string; onClose: () => void }) {
     setSubmitting(true);
     try {
       await assignmentsApi.createCalendarEntry({ hotel_id: hotelId, worker_id: workerId, day });
+      // Revalidate every visible calendar-grid range so the new placement
+      // shows up immediately instead of waiting for SWR's next unrelated
+      // revalidation (focus/reconnect) or a manual reload.
+      await mutate((key) => Array.isArray(key) && key[0] === "calendar-entries-range");
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
