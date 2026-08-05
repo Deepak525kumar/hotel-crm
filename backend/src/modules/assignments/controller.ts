@@ -80,7 +80,8 @@ export async function updateAssignment(
       req.params.id,
       parsed.data,
       req.auth!.userId,
-      req.auth!.role
+      req.auth!.role,
+      req.auth!.scope ?? null
     );
     sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {

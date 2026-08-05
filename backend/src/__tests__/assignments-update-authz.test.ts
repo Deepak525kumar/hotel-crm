@@ -2,16 +2,18 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
 /**
- * Security-regression test for FIND-SEC-001 / OQ-01 (SPEC-JOB-DISPATCH-001).
+ * Security-regression test for FIND-SEC-001 / OQ-01 (SPEC-JOB-DISPATCH-001),
+ * updated for the 2026-08-05 product decision narrowing manager/
+ * regional_manager to their own hotel/group scope (previously unrestricted
+ * platform-wide -- this file's own history is the record of that original,
+ * now-superseded, fix).
  *
- * Guards the fix to `AssignmentService.update()` (PATCH /assignments/:id),
- * which previously had no authorization check at all: any authenticated
- * user of any role could drive any assignment's lifecycle
- * (CONFIRMED -> IN_PROGRESS -> COMPLETED/CANCELLED) for any worker at any
- * hotel. `update()` now applies the same deny-by-default guard already used
- * by `getById()`: admin/manager may act on any assignment; a worker may act
- * only on their own assignment (worker_id match) or one at a hotel in their
- * ACTIVE EmploymentRecord's hotel group.
+ * Guards `AssignmentService.update()` (PATCH /assignments/:id): a worker may
+ * act only on their own assignment (worker_id match) or one at a hotel in
+ * their ACTIVE EmploymentRecord's hotel group; a manager/regional_manager
+ * may act only on an assignment at a hotel within their own scope claim
+ * (isHotelInScope -- same primitive placeOnCalendar()/moveCalendarEntry()
+ * use); admin remains unrestricted.
  *
  * These tests exercise the real assignments router stack end-to-end via
  * supertest, asserting the guard is enforced. Removing it re-opens the
@@ -19,7 +21,7 @@ import type { Request, Response, NextFunction } from 'express';
  */
 
 // Test-controlled auth context injected by the mocked authMiddleware.
-let testAuth: { userId: string; role: string } | null = null;
+let testAuth: { userId: string; role: string; scope?: unknown } | null = null;
 // Hotels the actor is eligible at, via the mocked EmploymentRecord/hotel
 // group-scope lookup (lib/roster-scope.ts).
 let membershipHotelIds: string[] = [];
@@ -153,39 +155,66 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
     expect(res.status).toBe(200);
   });
 
-  it('allows a manager regardless of ownership/membership (200)', async () => {
-    testAuth = { userId: 'mgr_other', role: 'manager' };
+  it('allows a manager whose hotel scope claim matches the assignment\'s hotel (200)', async () => {
+    testAuth = { userId: 'mgr_other', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } };
     currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
-    membershipHotelIds = [];
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(200);
   });
 
-  it('allows an admin regardless of ownership/membership (200)', async () => {
-    testAuth = { userId: 'admin_other', role: 'admin' };
+  it('denies a manager whose hotel scope claim does NOT match the assignment\'s hotel (403)', async () => {
+    testAuth = { userId: 'mgr_other', role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } };
     currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
-    membershipHotelIds = [];
+    const res = await request(makeApp())
+      .patch('/assignments/a1')
+      .send({ status: 'IN_PROGRESS' });
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ForbiddenError');
+  });
+
+  it('denies a manager with no scope claim at all (deny-by-default, 403)', async () => {
+    testAuth = { userId: 'mgr_other', role: 'manager', scope: null };
+    currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
+    const res = await request(makeApp())
+      .patch('/assignments/a1')
+      .send({ status: 'IN_PROGRESS' });
+    expect(res.status).toBe(403);
+  });
+
+  it('allows an admin regardless of ownership/scope (200)', async () => {
+    testAuth = { userId: 'admin_other', role: 'admin', scope: { type: 'global' } };
+    currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(200);
   });
 
-  // ADR-030 §3 C-24 grants regional_manager `✓ᶜ` on assignments. This suite
-  // covered `manager` but never `regional_manager`, which is precisely why
-  // update()'s `actorRole !== 'admin' && actorRole !== 'manager'` guard survived
-  // the first authorization sweep: an RM MATCHED it and was routed through the
-  // worker-roster eligibility check (an individual-grain model) instead of being
-  // treated as management. With no membership rows it would 403.
-  it('allows a regional_manager regardless of ownership/membership (200)', async () => {
-    testAuth = { userId: 'rm_other', role: 'regional_manager' };
+  // ADR-030 §3 C-24 grants regional_manager `✓ᶜ` on assignments, at hotel_group
+  // scope (isHotelInScope's hotel_group branch resolves the target hotel's own
+  // group via one findUnique, mocked below to return 'g1' for hotel 'h9').
+  it('allows a regional_manager whose hotel_group scope claim matches the assignment\'s hotel group (200)', async () => {
+    testAuth = { userId: 'rm_other', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
     currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
-    membershipHotelIds = [];
+    // Drives the mocked hotel.findUnique (line 82-85 above) to resolve h9 -> g1.
+    membershipHotelIds = ['h9'];
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(200);
+  });
+
+  it('denies a regional_manager whose hotel_group scope claim does NOT match (403)', async () => {
+    testAuth = { userId: 'rm_other', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9' });
+    // h9 is NOT in membershipHotelIds -> mocked hotel.findUnique resolves it to
+    // g2, mismatching the RM's g1 claim.
+    membershipHotelIds = [];
+    const res = await request(makeApp())
+      .patch('/assignments/a1')
+      .send({ status: 'IN_PROGRESS' });
+    expect(res.status).toBe(403);
   });
 });
