@@ -27,6 +27,14 @@ export function Modal({
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // `onClose` is typically a fresh inline function on every parent render
+  // (e.g. a handleClose closing over other state). Reading it via ref keeps
+  // it out of the effect's deps, so typing in a form inside the modal can't
+  // re-run the focus-management effect below and steal focus back to the
+  // close button after every keystroke.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   // Close on Escape, lock body scroll, manage focus (trap + restore).
   useEffect(() => {
     if (!open) return;
@@ -36,7 +44,7 @@ export function Modal({
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -76,7 +84,7 @@ export function Modal({
       // Restore focus to whatever opened the dialog.
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 
@@ -107,7 +115,7 @@ export function Modal({
             </h2>
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => onCloseRef.current()}
               aria-label="Close"
               className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
             >
