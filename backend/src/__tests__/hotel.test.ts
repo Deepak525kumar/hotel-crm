@@ -19,6 +19,9 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // updateHotel()'s manager-change path takes a row lock on the affected
+  // user(s) before writing, mirroring updateHotelGroup's RM-transfer fix.
+  $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
   $transaction: jest.fn(async (arg: unknown) => {
     if (Array.isArray(arg)) return Promise.all(arg);
     return (arg as (tx: unknown) => Promise<unknown>)(mockPrisma);
@@ -365,6 +368,39 @@ describe('CrmService - Hotels', () => {
         await service.updateHotel('h1', { manager_user_id: 'u_same' }, 'admin_1', 'admin');
 
         expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      // Post-review fix (mirrors updateHotelGroup's #339 lock-ordering
+      // pattern): assertHotelManagerExists() runs BEFORE the transaction and
+      // its row lock, so its result can be stale by commit time. Simulates
+      // that race by having the pre-lock check see MANAGER, but the re-check
+      // under lock (a second tx.user.findUnique call) see a role that
+      // changed out from under it -- e.g. a concurrent updateUserRole()
+      // demotion that committed in the gap.
+      it('rejects under lock even if the pre-lock existence check passed (TOCTOU close)', async () => {
+        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: null };
+        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+        mockPrisma.user.findUnique
+          .mockResolvedValueOnce({ id: 'u_target', role: 'MANAGER', deleted_at: null }) // pre-lock assertHotelManagerExists
+          .mockResolvedValueOnce({ id: 'u_target', role: 'WORKER', deleted_at: null }); // re-check under lock
+
+        await expect(
+          service.updateHotel('h1', { manager_user_id: 'u_target' }, 'admin_1', 'admin')
+        ).rejects.toMatchObject({ name: 'ValidationError' });
+        expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it('locks the affected manager user row(s) before writing', async () => {
+        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
+        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_new', role: 'MANAGER', deleted_at: null });
+        mockPrisma.hotel.update.mockResolvedValue({ ...hotel, manager_user_id: 'u_new' });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await service.updateHotel('h1', { manager_user_id: 'u_new' }, 'admin_1', 'admin');
+
+        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
       });
     });
   });

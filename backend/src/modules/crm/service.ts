@@ -103,6 +103,18 @@ export class CrmService extends BaseService {
     return hotel;
   }
 
+  // Lock-ordering follow-up (post-#339 review, mirroring updateHotelGroup's
+  // RM-transfer fix below and users/service.ts#updateUserRole): a manager
+  // change locks the affected User row(s) — outgoing/incoming — BEFORE
+  // writing Hotel, and re-checks the incoming manager's role under that
+  // lock. Without this, `assertHotelManagerExists` (run outside the
+  // transaction, before the lock) can pass against a user who is
+  // concurrently demoted by updateUserRole() before this transaction
+  // commits, leaving Hotel.manager_user_id pointing at a non-MANAGER whose
+  // stale association still resolves a scope claim (auth/service.ts
+  // #resolveScope matches by association, not by re-checking role). Lock
+  // order is User first, then Hotel — same order updateUserRole and
+  // updateHotelGroup already use, so this can never deadlock against either.
   async updateHotel(hotelId: string, data: UpdateHotelRequest, actorId: string, actorRole: string, ip?: string) {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
     if (!hotel) throw new NotFoundError('Hotel not found');
@@ -117,6 +129,34 @@ export class CrmService extends BaseService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      if (isManagerChange) {
+        // Lock BOTH manager user rows (deduped, sorted) before touching
+        // Hotel, so a concurrent updateUserRole() demotion of either one
+        // blocks until this transaction commits.
+        const lockIds = [hotel.manager_user_id, data.manager_user_id]
+          .filter((id): id is string => id != null)
+          .filter((id, i, arr) => arr.indexOf(id) === i)
+          .sort();
+        for (const id of lockIds) {
+          await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${id} FOR UPDATE`;
+        }
+
+        // Re-check under lock: the assertHotelManagerExists() call above ran
+        // BEFORE this lock, so its result can be stale by the time we hold
+        // it (see method-level comment for the exact interleaving).
+        if (data.manager_user_id) {
+          const newManager = await tx.user.findUnique({
+            where: { id: data.manager_user_id },
+            select: { role: true, deleted_at: true },
+          });
+          if (!newManager || newManager.deleted_at || newManager.role !== 'MANAGER') {
+            throw new ValidationError('manager_user_id must reference a user already holding the Manager role', [
+              { field: 'manager_user_id', message: 'User is not a Manager' },
+            ]);
+          }
+        }
+      }
+
       const result = await tx.hotel.update({
         where: { id: hotelId },
         data: {
@@ -156,6 +196,25 @@ export class CrmService extends BaseService {
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { fields: Object.keys(data) }, ip);
+    if (isManagerChange) {
+      // Symmetric with updateHotelGroup's RM-transfer audit entry: names
+      // which accounts had their sessions forcibly invalidated, since the
+      // fields-only entry above doesn't record who was actually logged out.
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'MODIFY',
+        'HOTEL',
+        hotelId,
+        {
+          action: 'token_generation_bumped',
+          reason: 'hotel_manager_change',
+          outgoing_user_id: hotel.manager_user_id,
+          incoming_user_id: data.manager_user_id,
+        },
+        ip
+      );
+    }
     return updated;
   }
 
