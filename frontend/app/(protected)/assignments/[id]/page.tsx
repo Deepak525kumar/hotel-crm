@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
+import { useUserOptions } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { ApiError, assignmentsApi, qualityApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
@@ -35,6 +37,7 @@ export default function AssignmentDetailPage() {
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
+  const [reassignOpen, setReassignOpen] = useState(false);
   const action = useAsyncAction();
 
   // No GET endpoint exists for rooms-completed entries (ADR-028) — the
@@ -121,6 +124,9 @@ export default function AssignmentDetailPage() {
   const canComplete = assignment.status === "IN_PROGRESS";
   const canCancel =
     assignment.status === "CONFIRMED" || assignment.status === "IN_PROGRESS";
+  // Same eligible states as cancel -- reassign is a managerial alternative
+  // to cancel-then-recreate, not available on a terminal assignment.
+  const canReassign = canCancel;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -201,6 +207,17 @@ export default function AssignmentDetailPage() {
               shift lifecycle.
             </div>
             <div className="flex shrink-0 gap-2">
+              {canReassign && (
+                <RoleGate allow={["admin", "manager", "regional_manager"]}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setReassignOpen(true)}
+                    disabled={action.pending}
+                  >
+                    Reassign
+                  </Button>
+                </RoleGate>
+              )}
               {canCancel && (
                 <Button
                   variant="outline"
@@ -352,6 +369,15 @@ export default function AssignmentDetailPage() {
         />
       </Modal>
 
+      <ReassignModal
+        assignmentId={id}
+        hotelId={assignment.hotel_id}
+        currentWorkerId={assignment.worker_id}
+        open={reassignOpen}
+        onClose={() => setReassignOpen(false)}
+        onReassigned={(updated) => mutate(updated, { revalidate: false })}
+      />
+
       <LogRoomsCompletedModal
         assignmentId={id}
         open={roomsCompletedOpen}
@@ -374,6 +400,115 @@ export default function AssignmentDetailPage() {
         onCreated={setLoggedRating}
       />
     </div>
+  );
+}
+
+function ReassignModal({
+  assignmentId,
+  hotelId,
+  currentWorkerId,
+  open,
+  onClose,
+  onReassigned,
+}: {
+  assignmentId: string;
+  hotelId: string;
+  currentWorkerId: string;
+  open: boolean;
+  onClose: () => void;
+  onReassigned: (updated: import("@/lib/types").Assignment) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { users: workers, isLoading: workersLoading } = useUserOptions({
+    role: "worker",
+    hotel_id: hotelId,
+    search: debouncedSearch || undefined,
+    limit: 20,
+  });
+  const [selectedWorkerId, setSelectedWorkerId] = useState("");
+  const reassign = useAsyncAction();
+
+  const eligibleWorkers = workers.filter((w) => w.id !== currentWorkerId);
+
+  const reset = () => {
+    setSearch("");
+    setSelectedWorkerId("");
+  };
+
+  const handleClose = () => {
+    if (reassign.pending) return;
+    reset();
+    onClose();
+  };
+
+  const onSubmit = () => {
+    if (!selectedWorkerId) return;
+    reassign.run(() => assignmentsApi.reassign(assignmentId, selectedWorkerId), {
+      onSuccess: (result) => {
+        onReassigned(result.old_assignment);
+        reset();
+        onClose();
+      },
+      errorMessage: "Failed to reassign this assignment. Please try again.",
+    });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Reassign to a different worker"
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={reassign.pending}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={reassign.pending} disabled={!selectedWorkerId}>
+            Reassign
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-600">
+          The current assignment is marked reassigned; a new confirmed assignment is created for
+          the selected worker at the same hotel and day.
+        </p>
+        <Input
+          label="Search workers at this hotel"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or email…"
+        />
+        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+          {workersLoading ? (
+            <div className="p-3 text-sm text-gray-400">Searching…</div>
+          ) : eligibleWorkers.length === 0 ? (
+            <div className="p-3 text-sm text-gray-400">No eligible workers found.</div>
+          ) : (
+            eligibleWorkers.map((w) => {
+              const label = `${w.first_name} ${w.last_name}`;
+              const selected = selectedWorkerId === w.id;
+              return (
+                <button
+                  key={w.id}
+                  type="button"
+                  onClick={() => setSelectedWorkerId(w.id)}
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                    selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                  }`}
+                >
+                  <span className="truncate">{label}</span>
+                  <span className="truncate text-xs text-gray-400">{w.email}</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+        <FormError>{reassign.error}</FormError>
+      </div>
+    </Modal>
   );
 }
 
