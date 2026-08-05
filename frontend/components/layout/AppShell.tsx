@@ -7,10 +7,12 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui";
 import { SidebarNav } from "@/components/layout/SidebarNav";
+import { cn } from "@/lib/cn";
 
-const BrandMark = () => (
-  <div className="flex h-14 items-center border-b border-gray-200 px-6 font-semibold text-gray-900">
-    Hotel CRM
+/** `collapsed` swaps the full wordmark for just the initial, matching the icon-only rail. */
+const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
+  <div className="flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 px-6 font-semibold text-gray-900">
+    {collapsed ? "H" : "Hotel CRM"}
   </div>
 );
 
@@ -18,6 +20,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
   const drawerRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -70,10 +73,30 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-gray-200 bg-white md:flex">
-        <BrandMark />
-        <SidebarNav />
+      {/* Desktop sidebar — an icon-only rail by default, expanding smoothly
+          to show labels on hover. `w-16`/`w-60` bracket the transition;
+          `overflow-hidden` on children clips labels mid-expand so they don't
+          bleed into the main content area before the width animates open.
+          `onFocus`/`onBlur` (not just mouse hover) expand it too, so a
+          keyboard user tabbing into a link sees its label, not just an icon —
+          `sidebarHovered` name kept for the mouse case; focus is handled by
+          the same boolean since both mean "show the expanded rail." */}
+      <aside
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+        onFocus={() => setSidebarHovered(true)}
+        onBlur={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setSidebarHovered(false);
+          }
+        }}
+        className={cn(
+          "hidden shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 md:flex",
+          sidebarHovered ? "w-60" : "w-16",
+        )}
+      >
+        <BrandMark collapsed={!sidebarHovered} />
+        <SidebarNav collapsed={!sidebarHovered} />
       </aside>
 
       {/* Mobile drawer */}
