@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
@@ -31,9 +31,14 @@ export function Modal({
   // (e.g. a handleClose closing over other state). Reading it via ref keeps
   // it out of the effect's deps, so typing in a form inside the modal can't
   // re-run the focus-management effect below and steal focus back to the
-  // close button after every keystroke.
+  // close button after every keystroke. Written from a layout effect, not
+  // during render -- refs must not be mutated in the render body itself
+  // (react-hooks/refs); useLayoutEffect (vs. useEffect) keeps the ref
+  // current before any same-tick keydown/click handler could read it.
   const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   // Close on Escape, lock body scroll, manage focus (trap + restore).
   useEffect(() => {
