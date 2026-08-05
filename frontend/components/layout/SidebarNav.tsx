@@ -14,13 +14,10 @@ import {
   BarChart3,
   Building2,
   Building,
-  Bell,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/hooks/useAuth";
-import { useNotifications } from "@/hooks/useNotifications";
-import { Badge } from "@/components/ui";
 import type { Role } from "@/lib/types";
 
 export interface NavItem {
@@ -63,7 +60,8 @@ export const NAV: NavItem[] = [
   // last remaining place a manager/RM had no way to browse or open their
   // own group's workers by name/email, despite the API already serving it.
   { href: "/users", label: "Users", icon: UsersIcon, roles: ["admin", "manager", "regional_manager"] },
-  { href: "/notifications", label: "Notifications", icon: Bell },
+  // Notifications moved to a navbar bell icon (AppShell) -- no longer a
+  // sidebar entry.
 ];
 
 /**
@@ -81,7 +79,6 @@ export function SidebarNav({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const { unreadCount } = useNotifications();
 
   return (
     <nav className="flex-1 space-y-1 p-3">
@@ -128,9 +125,6 @@ export function SidebarNav({
                 {item.label}
               </span>
             </span>
-            {item.href === "/notifications" && unreadCount > 0 && !collapsed && (
-              <Badge tone="info">{unreadCount}</Badge>
-            )}
           </Link>
         );
       })}
