@@ -124,9 +124,24 @@ export default function CalendarGridPage() {
   const onMoveEntry = async (entryId: string, newDay: string) => {
     setMoveError(null);
     setMovingEntryId(entryId);
+    // Optimistic move: the card visually jumps to its new day cell
+    // immediately (matching a drag/drop gesture's own instant feedback)
+    // rather than waiting on the round-trip; SWR rolls the cache back to
+    // its pre-drop state automatically on failure.
     try {
-      await assignmentsApi.moveCalendarEntry(entryId, newDay);
-      await mutate((key) => Array.isArray(key) && key[0] === "calendar-entries-range");
+      await mutate(
+        ["calendar-entries-range", { from, to }],
+        async (current: CalendarEntryDto[] = []) => {
+          const moved = await assignmentsApi.moveCalendarEntry(entryId, newDay);
+          return current.map((e) => (e.id === entryId ? moved : e));
+        },
+        {
+          optimisticData: (current: CalendarEntryDto[] = []) =>
+            current.map((e) => (e.id === entryId ? { ...e, day: newDay } : e)),
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
     } catch (err) {
       setMoveError(err instanceof ApiError ? err.message : "Failed to move the placement. Please try again.");
     } finally {
@@ -225,7 +240,7 @@ export default function CalendarGridPage() {
         </div>
       )}
 
-      {addDay && <AddEntryModal day={addDay} onClose={() => setAddDay(null)} />}
+      {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
     </div>
   );
 }
@@ -490,7 +505,15 @@ function WorkerPicker({
   );
 }
 
-function AddEntryModal({ day, onClose }: { day: string; onClose: () => void }) {
+function AddEntryModal({
+  day,
+  range,
+  onClose,
+}: {
+  day: string;
+  range: { from: string; to: string };
+  onClose: () => void;
+}) {
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
   const [hotelId, setHotelId] = useState("");
   const [workerId, setWorkerId] = useState("");
@@ -513,12 +536,39 @@ function AddEntryModal({ day, onClose }: { day: string; onClose: () => void }) {
     if (!valid) return;
     setError(null);
     setSubmitting(true);
+
+    // Optimistic insertion: show the placement on the grid immediately with
+    // a temp id, swap it for the real row (or roll back) once the request
+    // resolves -- the visible range's own SWR key is mutated directly
+    // (not the earlier broad-match revalidation) so the update is
+    // synchronous and doesn't wait on a network round-trip to refetch.
+    const tempId = `temp-${Date.now()}`;
+    const optimisticEntry: CalendarEntryDto = {
+      id: tempId,
+      assignment_id: tempId,
+      worker_id: workerId,
+      hotel_id: hotelId,
+      day,
+      placed_by_id: "",
+      created_at: new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    };
+    const rangeKey = ["calendar-entries-range", range];
+
     try {
-      await assignmentsApi.createCalendarEntry({ hotel_id: hotelId, worker_id: workerId, day });
-      // Revalidate every visible calendar-grid range so the new placement
-      // shows up immediately instead of waiting for SWR's next unrelated
-      // revalidation (focus/reconnect) or a manual reload.
-      await mutate((key) => Array.isArray(key) && key[0] === "calendar-entries-range");
+      const created = await mutate(
+        rangeKey,
+        async (current: CalendarEntryDto[] = []) => {
+          const entry = await assignmentsApi.createCalendarEntry({ hotel_id: hotelId, worker_id: workerId, day });
+          return [...current.filter((e) => e.id !== tempId), entry];
+        },
+        {
+          optimisticData: (current: CalendarEntryDto[] = []) => [...current, optimisticEntry],
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+      void created;
       onClose();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
