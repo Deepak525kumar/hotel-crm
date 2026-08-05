@@ -327,6 +327,14 @@ model User {
   // SPEC-CONSENT-001 (ADR-015): backend-consent owns consent lifecycle/
   // records/versions/withdrawal/renewal/audit history exclusively.
   consent_records               ConsentRecord[]          @relation("consent_worker")
+  // Manager-vacancy history (both directions of "who was assigned" and "who
+  // performed the assignment/vacancy action") for HotelGroup and Hotel.
+  regional_manager_assignment_history            RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history")
+  regional_manager_assignment_history_assigned    RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_assigned_by")
+  regional_manager_assignment_history_unassigned  RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_unassigned_by")
+  hotel_manager_assignment_history                HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history")
+  hotel_manager_assignment_history_assigned       HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_assigned_by")
+  hotel_manager_assignment_history_unassigned     HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_unassigned_by")
 
   @@index([role])
   @@index([is_active])
@@ -372,25 +380,72 @@ model PasswordResetToken {
 // HOTEL MODULE
 // =============================================================================
 
+// Manager-vacancy tracking (Hotel.manager_user_id, HotelGroup.regional_manager_user_id):
+// NULL alone is ambiguous (never assigned? demoted? resigned? temporarily
+// closed?) — these fields make "no manager" an intentional, explained state
+// rather than an unqualified absence, and the paired *AssignmentHistory model
+// below keeps a full audit trail independent of the current pointer.
+enum ManagerVacancyReason {
+  NOT_ASSIGNED
+  DEMOTED
+  RESIGNED
+  TERMINATED
+  TRANSFERRED
+  TEMPORARY
+}
+
 // HotelGroup: ADR-023 — first-class entity aggregating hotels under one Regional
 // Manager with shared billing. Owned by backend-crm. Additive only in this
 // migration — no reader/writer consumes it yet (Epic 5 PR 5.1; CRUD lands in
 // PR 5.2). One Regional Manager per HotelGroup; a Regional Manager may manage
 // several groups (ADR-023 §1), hence the FK lives on HotelGroup, not User.
+//
+// regional_manager_user_id is nullable (relaxed from the original non-null
+// @unique — a group may now go temporarily vacant, e.g. on demotion, rather
+// than being unable to demote its RM at all until a replacement exists).
+// @unique is preserved: Postgres permits multiple NULL rows under a unique
+// index, so vacancy for several groups at once is unaffected, while a
+// non-null value is still guaranteed to name at most one group.
 model HotelGroup {
-  id                       String   @id @default(cuid())
+  id                       String    @id @default(cuid())
   name                     String
   billing_info             String?
-  regional_manager_user_id String   @unique
-  regional_manager         User     @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
-  created_at               DateTime @default(now())
-  updated_at               DateTime @updatedAt
+  regional_manager_user_id String?   @unique
+  regional_manager         User?     @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: SetNull)
+  regional_manager_assigned_at DateTime?
+  regional_manager_vacated_at  DateTime?
+  regional_manager_vacancy_reason ManagerVacancyReason?
+  created_at               DateTime  @default(now())
+  updated_at               DateTime  @updatedAt
 
   // Relations
   hotels             Hotel[]
   // Epic 5 PR 5.6 (ADR-023 §4): employment records associated with this group.
   employment_records EmploymentRecord[] @relation("employment_group")
+  regional_manager_assignment_history RegionalManagerAssignmentHistory[]
 
+  @@index([regional_manager_user_id])
+}
+
+// Full audit trail of RM assignments/vacancies for a HotelGroup, independent
+// of the current regional_manager_user_id pointer (which only ever reflects
+// the latest state). assigned_by/unassigned_by are nullable — a row created
+// by a migration backfill or system process has no human actor.
+model RegionalManagerAssignmentHistory {
+  id               String    @id @default(cuid())
+  hotel_group_id   String
+  hotel_group      HotelGroup @relation(fields: [hotel_group_id], references: [id], onDelete: Cascade)
+  regional_manager_user_id String
+  regional_manager User      @relation("regional_manager_assignment_history", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
+  assigned_at      DateTime
+  unassigned_at    DateTime?
+  assigned_by_id   String?
+  assigned_by      User?     @relation("regional_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
+  unassigned_by_id String?
+  unassigned_by    User?     @relation("regional_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
+  reason           ManagerVacancyReason?
+
+  @@index([hotel_group_id])
   @@index([regional_manager_user_id])
 }
 
@@ -426,6 +481,9 @@ model Hotel {
   hotel_group     HotelGroup? @relation(fields: [hotel_group_id], references: [id], onDelete: SetNull)
   manager_user_id String?
   manager         User?       @relation("hotel_manager", fields: [manager_user_id], references: [id], onDelete: SetNull)
+  manager_assigned_at DateTime?
+  manager_vacated_at  DateTime?
+  manager_vacancy_reason ManagerVacancyReason?
 
   // Relations
   hotel_workers           HotelWorker[]
@@ -445,11 +503,33 @@ model Hotel {
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
   // assignments at this hotel.
   calendar_entries        CalendarEntry[]
+  manager_assignment_history HotelManagerAssignmentHistory[]
 
   @@index([country])
   @@index([is_active])
   @@index([city, country])
   @@index([hotel_group_id])
+  @@index([manager_user_id])
+}
+
+// Full audit trail of Hotel Manager assignments/vacancies, independent of
+// the current manager_user_id pointer -- mirrors
+// RegionalManagerAssignmentHistory for the Hotel/manager relationship.
+model HotelManagerAssignmentHistory {
+  id             String    @id @default(cuid())
+  hotel_id       String
+  hotel          Hotel     @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  manager_user_id String
+  manager        User      @relation("hotel_manager_assignment_history", fields: [manager_user_id], references: [id], onDelete: Restrict)
+  assigned_at    DateTime
+  unassigned_at  DateTime?
+  assigned_by_id String?
+  assigned_by    User?     @relation("hotel_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
+  unassigned_by_id String?
+  unassigned_by  User?     @relation("hotel_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
+  reason         ManagerVacancyReason?
+
+  @@index([hotel_id])
   @@index([manager_user_id])
 }
 

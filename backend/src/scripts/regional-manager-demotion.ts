@@ -5,11 +5,14 @@
  * This is the counterpart to `promoteRegionalManagers` (ADR-030 M-3), closing
  * the gap the earlier audit flagged: the M-3 promotion had no inverse, making
  * every promotion one-way. It is deliberately NOT a way to demote an RM who
- * still owns a group — `updateUserRole` (users/service.ts) already enforces
- * Decision 11 as a live guard (ConflictError) at the point of any role change,
- * API or script. This script only ever touches rows the guard would already
- * allow: REGIONAL_MANAGER users with zero matching HotelGroup row (transferred
- * away via PATCH /hotel-groups/:id, or never assigned one to begin with).
+ * still owns a group, even though `updateUserRole` (users/service.ts) itself
+ * now permits that directly (vacancy model, 2026-08-06: it auto-clears the
+ * group rather than blocking). A batch/automated script silently vacating
+ * group ownership is a materially bigger blast radius than a single
+ * admin-initiated API call -- this script keeps its own, more conservative
+ * policy and only ever touches REGIONAL_MANAGER users with zero matching
+ * HotelGroup row (transferred away via PATCH /hotel-groups/:id, or never
+ * assigned one to begin with).
  *
  * Idempotent: only rows currently `role = REGIONAL_MANAGER` with no owned
  * group are selected, so re-running after a partial run touches nothing

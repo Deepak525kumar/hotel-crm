@@ -65,7 +65,11 @@ export function HotelGroupForm({
     });
   };
 
-  const valid = form.name.trim() && form.regional_manager_user_id;
+  // Vacancy model (2026-08-06): create still requires an RM (ADR-023's
+  // original "one HotelGroup has exactly one assigned RM" invariant at
+  // creation time); edit allows leaving it unassigned (vacant), since a
+  // group can now go through a demotion/transfer gap.
+  const valid = form.name.trim() && (mode === "edit" || form.regional_manager_user_id);
 
   return (
     <Card>
@@ -81,11 +85,12 @@ export function HotelGroupForm({
 
           <Select
             label="Regional manager"
-            required
+            required={mode === "create"}
             value={form.regional_manager_user_id}
             onChange={(e) => set("regional_manager_user_id", e.target.value)}
-            placeholder={managersLoading ? "Loading managers…" : "Select a manager"}
+            placeholder={mode === "create" ? (managersLoading ? "Loading managers…" : "Select a manager") : undefined}
           >
+            {mode === "edit" && <option value="">Vacant (unassigned)</option>}
             {managers.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.first_name} {m.last_name} — {m.email}

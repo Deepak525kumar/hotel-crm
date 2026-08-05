@@ -1,13 +1,20 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+// Vacancy-history model (2026-08-06): demoting a Regional Manager/Manager who
+// still owns a group/hotel now auto-clears the assignment (rather than
+// blocking), so updateUserRole() also writes hotelGroup/hotel and their
+// paired *AssignmentHistory tables.
 const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
 };
 
 // Regional Manager V1 Decision 11: updateUserRole() checks whether the target
 // still owns a hotel group before permitting demotion.
 const mockHotelGroup = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
 };
 
 const mockPrisma = {
@@ -26,6 +33,12 @@ const mockPrisma = {
   // makes getPrisma() return this mockPrisma everywhere.
   employmentRecord: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  regionalManagerAssignmentHistory: {
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+  },
+  hotelManagerAssignmentHistory: {
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   // updateUserRole()'s Decision-11 race fix (post-#339 review) takes a
@@ -750,29 +763,90 @@ describe('UserService', () => {
       );
     });
 
-    // Regional Manager V1 Decision 11 (supersedes the earlier "transfer OR
-    // remove" wording of Decision 6): a Hotel Group must always have exactly
-    // one assigned RM, so demoting an RM who still owns a group must be
-    // rejected — the group must be transferred to a successor first.
-    describe('Decision 11 — demoting a Regional Manager who still owns a group', () => {
-      it('rejects demoting a regional_manager who still owns a hotel group', async () => {
+    // Vacancy model (2026-08-06, supersedes Regional Manager V1 Decision 11's
+    // "transfer OR remove" block): demoting an RM who still owns a group no
+    // longer requires an immediate successor -- it auto-clears the group's
+    // assignment (vacancy reason DEMOTED) and records it in
+    // RegionalManagerAssignmentHistory, rather than throwing ConflictError.
+    describe('demoting a Regional Manager/Manager who still owns a group/hotel (vacancy model)', () => {
+      it('auto-clears the group and vacates it when demoting a regional_manager who still owns a hotel group', async () => {
         mockPrisma.user.findUnique.mockResolvedValue({
           id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
         });
         mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', name: 'North Region' });
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'rm1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+          phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
 
         await expect(
           service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin')
-        ).rejects.toThrow(/still manages hotel group "North Region"/);
+        ).resolves.toBeDefined();
 
-        // Post-#339 review (TOCTOU fix): the ownership check now runs INSIDE
-        // the transaction, after a row lock on the target user, to close the
-        // race between this check and a concurrent group transfer
-        // (crm/service.ts#updateHotelGroup). $transaction IS therefore called
-        // — to acquire the lock and run the check — but the throw inside it
-        // rolls the transaction back before user.update ever runs.
-        expect(mockPrisma.user.update).not.toHaveBeenCalled();
-        expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+        expect(mockHotelGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'g1' },
+            data: expect.objectContaining({
+              regional_manager_user_id: null,
+              regional_manager_vacancy_reason: 'DEMOTED',
+            }),
+          })
+        );
+        expect(mockPrisma.regionalManagerAssignmentHistory.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { hotel_group_id: 'g1', regional_manager_user_id: 'rm1', unassigned_at: null },
+            data: expect.objectContaining({ reason: 'DEMOTED' }),
+          })
+        );
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({ where: { id: 'rm1' }, data: expect.objectContaining({ role: 'MANAGER' }) })
+        );
+      });
+
+      it('auto-clears every hotel and vacates it when demoting a manager who still manages hotels', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'mgr1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockHotel.findMany.mockResolvedValue([{ id: 'h1' }, { id: 'h2' }]);
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'mgr1', email: 'mgr@test.com', first_name: 'M', last_name: 'G',
+          phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await expect(
+          service.updateUserRole('mgr1', { role: 'worker' }, 'admin_actor', 'admin')
+        ).resolves.toBeDefined();
+
+        expect(mockHotel.update).toHaveBeenCalledTimes(2);
+        expect(mockHotel.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'h1' },
+            data: expect.objectContaining({ manager_user_id: null, manager_vacancy_reason: 'DEMOTED' }),
+          })
+        );
+        expect(mockPrisma.hotelManagerAssignmentHistory.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { hotel_id: 'h1', manager_user_id: 'mgr1', unassigned_at: null },
+            data: expect.objectContaining({ reason: 'DEMOTED' }),
+          })
+        );
+      });
+
+      it('does not touch Hotel at all when demoting a non-manager target', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'w1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+        });
+        mockPrisma.user.update.mockResolvedValue({
+          id: 'w1', email: 'w@test.com', first_name: 'W', last_name: 'K',
+          phone: null, role: 'CHECKER', permissions: [], is_active: true, updated_at: new Date(),
+        });
+        mockPrisma.auditLog.create.mockResolvedValue({});
+
+        await service.updateUserRole('w1', { role: 'checker' }, 'admin_actor', 'admin');
+
+        expect(mockHotel.findMany).not.toHaveBeenCalled();
       });
 
       it('allows demoting a regional_manager who owns NO hotel group', async () => {

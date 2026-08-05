@@ -19,6 +19,12 @@ const mockPrisma = {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // Vacancy-history model (2026-08-06): updateHotel() records manager
+  // assign/unassign transitions in this table.
+  hotelManagerAssignmentHistory: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+  },
   // updateHotel()'s manager-change path takes a row lock on the affected
   // user(s) before writing, mirroring updateHotelGroup's RM-transfer fix.
   $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
@@ -391,7 +397,7 @@ describe('CrmService - Hotels', () => {
         expect(mockPrisma.user.update).not.toHaveBeenCalled();
       });
 
-      it('locks the affected manager user row(s) before writing', async () => {
+      it('locks the affected manager user row(s), then the Hotel row itself, before writing', async () => {
         const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
         mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
         mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_new', role: 'MANAGER', deleted_at: null });
@@ -400,7 +406,10 @@ describe('CrmService - Hotels', () => {
 
         await service.updateHotel('h1', { manager_user_id: 'u_new' }, 'admin_1', 'admin');
 
-        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(2);
+        // 2 manager user-row locks (u_old, u_new) + 1 Hotel-row lock, in that
+        // order -- User-then-Hotel, matching updateUserRole/updateHotelGroup's
+        // shared lock-ordering invariant (see the method's own comment).
+        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(3);
       });
     });
   });

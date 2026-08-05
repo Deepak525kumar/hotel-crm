@@ -150,6 +150,15 @@ export interface ListUsersQuery {
 /*  CRM — Hotels                                                               */
 /* -------------------------------------------------------------------------- */
 
+/** Manager-vacancy model (2026-08-06): explains a null manager_user_id/regional_manager_user_id instead of leaving it an unqualified absence. */
+export type ManagerVacancyReason =
+  | "NOT_ASSIGNED"
+  | "DEMOTED"
+  | "RESIGNED"
+  | "TERMINATED"
+  | "TRANSFERRED"
+  | "TEMPORARY";
+
 /**
  * A hotel as returned by `GET /crm/hotels/:id`. List responses
  * (`GET /crm/hotels`) omit the contact/group/manager/deleted fields — the
@@ -170,6 +179,9 @@ export interface Hotel {
   accepting_jobs: boolean;
   hotel_group_id: string | null;
   manager_user_id: string | null;
+  manager_assigned_at: string | null;
+  manager_vacated_at: string | null;
+  manager_vacancy_reason: ManagerVacancyReason | null;
   /** GD-14/OD-GEO-001 (SPEC-GEO-001): hotel-coordinate source of truth for
    * backend-geo's distance-check. Null until an admin sets it (OD-GEO-004). */
   latitude: number | null;
@@ -207,6 +219,8 @@ export interface UpdateHotelInput {
   hotel_group_id?: string | null;
   /** Hotel Manager assignment is update-only (assigned after creation, ADR-025) — the sole source of that manager's JWT scope claim. `null` clears it. */
   manager_user_id?: string | null;
+  /** Only read when manager_user_id is explicitly cleared to null; ignored otherwise. */
+  manager_vacancy_reason?: ManagerVacancyReason;
   /** GD-14/OD-GEO-004: admin-only manual entry, no geocoding service. */
   latitude?: number;
   longitude?: number;
@@ -234,7 +248,11 @@ export interface HotelGroup {
   id: string;
   name: string;
   billing_info: string | null;
-  regional_manager_user_id: string;
+  /** Nullable (2026-08-06 vacancy model): a group may be temporarily unassigned. */
+  regional_manager_user_id: string | null;
+  regional_manager_assigned_at: string | null;
+  regional_manager_vacated_at: string | null;
+  regional_manager_vacancy_reason: ManagerVacancyReason | null;
   created_at: string;
   updated_at: string;
 }
@@ -249,7 +267,10 @@ export interface CreateHotelGroupInput {
 /** Body of `PATCH /crm/hotel-groups/:id` (admin-only). */
 export interface UpdateHotelGroupInput {
   name?: string;
-  regional_manager_user_id?: string;
+  /** `null` clears the assignment (2026-08-06 vacancy model). */
+  regional_manager_user_id?: string | null;
+  /** Only read when regional_manager_user_id is explicitly cleared to null; ignored otherwise. */
+  regional_manager_vacancy_reason?: ManagerVacancyReason;
   billing_info?: string;
 }
 

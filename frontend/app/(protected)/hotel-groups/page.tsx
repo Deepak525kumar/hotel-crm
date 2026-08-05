@@ -33,7 +33,9 @@ export default function HotelGroupsPage() {
 
   const managerName = useMemo(() => {
     const map = new Map(managers.map((m) => [m.id, `${m.first_name} ${m.last_name}`]));
-    return (id: string) => map.get(id) ?? "—";
+    // Vacancy model (2026-08-06): null means the group has no RM assigned
+    // right now, distinct from "assigned but not found in the candidate list".
+    return (id: string | null) => (id ? map.get(id) ?? "—" : "Vacant");
   }, [managers]);
 
   const columns = 2;

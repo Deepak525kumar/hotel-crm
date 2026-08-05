@@ -27,7 +27,15 @@ function EditHotelGroup() {
     setSubmitting(true);
     const payload: UpdateHotelGroupInput = {
       name: values.name,
-      regional_manager_user_id: values.regional_manager_user_id,
+      // Omitting the field leaves the assignment unchanged; an empty
+      // selection only sends `null` (clear) when the group currently has an
+      // RM to clear, so re-visiting this form without touching the selector
+      // never accidentally vacates it.
+      ...(values.regional_manager_user_id
+        ? { regional_manager_user_id: values.regional_manager_user_id }
+        : group?.regional_manager_user_id
+          ? { regional_manager_user_id: null }
+          : {}),
       billing_info: values.billing_info,
     };
     try {

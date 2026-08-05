@@ -383,39 +383,77 @@ export class UserService extends BaseService {
     // without also invalidating the demoted user's already-issued access
     // token.
     //
-    // Regional Manager V1 Decision 11 (supersedes the earlier "transfer OR
-    // remove" wording of Decision 6) / lock-ordering follow-up (post-#339
-    // review): a Hotel Group must always have exactly one assigned Regional
-    // Manager. The ownership check MUST run inside this transaction, after
-    // taking a row lock on the target User via `SELECT ... FOR UPDATE` —
-    // checking it beforehand (as a separate, unlocked read) is a TOCTOU race:
-    // `PATCH /hotel-groups/:id` could assign this user to a new group in the
-    // gap between an unlocked check and this transaction's commit, leaving a
-    // HotelGroup row pointing at a now-demoted MANAGER with no actual RM
-    // authority.
+    // Vacancy model (2026-08-06, supersedes Regional Manager V1 Decision 11's
+    // "transfer OR remove" block): a Hotel Group / Hotel no longer requires
+    // an immediate replacement before its RM/manager can be demoted --
+    // demoting instead auto-clears the assignment (vacancy reason DEMOTED)
+    // and records it in the paired *AssignmentHistory table, rather than
+    // throwing ConflictError. The TOCTOU-closing shape is unchanged: the
+    // group/hotel lookup and clear still happen inside this transaction,
+    // after the row lock below, not as a separate unlocked pre-check.
     //
-    // Lock order is User FIRST, then HotelGroup — always, in both this method
-    // and `crm/service.ts#updateHotelGroup` (the transfer path, which now also
-    // locks the outgoing/incoming RM's User rows for its own token_generation
-    // bump). Two operations that both touch User and HotelGroup but disagree
-    // on ordering is exactly how a demote-vs-transfer race becomes a
-    // deadlock instead of a clean serialization; both call sites acquire in
-    // this same order so Postgres always serializes them, never deadlocks.
+    // Lock order is User FIRST, then HotelGroup/Hotel — always, in both this
+    // method and `crm/service.ts#updateHotelGroup`/`updateHotel` (which lock
+    // the outgoing/incoming manager's User rows for their own
+    // token_generation bump). Two operations that both touch User and
+    // HotelGroup/Hotel but disagree on ordering is exactly how a
+    // demote-vs-transfer race becomes a deadlock instead of a clean
+    // serialization; all call sites acquire in this same order so Postgres
+    // always serializes them, never deadlocks.
     const updated = await this.prisma.$transaction(async (tx) => {
       // Row lock on the target user — blocks a concurrent transfer's own
       // User-row lock (crm/service.ts) until this transaction commits or
       // rolls back, closing the race window entirely.
       await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${userId} FOR UPDATE`;
 
+      const now = new Date();
+
       if (user.role === 'REGIONAL_MANAGER' && newRole !== 'REGIONAL_MANAGER') {
         const ownedGroup = await tx.hotelGroup.findUnique({
           where: { regional_manager_user_id: userId },
-          select: { id: true, name: true },
+          select: { id: true },
         });
         if (ownedGroup) {
-          throw new ConflictError(
-            `Cannot change role: user still manages hotel group "${ownedGroup.name}". Transfer the group to another Regional Manager first.`
-          );
+          await tx.hotelGroup.update({
+            where: { id: ownedGroup.id },
+            data: {
+              regional_manager_user_id: null,
+              regional_manager_assigned_at: null,
+              regional_manager_vacated_at: now,
+              regional_manager_vacancy_reason: 'DEMOTED',
+            },
+          });
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: userId, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'DEMOTED' },
+          });
+        }
+      }
+
+      // Same demotion-vacates-the-assignment behavior for a Hotel Manager
+      // being demoted, mirroring the RM branch above -- this guard never
+      // existed before (Hotel.manager_user_id had no ownership check at
+      // all), so a demoted MANAGER could silently keep a hotel's
+      // manager_user_id pointing at them with no actual manager authority.
+      if (user.role === 'MANAGER' && newRole !== 'MANAGER') {
+        const managedHotels = await tx.hotel.findMany({
+          where: { manager_user_id: userId },
+          select: { id: true },
+        });
+        for (const hotel of managedHotels) {
+          await tx.hotel.update({
+            where: { id: hotel.id },
+            data: {
+              manager_user_id: null,
+              manager_assigned_at: null,
+              manager_vacated_at: now,
+              manager_vacancy_reason: 'DEMOTED',
+            },
+          });
+          await tx.hotelManagerAssignmentHistory.updateMany({
+            where: { hotel_id: hotel.id, manager_user_id: userId, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'DEMOTED' },
+          });
         }
       }
 
