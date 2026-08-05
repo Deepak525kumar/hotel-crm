@@ -226,6 +226,10 @@ describe('JobRequestService.acceptBroadcast', () => {
       data: expect.objectContaining({
         work_request_id: null,
         job_request_id: 'jr1',
+        // 2026-08-05 lifecycle fix: records which slot was claimed, so a
+        // later cancellation can decrement exactly this slot's
+        // confirmed_count (see assignments.test.ts for that half).
+        skill_slot_id: 'slot1',
         worker_id: 'w1',
         hotel_id: 'h1',
         assigned_by_id: 'mgr1', // the broadcast's own created_by_id, not the worker
@@ -257,7 +261,18 @@ describe('JobRequestService.acceptBroadcast', () => {
       skill: 'CLEANER',
     });
     expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
-    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    // Lost-race audit fix (2026-08-05): no WorkerAssignment was created, but
+    // the attempt itself is now recorded (against the WORK_REQUEST, since
+    // there's no WORKER_ASSIGNMENT resource for a claim that never landed).
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'ACCEPT_BROADCAST_LOST_RACE',
+          resource_type: 'WORK_REQUEST',
+          resource_id: 'jr1',
+        }),
+      })
+    );
   });
 
   it('translates a P2002 unique-constraint violation (daily-exclusivity index) into ConflictError', async () => {
@@ -329,7 +344,7 @@ describe('JobRequestService.acceptBroadcast', () => {
       expect(sharedSlot.confirmed_count).toBe(1); // exactly one increment persisted, not two
     });
 
-    it('the losing claimant creates zero assignment rows and logs no audit entry', async () => {
+    it('the losing claimant creates zero assignment rows and logs a lost-race audit entry (not a WORKER_ASSIGNMENT one)', async () => {
       const sharedSlot = { headcount: 1, confirmed_count: 0 };
       mockJobRequestSkillSlot.updateMany.mockImplementation(async () => {
         if (sharedSlot.confirmed_count < sharedSlot.headcount) {
@@ -359,7 +374,20 @@ describe('JobRequestService.acceptBroadcast', () => {
       // Exactly one WorkerAssignment created across both concurrent
       // attempts — the loser's transaction never reaches the create() call.
       expect(createCallCount).toBe(1);
-      expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
+      // Two audit entries total: the winner's ACCEPT_BROADCAST (against the
+      // new WORKER_ASSIGNMENT) and the loser's ACCEPT_BROADCAST_LOST_RACE
+      // (against the WORK_REQUEST, since the loser created no assignment).
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(2);
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'ACCEPT_BROADCAST' }),
+        })
+      );
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'ACCEPT_BROADCAST_LOST_RACE' }),
+        })
+      );
     });
   });
 });

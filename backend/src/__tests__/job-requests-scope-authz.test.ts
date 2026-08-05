@@ -127,6 +127,11 @@ jest.mock('../lib/db.js', () => ({
       }),
     },
     employmentRecord: { findMany: async () => [] },
+    // Cancel-cascade fix (2026-08-05): JobRequestService.update() queries
+    // for active assignments to cascade-cancel whenever the target status
+    // is CANCELLED -- none of this file's fixtures have any, so an empty
+    // result correctly makes the cascade a no-op.
+    workerAssignment: { findMany: async () => [] },
     auditLog: { create: async () => undefined },
   }),
 }));

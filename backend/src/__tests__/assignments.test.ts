@@ -8,6 +8,7 @@ const mockWorkerAssignment = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockEmploymentRecord = {
@@ -30,6 +31,18 @@ const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockJobRequestSkillSlot = {
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
@@ -37,6 +50,9 @@ const mockPrisma = {
   rating: mockRating,
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
+  jobRequestSkillSlot: mockJobRequestSkillSlot,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -82,6 +98,9 @@ describe('AssignmentService', () => {
     mockWorkerAssignment.findFirst.mockResolvedValue(null);
     mockAttendance.count.mockResolvedValue(0 as never);
     mockWorkerOverallRating.upsert.mockResolvedValue({});
+    mockJobRequestSkillSlot.update.mockResolvedValue({});
+    mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
   });
 
   describe('update', () => {
@@ -121,7 +140,9 @@ describe('AssignmentService', () => {
 
     it('cancels with reason and sets cancelled_at', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
-      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      mockWorkerAssignment.update.mockResolvedValue(
+        makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+      );
       await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
         type: 'global',
       });
@@ -129,6 +150,113 @@ describe('AssignmentService', () => {
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
       expect(data.cancellation_reason).toBe('sick');
+    });
+
+    // Audit-trail fix (2026-08-05): cancellation_reason was saved to the row
+    // but never surfaced in the audit log's details.
+    it('includes cancellation_reason in the audit log details when cancelling', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(
+        makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+      );
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'UPDATE_ASSIGNMENT',
+            details: expect.objectContaining({ cancellation_reason: 'sick' }),
+          }),
+        })
+      );
+    });
+
+    it('does not include a cancellation_reason key in the audit log details for a non-cancelling transition', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      const call = mockPrisma.auditLog.create.mock.calls.find(
+        (c: any) => c[0].data.action === 'UPDATE_ASSIGNMENT'
+      );
+      expect(call?.[0].data.details).not.toHaveProperty('cancellation_reason');
+    });
+
+    // Job-dispatch lifecycle audit fix (2026-08-05): cancelling a
+    // broadcast-accept assignment must free up the slot it claimed, or a
+    // headcount-N slot gets stuck permanently "full" after a cancellation.
+    it('decrements JobRequestSkillSlot.confirmed_count when cancelling a broadcast-accept assignment (skill_slot_id set)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ skill_slot_id: 'slot1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED', skill_slot_id: 'slot1' }));
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockJobRequestSkillSlot.update).toHaveBeenCalledWith({
+        where: { id: 'slot1' },
+        data: { confirmed_count: { decrement: 1 } },
+      });
+    });
+
+    it('does not touch JobRequestSkillSlot when cancelling a calendar-placed assignment (skill_slot_id null)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ skill_slot_id: null }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+        type: 'global',
+      });
+      expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+    });
+
+    it('does not decrement JobRequestSkillSlot.confirmed_count on completion, only on cancellation', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(
+        makeAssignment({ status: 'IN_PROGRESS', skill_slot_id: 'slot1' })
+      );
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED', skill_slot_id: 'slot1' }));
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+    });
+
+    // Job-dispatch lifecycle notification fix (2026-08-05): a cancelled
+    // assignment previously notified nobody at all.
+    describe('cancellation notifications', () => {
+      it('notifies the worker when a manager cancels their assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', assigned_by_id: 'mgr1' })
+        );
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+        );
+        await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+          type: 'global',
+        });
+        expect(mockNotification.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ user_id: 'w1', type: 'ASSIGNMENT_CANCELLED' }),
+          })
+        );
+      });
+
+      it('notifies the assigning manager (not the worker) when the worker cancels their own assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', assigned_by_id: 'mgr1' })
+        );
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+        await service.update('a1', { status: 'CANCELLED' }, 'w1', 'worker');
+        expect(mockNotification.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ user_id: 'mgr1', type: 'ASSIGNMENT_CANCELLED' }),
+          })
+        );
+        expect(mockNotification.create).not.toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ user_id: 'w1' }) })
+        );
+      });
+
+      it('sends no cancellation notification for a non-cancelling transition', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        expect(mockNotification.create).not.toHaveBeenCalled();
+      });
     });
 
     // GD-04: this endpoint mutates the fields WorkerOverallRating derives
@@ -169,6 +297,212 @@ describe('AssignmentService', () => {
         name: 'ConflictError',
       });
       expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // Job-dispatch lifecycle feature (2026-08-05): atomic reassign.
+  describe('reassign', () => {
+    beforeEach(() => {
+      // Defaults: new worker eligible at the hotel (ACTIVE EmploymentRecord,
+      // matching hotel_group) and free that day.
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockWorkerAssignment.findFirst.mockResolvedValue(null);
+      mockWorkerAssignment.create.mockImplementation(async ({ data }: any) => ({
+        id: 'a2',
+        ...data,
+        confirmed_at: new Date('2026-08-05T00:00:00Z'),
+        started_at: null,
+        completed_at: null,
+        cancelled_at: null,
+        cancellation_reason: null,
+        updated_at: new Date('2026-08-05T00:00:00Z'),
+      }));
+    });
+
+    it('throws NotFoundError for an unknown assignment', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(null);
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'NotFoundError' });
+    });
+
+    it('rejects reassigning a COMPLETED assignment (ConflictError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects reassigning an already-CANCELLED assignment (ConflictError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    it('rejects reassigning to the same worker already on the assignment (ConflictError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+      await expect(
+        service.reassign('a1', { worker_id: 'w1' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    it('rejects a new worker who is not roster-eligible at the hotel (ForbiddenError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockEmploymentRecord.findUnique.mockResolvedValue(null);
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects a new worker who already has an assignment that day (ConflictError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'other' });
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+    });
+
+    it('a manager in scope succeeds', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ hotel_id: 'h9' }));
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      const result = await service.reassign(
+        'a1',
+        { worker_id: 'w2' },
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } }
+      );
+      expect(result.new_assignment.worker_id).toBe('w2');
+    });
+
+    it('a manager out of scope is denied (ForbiddenError), before touching the transaction', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ hotel_id: 'h9' }));
+      await expect(
+        service.reassign(
+          'a1',
+          { worker_id: 'w2' },
+          { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } }
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('sets the old assignment to REASSIGNED and creates a new CONFIRMED one chained via previous_assignment_id', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ id: 'a1', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ id: 'a1', status: 'REASSIGNED' }));
+
+      const result = await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockWorkerAssignment.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: { status: 'REASSIGNED' },
+      });
+      expect(mockWorkerAssignment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          worker_id: 'w2',
+          assigned_by_id: 'mgr1',
+          status: 'CONFIRMED',
+          previous_assignment_id: 'a1',
+        }),
+      });
+      expect(result.old_assignment.status).toBe('REASSIGNED');
+      expect(result.new_assignment.worker_id).toBe('w2');
+    });
+
+    it('inherits hotel_id, day, job_request_id, work_request_id, and skill_slot_id from the old assignment unchanged', async () => {
+      // The service reads these from tx.workerAssignment.update()'s RETURN
+      // VALUE (oldAssignment), not from the earlier findUnique() lookup --
+      // both mocks must agree, but update()'s is what the create() call
+      // actually inherits from.
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ hotel_id: 'h1' }));
+      mockWorkerAssignment.update.mockResolvedValue(
+        makeAssignment({
+          status: 'REASSIGNED',
+          hotel_id: 'h1',
+          day: new Date('2026-08-10T00:00:00.000Z'),
+          job_request_id: 'jr1',
+          work_request_id: null,
+          skill_slot_id: 'slot1',
+        })
+      );
+
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockWorkerAssignment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          hotel_id: 'h1',
+          day: expect.any(Date),
+          job_request_id: 'jr1',
+          work_request_id: null,
+          skill_slot_id: 'slot1',
+        }),
+      });
+      // Reassignment does NOT free the slot -- it changes who fills it, not
+      // whether it's filled (contrast with Bug 3's cancel-path decrement).
+      expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+    });
+
+    it('recomputes WorkerOverallRating for the OLD worker (their completion rate must reflect the terminal outcome)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'REASSIGNED' }));
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+      expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+      expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+    });
+
+    it('logs REASSIGN_ASSIGNMENT with both worker ids and the previous assignment id', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ id: 'a1', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ id: 'a1', status: 'REASSIGNED' }));
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'REASSIGN_ASSIGNMENT',
+            resource_type: 'WORKER_ASSIGNMENT',
+            details: expect.objectContaining({
+              previous_assignment_id: 'a1',
+              previous_worker_id: 'w1',
+              new_worker_id: 'w2',
+            }),
+          }),
+        })
+      );
+    });
+
+    it('translates a P2002 (new worker double-booked, lost the race) into ConflictError', async () => {
+      const { Prisma } = await import('@prisma/client');
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.22.0',
+        })
+      );
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    // Job-dispatch lifecycle notification fix (2026-08-05): both affected
+    // workers were previously left uninformed.
+    it('notifies the old worker (shift reassigned away) and the new worker (shift assigned to them)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ id: 'a1', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ id: 'a1', status: 'REASSIGNED' }));
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_id: 'w1', type: 'ASSIGNMENT_CANCELLED' }),
+        })
+      );
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_id: 'w2', type: 'ASSIGNMENT_CONFIRMED' }),
+        })
+      );
     });
   });
 

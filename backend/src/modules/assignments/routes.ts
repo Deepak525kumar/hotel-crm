@@ -9,6 +9,7 @@ import {
   listCalendarEntries,
   logRoomsCompleted,
   moveCalendarEntry,
+  reassignAssignment,
   updateAssignment,
 } from './controller.js';
 
@@ -100,6 +101,20 @@ router.post(
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('staffing:write'),
   logRoomsCompleted
+);
+
+// Job-dispatch lifecycle feature (2026-08-05): atomic reassign, replacing
+// the two-call cancel-then-recreate flow. Managerial action, not
+// self-service — no worker/checker branch exists on this route the way
+// PATCH /:id has one, since a worker cannot reassign their own shift to
+// someone else. Not gated by FEATURE_JOBDISPATCH_PHASE2: it applies to any
+// existing assignment (calendar-placed or broadcast-accepted alike), not
+// only to the flagged creation paths.
+router.post(
+  '/:id/reassign',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('staffing:write'),
+  reassignAssignment
 );
 
 export default router;

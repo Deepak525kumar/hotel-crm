@@ -8,6 +8,17 @@ export const UpdateAssignmentSchema = z
   })
   .refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' });
 
+// Job-dispatch lifecycle feature (2026-08-05): atomic reassign. Replaces the
+// old worker on a CONFIRMED/IN_PROGRESS assignment with a new one, in one
+// transaction (old -> REASSIGNED, new -> CONFIRMED, chained via
+// previous_assignment_id) instead of two independent cancel-then-recreate
+// calls that could leave the shift unstaffed between them if the second
+// call failed. Same hotel/day as the original assignment -- reassigning to
+// a different hotel or day is a new placement, not this endpoint.
+export const ReassignAssignmentSchema = z.object({
+  worker_id: z.string().min(1),
+});
+
 export const ListAssignmentsQuerySchema = z.object({
   hotel_id: z.string().optional(),
   work_request_id: z.string().optional(),
@@ -55,6 +66,7 @@ export const LogRoomsCompletedSchema = z.object({
 });
 
 export type UpdateAssignmentInput = z.infer<typeof UpdateAssignmentSchema>;
+export type ReassignAssignmentInput = z.infer<typeof ReassignAssignmentSchema>;
 export type ListAssignmentsQuery = z.infer<typeof ListAssignmentsQuerySchema>;
 export type LogRoomsCompletedInput = z.infer<typeof LogRoomsCompletedSchema>;
 export type CreateCalendarEntryInput = z.infer<typeof CreateCalendarEntrySchema>;

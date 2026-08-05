@@ -15,7 +15,7 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
-import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
+import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -306,9 +306,63 @@ export class JobRequestService extends BaseService {
     await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
       from_status: wr.status,
       to_status: updated.status,
+      // cancellation_reason was saved to the row (line 264) but never
+      // surfaced in the audit trail -- an admin reviewing the log couldn't
+      // see WHY a request was cancelled, only that it was.
+      ...(updated.status === WorkRequestStatus.CANCELLED
+        ? { cancellation_reason: updated.cancellation_reason }
+        : {}),
     });
 
+    // Job-dispatch lifecycle cascade fix (2026-08-05): cancelling a
+    // JobRequest previously never touched its already-assigned
+    // WorkerAssignments -- a worker with a CONFIRMED assignment against a
+    // cancelled request stayed CONFIRMED indefinitely. Runs AFTER the
+    // parent's own transaction commits, not inside it: AssignmentService.
+    // update() opens its own transaction and is not composable inside this
+    // one (same "delegates to the assignment owner's own service" boundary
+    // CalendarService.autoCancelSameDayAssignment() already established) --
+    // a crash between the two leaves the parent cancelled but assignments
+    // still active, the same accepted tradeoff that existing delegation
+    // already carries, not a new risk.
+    if (updated.status === WorkRequestStatus.CANCELLED) {
+      await this.cascadeCancelAssignments(id, actor);
+    }
+
     return this.toDto(updated);
+  }
+
+  // Job-dispatch lifecycle cascade fix (2026-08-05): cancels every active
+  // (CONFIRMED/IN_PROGRESS) WorkerAssignment tied to this JobRequest, via
+  // EITHER work_request_id (marketplace-lineage) or job_request_id
+  // (broadcast-accept-lineage) -- the two nullable FKs a WorkerAssignment
+  // can carry back to the same JobRequest id (see WorkerAssignment's own
+  // schema comment). Delegates each cancellation to
+  // AssignmentService.update() one at a time (not a bulk updateMany) so
+  // every one of that method's own side effects fires per assignment:
+  // WorkerOverallRating recompute, the JobRequestSkillSlot.confirmed_count
+  // decrement (Bug 3), and the cancellation notification (this session's
+  // notification fix) -- reusing the single source of truth for "what
+  // happens when an assignment is cancelled" rather than partially
+  // reimplementing it here.
+  private async cascadeCancelAssignments(jobRequestId: string, actor: Actor): Promise<void> {
+    const assignments = await this.prisma.workerAssignment.findMany({
+      where: {
+        OR: [{ work_request_id: jobRequestId }, { job_request_id: jobRequestId }],
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+      },
+      select: { id: true },
+    });
+
+    for (const a of assignments) {
+      await assignmentService.update(
+        a.id,
+        { status: 'CANCELLED', cancellation_reason: 'The work request was cancelled' },
+        actor.userId,
+        actor.role,
+        actor.scope ?? null
+      );
+    }
   }
 
   // Enqueue a WORK_REQUEST_PUBLISHED notification for every active worker on
@@ -717,6 +771,7 @@ export class JobRequestService extends BaseService {
           data: {
             work_request_id: null,
             job_request_id: wr.id,
+            skill_slot_id: slot.id,
             worker_id: actor.userId,
             hotel_id: wr.hotel_id,
             assigned_by_id: wr.created_by_id,
@@ -734,6 +789,14 @@ export class JobRequestService extends BaseService {
     }
 
     if (assignmentId === null) {
+      // Lost the first-accept-wins race -- no WorkerAssignment was created,
+      // so there's no WORKER_ASSIGNMENT resource to attach an audit entry
+      // to, but the attempt itself is worth a record (an admin investigating
+      // "why didn't this worker get the shift" should be able to see the
+      // attempt, not just silence). Logged against the WORK_REQUEST instead.
+      await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST_LOST_RACE', 'WORK_REQUEST', wr.id, {
+        skill,
+      });
       return { status: 'requirement_fulfilled', job_request_id: wr.id, skill };
     }
 
@@ -864,6 +927,15 @@ export class JobRequestService extends BaseService {
             data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
           });
           await this.enqueueJobRequestClosed(tx, closed, 'auto');
+        });
+        // Audit gap: manualClose() logs MANUAL_CLOSE, but this scheduled
+        // path previously logged nothing at all -- a broadcast could expire
+        // with zero audit trail. `logAudit(null, 'system', ...)` matches the
+        // existing convention for scheduled-job-initiated actions (see
+        // employee-management/service.ts's contract-lapse deactivation).
+        await this.logAudit(null, 'system', 'AUTO_CLOSE', 'WORK_REQUEST', wr.id, {
+          from_status: wr.status,
+          to_status: WorkRequestStatus.EXPIRED,
         });
       }
       total += stale.length;

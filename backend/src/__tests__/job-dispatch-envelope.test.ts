@@ -130,10 +130,35 @@ jest.mock('../lib/db.js', () => ({
     },
     workerAssignment: {
       findUnique: async ({ where }: any) => assignments[where.id] ?? null,
-      findMany: async () => Object.values(assignments),
+      findMany: async ({ where }: any) => {
+        // Cancel-cascade fix (2026-08-05): JobRequestService.update()
+        // queries by work_request_id/job_request_id + active status when
+        // cancelling -- honor that filter rather than returning every
+        // fixture unconditionally, or an unrelated cancel would try to
+        // cascade-cancel asg_1 too.
+        if (!where) return Object.values(assignments);
+        const ids = new Set(
+          (where.OR ?? [])
+            .map((c: any) => c.work_request_id ?? c.job_request_id)
+            .filter(Boolean),
+        );
+        const statuses = where.status?.in ?? null;
+        return Object.values(assignments).filter(
+          (a: any) =>
+            (ids.size === 0 || ids.has(a.work_request_id) || ids.has(a.job_request_id)) &&
+            (!statuses || statuses.includes(a.status)),
+        );
+      },
       count: async () => Object.values(assignments).length,
+      update: async ({ where, data }: any) => ({ ...assignments[where.id], ...data, updated_at: new Date() }),
     },
     employmentRecord: { findMany: async () => [] },
+    rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
+    attendance: { count: async () => 0 },
+    workerOverallRating: { upsert: async () => ({}) },
+    jobRequestSkillSlot: { update: async () => ({}) },
+    notification: { create: async () => ({ id: 'notif_new' }) },
+    outboxEvent: { create: async () => ({ id: 'outbox_new' }) },
     auditLog: { create: async () => undefined },
     $transaction: async (fn: any) =>
       fn({
@@ -146,8 +171,21 @@ jest.mock('../lib/db.js', () => ({
           updateMany: async () => ({ count: 1 }),
           findUnique: async ({ where }: any) => workRequests[where.id] ?? null,
         },
-        workerAssignment: { create: async ({ data }: any) => ({ id: 'asg_new', ...data }) },
-        attendance: { create: async ({ data }: any) => ({ id: 'att_new', ...data }) },
+        workerAssignment: {
+          create: async ({ data }: any) => ({ id: 'asg_new', ...data }),
+          update: async ({ where, data }: any) => ({ ...assignments[where.id], ...data, updated_at: new Date() }),
+          count: async () => Object.values(assignments).length,
+          findFirst: async () => null,
+        },
+        attendance: {
+          create: async ({ data }: any) => ({ id: 'att_new', ...data }),
+          count: async () => 0,
+        },
+        rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
+        workerOverallRating: { upsert: async () => ({}) },
+        jobRequestSkillSlot: { update: async () => ({}) },
+        notification: { create: async () => ({ id: 'notif_new' }) },
+        outboxEvent: { create: async () => ({ id: 'outbox_new' }) },
       }),
   }),
 }));

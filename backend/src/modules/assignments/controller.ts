@@ -8,6 +8,7 @@ import {
   ListCalendarEntriesQuerySchema,
   LogRoomsCompletedSchema,
   MoveCalendarEntrySchema,
+  ReassignAssignmentSchema,
   UpdateAssignmentSchema,
 } from './types.js';
 
@@ -84,6 +85,29 @@ export async function updateAssignment(
       req.auth!.scope ?? null
     );
     sendSuccess(res, result, { requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Job-dispatch lifecycle feature (2026-08-05): atomic reassign.
+export async function reassignAssignment(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = ReassignAssignmentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await assignmentService.reassign(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
   } catch (error) {
     next(error);
   }

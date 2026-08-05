@@ -488,6 +488,19 @@ export const assignmentsApi = {
       method: "PATCH",
       body: { day },
     }),
+
+  /**
+   * Atomic reassign (2026-08-05, admin/manager/regional_manager): replaces
+   * the worker on a CONFIRMED/IN_PROGRESS assignment with a new one in one
+   * request. hotel/day/job_request_id carry over unchanged from the old
+   * assignment — this cannot move the shift to a different hotel or day,
+   * only change who's staffing it.
+   */
+  reassign: (id: string, workerId: string) =>
+    apiFetch<{ old_assignment: Assignment; new_assignment: Assignment }>(
+      `/assignments/${id}/reassign`,
+      { method: "POST", body: { worker_id: workerId } },
+    ),
 };
 
 /**

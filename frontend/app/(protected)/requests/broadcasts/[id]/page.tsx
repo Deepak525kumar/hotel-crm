@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkRequest, useBroadcastEligibility } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -8,7 +9,9 @@ import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { useAuthStore } from "@/stores/auth";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import { formatDateTime } from "@/lib/format";
+import type { AcceptBroadcastResultDto, SkillTag } from "@/lib/types";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -35,26 +38,46 @@ export default function BroadcastDetailPage() {
 
   // The backend's eligibility route (GET /work-requests/broadcasts/:id/
   // eligibility) has no requireRole gate — any authenticated role can call
-  // it, but the response itself is now role-scoped server-side (no
-  // eligible_worker_ids field exists on the wire for anyone; see
-  // SkillSlotEligibilityDto's doc comment) — so this gate is a UX/scope
-  // choice (only admin/manager act on this section), not a data-exposure
-  // control the way it was before that fix.
+  // it, and the response is role-scoped server-side: admin/manager get an
+  // aggregate eligible_count per slot, a worker/checker instead gets their
+  // OWN `eligible: boolean` (SkillSlotEligibilityDto's doc comment) — no
+  // eligible_worker_ids field exists on the wire for anyone. Both shapes
+  // come from the same fetch; canSeeAggregateEligibility only gates which
+  // one is rendered.
   const role = useAuthStore((s) => s.user?.role);
-  const canSeeEligibility = role === "admin" || role === "manager";
+  const canSeeAggregateEligibility = role === "admin" || role === "manager";
+  const canAccept = role === "worker" || role === "checker";
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
   const {
     data: eligibility,
     isLoading: eligibilityLoading,
     error: eligibilityError,
-  } = useBroadcastEligibility(canSeeEligibility ? id : null);
+    mutate: mutateEligibility,
+  } = useBroadcastEligibility(id);
   const close = useAsyncAction();
+  const accept = useAsyncAction();
+  const [acceptResult, setAcceptResult] = useState<AcceptBroadcastResultDto | null>(null);
 
   const onClose = () =>
     close.run(() => workRequestsApi.manualCloseBroadcast(id), {
       onSuccess: (updated) => mutate(updated, { revalidate: false }),
       errorMessage: "Failed to close this broadcast. Please try again.",
+    });
+
+  const onAccept = (skill: SkillTag) =>
+    accept.run(() => workRequestsApi.acceptBroadcast(id, { skill }), {
+      key: skill,
+      onSuccess: (result) => {
+        setAcceptResult(result);
+        // Re-fetch both the request (confirmed_count moved) and this
+        // worker's own eligibility (now assigned that day, so any other
+        // open slot they'd have been eligible for no longer shows them as
+        // such).
+        void mutate();
+        void mutateEligibility();
+      },
+      errorMessage: "Failed to accept this shift. Please try again.",
     });
 
   if (isLoading) {
@@ -149,24 +172,28 @@ export default function BroadcastDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{canSeeEligibility ? "Skills & eligibility" : "Skills"}</CardTitle>
+          <CardTitle>{canSeeAggregateEligibility ? "Skills & eligibility" : "Skills"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {canSeeEligibility && eligibilityError ? (
+          {eligibilityError ? (
             <p className="text-sm text-red-600">
               Failed to load eligibility for this broadcast.
             </p>
           ) : (
             request.skill_slots.map((slot) => {
-              const eligibleCount =
-                !canSeeEligibility || eligibilityLoading
-                  ? null
-                  : (eligibilityBySkill.get(slot.skill)?.eligible_count ?? 0);
+              const slotEligibility = eligibilityLoading ? null : eligibilityBySkill.get(slot.skill);
+              const eligibleCount = canSeeAggregateEligibility ? slotEligibility?.eligible_count ?? 0 : null;
               const filled = slot.confirmed_count >= slot.headcount;
+              const canAcceptThisSlot =
+                canAccept &&
+                request.status === "OPEN" &&
+                !filled &&
+                !eligibilityLoading &&
+                slotEligibility?.eligible === true;
               return (
                 <div
                   key={slot.id}
-                  className="flex items-center justify-between rounded-md border border-gray-200 px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-4 py-3"
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900">
@@ -179,15 +206,49 @@ export default function BroadcastDetailPage() {
                         : ""}
                     </p>
                   </div>
-                  {filled && (
-                    <span className="text-sm font-medium text-green-700">Filled</span>
-                  )}
+                  {filled ? (
+                    <span className="shrink-0 text-sm font-medium text-green-700">Filled</span>
+                  ) : canAcceptThisSlot ? (
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      onClick={() => onAccept(slot.skill)}
+                      loading={accept.isPending(slot.skill)}
+                      disabled={accept.pending}
+                    >
+                      Accept
+                    </Button>
+                  ) : null}
                 </div>
               );
             })
           )}
         </CardContent>
       </Card>
+
+      {acceptResult && (
+        <Card>
+          <CardContent className="flex items-center gap-3">
+            {acceptResult.status === "accepted" ? (
+              <>
+                <Badge tone="success">Confirmed</Badge>
+                <p className="text-sm text-gray-700">
+                  You&rsquo;re confirmed for this shift ({SKILL_LABELS[acceptResult.skill] ?? acceptResult.skill}).
+                </p>
+              </>
+            ) : (
+              <>
+                <Badge tone="warning">Already filled</Badge>
+                <p className="text-sm text-gray-700">
+                  Someone else claimed this slot just before you — no shift was assigned.
+                </p>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      <FormError>{accept.error}</FormError>
 
       <JobDispatchPhase2WriteGate>
         {request.status === "OPEN" && (

@@ -1,4 +1,12 @@
-import { Prisma, WorkerAssignment, CalendarEntry, AssignmentStatus, RoomsCompletedEntry } from '@prisma/client';
+import {
+  Prisma,
+  WorkerAssignment,
+  CalendarEntry,
+  AssignmentStatus,
+  RoomsCompletedEntry,
+  OutboxSourceModule,
+  OutboxTransport,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
@@ -9,6 +17,7 @@ import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import { getPrisma } from '../../lib/db.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
+import { notificationService } from '../notifications/service.js';
 import {
   AssignmentDto,
   CalendarEntryDto,
@@ -17,6 +26,7 @@ import {
   ListCalendarEntriesQuery,
   LogRoomsCompletedInput,
   MoveCalendarEntryInput,
+  ReassignAssignmentInput,
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
 } from './types.js';
@@ -200,15 +210,205 @@ export class AssignmentService extends BaseService {
         await refreshWorkerOverallRating(tx, assignment.worker_id);
       }
 
+      // Job-dispatch lifecycle audit fix (2026-08-05): a cancelled
+      // broadcast-accept assignment previously left its
+      // JobRequestSkillSlot.confirmed_count permanently incremented, even
+      // though the slot is open again -- a headcount-3 slot could get stuck
+      // showing 3/3 filled forever after a single cancellation, silently
+      // blocking any backfill. skill_slot_id is only ever set by
+      // acceptBroadcast(), so this is a no-op for calendar-placed
+      // assignments (skill_slot_id null) and never fires for COMPLETED.
+      if (next === AssignmentStatus.CANCELLED && assignment.skill_slot_id) {
+        await tx.jobRequestSkillSlot.update({
+          where: { id: assignment.skill_slot_id },
+          data: { confirmed_count: { decrement: 1 } },
+        });
+      }
+
+      // Job-dispatch lifecycle notification fix (2026-08-05): a cancelled
+      // assignment previously notified nobody at all -- a worker's
+      // confirmed shift could vanish (manager-cancelled) with zero notice,
+      // and a manager never learned when a worker cancelled their own
+      // shift. Only the party who did NOT initiate the cancellation is
+      // notified -- the actor already knows what they just did.
+      if (next === AssignmentStatus.CANCELLED) {
+        const isWorkerInitiated = actorId === assignment.worker_id;
+        if (!isWorkerInitiated) {
+          await notificationService.enqueue(
+            {
+              recipientId: assignment.worker_id,
+              type: 'ASSIGNMENT_CANCELLED',
+              title: 'Shift cancelled',
+              message: 'Your confirmed shift has been cancelled.',
+              data: { assignment_id: id, cancellation_reason: result.cancellation_reason },
+              hotelId: assignment.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.ASSIGNMENTS,
+              producerService: 'AssignmentService',
+            },
+            tx
+          );
+        } else {
+          await notificationService.enqueue(
+            {
+              recipientId: assignment.assigned_by_id,
+              type: 'ASSIGNMENT_CANCELLED',
+              title: 'Worker cancelled their shift',
+              message: 'A worker cancelled their own confirmed shift.',
+              data: { assignment_id: id, worker_id: assignment.worker_id, cancellation_reason: result.cancellation_reason },
+              hotelId: assignment.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.ASSIGNMENTS,
+              producerService: 'AssignmentService',
+            },
+            tx
+          );
+        }
+      }
+
       return result;
     });
 
     await this.logAudit(actorId, actorRole, 'UPDATE_ASSIGNMENT', 'WORKER_ASSIGNMENT', id, {
       from_status: assignment.status,
       to_status: next,
+      // cancellation_reason was saved to the row above but never surfaced
+      // in the audit trail.
+      ...(next === AssignmentStatus.CANCELLED ? { cancellation_reason: updated.cancellation_reason } : {}),
     });
 
     return this.toDto(updated);
+  }
+
+  // Job-dispatch lifecycle feature (2026-08-05): atomic reassign. Replaces
+  // the worker on a CONFIRMED/IN_PROGRESS assignment with a new one, in one
+  // transaction, instead of two independent cancel-then-recreate calls that
+  // could leave the shift unstaffed between them if the second call failed
+  // (or if a concurrent request claimed the now-cancelled slot first).
+  // Managerial action only (admin/manager/regional_manager) -- a worker
+  // cannot reassign their own shift to someone else; that's a scheduling
+  // decision, not a self-service one, unlike cancel/start/complete on
+  // AssignmentService.update().
+  async reassign(
+    id: string,
+    input: ReassignAssignmentInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<{ old_assignment: AssignmentDto; new_assignment: AssignmentDto }> {
+    const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot reassign an assignment for this hotel');
+      }
+    }
+
+    if (!ALLOWED_TRANSITIONS[assignment.status]?.includes(AssignmentStatus.CANCELLED)) {
+      throw new ConflictError(`Cannot reassign an assignment in status ${assignment.status}`);
+    }
+
+    if (input.worker_id === assignment.worker_id) {
+      throw new ConflictError('New worker must be different from the currently assigned worker');
+    }
+
+    const eligible = await isWorkerEligibleForHotel(input.worker_id, assignment.hotel_id);
+    if (!eligible) {
+      throw new ForbiddenError('The new worker is not eligible at this hotel');
+    }
+
+    const free = await isWorkerFreeOnDay(input.worker_id, assignment.day);
+    if (!free) {
+      throw new ConflictError('The new worker already has an assignment for this day');
+    }
+
+    let result;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const oldAssignment = await tx.workerAssignment.update({
+          where: { id },
+          data: { status: AssignmentStatus.REASSIGNED },
+        });
+
+        // Same broadcast/skill-slot claim carries over to the new worker --
+        // reassignment doesn't free the slot (unlike a plain cancel, Bug 3
+        // above), it just changes who's filling it. skill_slot_id/
+        // job_request_id/work_request_id/hotel_id/day are inherited
+        // unchanged; only worker_id, assigned_by_id, and the reassignment
+        // chain link differ.
+        const newAssignment = await tx.workerAssignment.create({
+          data: {
+            work_request_id: oldAssignment.work_request_id,
+            job_request_id: oldAssignment.job_request_id,
+            skill_slot_id: oldAssignment.skill_slot_id,
+            worker_id: input.worker_id,
+            hotel_id: oldAssignment.hotel_id,
+            assigned_by_id: actor.userId,
+            status: AssignmentStatus.CONFIRMED,
+            day: oldAssignment.day,
+            previous_assignment_id: oldAssignment.id,
+          },
+        });
+
+        // GD-04, same rule update() follows: REASSIGNED is a terminal
+        // outcome for the OLD worker that never completes the shift, same
+        // aggregate-affecting shape as CANCELLED -- their completion rate
+        // must reflect it. The new worker has no rating-affecting event yet
+        // (a fresh CONFIRMED row), so only one recompute is needed here.
+        await refreshWorkerOverallRating(tx, assignment.worker_id);
+
+        // Job-dispatch lifecycle notification fix (2026-08-05): both
+        // affected workers were previously left uninformed -- the old
+        // worker's shift silently disappeared, and the new worker had no
+        // idea they'd been assigned it.
+        await notificationService.enqueue(
+          {
+            recipientId: assignment.worker_id,
+            type: 'ASSIGNMENT_CANCELLED',
+            title: 'Shift reassigned',
+            message: 'Your shift has been reassigned to another worker.',
+            data: { assignment_id: id, new_worker_id: input.worker_id },
+            hotelId: assignment.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+        await notificationService.enqueue(
+          {
+            recipientId: input.worker_id,
+            type: 'ASSIGNMENT_CONFIRMED',
+            title: 'You have been assigned a shift',
+            message: "You've been assigned a shift previously held by another worker.",
+            data: { assignment_id: newAssignment.id, previous_assignment_id: id },
+            hotelId: assignment.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+
+        return { oldAssignment, newAssignment };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('The new worker already has an assignment for this day');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'REASSIGN_ASSIGNMENT', 'WORKER_ASSIGNMENT', result.newAssignment.id, {
+      previous_assignment_id: result.oldAssignment.id,
+      previous_worker_id: assignment.worker_id,
+      new_worker_id: input.worker_id,
+    });
+
+    return {
+      old_assignment: this.toDto(result.oldAssignment),
+      new_assignment: this.toDto(result.newAssignment),
+    };
   }
 
   private toRoomsCompletedDto(r: RoomsCompletedEntry): RoomsCompletedEntryDto {
@@ -414,6 +614,30 @@ export class AssignmentService extends BaseService {
           where: { id: existing.assignment_id },
           data: { day },
         });
+
+        // Job-dispatch lifecycle notification fix (2026-08-05): moving a
+        // placement to a different day previously notified nobody -- the
+        // worker could show up on the original day expecting a shift that
+        // was silently relocated.
+        await notificationService.enqueue(
+          {
+            recipientId: existing.worker_id,
+            type: 'ASSIGNMENT_CONFIRMED',
+            title: 'Shift moved',
+            message: 'Your confirmed shift was moved to a different day.',
+            data: {
+              assignment_id: assignment.id,
+              from_day: existing.day.toISOString().slice(0, 10),
+              to_day: input.day,
+            },
+            hotelId: existing.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+
         return { assignment, calendarEntry };
       });
     } catch (error) {
