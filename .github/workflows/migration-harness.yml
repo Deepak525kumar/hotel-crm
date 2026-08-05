@@ -33,6 +33,16 @@ on:
 permissions:
   contents: read
 
+# Dedup fix (2026-08-06): same duplication ci.yml has, and the same fix —
+# see that workflow's concurrency comment for the full rationale.
+# `github.head_ref` is only populated on `pull_request` events, so this key
+# matches across the push-triggered and pull_request-triggered run of the
+# same branch/commit, letting GitHub cancel the redundant one instead of
+# running the full Postgres + forward/rollback/recovery harness twice.
+concurrency:
+  group: migration-harness-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   migration-harness:
     name: Forward · Rollback · Recovery
