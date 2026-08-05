@@ -7,8 +7,9 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { notificationsApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
-import { Badge, TextLink } from "@/components/ui";
+import { Badge, FormError, TextLink } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import type { Notification } from "@/lib/types";
 
 const PREVIEW_COUNT = 5;
 
@@ -23,7 +24,6 @@ export function NotificationsBell() {
   const { notifications, unreadCount, mutate } = useNotifications();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const markRead = useAsyncAction();
 
   useEffect(() => {
     if (!open) return;
@@ -41,12 +41,6 @@ export function NotificationsBell() {
     };
   }, [open]);
 
-  const onMarkRead = (id: string) =>
-    markRead.run(() => notificationsApi.markAsRead(id), {
-      key: id,
-      onSuccess: () => mutate(),
-    });
-
   const preview = notifications.slice(0, PREVIEW_COUNT);
 
   return (
@@ -54,9 +48,12 @@ export function NotificationsBell() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label="Notifications"
+        aria-label={
+          unreadCount > 0
+            ? `Notifications, ${unreadCount} unread`
+            : "Notifications"
+        }
         aria-expanded={open}
-        aria-haspopup="true"
         className="relative rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
       >
         <Bell className="h-5 w-5" aria-hidden />
@@ -70,9 +67,13 @@ export function NotificationsBell() {
         )}
       </button>
 
+      {/* A plain labelled region, not role="menu" -- this isn't a menu of
+          commands with arrow-key navigation, it's a list of links/buttons,
+          so the native semantics of <ul>/<li>/<a>/<button> already describe
+          it correctly without taking on ARIA menu's stricter (and here
+          unmet) contract. */}
       {open && (
         <div
-          role="menu"
           aria-label="Notifications"
           className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg"
         >
@@ -90,39 +91,12 @@ export function NotificationsBell() {
           ) : (
             <ul className="max-h-96 overflow-y-auto">
               {preview.map((n) => (
-                <li
+                <NotificationRow
                   key={n.id}
-                  className={cn(
-                    "border-b border-gray-50 px-4 py-3 last:border-b-0",
-                    !n.is_read && "bg-blue-50/50",
-                  )}
-                >
-                  <Link
-                    href={`/notifications/${n.id}`}
-                    onClick={() => setOpen(false)}
-                    className="block text-sm font-medium text-gray-900 hover:underline"
-                  >
-                    {n.title}
-                  </Link>
-                  <p className="mt-0.5 line-clamp-2 text-sm text-gray-500">
-                    {n.message}
-                  </p>
-                  <div className="mt-1 flex items-center justify-between">
-                    <span className="text-xs text-gray-400">
-                      {formatDateTime(n.created_at)}
-                    </span>
-                    {!n.is_read && (
-                      <button
-                        type="button"
-                        onClick={() => onMarkRead(n.id)}
-                        disabled={markRead.isPending(n.id)}
-                        className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
-                      >
-                        Mark as read
-                      </button>
-                    )}
-                  </div>
-                </li>
+                  notification={n}
+                  onClose={() => setOpen(false)}
+                  onMarkedRead={() => mutate()}
+                />
               ))}
             </ul>
           )}
@@ -135,5 +109,62 @@ export function NotificationsBell() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Own `useAsyncAction()` instance per row -- a single shared instance across
+ * every preview row can't distinguish "row A's request is pending" from
+ * "row B's request is pending" (it tracks one pendingKey at a time), so two
+ * concurrent "Mark as read" clicks on different rows would incorrectly
+ * re-enable each other's button mid-flight.
+ */
+function NotificationRow({
+  notification: n,
+  onClose,
+  onMarkedRead,
+}: {
+  notification: Notification;
+  onClose: () => void;
+  onMarkedRead: () => void;
+}) {
+  const markRead = useAsyncAction();
+
+  const onMarkRead = () =>
+    markRead.run(() => notificationsApi.markAsRead(n.id), {
+      onSuccess: onMarkedRead,
+      errorMessage: "Failed to mark as read. Please try again.",
+    });
+
+  return (
+    <li
+      className={cn(
+        "border-b border-gray-50 px-4 py-3 last:border-b-0",
+        !n.is_read && "bg-blue-50/50",
+      )}
+    >
+      <Link
+        href={`/notifications/${n.id}`}
+        onClick={onClose}
+        className="block text-sm font-medium text-gray-900 hover:underline"
+      >
+        {n.title}
+      </Link>
+      <p className="mt-0.5 line-clamp-2 text-sm text-gray-500">{n.message}</p>
+      <div className="mt-1 flex items-center justify-between">
+        <span className="text-xs text-gray-400">{formatDateTime(n.created_at)}</span>
+        {!n.is_read && (
+          <button
+            type="button"
+            onClick={onMarkRead}
+            disabled={markRead.pending}
+            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+          >
+            Mark as read
+          </button>
+        )}
+      </div>
+      <FormError className="mt-1 text-xs">{markRead.error}</FormError>
+    </li>
   );
 }
