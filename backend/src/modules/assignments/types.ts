@@ -25,6 +25,14 @@ export const CreateCalendarEntrySchema = z.object({
   day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
 });
 
+// Calendar grid view: drag/drop scheduling. Day-only move — the hotel and
+// worker on a CalendarEntry never change via this endpoint (product
+// decision, 2026-08-05); moving to a different hotel means cancelling and
+// re-placing, not this endpoint.
+export const MoveCalendarEntrySchema = z.object({
+  day: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'day must be YYYY-MM-DD'),
+});
+
 export const ListCalendarEntriesQuerySchema = z.object({
   worker_id: z.string().optional(),
   hotel_id: z.string().optional(),
@@ -50,6 +58,7 @@ export type UpdateAssignmentInput = z.infer<typeof UpdateAssignmentSchema>;
 export type ListAssignmentsQuery = z.infer<typeof ListAssignmentsQuerySchema>;
 export type LogRoomsCompletedInput = z.infer<typeof LogRoomsCompletedSchema>;
 export type CreateCalendarEntryInput = z.infer<typeof CreateCalendarEntrySchema>;
+export type MoveCalendarEntryInput = z.infer<typeof MoveCalendarEntrySchema>;
 export type ListCalendarEntriesQuery = z.infer<typeof ListCalendarEntriesQuerySchema>;
 
 export interface RoomsCompletedEntryDto {

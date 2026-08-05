@@ -53,10 +53,25 @@ const listCalendarEntries = jest.fn(async () => ({ data: [], total: 0 })) as jes
   (...args: any[]) => any
 >;
 
+const moveCalendarEntry = jest.fn(async () => ({
+  assignment: { id: 'a1', worker_id: 'w1', hotel_id: 'h1' },
+  calendar_entry: {
+    id: 'ce1',
+    assignment_id: 'a1',
+    worker_id: 'w1',
+    hotel_id: 'h1',
+    day: '2026-08-12',
+    placed_by_id: 'admin_1',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+})) as jest.MockedFunction<(...args: any[]) => any>;
+
 jest.mock('../modules/assignments/service.js', () => ({
   assignmentService: {
     placeOnCalendar,
     listCalendarEntries,
+    moveCalendarEntry,
     list: jest.fn(async () => ({ data: [], total: 0 })) as jest.MockedFunction<(...args: any[]) => any>,
     getById: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -86,6 +101,7 @@ describe('Calendar-entries route: FEATURE_JOBDISPATCH_PHASE2 gate (end-to-end)',
     testAuth = { userId: 'admin_1', role: 'admin', scope: null };
     placeOnCalendar.mockClear();
     listCalendarEntries.mockClear();
+    moveCalendarEntry.mockClear();
   });
 
   describe('flag OFF (default)', () => {
@@ -102,6 +118,15 @@ describe('Calendar-entries route: FEATURE_JOBDISPATCH_PHASE2 gate (end-to-end)',
       const res = await request(makeApp()).get('/assignments/calendar-entries');
       void res;
       expect(listCalendarEntries).not.toHaveBeenCalled();
+    });
+
+    it('PATCH /assignments/calendar-entries/:id/move falls through to 404, never calling the service', async () => {
+      const res = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: '2026-08-12' });
+
+      expect(res.status).toBe(404);
+      expect(moveCalendarEntry).not.toHaveBeenCalled();
     });
   });
 
@@ -147,6 +172,53 @@ describe('Calendar-entries route: FEATURE_JOBDISPATCH_PHASE2 gate (end-to-end)',
 
       expect(res.status).toBe(422);
       expect(placeOnCalendar).not.toHaveBeenCalled();
+    });
+
+    it('PATCH /assignments/calendar-entries/:id/move reaches the service and returns 200 for an admitted role', async () => {
+      const res = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: '2026-08-12' });
+
+      expect(res.status).toBe(200);
+      expect(moveCalendarEntry).toHaveBeenCalledTimes(1);
+      expect(moveCalendarEntry.mock.calls[0]?.[0]).toBe('ce1');
+      expect(moveCalendarEntry.mock.calls[0]?.[1]).toEqual({ day: '2026-08-12' });
+    });
+
+    it('PATCH /assignments/calendar-entries/:id/move admits manager and regional_manager', async () => {
+      testAuth = { userId: 'mgr1', role: 'manager', scope: null };
+      const managerRes = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: '2026-08-12' });
+      expect(managerRes.status).toBe(200);
+
+      testAuth = { userId: 'rm1', role: 'regional_manager', scope: null };
+      const rmRes = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: '2026-08-12' });
+      expect(rmRes.status).toBe(200);
+
+      expect(moveCalendarEntry).toHaveBeenCalledTimes(2);
+    });
+
+    it('PATCH /assignments/calendar-entries/:id/move rejects a worker with 403', async () => {
+      testAuth = { userId: 'w1', role: 'worker', scope: null };
+
+      const res = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: '2026-08-12' });
+
+      expect(res.status).toBe(403);
+      expect(moveCalendarEntry).not.toHaveBeenCalled();
+    });
+
+    it('PATCH /assignments/calendar-entries/:id/move rejects a malformed body with 422, never calling the service', async () => {
+      const res = await request(makeApp())
+        .patch('/assignments/calendar-entries/ce1/move')
+        .send({ day: 'not-a-date' });
+
+      expect(res.status).toBe(422);
+      expect(moveCalendarEntry).not.toHaveBeenCalled();
     });
   });
 });

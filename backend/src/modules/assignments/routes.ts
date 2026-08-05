@@ -8,6 +8,7 @@ import {
   listAssignments,
   listCalendarEntries,
   logRoomsCompleted,
+  moveCalendarEntry,
   updateAssignment,
 } from './controller.js';
 
@@ -50,6 +51,32 @@ router.get('/calendar-entries', (req, res, next) => {
   }
   listCalendarEntries(req, res, next);
 });
+
+// Calendar grid view: drag/drop scheduling (day-only move, product decision
+// 2026-08-05). Same flag gate and role/scope shape as POST /calendar-entries
+// above — admin/manager/regional_manager, with the inline isHotelInScope()
+// check in the service. Registered ahead of the bare PATCH /:id below so a
+// calendar-entry id can never be mistaken for an assignment id there (it
+// isn't one — this path segment is longer/distinct regardless of
+// registration order, but kept grouped with its sibling calendar-entries
+// routes for readability).
+router.patch(
+  '/calendar-entries/:id/move',
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    requireRole(['admin', 'manager', 'regional_manager'])(req, res, next);
+  },
+  (req, res, next) => {
+    if (!isJobDispatchPhase2Enabled()) {
+      next();
+      return;
+    }
+    moveCalendarEntry(req, res, next);
+  }
+);
 
 // RBAC per API_SPEC_V1_PATCH_V2 §PATCH-07:
 // Read: all authenticated roles (service scopes workers to their own assignments).

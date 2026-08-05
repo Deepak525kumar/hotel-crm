@@ -20,11 +20,14 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockWorkerAssignment = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockCalendarEntry = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
@@ -277,6 +280,129 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       // The failure happened on the WorkerAssignment create — calendarEntry.create()
       // must never have been reached in this transaction attempt.
       expect(mockCalendarEntry.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('moveCalendarEntry (calendar grid view drag/drop, day-only move)', () => {
+    beforeEach(() => {
+      mockCalendarEntry.findUnique.mockReset();
+      mockCalendarEntry.update.mockReset();
+      mockWorkerAssignment.update.mockReset();
+      mockHotel.findUnique.mockReset();
+    });
+
+    it('admin moves a placement to a new day', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow());
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+
+      const result = await service.moveCalendarEntry(
+        'ce1',
+        { day: '2026-08-05' },
+        { userId: 'admin1', role: 'admin' }
+      );
+
+      expect(result.calendar_entry.day).toBe('2026-08-05');
+      expect(mockCalendarEntry.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'ce1' }, data: { day: new Date('2026-08-05T00:00:00.000Z') } })
+      );
+      expect(mockWorkerAssignment.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'a1' }, data: { day: new Date('2026-08-05T00:00:00.000Z') } })
+      );
+    });
+
+    it('throws NotFoundError when the calendar entry does not exist', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.moveCalendarEntry('missing', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' })
+      ).rejects.toThrow('Calendar entry not found');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('manager in scope (hotel claim matches) succeeds', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ hotel_id: 'h1' }));
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow());
+
+      await service.moveCalendarEntry(
+        'ce1',
+        { day: '2026-08-05' },
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } }
+      );
+
+      expect(mockCalendarEntry.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('manager out of scope (hotel claim does not match) is rejected (ForbiddenError)', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ hotel_id: 'h1' }));
+
+      await expect(
+        service.moveCalendarEntry(
+          'ce1',
+          { day: '2026-08-05' },
+          { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h2' } }
+        )
+      ).rejects.toThrow('Cannot move a calendar placement for this hotel');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('regional_manager in scope (hotel_group claim matches the hotel\'s group) succeeds — ADR-030 D-5', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ hotel_id: 'h1' }));
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow());
+
+      await service.moveCalendarEntry(
+        'ce1',
+        { day: '2026-08-05' },
+        { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      );
+
+      expect(mockCalendarEntry.update).toHaveBeenCalledTimes(1);
+    });
+
+    it('regional_manager out of scope (hotel belongs to another group) is denied', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ hotel_id: 'h1' }));
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+
+      await expect(
+        service.moveCalendarEntry(
+          'ce1',
+          { day: '2026-08-05' },
+          { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        )
+      ).rejects.toThrow('Cannot move a calendar placement for this hotel');
+    });
+
+    it('translates a P2002 unique-constraint violation into ConflictError (destination day already occupied)', async () => {
+      const { Prisma } = await import('@prisma/client');
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow());
+      mockCalendarEntry.update.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
+          code: 'P2002',
+          clientVersion: '5.22.0',
+        })
+      );
+
+      await expect(
+        service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' })
+      ).rejects.toThrow('Worker already has a calendar placement for this day');
+    });
+
+    it('never changes hotel_id or worker_id — day-only move (product decision, 2026-08-05)', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ hotel_id: 'h1', worker_id: 'w1' }));
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow());
+
+      await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+      const calendarUpdateCall = mockCalendarEntry.update.mock.calls[0]?.[0] as any;
+      const assignmentUpdateCall = mockWorkerAssignment.update.mock.calls[0]?.[0] as any;
+      expect(calendarUpdateCall.data).toEqual({ day: new Date('2026-08-05T00:00:00.000Z') });
+      expect(assignmentUpdateCall.data).toEqual({ day: new Date('2026-08-05T00:00:00.000Z') });
     });
   });
 
