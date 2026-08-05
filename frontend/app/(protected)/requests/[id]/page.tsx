@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
@@ -16,9 +17,11 @@ import {
   DataList,
   DataRow,
   FormError,
+  Modal,
   PageHeader,
   Skeleton,
   TextLink,
+  Textarea,
 } from "@/components/ui";
 
 export default function WorkRequestDetailPage() {
@@ -26,14 +29,32 @@ export default function WorkRequestDetailPage() {
   const id = params.id;
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
-  const publish = useAsyncAction();
+  const action = useAsyncAction();
+
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const onPublish = () =>
-    publish.run(() => workRequestsApi.publish(id), {
+    action.run(() => workRequestsApi.publish(id), {
+      key: "publish",
       // Optimistically replace the cached value with the server response.
       onSuccess: (updated) => mutate(updated, { revalidate: false }),
       errorMessage: "Failed to publish. Please try again.",
     });
+
+  const onCancel = () =>
+    action.run(
+      () => workRequestsApi.cancel(id, cancelReason.trim() || undefined),
+      {
+        key: "cancel",
+        onSuccess: async (updated) => {
+          await mutate(updated, { revalidate: false });
+          setCancelOpen(false);
+          setCancelReason("");
+        },
+        errorMessage: "Failed to cancel. Please try again.",
+      },
+    );
 
   if (isLoading) {
     return (
@@ -150,21 +171,85 @@ export default function WorkRequestDetailPage() {
       )}
 
       <StaffingWriteGate>
-        {request.status === "DRAFT" && (
-          <Card>
-            <CardContent className="flex items-center justify-between gap-4">
-              <div className="text-sm text-gray-600">
-                This request is a draft. Publish it to open it for staffing.
-              </div>
-              <Button onClick={onPublish} loading={publish.pending}>
-                Publish
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        {(() => {
+          const canPublish = request.status === "DRAFT";
+          const canCancel =
+            request.status === "DRAFT" ||
+            request.status === "OPEN" ||
+            request.status === "PARTIALLY_FILLED";
+
+          if (!canPublish && !canCancel) return null;
+
+          return (
+            <Card>
+              <CardContent className="flex items-center justify-between gap-4">
+                <div className="text-sm text-gray-600">
+                  {canPublish
+                    ? "This request is a draft. Publish it to open it for staffing."
+                    : "Manage this work request's status."}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  {canCancel && (
+                    <Button
+                      variant="outline"
+                      onClick={() => setCancelOpen(true)}
+                      disabled={action.pending}
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                  {canPublish && (
+                    <Button
+                      onClick={onPublish}
+                      loading={action.isPending("publish")}
+                      disabled={action.isPending("cancel")}
+                    >
+                      Publish
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
       </StaffingWriteGate>
 
-      <FormError>{publish.error}</FormError>
+      <FormError>{action.error}</FormError>
+
+      <Modal
+        open={cancelOpen}
+        onClose={() => {
+          if (!action.isPending("cancel")) setCancelOpen(false);
+        }}
+        title="Cancel work request"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setCancelOpen(false)}
+              disabled={action.isPending("cancel")}
+            >
+              Keep request
+            </Button>
+            <Button
+              variant="danger"
+              onClick={onCancel}
+              loading={action.isPending("cancel")}
+            >
+              Cancel request
+            </Button>
+          </>
+        }
+      >
+        <Textarea
+          label="Reason (optional)"
+          value={cancelReason}
+          onChange={(e) => setCancelReason(e.target.value)}
+          maxLength={500}
+          rows={4}
+          placeholder="Share why this work request was cancelled."
+        />
+      </Modal>
     </div>
   );
 }

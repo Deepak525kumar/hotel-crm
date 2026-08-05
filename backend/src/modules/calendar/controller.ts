@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { calendarService } from './service.js';
-import { MarkAbsenceSchema } from './types.js';
+import { MarkAbsenceSchema, ListAbsencesQuerySchema } from './types.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
 
 function zodDetails(error: import('zod').ZodError) {
@@ -63,6 +63,31 @@ export class CalendarController {
       }
       const result = await calendarService.markAbsence(req.auth.userId, parsed.data);
       res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // New (calendar grid view): manager/regional_manager/admin view of
+  // absences across their scoped team.
+  async listAbsences(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const parsed = ListAbsencesQuerySchema.safeParse(req.query);
+      if (!parsed.success) {
+        next(new ValidationError('Invalid query parameters', zodDetails(parsed.error)));
+        return;
+      }
+      const result = await calendarService.listAbsences(parsed.data, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
+      res.status(200).json({
         status: 'success',
         data: result,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

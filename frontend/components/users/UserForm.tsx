@@ -30,6 +30,11 @@ export interface UserFormValues {
   is_active: boolean;
 }
 
+/** Submitted shape: unlike form state, blank phone becomes `null`, not `""`. */
+export type UserFormSubmitValues = Omit<UserFormValues, "phone"> & {
+  phone: string | null;
+};
+
 function toValues(user?: UserDetail | null): UserFormValues {
   return {
     email: user?.email ?? "",
@@ -47,7 +52,7 @@ export interface UserFormProps {
   user?: UserDetail | null;
   submitting?: boolean;
   error?: string | null;
-  onSubmit: (values: UserFormValues) => void;
+  onSubmit: (values: UserFormSubmitValues) => void;
   onCancel?: () => void;
 }
 
@@ -72,7 +77,9 @@ export function UserForm({
       email: form.email.trim(),
       first_name: form.first_name.trim(),
       last_name: form.last_name.trim(),
-      phone: form.phone.trim(),
+      // Blank phone must not be sent as "" — phone is unique-but-nullable,
+      // and "" collides with every other user who also left it blank.
+      phone: form.phone.trim() || null,
     });
   };
 

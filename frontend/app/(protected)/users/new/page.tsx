@@ -6,7 +6,7 @@ import { mutate } from "swr";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
-import type { UserFormValues } from "@/components/users/UserForm";
+import type { UserFormSubmitValues } from "@/components/users/UserForm";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateUserInput } from "@/lib/types";
 
@@ -15,7 +15,7 @@ function NewUser() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async (values: UserFormValues) => {
+  const onSubmit = async (values: UserFormSubmitValues) => {
     setError(null);
     setSubmitting(true);
     const payload: CreateUserInput = {

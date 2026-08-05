@@ -16,6 +16,7 @@ import {
   ListAssignmentsQuery,
   ListCalendarEntriesQuery,
   LogRoomsCompletedInput,
+  MoveCalendarEntryInput,
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
 } from './types.js';
@@ -365,12 +366,69 @@ export class AssignmentService extends BaseService {
     };
   }
 
+  // Calendar grid view: drag/drop scheduling. Day-only move — hotel and
+  // worker are unchanged (product decision, 2026-08-05); role/scope gate and
+  // hotel-scope check mirror placeOnCalendar() exactly, since a manager/RM
+  // moving a placement is authorizing the same "can this actor schedule this
+  // worker at this hotel" question create does, just for a different day.
+  async moveCalendarEntry(
+    calendarEntryId: string,
+    input: MoveCalendarEntryInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<{ assignment: AssignmentDto; calendar_entry: CalendarEntryDto }> {
+    const existing = await this.prisma.calendarEntry.findUnique({ where: { id: calendarEntryId } });
+    if (!existing) throw new NotFoundError('Calendar entry not found');
+
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, existing.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot move a calendar placement for this hotel');
+      }
+    }
+
+    const day = new Date(`${input.day}T00:00:00.000Z`);
+
+    let updated;
+    try {
+      updated = await this.prisma.$transaction(async (tx) => {
+        const calendarEntry = await tx.calendarEntry.update({
+          where: { id: calendarEntryId },
+          data: { day },
+        });
+        const assignment = await tx.workerAssignment.update({
+          where: { id: existing.assignment_id },
+          data: { day },
+        });
+        return { assignment, calendarEntry };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('Worker already has a calendar placement for this day');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'MOVE_CALENDAR_ENTRY', 'CALENDAR_ENTRY', calendarEntryId, {
+      assignment_id: updated.assignment.id,
+      from_day: existing.day.toISOString().slice(0, 10),
+      to_day: input.day,
+    });
+
+    return {
+      assignment: this.toDto(updated.assignment),
+      calendar_entry: this.toCalendarEntryDto(updated.calendarEntry),
+    };
+  }
+
   async listCalendarEntries(
     query: ListCalendarEntriesQuery,
     actor: { userId: string; role: string }
   ): Promise<{ data: CalendarEntryDto[]; total: number }> {
     const where: Prisma.CalendarEntryWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
+      ...(query.from && query.to
+        ? { day: { gte: new Date(`${query.from}T00:00:00.000Z`), lte: new Date(`${query.to}T00:00:00.000Z`) } }
+        : {}),
     };
 
     // Workers see only their own calendar entries; admin/manager may filter

@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { ApiError, calendarApi } from "@/lib/api";
+import type { ListAbsencesQuery } from "@/lib/types";
 
 /**
  * Fetches a worker's today-only availability (SPEC-CALENDAR-001 REQ-CAL-T06,
@@ -37,4 +38,25 @@ export function useAvailability(workerId: string | null | undefined) {
 /** REQ-CAL-T02: the caller's own absences (self-scoped, any authenticated role). */
 export function useOwnAbsences() {
   return useSWR(["my-absences"], () => calendarApi.listOwnAbsences());
+}
+
+/**
+ * Calendar grid view (admin/manager/regional_manager, view-only): absences
+ * across the caller's scoped team for a bounded date range. A 403 here means
+ * "not visible to me" (no resolvable scope) rather than a real failure — same
+ * treatment as {@link useAvailability} above — since the backend already
+ * returns an empty list rather than throwing for a scoped-but-empty result;
+ * a 403 would only occur for a role the route gate itself denies outright.
+ */
+export function useAbsencesInRange(query: ListAbsencesQuery | null) {
+  return useSWR(
+    query ? ["calendar-absences", query] : null,
+    ([, q]) => calendarApi.listAbsences(q),
+    {
+      onError: (error) => {
+        if (error instanceof ApiError && error.status === 403) return;
+        console.error("Failed to load absences", { query }, error);
+      },
+    },
+  );
 }

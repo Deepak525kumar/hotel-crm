@@ -127,7 +127,7 @@ export interface CreateUserInput {
 export interface UpdateUserInput {
   first_name?: string;
   last_name?: string;
-  phone?: string;
+  phone?: string | null;
   is_active?: boolean;
 }
 
@@ -604,6 +604,9 @@ export interface CreateCalendarEntryInput {
 export interface ListCalendarEntriesQuery {
   worker_id?: string;
   hotel_id?: string;
+  /** Calendar grid view: bounded day range (YYYY-MM-DD), both or neither. */
+  from?: string;
+  to?: string;
   page?: number;
   per_page?: number;
 }
@@ -804,6 +807,17 @@ export interface CalendarAbsence {
 export interface MarkAbsenceInput {
   day: string; // ISO date (YYYY-MM-DD)
   kind: AbsenceKind;
+}
+
+/**
+ * Query params accepted by `GET /calendar/absences` (calendar grid view,
+ * manager/regional_manager/admin, view-only — see calendar/types.ts
+ * ListAbsencesQuerySchema).
+ */
+export interface ListAbsencesQuery {
+  from: string; // YYYY-MM-DD
+  to: string; // YYYY-MM-DD
+  worker_id?: string;
 }
 
 /* -------------------------------------------------------------------------- */

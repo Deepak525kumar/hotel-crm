@@ -215,7 +215,10 @@ export class UserService extends BaseService {
         data: {
           first_name: data.first_name ?? user.first_name,
           last_name: data.last_name ?? user.last_name,
-          phone: data.phone ?? user.phone,
+          // Empty string is a real, non-null value for the @unique phone
+          // column — passing it through collides with any other user who
+          // also has no phone number, surfacing as a false "already exists".
+          phone: data.phone !== undefined ? (data.phone?.trim() || null) : user.phone,
           role: newRole,
           is_active: newIsActive,
         },
@@ -278,7 +281,8 @@ export class UserService extends BaseService {
         data: {
           first_name: data.first_name ?? user.first_name,
           last_name: data.last_name ?? user.last_name,
-          phone: data.phone ?? user.phone,
+          // See updateUser: empty string must not hit the @unique phone column.
+          phone: data.phone !== undefined ? (data.phone?.trim() || null) : user.phone,
           is_active: newIsActive,
         },
         select: {

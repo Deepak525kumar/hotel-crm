@@ -7,6 +7,7 @@ import {
   ListAssignmentsQuerySchema,
   ListCalendarEntriesQuerySchema,
   LogRoomsCompletedSchema,
+  MoveCalendarEntrySchema,
   UpdateAssignmentSchema,
 } from './types.js';
 
@@ -130,6 +131,30 @@ export async function createCalendarEntry(
       scope: req.auth!.scope ?? null,
     });
     sendSuccess(res, result, { statusCode: 201, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Calendar grid view: drag/drop scheduling. Day-only move (product decision,
+// 2026-08-05) — hotel/worker are unchanged.
+export async function moveCalendarEntry(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = MoveCalendarEntrySchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await assignmentService.moveCalendarEntry(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
     next(error);
   }

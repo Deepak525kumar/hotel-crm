@@ -26,6 +26,12 @@ export const NAV: NavItem[] = [
   // creation/detail flows don't get conflated.
   { href: "/requests/broadcasts", label: "Broadcasts" },
   { href: "/assignments", label: "Assignments" },
+  // Teams-style day-grid view of placements + absences (FEATURE_JOBDISPATCH_PHASE2
+  // gates placement data server-side; absences are additionally manager/RM/admin-only
+  // — a worker/checker still sees the page, just with an empty placements/absences
+  // set until the flag is on, matching the "not visible to me, not an error" pattern
+  // this app already uses elsewhere).
+  { href: "/calendar", label: "Calendar" },
   { href: "/attendance", label: "Attendance" },
   // SPEC-GEO-001 (GD-14): regional_manager added per Regional Manager V1
   // Decision 3 (grant at group scope) — see GeoCheckinsGate for the backend

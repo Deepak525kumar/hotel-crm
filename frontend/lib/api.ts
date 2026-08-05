@@ -31,6 +31,7 @@ import type {
   Hotel,
   HotelGroup,
   Contract,
+  ListAbsencesQuery,
   ListAssignmentsQuery,
   ListAttendanceQuery,
   ListCalendarEntriesQuery,
@@ -382,6 +383,16 @@ export const workRequestsApi = {
       body: { status: "OPEN" },
     }),
 
+  /** Cancel a DRAFT/OPEN/PARTIALLY_FILLED request by transitioning it to CANCELLED. */
+  cancel: (id: string, reason?: string) =>
+    apiFetch<WorkRequest>(`/work-requests/${id}`, {
+      method: "PATCH",
+      body: {
+        status: "CANCELLED",
+        ...(reason ? { cancellation_reason: reason } : {}),
+      },
+    }),
+
   /**
    * Job Dispatch Phase 2 (Epic 9 PR 9.7, admin/manager only): raise a
    * standalone broadcast specifying skill x headcount lines. Published
@@ -466,6 +477,17 @@ export const assignmentsApi = {
 
   listCalendarEntries: (query: ListCalendarEntriesQuery = {}) =>
     apiFetch<CalendarEntryDto[]>(`/assignments/calendar-entries${toQuery({ ...query })}`),
+
+  /**
+   * Calendar grid view (drag/drop scheduling): moves a placement to a new
+   * day. Day-only — hotel and worker are unchanged (product decision,
+   * 2026-08-05). Same flag/role gate as createCalendarEntry above.
+   */
+  moveCalendarEntry: (id: string, day: string) =>
+    apiFetch<CalendarEntryDto>(`/assignments/calendar-entries/${id}/move`, {
+      method: "PATCH",
+      body: { day },
+    }),
 };
 
 /**
@@ -554,6 +576,14 @@ export const calendarApi = {
   /** REQ-CAL-T03/T04/T08: marks the caller absent for one day (self-scoped). */
   markOwnAbsence: (input: MarkAbsenceInput) =>
     apiFetch<CalendarAbsence>("/calendar/my-absences", { method: "POST", body: input }),
+
+  /**
+   * Calendar grid view (admin/manager/regional_manager, view-only): absences
+   * across the caller's scoped team for a bounded date range. No write path —
+   * absence marking stays self-service only (see markOwnAbsence above).
+   */
+  listAbsences: (query: ListAbsencesQuery) =>
+    apiFetch<CalendarAbsence[]>(`/calendar/absences${toQuery({ ...query })}`),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */
