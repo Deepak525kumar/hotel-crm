@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { localToday } from "@/lib/format";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
@@ -93,10 +94,26 @@ function NewWorkRequestForm() {
     }
   };
 
-  const onSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    submit("DRAFT");
-  };
+  // Best-effort guard only, using the browser's local date -- the backend
+  // has no equivalent cross-field check today (format-only regex), so this
+  // is purely a UX improvement for honest input, not a security boundary.
+  // Unlike AbsencesCard's date guard, there is no backend fallback here if
+  // this client check is ever wrong, so it must actually be correct: see
+  // localToday()'s own comment for why a naive `toISOString()` slice is a
+  // real bug (it's the UTC date, not the local one -- it incorrectly
+  // treats "today" as already past for several hours every evening in any
+  // timezone west of UTC).
+  const today = localToday();
+  const isPastDate = form.shift_date && form.shift_date < today;
+  const isEndBeforeStart =
+    form.shift_start_time &&
+    form.shift_end_time &&
+    form.shift_end_time <= form.shift_start_time;
+  const dateTimeError = isPastDate
+    ? "Shift date cannot be in the past."
+    : isEndBeforeStart
+      ? "End time must be after start time."
+      : null;
 
   // Native required attributes cover the mandatory fields; the publish button
   // additionally checks the form's validity before submitting as OPEN.
@@ -106,7 +123,14 @@ function NewWorkRequestForm() {
     form.shift_date &&
     form.shift_start_time &&
     form.shift_end_time &&
-    Number(form.workers_needed) > 0;
+    Number(form.workers_needed) > 0 &&
+    !dateTimeError;
+
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!valid) return;
+    submit("DRAFT");
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -162,6 +186,7 @@ function NewWorkRequestForm() {
                 label="Shift date"
                 type="date"
                 required
+                min={today}
                 value={form.shift_date}
                 onChange={(e) => set("shift_date", e.target.value)}
               />
@@ -179,6 +204,7 @@ function NewWorkRequestForm() {
                 label="End time"
                 type="time"
                 required
+                min={form.shift_start_time || undefined}
                 value={form.shift_end_time}
                 onChange={(e) => set("shift_end_time", e.target.value)}
               />
@@ -218,14 +244,14 @@ function NewWorkRequestForm() {
               onChange={(e) => set("requirements", e.target.value)}
             />
 
-            <FormError>{error}</FormError>
+            <FormError>{dateTimeError ?? error}</FormError>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button
                 type="submit"
                 variant="outline"
                 loading={submitting === "draft"}
-                disabled={submitting !== null}
+                disabled={submitting !== null || !valid}
               >
                 Save draft
               </Button>

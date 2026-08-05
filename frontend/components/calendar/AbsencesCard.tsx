@@ -5,7 +5,7 @@ import { mutate } from "swr";
 import { useOwnAbsences } from "@/hooks/useCalendar";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { calendarApi } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { formatDate, localToday } from "@/lib/format";
 import {
   Badge,
   Button,
@@ -144,12 +144,14 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
         <Input
           label="Date"
           type="date"
-          // Best-effort guard only, using the browser's local date — the
-          // backend's own timezone-aware check (ConflictError, "Cannot mark
-          // a past day sick or vacation") remains the authoritative one and
-          // is surfaced via FormError below if this client-side check
-          // somehow disagrees with it (e.g. a stale local clock).
-          min={new Date().toISOString().slice(0, 10)}
+          // Best-effort guard only, using the browser's local date (see
+          // localToday()'s own comment: `toISOString()` would give the UTC
+          // date, which disagrees with local for part of the day in any
+          // non-UTC timezone) — the backend's own timezone-aware check
+          // (ConflictError, "Cannot mark a past day sick or vacation")
+          // remains the authoritative one and is surfaced via FormError
+          // below if this client-side check somehow disagrees with it.
+          min={localToday()}
           value={day}
           onChange={(e) => setDay(e.target.value)}
         />

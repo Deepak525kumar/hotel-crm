@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { localToday } from "@/lib/format";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
@@ -84,13 +85,35 @@ function NewBroadcastForm() {
       skills: prev.skills.filter((_, i) => i !== index),
     }));
 
+  // Best-effort guard only, using the browser's local date -- the backend
+  // has no equivalent cross-field check today (format-only regex), so this
+  // is purely a UX improvement for honest input, not a security boundary.
+  // Unlike AbsencesCard's date guard, there is no backend fallback here if
+  // this client check is ever wrong, so it must actually be correct: see
+  // localToday()'s own comment for why a naive `toISOString()` slice is a
+  // real bug (it's the UTC date, not the local one -- it incorrectly
+  // treats "today" as already past for several hours every evening in any
+  // timezone west of UTC).
+  const today = localToday();
+  const isPastDate = form.shift_date && form.shift_date < today;
+  const isEndBeforeStart =
+    form.shift_start_time &&
+    form.shift_end_time &&
+    form.shift_end_time <= form.shift_start_time;
+  const dateTimeError = isPastDate
+    ? "Shift date cannot be in the past."
+    : isEndBeforeStart
+      ? "End time must be after start time."
+      : null;
+
   const valid =
     form.hotel_id &&
     form.shift_date &&
     form.shift_start_time &&
     form.shift_end_time &&
     form.skills.length > 0 &&
-    form.skills.every((line) => Number(line.headcount) > 0);
+    form.skills.every((line) => Number(line.headcount) > 0) &&
+    !dateTimeError;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,6 +187,7 @@ function NewBroadcastForm() {
                 label="Shift date"
                 type="date"
                 required
+                min={today}
                 value={form.shift_date}
                 onChange={(e) => set("shift_date", e.target.value)}
               />
@@ -178,6 +202,7 @@ function NewBroadcastForm() {
                 label="End time"
                 type="time"
                 required
+                min={form.shift_start_time || undefined}
                 value={form.shift_end_time}
                 onChange={(e) => set("shift_end_time", e.target.value)}
               />
@@ -254,7 +279,7 @@ function NewBroadcastForm() {
               ))}
             </div>
 
-            <FormError>{error}</FormError>
+            <FormError>{dateTimeError ?? error}</FormError>
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="submit" loading={submitting} disabled={submitting || !valid}>
