@@ -217,4 +217,77 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
       .send({ status: 'IN_PROGRESS' });
     expect(res.status).toBe(403);
   });
+
+  // The scope check above (line 158-170 of service.ts) runs unconditionally,
+  // before input.status is ever read -- so in principle it applies
+  // identically to every transition. The IN_PROGRESS (start) cases above
+  // prove the check fires at all; this block proves it for COMPLETE and
+  // CANCEL too, rather than relying on that "runs before status is read"
+  // claim without a test to back it for the other two transitions a
+  // manager/RM can actually drive day to day.
+  describe('the same scope guard applies to complete and cancel, not just start', () => {
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('manager in scope: $label (200)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'mgr_other', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9', status: fromStatus });
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(200);
+    });
+
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('manager out of scope: $label (403, never reaches the transition logic)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'mgr_other', role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9', status: fromStatus });
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('regional_manager in scope: $label (200)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'rm_other', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9', status: fromStatus });
+      membershipHotelIds = ['h9'];
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(200);
+    });
+
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('regional_manager out of scope: $label (403, never reaches the transition logic)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'rm_other', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h9', status: fromStatus });
+      membershipHotelIds = [];
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(403);
+    });
+
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('worker: $label their own assignment (200)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'w1', role: 'worker' };
+      currentAssignment = makeAssignment({ worker_id: 'w1', hotel_id: 'h9', status: fromStatus });
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(200);
+    });
+
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('worker: $label ANOTHER worker\'s assignment with no hotel membership (403)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'w1', role: 'worker' };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: fromStatus });
+      membershipHotelIds = [];
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(403);
+    });
+  });
 });
