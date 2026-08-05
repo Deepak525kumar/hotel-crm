@@ -377,6 +377,47 @@ describe('UserService', () => {
       expect(result.first_name).toBe('Changed');
     });
 
+    // Regression: phone is @unique-but-nullable. An empty string is a real,
+    // non-null value, so writing "" for every phoneless user collided with
+    // the first phoneless user to save, surfacing as a false P2002
+    // "already exists" on totally unrelated edits. Blank phone must persist
+    // as null, not "".
+    it('normalizes a blank phone to null instead of writing an empty string', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUser('u_worker', { first_name: 'Changed', phone: '   ' }, 'manager_actor', 'manager');
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ phone: null }) })
+      );
+    });
+
+    it('leaves phone untouched when the field is omitted from the payload', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: '+15551234567', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: '+15551234567', role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.updateUser('u_worker', { first_name: 'Changed' }, 'manager_actor', 'manager');
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ phone: '+15551234567' }) })
+      );
+    });
+
     // ADR-031 D-4/C-5: a role change or deactivation must bump
     // token_generation atomically with the state change that motivates it.
     it('bumps token_generation on a role change', async () => {

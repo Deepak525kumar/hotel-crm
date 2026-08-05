@@ -7,7 +7,7 @@ import { useUser } from "@/hooks/useUsers";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
-import type { UserFormValues } from "@/components/users/UserForm";
+import type { UserFormSubmitValues } from "@/components/users/UserForm";
 import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateUserInput } from "@/lib/types";
 
@@ -21,7 +21,7 @@ function EditUser() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const onSubmit = async (values: UserFormValues) => {
+  const onSubmit = async (values: UserFormSubmitValues) => {
     setSubmitError(null);
     setSubmitting(true);
     const payload: UpdateUserInput = {

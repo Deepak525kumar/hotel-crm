@@ -21,7 +21,7 @@ export const CreateUserSchema = z.object({
 export const UpdateUserSchema = z.object({
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
-  phone: z.string().optional(),
+  phone: z.string().nullable().optional(),
   role: z.enum(['worker', 'checker', 'manager', 'admin']).optional(),
   is_active: z.boolean().optional(),
 });
@@ -36,7 +36,7 @@ export const UpdateUserProfileSchema = z
   .object({
     first_name: z.string().min(1).max(100).optional(),
     last_name: z.string().min(1).max(100).optional(),
-    phone: z.string().optional(),
+    phone: z.string().nullable().optional(),
     is_active: z.boolean().optional(),
   })
   .strict();
