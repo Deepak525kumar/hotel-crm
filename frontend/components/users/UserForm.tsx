@@ -50,6 +50,8 @@ function toValues(user?: UserDetail | null): UserFormValues {
 export interface UserFormProps {
   mode: "create" | "edit";
   user?: UserDetail | null;
+  /** PUT /users/:id/role is admin-only backend-side; disable the selector for any other actor so a manager/RM can't submit a role change that will just be rejected. */
+  canEditRole?: boolean;
   submitting?: boolean;
   error?: string | null;
   onSubmit: (values: UserFormSubmitValues) => void;
@@ -60,6 +62,7 @@ export interface UserFormProps {
 export function UserForm({
   mode,
   user,
+  canEditRole = true,
   submitting = false,
   error,
   onSubmit,
@@ -145,6 +148,8 @@ export function UserForm({
               value={form.role}
               onChange={(e) => set("role", e.target.value as Role)}
               options={ROLE_OPTIONS}
+              disabled={!canEditRole}
+              hint={!canEditRole ? "Only admins can change a user's role." : undefined}
             />
           </div>
 

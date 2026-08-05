@@ -10,7 +10,7 @@ import {
   UpdateUserRoleRequest,
   ListUsersQuery,
 } from './types.js';
-import { resolveNonAdminScopeFilter, isWorkerInGroupScope } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
@@ -109,7 +109,7 @@ export class UserService extends BaseService {
     };
   }
 
-  async getUser(userId: string, actorId: string, actorRole: string, ip?: string) {
+  async getUser(userId: string, actorId: string, actorRole: string, actorScope: UserScope | null, ip?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -127,6 +127,22 @@ export class UserService extends BaseService {
       },
     });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
+
+    // Read-side counterpart of updateUser's scope check: a manager/RM could
+    // otherwise read any user's full profile platform-wide (a read-only
+    // IDOR), holding `users:read` with no route-level scope gate. `checker`
+    // is deliberately left unscoped here, matching its documented
+    // cross-hotel bypass elsewhere in this module (isSelfScopedRole).
+    // Self-read is exempt (a manager viewing their OWN profile, e.g. the
+    // /users/:id detail page they now have a nav link to) — same exemption
+    // as updateUser's target-role/scope check.
+    if (isScopedManagerRole(actorRole) && userId !== actorId) {
+      if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
+        throw new ForbiddenError('User not in your scope');
+      }
+      const inScope = await isWorkerInGroupScope(actorScope, userId);
+      if (!inScope) throw new ForbiddenError('User not in your scope');
+    }
 
     await this.logAudit(actorId, actorRole, 'VIEW', 'USER', userId, {}, ip);
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
@@ -182,7 +198,14 @@ export class UserService extends BaseService {
     return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
   }
 
-  async updateUser(userId: string, data: UpdateUserRequest, actorId: string, actorRole: string, ip?: string) {
+  async updateUser(
+    userId: string,
+    data: UpdateUserRequest,
+    actorId: string,
+    actorRole: string,
+    actorScope: UserScope | null,
+    ip?: string
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
@@ -198,6 +221,31 @@ export class UserService extends BaseService {
     // Prevent non-admins from elevating to admin
     if (data.role === 'admin' && actorRole !== 'admin') {
       throw new ForbiddenError('Only admins can assign admin role');
+    }
+
+    // This is the flag-off (default) legacy path — it never had a scope
+    // check at all, so a manager/regional_manager reachable at the route
+    // (`requireRole(['admin','manager','regional_manager'])`) could update
+    // or deactivate any non-admin user platform-wide — the same bug class
+    // fixed for assignments in PR #344. Product decision (2026-08-06): a
+    // scoped manager/RM may only edit worker/checker targets, and only ones
+    // already on their group's roster (an EmploymentRecord assigned to a
+    // hotel_group) — never another admin/manager/RM, and never a worker who
+    // hasn't been onboarded yet (that's an Admin-only action until then).
+    // Self-edit is exempt from the target-role/scope check below (a manager
+    // editing their OWN name/phone isn't "modifying a manager account" in
+    // the sense that rule is guarding against) — `data.role`/elevation are
+    // already blocked above regardless of actor/target.
+    // Kept as `actorRole !== 'admin'` (deny-list), not isScopedManagerRole
+    // (allow-list): this route is admin/manager/RM-only today, but a
+    // deny-list fails safe if a future role were ever added to it, where an
+    // allow-list would silently skip the check for that new role.
+    if (actorRole !== 'admin' && userId !== actorId) {
+      if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
+        throw new ForbiddenError('Only admins can modify manager or admin accounts');
+      }
+      const inScope = await isWorkerInGroupScope(actorScope, userId);
+      if (!inScope) throw new ForbiddenError('User not in your scope');
     }
 
     const newRole = data.role ? (data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN') : user.role;

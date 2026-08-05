@@ -80,9 +80,13 @@ function UsersDirectory() {
         title="Users"
         description="People with access to the platform."
         actions={
-          <Link href="/users/new">
-            <Button>New user</Button>
-          </Link>
+          // POST /users is admin-only backend-side; a manager/RM can browse
+          // this directory (scope-filtered to their own group) but not create.
+          <RoleGate allow={["admin"]}>
+            <Link href="/users/new">
+              <Button>New user</Button>
+            </Link>
+          </RoleGate>
         }
       />
 
@@ -188,11 +192,11 @@ function UsersDirectory() {
 export default function UsersPage() {
   return (
     <RoleGate
-      allow={["admin"]}
+      allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500">
-            Only admins can manage users.
+            Only admins and managers can view users.
           </CardContent>
         </Card>
       }
