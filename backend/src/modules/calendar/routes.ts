@@ -39,6 +39,19 @@ router.post(
 router.get('/my-absences', (req, res, next) => calendarController.getOwnAbsences(req, res, next));
 router.post('/my-absences', (req, res, next) => calendarController.markAbsence(req, res, next));
 
+// New (calendar grid view): manager/regional_manager/admin view of absences
+// across their scoped team, for a bounded date range. View-only -- no write
+// path for marking a worker's absence on their behalf (REQ-CAL-T03's
+// self-service-only model is unchanged). Role gate matches the calendar
+// operations routes above; scope narrowing happens in the service
+// (resolveNonAdminScopeFilter -> hotel_group_id, same primitive
+// listCalendarEntries/analytics use).
+router.get(
+  '/absences',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  (req, res, next) => calendarController.listAbsences(req, res, next)
+);
+
 // REQ-CAL-T06/RULE-CAL-08 (IF-CAL-GetAvailability/v0, ADR-021 "OD-CAL-01
 // RESOLVED"): no route-level role gate -- worker_id defaults to the caller
 // (self-scope is itself the authorization, same as /my-absences above), and

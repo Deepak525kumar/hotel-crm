@@ -7,6 +7,19 @@ export const MarkAbsenceSchema = z.object({
 
 export type MarkAbsenceInput = z.infer<typeof MarkAbsenceSchema>;
 
+// New (calendar grid view): manager/regional_manager/admin read of absences
+// across their scoped team, for a bounded date range -- distinct from
+// /my-absences (self-only, no range). View-only by design: REQ-CAL-T03's
+// "no cap, no approval" self-service model is unchanged; this adds no write
+// path for marking a worker's absence on their behalf.
+export const ListAbsencesQuerySchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
+  worker_id: z.string().min(1).optional(),
+});
+
+export type ListAbsencesQuery = z.infer<typeof ListAbsencesQuerySchema>;
+
 export interface DailyOperation {
   id: string;
   date: string;

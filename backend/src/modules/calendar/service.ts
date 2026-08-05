@@ -2,11 +2,11 @@ import { AssignmentStatus, CalendarAbsenceKind, EmploymentStatus, OutboxSourceMo
 import { BaseService } from '../../lib/base-service.js';
 import { NotImplementedError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
-import { isWorkerInGroupScope } from '../../lib/scope.js';
+import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AssignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
-import type { MarkAbsenceInput, CalendarAbsenceDto, AvailabilityDto } from './types.js';
+import type { MarkAbsenceInput, CalendarAbsenceDto, AvailabilityDto, ListAbsencesQuery } from './types.js';
 
 // Calendar depends directly on AssignmentService because GD-12 (event bus)
 // is unresolved -- the target design (EVT-CAL-SickVacationMarked) would
@@ -84,6 +84,47 @@ export class CalendarService extends BaseService {
     }
 
     return this.toDto(absence);
+  }
+
+  // New (calendar grid view): manager/regional_manager read of absences
+  // across their scoped team, admin unrestricted. View-only -- REQ-CAL-T03's
+  // self-service-only marking is unchanged, this adds no write path.
+  // Scoped the same way listCalendarEntries/analytics's group-filter
+  // consumers are (resolveNonAdminScopeFilter -> hotel_group_id), joined
+  // through the worker's own EmploymentRecord since CalendarAbsence carries
+  // no hotel/group column of its own.
+  async listAbsences(
+    query: ListAbsencesQuery,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<CalendarAbsenceDto[]> {
+    const where: Record<string, unknown> = {
+      day: {
+        gte: new Date(`${query.from}T00:00:00.000Z`),
+        lte: new Date(`${query.to}T00:00:00.000Z`),
+      },
+    };
+
+    // worker_id narrows within whatever scope is resolved below; it must
+    // never be assigned after the scope check, or an explicit worker_id
+    // would silently overwrite (and bypass) a deny/group restriction.
+    if (query.worker_id) {
+      where['worker_id'] = query.worker_id;
+    }
+
+    if (actor.role !== 'admin') {
+      const filter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
+      if (filter.kind === 'deny') {
+        where['worker_id'] = { in: [] };
+      } else {
+        where['worker'] = { employment_record: { hotel_group_id: filter.hotelGroupId } };
+      }
+    }
+
+    const rows = await this.prisma.calendarAbsence.findMany({
+      where,
+      orderBy: { day: 'asc' },
+    });
+    return rows.map((r) => this.toDto(r));
   }
 
   // REQ-CAL-T06/RULE-CAL-08 (IF-CAL-GetAvailability/v0). Ownership of this
