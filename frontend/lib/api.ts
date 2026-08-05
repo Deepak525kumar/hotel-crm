@@ -477,6 +477,17 @@ export const assignmentsApi = {
 
   listCalendarEntries: (query: ListCalendarEntriesQuery = {}) =>
     apiFetch<CalendarEntryDto[]>(`/assignments/calendar-entries${toQuery({ ...query })}`),
+
+  /**
+   * Calendar grid view (drag/drop scheduling): moves a placement to a new
+   * day. Day-only — hotel and worker are unchanged (product decision,
+   * 2026-08-05). Same flag/role gate as createCalendarEntry above.
+   */
+  moveCalendarEntry: (id: string, day: string) =>
+    apiFetch<CalendarEntryDto>(`/assignments/calendar-entries/${id}/move`, {
+      method: "PATCH",
+      body: { day },
+    }),
 };
 
 /**

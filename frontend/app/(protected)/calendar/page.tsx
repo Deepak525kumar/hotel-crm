@@ -117,6 +117,23 @@ export default function CalendarGridPage() {
 
   const isLoading = entriesLoading || (canSeeAbsences && absencesLoading);
 
+  const [moveError, setMoveError] = useState<string | null>(null);
+  const [movingEntryId, setMovingEntryId] = useState<string | null>(null);
+  const canWrite = user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
+
+  const onMoveEntry = async (entryId: string, newDay: string) => {
+    setMoveError(null);
+    setMovingEntryId(entryId);
+    try {
+      await assignmentsApi.moveCalendarEntry(entryId, newDay);
+      await mutate((key) => Array.isArray(key) && key[0] === "calendar-entries-range");
+    } catch (err) {
+      setMoveError(err instanceof ApiError ? err.message : "Failed to move the placement. Please try again.");
+    } finally {
+      setMovingEntryId(null);
+    }
+  };
+
   const goPrev = () =>
     setAnchor((a) =>
       view === "week"
@@ -171,6 +188,8 @@ export default function CalendarGridPage() {
         }
       />
 
+      <FormError>{moveError}</FormError>
+
       {entriesError ? (
         <Card>
           <div className="p-6 text-center text-sm text-red-600">Failed to load the calendar. Please try again.</div>
@@ -196,7 +215,10 @@ export default function CalendarGridPage() {
                 absences={absencesByDay.get(key) ?? []}
                 workerNameById={workerNameById}
                 loading={isLoading}
+                canWrite={canWrite}
+                movingEntryId={movingEntryId}
                 onAdd={() => setAddDay(key)}
+                onMoveEntry={onMoveEntry}
               />
             );
           })}
@@ -220,6 +242,10 @@ function groupByDay<T>(items: T[], getDay: (item: T) => string): Map<string, T[]
 }
 
 const MONTH_VIEW_VISIBLE_ITEMS = 3;
+/** dataTransfer MIME type for a dragged placement -- namespaced so a drop
+ * handler never mistakes an unrelated browser drag (e.g. dragging text or a
+ * link) for a calendar-entry move. */
+const PLACEMENT_DRAG_TYPE = "application/x-calendar-entry-id";
 
 function DayCell({
   date,
@@ -230,7 +256,10 @@ function DayCell({
   absences,
   workerNameById,
   loading,
+  canWrite,
+  movingEntryId,
   onAdd,
+  onMoveEntry,
 }: {
   date: Date;
   dayKey: string;
@@ -240,10 +269,14 @@ function DayCell({
   absences: CalendarAbsence[];
   workerNameById: Map<string, string>;
   loading: boolean;
+  canWrite: boolean;
+  movingEntryId: string | null;
   onAdd: () => void;
+  onMoveEntry: (entryId: string, newDay: string) => void;
 }) {
   const isToday = dayKey === toDateKey(new Date());
   const isMonth = view === "month";
+  const [dragOver, setDragOver] = useState(false);
 
   // Month cells are small -- cap how many tags render inline and roll the
   // rest into a "+N more" count, rather than let a busy day blow out the
@@ -257,11 +290,26 @@ function DayCell({
   const visibleItems = items?.slice(0, MONTH_VIEW_VISIBLE_ITEMS);
   const hiddenCount = items ? items.length - (visibleItems?.length ?? 0) : 0;
 
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const entryId = e.dataTransfer.getData(PLACEMENT_DRAG_TYPE);
+    if (entryId) onMoveEntry(entryId, dayKey);
+  };
+
   return (
     <Card
+      onDragOver={(e) => {
+        if (!canWrite) return;
+        e.preventDefault();
+        setDragOver(true);
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={canWrite ? onDrop : undefined}
       className={[
         isToday ? "ring-2 ring-blue-500" : undefined,
         outsideCurrentMonth ? "opacity-50" : undefined,
+        dragOver ? "bg-blue-50" : undefined,
       ]
         .filter(Boolean)
         .join(" ") || undefined}
@@ -296,9 +344,14 @@ function DayCell({
           <>
             {visibleItems?.map((item) =>
               item.type === "entry" ? (
-                <div key={item.id} className="truncate rounded bg-blue-50 px-1.5 py-0.5 text-[11px] font-medium text-blue-700">
-                  {workerNameById.get(item.workerId) ?? item.workerId}
-                </div>
+                <PlacementTag
+                  key={item.id}
+                  entryId={item.id}
+                  label={workerNameById.get(item.workerId) ?? item.workerId}
+                  draggable={canWrite}
+                  moving={movingEntryId === item.id}
+                  size="sm"
+                />
               ) : (
                 <div key={item.id} className="truncate rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
                   {workerNameById.get(item.workerId) ?? item.workerId} · {item.kind === "SICK" ? "Sick" : "Vacation"}
@@ -310,9 +363,14 @@ function DayCell({
         ) : (
           <>
             {entries.map((e) => (
-              <div key={e.id} className="truncate rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
-                {workerNameById.get(e.worker_id) ?? e.worker_id}
-              </div>
+              <PlacementTag
+                key={e.id}
+                entryId={e.id}
+                label={workerNameById.get(e.worker_id) ?? e.worker_id}
+                draggable={canWrite}
+                moving={movingEntryId === e.id}
+                size="md"
+              />
             ))}
             {absences.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-1">
@@ -327,6 +385,43 @@ function DayCell({
         )}
       </div>
     </Card>
+  );
+}
+
+/** A single placement tag. Draggable (native HTML5 DnD) when `draggable` —
+ * gated on the same StaffingWriteGate role set as the add-entry button,
+ * since dragging is just another form of scheduling write. */
+function PlacementTag({
+  entryId,
+  label,
+  draggable,
+  moving,
+  size,
+}: {
+  entryId: string;
+  label: string;
+  draggable: boolean;
+  moving: boolean;
+  size: "sm" | "md";
+}) {
+  return (
+    <div
+      draggable={draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(PLACEMENT_DRAG_TYPE, entryId);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={[
+        "truncate rounded bg-blue-50 font-medium text-blue-700",
+        size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
+        draggable ? "cursor-grab active:cursor-grabbing" : undefined,
+        moving ? "opacity-50" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {label}
+    </div>
   );
 }
 
