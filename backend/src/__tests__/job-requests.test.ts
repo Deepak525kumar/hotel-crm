@@ -27,12 +27,41 @@ const mockHotel = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Cancel-cascade fix (2026-08-05): JobRequestService.update() delegates to
+// the real AssignmentService.update() for each active assignment tied to a
+// cancelled request -- these back its internal Prisma calls (findUnique,
+// update, the WorkerOverallRating aggregate reads, jobRequestSkillSlot).
+const mockWorkerAssignment = {
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+const mockRating = {
+  aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+const mockAttendance = {
+  count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+const mockWorkerOverallRating = {
+  upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+const mockJobRequestSkillSlot = {
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   hotel: mockHotel,
   jobRequest: mockWorkRequest,
   employmentRecord: mockEmploymentRecord,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
+  workerAssignment: mockWorkerAssignment,
+  rating: mockRating,
+  attendance: mockAttendance,
+  workerOverallRating: mockWorkerOverallRating,
+  jobRequestSkillSlot: mockJobRequestSkillSlot,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -41,6 +70,15 @@ const mockPrisma = {
 // the publish transaction has something to read `.id` off of.
 mockNotification.create.mockResolvedValue({ id: 'notif-default' });
 mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
+// Cancel-cascade default: no assignments found, so the cascade is a no-op
+// for every test that doesn't explicitly set up assignments to cancel.
+mockWorkerAssignment.findMany.mockResolvedValue([]);
+mockWorkerAssignment.count.mockResolvedValue(0);
+mockWorkerAssignment.findFirst.mockResolvedValue(null);
+mockRating.aggregate.mockResolvedValue({ _avg: { score: 0 }, _count: 0 });
+mockAttendance.count.mockResolvedValue(0);
+mockWorkerOverallRating.upsert.mockResolvedValue({});
+mockJobRequestSkillSlot.update.mockResolvedValue({});
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
@@ -223,6 +261,102 @@ describe('WorkRequestService', () => {
       await service.update('wr1', { position: 'supervisor' }, { userId: 'mgr1', role: 'admin' });
       const data = mockWorkRequest.update.mock.calls[0][0].data;
       expect(data.position).toBeUndefined();
+    });
+
+    // Cancel-cascade fix (2026-08-05): cancelling a JobRequest previously
+    // never touched its already-assigned WorkerAssignments.
+    describe('cancel-cascade to already-assigned WorkerAssignments', () => {
+      const makeAssignmentRow = (overrides: Record<string, unknown> = {}) => ({
+        id: 'a1',
+        work_request_id: 'wr1',
+        job_request_id: null,
+        skill_slot_id: null,
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        assigned_by_id: 'mgr1',
+        status: 'CONFIRMED' as const,
+        confirmed_at: new Date('2026-06-01T00:00:00Z'),
+        started_at: null,
+        completed_at: null,
+        cancelled_at: null,
+        cancellation_reason: null,
+        previous_assignment_id: null,
+        updated_at: new Date('2026-06-01T00:00:00Z'),
+        ...overrides,
+      });
+
+      it('cancels every active assignment tied to the request via work_request_id OR job_request_id', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
+        mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
+        mockWorkerAssignment.findMany.mockResolvedValue([{ id: 'a1' }, { id: 'a2' }]);
+        mockWorkerAssignment.findUnique
+          .mockResolvedValueOnce(makeAssignmentRow({ id: 'a1', worker_id: 'w1' }))
+          .mockResolvedValueOnce(makeAssignmentRow({ id: 'a2', worker_id: 'w2' }));
+        mockWorkerAssignment.update
+          .mockResolvedValueOnce(makeAssignmentRow({ id: 'a1', status: 'CANCELLED' }))
+          .mockResolvedValueOnce(makeAssignmentRow({ id: 'a2', status: 'CANCELLED' }));
+
+        await service.update('wr1', { status: 'CANCELLED' }, { userId: 'mgr1', role: 'admin' });
+
+        expect(mockWorkerAssignment.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              OR: [{ work_request_id: 'wr1' }, { job_request_id: 'wr1' }],
+              status: { in: ['CONFIRMED', 'IN_PROGRESS'] },
+            }),
+          })
+        );
+        expect(mockWorkerAssignment.update).toHaveBeenCalledTimes(2);
+        expect(mockWorkerAssignment.update).toHaveBeenNthCalledWith(1, {
+          where: { id: 'a1' },
+          data: expect.objectContaining({ status: 'CANCELLED' }),
+        });
+        expect(mockWorkerAssignment.update).toHaveBeenNthCalledWith(2, {
+          where: { id: 'a2' },
+          data: expect.objectContaining({ status: 'CANCELLED' }),
+        });
+      });
+
+      it('does not touch any assignment when cancelling a request with none active', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
+        mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
+        mockWorkerAssignment.findMany.mockResolvedValue([]);
+
+        await service.update('wr1', { status: 'CANCELLED' }, { userId: 'mgr1', role: 'admin' });
+
+        expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+      });
+
+      it('does not run the cascade for a non-cancelling status change', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'DRAFT' }));
+        mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'OPEN' }));
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockEmploymentRecord.findMany.mockResolvedValue([]);
+
+        await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'admin' });
+
+        expect(mockWorkerAssignment.findMany).not.toHaveBeenCalled();
+      });
+
+      it('cascade-cancelled assignments decrement their skill slot and recompute the worker rating (reuses AssignmentService.update()\'s own side effects)', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ status: 'OPEN' }));
+        mockWorkRequest.update.mockResolvedValue(makeRow({ status: 'CANCELLED' }));
+        mockWorkerAssignment.findMany.mockResolvedValue([{ id: 'a1' }]);
+        mockWorkerAssignment.findUnique.mockResolvedValueOnce(
+          makeAssignmentRow({ id: 'a1', job_request_id: 'wr1', work_request_id: null, skill_slot_id: 'slot1' })
+        );
+        mockWorkerAssignment.update.mockResolvedValueOnce(
+          makeAssignmentRow({ id: 'a1', status: 'CANCELLED', skill_slot_id: 'slot1' })
+        );
+
+        await service.update('wr1', { status: 'CANCELLED' }, { userId: 'mgr1', role: 'admin' });
+
+        expect(mockJobRequestSkillSlot.update).toHaveBeenCalledWith({
+          where: { id: 'slot1' },
+          data: { confirmed_count: { decrement: 1 } },
+        });
+        expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+      });
     });
 
     // notifyRosterPublished's fan-out reads listEligibleWorkerIds()

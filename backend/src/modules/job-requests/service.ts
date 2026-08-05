@@ -15,7 +15,7 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
-import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
+import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -314,7 +314,55 @@ export class JobRequestService extends BaseService {
         : {}),
     });
 
+    // Job-dispatch lifecycle cascade fix (2026-08-05): cancelling a
+    // JobRequest previously never touched its already-assigned
+    // WorkerAssignments -- a worker with a CONFIRMED assignment against a
+    // cancelled request stayed CONFIRMED indefinitely. Runs AFTER the
+    // parent's own transaction commits, not inside it: AssignmentService.
+    // update() opens its own transaction and is not composable inside this
+    // one (same "delegates to the assignment owner's own service" boundary
+    // CalendarService.autoCancelSameDayAssignment() already established) --
+    // a crash between the two leaves the parent cancelled but assignments
+    // still active, the same accepted tradeoff that existing delegation
+    // already carries, not a new risk.
+    if (updated.status === WorkRequestStatus.CANCELLED) {
+      await this.cascadeCancelAssignments(id, actor);
+    }
+
     return this.toDto(updated);
+  }
+
+  // Job-dispatch lifecycle cascade fix (2026-08-05): cancels every active
+  // (CONFIRMED/IN_PROGRESS) WorkerAssignment tied to this JobRequest, via
+  // EITHER work_request_id (marketplace-lineage) or job_request_id
+  // (broadcast-accept-lineage) -- the two nullable FKs a WorkerAssignment
+  // can carry back to the same JobRequest id (see WorkerAssignment's own
+  // schema comment). Delegates each cancellation to
+  // AssignmentService.update() one at a time (not a bulk updateMany) so
+  // every one of that method's own side effects fires per assignment:
+  // WorkerOverallRating recompute, the JobRequestSkillSlot.confirmed_count
+  // decrement (Bug 3), and the cancellation notification (this session's
+  // notification fix) -- reusing the single source of truth for "what
+  // happens when an assignment is cancelled" rather than partially
+  // reimplementing it here.
+  private async cascadeCancelAssignments(jobRequestId: string, actor: Actor): Promise<void> {
+    const assignments = await this.prisma.workerAssignment.findMany({
+      where: {
+        OR: [{ work_request_id: jobRequestId }, { job_request_id: jobRequestId }],
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+      },
+      select: { id: true },
+    });
+
+    for (const a of assignments) {
+      await assignmentService.update(
+        a.id,
+        { status: 'CANCELLED', cancellation_reason: 'The work request was cancelled' },
+        actor.userId,
+        actor.role,
+        actor.scope ?? null
+      );
+    }
   }
 
   // Enqueue a WORK_REQUEST_PUBLISHED notification for every active worker on
