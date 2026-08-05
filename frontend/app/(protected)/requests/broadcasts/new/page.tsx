@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { localToday } from "@/lib/format";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
@@ -84,12 +85,16 @@ function NewBroadcastForm() {
       skills: prev.skills.filter((_, i) => i !== index),
     }));
 
-  // Best-effort guards only, using the browser's local date/time -- the
-  // backend has no equivalent cross-field check today (format-only regex),
-  // so these are purely a UX improvement for honest input, not a security
-  // boundary. Same "min = today, browser-local" convention as
-  // AbsencesCard's date guard.
-  const today = new Date().toISOString().slice(0, 10);
+  // Best-effort guard only, using the browser's local date -- the backend
+  // has no equivalent cross-field check today (format-only regex), so this
+  // is purely a UX improvement for honest input, not a security boundary.
+  // Unlike AbsencesCard's date guard, there is no backend fallback here if
+  // this client check is ever wrong, so it must actually be correct: see
+  // localToday()'s own comment for why a naive `toISOString()` slice is a
+  // real bug (it's the UTC date, not the local one -- it incorrectly
+  // treats "today" as already past for several hours every evening in any
+  // timezone west of UTC).
+  const today = localToday();
   const isPastDate = form.shift_date && form.shift_date < today;
   const isEndBeforeStart =
     form.shift_start_time &&
