@@ -383,6 +383,16 @@ export const workRequestsApi = {
       body: { status: "OPEN" },
     }),
 
+  /** Cancel a DRAFT/OPEN/PARTIALLY_FILLED request by transitioning it to CANCELLED. */
+  cancel: (id: string, reason?: string) =>
+    apiFetch<WorkRequest>(`/work-requests/${id}`, {
+      method: "PATCH",
+      body: {
+        status: "CANCELLED",
+        ...(reason ? { cancellation_reason: reason } : {}),
+      },
+    }),
+
   /**
    * Job Dispatch Phase 2 (Epic 9 PR 9.7, admin/manager only): raise a
    * standalone broadcast specifying skill x headcount lines. Published
