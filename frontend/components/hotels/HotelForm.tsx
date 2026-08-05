@@ -218,7 +218,14 @@ export function HotelForm({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Coordinates</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">Coordinates</span>
+                {form.latitude.trim() && form.longitude.trim() && (
+                  <span className="text-xs text-green-700">
+                    Configured ({form.latitude}, {form.longitude})
+                  </span>
+                )}
+              </div>
               <Button
                 type="button"
                 variant="outline"
