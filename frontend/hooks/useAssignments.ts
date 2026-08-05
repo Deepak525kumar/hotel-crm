@@ -50,17 +50,34 @@ export function useCalendarEntries(query: ListCalendarEntriesQuery = {}) {
   return { ...swr, calendarEntries: items, hasNext };
 }
 
+const CALENDAR_ENTRIES_RANGE_PAGE_SIZE = 100;
+
 /**
- * Calendar grid view: every placement within a bounded day range in one
- * fetch (the backend max page size, 100, comfortably covers a week/month of
- * placements for a single scoped team) — unlike {@link useCalendarEntries},
- * this is not paginated, since the grid renders the whole range at once.
+ * Calendar grid view: every placement within a bounded day range, fully
+ * paged through (the backend caps per_page at 100, the same convention
+ * every paginated list endpoint in this app uses -- a team large enough to
+ * exceed 100 placements/week is a realistic case, not an edge case, so this
+ * loops rather than assume a single page ever covers the range) -- unlike
+ * {@link useCalendarEntries}, this returns the whole range at once rather
+ * than one page at a time, since the grid renders every visible day
+ * together.
  */
 export function useCalendarEntriesInRange(
   range: { from: string; to: string; hotel_id?: string; worker_id?: string } | null,
 ) {
-  return useSWR(
-    range ? ["calendar-entries-range", range] : null,
-    ([, r]) => assignmentsApi.listCalendarEntries({ ...r, per_page: 100 }),
-  );
+  return useSWR(range ? ["calendar-entries-range", range] : null, async ([, r]) => {
+    const all = [];
+    let page = 1;
+    while (true) {
+      const batch = await assignmentsApi.listCalendarEntries({
+        ...r,
+        page,
+        per_page: CALENDAR_ENTRIES_RANGE_PAGE_SIZE,
+      });
+      all.push(...batch);
+      if (batch.length < CALENDAR_ENTRIES_RANGE_PAGE_SIZE) break;
+      page += 1;
+    }
+    return all;
+  });
 }
