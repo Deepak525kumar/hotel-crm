@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
+import { useAuth } from "@/hooks/useAuth";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
@@ -17,6 +18,8 @@ function EditUser() {
   const router = useRouter();
 
   const { data: user, isLoading, error } = useUser(id);
+  const { user: actor } = useAuth();
+  const canEditRole = actor?.role === "admin";
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -35,10 +38,13 @@ function EditUser() {
       // route (ADR-030 D-4a) — sending `role` there is rejected at the schema
       // boundary once FEATURE_GD02_MATRIX is on, and the legacy schema it
       // falls back to when the flag is off doesn't accept `regional_manager`
-      // at all. The dedicated PUT /users/:id/role is Admin-only, which this
-      // page already requires (RoleGate allow={["admin"]} below).
+      // at all. The dedicated PUT /users/:id/role is Admin-only -- this page
+      // now also admits in-scope manager/RM (2026-08-06 scope fix), so only
+      // attempt the role call when the actor is actually an admin; the Role
+      // selector is disabled for everyone else, but a submit shouldn't hit a
+      // route that would just 403.
       let updated = await usersApi.update(id, payload);
-      if (values.role !== user?.role) {
+      if (canEditRole && values.role !== user?.role) {
         updated = await usersApi.updateRole(id, { role: values.role });
       }
       await Promise.all([
@@ -86,6 +92,7 @@ function EditUser() {
         <UserForm
           mode="edit"
           user={user}
+          canEditRole={canEditRole}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}
@@ -99,12 +106,12 @@ function EditUser() {
 export default function EditUserPage() {
   return (
     <RoleGate
-      allow={["admin"]}
+      allow={["admin", "manager", "regional_manager"]}
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500">
-              Only admins can edit users.
+              Only admins and managers can edit users.
             </CardContent>
           </Card>
         </div>

@@ -42,7 +42,11 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotels", label: "Hotels", roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", roles: ["manager", "regional_manager", "admin"] },
-  { href: "/users", label: "Users", roles: ["admin"] },
+  // Backend (GET /users, GET/PUT /users/:id) is scope-correct for manager
+  // and regional_manager (2026-08-06 scope fixes) -- this nav entry was the
+  // last remaining place a manager/RM had no way to browse or open their
+  // own group's workers by name/email, despite the API already serving it.
+  { href: "/users", label: "Users", roles: ["admin", "manager", "regional_manager"] },
   { href: "/notifications", label: "Notifications" },
 ];
 

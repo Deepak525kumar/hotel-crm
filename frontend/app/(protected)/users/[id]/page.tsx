@@ -117,11 +117,11 @@ function UserDetail() {
             }
             description={user.email}
             actions={
-              // The edit page itself remains admin-only (frontend-side,
-              // out of scope for this change) — hidden here for other
-              // roles so widening this page's own view gate doesn't leave
-              // a dead-end link to a page that will only show a fallback.
-              <RoleGate allow={["admin"]}>
+              // Edit now admits in-scope manager/RM too (2026-08-06 scope
+              // fix to updateUser) -- the edit page itself still hides the
+              // Role selector for non-admins (PUT /users/:id/role stays
+              // admin-only).
+              <RoleGate allow={["admin", "manager", "regional_manager"]}>
                 <Link href={`/users/${id}/edit`}>
                   <Button variant="outline">Edit</Button>
                 </Link>
@@ -315,7 +315,7 @@ function UserDetail() {
 export default function UserDetailPage() {
   return (
     <RoleGate
-      allow={["admin", "manager"]}
+      allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500">

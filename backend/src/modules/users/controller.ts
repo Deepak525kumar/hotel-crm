@@ -43,7 +43,7 @@ export class UserController {
   async getUser(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
-      const user = await userService.getUser(req.params['user_id']!, req.auth.userId, req.auth.role, req.ip);
+      const user = await userService.getUser(req.params['user_id']!, req.auth.userId, req.auth.role, req.auth.scope ?? null, req.ip);
       res.status(200).json({
         status: 'success',
         data: user,
@@ -86,7 +86,14 @@ export class UserController {
           if (!parsed.success) {
             throw new ValidationError('Request body validation failed', zodDetails(parsed.error));
           }
-          const user = await userService.updateUser(req.params['user_id']!, parsed.data, req.auth.userId, req.auth.role, req.ip);
+          const user = await userService.updateUser(
+            req.params['user_id']!,
+            parsed.data,
+            req.auth.userId,
+            req.auth.role,
+            req.auth.scope ?? null,
+            req.ip
+          );
           res.status(200).json({
             status: 'success',
             data: user,
