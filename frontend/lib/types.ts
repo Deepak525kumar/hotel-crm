@@ -203,8 +203,10 @@ export interface UpdateHotelInput {
   is_active?: boolean;
   /** GD-05: per-hotel "pause new jobs" toggle, distinct from is_active. */
   accepting_jobs?: boolean;
-  /** Group assignment is update-only (assigned after creation, ADR-023). */
-  hotel_group_id?: string;
+  /** Group assignment is update-only (assigned after creation, ADR-023). `null` clears it. */
+  hotel_group_id?: string | null;
+  /** Hotel Manager assignment is update-only (assigned after creation, ADR-025) — the sole source of that manager's JWT scope claim. `null` clears it. */
+  manager_user_id?: string | null;
   /** GD-14/OD-GEO-004: admin-only manual entry, no geocoding service. */
   latitude?: number;
   longitude?: number;

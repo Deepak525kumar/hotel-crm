@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
-import { useHotel, useHotelGroup } from "@/hooks/useHotels";
+import { useHotel, useHotelGroup, useUsersByIds } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
@@ -34,6 +34,8 @@ export default function HotelDetailPage() {
 
   const { data: hotel, isLoading, error } = useHotel(id);
   const { data: group } = useHotelGroup(hotel?.hotel_group_id);
+  const managerById = useUsersByIds(hotel?.manager_user_id ? [hotel.manager_user_id] : []);
+  const manager = hotel?.manager_user_id ? managerById.get(hotel.manager_user_id) : undefined;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
@@ -115,6 +117,18 @@ export default function HotelDetailPage() {
                         href={`/hotel-groups/${hotel.hotel_group_id}`}
                       >
                         {group?.name ?? "View group"}
+                      </TextLink>
+                    ) : (
+                      <span className="text-gray-500">Unassigned</span>
+                    )
+                  }
+                />
+                <DataRow
+                  label="Manager"
+                  value={
+                    hotel.manager_user_id ? (
+                      <TextLink href={`/users/${hotel.manager_user_id}`}>
+                        {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
                       </TextLink>
                     ) : (
                       <span className="text-gray-500">Unassigned</span>

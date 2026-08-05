@@ -25,8 +25,15 @@ export const UpdateHotelSchema = z.object({
   accepting_jobs: z.boolean().optional(),
   // Epic 5 PR 5.3 (ADR-023): group assignment happens after hotel creation
   // ("after a hotel is created, it is assigned" — CRR §11), so this is
-  // update-only, not part of CreateHotelSchema.
-  hotel_group_id: z.string().min(1).optional(),
+  // update-only, not part of CreateHotelSchema. `null` clears the
+  // assignment (distinct from omitting the field, which leaves it as-is).
+  hotel_group_id: z.string().min(1).nullable().optional(),
+  // ADR-025: dedicated Hotel Manager assigned after hotel creation (CRR
+  // §11), same update-only shape as hotel_group_id above — this is also
+  // the write path for `Hotel.manager_user_id`, the sole source of a Hotel
+  // Manager's JWT scope claim (auth/service.ts#resolveScope). `null` clears
+  // the assignment.
+  manager_user_id: z.string().min(1).nullable().optional(),
   // GD-14/OD-GEO-001/004 (SPEC-GEO-001): hotel-coordinate source of truth,
   // admin-only manual entry (this route is already admin-only per
   // requireRoleFlagged(['admin','manager'], 'admin') in routes.ts — no new

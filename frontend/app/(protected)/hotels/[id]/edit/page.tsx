@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
-import { useHotel, useHotelGroups } from "@/hooks/useHotels";
+import { useHotel, useHotelGroups, useUserOptions } from "@/hooks/useHotels";
 import { ApiError, hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
@@ -18,6 +18,7 @@ function EditHotel() {
 
   const { data: hotel, isLoading, error } = useHotel(id);
   const { groups } = useHotelGroups({ limit: 100 });
+  const { users: managers } = useUserOptions({ role: "manager" });
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -33,11 +34,20 @@ function EditHotel() {
       timezone: values.timezone,
       is_active: values.is_active,
       accepting_jobs: values.accepting_jobs,
-      // Only send a group assignment when one is selected; the API treats an
-      // omitted field as "leave unchanged".
+      // Omitting the field leaves the assignment unchanged; an empty
+      // selection only sends `null` (clear) when the hotel currently has an
+      // assignment to clear, so re-visiting this form without touching the
+      // selector never accidentally unassigns anything.
       ...(values.hotel_group_id
         ? { hotel_group_id: values.hotel_group_id }
-        : {}),
+        : hotel?.hotel_group_id
+          ? { hotel_group_id: null }
+          : {}),
+      ...(values.manager_user_id
+        ? { manager_user_id: values.manager_user_id }
+        : hotel?.manager_user_id
+          ? { manager_user_id: null }
+          : {}),
       // GD-14/OD-GEO-001/004: only send coordinates when both fields are
       // filled in — same "omitted = leave unchanged" convention as
       // hotel_group_id above. Sending only one of the two would leave the
@@ -95,6 +105,7 @@ function EditHotel() {
           mode="edit"
           hotel={hotel}
           groups={groups}
+          managers={managers}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}
