@@ -17,6 +17,7 @@ import {
   ListCalendarEntriesQuery,
   LogRoomsCompletedInput,
   MoveCalendarEntryInput,
+  ReassignAssignmentInput,
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
 } from './types.js';
@@ -227,6 +228,104 @@ export class AssignmentService extends BaseService {
     });
 
     return this.toDto(updated);
+  }
+
+  // Job-dispatch lifecycle feature (2026-08-05): atomic reassign. Replaces
+  // the worker on a CONFIRMED/IN_PROGRESS assignment with a new one, in one
+  // transaction, instead of two independent cancel-then-recreate calls that
+  // could leave the shift unstaffed between them if the second call failed
+  // (or if a concurrent request claimed the now-cancelled slot first).
+  // Managerial action only (admin/manager/regional_manager) -- a worker
+  // cannot reassign their own shift to someone else; that's a scheduling
+  // decision, not a self-service one, unlike cancel/start/complete on
+  // AssignmentService.update().
+  async reassign(
+    id: string,
+    input: ReassignAssignmentInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<{ old_assignment: AssignmentDto; new_assignment: AssignmentDto }> {
+    const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot reassign an assignment for this hotel');
+      }
+    }
+
+    if (!ALLOWED_TRANSITIONS[assignment.status]?.includes(AssignmentStatus.CANCELLED)) {
+      throw new ConflictError(`Cannot reassign an assignment in status ${assignment.status}`);
+    }
+
+    if (input.worker_id === assignment.worker_id) {
+      throw new ConflictError('New worker must be different from the currently assigned worker');
+    }
+
+    const eligible = await isWorkerEligibleForHotel(input.worker_id, assignment.hotel_id);
+    if (!eligible) {
+      throw new ForbiddenError('The new worker is not eligible at this hotel');
+    }
+
+    const free = await isWorkerFreeOnDay(input.worker_id, assignment.day);
+    if (!free) {
+      throw new ConflictError('The new worker already has an assignment for this day');
+    }
+
+    let result;
+    try {
+      result = await this.prisma.$transaction(async (tx) => {
+        const oldAssignment = await tx.workerAssignment.update({
+          where: { id },
+          data: { status: AssignmentStatus.REASSIGNED },
+        });
+
+        // Same broadcast/skill-slot claim carries over to the new worker --
+        // reassignment doesn't free the slot (unlike a plain cancel, Bug 3
+        // above), it just changes who's filling it. skill_slot_id/
+        // job_request_id/work_request_id/hotel_id/day are inherited
+        // unchanged; only worker_id, assigned_by_id, and the reassignment
+        // chain link differ.
+        const newAssignment = await tx.workerAssignment.create({
+          data: {
+            work_request_id: oldAssignment.work_request_id,
+            job_request_id: oldAssignment.job_request_id,
+            skill_slot_id: oldAssignment.skill_slot_id,
+            worker_id: input.worker_id,
+            hotel_id: oldAssignment.hotel_id,
+            assigned_by_id: actor.userId,
+            status: AssignmentStatus.CONFIRMED,
+            day: oldAssignment.day,
+            previous_assignment_id: oldAssignment.id,
+          },
+        });
+
+        // GD-04, same rule update() follows: REASSIGNED is a terminal
+        // outcome for the OLD worker that never completes the shift, same
+        // aggregate-affecting shape as CANCELLED -- their completion rate
+        // must reflect it. The new worker has no rating-affecting event yet
+        // (a fresh CONFIRMED row), so only one recompute is needed here.
+        await refreshWorkerOverallRating(tx, assignment.worker_id);
+
+        return { oldAssignment, newAssignment };
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        throw new ConflictError('The new worker already has an assignment for this day');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'REASSIGN_ASSIGNMENT', 'WORKER_ASSIGNMENT', result.newAssignment.id, {
+      previous_assignment_id: result.oldAssignment.id,
+      previous_worker_id: assignment.worker_id,
+      new_worker_id: input.worker_id,
+    });
+
+    return {
+      old_assignment: this.toDto(result.oldAssignment),
+      new_assignment: this.toDto(result.newAssignment),
+    };
   }
 
   private toRoomsCompletedDto(r: RoomsCompletedEntry): RoomsCompletedEntryDto {
