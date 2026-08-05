@@ -29,6 +29,22 @@ on:
 permissions:
   contents: read
 
+# Dedup fix (2026-08-06): `push` and `pull_request` are BOTH intentionally
+# unfiltered/broad (see the `pull_request` comment above) so a commit pushed
+# to a branch with an open PR fires this workflow twice — once per event,
+# full job matrix each time (Postgres container, three `npm ci` installs, a
+# mobile matrix). `github.head_ref` is only populated on `pull_request`
+# events; `github.ref` is what's left for `push`/`workflow_call` — so this
+# key is identical for the push-triggered and pull_request-triggered run of
+# the same branch/commit, letting GitHub cancel the redundant one rather
+# than running both to completion. Does NOT reopen the #339 stacked-PR gap
+# (d464e68): that was about `pull_request` being filtered OUT entirely by
+# base branch; this still runs pull_request unconditionally, it just stops
+# also running push's duplicate of the same commit.
+concurrency:
+  group: ci-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   repository-integrity:
     name: Repository Integrity Validation
