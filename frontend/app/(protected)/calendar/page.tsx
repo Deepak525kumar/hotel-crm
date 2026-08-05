@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
-import { useUserOptions } from "@/hooks/useHotels";
+import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange } from "@/hooks/useCalendar";
@@ -108,14 +108,22 @@ export default function CalendarGridPage() {
 
   // Worker names for display -- the grid renders worker_id-keyed placements
   // and absences, but a Teams-style grid should show a name, not a raw id.
-  // A worker viewing their own grid only ever sees themself (isSelfScopedRole
-  // on the backend), so this list is small even in the read-only case.
-  const { users: workers } = useUserOptions({ role: "worker", limit: 200 });
+  // Resolved by id (useUsersByIds), not a flat capped role listing: a
+  // fixed-size "first N workers" fetch silently misses anyone outside its
+  // first page/sort order, which is exactly what surfaced this as a raw id
+  // in the placement-details modal instead of a name.
+  const visibleWorkerIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const e of entries ?? []) ids.add(e.worker_id);
+    for (const a of absences ?? []) ids.add(a.worker_id);
+    return Array.from(ids);
+  }, [entries, absences]);
+  const usersById = useUsersByIds(visibleWorkerIds);
   const workerNameById = useMemo(() => {
     const map = new Map<string, string>();
-    for (const w of workers) map.set(w.id, `${w.first_name} ${w.last_name}`);
+    for (const [id, u] of usersById) map.set(id, `${u.first_name} ${u.last_name}`);
     return map;
-  }, [workers]);
+  }, [usersById]);
 
   const isLoading = entriesLoading || (canSeeAbsences && absencesLoading);
 

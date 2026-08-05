@@ -7,6 +7,7 @@ import type {
   ListHotelGroupsQuery,
   ListHotelsQuery,
   ListUsersQuery,
+  UserDetail,
 } from "@/lib/types";
 
 /**
@@ -62,6 +63,39 @@ export function useUserOptions(query: ListUsersQuery = {}) {
   const key = ["user-options", { ...query }] as const;
   const swr = useSWR(key, ([, q]) => usersApi.list({ limit: 100, ...q }));
   return { ...swr, users: swr.data ?? [] };
+}
+
+/**
+ * Resolves a batch of user ids to display names, for surfaces (like the
+ * calendar grid) that render worker_id-keyed records and need a name for
+ * whichever workers actually appear -- not a flat, capped role listing that
+ * silently misses anyone outside its first page. There is no batch-by-ids
+ * endpoint, so this fans out to the existing single-user GET (usersApi.get),
+ * one SWR-deduplicated request per id; cheap at the scale a single visible
+ * week/month of placements ever needs (a handful of distinct workers).
+ */
+export function useUsersByIds(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids)).sort();
+  const key = uniqueIds.length > 0 ? (["users-by-ids", uniqueIds] as const) : null;
+  const swr = useSWR(key, async ([, idList]) => {
+    const results = await Promise.all(
+      idList.map(async (id) => {
+        try {
+          return await usersApi.get(id);
+        } catch {
+          // A deleted/inaccessible user shouldn't break the whole lookup --
+          // callers fall back to the raw id for just that one entry.
+          return null;
+        }
+      }),
+    );
+    const map = new Map<string, UserDetail>();
+    results.forEach((user, i) => {
+      if (user) map.set(idList[i], user);
+    });
+    return map;
+  });
+  return swr.data ?? new Map<string, UserDetail>();
 }
 
 /**
