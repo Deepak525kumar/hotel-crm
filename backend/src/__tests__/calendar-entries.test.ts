@@ -40,10 +40,20 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
   hotel: mockHotel,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -98,6 +108,8 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AssignmentService();
+    mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
   });
 
   describe('placeOnCalendar', () => {
@@ -308,6 +320,23 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       );
       expect(mockWorkerAssignment.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'a1' }, data: { day: new Date('2026-08-05T00:00:00.000Z') } })
+      );
+    });
+
+    // Job-dispatch lifecycle notification fix (2026-08-05): moving a
+    // placement previously notified nobody -- the worker could show up on
+    // the original day expecting a shift that was silently relocated.
+    it('notifies the worker that their shift moved to a new day', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ worker_id: 'w1' }));
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+
+      await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_id: 'w1', type: 'ASSIGNMENT_CONFIRMED' }),
+        })
       );
     });
 

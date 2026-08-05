@@ -86,6 +86,11 @@ jest.mock('../lib/db.js', () => {
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0 },
     workerOverallRating: { upsert: async () => ({}) },
+    // Assignment lifecycle notifications (2026-08-05): cancel enqueues one,
+    // which calls prisma.notification.create()/outboxEvent.create()
+    // internally -- unmocked, these throw and 500 every cancel case here.
+    notification: { create: async () => ({ id: 'notif-1' }) },
+    outboxEvent: { create: async () => ({ id: 'outbox-1' }) },
     auditLog: { create: async () => ({}) },
     $transaction: async (cb: (tx: any) => Promise<unknown>) => cb(prisma),
   };

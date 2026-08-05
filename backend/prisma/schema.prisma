@@ -167,6 +167,13 @@ enum OutboxSourceModule {
   HR
   CONSENT
   AUTH
+  // Assignment lifecycle notifications (2026-08-05): cancel, move, reassign
+  // — ASSIGNMENT_CONFIRMED/ASSIGNMENT_CANCELLED already existed in
+  // NotificationType but were never enqueued anywhere; this is their module
+  // tag, distinct from WORK_REQUESTS (which JOB_REQUEST_BROADCAST/
+  // JOB_REQUEST_CLOSED file under, since those are JobRequest-lifecycle
+  // events, not WorkerAssignment-lifecycle ones).
+  ASSIGNMENTS
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim

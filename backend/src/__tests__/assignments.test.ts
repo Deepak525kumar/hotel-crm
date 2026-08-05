@@ -35,6 +35,14 @@ const mockJobRequestSkillSlot = {
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockNotification = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+const mockOutboxEvent = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
@@ -43,6 +51,8 @@ const mockPrisma = {
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
+  notification: mockNotification,
+  outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -89,6 +99,8 @@ describe('AssignmentService', () => {
     mockAttendance.count.mockResolvedValue(0 as never);
     mockWorkerOverallRating.upsert.mockResolvedValue({});
     mockJobRequestSkillSlot.update.mockResolvedValue({});
+    mockNotification.create.mockResolvedValue({ id: 'notif-default' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
   });
 
   describe('update', () => {
@@ -201,6 +213,50 @@ describe('AssignmentService', () => {
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED', skill_slot_id: 'slot1' }));
       await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
       expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+    });
+
+    // Job-dispatch lifecycle notification fix (2026-08-05): a cancelled
+    // assignment previously notified nobody at all.
+    describe('cancellation notifications', () => {
+      it('notifies the worker when a manager cancels their assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', assigned_by_id: 'mgr1' })
+        );
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'CANCELLED', cancellation_reason: 'sick' })
+        );
+        await service.update('a1', { status: 'CANCELLED', cancellation_reason: 'sick' }, 'mgr1', 'manager', {
+          type: 'global',
+        });
+        expect(mockNotification.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ user_id: 'w1', type: 'ASSIGNMENT_CANCELLED' }),
+          })
+        );
+      });
+
+      it('notifies the assigning manager (not the worker) when the worker cancels their own assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', assigned_by_id: 'mgr1' })
+        );
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+        await service.update('a1', { status: 'CANCELLED' }, 'w1', 'worker');
+        expect(mockNotification.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({ user_id: 'mgr1', type: 'ASSIGNMENT_CANCELLED' }),
+          })
+        );
+        expect(mockNotification.create).not.toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ user_id: 'w1' }) })
+        );
+      });
+
+      it('sends no cancellation notification for a non-cancelling transition', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        expect(mockNotification.create).not.toHaveBeenCalled();
+      });
     });
 
     // GD-04: this endpoint mutates the fields WorkerOverallRating derives
@@ -428,6 +484,25 @@ describe('AssignmentService', () => {
       await expect(
         service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
       ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    // Job-dispatch lifecycle notification fix (2026-08-05): both affected
+    // workers were previously left uninformed.
+    it('notifies the old worker (shift reassigned away) and the new worker (shift assigned to them)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ id: 'a1', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ id: 'a1', status: 'REASSIGNED' }));
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_id: 'w1', type: 'ASSIGNMENT_CANCELLED' }),
+        })
+      );
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ user_id: 'w2', type: 'ASSIGNMENT_CONFIRMED' }),
+        })
+      );
     });
   });
 

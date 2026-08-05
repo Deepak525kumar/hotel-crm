@@ -1,4 +1,12 @@
-import { Prisma, WorkerAssignment, CalendarEntry, AssignmentStatus, RoomsCompletedEntry } from '@prisma/client';
+import {
+  Prisma,
+  WorkerAssignment,
+  CalendarEntry,
+  AssignmentStatus,
+  RoomsCompletedEntry,
+  OutboxSourceModule,
+  OutboxTransport,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
@@ -9,6 +17,7 @@ import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import { getPrisma } from '../../lib/db.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
+import { notificationService } from '../notifications/service.js';
 import {
   AssignmentDto,
   CalendarEntryDto,
@@ -216,6 +225,47 @@ export class AssignmentService extends BaseService {
         });
       }
 
+      // Job-dispatch lifecycle notification fix (2026-08-05): a cancelled
+      // assignment previously notified nobody at all -- a worker's
+      // confirmed shift could vanish (manager-cancelled) with zero notice,
+      // and a manager never learned when a worker cancelled their own
+      // shift. Only the party who did NOT initiate the cancellation is
+      // notified -- the actor already knows what they just did.
+      if (next === AssignmentStatus.CANCELLED) {
+        const isWorkerInitiated = actorId === assignment.worker_id;
+        if (!isWorkerInitiated) {
+          await notificationService.enqueue(
+            {
+              recipientId: assignment.worker_id,
+              type: 'ASSIGNMENT_CANCELLED',
+              title: 'Shift cancelled',
+              message: 'Your confirmed shift has been cancelled.',
+              data: { assignment_id: id, cancellation_reason: result.cancellation_reason },
+              hotelId: assignment.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.ASSIGNMENTS,
+              producerService: 'AssignmentService',
+            },
+            tx
+          );
+        } else {
+          await notificationService.enqueue(
+            {
+              recipientId: assignment.assigned_by_id,
+              type: 'ASSIGNMENT_CANCELLED',
+              title: 'Worker cancelled their shift',
+              message: 'A worker cancelled their own confirmed shift.',
+              data: { assignment_id: id, worker_id: assignment.worker_id, cancellation_reason: result.cancellation_reason },
+              hotelId: assignment.hotel_id,
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.ASSIGNMENTS,
+              producerService: 'AssignmentService',
+            },
+            tx
+          );
+        }
+      }
+
       return result;
     });
 
@@ -306,6 +356,39 @@ export class AssignmentService extends BaseService {
         // must reflect it. The new worker has no rating-affecting event yet
         // (a fresh CONFIRMED row), so only one recompute is needed here.
         await refreshWorkerOverallRating(tx, assignment.worker_id);
+
+        // Job-dispatch lifecycle notification fix (2026-08-05): both
+        // affected workers were previously left uninformed -- the old
+        // worker's shift silently disappeared, and the new worker had no
+        // idea they'd been assigned it.
+        await notificationService.enqueue(
+          {
+            recipientId: assignment.worker_id,
+            type: 'ASSIGNMENT_CANCELLED',
+            title: 'Shift reassigned',
+            message: 'Your shift has been reassigned to another worker.',
+            data: { assignment_id: id, new_worker_id: input.worker_id },
+            hotelId: assignment.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+        await notificationService.enqueue(
+          {
+            recipientId: input.worker_id,
+            type: 'ASSIGNMENT_CONFIRMED',
+            title: 'You have been assigned a shift',
+            message: "You've been assigned a shift previously held by another worker.",
+            data: { assignment_id: newAssignment.id, previous_assignment_id: id },
+            hotelId: assignment.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
 
         return { oldAssignment, newAssignment };
       });
@@ -531,6 +614,30 @@ export class AssignmentService extends BaseService {
           where: { id: existing.assignment_id },
           data: { day },
         });
+
+        // Job-dispatch lifecycle notification fix (2026-08-05): moving a
+        // placement to a different day previously notified nobody -- the
+        // worker could show up on the original day expecting a shift that
+        // was silently relocated.
+        await notificationService.enqueue(
+          {
+            recipientId: existing.worker_id,
+            type: 'ASSIGNMENT_CONFIRMED',
+            title: 'Shift moved',
+            message: 'Your confirmed shift was moved to a different day.',
+            data: {
+              assignment_id: assignment.id,
+              from_day: existing.day.toISOString().slice(0, 10),
+              to_day: input.day,
+            },
+            hotelId: existing.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+
         return { assignment, calendarEntry };
       });
     } catch (error) {
