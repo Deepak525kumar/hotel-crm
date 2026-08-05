@@ -107,24 +107,52 @@ export class CrmService extends BaseService {
     const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
     if (!hotel) throw new NotFoundError('Hotel not found');
 
-    if (data.hotel_group_id !== undefined) {
+    if (data.hotel_group_id !== undefined && data.hotel_group_id !== null) {
       await this.assertHotelGroupExists(data.hotel_group_id);
     }
+    const isManagerChange =
+      data.manager_user_id !== undefined && data.manager_user_id !== hotel.manager_user_id;
+    if (data.manager_user_id !== undefined && data.manager_user_id !== null) {
+      await this.assertHotelManagerExists(data.manager_user_id);
+    }
 
-    const updated = await this.prisma.hotel.update({
-      where: { id: hotelId },
-      data: {
-        name: data.name ?? hotel.name,
-        city: data.city ?? hotel.city,
-        country: data.country ?? hotel.country,
-        address: data.address ?? hotel.address,
-        timezone: data.timezone ?? hotel.timezone,
-        is_active: data.is_active ?? hotel.is_active,
-        accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs,
-        hotel_group_id: data.hotel_group_id ?? hotel.hotel_group_id,
-        latitude: data.latitude ?? hotel.latitude,
-        longitude: data.longitude ?? hotel.longitude,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.hotel.update({
+        where: { id: hotelId },
+        data: {
+          name: data.name ?? hotel.name,
+          city: data.city ?? hotel.city,
+          country: data.country ?? hotel.country,
+          address: data.address ?? hotel.address,
+          timezone: data.timezone ?? hotel.timezone,
+          is_active: data.is_active ?? hotel.is_active,
+          accepting_jobs: data.accepting_jobs ?? hotel.accepting_jobs,
+          // `undefined` (field omitted) leaves the existing value; `null`
+          // (field explicitly sent) clears the assignment.
+          hotel_group_id: data.hotel_group_id === undefined ? hotel.hotel_group_id : data.hotel_group_id,
+          manager_user_id: data.manager_user_id === undefined ? hotel.manager_user_id : data.manager_user_id,
+          latitude: data.latitude ?? hotel.latitude,
+          longitude: data.longitude ?? hotel.longitude,
+        },
+      });
+
+      if (isManagerChange) {
+        // manager_user_id is the sole source of a Hotel Manager's JWT scope
+        // claim (auth/service.ts#resolveScope reads it on every
+        // login/refresh) — bump both the outgoing manager (so a live token
+        // minted under the old scope can't keep acting on a hotel they were
+        // just removed from) and the incoming manager (whose existing token,
+        // if any, was minted before this assignment and carries a stale/null
+        // scope), mirroring updateHotelGroup's RM-transfer token bump above.
+        if (hotel.manager_user_id) {
+          await bumpTokenGeneration(tx, hotel.manager_user_id);
+        }
+        if (data.manager_user_id) {
+          await bumpTokenGeneration(tx, data.manager_user_id);
+        }
+      }
+
+      return result;
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { fields: Object.keys(data) }, ip);
@@ -140,6 +168,24 @@ export class CrmService extends BaseService {
     if (!hotelGroup) {
       throw new ValidationError('hotel_group_id does not reference an existing hotel group', [
         { field: 'hotel_group_id', message: 'Hotel group not found' },
+      ]);
+    }
+  }
+
+  // ADR-025: mirrors assertRegionalManagerExists — the target must already
+  // hold the `manager` role before being assigned to a hotel, so this never
+  // grants authority the user didn't already have (promotion via
+  // `PUT /users/:id/role` is a separate, prior step).
+  private async assertHotelManagerExists(managerUserId: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { id: managerUserId } });
+    if (!user || user.deleted_at) {
+      throw new ValidationError('manager_user_id does not reference an existing user', [
+        { field: 'manager_user_id', message: 'User not found' },
+      ]);
+    }
+    if (user.role !== 'MANAGER') {
+      throw new ValidationError('manager_user_id must reference a user already holding the Manager role', [
+        { field: 'manager_user_id', message: 'User is not a Manager' },
       ]);
     }
   }

@@ -7,11 +7,14 @@ import { ApiError, hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
+import { useHotelGroups, useUserOptions } from "@/hooks/useHotels";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateHotelInput } from "@/lib/types";
 
 function NewHotel() {
   const router = useRouter();
+  const { groups } = useHotelGroups({ limit: 100 });
+  const { users: managers } = useUserOptions({ role: "manager" });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -35,6 +38,25 @@ function NewHotel() {
       const created = await hotelsApi.create(payload);
       // Revalidate every hotel list query so the new row appears on return.
       await mutate((key) => Array.isArray(key) && key[0] === "hotels");
+
+      // Group/manager assignment is update-only server-side (ADR-023/025:
+      // "after a hotel is created, it is assigned") -- when either optional
+      // field was filled in on the create form, immediately follow up with
+      // a PATCH so the UX still reads as "set at creation time". The hotel
+      // itself is already created and usable at this point, so a failure
+      // here routes to its detail page (where the assignment can be retried
+      // via Edit) instead of re-showing the create form.
+      if (values.hotel_group_id || values.manager_user_id) {
+        try {
+          await hotelsApi.update(created.id, {
+            ...(values.hotel_group_id ? { hotel_group_id: values.hotel_group_id } : {}),
+            ...(values.manager_user_id ? { manager_user_id: values.manager_user_id } : {}),
+          });
+        } catch {
+          router.replace(`/hotels/${created.id}`);
+          return;
+        }
+      }
       router.replace(`/hotels/${created.id}`);
     } catch (err) {
       setError(
@@ -55,11 +77,13 @@ function NewHotel() {
         <PageHeader
           className="mt-2"
           title="New hotel"
-          description="Add a property. You can assign it to a group after creation."
+          description="Add a property. Group and manager assignment are optional here and can also be set later."
         />
       </div>
       <HotelForm
         mode="create"
+        groups={groups}
+        managers={managers}
         submitting={submitting}
         error={error}
         onSubmit={onSubmit}
