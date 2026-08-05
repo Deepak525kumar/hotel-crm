@@ -6,6 +6,12 @@ export const CreateHotelSchema = z.object({
   country: z.string().min(1).max(100).default('Germany'),
   address: z.string().min(1).max(500),
   timezone: z.string().default('Europe/Berlin'),
+  // GD-14/OD-GEO-001/004 (SPEC-GEO-001): hotel-coordinate source of truth,
+  // admin-only manual entry (this route is already admin-only per
+  // requireRoleFlagged(['admin','manager'], 'admin') in routes.ts — no new
+  // permission/role gate needed). No geocoding-from-address service.
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
 });
 
 export const UpdateHotelSchema = z.object({

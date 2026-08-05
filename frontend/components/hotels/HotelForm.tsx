@@ -12,6 +12,27 @@ import {
 } from "@/components/ui";
 import type { Hotel, HotelGroup } from "@/lib/types";
 
+/** Inline pin icon for the "use current location" button — no icon set in the ui barrel. */
+function LocationIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      className="h-4 w-4"
+      aria-hidden
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 21s-7-6.14-7-11a7 7 0 1 1 14 0c0 4.86-7 11-7 11Z"
+      />
+      <circle cx="12" cy="10" r="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** Common timezones offered by the selector; free-form values still validate. */
 const TIMEZONES = [
   "Europe/Berlin",
@@ -82,11 +103,38 @@ export function HotelForm({
   onCancel,
 }: HotelFormProps) {
   const [form, setForm] = useState<HotelFormValues>(() => toValues(hotel));
+  const [locating, setLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const set = <K extends keyof HotelFormValues>(
     key: K,
     value: HotelFormValues[K],
   ) => setForm((prev) => ({ ...prev, [key]: value }));
+
+  const useCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation is not supported by this browser.");
+      return;
+    }
+    setLocationError(null);
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        set("latitude", String(position.coords.latitude));
+        set("longitude", String(position.coords.longitude));
+        setLocating(false);
+      },
+      (err) => {
+        setLocationError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission denied. Enter coordinates manually."
+            : "Could not determine current location. Enter coordinates manually.",
+        );
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,32 +213,48 @@ export function HotelForm({
                 checked={form.accepting_jobs}
                 onChange={(e) => set("accepting_jobs", e.target.checked)}
               />
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Input
-                  label="Latitude"
-                  type="number"
-                  step="any"
-                  min={-90}
-                  max={90}
-                  value={form.latitude}
-                  onChange={(e) => set("latitude", e.target.value)}
-                  placeholder="e.g. 52.5200"
-                  hint="Required for worker geofence check-in (GD-14)"
-                />
-                <Input
-                  label="Longitude"
-                  type="number"
-                  step="any"
-                  min={-180}
-                  max={180}
-                  value={form.longitude}
-                  onChange={(e) => set("longitude", e.target.value)}
-                  placeholder="e.g. 13.4050"
-                />
-              </div>
             </>
           )}
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-700">Coordinates</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                loading={locating}
+                onClick={useCurrentLocation}
+              >
+                <LocationIcon />
+                Use current location
+              </Button>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Latitude"
+                type="number"
+                step="any"
+                min={-90}
+                max={90}
+                value={form.latitude}
+                onChange={(e) => set("latitude", e.target.value)}
+                placeholder="e.g. 52.5200"
+                hint="Required for worker geofence check-in (GD-14)"
+              />
+              <Input
+                label="Longitude"
+                type="number"
+                step="any"
+                min={-180}
+                max={180}
+                value={form.longitude}
+                onChange={(e) => set("longitude", e.target.value)}
+                placeholder="e.g. 13.4050"
+              />
+            </div>
+            {locationError && <FormError>{locationError}</FormError>}
+          </div>
 
           <FormError>{error}</FormError>
 

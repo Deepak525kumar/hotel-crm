@@ -49,18 +49,18 @@ describe('haversineDistanceMeters', () => {
     expect(Number.isFinite(distance)).toBe(true);
   });
 
-  it('review fix: pins the exact 100m geofence boundary this module\'s service.ts compares against (RULE-GEO-001, GEOFENCE_RADIUS_METERS)', () => {
-    // service.ts:66 uses `distanceMeters <= GEOFENCE_RADIUS_METERS` (100m,
+  it('review fix: pins the exact 30m geofence boundary this module\'s service.ts compares against (RULE-GEO-001, GEOFENCE_RADIUS_METERS)', () => {
+    // service.ts:66 uses `distanceMeters <= GEOFENCE_RADIUS_METERS` (30m,
     // inclusive) -- this test proves haversineDistanceMeters itself resolves
-    // a known ~100m offset to a value the service's own boundary comparison
+    // a known ~30m offset to a value the service's own boundary comparison
     // would correctly classify, distinct from the existing "sub-100m,
     // 90-110m band" test above which never asserts the actual boundary.
-    // ~0.0009045 degrees latitude ≈ 100.6m at these latitudes; used to
-    // produce a distance just over 100m as a concrete reference point.
-    const justOver100m = haversineDistanceMeters(52.52, 13.405, 52.520905, 13.405);
-    expect(justOver100m).toBeGreaterThan(100);
+    // ~0.00027 degrees latitude ≈ 30.05m at these latitudes; used to
+    // produce a distance just over 30m as a concrete reference point.
+    const justOver30m = haversineDistanceMeters(52.52, 13.405, 52.52027, 13.405);
+    expect(justOver30m).toBeGreaterThan(30);
 
     const zero = haversineDistanceMeters(52.52, 13.405, 52.52, 13.405);
-    expect(zero).toBeLessThanOrEqual(100);
+    expect(zero).toBeLessThanOrEqual(30);
   });
 });

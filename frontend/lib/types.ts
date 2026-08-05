@@ -188,6 +188,9 @@ export interface CreateHotelInput {
   country?: string;
   /** Defaults to "Europe/Berlin" backend-side. */
   timezone?: string;
+  /** GD-14/OD-GEO-001/004: hotel-coordinate source of truth for the geofence check. */
+  latitude?: number;
+  longitude?: number;
 }
 
 /** Body of `PATCH /crm/hotels/:id`. */

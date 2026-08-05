@@ -3,10 +3,11 @@
 
 import { z } from 'zod';
 
-// REQ-CRM/GD-14/OD-GEO-001: the confirmed geofence radius (CRR §17 line 264,
-// "chosen by Zirove due to GPS drift near large buildings"). Not yet a
-// per-hotel-configurable schema field (CRR §17 leaves that for later).
-export const GEOFENCE_RADIUS_METERS = 100;
+// REQ-CRM/GD-14/OD-GEO-001: the geofence radius. CRR §17 line 264 originally
+// chose 100m for GPS drift near large buildings; tightened to 30m per
+// explicit product decision (2026-08-05). Not yet a per-hotel-configurable
+// schema field (CRR §17 leaves that for later).
+export const GEOFENCE_RADIUS_METERS = 30;
 
 // TREQ-GEO-005/RULE-GEO-004 (Tier 1, CRR §25 line 333): "6 months, then hard
 // delete."

@@ -97,7 +97,7 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
     });
 
-    it('marks inside_radius=true when within 100m and persists the raw coordinates', async () => {
+    it('marks inside_radius=true when within 30m and persists the raw coordinates', async () => {
       mockWorkerGeoCheckinCreate.mockResolvedValue({
         id: 'c1',
         worker_id: 'w1',
@@ -127,7 +127,7 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       );
     });
 
-    it('marks inside_radius=false when outside 100m, but still records the check-in (TREQ-GEO-004)', async () => {
+    it('marks inside_radius=false when outside 30m, but still records the check-in (TREQ-GEO-004)', async () => {
       mockWorkerGeoCheckinCreate.mockResolvedValue({
         id: 'c2',
         worker_id: 'w1',
@@ -193,9 +193,9 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       expect(details).not.toHaveProperty('longitude');
       // The audit details reflect the actually-computed distance (not the
       // mocked create() return value) -- a small offset from the hotel's
-      // coordinates is well within the 100m radius.
+      // coordinates is well within the 30m radius.
       expect(typeof details.distance_meters).toBe('number');
-      expect(details.distance_meters as number).toBeLessThan(100);
+      expect(details.distance_meters as number).toBeLessThan(30);
       expect(details.inside_radius).toBe(true);
     });
   });

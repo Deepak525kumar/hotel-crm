@@ -24,6 +24,12 @@ function NewHotel() {
       address: values.address,
       country: values.country.trim() || undefined,
       timezone: values.timezone || undefined,
+      // GD-14/OD-GEO-001/004: only send coordinates when both fields are
+      // filled in -- both are required for backend-geo's distance-check to
+      // treat the hotel as configured anyway.
+      ...(values.latitude.trim() && values.longitude.trim()
+        ? { latitude: Number(values.latitude), longitude: Number(values.longitude) }
+        : {}),
     };
     try {
       const created = await hotelsApi.create(payload);
