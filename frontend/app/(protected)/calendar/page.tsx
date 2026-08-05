@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   Card,
+  Checkbox,
   FormError,
   Input,
   Modal,
@@ -528,6 +529,16 @@ function WorkerPicker({
   );
 }
 
+/** YYYY-MM-DD + N weeks, in local-date arithmetic (matches toDateKey's own
+ * local-component construction, never touches toISOString). */
+function addWeeks(day: string, weeks: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const date = new Date(y, m - 1, d + weeks * 7);
+  return toDateKey(date);
+}
+
+const MAX_RECURRING_OCCURRENCES = 26; // ~6 months weekly -- a sane upper bound, not a hard product limit
+
 function AddEntryModal({
   day,
   range,
@@ -541,10 +552,13 @@ function AddEntryModal({
   const [hotelId, setHotelId] = useState("");
   const [workerId, setWorkerId] = useState("");
   const [workerLabel, setWorkerLabel] = useState("");
+  const [repeatWeekly, setRepeatWeekly] = useState(false);
+  const [occurrences, setOccurrences] = useState(4);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [partialFailures, setPartialFailures] = useState<string[]>([]);
 
-  const valid = hotelId && workerId;
+  const valid = hotelId && workerId && (!repeatWeekly || (occurrences >= 1 && occurrences <= MAX_RECURRING_OCCURRENCES));
 
   const onHotelChange = (id: string) => {
     setHotelId(id);
@@ -555,47 +569,81 @@ function AddEntryModal({
     setWorkerLabel("");
   };
 
-  const onSubmit = async () => {
-    if (!valid) return;
-    setError(null);
-    setSubmitting(true);
+  const rangeKey = ["calendar-entries-range", range];
 
-    // Optimistic insertion: show the placement on the grid immediately with
-    // a temp id, swap it for the real row (or roll back) once the request
-    // resolves -- the visible range's own SWR key is mutated directly
-    // (not the earlier broad-match revalidation) so the update is
-    // synchronous and doesn't wait on a network round-trip to refetch.
-    const tempId = `temp-${Date.now()}`;
+  const createOne = async (targetDay: string) => {
+    const tempId = `temp-${targetDay}-${Date.now()}`;
     const optimisticEntry: CalendarEntryDto = {
       id: tempId,
       assignment_id: tempId,
       worker_id: workerId,
       hotel_id: hotelId,
-      day,
+      day: targetDay,
       placed_by_id: "",
       created_at: new Date(0).toISOString(),
       updated_at: new Date(0).toISOString(),
     };
-    const rangeKey = ["calendar-entries-range", range];
+    // Optimistic insertion: show the placement on the grid immediately with
+    // a temp id, swap it for the real row (or roll back just this one) once
+    // the request resolves -- the visible range's own SWR key is mutated
+    // directly (not a broad-match revalidation) so the update is
+    // synchronous and doesn't wait on a network round-trip to refetch.
+    return mutate(
+      rangeKey,
+      async (current: CalendarEntryDto[] = []) => {
+        const entry = await assignmentsApi.createCalendarEntry({ hotel_id: hotelId, worker_id: workerId, day: targetDay });
+        return [...current.filter((e) => e.id !== tempId), entry];
+      },
+      {
+        optimisticData: (current: CalendarEntryDto[] = []) => [...current, optimisticEntry],
+        rollbackOnError: true,
+        revalidate: false,
+      },
+    );
+  };
 
-    try {
-      const created = await mutate(
-        rangeKey,
-        async (current: CalendarEntryDto[] = []) => {
-          const entry = await assignmentsApi.createCalendarEntry({ hotel_id: hotelId, worker_id: workerId, day });
-          return [...current.filter((e) => e.id !== tempId), entry];
-        },
-        {
-          optimisticData: (current: CalendarEntryDto[] = []) => [...current, optimisticEntry],
-          rollbackOnError: true,
-          revalidate: false,
-        },
-      );
-      void created;
+  const onSubmit = async () => {
+    if (!valid) return;
+    setError(null);
+    setPartialFailures([]);
+    setSubmitting(true);
+
+    if (!repeatWeekly) {
+      try {
+        await createOne(day);
+        onClose();
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    // Recurring placement: each occurrence is created independently via the
+    // same createCalendarEntry() call a single placement uses -- no batch
+    // endpoint, no shared transaction, no bypass of per-occurrence
+    // authorization/scope/duplicate-day checks (explicit product decision,
+    // 2026-08-05). A failure on one occurrence (out of scope, already
+    // occupied, etc.) does not roll back or block the others; every
+    // attempted occurrence is reported, success or failure, so the manager
+    // knows exactly what landed.
+    const failures: string[] = [];
+    for (let i = 0; i < occurrences; i++) {
+      const targetDay = addWeeks(day, i);
+      try {
+        await createOne(targetDay);
+      } catch (err) {
+        failures.push(`${targetDay}: ${err instanceof ApiError ? err.message : "Failed"}`);
+      }
+    }
+
+    setSubmitting(false);
+    if (failures.length === 0) {
       onClose();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong. Please try again.");
-      setSubmitting(false);
+    } else if (failures.length === occurrences) {
+      setError(`All ${occurrences} occurrences failed. ${failures[0]}`);
+    } else {
+      setPartialFailures(failures);
     }
   };
 
@@ -610,7 +658,7 @@ function AddEntryModal({
             Cancel
           </Button>
           <Button onClick={onSubmit} loading={submitting} disabled={submitting || !valid}>
-            Place worker
+            {repeatWeekly ? `Place worker (${occurrences}x)` : "Place worker"}
           </Button>
         </>
       }
@@ -638,7 +686,36 @@ function AddEntryModal({
           </p>
         )}
         <Input label="Day" type="date" value={day} readOnly disabled />
+        <Checkbox
+          label="Repeat weekly"
+          checked={repeatWeekly}
+          onChange={(e) => setRepeatWeekly(e.target.checked)}
+        />
+        {repeatWeekly && (
+          <Input
+            label="Number of weeks"
+            type="number"
+            min={1}
+            max={MAX_RECURRING_OCCURRENCES}
+            value={occurrences}
+            onChange={(e) => setOccurrences(Number(e.target.value))}
+            hint={`Creates ${occurrences} separate placements (this day, then every 7 days after), each independently validated -- a placement that fails (e.g. the worker is already booked that day) is skipped, not blocked or rolled back.`}
+          />
+        )}
         <FormError>{error}</FormError>
+        {partialFailures.length > 0 && (
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+            <p className="font-medium">
+              {occurrences - partialFailures.length} of {occurrences} placements created. {partialFailures.length}{" "}
+              failed:
+            </p>
+            <ul className="mt-1 list-disc pl-4">
+              {partialFailures.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </Modal>
   );
