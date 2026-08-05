@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui";
 import { SidebarNav } from "@/components/layout/SidebarNav";
+import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { cn } from "@/lib/cn";
 
 /**
@@ -171,6 +172,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </span>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            {user && <NotificationsBell />}
             {user && (
               <Link
                 href="/profile"
