@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useOrgChart } from "@/hooks/useEmployment";
 import { RoleGate } from "@/components/auth/RoleGate";
-import type { EmploymentStatus } from "@/lib/types";
+import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import {
   Badge,
   Card,
@@ -21,22 +21,6 @@ import {
   TR,
   TextLink,
 } from "@/components/ui";
-
-const STATUS_TONE: Record<EmploymentStatus, "warning" | "success" | "neutral" | "danger"> = {
-  INACTIVE: "warning",
-  UNDER_REVIEW: "warning",
-  ACTIVE: "success",
-  REJECTED: "danger",
-  DEACTIVATED: "neutral",
-};
-
-const STATUS_LABEL: Record<EmploymentStatus, string> = {
-  INACTIVE: "Onboarding started",
-  UNDER_REVIEW: "Ready for approval",
-  ACTIVE: "Active",
-  REJECTED: "Rejected",
-  DEACTIVATED: "Deactivated",
-};
 
 function OrgChart() {
   const params = useParams<{ id: string }>();
@@ -156,8 +140,8 @@ function OrgChart() {
                         </TD>
                         <TD>{e.job_title}</TD>
                         <TD>
-                          <Badge tone={STATUS_TONE[e.status]}>
-                            {STATUS_LABEL[e.status]}
+                          <Badge tone={EMPLOYMENT_STATUS_TONE[e.status]}>
+                            {EMPLOYMENT_STATUS_LABEL[e.status]}
                           </Badge>
                         </TD>
                       </TR>

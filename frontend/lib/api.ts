@@ -71,7 +71,10 @@ import type {
   EmploymentRecord,
   OrgChart,
   CreateEmploymentInput,
-  LifecycleSignalInput,
+  ApproveEmploymentInput,
+  RejectEmploymentInput,
+  DeactivateEmploymentInput,
+  DeleteEmploymentInput,
   SetBlocklistInput,
   SubjectRightsBundle,
 } from "@/lib/types";
@@ -835,16 +838,52 @@ export const employeesApi = {
   getByUserId: (userId: string) =>
     apiFetch<EmploymentRecord | null>(`/employees/by-user/${userId}`),
 
-  /** Creates the EmploymentRecord for an existing worker `User` (Admin-only). Starts `INACTIVE`. */
+  /** Creates the EmploymentRecord for an existing worker `User` (Admin-only). Starts `PENDING`. */
   create: (input: CreateEmploymentInput) =>
     apiFetch<EmploymentRecord>(`/employees`, { method: "POST", body: input }),
 
-  /** Drives the employment lifecycle state machine (Admin-only, stand-in for the unbuilt Onboarding module). */
-  lifecycleSignal: (employeeId: string, input: LifecycleSignalInput) =>
-    apiFetch<EmploymentRecord>(`/employees/${employeeId}/lifecycle-signal`, {
-      method: "POST",
-      body: input,
-    }),
+  /*
+   * Lifecycle actions (REQ-EMP-002 rework, 2026-08-06). Replaces the old
+   * single `lifecycleSignal` endpoint — see the ApproveEmploymentInput etc.
+   * doc comments in lib/types.ts for why one endpoint per action.
+   *
+   * Permission split (ADR-030 §3 C-16 amendment): submit/approve/reject/
+   * deactivate/reactivate/rehire admit Admin or a scoped Manager/Regional
+   * Manager (their own hotel group). delete/restore stay Admin-only — they
+   * cross the account boundary (soft-deletes/restores the User too).
+   */
+
+  /** PENDING -> PENDING (sets submitted_for_review_at; not a status change). */
+  submitForReview: (employeeId: string) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/submit-for-review`, { method: "POST" }),
+
+  /** PENDING -> ACTIVE. Fails if the record was never submitted for review. */
+  approve: (employeeId: string, input: ApproveEmploymentInput = {}) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/approve`, { method: "POST", body: input }),
+
+  /** PENDING -> REJECTED. */
+  reject: (employeeId: string, input: RejectEmploymentInput = {}) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/reject`, { method: "POST", body: input }),
+
+  /** ACTIVE -> DEACTIVATED (temporary pause: leave/seasonal/suspension). Cancels future assignments. */
+  deactivate: (employeeId: string, input: DeactivateEmploymentInput) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/deactivate`, { method: "POST", body: input }),
+
+  /** DEACTIVATED -> ACTIVE, direct — the paused employee returns, no re-approval. */
+  reactivate: (employeeId: string) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/reactivate`, { method: "POST" }),
+
+  /** REJECTED -> ACTIVE, direct — a previously-declined applicant is taken on after all. */
+  rehire: (employeeId: string) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/rehire`, { method: "POST" }),
+
+  /** ACTIVE/DEACTIVATED/REJECTED -> DELETED (left the company). Admin-only; also soft-deletes the User account. */
+  deleteEmployee: (employeeId: string, input: DeleteEmploymentInput) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/delete`, { method: "POST", body: input }),
+
+  /** DELETED -> PENDING (a true rehire; re-approval required). Admin-only; also restores the User account. */
+  restore: (employeeId: string) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/restore`, { method: "POST" }),
 
   listBlocklist: (hotelId: string) =>
     apiFetch<EmployeeBlocklistEntry[]>(`/employees/hotels/${hotelId}/blocklist`),
