@@ -1,15 +1,13 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-06 (employment-lifecycle rework: research and planning complete, PR 1
-implemented and locally committed).
+Last updated: 2026-08-06 (employment-lifecycle rework: PR #354 merged to `main`).
 
-Current status: **All prior-session work (#345–353) merged to `main`.** The employment-lifecycle
-rework (see §3) has moved from research into implementation. Research completed, all design
-questions resolved (with the user and via an Opus verification pass), and a full implementation
-plan approved. **PR 1 (schema/migration + core service-layer transitions, combined per the user's
-"combine similar PRs" instruction) is implemented, adversarially reviewed, and locally committed**
-on branch `feat/employment-lifecycle-rework` (commit `4ec3533`) — **not yet pushed or opened as a
-PR**, per this session's "don't push, just continue the work" instruction. PRs 3–5 (frontend UI,
+Current status: **All prior-session work (#345–354) merged to `main`, local `main` synced.** PR
+#354 (schema/migration + service-layer transitions, combined per the user's "combine similar PRs"
+instruction) is merged — see §3.5 below for what shipped, what an adversarial review and a
+governance-conflict resolution caught along the way, and the CI debugging story (a real,
+pre-existing `import.meta`/CJS-ESM landmine in `config/env.ts` that PR #354 was the first change
+to trip). PRs 3–5 (frontend UI,
 blocklist enforcement, docs+test sync) are not yet started. 13 unrelated deferred items (6 from the
 prior session + 11 new) are batched and still queued behind this — see §4.
 
@@ -243,8 +241,8 @@ describing a schema state that doesn't exist — `WorkerAssignment.worker_id` is
 The full plan (with rationale for every decision above) is preserved at
 `~/.claude/plans/expressive-floating-koala.md` on this machine.
 
-**PR 1 (schema/migration + service-layer, combined per user instruction) — implemented, committed
-locally, not pushed** (branch `feat/employment-lifecycle-rework`, commit `4ec3533`):
+### 3.5. PR #354 — merged (schema/migration + service-layer, combined per user instruction)
+
 - New migration `20260806123146_employment_lifecycle_rework` — enum rename/recreate/cast/drop
   (Postgres has no native enum-value-collapse), remaps `DEACTIVATED→DELETED` for existing rows with
   a queryable provenance history row, adds `EmploymentStatusHistory`, `employment_cycle`,
@@ -255,39 +253,77 @@ locally, not pushed** (branch `feat/employment-lifecycle-rework`, commit `4ec353
   write goes through it, one `EmploymentStatusHistory` row per transition, same transaction.
 - New actions: `submitForReview`, `approve`, `reject`, `deactivate`, `reactivate`, `rehire`,
   `delete`, `restore` — 8 explicit endpoints replacing the old single `/lifecycle-signal` endpoint.
-- **Adversarial review (Opus) found and fixed 2 HIGH-severity bugs before commit**: (1)
-  `cancelFutureAssignments` was re-authorizing each cancellation through
-  `AssignmentService.update()`'s own hotel-grain check, which always threw for the
-  contract-lapse's system-driven cascade and could abort mid-loop for a manager acting across their
-  whole group — fixed by recognizing the employment service as the sole authority that already
-  authorized the parent action. (2) Manager/RM could never actually reach
-  submit-for-review/approve/reject/rehire, since those records start with no `hotel_group_id` and
-  the scope check denies on null — added an explicit "does this actor own a group at all" fallback
-  for exactly those four actions. Also fixed 2 MEDIUM findings: `restore()` wasn't clearing
-  `marked_suitable` (leaking probation status across a rehire), and the down-migration's remap
-  discriminator used a forgeable free-text field (fixed to use the deterministic history-row id).
-- `tsc --noEmit` and `eslint` both clean. Jest could not run in this environment (pre-existing
-  `ts-jest`/`import.meta` config issue in `config/env.ts`, unrelated to this change — confirmed via
-  git stash comparison). Test file received compile-only fixes; test *logic* still reflects the old
-  terminal-state assumptions and needs a full rewrite, tracked in PR 5 below.
 
-**Remaining PRs** (see the plan file for full detail on each):
-- **PR 3 — Frontend lifecycle UI.** No deactivate/rehire/delete/restore UI exists at all today.
-  Needs: new `employeesApi` client methods, dedupe the copy-pasted `STATUS_TONE`/`STATUS_LABEL`
+**Adversarial review (Opus) found and fixed 2 HIGH-severity bugs before merge:**
+1. `cancelFutureAssignments` was re-authorizing each cancellation through `AssignmentService.update()`'s
+   own hotel-grain check, which always threw for the contract-lapse's system-driven cascade and could
+   abort mid-loop for a manager acting across their whole group — fixed by recognizing the employment
+   service as the sole authority that already authorized the parent action.
+2. Manager/RM could never actually reach submit-for-review/approve/reject/rehire, since those records
+   start with no `hotel_group_id` and the scope check denies on null — added an explicit "does this
+   actor own a group at all" fallback for exactly those four actions.
+
+Also fixed 2 MEDIUM findings: `restore()` wasn't clearing `marked_suitable` (leaking probation status
+across a rehire), and the down-migration's remap discriminator used a forgeable free-text field (fixed
+to use the deterministic history-row id).
+
+**A second, user-driven review round** (after the PR was opened) caught one more real bug: `approve()`
+(`PENDING → ACTIVE`) had no check that `submitted_for_review_at` was ever set — `assertTransition`
+alone can't express a sub-state guard, so an application could be approved without ever being
+submitted. Fixed with an explicit `ConflictError` guard. The migration's `UNDER_REVIEW` timestamp
+backfill comments were also strengthened to disclose it's an approximation (`updated_at`, not the true
+event time) for pre-migration rows only.
+
+**Governance conflict, resolved by amending ADR-030.** The permission expansion (scoped manager/RM can
+now approve/reject/deactivate/reactivate/rehire) directly contradicted the ratified ADR-030 capability
+matrix (`C-16` was pinned admin-only, deferred to a `backend-onboarding` module that was never built;
+`C-18` was a separate admin-only "Deactivate employee" row) — caught by `capability-policy.test.ts`,
+which exists specifically to catch this kind of drift. Resolved (user's explicit call) by amending
+`ADR-030-manager-write-authority-capability-model.md` itself rather than pinning the divergence as known
+debt: `C-16` now reflects the new grant, `C-18` is merged into it (deactivate is just one of six
+uniformly-authorized transitions now), and two genuinely new admin-only capabilities (`delete`/`restore`)
+are documented as deliberately NOT covered by `C-16`'s grant, since they cross the account boundary.
+
+**CI debugging: a real, pre-existing landmine, not a new bug — found and fixed.** Three test suites
+failed to even load with a confusing `TS1343`/`import.meta` error. Extensive bisection (schema, imports,
+file size, `moduleResolution`) failed to isolate it; a targeted `diagnostics: warnOnly` dump plus a
+fresh-context Opus subagent found the real root cause: **Jest in this repo never actually runs in
+native-ESM mode** (the ESM preset needs `NODE_OPTIONS=--experimental-vm-modules`, which nothing sets),
+so every file compiles as CommonJS regardless of config, and `config/env.ts`'s literal `import.meta.url`
+is a syntax error under CommonJS. This was already known and worked around elsewhere in the codebase
+(`route-registry.ts` and `outbox-config.test.ts` both have comments about it; 32 of 103 test files mock
+`config/env.js` to sidestep it) — PR #354 was simply the first change to create an *unmocked* import path
+reaching it (`employee-management/service.ts` → `auth/service.ts`, added for `bumpTokenGeneration`). Fixed
+with a `backendRoot()` helper in `env.ts` that's safe under both CJS (Jest) and native ESM (production),
+no behavior change. This unmasked (didn't cause) 15 genuinely stale test assertions in two suites that
+could never previously load — rewritten in the same PR against the new lifecycle model rather than
+deferred, since the user asked for it pulled forward.
+
+**Final state**: `tsc --noEmit` and `eslint` clean; full suite 103/103 passed, 2249/2249 tests. Migration
+harness (`Forward · Rollback · Recovery`) green — also caught and fixed two real `down.sql` bugs (a drop
+ordering issue, and a redundant transaction wrapper conflicting with the harness's own `--single-transaction`).
+Merged as commit `a25308b`.
+
+**Remaining PRs** (see the plan file for full detail on each; PR 5's test-rewrite half is DONE, folded
+into #354 — see above):
+- **PR 3 — Frontend lifecycle UI** (not started). No deactivate/rehire/delete/restore UI exists at
+  all today. Needs: new `employeesApi` client methods, dedupe the copy-pasted `STATUS_TONE`/`STATUS_LABEL`
   maps (`WorkerOnboardingCard.tsx` and `org-chart/page.tsx`), net-new action buttons, a "Deleted"
   badge+date+reason wherever a deleted person is surfaced via the admin-only `include_deleted`
   search, and an SWR cache-invalidation checklist (8 surfaces named in the plan).
-- **PR 4 — Blocklist removal + real enforcement.** Separate, already-scoped work: blocklist entries
-  have no removal path, and the blocklist enforces nothing today (`isWorkerEligibleForHotel` never
-  checks it).
-- **PR 5 — Docs + tests sync.** Revise `MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12` and
-  `.claude/knowledge/MODULE_MEMORY.yaml`; rewrite `employee-management.test.ts`'s logic (not just
-  compile fixes — several assertions test the OLD terminal-state behavior and need inverting, e.g.
-  "rejects DEACTIVATED→ACTIVE" is now a required-legal transition); add the permission-matrix test
-  file the plan calls for (every transition × every role, including checker/worker denials).
+- **PR 4 — Blocklist removal + real enforcement** (not started). Separate, already-scoped work:
+  blocklist entries have no removal path, and the blocklist enforces nothing today
+  (`isWorkerEligibleForHotel` never checks it).
+- **PR 5 — Remaining docs sync** (not started; test-rewrite half already shipped in #354). Revise
+  `docs/03-modules/employee-management/MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12` and
+  `.claude/knowledge/MODULE_MEMORY.yaml` to reflect the new permanent lifecycle (currently still
+  describe the old terminal 5-state model — #354 amended ADR-030, not this spec). Add the dedicated
+  permission-matrix test file the plan calls for (every transition × every role including
+  checker/worker denials) if not considered already covered by `employee-management-scope-authz.test.ts`'s
+  new route-level coverage from #354.
 
 Full 21-scenario end-to-end verification list (including the environment's no-live-DB constraint)
-is in the plan file — not yet run, since PRs 3–5 aren't built.
+is in the plan file — not yet run, since PRs 3–5 aren't fully built.
 
 ## 4. Deferred bug reports — 6 from the prior session + 11 new, none investigated yet
 
@@ -463,14 +499,20 @@ picked up.
 - **GitHub Actions billing can be exhausted mid-session** (happened once already) — if deploy/CI
   runs start failing instantly with a billing message, that's an account-level issue, not a code
   problem; it self-resolves and doesn't need a code fix.
-- **`npx jest` fails to run backend tests in this environment** with `TS1343: The 'import.meta'
-  meta-property is only allowed when the '--module' option is ... 'nodenext'` from
-  `backend/src/config/env.ts:287`. Confirmed pre-existing (via `git stash` comparison against
-  `main`, not introduced by the lifecycle rework) — a `ts-jest`/`tsconfig` module-target mismatch,
-  not a code bug. `tsc --noEmit` and `eslint` both still run cleanly and were used as the
-  verification bar instead; disclose this the same way as the no-live-DB limitation in any PR
-  whose test plan would otherwise imply full test-suite coverage. Root-causing/fixing the Jest
-  config itself is out of scope for the lifecycle work but worth its own quick fix at some point.
+- **RESOLVED, but the mechanism is worth knowing:** `npx jest` can fail on any suite whose import
+  graph reaches `backend/src/config/env.ts` unmocked, with `TS1343: The 'import.meta' meta-property
+  is only allowed when...`. Root cause (found in #354's CI debugging, after an initial wrong "it's
+  pre-existing, unrelated" diagnosis that had to be retracted): **Jest in this repo never actually
+  runs in native-ESM mode** — the ts-jest ESM preset only activates under
+  `NODE_OPTIONS=--experimental-vm-modules`, which nothing sets, so every file compiles as CommonJS
+  regardless of the inline `module: "ESNext"` tsconfig override, and `env.ts`'s literal
+  `import.meta.url` is illegal syntax there. This is now fixed at the source (`env.ts` uses a
+  `backendRoot()` helper that's safe under both CJS and native ESM), so it should not recur — but
+  if it ever does (e.g. a new module imports something that reaches `env.ts` in a way the fix
+  didn't anticipate), the fix is either mock `config/env.js` in the test (32 files already do this)
+  or extend `backendRoot()`, not re-diagnose from scratch. `git stash`-based "is this pre-existing"
+  checks are unreliable if the stash doesn't cleanly revert generated Prisma client output —
+  verify via a real `git worktree add` checkout instead.
 
 ## 7. Quick reference: where things are
 
@@ -491,20 +533,26 @@ picked up.
 
 ## 8. Immediate next action for whoever resumes
 
+**PR #354 is merged** (schema/migration + service-layer + ADR-030 amendment + full test rewrite —
+see §3.5). `main` is synced locally. Next:
+
 1. **PR 3 — Frontend lifecycle UI.** No deactivate/rehire/delete/restore UI exists at all yet
    (confirmed in research: the frontend only has create→submit→approve/reject). See section 3's
    "Remaining PRs" for the concrete scope (new API client methods, dedupe `STATUS_TONE`/
    `STATUS_LABEL`, new action buttons, deleted badge, SWR invalidation checklist).
-2. **PR 4 — Blocklist removal + enforcement**, then **PR 5 — Docs + tests sync** (in that order,
-   per the plan's sequencing).
-3. Every PR gets the same bar already established this session: `tsc --noEmit`/`eslint` clean,
-   independent adversarial review (an Opus subagent, per this session's "decisional tasks → Opus
-   subagent" instruction) before considering it done, and the user merges — never self-merge.
+2. **PR 4 — Blocklist removal + enforcement**, then **PR 5 — remaining docs sync**
+   (`MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12`, `.claude/knowledge/MODULE_MEMORY.yaml` —
+   the test-rewrite half of the original PR 5 scope already shipped in #354).
+3. Every PR gets the same bar already established this session: `tsc --noEmit`/`eslint` clean, the
+   FULL test suite green (not just the touched files — #354's CI debugging showed an unmocked
+   import chain in one module can break suites in another), independent adversarial review (an
+   Opus subagent, per this session's "decisional tasks → Opus subagent" instruction) before
+   considering it done, and the user merges — never self-merge.
 4. Once PRs 3–5 land, run the full 21-scenario end-to-end verification list from the plan file
    (`~/.claude/plans/expressive-floating-koala.md`).
 5. Only after the lifecycle work is fully shipped: triage the 13 deferred items in section 4 —
    group into the 4 batches already identified there, each batch or item likely becomes its own
    PR, per this repo's established one-logical-change-per-PR discipline.
-6. **Do not push `feat/employment-lifecycle-rework` or open a PR without the user's explicit
-   go-ahead** — this session's instruction was "don't push, just continue the work"; that has not
-   been superseded as of this handoff.
+6. **CI re-run discipline (new this session):** after fixing a failing CI check, re-run only that
+   specific failed job rather than the whole workflow, where GitHub's re-run API allows scoping to
+   one job.
