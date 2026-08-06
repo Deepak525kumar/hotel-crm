@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SkillTag } from '@prisma/client';
+import { DeactivationReason, SkillTag } from '@prisma/client';
 import { MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE } from './constants.js';
 
 // IF-EMP-CreateEmployee / v0 (REQ-EMP-001, REQ-EMP-003, REQ-EMP-011).
@@ -70,13 +70,54 @@ export const ByUserParamsSchema = z.object({
   user_id: z.string().min(1),
 });
 
-// IF-EMP-LifecycleSignal / v0 (internal, Onboarding-driven).
-export const LifecycleSignalSchema = z.object({
-  signal: z.enum(['submitted_for_review', 'approved', 'rejected']),
-  // Explicit fallback only (ADR-023 §4 provisional resolution order) — see
-  // EmployeeManagementService.resolveApprovalGroupId.
+// ── Lifecycle actions (REQ-EMP-002 rework, 2026-08-06) ──────────────────────
+//
+// Replaces the single IF-EMP-LifecycleSignal endpoint's
+// `{signal, hotel_group_id}` body with one schema per action. The generic
+// shape could not survive the rework: deactivate now requires a
+// DeactivationReason enum and delete requires a free-text deleted_reason,
+// neither of which applies to any other signal — expressing that in one
+// schema means conditionally-required fields keyed off `signal`, i.e. the
+// validation Zod would otherwise do for free, hand-rolled. One schema per
+// action keeps each endpoint's contract independently readable, the same way
+// SetBlocklistSchema states its own required-reason rule locally.
+
+// PENDING -> ACTIVE. hotel_group_id is an explicit fallback only (ADR-023 §4
+// provisional resolution order) — see
+// EmployeeManagementService.resolveApprovalGroupId.
+export const ApproveEmployeeSchema = z.object({
   hotel_group_id: z.string().optional(),
 });
 
-export type LifecycleSignalRequest = z.infer<typeof LifecycleSignalSchema>;
-export type LifecycleSignal = LifecycleSignalRequest['signal'];
+export type ApproveEmployeeRequest = z.infer<typeof ApproveEmployeeSchema>;
+
+// PENDING -> REJECTED. Reason is optional here, unlike deactivate/delete
+// below: a rejection ends an application that never became employment, so
+// there is no employment record state that depends on the reason being
+// present (contrast deactivation_reason/deleted_reason, both persisted
+// columns the rework requires on their transitions).
+export const RejectEmployeeSchema = z.object({
+  reason: z.string().max(1000).optional(),
+});
+
+export type RejectEmployeeRequest = z.infer<typeof RejectEmployeeSchema>;
+
+// ACTIVE -> DEACTIVATED (temporary pause). deactivation_reason is required
+// and constrained to the DeactivationReason enum (schema.prisma).
+export const DeactivateEmployeeSchema = z.object({
+  deactivation_reason: z.nativeEnum(DeactivationReason, {
+    required_error: 'deactivation_reason is required',
+  }),
+});
+
+export type DeactivateEmployeeRequest = z.infer<typeof DeactivateEmployeeSchema>;
+
+// ACTIVE/DEACTIVATED/REJECTED -> DELETED (left the company). Free text, not
+// an enum — "why someone left" doesn't reduce to a fixed small set the way a
+// pause reason does (schema.prisma DeactivationReason note). Required, same
+// non-blank rule as SetBlocklistSchema.
+export const DeleteEmployeeSchema = z.object({
+  deleted_reason: z.string().trim().min(1, 'deleted_reason is required').max(1000),
+});
+
+export type DeleteEmployeeRequest = z.infer<typeof DeleteEmployeeSchema>;

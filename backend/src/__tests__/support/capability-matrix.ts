@@ -106,9 +106,21 @@ export const CAPABILITY_MATRIX: readonly Capability[] = Object.freeze([
   { id: 'C-13', name: 'Deactivate / delete user', class: 'M', token: null, outcome: o(A, D, D, D, D) },
   { id: 'C-14', name: 'View users', class: 'O', token: 'users:read', outcome: o(A, A, A, D, D) },
   { id: 'C-15', name: 'Create / bulk-import employee', class: 'M', token: 'employees:write', outcome: o(A, D, D, D, D) },
-  { id: 'C-16', name: 'Employee operational transitions', class: 'O', token: null, outcome: o(A, D, D, D, D) },
+  // Superseded 2026-08-06 (employment-lifecycle rework, PR #354, ADR-030 §3
+  // note ³): was token: null / admin-only, deferred to an unbuilt
+  // backend-onboarding module. Now a live, scoped grant covering
+  // submit-for-review/approve/reject/deactivate/reactivate/rehire, all gated
+  // by employee-management's own assertLifecycleAuthority(). C-18
+  // ("Deactivate employee") merges into this row -- see below.
+  { id: 'C-16', name: 'Employee operational transitions', class: 'O', token: 'employees:write', outcome: o(A, A, A, D, D) },
   { id: 'C-17', name: 'Edit employee record fields', class: 'M', token: 'employees:write', outcome: o(A, D, D, D, D) },
-  { id: 'C-18', name: 'Deactivate employee', class: 'M', token: 'employees:delete', outcome: o(A, D, D, D, D) },
+  // Merged into C-16 (2026-08-06, PR #354): deactivate is now one of six
+  // uniformly-authorized lifecycle transitions, not a separately-ratified
+  // capability. Retained as a row (not deleted) so `id` numbering C-01..C-34
+  // stays stable and the "covers C-01..C-34 with no gaps" invariant test
+  // keeps holding -- `token: null` and no CAPABILITY_ROUTES entry means this
+  // row is asserted at neither the token-grant nor route-gate layer.
+  { id: 'C-18', name: 'Deactivate employee (merged into C-16)', class: 'M', token: null, outcome: o(A, D, D, D, D) },
   { id: 'C-19', name: 'View employee profile', class: 'O', token: 'employees:read', outcome: o(A, A, A, A, A) },
   { id: 'C-20', name: 'Read special-category fields', class: 'M', token: 'employees:special_category:read', outcome: o(A, D, D, D, D) },
   { id: 'C-21', name: 'Subject-rights export', class: 'M', token: 'employees:read', outcome: o(A, D, D, D, D) },

@@ -46,22 +46,79 @@ router.get(
   (req, res, next) => controller.exportEmployeeData(req, res, next)
 );
 
-// Deactivation (Admin-driven soft delete).
+// ── Lifecycle actions (REQ-EMP-002 rework, 2026-08-06) ─────────────────────
+//
+// Replaces the single POST /:employee_id/lifecycle-signal endpoint and the
+// old Admin-only /deactivate. Two authorization tiers, deliberately split:
+//
+//  1. Employment-status actions (submit-for-review, approve, reject,
+//     deactivate, reactivate, rehire) admit admin/manager/regional_manager at
+//     the route, with scope narrowing done service-side via
+//     assertLifecycleAuthority() -> isWorkerInGroupScope(). This is the same
+//     split the hotel blocklist POST below already uses (route names the
+//     roles, service narrows the scope) rather than trying to express a
+//     group-membership predicate in a route gate, which requireRole() cannot
+//     do. Supersedes OD-EMP-09's Admin-only transport boundary for these
+//     actions: they are no longer internal Onboarding-driven signals but
+//     first-class managerial actions on a manager's own group.
+//
+//  2. Account-boundary actions (delete, restore) stay requireRole('admin').
+//     Both cross into User (deleted_at / is_active / token_generation), i.e.
+//     they revoke or restore platform access rather than only changing
+//     employment status — a strictly larger blast radius than tier 1, and one
+//     no scope claim narrows. The service re-checks admin independently.
+router.post(
+  '/:employee_id/submit-for-review',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  (req, res, next) => controller.submitForReview(req, res, next)
+);
+router.post(
+  '/:employee_id/approve',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.approve
+);
+router.post(
+  '/:employee_id/reject',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.reject
+);
 router.post(
   '/:employee_id/deactivate',
-  requireRole('admin'),
-  requirePermission('employees:delete'),
-  (req, res, next) => controller.deactivate(req, res, next)
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.deactivate
+);
+router.post(
+  '/:employee_id/reactivate',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  (req, res, next) => controller.reactivate(req, res, next)
+);
+router.post(
+  '/:employee_id/rehire',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  (req, res, next) => controller.rehire(req, res, next)
 );
 
-// Internal, Onboarding-driven lifecycle signal (OD-EMP-09: no
-// service-to-service auth mechanism exists yet; Admin-gated at the transport
-// boundary).
+// Tier 2 — account-boundary. `employees:delete` (not `employees:write`) for
+// both: restore is the exact inverse of delete and reverses the same
+// account-level state, so gating it on the weaker write token would let a
+// holder undo a deletion they could never have performed.
 router.post(
-  '/:employee_id/lifecycle-signal',
+  '/:employee_id/delete',
   requireRole('admin'),
-  requirePermission('employees:write'),
-  ...controller.lifecycleSignal
+  requirePermission('employees:delete'),
+  ...controller.deleteEmployee
+);
+router.post(
+  '/:employee_id/restore',
+  requireRole('admin'),
+  requirePermission('employees:delete'),
+  (req, res, next) => controller.restore(req, res, next)
 );
 
 // Hotel blocklist (REQ-EMP-005 / RULE-EMP-07) — hotel-scoped via

@@ -94,33 +94,56 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
+// isWorkerInGroupScope (lib/scope.ts) looks up EmploymentRecord BY user_id,
+// not employee_id -- a second index alongside `employmentRecords` (keyed by
+// employee_id) so the scope check resolves the same fixture record.
+const employmentRecordsByUserId: Record<string, any> = Object.fromEntries(
+  Object.values(employmentRecords).map((r) => [r.user_id, r])
+);
+
+const mockDb = {
+  employmentRecord: {
+    findUnique: async ({ where }: any) =>
+      (where.employee_id ? employmentRecords[where.employee_id] : employmentRecordsByUserId[where.user_id]) ?? null,
+    findMany: async ({ where }: any) => groupEmploymentRecords[where.hotel_group_id] ?? [],
+    update: async ({ where, data }: any) => {
+      const record = Object.values(employmentRecords).find((r) => r.id === where.id);
+      Object.assign(record, data);
+      return record;
+    },
+  },
+  employmentStatusHistory: {
+    create: async (args: any) => ({ id: 'hist_1', ...args.data }),
+  },
+  user: {
+    update: async ({ data }: any) => ({ id: 'user_1', ...data }),
+  },
+  employeeBlocklistEntry: {
+    create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
+    findMany: async () => [],
+  },
+  hotel: {
+    findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
+    findFirst: async () => null,
+  },
+  hotelGroup: {
+    findFirst: async () => null,
+    findUnique: async ({ where }: any) => hotelGroups[where.id] ?? null,
+  },
+  attendance: { findMany: async () => [] },
+  rating: { findMany: async () => [] },
+  workerAssignment: { findMany: async () => [] },
+  auditLog: {
+    create: async (args: any) => {
+      auditCalls.push(args);
+      return {};
+    },
+  },
+  $transaction: async (cb: any) => cb(mockDb),
+};
+
 jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
-    employmentRecord: {
-      findUnique: async ({ where }: any) => employmentRecords[where.employee_id] ?? null,
-      findMany: async ({ where }: any) => groupEmploymentRecords[where.hotel_group_id] ?? [],
-    },
-    employeeBlocklistEntry: {
-      create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
-      findMany: async () => [],
-    },
-    hotel: {
-      findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
-      findFirst: async () => null,
-    },
-    hotelGroup: {
-      findFirst: async () => null,
-      findUnique: async ({ where }: any) => hotelGroups[where.id] ?? null,
-    },
-    attendance: { findMany: async () => [] },
-    rating: { findMany: async () => [] },
-    auditLog: {
-      create: async (args: any) => {
-        auditCalls.push(args);
-        return {};
-      },
-    },
-  }),
+  getPrisma: () => mockDb,
 }));
 
 jest.mock('../middleware/auth.js', () => ({
@@ -151,6 +174,11 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
   beforeEach(() => {
     testAuth = null;
     auditCalls.length = 0;
+    // E-001's mutable fields get reset between tests: several new tests in
+    // this suite (submit-for-review) call the real service.update(), which
+    // mutates the shared fixture object in place via mockDb above.
+    employmentRecords['E-001'].status = 'ACTIVE';
+    employmentRecords['E-001'].submitted_for_review_at = null;
   });
 
   describe('POST /employees/hotels/:hotel_id/blocklist — manager hotel-scope enforcement (FIND-001)', () => {
@@ -338,14 +366,80 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
     });
   });
 
-  describe('POST /employees/:employee_id/lifecycle-signal — Admin-only transport (OD-EMP-09)', () => {
-    it('denies a non-admin (manager) actor at the route (403)', async () => {
-      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['employees:write'], scope: { type: 'global' } };
-      const res = await request(makeApp())
-        .post('/employees/E-001/lifecycle-signal')
-        .send({ signal: 'submitted_for_review' });
+  // Replaces the pre-rework single /lifecycle-signal endpoint (removed) --
+  // see ADR-030 §3 note ³ (2026-08-06 amendment): submit-for-review/approve/
+  // reject/deactivate/reactivate/rehire now admit admin OR a scoped
+  // manager/regional_manager (assertLifecycleAuthority(), scoped via
+  // isWorkerInGroupScope against the record's hotel_group_id), not
+  // admin-only. E-001's fixture record has hotel_group_id: 'g1' (see
+  // employmentRecords above).
+  describe('POST /employees/:employee_id/submit-for-review — scoped manager/RM, not admin-only (C-16)', () => {
+    it('denies a worker outright (not admin, not a scoped manager role)', async () => {
+      testAuth = { userId: 'w_1', role: 'worker', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
       expect(res.status).toBe(403);
       expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('denies a manager with no scope claim (deny-by-default, isWorkerInGroupScope)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('denies a manager scoped to a different hotel group', async () => {
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:write'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g2' },
+      };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager scoped to the record\'s own hotel group', async () => {
+      employmentRecords['E-001'].status = 'PENDING';
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:write'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows an admin regardless of scope', async () => {
+      employmentRecords['E-001'].status = 'PENDING';
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('POST /employees/:employee_id/delete and /restore — admin-only, unrestricted scope does not admit a manager (account-boundary actions)', () => {
+    it('denies a scoped manager on delete even within their own group', async () => {
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:write', 'employees:delete'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).post('/employees/E-001/delete').send({ deleted_reason: 'Resigned' });
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a scoped manager on restore even within their own group', async () => {
+      testAuth = {
+        userId: 'mgr_1',
+        role: 'manager',
+        permissions: ['employees:write', 'employees:delete'],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).post('/employees/E-001/restore');
+      expect(res.status).toBe(403);
     });
   });
 });

@@ -9,16 +9,24 @@ export const ASSESSMENT_BASIS: Record<SkillTag, string> = {
   [SkillTag.WAITER]: 'hours_worked',
 };
 
-// REQ-EMP-002 / RULE-EMP-02, RULE-EMP-03, RULE-EMP-12: the only confirmed
-// lifecycle transitions. No Suspended state; no rating/warning-driven
-// automatic transition out of Active (MODULE_SPEC.md "State and Lifecycle"
-// invariants).
+// REQ-EMP-002 rework (2026-08-06): permanent, non-terminal lifecycle.
+// Supersedes the old terminal-state table (RULE-EMP-02/03/12) -- every state
+// can return to ACTIVE, so rehire never requires a duplicate User
+// (RULE-EMP-01). No Suspended state; no rating/warning-driven automatic
+// transition out of Active (MODULE_SPEC.md "State and Lifecycle" invariants
+// -- still true, unaffected by this rework).
+//
+// DEACTIVATED means a temporary pause only (leave/seasonal/suspension) and
+// always reactivates directly. DELETED means the person left the company and
+// its return is a true rehire, gated through PENDING (re-approval required) —
+// see EmployeeManagementService.applyTransition's DEACTIVATED/DELETED
+// reason-requirement enforcement for the other half of this distinction.
 export const ALLOWED_TRANSITIONS: Record<EmploymentStatus, EmploymentStatus[]> = {
-  [EmploymentStatus.INACTIVE]: [EmploymentStatus.UNDER_REVIEW],
-  [EmploymentStatus.UNDER_REVIEW]: [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
-  [EmploymentStatus.ACTIVE]: [EmploymentStatus.DEACTIVATED],
-  [EmploymentStatus.REJECTED]: [],
-  [EmploymentStatus.DEACTIVATED]: [],
+  [EmploymentStatus.PENDING]: [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
+  [EmploymentStatus.ACTIVE]: [EmploymentStatus.DEACTIVATED, EmploymentStatus.DELETED],
+  [EmploymentStatus.DEACTIVATED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
+  [EmploymentStatus.REJECTED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
+  [EmploymentStatus.DELETED]: [EmploymentStatus.PENDING],
 };
 
 export function assertTransition(from: EmploymentStatus, to: EmploymentStatus): void {

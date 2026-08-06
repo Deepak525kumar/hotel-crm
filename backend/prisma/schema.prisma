@@ -229,12 +229,37 @@ enum PushApp {
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-002 / RULE-EMP-02, 03, 12): employee
 // lifecycle status. No Suspended state; no rating/warning-driven automatic
 // transition (invariant, MODULE_SPEC.md "State and Lifecycle").
+// Permanent, non-terminal employment lifecycle (2026-08-06 rework,
+// supersedes RULE-EMP-02/03/12's terminal-state design). Every state can
+// return to ACTIVE — a person is never a dead end, so rehire never requires
+// a duplicate User (RULE-EMP-01).
+//
+// PENDING collapses the old INACTIVE/UNDER_REVIEW distinction; that detail
+// is preserved on EmploymentRecord.submitted_for_review_at instead (null =
+// old INACTIVE, non-null = old UNDER_REVIEW), not as separate enum values.
+//
+// DEACTIVATED means a temporary pause only (leave/seasonal/suspension,
+// EmploymentRecord.deactivation_reason required) — always reactivates
+// directly to ACTIVE, no re-approval. DELETED means the person left the
+// company (resigned/terminated/contract lapsed) and is the same action as
+// User-level soft delete (deleted_at, is_active=false, token_generation
+// bump) — its return is a true rehire: DELETED -> PENDING -> ACTIVE.
 enum EmploymentStatus {
-  INACTIVE
-  UNDER_REVIEW
+  PENDING
   ACTIVE
-  REJECTED
   DEACTIVATED
+  REJECTED
+  DELETED
+}
+
+// REQ-EMP-002 rework: reason a DEACTIVATED (temporary pause) transition was
+// made. Distinct from a DELETED (left the company) transition, which has no
+// enum here -- that path uses deleted_reason (free text) since "why someone
+// left" doesn't reduce to a fixed small set the way a pause reason does.
+enum DeactivationReason {
+  TEMPORARY_LEAVE
+  SEASONAL
+  SUSPENDED
 }
 
 // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-003 / RULE-EMP-04): fixed confirmed
@@ -281,60 +306,62 @@ model User {
   updated_at        DateTime  @updatedAt
 
   // Relations
-  sessions                      Session[]
-  hotel_workers                 HotelWorker[]
-  assignments                   WorkerAssignment[]       @relation("assigned_worker")
-  assignments_managed           WorkerAssignment[]       @relation("assignment_manager")
-  attendance_records            Attendance[]             @relation("attendee")
-  attendance_verified           Attendance[]             @relation("attendance_verifier")
-  verifications_performed       QualityVerification[]    @relation("verifier")
-  ratings_received              Rating[]                 @relation("rated_worker")
-  ratings_given                 Rating[]                 @relation("rater")
-  overall_rating                WorkerOverallRating?
-  notifications                 Notification[]
-  push_tokens                   PushToken[]
-  created_work_requests         JobRequest[]             @relation("request_creator")
-  audit_logs                    AuditLog[]
-  password_reset_tokens         PasswordResetToken[]
-  managed_hotel_groups          HotelGroup[]             @relation("regional_manager_of_group")
-  managed_hotels                Hotel[]                  @relation("hotel_manager")
-  calendar_absences             CalendarAbsence[]        @relation("calendar_absence_worker")
+  sessions                                       Session[]
+  hotel_workers                                  HotelWorker[]
+  assignments                                    WorkerAssignment[]                 @relation("assigned_worker")
+  assignments_managed                            WorkerAssignment[]                 @relation("assignment_manager")
+  attendance_records                             Attendance[]                       @relation("attendee")
+  attendance_verified                            Attendance[]                       @relation("attendance_verifier")
+  verifications_performed                        QualityVerification[]              @relation("verifier")
+  ratings_received                               Rating[]                           @relation("rated_worker")
+  ratings_given                                  Rating[]                           @relation("rater")
+  overall_rating                                 WorkerOverallRating?
+  notifications                                  Notification[]
+  push_tokens                                    PushToken[]
+  created_work_requests                          JobRequest[]                       @relation("request_creator")
+  audit_logs                                     AuditLog[]
+  password_reset_tokens                          PasswordResetToken[]
+  managed_hotel_groups                           HotelGroup[]                       @relation("regional_manager_of_group")
+  managed_hotels                                 Hotel[]                            @relation("hotel_manager")
+  calendar_absences                              CalendarAbsence[]                  @relation("calendar_absence_worker")
   // SPEC-DOCUMENTS-001 (GD-16): documents owned by this worker and uploads
   // performed by this user on behalf of a worker (manager contract-scan, RULE-DOC-04).
-  worker_documents              WorkerDocument[]         @relation("documents_worker")
-  documents_uploaded            WorkerDocument[]         @relation("documents_uploader")
+  worker_documents                               WorkerDocument[]                   @relation("documents_worker")
+  documents_uploaded                             WorkerDocument[]                   @relation("documents_uploader")
   // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
-  employment_record             EmploymentRecord?        @relation("employment_record")
-  blocklist_entries_authored    EmployeeBlocklistEntry[] @relation("blocklist_author")
+  employment_record                              EmploymentRecord?                  @relation("employment_record")
+  blocklist_entries_authored                     EmployeeBlocklistEntry[]           @relation("blocklist_author")
+  // 2026-08-06 lifecycle rework: who performed each transition (null = system-driven, e.g. contract-lapse).
+  employment_status_transitions                  EmploymentStatusHistory[]          @relation("employment_status_history_actor")
   // GD-14/OD-GEO-002 (SPEC-GEO-001): backend-geo owns worker-coordinate
   // capture + the 6-month retention sweep (Tier 1, CRR §25).
-  geo_checkins                  WorkerGeoCheckin[]       @relation("geo_checkin_worker")
+  geo_checkins                                   WorkerGeoCheckin[]                 @relation("geo_checkin_worker")
   // ADR-028: manager-entered "rooms completed" daily count, per worker's
   // full-day WorkerAssignment — no room-level task layer implied.
-  rooms_completed_as_worker     RoomsCompletedEntry[]    @relation("rooms_completed_worker")
-  rooms_completed_entered       RoomsCompletedEntry[]    @relation("rooms_completed_entered_by")
+  rooms_completed_as_worker                      RoomsCompletedEntry[]              @relation("rooms_completed_worker")
+  rooms_completed_entered                        RoomsCompletedEntry[]              @relation("rooms_completed_entered_by")
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
   // assignment — the worker placed and the manager who placed them.
-  calendar_entries_as_worker    CalendarEntry[]          @relation("calendar_entry_worker")
-  calendar_entries_placed       CalendarEntry[]          @relation("calendar_entry_placed_by")
+  calendar_entries_as_worker                     CalendarEntry[]                    @relation("calendar_entry_worker")
+  calendar_entries_placed                        CalendarEntry[]                    @relation("calendar_entry_placed_by")
   // SPEC-HR-001 (ADR-012/ADR-014): contract lifecycle + payslip-request
   // capability, owned exclusively by backend-hr.
-  hr_contracts                  Contract[]               @relation("hr_contract_worker")
-  hr_contracts_confirmed        Contract[]               @relation("hr_contract_confirmed_by")
-  hr_payslip_requests           PayslipRequest[]         @relation("hr_payslip_worker")
-  hr_payslip_requests_fulfilled PayslipRequest[]         @relation("hr_payslip_fulfilled_by")
+  hr_contracts                                   Contract[]                         @relation("hr_contract_worker")
+  hr_contracts_confirmed                         Contract[]                         @relation("hr_contract_confirmed_by")
+  hr_payslip_requests                            PayslipRequest[]                   @relation("hr_payslip_worker")
+  hr_payslip_requests_fulfilled                  PayslipRequest[]                   @relation("hr_payslip_fulfilled_by")
   // SPEC-CONSENT-001 (ADR-015): backend-consent owns consent lifecycle/
   // records/versions/withdrawal/renewal/audit history exclusively.
-  consent_records               ConsentRecord[]          @relation("consent_worker")
+  consent_records                                ConsentRecord[]                    @relation("consent_worker")
   // Manager-vacancy history (both directions of "who was assigned" and "who
   // performed the assignment/vacancy action") for HotelGroup and Hotel.
   regional_manager_assignment_history            RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history")
-  regional_manager_assignment_history_assigned    RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_assigned_by")
-  regional_manager_assignment_history_unassigned  RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_unassigned_by")
-  hotel_manager_assignment_history                HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history")
-  hotel_manager_assignment_history_assigned       HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_assigned_by")
-  hotel_manager_assignment_history_unassigned     HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_unassigned_by")
+  regional_manager_assignment_history_assigned   RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_assigned_by")
+  regional_manager_assignment_history_unassigned RegionalManagerAssignmentHistory[] @relation("regional_manager_assignment_history_unassigned_by")
+  hotel_manager_assignment_history               HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history")
+  hotel_manager_assignment_history_assigned      HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_assigned_by")
+  hotel_manager_assignment_history_unassigned    HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_unassigned_by")
 
   @@index([role])
   @@index([is_active])
@@ -407,21 +434,21 @@ enum ManagerVacancyReason {
 // index, so vacancy for several groups at once is unaffected, while a
 // non-null value is still guaranteed to name at most one group.
 model HotelGroup {
-  id                       String    @id @default(cuid())
-  name                     String
-  billing_info             String?
-  regional_manager_user_id String?   @unique
-  regional_manager         User?     @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: SetNull)
-  regional_manager_assigned_at DateTime?
-  regional_manager_vacated_at  DateTime?
+  id                              String                @id @default(cuid())
+  name                            String
+  billing_info                    String?
+  regional_manager_user_id        String?               @unique
+  regional_manager                User?                 @relation("regional_manager_of_group", fields: [regional_manager_user_id], references: [id], onDelete: SetNull)
+  regional_manager_assigned_at    DateTime?
+  regional_manager_vacated_at     DateTime?
   regional_manager_vacancy_reason ManagerVacancyReason?
-  created_at               DateTime  @default(now())
-  updated_at               DateTime  @updatedAt
+  created_at                      DateTime              @default(now())
+  updated_at                      DateTime              @updatedAt
 
   // Relations
-  hotels             Hotel[]
+  hotels                              Hotel[]
   // Epic 5 PR 5.6 (ADR-023 §4): employment records associated with this group.
-  employment_records EmploymentRecord[] @relation("employment_group")
+  employment_records                  EmploymentRecord[]                 @relation("employment_group")
   regional_manager_assignment_history RegionalManagerAssignmentHistory[]
 
   @@index([regional_manager_user_id])
@@ -432,18 +459,18 @@ model HotelGroup {
 // the latest state). assigned_by/unassigned_by are nullable — a row created
 // by a migration backfill or system process has no human actor.
 model RegionalManagerAssignmentHistory {
-  id               String    @id @default(cuid())
-  hotel_group_id   String
-  hotel_group      HotelGroup @relation(fields: [hotel_group_id], references: [id], onDelete: Cascade)
+  id                       String                @id @default(cuid())
+  hotel_group_id           String
+  hotel_group              HotelGroup            @relation(fields: [hotel_group_id], references: [id], onDelete: Cascade)
   regional_manager_user_id String
-  regional_manager User      @relation("regional_manager_assignment_history", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
-  assigned_at      DateTime
-  unassigned_at    DateTime?
-  assigned_by_id   String?
-  assigned_by      User?     @relation("regional_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
-  unassigned_by_id String?
-  unassigned_by    User?     @relation("regional_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
-  reason           ManagerVacancyReason?
+  regional_manager         User                  @relation("regional_manager_assignment_history", fields: [regional_manager_user_id], references: [id], onDelete: Restrict)
+  assigned_at              DateTime
+  unassigned_at            DateTime?
+  assigned_by_id           String?
+  assigned_by              User?                 @relation("regional_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
+  unassigned_by_id         String?
+  unassigned_by            User?                 @relation("regional_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
+  reason                   ManagerVacancyReason?
 
   @@index([hotel_group_id])
   @@index([regional_manager_user_id])
@@ -477,32 +504,32 @@ model Hotel {
   // ADR-023: nullable until assigned ("after a hotel is created, it is assigned" — CRR §11).
   // ADR-025: nullable — dedicated Hotel Manager assigned after hotel creation (CRR §11).
   // Both additive only in this migration — no reader consumes either field yet (Epic 5 PR 5.1).
-  hotel_group_id  String?
-  hotel_group     HotelGroup? @relation(fields: [hotel_group_id], references: [id], onDelete: SetNull)
-  manager_user_id String?
-  manager         User?       @relation("hotel_manager", fields: [manager_user_id], references: [id], onDelete: SetNull)
-  manager_assigned_at DateTime?
-  manager_vacated_at  DateTime?
+  hotel_group_id         String?
+  hotel_group            HotelGroup?           @relation(fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  manager_user_id        String?
+  manager                User?                 @relation("hotel_manager", fields: [manager_user_id], references: [id], onDelete: SetNull)
+  manager_assigned_at    DateTime?
+  manager_vacated_at     DateTime?
   manager_vacancy_reason ManagerVacancyReason?
 
   // Relations
-  hotel_workers           HotelWorker[]
-  work_requests           JobRequest[]
-  assignments             WorkerAssignment[]
-  attendance              Attendance[]
-  verifications           QualityVerification[]
-  ratings                 Rating[]
-  notifications           Notification[]
+  hotel_workers              HotelWorker[]
+  work_requests              JobRequest[]
+  assignments                WorkerAssignment[]
+  attendance                 Attendance[]
+  verifications              QualityVerification[]
+  ratings                    Rating[]
+  notifications              Notification[]
   // Epic 5 PR 5.6 (SPEC-EMP-001 REQ-EMP-005 / RULE-EMP-07): hotel blocklist entries.
-  blocklist_entries       EmployeeBlocklistEntry[] @relation("hotel_blocklist")
+  blocklist_entries          EmployeeBlocklistEntry[]        @relation("hotel_blocklist")
   // ADR-028: manager-entered "rooms completed" daily counts for this hotel.
-  rooms_completed_entries RoomsCompletedEntry[]
+  rooms_completed_entries    RoomsCompletedEntry[]
   // GD-14/OD-GEO-002 (SPEC-GEO-001): worker geofence checks against this
   // hotel's coordinates (backend-geo-owned, read-only from CRM's side).
-  geo_checkins            WorkerGeoCheckin[]
+  geo_checkins               WorkerGeoCheckin[]
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): manager calendar-placement direct
   // assignments at this hotel.
-  calendar_entries        CalendarEntry[]
+  calendar_entries           CalendarEntry[]
   manager_assignment_history HotelManagerAssignmentHistory[]
 
   @@index([country])
@@ -516,18 +543,18 @@ model Hotel {
 // the current manager_user_id pointer -- mirrors
 // RegionalManagerAssignmentHistory for the Hotel/manager relationship.
 model HotelManagerAssignmentHistory {
-  id             String    @id @default(cuid())
-  hotel_id       String
-  hotel          Hotel     @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  manager_user_id String
-  manager        User      @relation("hotel_manager_assignment_history", fields: [manager_user_id], references: [id], onDelete: Restrict)
-  assigned_at    DateTime
-  unassigned_at  DateTime?
-  assigned_by_id String?
-  assigned_by    User?     @relation("hotel_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
+  id               String                @id @default(cuid())
+  hotel_id         String
+  hotel            Hotel                 @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  manager_user_id  String
+  manager          User                  @relation("hotel_manager_assignment_history", fields: [manager_user_id], references: [id], onDelete: Restrict)
+  assigned_at      DateTime
+  unassigned_at    DateTime?
+  assigned_by_id   String?
+  assigned_by      User?                 @relation("hotel_manager_assignment_history_assigned_by", fields: [assigned_by_id], references: [id], onDelete: SetNull)
   unassigned_by_id String?
-  unassigned_by  User?     @relation("hotel_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
-  reason         ManagerVacancyReason?
+  unassigned_by    User?                 @relation("hotel_manager_assignment_history_unassigned_by", fields: [unassigned_by_id], references: [id], onDelete: SetNull)
+  reason           ManagerVacancyReason?
 
   @@index([hotel_id])
   @@index([manager_user_id])
@@ -570,28 +597,75 @@ model HotelWorker {
 // HotelGroup), nullable until hire-approval, set at Under Review -> Active.
 // ADR-025 Decision 3: deliberately hotel-tie-free — no per-hotel FK here.
 model EmploymentRecord {
-  id                String           @id @default(cuid())
-  user_id           String           @unique // account link (REQ-EMP-001: one record per account)
-  user              User             @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
-  employee_id       String           @unique // human-facing Employee ID
-  job_title         String // free text, provisional (OD-EMP-13)
-  start_date        DateTime
-  status            EmploymentStatus @default(INACTIVE)
-  marked_suitable   Boolean          @default(false) // probation milestone flag, not a status
-  hotel_group_id    String? // ADR-023 §4, group-grain, nullable until hire-approval
-  hotel_group       HotelGroup?      @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
-  skills            SkillTag[] // fixed set (REQ-EMP-003)
-  personal_data     Json? // Personalfragebogen non-special data (REQ-EMP-011)
-  konfession        String? // special-category (RULE-EMP-09) — never on general profile
-  disability_status String? // special-category (RULE-EMP-09)
-  deleted_at        DateTime? // soft delete (REQ-EMP-010)
-  created_at        DateTime         @default(now())
-  updated_at        DateTime         @updatedAt
+  id                      String              @id @default(cuid())
+  user_id                 String              @unique // account link (REQ-EMP-001: one record per account)
+  user                    User                @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
+  employee_id             String              @unique // human-facing Employee ID
+  job_title               String // free text, provisional (OD-EMP-13)
+  start_date              DateTime
+  status                  EmploymentStatus    @default(PENDING)
+  // Sub-state of PENDING only (2026-08-06 rework): null = old INACTIVE
+  // (onboarding not yet submitted), non-null = old UNDER_REVIEW (awaiting
+  // approval). Status itself stays PENDING across both; only Approve/Reject
+  // actually changes status.
+  submitted_for_review_at DateTime?
+  // Required when status transitions to DEACTIVATED (temporary pause);
+  // null otherwise.
+  deactivation_reason     DeactivationReason?
+  // Free-text reason captured when status transitions to DELETED (left the
+  // company) -- unlike deactivation_reason, not a fixed enum (RULE-EMP-02
+  // rework rationale above the DeactivationReason enum).
+  deleted_reason          String?
+  // Increments only on DELETED -> PENDING (a rehire after leaving), never on
+  // DEACTIVATED -> ACTIVE (same cycle continuing) or REJECTED -> ACTIVE.
+  // Denormalized on top of EmploymentStatusHistory for cheap "how many times
+  // rehired" / "current cycle" reads; EmploymentStatusHistory stays the
+  // source of truth for cycle boundaries.
+  employment_cycle        Int                 @default(1)
+  marked_suitable         Boolean             @default(false) // probation milestone flag, not a status
+  hotel_group_id          String? // ADR-023 §4, group-grain, nullable until hire-approval
+  hotel_group             HotelGroup?         @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  skills                  SkillTag[] // fixed set (REQ-EMP-003)
+  personal_data           Json? // Personalfragebogen non-special data (REQ-EMP-011)
+  konfession              String? // special-category (RULE-EMP-09) — never on general profile
+  disability_status       String? // special-category (RULE-EMP-09)
+  deleted_at              DateTime? // soft delete (REQ-EMP-010) -- mirrors User.deleted_at (Decision 1: DELETED == deleteUser())
+  created_at              DateTime            @default(now())
+  updated_at              DateTime            @updatedAt
 
-  blocklist_entries EmployeeBlocklistEntry[] @relation("blocklist_of_employee")
+  blocklist_entries EmployeeBlocklistEntry[]  @relation("blocklist_of_employee")
+  status_history    EmploymentStatusHistory[] @relation("employment_status_history")
 
   @@index([hotel_group_id])
   @@index([status])
+}
+
+// Append-only lifecycle transition log (2026-08-06 rework). Every
+// EmploymentStatus write MUST insert exactly one row here in the same
+// transaction (enforced by employee-management/service.ts's single
+// applyTransition() helper -- no other code path may write
+// EmploymentRecord.status/employment_cycle directly). This is the source of
+// truth for employment-cycle boundaries: cycle N spans from the DELETED ->
+// PENDING row bearing employment_cycle = N to the next such row, or to now.
+// Because this table is append-only and each row's created_at is immutable,
+// historical WorkerAssignment/Attendance/etc. rows can be attributed to a
+// cycle by joining worker_id -> User -> EmploymentRecord and bucketing the
+// row's own timestamp against these intervals, without ever risking a
+// record "migrating" to a later cycle after a rehire.
+model EmploymentStatusHistory {
+  id                   String           @id @default(cuid())
+  employment_record_id String
+  employment_record    EmploymentRecord @relation("employment_status_history", fields: [employment_record_id], references: [id], onDelete: Cascade)
+  from_status          EmploymentStatus
+  to_status            EmploymentStatus
+  reason               String? // required for DEACTIVATED/DELETED transitions at the service layer; not DB-enforced
+  actor_user_id        String? // null for system-driven transitions (e.g. contract-lapse)
+  actor                User?            @relation("employment_status_history_actor", fields: [actor_user_id], references: [id], onDelete: SetNull)
+  employment_cycle     Int // the cycle this transition occurred within
+  created_at           DateTime         @default(now())
+
+  @@index([employment_record_id])
+  @@index([created_at])
 }
 
 // EmployeeBlocklistEntry: hotel-scoped block preventing a specific employee
@@ -701,7 +775,7 @@ model JobRequestSkillSlot {
   updated_at      DateTime   @updatedAt
 
   // Back-reference for WorkerAssignment.skill_slot_id (2026-08-05 lifecycle fix).
-  claimed_by      WorkerAssignment[]
+  claimed_by WorkerAssignment[]
 
   // confirmed_count must never exceed headcount — CHECK constraint in migration.
   @@index([job_request_id])
@@ -728,7 +802,7 @@ model JobRequestSkillSlot {
 // User.hotel_group, AuditLog.actor) — an assignment should outlive the job
 // request it was created from, not be deleted alongside it.
 model WorkerAssignment {
-  id                     String             @id @default(cuid())
+  id                     String               @id @default(cuid())
   // Epic 9 PR 9.5 (TREQ-001/MIG-GAP-03): relaxed from mandatory to nullable.
   // A calendar-placed assignment (placeOnCalendar()) has no backing JobRequest
   // at all (per ADR-056's ratified "no intermediating application or
@@ -739,9 +813,9 @@ model WorkerAssignment {
   // Every pre-existing row keeps its current non-null value; only the
   // NOT NULL constraint relaxes (additive, reversible, zero data-loss).
   work_request_id        String?
-  work_request           JobRequest?        @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
+  work_request           JobRequest?          @relation(fields: [work_request_id], references: [id], onDelete: Cascade)
   job_request_id         String?
-  job_request            JobRequest?        @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
+  job_request            JobRequest?          @relation("job_request_assignment", fields: [job_request_id], references: [id], onDelete: SetNull)
   // Job-dispatch lifecycle audit fix (2026-08-05): records exactly which
   // skill slot a broadcast-accept assignment claimed. A multi-skill
   // broadcast (e.g. "2 Cleaners + 1 Waiter") has several
@@ -755,22 +829,22 @@ model WorkerAssignment {
   skill_slot_id          String?
   skill_slot             JobRequestSkillSlot? @relation(fields: [skill_slot_id], references: [id], onDelete: SetNull)
   worker_id              String
-  worker                 User               @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  worker                 User                 @relation("assigned_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id               String
-  hotel                  Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  hotel                  Hotel                @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   assigned_by_id         String
-  assigned_by            User               @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
-  status                 AssignmentStatus   @default(CONFIRMED)
-  confirmed_at           DateTime           @default(now())
+  assigned_by            User                 @relation("assignment_manager", fields: [assigned_by_id], references: [id], onDelete: Restrict)
+  status                 AssignmentStatus     @default(CONFIRMED)
+  confirmed_at           DateTime             @default(now())
   started_at             DateTime?
   completed_at           DateTime?
   cancelled_at           DateTime?
   cancellation_reason    String?
   // Self-referential chain for reassignments
   previous_assignment_id String?
-  previous_assignment    WorkerAssignment?  @relation("reassignment_chain", fields: [previous_assignment_id], references: [id], onDelete: SetNull)
-  reassignments          WorkerAssignment[] @relation("reassignment_chain")
-  updated_at             DateTime           @updatedAt
+  previous_assignment    WorkerAssignment?    @relation("reassignment_chain", fields: [previous_assignment_id], references: [id], onDelete: SetNull)
+  reassignments          WorkerAssignment[]   @relation("reassignment_chain")
+  updated_at             DateTime             @updatedAt
 
   // Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): denormalized calendar
   // day for this assignment, populated identically regardless of creation
@@ -1341,9 +1415,9 @@ enum ConsentDecision {
 }
 
 model ConsentRecord {
-  id             String          @id @default(cuid())
-  worker_id      String
-  worker         User            @relation("consent_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  id               String          @id @default(cuid())
+  worker_id        String
+  worker           User            @relation("consent_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Consent instance identifier (RULE-CONSENT-01/06), e.g. "daily-access-gate"
   // or "chatbot-data-processing" -- not a foreign-keyed enum, since ADR-015
   // frames this module as owning a general consent-record model of which the
@@ -1415,15 +1489,15 @@ enum RetentionTier {
 // OD-RETENTION-03 (duplicate registration with a conflicting tier is still
 // an explicitly OPEN decision -- out of scope for this schema-only PR).
 model RetentionCategory {
-  id         String        @id @default(cuid())
+  id          String        @id @default(cuid())
   // Consuming-module identifier, module-scoped (e.g. "attendance").
-  module_id  String
+  module_id   String
   // Category identifier, scoped within module_id (e.g. "shift_coordinate").
   category_id String
-  tier       RetentionTier
-  created_at DateTime      @default(now())
+  tier        RetentionTier
+  created_at  DateTime      @default(now())
 
-  logs       RetentionLog[]
+  logs RetentionLog[]
 
   @@unique([module_id, category_id])
 }
@@ -1452,25 +1526,25 @@ model RetentionCategory {
 // RetentionLog row can never exist without a registered category, which a
 // denormalized pair alone would not guarantee.
 model RetentionLog {
-  id            String            @id @default(cuid())
-  category_id   String
-  category      RetentionCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
+  id          String            @id @default(cuid())
+  category_id String
+  category    RetentionCategory @relation(fields: [category_id], references: [id], onDelete: Cascade)
   // Opaque cross-module record reference (module-scoped id sufficient for
   // the owning module to identify the record on its own side) -- NOT a
   // Prisma relation/foreign key, since the referenced record lives in
   // another module's own table, outside this module's schema ownership
   // (Ownership and Boundaries: this module never owns/redefines another
   // module's business record).
-  record_ref    String
+  record_ref  String
   // RULE-RETENTION-03: the clock the tier's window counts from (the
   // record's creation/effective timestamp, per IF-RETENTION-TagRecord).
-  tagged_at     DateTime
+  tagged_at   DateTime
   // Set once the sweep (PR 3+) determines and/or executes deletion for this
   // row. deleted_at null == still Tagged/Tracked or Eligible; non-null ==
   // Deleted (RULE-RETENTION-05). No business logic for computing eligibility
   // or performing deletion is implemented in this PR.
-  deleted_at    DateTime?
-  created_at    DateTime          @default(now())
+  deleted_at  DateTime?
+  created_at  DateTime          @default(now())
 
   @@index([category_id])
   @@index([tagged_at])
@@ -1500,12 +1574,12 @@ model RetentionLog {
 // "timestamp" refers to: when the delete happened, not when the audit
 // entry was written.
 model RetentionAuditEntry {
-  id           String        @id @default(cuid())
-  module_id    String
-  category_id  String
-  tier         RetentionTier
-  deleted_at   DateTime
-  created_at   DateTime      @default(now())
+  id          String        @id @default(cuid())
+  module_id   String
+  category_id String
+  tier        RetentionTier
+  deleted_at  DateTime
+  created_at  DateTime      @default(now())
 
   @@index([module_id, category_id])
   @@index([deleted_at])

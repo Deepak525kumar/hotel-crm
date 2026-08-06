@@ -137,7 +137,19 @@ const CAPABILITY_ROUTES: Record<string, string[]> = {
   'C-12': ['users:PUT /:user_id/role'],
   'C-13': ['users:DELETE /:user_id'],
   'C-15': ['employee-management:POST /', 'employee-management:POST /bulk-import'],
-  'C-18': ['employee-management:POST /:employee_id/deactivate'],
+  // C-16 "Employee operational transitions" -- superseded 2026-08-06 (PR #354,
+  // ADR-030 §3 note ³): now has a live route surface (was previously
+  // token-only, see the comment above CAPABILITY_ROUTES). C-18 "Deactivate
+  // employee" is merged into this row; its former route moves here rather
+  // than staying under a retired id.
+  'C-16': [
+    'employee-management:POST /:employee_id/submit-for-review',
+    'employee-management:POST /:employee_id/approve',
+    'employee-management:POST /:employee_id/reject',
+    'employee-management:POST /:employee_id/deactivate',
+    'employee-management:POST /:employee_id/reactivate',
+    'employee-management:POST /:employee_id/rehire',
+  ],
   'C-20': ['employee-management:GET /:employee_id/special-category/:field'],
   'C-21': ['employee-management:GET /:employee_id/export'],
   'C-22': ['employee-management:POST /hotels/:hotel_id/blocklist'],

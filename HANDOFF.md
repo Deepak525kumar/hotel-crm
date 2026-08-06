@@ -1,14 +1,17 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-06 (mid-session handoff — an employment-lifecycle planning task was
-interrupted by an API session-limit error; this file exists to make that resumable cold).
+Last updated: 2026-08-06 (employment-lifecycle rework: research and planning complete, PR 1
+implemented and locally committed).
 
-Current status: **All work from this session is merged to `main`. No open PRs.** A large new
-initiative (employment-lifecycle rework) was in the *research* phase — plan-mode exploration, not
-implementation — when the session hit an API limit mid-agent-call. Nothing was written to disk for
-that initiative; it needs to restart from research. Several other bug reports came in during that
-research and were explicitly deferred (not investigated) at the user's own direction, in favor of
-finishing the lifecycle plan first — see "Deferred bug reports" below, all still open.
+Current status: **All prior-session work (#345–353) merged to `main`.** The employment-lifecycle
+rework (see §3) has moved from research into implementation. Research completed, all design
+questions resolved (with the user and via an Opus verification pass), and a full implementation
+plan approved. **PR 1 (schema/migration + core service-layer transitions, combined per the user's
+"combine similar PRs" instruction) is implemented, adversarially reviewed, and locally committed**
+on branch `feat/employment-lifecycle-rework` (commit `4ec3533`) — **not yet pushed or opened as a
+PR**, per this session's "don't push, just continue the work" instruction. PRs 3–5 (frontend UI,
+blocklist enforcement, docs+test sync) are not yet started. 13 unrelated deferred items (6 from the
+prior session + 11 new) are batched and still queued behind this — see §4.
 
 ---
 
@@ -42,9 +45,7 @@ single PR from #348 onward. Keep using it.
 No open PRs as of this handoff. Confirmed via `gh pr list --state all` — everything through #353 is
 merged, and no branch has been created for the (unstarted) lifecycle rework.
 
-## 3. What was in progress when this session was interrupted
-
-### The employment-lifecycle rework (INTERRUPTED — 0% implemented, research incomplete)
+## 3. The employment-lifecycle rework (research complete, PR 1 implemented, PRs 3–5 remaining)
 
 **Origin**: during a Priority-2 (Employee Management) audit, three known gaps were investigated:
 1. Hotel blocklist entries have no removal path, and — bigger finding — **the blocklist doesn't
@@ -199,92 +200,161 @@ ground truth, re-verify only if something seems to have changed since):
 
 </details>
 
-**Research NOT yet done** (agent 2 was mid-run when the session hit its limit — re-launch from
-scratch, nothing was salvaged):
-1. **Frontend consumers** — every `EmploymentStatus` reference in `frontend/`, especially
-   `frontend/components/employees/WorkerOnboardingCard.tsx` (known from earlier audits to have
-   `STATUS_TONE`/`STATUS_LABEL` maps and status-gated buttons) and
-   `frontend/app/(protected)/hotel-groups/[id]/org-chart/page.tsx` (duplicates the same maps).
-   Also `frontend/lib/types.ts`'s `EmploymentStatus` type and `frontend/lib/api.ts`'s
-   `employeesApi` — need the exact current shape before designing the new one.
-2. **Permissions** — full `ROLE_PERMISSIONS` map (`backend/src/config/constants.ts`) and full
-   `employee-management/routes.ts` route-gate table, to determine what Rehire/Restore/Delete
-   permission gates should be (the user's spec explicitly requires "rehire, restore, deactivate,
-   delete, approve, reject all require correct permissions" — reviewed, not assumed).
-3. **HR cross-dependency** — every `employeeManagementService` call site outside
-   employee-management itself (known: `hr/service.ts#manualLapseContract` calls
-   `deactivateForContractLapse`; there may be others — confirm via repo-wide grep, not assumption).
-4. **Analytics module** — does any leaderboard/aggregate query filter by `EmploymentStatus`, and
-   would introducing `DELETED` as a real status (as opposed to today's `deleted_at` timestamp)
-   change what needs excluding.
-5. **Documents module** — any `EmploymentRecord`/`EmploymentStatus` dependency at all.
-6. **Migration precedent** — this is important and unresearched: does any prior migration in
-   `backend/prisma/migrations/` **rename or remap existing enum values with a data backfill**
-   (as opposed to just `ALTER TYPE ... ADD VALUE`, which several precedents already show)? The
-   new lifecycle isn't a pure additive change — `INACTIVE`/`UNDER_REVIEW` need to collapse into
-   (or be replaced by) `PENDING` somehow, which is exactly the harder enum-remap case Postgres
-   doesn't support natively (`ALTER TYPE` can add values but not rename/remove them in one step —
-   the existing precedent for a full enum *reconstruction* is the `OutboxSourceModule`
-   rename-recreate-cast-drop pattern used in `20260727050000_add_calendar_notification_type`'s
-   sibling migrations and in PR #350's `20260806000000_manager_rm_vacancy_history` migration,
-   which relaxed a NOT NULL constraint — read both of those files in full before designing this
-   migration, they are the closest available precedent even though neither is a value-rename).
-7. **Docs/specs** — do `REQ-EMP-002`, `RULE-EMP-02/03/12` (referenced in code comments) exist as
-   real documents anywhere in the repo (`docs/`, `.claude/knowledge/`, `.claude/governance/`), and
-   if so what do they currently say verbatim — these need synchronizing per the spec's
-   documentation requirement, but only if they're real files, not just comment-shorthand.
+**Research completed (round 2)**: frontend consumers (exactly 4 files reference `EmploymentStatus`
+in the lifecycle sense — `WorkerOnboardingCard.tsx`, `org-chart/page.tsx`, `lib/types.ts`,
+`lib/api.ts`; the frontend currently has **zero** deactivate/rehire/delete/restore UI, only
+create→submit→approve/reject); permissions (`lifecycle-signal` was admin-only at both route and
+service — expanding this to manager/RM was a real permission *expansion*, not a restatement);
+HR cross-dependency (`manualLapseContract` is the only external caller, confirmed via exhaustive
+grep); Analytics/Documents modules (zero `EmploymentStatus` dependency in either); migration
+precedent (no prior migration in this repo ever collapsed enum values with a data remap — the
+closest precedent, `20260726000000_add_regional_manager_role/down.sql`, only ever removed an
+unused value and had never run forward); docs/specs (`REQ-EMP-002`/`RULE-EMP-02/03/12` are real,
+authoritative content in `docs/03-modules/employee-management/MODULE_SPEC.md`, not just code
+comments — still need formal revision, tracked as part of PR 5 below).
 
-### Open design questions not yet resolved (raise these explicitly before/during planning, don't guess)
+**All open design questions resolved** (via `AskUserQuestion` with the user, plus one Opus
+subagent verification pass that caught the literal "assignment becomes unassigned/open" proposal
+describing a schema state that doesn't exist — `WorkerAssignment.worker_id` is non-nullable):
 
-- **Does "Delete" (the new EmploymentStatus value) = today's `deleteUser()` (User-level soft
-  delete), or a new, separate, EmploymentRecord-only transition that leaves the User row alone?**
-  The spec's own framing ("A User is permanent until explicitly hard-deleted... not part of this
-  work" vs. "Delete is a soft delete... user disappears from operational UI") suggests these are
-  meant to be **two different things**: `User` is permanent-and-only-hard-deletable (out of scope),
-  while the NEW `EmploymentStatus.DELETED` is a lifecycle state on `EmploymentRecord` that makes
-  the *employment relationship* (not the account) disappear from operational UI. This reading
-  would mean `deleteUser()` (users/service.ts) is UNCHANGED by this work, and a new, distinct
-  `EmploymentRecord`-scoped soft-delete/restore pair gets added alongside it — but this needs to be
-  stated as an explicit decision in the plan and confirmed, not assumed, since the two flows will
-  look confusingly similar (both called "soft delete") if not clearly distinguished in the docs.
-- **What does INACTIVE/UNDER_REVIEW map to under the new 5-value enum?** The spec's new enum
-  (`PENDING, ACTIVE, DEACTIVATED, REJECTED, DELETED`) has no direct `UNDER_REVIEW` equivalent — the
-  most likely reading is `PENDING` collapses both `INACTIVE` (paperwork pending) and
-  `UNDER_REVIEW` (ready for admin review) into one state, with the two-step
-  `onSubmitForReview`/`onApprove` UI flow in `WorkerOnboardingCard.tsx` becoming two actions that
-  both operate while status stays `PENDING` (only the final approve/reject actually changes status).
-  This is a reasonable design but must be presented as a proposal for confirmation, not shipped
-  silently — the "no partial migrations" instruction means getting this mapping wrong requires a
-  second migration to fix, which the spec explicitly forbids planning for.
-- **Rehire from DELETED specifically**: the spec says `DELETED → ACTIVE` is a valid Rehire
-  transition, but does rehiring from DELETED skip PENDING entirely (direct restore to ACTIVE) or
-  does it require going through approval again? The spec's own wording ("Rehire... restore +
-  rehire" for DELETED specifically, vs. plain "Rehire" for REJECTED/DEACTIVATED) hints DELETED
-  might be handled differently from the other two, but this is genuinely ambiguous and needs a
-  direct question to the user, not an inference.
-- **Permission model for the new actions**: today `deactivate`/`lifecycleSignal` are both
-  `requireRole('admin')`-only (per the completed research above). Does Rehire get the same
-  admin-only gate, or should a Regional Manager be able to rehire someone into their own group
-  (mirroring the manager/RM scope work already done in #349)? The spec explicitly lists "Regional
-  Manager permissions" and "Manager attempts unauthorized rehire" as end-to-end scenarios to
-  verify, implying non-admin roles ARE expected to have SOME rehire capability, scoped
-  somehow — this is a real design decision, not just an authz review of an already-decided rule.
+- **DELETED = `deleteUser()`, one unified action.** Soft-deletes the User account too (`deleted_at`,
+  `is_active=false`, `token_generation` bump), not a separate EmploymentRecord-only state.
+- **INACTIVE/UNDER_REVIEW collapse into PENDING via a sub-state field**, not a 6th enum value:
+  `EmploymentRecord.submitted_for_review_at` (null = old INACTIVE, non-null = old UNDER_REVIEW).
+- **DELETED → PENDING → ACTIVE** (full re-approval required) for a true rehire.
+- **DEACTIVATED means a temporary pause ONLY** (leave/seasonal/suspension, reason required) and
+  always reactivates *directly* to ACTIVE — this was the pivotal correction from an earlier draft
+  of the plan, made after user review: without this split, `DEACTIVATED` was ambiguous between
+  "still employed, paused" and "left the company," which is exactly the conflation the old code had
+  (every historical `DEACTIVATED` write was paired with `deleted_at`). Someone who actually left
+  goes to `DELETED` instead.
+- **Rehire permission**: admin unrestricted, or manager/regional_manager scoped to their own group.
+- **Cycle history**: new `EmploymentStatusHistory` table (append-only, one row per transition,
+  same transaction) plus a denormalized `employment_cycle` counter incrementing only on
+  `DELETED → PENDING`.
+- **Assignment handling on deactivate/delete**: cancel future assignments via the *existing*
+  `AssignmentService.update()` path (which already decrements a broadcast slot's `confirmed_count`,
+  reopening it for another worker — no new "vacant" schema needed). On delete, also invalidate
+  sessions and auto-reopen a `FILLED` JobRequest that drops below headcount.
+- **Migration mapping**: every pre-existing `DEACTIVATED` row remaps to `DELETED`, not the new
+  `DEACTIVATED` — verified exhaustively (grep, not assumption) that every historical write ever
+  producing that status paired it with `deleted_at`.
 
-**Recommended immediate next step for whoever resumes this**: re-launch the 2 unfinished Explore
-agents (frontend consumers + permissions/HR/analytics/docs — see the numbered list above, they can
-be one combined agent or two, either is fine) with the same prompts that were queued (this file
-has enough context to reconstruct them, or just re-derive from the "Research NOT yet done" list
-above), THEN resolve the 4 open design questions above via `AskUserQuestion` BEFORE writing the
-implementation plan doc. Do not start writing code or migrations until the plan is written and
-the user has explicitly approved it via `ExitPlanMode` — that was the user's explicit process
-requirement for this specific piece of work.
+The full plan (with rationale for every decision above) is preserved at
+`~/.claude/plans/expressive-floating-koala.md` on this machine.
 
-## 4. Deferred bug reports — all still open, none investigated yet
+**PR 1 (schema/migration + service-layer, combined per user instruction) — implemented, committed
+locally, not pushed** (branch `feat/employment-lifecycle-rework`, commit `4ec3533`):
+- New migration `20260806123146_employment_lifecycle_rework` — enum rename/recreate/cast/drop
+  (Postgres has no native enum-value-collapse), remaps `DEACTIVATED→DELETED` for existing rows with
+  a queryable provenance history row, adds `EmploymentStatusHistory`, `employment_cycle`,
+  `submitted_for_review_at`, `deactivation_reason`, `deleted_reason`. `down.sql` has an *enforced*
+  precondition guard (`RAISE EXCEPTION`, not just a comment) refusing to roll back if any real
+  post-rework rehire/transition has occurred.
+- `employee-management/service.ts` rewritten around one `applyTransition()` helper — every status
+  write goes through it, one `EmploymentStatusHistory` row per transition, same transaction.
+- New actions: `submitForReview`, `approve`, `reject`, `deactivate`, `reactivate`, `rehire`,
+  `delete`, `restore` — 8 explicit endpoints replacing the old single `/lifecycle-signal` endpoint.
+- **Adversarial review (Opus) found and fixed 2 HIGH-severity bugs before commit**: (1)
+  `cancelFutureAssignments` was re-authorizing each cancellation through
+  `AssignmentService.update()`'s own hotel-grain check, which always threw for the
+  contract-lapse's system-driven cascade and could abort mid-loop for a manager acting across their
+  whole group — fixed by recognizing the employment service as the sole authority that already
+  authorized the parent action. (2) Manager/RM could never actually reach
+  submit-for-review/approve/reject/rehire, since those records start with no `hotel_group_id` and
+  the scope check denies on null — added an explicit "does this actor own a group at all" fallback
+  for exactly those four actions. Also fixed 2 MEDIUM findings: `restore()` wasn't clearing
+  `marked_suitable` (leaking probation status across a rehire), and the down-migration's remap
+  discriminator used a forgeable free-text field (fixed to use the deterministic history-row id).
+- `tsc --noEmit` and `eslint` both clean. Jest could not run in this environment (pre-existing
+  `ts-jest`/`import.meta` config issue in `config/env.ts`, unrelated to this change — confirmed via
+  git stash comparison). Test file received compile-only fixes; test *logic* still reflects the old
+  terminal-state assumptions and needs a full rewrite, tracked in PR 5 below.
 
-These arrived mid-research on the lifecycle plan. The user explicitly chose to finish the
-lifecycle plan first and triage these after — **none of the below have been looked at, reproduced,
-or root-caused yet.** Investigate each fresh; don't assume any are related to each other or to the
-lifecycle work above.
+**Remaining PRs** (see the plan file for full detail on each):
+- **PR 3 — Frontend lifecycle UI.** No deactivate/rehire/delete/restore UI exists at all today.
+  Needs: new `employeesApi` client methods, dedupe the copy-pasted `STATUS_TONE`/`STATUS_LABEL`
+  maps (`WorkerOnboardingCard.tsx` and `org-chart/page.tsx`), net-new action buttons, a "Deleted"
+  badge+date+reason wherever a deleted person is surfaced via the admin-only `include_deleted`
+  search, and an SWR cache-invalidation checklist (8 surfaces named in the plan).
+- **PR 4 — Blocklist removal + real enforcement.** Separate, already-scoped work: blocklist entries
+  have no removal path, and the blocklist enforces nothing today (`isWorkerEligibleForHotel` never
+  checks it).
+- **PR 5 — Docs + tests sync.** Revise `MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12` and
+  `.claude/knowledge/MODULE_MEMORY.yaml`; rewrite `employee-management.test.ts`'s logic (not just
+  compile fixes — several assertions test the OLD terminal-state behavior and need inverting, e.g.
+  "rejects DEACTIVATED→ACTIVE" is now a required-legal transition); add the permission-matrix test
+  file the plan calls for (every transition × every role, including checker/worker denials).
+
+Full 21-scenario end-to-end verification list (including the environment's no-live-DB constraint)
+is in the plan file — not yet run, since PRs 3–5 aren't built.
+
+## 4. Deferred bug reports — 6 from the prior session + 11 new, none investigated yet
+
+These arrived mid-research on the lifecycle plan (6 originally, then 11 more mid-session). The
+user explicitly chose to finish the lifecycle plan first and triage these after, then — when the
+11 new ones arrived — explicitly said to "bunch similar work of bugs and do that way" once
+lifecycle work resumes. **None of the below have been looked at, reproduced, or root-caused yet.**
+Investigate each fresh; don't assume any are related to each other or to the lifecycle work above.
+
+The original 6 (numbered 1–6 below) predate the batching instruction and haven't been re-sorted
+into it, but conceptually: #1 and the new "assignment completed but request still pending" item
+belong together (calendar/assignment status-sync); #4 and #5/#6 are UI-surface bugs, not a natural
+fit for any one batch below.
+
+**Batch — calendar/assignment status sync** (item #1 below + two new items):
+- Worker accepted a broadcast job but it's not in the calendar (see #1 below, full detail).
+- **Assignment marked completed but the work request still shows pending** — likely the same class
+  of bug as #1: some downstream read (work-request status) isn't reacting to an upstream write
+  (assignment completion). Check whether `job-requests/service.ts` recomputes/reads `JobRequest`
+  fulfillment status off `WorkerAssignment.status` synchronously, or whether it's cached/derived
+  incorrectly. Investigate both together — a shared root cause (status change not propagating to
+  a dependent read) is plausible but not yet confirmed.
+- **Assignments should not be able to start before their assigned date/time.** Not yet reproduced —
+  need to determine whether this means (a) `AssignmentService.update()` allows a transition to
+  `IN_PROGRESS` with no check against `WorkerAssignment.day`/a shift start time, (b) attendance
+  check-in has no guard against checking in early, or (c) both. Check
+  `assignments/service.ts#update()` (`ALLOWED_TRANSITIONS`, ~line 186) for any date/time
+  comparison before allowing `CONFIRMED → IN_PROGRESS` — on a first read there does not appear to
+  be one, but confirm rather than assume, and check the attendance module's check-in path
+  separately since "start" could mean either.
+
+**Batch — dashboard/analytics visibility** (4 new items, all in Analytics/reporting territory —
+confirmed in this session's lifecycle research that the Analytics module currently has **zero**
+`EmploymentStatus` filtering, for context, though these 4 items are about missing UI, not that):
+- Color coding (red/green) for worker availability, visible to managers — no such indicator exists
+  today; needs a "what does available/unavailable mean" clarification (currently `ACTIVE` status?
+  no conflicting assignment that day? something else?) before building.
+- Search/filter analytics and workforce by hotel, with room to scale to more hotels — check
+  `frontend/app/(protected)/analytics/` (or wherever the analytics pages live) for existing
+  hotel-filter patterns to extend, e.g. the org-chart's hotel-group scoping.
+- No ranking/leaderboard system — Analytics `service.ts` (`getWorkerStats` etc., per this session's
+  research) has the raw aggregate data (ratings, completed assignments) but no ranking query or UI
+  surfaces it.
+- Total rooms (stay-over/checkout/total headcount) per day, with notes on what work was done — a
+  new reporting view; check `RoomsCompletedEntry` (referenced in this session's Analytics research)
+  as a likely existing data source before assuming this needs new schema.
+
+**Batch — missing UI controls** (3 new items, small/independent — likely 3 separate quick PRs):
+- No hotel delete button (a delete/soft-delete action exists for hotels per the backend, per
+  `hotels/[id]/page.tsx`'s existing "Deactivate" button noted in this session's research — confirm
+  whether this is actually about a *different*, currently-absent delete action, or the user wants
+  the existing Deactivate button relabeled/relocated).
+- No language switcher — entirely new i18n surface; clarify scope (how many languages, where does
+  the toggle live) before estimating.
+- No edit-profile button — check `frontend/app/(protected)/profile/page.tsx`, referenced in this
+  session's research as the navbar's profile destination; may already support editing and just be
+  missing a discoverable entry point, similar to the "no leave/absence" ambiguity in #3 below.
+
+**New feature — Leave & Sickness module** (leave requests, clash check, sick-note OCR): explicitly
+scoped as a NEW feature by the user, separate from item #3 below (`AbsencesCard`'s existing
+single-day mark-absence flow). OCR for sick notes is a genuinely new capability with no existing
+precedent in this codebase — needs its own design/plan pass, not a quick add.
+
+**Zirove copyright/footer notice**: clarified with the user — this means adding a "© zirove" (or
+similar) copyright/ownership notice, most likely in the app footer or an About surface. Not a
+LICENSE file or legal document change. Should be one of the smallest, fastest items to close once
+picked up.
 
 1. **Worker accepted a broadcast job but it's not showing in the calendar.** User's own hypothesis
    to check first: "should check if db has marked with calendar and user is blocked to the
@@ -393,6 +463,14 @@ lifecycle work above.
 - **GitHub Actions billing can be exhausted mid-session** (happened once already) — if deploy/CI
   runs start failing instantly with a billing message, that's an account-level issue, not a code
   problem; it self-resolves and doesn't need a code fix.
+- **`npx jest` fails to run backend tests in this environment** with `TS1343: The 'import.meta'
+  meta-property is only allowed when the '--module' option is ... 'nodenext'` from
+  `backend/src/config/env.ts:287`. Confirmed pre-existing (via `git stash` comparison against
+  `main`, not introduced by the lifecycle rework) — a `ts-jest`/`tsconfig` module-target mismatch,
+  not a code bug. `tsc --noEmit` and `eslint` both still run cleanly and were used as the
+  verification bar instead; disclose this the same way as the no-live-DB limitation in any PR
+  whose test plan would otherwise imply full test-suite coverage. Root-causing/fixing the Jest
+  config itself is out of scope for the lifecycle work but worth its own quick fix at some point.
 
 ## 7. Quick reference: where things are
 
@@ -413,13 +491,20 @@ lifecycle work above.
 
 ## 8. Immediate next action for whoever resumes
 
-1. Re-run the two unfinished research agents from the lifecycle plan (frontend consumers;
-   permissions/HR/analytics/documents/migration-precedent/docs — see section 3's numbered list).
-2. Resolve the 4 open design questions in section 3 via `AskUserQuestion`.
-3. Write the full implementation plan to a plan file, get explicit user approval via
-   `ExitPlanMode`.
-4. Only then start implementing — expect this to be several PRs (schema/migration; core
-   service-layer transition logic; blocklist removal+enforcement; deactivate-button UI; frontend
-   lifecycle UI updates; docs sync; the 10-scenario E2E verification pass), not one.
-5. Once the lifecycle work is fully shipped, triage and fix the 6 deferred bug reports in
-   section 4 — each almost certainly becomes its own PR, per this repo's established discipline.
+1. **PR 3 — Frontend lifecycle UI.** No deactivate/rehire/delete/restore UI exists at all yet
+   (confirmed in research: the frontend only has create→submit→approve/reject). See section 3's
+   "Remaining PRs" for the concrete scope (new API client methods, dedupe `STATUS_TONE`/
+   `STATUS_LABEL`, new action buttons, deleted badge, SWR invalidation checklist).
+2. **PR 4 — Blocklist removal + enforcement**, then **PR 5 — Docs + tests sync** (in that order,
+   per the plan's sequencing).
+3. Every PR gets the same bar already established this session: `tsc --noEmit`/`eslint` clean,
+   independent adversarial review (an Opus subagent, per this session's "decisional tasks → Opus
+   subagent" instruction) before considering it done, and the user merges — never self-merge.
+4. Once PRs 3–5 land, run the full 21-scenario end-to-end verification list from the plan file
+   (`~/.claude/plans/expressive-floating-koala.md`).
+5. Only after the lifecycle work is fully shipped: triage the 13 deferred items in section 4 —
+   group into the 4 batches already identified there, each batch or item likely becomes its own
+   PR, per this repo's established one-logical-change-per-PR discipline.
+6. **Do not push `feat/employment-lifecycle-rework` or open a PR without the user's explicit
+   go-ahead** — this session's instruction was "don't push, just continue the work"; that has not
+   been superseded as of this handoff.
