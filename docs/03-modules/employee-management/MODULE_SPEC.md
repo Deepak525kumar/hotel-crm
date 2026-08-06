@@ -4,12 +4,12 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-EMP-001 / 0.2.7` |
+| Spec ID / version | `SPEC-EMP-001 / 0.2.8` |
 | Status | `FROZEN` |
 | Owner | `unassigned` — reserved human authority (SYNC-001); no `CODEOWNERS` exists and `backend/package.json` author is empty |
 | Authors / reviewers | Author: Module Author (documentation workflow). Independent reviewers (2026-07-20 G4 round, reused for freeze): Architecture `PASS_WITH_ACTIONS`, Dependency `PASS_WITH_ACTIONS`, Consistency `PASS_WITH_ACTIONS`, Performance `PASS_WITH_ACTIONS`, Security `PASS_WITH_ACTIONS` (upgraded from `FAIL` by the targeted 2026-07-20 re-verification against `ADR-023`; see Review and Change Log). |
 | Repository revision | `1796c370ec2639ea801f8f057a15918b8cbd41fc` (`1796c37`) |
-| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-20 by the commissioning human (this session's explicit conditional authorization: "if Security passes... execute the G2 freeze workflow"), reusing the existing G4 evidence. Security's 2 High findings (`FIND-001`/`FIND-002`) are RELEASE PREREQUISITES reviewed at G8, not freeze blockers, per the `SPEC-AUTH-001`/`SPEC-ATT-001` precedent explicitly cited by the re-verification. **Amended (Correction, v0.2.1→0.2.2) 2026-07-28, per `GD-12`** (`ADR-032`, Platform event-bus / inter-module transport, Decided via the Governance Resolution workflow): `OD-EMP-09` is now RESOLVED at the transport-convention level — every `EVT-EMP-*`/`IF-EMP-*` row's transport is a direct in-process call (synchronous effects) or the existing Outbox (asynchronous/durable effects), per `ADR-032`; no generic event bus exists or is introduced. No producer/consumer is built yet for any `EVT-EMP-*` event, so this amendment resolves the platform-level convention only — which mechanism each specific event uses remains to be assigned when its producer is actually built, per the criterion `ADR-032` states (atomic-with-trigger → direct call; eventually-delivered → Outbox). No other requirement, rule, or open decision is touched. FROZEN status retained. |
+| Approved by / at | FROZEN at G2 Specification Freeze on 2026-07-20 by the commissioning human (this session's explicit conditional authorization: "if Security passes... execute the G2 freeze workflow"), reusing the existing G4 evidence. Security's 2 High findings (`FIND-001`/`FIND-002`) are RELEASE PREREQUISITES reviewed at G8, not freeze blockers, per the `SPEC-AUTH-001`/`SPEC-ATT-001` precedent explicitly cited by the re-verification. **Amended (Correction, v0.2.1→0.2.2) 2026-07-28, per `GD-12`** (`ADR-032`, Platform event-bus / inter-module transport, Decided via the Governance Resolution workflow): `OD-EMP-09` is now RESOLVED at the transport-convention level — every `EVT-EMP-*`/`IF-EMP-*` row's transport is a direct in-process call (synchronous effects) or the existing Outbox (asynchronous/durable effects), per `ADR-032`; no generic event bus exists or is introduced. No producer/consumer is built yet for any `EVT-EMP-*` event, so this amendment resolves the platform-level convention only — which mechanism each specific event uses remains to be assigned when its producer is actually built, per the criterion `ADR-032` states (atomic-with-trigger → direct call; eventually-delivered → Outbox). No other requirement, rule, or open decision is touched. FROZEN status retained. **Amended (Correction, v0.2.7→0.2.8) 2026-08-07, per the employment-lifecycle rework** (PR #354/#355/#356, `ADR-030` §3 note ³, `docs/14-governance/architecture-decisions/ADR-030-manager-write-authority-capability-model.md`): `REQ-EMP-002`/`RULE-EMP-02`/`RULE-EMP-03`/`RULE-EMP-12` and the State and Lifecycle section are updated to describe the shipped permanent, non-terminal employment lifecycle (`PENDING`/`ACTIVE`/`DEACTIVATED`/`REJECTED`/`DELETED`, `backend/prisma/schema.prisma`), which supersedes the terminal 5-state model (`Inactive`/`Under Review`/`Active`/`Rejected`/`Deactivated`, with `Rejected`/`Deactivated` as dead ends) this spec previously described. Authority for this correction is the shipped, tested, merged implementation plus the already-amended `ADR-030`, not a new `CONFIRMED_REQUIREMENTS_REGISTER.md`/`PIVOT_DESIGN_DOCUMENT.md` entry — **CRR/PDD are not updated by this correction and remain stale on this specific point**; a future documentation pass should reconcile them, but this correction does not block on that (same pragmatic-sync precedent as `ADR-030`'s own amendment, which cited the shipped code rather than re-deriving requirements from scratch). No other requirement, rule, boundary, or open decision in this spec is touched. FROZEN status retained. |
 | Supersedes | Prior non-canonical *Employee Management Module — Business Specification* at this path, revision `7c71498` (retained as historical evidence in git history) |
 
 > **Authoring note (not a normative section change).** This document is the canonical-template instance for the Employee Management module, authored per the [Documentation Workflow](../../../.claude/workflows/documentation.md) freeze sequence. It replaces the prior free-form business specification at this path with the fixed shape of [`MODULE_SPEC_TEMPLATE.md`](../../../.claude/templates/MODULE_SPEC_TEMPLATE.md); the template file itself is unmodified. Behaviour is derived **exclusively** from the two authoritative documents — `docs/00-foundations/CONFIRMED_REQUIREMENTS_REGISTER.md` (**CRR §n**) and `docs/00-foundations/PIVOT_DESIGN_DOCUMENT.md` (**PDD §n**) — plus the current worktree for repository facts. No behaviour is drawn from marketplace-era or `docs/legacy/**` sources.
@@ -22,7 +22,7 @@
 
 - Employee identity linkage to the platform account (account owned by Authentication/User Management; this module owns the employment-domain record and references the account) (CRR §1, §2; PDD §5.3).
 - Core employment profile fields: Employee ID, Job Title, Start Date (CRR §4).
-- Employee lifecycle status and its transitions: Inactive → Under Review → Active/Rejected → Deactivated, plus the manual "marked suitable" probation milestone (CRR §6–§10; PDD §9.1).
+- Employee lifecycle status and its transitions — permanent, non-terminal (**corrected v0.2.8**, see State and Lifecycle): Pending → Active/Rejected, with Deactivated (temporary pause) and Deleted (left the company) both returning to Active — plus the manual "marked suitable" probation milestone (CRR §6–§10; PDD §9.1).
 - Skill tags carried on the record — the fixed confirmed set and each tag's assessment basis — as the authoritative input other modules read (CRR §4, §13).
 - Unified profile-and-history view: aggregation and presentation of work history, task scores, and rating history, with date and management filters (CRR §5).
 - Personalfragebogen-sourced personal data carried on the employee record (collected by Onboarding; stored here as the employee's personal data) (CRR §6).
@@ -104,11 +104,11 @@
 | Requirement | Statement | Priority | Acceptance criteria | Rule IDs |
 |---|---|---|---|---|
 | `REQ-EMP-001` | Maintain exactly one employment record per employee, linked to one platform account, holding core fields Employee ID, Job Title, Start Date. | MUST | A created employee has exactly one record and one account link; Employee ID, Job Title, Start Date are present and readable; no Department or employment-type distinguishing field exists. | `RULE-EMP-01` |
-| `REQ-EMP-002` | Own the employee lifecycle status and permit only the confirmed transitions. | MUST | Status is one of {Inactive, Under Review, Active, Rejected, Deactivated}; every transition matches State and Lifecycle; no Suspended state and no rating/warning-driven automatic transition exist. | `RULE-EMP-02`, `RULE-EMP-03`, `RULE-EMP-12` |
+| `REQ-EMP-002` | Own the employee lifecycle status and permit only the confirmed transitions. **Corrected v0.2.8** (see Document Control): status is now permanent and non-terminal — every state can return to Active, so a returning employee is never a duplicate record. | MUST | Status is one of {Pending, Active, Deactivated, Rejected, Deleted}; every transition matches State and Lifecycle; no Suspended state and no rating/warning-driven automatic transition exist. | `RULE-EMP-02`, `RULE-EMP-03`, `RULE-EMP-12` |
 | `REQ-EMP-003` | Hold each employee's skill tags, drawn only from the fixed set, with each tag's assessment basis available to consumers. | MUST | Skill tags accepted only from {Cleaner, Public Service, Kitchen Dishwasher, Waiter}; Cleaner carries rooms-cleaned basis, the others hours-worked; no certifications or expiry. | `RULE-EMP-04` |
 | `REQ-EMP-004` | Compose and serve a single profile-and-history view (work history, task scores, rating history) with date and management filters, as the performance-review surface. | MUST | View aggregates referenced data owned elsewhere; date/management filters apply; no separate performance-review process exists; special-category fields never appear. **[G4 PERF-EMP-002, Medium]** This is a multi-module aggregation query with no stated pagination or cross-service call-budget limit; the eventual interface schema (`OD-EMP-09`) must specify a result-set/date-range bound and a maximum synchronous fan-out per request to avoid unbounded-fan-out risk as history depth and hotel count grow. | `RULE-EMP-08`, `RULE-EMP-09` |
 | `REQ-EMP-005` | Maintain hotel blocklist entries, each requiring a logged reason. | MUST | A blocklist entry cannot be created without a reason; the entry and its reason are audit-logged; assignment consumers can read the block for a (hotel, employee). | `RULE-EMP-07` |
-| `REQ-EMP-006` | Support bulk CSV import of staff, routing each created employee through the same hire-approval path as manual creation. | MUST | Imported employees start Inactive and enter the standard hire-approval flow; manual and bulk paths reach Active identically. | `RULE-EMP-10` |
+| `REQ-EMP-006` | Support bulk CSV import of staff, routing each created employee through the same hire-approval path as manual creation. | MUST | Imported employees start Pending and enter the standard hire-approval flow; manual and bulk paths reach Active identically. | `RULE-EMP-10` |
 | `REQ-EMP-007` | Restrict special-category field visibility to the confirmed audiences and emit a distinct audit entry on each access. | MUST | Konfession is visible only to the payslip-request processor and Admin; disability status only to Admin; each view/edit yields its own audit entry; general profile never exposes these fields. **[G4 FIND-002, High]** At implementation, these fields must live behind a physically/logically separate accessor unreachable from the general profile serializer, with the audit write enforced synchronously in the same transaction/request lifecycle (not best-effort logging); a test must assert `IF-EMP-GetProfileHistory` never includes these fields. | `RULE-EMP-09` |
 | `REQ-EMP-008` | Classify each employee field into its retention tier so the Retention module can delete it automatically at the correct horizon. | MUST | Shift coordinates → 6 months (Tier 1, attendance-linked); general personal/profile data → 5 years (Tier 2); payroll/tax-adjacent fields (IBAN, Tax ID, payslip-request records, wage records) → 6 years (Tier 3). | `RULE-EMP-11` |
 | `REQ-EMP-009` | Provide the employee's data for subject-rights access/export requests fulfilled by Compliance. | SHOULD | On a Compliance-initiated request, this module returns the employee's owned fields; each collected field retains its stated legal basis. | `RULE-EMP-09` |
@@ -123,8 +123,8 @@
 | Rule | Preconditions | Outcome/invariant | Exceptions/precedence | Owner/source |
 |---|---|---|---|---|
 | `RULE-EMP-01` | Employee record exists | Exactly one employment record per employee, linked to one account; core fields present | No Department field; no employment-type distinguishing field | This module (CRR §4) |
-| `RULE-EMP-02` | Onboarding completion criteria not yet satisfied | Record stays **Inactive**; cannot work | Completion criteria differ by nationality (owned by Onboarding/Documents) | This module observes; Onboarding owns criteria (CRR §4, §7, §8) |
-| `RULE-EMP-03` | Onboarding signals completion → hire-approval decision | Status transitions Inactive → Under Review → Active or Rejected | Hire-approval mechanism (pool/claim) owned by Onboarding | This module owns resulting status (CRR §8, §10) |
+| `RULE-EMP-02` | Onboarding completion criteria not yet satisfied | Record stays **Pending** (`submitted_for_review_at` null, the old Inactive sub-state); cannot work | Completion criteria differ by nationality (owned by Onboarding/Documents) | This module observes; Onboarding owns criteria (CRR §4, §7, §8) |
+| `RULE-EMP-03` | Onboarding signals completion → hire-approval decision | Status remains **Pending** with `submitted_for_review_at` set (the old Under Review sub-state), then transitions Pending → Active or Rejected. **Corrected v0.2.8:** Rejected is no longer a dead end — Rejected → Active is a legal, direct rehire (no re-approval). See State and Lifecycle for the full transition graph, including Deactivated (temporary pause, direct return) and Deleted (left the company, returns via Deleted → Pending → Active). | Hire-approval mechanism (pool/claim) owned by Onboarding | This module owns resulting status (CRR §8, §10) |
 | `RULE-EMP-04` | Skill tag assigned | Tag ∈ {Cleaner, Public Service, Kitchen Dishwasher, Waiter}; carries its assessment basis | No certifications, no expiring qualifications | This module (CRR §4) |
 | `RULE-EMP-05` | Worker assigned anything for a day (calendar or broadcast) | Reflected as unavailable for further same-day assignment | Exclusivity **enforced** by Job Dispatch; this module reflects it | Job Dispatch owns; this module reflects (CRR §12, §13, §20) |
 | `RULE-EMP-06` | Worker marks a day sick/vacation | Calendar owns the mark (`state-calendar-absence`) and emits `EVT-CAL-SickVacationMarked`; the same-day assignment is auto-cancelled by Job Dispatch/assignments on consuming that event, not by Calendar (`ADR-021`); availability reflects it | Vacation is a label only — no balance tracking | Calendar owns the mark + availability read-model; Job Dispatch owns the cancel; this module reflects (CRR §22, §20; `ADR-021`) |
@@ -142,7 +142,7 @@
 **Owned state:**
 
 - The employment record and its core fields (Employee ID, Job Title, Start Date).
-- The employment record's `hotel_group_id` (`ADR-023`): the employee's Hotel Group association, a foreign key to the `HotelGroup` entity owned by `backend-crm`. Set at the `Under Review → Active` hire-approval transition (`RULE-EMP-03`) from the approving manager's own `hotel_group_id`; bounds assignability per `REQ-EMP-012`. Resolves `OD-EMP-05`.
+- The employment record's `hotel_group_id` (`ADR-023`): the employee's Hotel Group association, a foreign key to the `HotelGroup` entity owned by `backend-crm`. Set at the `Pending → Active` hire-approval transition (`RULE-EMP-03`) from the approving manager's own `hotel_group_id`; bounds assignability per `REQ-EMP-012`. Resolves `OD-EMP-05`. **Not** set on a direct reactivation/rehire (`Deactivated → Active`, `Rejected → Active`) — those transitions leave `hotel_group_id` unchanged, since only the initial `Pending → Active` approval resolves it (corrected v0.2.8, see State and Lifecycle).
 - Employee lifecycle status and the manual "marked suitable" milestone flag.
 - Skill tags and their assessment basis on the record.
 - Personalfragebogen-sourced personal data carried on the record, including the restricted special-category fields (Konfession, disability status).
@@ -165,15 +165,23 @@ For each API, command, query, event, job, or UI contract:
 
 | Contract ID/version | Direction | Input | Output | Errors | Auth | Compatibility |
 |---|---|---|---|---|---|---|
-| `IF-EMP-CreateEmployee / v0` | Inbound (command) | Account link + core fields (manual or bulk-import row) | Employee record in **Inactive** status | Validation failure; duplicate identity `[OPEN]` (OD-EMP-08) | Admin; other importing roles `[OPEN]` (OD-EMP-08) | New |
+| `IF-EMP-CreateEmployee / v0` | Inbound (command) | Account link + core fields (manual or bulk-import row) | Employee record in **Pending** status (**corrected v0.2.8**, was Inactive) | Validation failure; duplicate identity `[OPEN]` (OD-EMP-08) | Admin; other importing roles `[OPEN]` (OD-EMP-08) | New |
 | `IF-EMP-GetProfileHistory / v0` | Inbound (query) | Employee id, optional date/management filters | Unified profile-and-history view (owned + referenced data), special-category fields excluded | Not found; scope denied | Self + roles above within scope (CRR §5) | New |
 | `IF-EMP-GetSkills / v0` | Inbound (query) | Employee id (or skill filter) | Skill tags + assessment basis | Not found | Dispatch/manager scope | New |
 | `IF-EMP-GetBlocklist / v0` | Inbound (query) | Hotel id and/or employee id | Blocklist entries with reasons | Scope denied | Manager scope / Job Dispatch | New |
 | `IF-EMP-SetBlocklist / v0` | Inbound (command) | Hotel id, employee id, **reason (required)** | Blocklist entry (audit-logged) | Missing reason → rejected; scope denied | Hotel/Regional Manager, Admin | New |
+| `IF-EMP-RemoveBlocklist / v0` | Inbound (command) | Hotel id, entry id | Blocklist entry removed (audit-logged) | Entry not found, or found but belongs to a different hotel than the one requested → 404 (not 403, to avoid confirming the id exists elsewhere); scope denied | Hotel/Regional Manager, Admin — same shape as `IF-EMP-SetBlocklist` | **New, v0.2.8** (PR #356 — blocklist entries previously had no removal path at all) |
 | `IF-EMP-GetSpecialCategory / v0` | Inbound (query) | Employee id, field | Field value (each access audit-logged) | Denied + logged if lacking restricted permission | Restricted tier: Konfession → payslip processor + Admin; disability → Admin | New |
 | `IF-EMP-ExportEmployeeData / v0` | Inbound (query, Compliance-initiated) | Employee id | Owned fields for subject-rights fulfilment | Not found | Compliance/Admin | New |
-| `IF-EMP-Deactivate / v0` | Inbound (command) | Employee id | Record soft-deleted; history retained | Scope denied | Admin | New |
-| `IF-EMP-LifecycleSignal / v0` | Inbound (event-driven) | Onboarding completion / approve / reject signal | Status transition (Under Review / Active / Rejected) | Out-of-order signal `[OPEN]` (OD-EMP-09) | Internal (Onboarding) — **confirmed by `ADR-030` (2026-07-25, D-4c/F-1):** this receiver stays internal-only; the manager-facing approve/reject action it receives from is owned by the unbuilt `backend-onboarding` module, not by a manager calling this module directly | New |
+| `IF-EMP-SubmitForReview / v0` | Inbound (command) | Employee id | `submitted_for_review_at` set; status stays Pending (not a status transition) | Not Pending → rejected | Admin, or scoped Manager/Regional Manager | **Corrected v0.2.8** — replaces one branch of the retired `IF-EMP-LifecycleSignal` below |
+| `IF-EMP-Approve / v0` | Inbound (command) | Employee id, optional hotel_group_id | Status → Active; `hotel_group_id` resolved (actor's own group, or explicit override) | Not submitted for review → rejected; illegal transition; scope denied | Admin, or scoped Manager/Regional Manager | **Corrected v0.2.8** |
+| `IF-EMP-Reject / v0` | Inbound (command) | Employee id, optional reason | Status → Rejected | Illegal transition; scope denied | Admin, or scoped Manager/Regional Manager | **Corrected v0.2.8** |
+| `IF-EMP-Deactivate / v0` | Inbound (command) | Employee id, **deactivation_reason (required)** | Status → Deactivated (temporary pause); future assignments cancelled | Missing reason → rejected; illegal transition; scope denied | Admin, or scoped Manager/Regional Manager (**corrected v0.2.8** — was Admin-only) | **Corrected v0.2.8** — no longer soft-deletes the record; see `IF-EMP-DeleteEmployee` |
+| `IF-EMP-Reactivate / v0` | Inbound (command) | Employee id | Status → Active, direct, no re-approval | Illegal transition; scope denied | Admin, or scoped Manager/Regional Manager | **New, v0.2.8** |
+| `IF-EMP-Rehire / v0` | Inbound (command) | Employee id | Status → Active, direct, no re-approval | Illegal transition; scope denied | Admin, or scoped Manager/Regional Manager | **New, v0.2.8** |
+| `IF-EMP-DeleteEmployee / v0` | Inbound (command) | Employee id, **deleted_reason (required)** | Status → Deleted; record soft-deleted; account soft-deleted + sessions invalidated (unified); future assignments cancelled | Missing reason → rejected; illegal transition; Admin-only | Admin only — crosses the account boundary | **New, v0.2.8** — replaces the retired `IF-EMP-Deactivate`'s soft-delete semantics |
+| `IF-EMP-Restore / v0` | Inbound (command) | Employee id | Status → Pending (re-approval required); account restored, sessions invalidated again on restore | Illegal transition; Admin-only | Admin only — crosses the account boundary | **New, v0.2.8** |
+| ~~`IF-EMP-LifecycleSignal / v0`~~ | ~~Inbound (event-driven)~~ | ~~Onboarding completion / approve / reject signal~~ | ~~Status transition (Under Review / Active / Rejected)~~ | — | — | **Retired, v0.2.8** — this single generic `{signal, ...}` endpoint is replaced by the seven explicit `IF-EMP-SubmitForReview`/`Approve`/`Reject`/`Deactivate`/`Reactivate`/`Rehire`/`DeleteEmployee`/`Restore` interfaces above, since Deactivate/DeleteEmployee need required fields (`deactivation_reason`/`deleted_reason`) a generic body can't cleanly express. The prior Admin-only/internal-only authorization this row described (`ADR-030` D-4c/F-1) is itself superseded by the `ADR-030` §3 note ³ amendment — see State and Lifecycle and `ADR-030-manager-write-authority-capability-model.md`. |
 
 ## Events
 
@@ -181,15 +189,17 @@ For each API, command, query, event, job, or UI contract:
 
 | Event ID/version | Publisher | Trigger | Payload source | Consumers | Delivery/idempotency |
 |---|---|---|---|---|---|
-| `EVT-EMP-Created / v0` | employee-management | Record created (signup or bulk import; Inactive) | Core fields + account link | Onboarding, Notifications, Audit | `[OPEN]` (OD-EMP-09) |
+| `EVT-EMP-Created / v0` | employee-management | Record created (signup or bulk import; Pending) | Core fields + account link | Onboarding, Notifications, Audit | `[OPEN]` (OD-EMP-09) |
 | `EVT-EMP-SubmittedForReview / v0` | employee-management | Onboarding signals completion | Employee id | Notifications, Audit | `[OPEN]` |
-| `EVT-EMP-Activated / v0` | employee-management | Hire-approval approved | Employee id | Job Dispatch, Calendar, Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-Activated / v0` | employee-management | Hire-approval approved (Pending → Active), or a direct reactivation/rehire (Deactivated/Rejected → Active) | Employee id | Job Dispatch, Calendar, Notifications, Audit | `[OPEN]` |
 | `EVT-EMP-Rejected / v0` | employee-management | Hire-approval rejected | Employee id | Notifications, Audit | `[OPEN]` |
 | `EVT-EMP-MarkedSuitable / v0` | employee-management | Manager confirms probation suitability | Employee id, manager | Audit | `[OPEN]` |
 | `EVT-EMP-ProfileUpdated / v0` | employee-management | Core/personal field change | Changed fields | Audit | `[OPEN]` — stays open; no producing interface exists, and `ADR-030` (ratified 2026-07-25, `OQ-030-A`/D-4b) rules out a manager/RM field-level edit path as its producer. Not superseded by this correction, only confirmed unresolved by design. |
 | `EVT-EMP-SkillsChanged / v0` | employee-management | Skill tags changed | Employee id, tags | Job Dispatch, Audit | `[OPEN]` |
-| `EVT-EMP-Blocklisted / v0` | employee-management | Blocklist added/removed | Hotel, employee, reason | Job Dispatch, Audit | `[OPEN]` |
-| `EVT-EMP-Deactivated / v0` | employee-management | Record soft-deleted | Employee id | Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-Blocklisted / v0` | employee-management | Blocklist added/removed (**corrected v0.2.8**: removal is now a real interface, `IF-EMP-RemoveBlocklist`, not just a conceptual "removed") | Hotel, employee, reason | Job Dispatch, Audit | `[OPEN]` |
+| `EVT-EMP-Deactivated / v0` | employee-management | **Corrected v0.2.8:** a temporary pause begins (Active → Deactivated) — no longer implies soft-deletion. See `EVT-EMP-Deleted` for the departure case this row previously conflated with pausing. | Employee id | Notifications, Audit | `[OPEN]` |
+| `EVT-EMP-Deleted / v0` | employee-management | Record soft-deleted (person left the company); account soft-deleted + sessions invalidated in the same transaction | Employee id | Notifications, Audit | **New, v0.2.8** |
+| `EVT-EMP-Restored / v0` | employee-management | A former employee is taken back on (Deleted → Pending); account restored | Employee id | Notifications, Audit | **New, v0.2.8** |
 
 **Consumed events** (to keep profile/availability/history current; contract `[OPEN]`): Onboarding/Documents/Contracts — completion, contract signed, approve/reject → lifecycle transitions (CRR §8–§10); Job Dispatch — worker assigned for a day → history + availability input (CRR §12, §13, §20); Calendar — sick/vacation for a day → availability input (CRR §20, §22); Quality — new rating/score, warning thresholds crossed → profile view, display only (CRR §5, §15, §16); Attendance — clock-in/out recorded → work history (CRR §5, §17). An "availability changed" event is deliberately **not** claimed as published here (OD-EMP-07).
 
@@ -198,7 +208,7 @@ For each API, command, query, event, job, or UI contract:
 | Dependency/edge | Reason | Contract | Compatibility | Failure behavior |
 |---|---|---|---|---|
 | Authentication / User Management | Account, role, scope, MFA, sessions link the employee | `auth-middleware`, RBAC/scope (reused) | compatible (reuse) | No auth → employee functions unavailable (access precondition) |
-| Onboarding | Signals workflow completion and approve/reject; owns Personalfragebogen/chatbot/pool-claim | `IF-EMP-LifecycleSignal` (candidate) | conditional (schema `[OPEN]`) | No signal → record stays Inactive |
+| Onboarding | Signals workflow completion and approve/reject; owns Personalfragebogen/chatbot/pool-claim | `IF-EMP-SubmitForReview`/`Approve`/`Reject` (candidate) — **corrected v0.2.8**, was the single retired `IF-EMP-LifecycleSignal` | conditional (schema `[OPEN]`) | No signal → record stays Pending |
 | Documents | Documents + expiry + non-EU work permit gate activation | referenced (Documents-owned) | conditional | Missing required docs → cannot reach Active |
 | Contracts | Manager-confirmed hand-signed contract activates the account | referenced (Contracts-owned) | conditional | No signed contract → cannot activate (CRR §9) |
 | Calendar/Scheduling | Sick/vacation → availability input | consumed event (candidate) | conditional | Degraded availability freshness |
@@ -215,24 +225,90 @@ For each API, command, query, event, job, or UI contract:
 
 ## State and Lifecycle
 
+> **Corrected v0.2.8** (see Document Control): this section previously described a terminal
+> 5-state model where `Rejected`/`Deactivated` were dead ends and re-engagement created a **new**
+> `EmploymentRecord`. That design shipped and was then superseded by the permanent, non-terminal
+> lifecycle below (PR #354/#355/#356) — every state can return to `Active`, and a returning
+> employee **reuses the existing `EmploymentRecord`**, never a duplicate. The prior terminal design
+> is preserved in git history (this file's pre-`v0.2.8` revisions), not restated here.
+
 **States (employee-level, owned here):**
 
-- **Inactive** — record exists (signup or bulk import); onboarding not complete; cannot work (CRR §4, §8).
-- **Under Review** — onboarding complete; application in the manager pool, possibly claimed (CRR §10).
+- **Pending** — record exists (signup or bulk import); may be pre- or post-onboarding-submission.
+  The old `Inactive`/`Under Review` distinction is now a sub-state on the same status
+  (`EmploymentRecord.submitted_for_review_at`: `null` = old Inactive, "onboarding not complete,
+  cannot work"; set = old Under Review, "application in the manager pool") rather than two
+  separate statuses (CRR §4, §8, §10).
 - **Active** — approved by a manager; may be scheduled and may accept broadcasts (CRR §10).
-- **Rejected** — the manager rejected the application (CRR §10).
-- **Deactivated (soft-deleted)** — retained for history/audit; no longer an operating employee (PDD §9.1).
+- **Deactivated** — a **temporary pause only** (leave, seasonal, suspension — a required
+  `deactivation_reason` names which). The person is still employed; the employment record and its
+  `hotel_group_id` are untouched. Always returns directly to Active, with no re-approval.
+- **Rejected** — the manager rejected the application. Returns directly to Active (rehire), with
+  no re-approval — the application was never approved, so there is no prior employment period to
+  reopen.
+- **Deleted** — the person left the company (resignation, termination, contract lapse — a required
+  free-text `deleted_reason` names which). Unified with the platform account's own soft-delete
+  (`User.deleted_at`/`is_active`/`token_generation`) — deleting the employment record also
+  deactivates the account and invalidates its sessions, in the same transaction. Returns only via
+  `Pending` (full re-approval required) — this is the one state whose return is a genuine rehire,
+  not a direct reactivation.
 
-**Transitions (each audit-logged; each arises from a confirmed event):**
+**Transitions (each audit-logged; each arises from a confirmed event; enforced against
+`ALLOWED_TRANSITIONS`, `backend/src/modules/employee-management/constants.ts`):**
 
-- `(none) → Inactive` — record created at signup or via bulk import.
-- `Inactive → Under Review` — Onboarding signals workflow completion.
-- `Under Review → Active` — Onboarding approval decision.
-- `Under Review → Rejected` — Onboarding rejection decision.
-- `Active → Active (marked suitable)` — manager manually confirms probation suitability; **not** a distinct status and **not** automated. The resolved probation shape (1-year fixed-term contract, 6-month probation clause, hand-signed; permanent after 2 years) adds no separate status. **Known dormancy (recorded by `ADR-030` §8, forward-note below):** the backing column, `EmploymentRecord.marked_suitable`, exists in `schema.prisma` and its migration but is written by **zero code paths** — it awaits the CRR §10:163 "manager marks suitable" capability, which `ADR-030` defers (D-4c, F-1, to `backend-onboarding`). Recorded as known dormancy; no action needed now.
-- `Active → Deactivated` — Admin-driven soft-deletion. **RESOLVED (Option (c), hybrid) `GD-15`/`ADR-045`, 2026-07-28:** contract-lapse-caused offboarding (per `SPEC-HR-001`'s `OD-HR-03`/`ADR-040`) triggers deactivation automatically via a direct in-process call (`ADR-032`); every other offboarding cause (voluntary resignation, termination for cause) remains Admin-initiated manually, since HR's own contract state machine has no upstream event for those causes. Re-engagement creates a **new `EmploymentRecord`** for the existing `Worker`, not a reactivation of the closed record — the prior employment period's history/audit trail remains intact and untouched.
+- `(none) → Pending` — record created at signup or via bulk import (`submitted_for_review_at` null).
+- `Pending → Pending` (sub-state only, not a status transition) — Onboarding signals workflow
+  completion; sets `submitted_for_review_at`.
+- `Pending → Active` — Onboarding approval decision. Requires `submitted_for_review_at` to be set
+  first — an application that was never submitted cannot be approved.
+- `Pending → Rejected` — Onboarding rejection decision.
+- `Active → Deactivated` — a temporary pause begins (`deactivation_reason` required). Future
+  assignments are cancelled (reopening any broadcast slot they held), but the employment record and
+  `hotel_group_id` are untouched.
+- `Deactivated → Active` — the pause ends; the person returns directly, no re-approval.
+- `Rejected → Active` — a previously-declined applicant is taken on after all; direct, no
+  re-approval (there was never a prior employment period to reopen).
+- `Active → Deleted`, `Deactivated → Deleted`, `Rejected → Deleted` — the person leaves the
+  company (`deleted_reason` required). Unified with the platform account's soft-delete (see States,
+  above); future assignments and pending broadcast acceptances are cancelled; sessions invalidated.
+  **Supersedes this section's prior text**, which described this as creating a new
+  `EmploymentRecord` for re-engagement — it does not; see `Deleted → Pending` below.
+- `Deleted → Pending` — a former employee is taken back on: a true rehire, reusing the **same**
+  `EmploymentRecord` (never a duplicate). The account is restored (un-soft-deleted) but sessions are
+  invalidated again on restore, not silently revalidated — access is for onboarding/profile
+  completion only while Pending; full operational access resumes only once re-approved to Active.
+  `employment_cycle` (an integer counter on `EmploymentRecord`) increments on this transition only,
+  and only this one — every other transition leaves it unchanged. It exists purely for reporting
+  ("how many times has this person been rehired," "current cycle," "tenure per cycle") without
+  reconstructing the full transition history; `EmploymentStatusHistory` (below) remains the source
+  of truth for cycle boundaries.
+- `Active → Active (marked suitable)` — manager manually confirms probation suitability; **not** a
+  distinct status and **not** automated. The resolved probation shape (1-year fixed-term contract,
+  6-month probation clause, hand-signed; permanent after 2 years) adds no separate status. **Known
+  dormancy (recorded by `ADR-030` §8, forward-note below):** the backing column,
+  `EmploymentRecord.marked_suitable`, exists in `schema.prisma` and its migration but is written by
+  **zero code paths** — it awaits the CRR §10:163 "manager marks suitable" capability, which
+  `ADR-030` defers (D-4c, F-1, to `backend-onboarding`). A rehire (`Deleted → Pending`) explicitly
+  clears this flag rather than carrying it forward, since probation is earned per employment cycle,
+  not a permanent fact about the person. Recorded as known dormancy; no action needed now.
 
-**Invariants:** no Suspended state; no rating/warning-driven automatic transition out of Active (CRR §16); rating tiers (Elite/High/Standard/Low/Probation) are Quality-owned display labels, never lifecycle statuses (CRR §15); no account-lockout status (CRR §2).
+**History:** every transition writes exactly one row to `EmploymentStatusHistory`
+(`from_status`, `to_status`, `reason`, `actor_user_id`, `employment_cycle`, `created_at`) in the
+same transaction as the status change — enforced structurally: no code path outside the single
+`applyTransition()` seam (`employee-management/service.ts`) may write
+`EmploymentRecord.status`/`employment_cycle` directly. This is what makes the log complete (a
+transition can never commit unlogged) rather than best-effort.
+
+**Contract-lapse offboarding, corrected v0.2.8:** this section previously described
+contract-lapse-caused offboarding as triggering `Deactivated`. Under the corrected model this is
+wrong by definition — `Deactivated` now means a temporary pause, and a lapsed, non-renewed contract
+means the person left. Contract-lapse offboarding (`SPEC-HR-001`'s `OD-HR-03`/`ADR-040`,
+`GD-15`/`ADR-045`) now triggers `Active → Deleted` via the same direct in-process call (`ADR-032`),
+which also soft-deletes the account and invalidates sessions — a real, intended escalation over the
+prior behavior, not merely a status rename. Every other offboarding cause (voluntary resignation,
+termination for cause) remains Admin-initiated manually, unchanged from the prior design.
+
+**Invariants:** no Suspended state; no rating/warning-driven automatic transition out of Active (CRR §16); rating tiers (Elite/High/Standard/Low/Probation) are Quality-owned display labels, never lifecycle statuses (CRR §15); no account-lockout status (CRR §2); no state is terminal — every state has at least one path back to Active.
 
 **Concurrency:** hire-approval claim/lock concurrency is resolved entirely inside Onboarding; this module receives only the resulting decision. Same-day assignment vs. sick/vacation atomicity is owned by Calendar/Job Dispatch (a single transaction there prevents an employee appearing both assigned and on-leave; PDD §7.2).
 
@@ -242,9 +318,9 @@ For each API, command, query, event, job, or UI contract:
 
 **Failure modes/recovery:**
 
-- Activation attempted before Onboarding signals completion → blocked; record stays Inactive.
+- Activation attempted before Onboarding signals completion → blocked; record stays Pending (`submitted_for_review_at` null).
 - Onboarding completion criteria unmet for a nationality (non-EU work permit missing) → cannot reach Active.
-- Assignment attempted for a blocklisted worker at that hotel → not permitted (enforced by Job Dispatch using this module's blocklist).
+- Assignment attempted for a blocklisted worker at that hotel → not permitted. **Corrected v0.2.8:** as of PR #356 this is genuinely enforced (`isWorkerEligibleForHotel()`, `backend/src/lib/roster-scope.ts`, the single choke point used by reassignment, broadcast-accept, and manual calendar placement) — this row previously described intended behavior the blocklist did not yet implement; it existed only as audit-log data with no enforcement anywhere.
 - Special-category access without the restricted permission → denied and audit-logged.
 - Bulk import with invalid rows → valid staff created and routed to approval; invalid-row/duplicate handling is unresolved (OD-EMP-08).
 - Out-of-order or lost lifecycle signal from Onboarding → handling unresolved (OD-EMP-09).
@@ -265,7 +341,8 @@ Permission matrix (against the reused five-role RBAC model; deny-by-default):
 | View org chart | — | — | — | ✅ | ✅ |
 | View Konfession (special-category) | — | — | — | — | ✅ + payslip-request processor |
 | View disability status (special-category) | — | — | — | — | ✅ |
-| Account deletion (deactivation) | — | — | — | — | ✅ |
+| Approve/reject/deactivate/reactivate/rehire (**corrected v0.2.8**, `ADR-030` §3 note ³ — was Admin-only for the retired `IF-EMP-LifecycleSignal`/`IF-EMP-Deactivate`) | — | — | ✅ (their hotel/group) | ✅ (their group) | ✅ |
+| Delete / restore employment (crosses the account boundary) | — | — | — | — | ✅ |
 
 **Data classification/retention:** Germany-only; all documents/photos in EU/EEA object storage; no employee data leaves the EU/EEA. Three retention tiers classified here, deleted automatically by Retention: Tier 1 shift coordinates 6 months; Tier 2 general personal/profile data 5 years; Tier 3 payroll/tax-adjacent fields (IBAN, Steuer-ID, payslip-request records, wage records) 6 years. **[G4 FIND-003, Medium]** Blocklist `reason` (`RULE-EMP-07`) is currently unclassified into any tier and its free-text shape is not permission-restricted the way Konfession/disability are, despite being manager-authored narrative that may incidentally contain special-category-adjacent detail (e.g., a health or conduct allegation); recommend a structured reason-code enum at implementation, or an explicit no-special-category-content policy if free text is retained, pending a product decision. Special-category data is voluntary where applicable, tied to a named legal basis, never on the general profile, and audit-logged per access. Sick leave requires no doctor's note (Calendar owns; this record never holds sick-note health data). Daily GDPR consent gate is an access precondition (Consent-owned). Data-minimization is not actively pruned, but every collected field keeps a stated legal basis (CRR §24–§27, §30, §33; PDD §5.4, §5.7).
 
@@ -294,7 +371,7 @@ This module is part of the marketplace → Workforce Operations Platform forward
 | Skill tags constrained to the fixed set with correct assessment basis (`REQ-EMP-003`) | Unit + boundary | Valid + invalid tags | Accept/reject evidence |
 | Profile-and-history view aggregates correctly, excludes special-category, honors filters and role/scope visibility (`REQ-EMP-004`, `REQ-EMP-013`) | Integration + authorization | Multi-role, multi-hotel data | View contents + access-matrix results |
 | Blocklist requires a reason; is audit-logged; readable by assignment (`REQ-EMP-005`) | Unit + integration | Hotel/worker pairs | Missing-reason rejection; audit entry; read result |
-| Bulk import routes through hire-approval identically to manual (`REQ-EMP-006`) | Integration | CSV fixtures (valid rows) | Both paths reach Active; imported start Inactive |
+| Bulk import routes through hire-approval identically to manual (`REQ-EMP-006`) | Integration | CSV fixtures (valid rows) | Both paths reach Active; imported start Pending |
 | Special-category visibility restricted; each access audit-logged (`REQ-EMP-007`) | Authorization + audit | Restricted vs. general roles | Deny-and-log for unauthorized; per-access entries |
 | Retention-tier classification correct for each field (`REQ-EMP-008`) | Unit (classification) | Field catalog | Tier mapping table verified |
 | Subject-rights export returns owned fields with legal basis (`REQ-EMP-009`) | Integration | Employee with full data | Export contents + legal-basis presence |
