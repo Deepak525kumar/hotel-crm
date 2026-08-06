@@ -19,7 +19,13 @@
 --     REGIONAL_MANAGER rows exist" check -- except ENFORCED via RAISE
 --     EXCEPTION below, not left as a comment-only warning.
 
-BEGIN;
+-- No explicit BEGIN/COMMIT here: the migration harness's `down` command
+-- already wraps each migration's down.sql in its own transaction (this file
+-- is executed via `psql -1 -f down.sql`, or the harness's own transactional
+-- runner) -- an explicit BEGIN here produced "WARNING: there is already a
+-- transaction in progress" in CI (found 2026-08-06, PR #354's "Forward ·
+-- Rollback · Recovery" check). Harmless as a warning by itself, but removed
+-- for correctness rather than leaving a misleading no-op statement in place.
 
   -- Enforced precondition (not just the comment above): abort rather than
   -- silently reverting genuine post-rework departures to DEACTIVATED and
@@ -88,9 +94,16 @@ BEGIN;
       )::"EmploymentStatus",
     ALTER COLUMN "status" SET DEFAULT 'INACTIVE';
 
-  DROP TYPE "EmploymentStatus_new";
-
+  -- MUST run before DROP TYPE "EmploymentStatus_new" below: this table's
+  -- from_status/to_status columns are still typed as "EmploymentStatus_new"
+  -- (only EmploymentRecord.status was cast onto the new "EmploymentStatus"
+  -- type above; this table was never altered), so dropping the type first
+  -- fails with "cannot drop type ... because other objects depend on it"
+  -- (found 2026-08-06 in CI, PR #354's "Forward · Rollback · Recovery"
+  -- check -- this exact ordering bug is why that check exists).
   DROP TABLE "EmploymentStatusHistory";
+
+  DROP TYPE "EmploymentStatus_new";
 
   ALTER TABLE "EmploymentRecord"
     DROP COLUMN "submitted_for_review_at",
@@ -99,5 +112,3 @@ BEGIN;
     DROP COLUMN "employment_cycle";
 
   DROP TYPE "DeactivationReason";
-
-COMMIT;
