@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useBroadcasts } from "@/hooks/useWorkRequests";
+import { useHotel } from "@/hooks/useHotels";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import {
@@ -21,9 +22,36 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
+import type { WorkRequest } from "@/lib/types";
 
 const PER_PAGE = 20;
-const COLUMNS = 4;
+const COLUMNS = 5;
+
+function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
+  const { data: hotel } = useHotel(wr.hotel_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/requests/broadcasts/${wr.id}`} className="block">
+          {wr.shift_date}
+        </TextLink>
+      </TD>
+      <TD>{hotel?.name ?? "—"}</TD>
+      <TD>
+        {wr.shift_start_time}–{wr.shift_end_time}
+      </TD>
+      <TD>
+        {(wr.skill_slots ?? [])
+          .map((s) => `${s.confirmed_count}/${s.headcount} ${s.skill}`)
+          .join(", ")}
+      </TD>
+      <TD>
+        <WorkRequestStatusBadge status={wr.status} />
+      </TD>
+    </TR>
+  );
+}
 
 export default function BroadcastsPage() {
   const [page, setPage] = useState(1);
@@ -58,6 +86,7 @@ export default function BroadcastsPage() {
               <THead>
                 <tr>
                   <TH>Shift date</TH>
+                  <TH>Hotel</TH>
                   <TH>Time</TH>
                   <TH>Skills</TH>
                   <TH>Status</TH>
@@ -79,24 +108,7 @@ export default function BroadcastsPage() {
               ) : (
                 <TBody>
                   {broadcasts.map((wr) => (
-                    <TR key={wr.id}>
-                      <TD className="font-medium">
-                        <TextLink href={`/requests/broadcasts/${wr.id}`} className="block">
-                          {wr.shift_date}
-                        </TextLink>
-                      </TD>
-                      <TD>
-                        {wr.shift_start_time}–{wr.shift_end_time}
-                      </TD>
-                      <TD>
-                        {(wr.skill_slots ?? [])
-                          .map((s) => `${s.confirmed_count}/${s.headcount} ${s.skill}`)
-                          .join(", ")}
-                      </TD>
-                      <TD>
-                        <WorkRequestStatusBadge status={wr.status} />
-                      </TD>
-                    </TR>
+                    <BroadcastRow key={wr.id} broadcast={wr} />
                   ))}
                 </TBody>
               )}

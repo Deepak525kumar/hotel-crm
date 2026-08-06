@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useWorkRequests } from "@/hooks/useWorkRequests";
+import { useHotel } from "@/hooks/useHotels";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import {
@@ -22,7 +23,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
-import type { WorkRequestStatus } from "@/lib/types";
+import type { WorkRequest, WorkRequestStatus } from "@/lib/types";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -35,7 +36,32 @@ const STATUS_FILTERS = [
 ];
 
 const PER_PAGE = 20;
-const COLUMNS = 5;
+const COLUMNS = 6;
+
+function WorkRequestRow({ request: wr }: { request: WorkRequest }) {
+  const { data: hotel } = useHotel(wr.hotel_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/requests/${wr.id}`} className="block">
+          {wr.position}
+        </TextLink>
+      </TD>
+      <TD>{hotel?.name ?? "—"}</TD>
+      <TD>{wr.shift_date}</TD>
+      <TD>
+        {wr.shift_start_time}–{wr.shift_end_time}
+      </TD>
+      <TD>
+        {wr.workers_confirmed}/{wr.workers_needed}
+      </TD>
+      <TD>
+        <WorkRequestStatusBadge status={wr.status} />
+      </TD>
+    </TR>
+  );
+}
 
 export default function WorkRequestsPage() {
   const [status, setStatus] = useState<WorkRequestStatus | "">("");
@@ -88,6 +114,7 @@ export default function WorkRequestsPage() {
               <THead>
                 <tr>
                   <TH>Position</TH>
+                  <TH>Hotel</TH>
                   <TH>Shift date</TH>
                   <TH>Time</TH>
                   <TH>Staffing</TH>
@@ -114,26 +141,7 @@ export default function WorkRequestsPage() {
               ) : (
                 <TBody>
                   {requests.map((wr) => (
-                    <TR key={wr.id}>
-                      <TD className="font-medium">
-                        <TextLink
-                          href={`/requests/${wr.id}`}
-                          className="block"
-                        >
-                          {wr.position}
-                        </TextLink>
-                      </TD>
-                      <TD>{wr.shift_date}</TD>
-                      <TD>
-                        {wr.shift_start_time}–{wr.shift_end_time}
-                      </TD>
-                      <TD>
-                        {wr.workers_confirmed}/{wr.workers_needed}
-                      </TD>
-                      <TD>
-                        <WorkRequestStatusBadge status={wr.status} />
-                      </TD>
-                    </TR>
+                    <WorkRequestRow key={wr.id} request={wr} />
                   ))}
                 </TBody>
               )}

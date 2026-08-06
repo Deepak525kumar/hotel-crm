@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useAssignments } from "@/hooks/useAssignments";
+import { useHotel, useUsersByIds } from "@/hooks/useHotels";
+import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { formatDate } from "@/lib/format";
@@ -21,7 +23,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
-import type { AssignmentStatus } from "@/lib/types";
+import type { Assignment, AssignmentStatus } from "@/lib/types";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -34,7 +36,41 @@ const STATUS_FILTERS = [
 ];
 
 const PER_PAGE = 20;
-const COLUMNS = 4;
+const COLUMNS = 5;
+
+function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
+  const { data: hotel } = useHotel(a.hotel_id);
+  const { data: workRequest } = useWorkRequest(a.work_request_id);
+  const peopleById = useUsersByIds([a.worker_id]);
+  const worker = peopleById.get(a.worker_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/assignments/${a.id}`} className="block">
+          {worker ? `${worker.first_name} ${worker.last_name}` : "View assignment"}
+        </TextLink>
+      </TD>
+      <TD>
+        <TextLink href={`/hotels/${a.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
+      </TD>
+      <TD>
+        <TextLink href={`/requests/${a.work_request_id}`}>
+          {workRequest?.position ?? "View request"}
+        </TextLink>
+        {workRequest && (
+          <div className="text-xs text-gray-500">
+            {workRequest.shift_date} · {workRequest.shift_start_time}–{workRequest.shift_end_time}
+          </div>
+        )}
+      </TD>
+      <TD>{formatDate(a.confirmed_at)}</TD>
+      <TD>
+        <AssignmentStatusBadge status={a.status} />
+      </TD>
+    </TR>
+  );
+}
 
 export default function AssignmentsPage() {
   const [status, setStatus] = useState<AssignmentStatus | "">("");
@@ -87,6 +123,7 @@ export default function AssignmentsPage() {
               <THead>
                 <tr>
                   <TH>Worker</TH>
+                  <TH>Hotel</TH>
                   <TH>Work request</TH>
                   <TH>Confirmed</TH>
                   <TH>Status</TH>
@@ -112,27 +149,7 @@ export default function AssignmentsPage() {
               ) : (
                 <TBody>
                   {assignments.map((a) => (
-                    <TR key={a.id}>
-                      <TD className="font-medium">
-                        <TextLink
-                          href={`/assignments/${a.id}`}
-                          className="block"
-                        >
-                          {a.worker_id}
-                        </TextLink>
-                      </TD>
-                      <TD>
-                        <TextLink
-                          href={`/requests/${a.work_request_id}`}
-                        >
-                          {a.work_request_id}
-                        </TextLink>
-                      </TD>
-                      <TD>{formatDate(a.confirmed_at)}</TD>
-                      <TD>
-                        <AssignmentStatusBadge status={a.status} />
-                      </TD>
-                    </TR>
+                    <AssignmentRow key={a.id} assignment={a} />
                   ))}
                 </TBody>
               )}

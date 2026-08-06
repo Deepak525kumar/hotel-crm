@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAttendance } from "@/hooks/useAttendance";
+import { useUsersByIds } from "@/hooks/useHotels";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
 import { formatDateTime } from "@/lib/format";
@@ -21,7 +22,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
-import type { AttendanceStatus } from "@/lib/types";
+import type { Attendance, AttendanceStatus } from "@/lib/types";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -41,6 +42,29 @@ const VERIFIED_FILTERS = [
 
 const PER_PAGE = 20;
 const COLUMNS = 5;
+
+function AttendanceRow({ record: r }: { record: Attendance }) {
+  const peopleById = useUsersByIds([r.worker_id]);
+  const worker = peopleById.get(r.worker_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/attendance/${r.id}`} className="block">
+          {worker ? `${worker.first_name} ${worker.last_name}` : "View record"}
+        </TextLink>
+      </TD>
+      <TD>
+        <AttendanceStatusBadge status={r.status} />
+      </TD>
+      <TD>{formatDateTime(r.check_in_at)}</TD>
+      <TD>{formatDateTime(r.check_out_at)}</TD>
+      <TD>
+        <VerificationBadge verified={r.is_verified} />
+      </TD>
+    </TR>
+  );
+}
 
 export default function AttendancePage() {
   const [status, setStatus] = useState<AttendanceStatus | "">("");
@@ -129,24 +153,7 @@ export default function AttendancePage() {
               ) : (
                 <TBody>
                   {records.map((r) => (
-                    <TR key={r.id}>
-                      <TD className="font-medium">
-                        <TextLink
-                          href={`/attendance/${r.id}`}
-                          className="block"
-                        >
-                          {r.worker_id}
-                        </TextLink>
-                      </TD>
-                      <TD>
-                        <AttendanceStatusBadge status={r.status} />
-                      </TD>
-                      <TD>{formatDateTime(r.check_in_at)}</TD>
-                      <TD>{formatDateTime(r.check_out_at)}</TD>
-                      <TD>
-                        <VerificationBadge verified={r.is_verified} />
-                      </TD>
-                    </TR>
+                    <AttendanceRow key={r.id} record={r} />
                   ))}
                 </TBody>
               )}

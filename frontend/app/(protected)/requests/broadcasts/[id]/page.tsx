@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkRequest, useBroadcastEligibility } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useHotel } from "@/hooks/useHotels";
 import { ApiError, workRequestsApi } from "@/lib/api";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { useAuthStore } from "@/stores/auth";
@@ -49,6 +50,7 @@ export default function BroadcastDetailPage() {
   const canAccept = role === "worker" || role === "checker";
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
+  const { data: hotel } = useHotel(request?.hotel_id);
   const {
     data: eligibility,
     isLoading: eligibilityLoading,
@@ -138,6 +140,14 @@ export default function BroadcastDetailPage() {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
+            <DataRow
+              label="Hotel"
+              value={
+                <TextLink href={`/hotels/${request.hotel_id}`}>
+                  {hotel?.name ?? "View hotel"}
+                </TextLink>
+              }
+            />
             <DataRow label="Shift date" value={request.shift_date} />
             <DataRow
               label="Time"

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useHotel } from "@/hooks/useHotels";
 import { notificationsApi } from "@/lib/api";
 import { NotificationTypeBadge } from "@/components/notifications/NotificationTypeBadge";
 import { formatDateTime } from "@/lib/format";
@@ -32,7 +33,29 @@ const READ_FILTERS = [
   { value: "read", label: "Read" },
 ];
 
-const COLUMNS = 4;
+const COLUMNS = 5;
+
+function NotificationRow({ notification: n }: { notification: Notification }) {
+  const { data: hotel } = useHotel(n.hotel_id ?? undefined);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/notifications/${n.id}`} className="block">
+          {n.title}
+        </TextLink>
+      </TD>
+      <TD>
+        <NotificationTypeBadge type={n.type} />
+      </TD>
+      <TD>{n.hotel_id ? hotel?.name ?? "—" : "—"}</TD>
+      <TD>{formatDateTime(n.created_at)}</TD>
+      <TD>
+        {n.is_read ? <Badge tone="neutral">Read</Badge> : <Badge tone="info">Unread</Badge>}
+      </TD>
+    </TR>
+  );
+}
 
 export default function NotificationsPage() {
   const { notifications, unreadCount, isLoading, error, mutate } =
@@ -104,6 +127,7 @@ export default function NotificationsPage() {
                 <tr>
                   <TH>Title</TH>
                   <TH>Type</TH>
+                  <TH>Hotel</TH>
                   <TH>Received</TH>
                   <TH>Status</TH>
                 </tr>
@@ -128,27 +152,7 @@ export default function NotificationsPage() {
               ) : (
                 <TBody>
                   {visible.map((n) => (
-                    <TR key={n.id}>
-                      <TD className="font-medium">
-                        <TextLink
-                          href={`/notifications/${n.id}`}
-                          className="block"
-                        >
-                          {n.title}
-                        </TextLink>
-                      </TD>
-                      <TD>
-                        <NotificationTypeBadge type={n.type} />
-                      </TD>
-                      <TD>{formatDateTime(n.created_at)}</TD>
-                      <TD>
-                        {n.is_read ? (
-                          <Badge tone="neutral">Read</Badge>
-                        ) : (
-                          <Badge tone="info">Unread</Badge>
-                        )}
-                      </TD>
-                    </TR>
+                    <NotificationRow key={n.id} notification={n} />
                   ))}
                 </TBody>
               )}

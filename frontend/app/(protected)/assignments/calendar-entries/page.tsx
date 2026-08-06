@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCalendarEntries } from "@/hooks/useAssignments";
+import { useHotel, useUsersByIds } from "@/hooks/useHotels";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { formatDate } from "@/lib/format";
 import {
@@ -21,9 +22,33 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
+import type { CalendarEntryDto } from "@/lib/types";
 
 const PER_PAGE = 20;
-const COLUMNS = 3;
+const COLUMNS = 4;
+
+function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
+  const { data: hotel } = useHotel(entry.hotel_id);
+  const peopleById = useUsersByIds([entry.worker_id]);
+  const worker = peopleById.get(entry.worker_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/users/${entry.worker_id}`}>
+          {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
+        </TextLink>
+      </TD>
+      <TD>
+        <TextLink href={`/hotels/${entry.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
+      </TD>
+      <TD>{formatDate(entry.day)}</TD>
+      <TD>
+        <TextLink href={`/assignments/${entry.assignment_id}`}>View assignment</TextLink>
+      </TD>
+    </TR>
+  );
+}
 
 export default function CalendarEntriesPage() {
   const [page, setPage] = useState(1);
@@ -58,6 +83,7 @@ export default function CalendarEntriesPage() {
               <THead>
                 <tr>
                   <TH>Worker</TH>
+                  <TH>Hotel</TH>
                   <TH>Day</TH>
                   <TH>Assignment</TH>
                 </tr>
@@ -78,15 +104,7 @@ export default function CalendarEntriesPage() {
               ) : (
                 <TBody>
                   {calendarEntries.map((entry) => (
-                    <TR key={entry.id}>
-                      <TD className="font-medium">{entry.worker_id}</TD>
-                      <TD>{formatDate(entry.day)}</TD>
-                      <TD>
-                        <TextLink href={`/assignments/${entry.assignment_id}`}>
-                          {entry.assignment_id}
-                        </TextLink>
-                      </TD>
-                    </TR>
+                    <CalendarEntryRow key={entry.id} entry={entry} />
                   ))}
                 </TBody>
               )}
