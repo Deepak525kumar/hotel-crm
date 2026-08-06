@@ -1,13 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import {
-  useHotelGroup,
-  useHotels,
-  useRegionalManagerCandidates,
-} from "@/hooks/useHotels";
+import { useHotelGroup, useHotels, useUsersByIds } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -36,17 +31,25 @@ export default function HotelGroupDetailPage() {
   const id = params.id;
 
   const { data: group, isLoading, error } = useHotelGroup(id);
-  const { users: managers } = useRegionalManagerCandidates();
+
   // Server-side filtered by hotel_group_id — previously this fetched a flat
   // page of up to 100 hotels and filtered client-side, which silently
   // dropped a group's hotels once the platform had more than 100 hotels
   // total (or when they didn't happen to sort into that first page).
   const { hotels: groupHotels } = useHotels({ hotel_group_id: id, limit: 100 });
 
-  const manager = useMemo(
-    () => managers.find((m) => m.id === group?.regional_manager_user_id),
-    [managers, group],
+  // Person-centric assignment (2026-08-07): resolve the ASSIGNED regional
+  // manager by id, not by searching a candidate list. useRegionalManagerCandidates()
+  // returns users eligible to BE assigned; an already-assigned RM is not
+  // guaranteed to appear in it, so the name silently failed to resolve and the
+  // row fell back to rendering a raw user id. Same useUsersByIds pattern the
+  // hotel detail page already uses for its Manager/Regional manager rows.
+  const managerById = useUsersByIds(
+    group?.regional_manager_user_id ? [group.regional_manager_user_id] : [],
   );
+  const manager = group?.regional_manager_user_id
+    ? managerById.get(group.regional_manager_user_id)
+    : undefined;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -99,10 +102,12 @@ export default function HotelGroupDetailPage() {
                 <DataRow
                   label="Regional manager"
                   value={
-                    manager ? (
-                      `${manager.first_name} ${manager.last_name}`
-                    ) : group.regional_manager_user_id ? (
-                      group.regional_manager_user_id
+                    group.regional_manager_user_id ? (
+                      <TextLink href={`/users/${group.regional_manager_user_id}`}>
+                        {manager
+                          ? `${manager.first_name} ${manager.last_name}`
+                          : "View regional manager"}
+                      </TextLink>
                     ) : (
                       <span className="text-gray-500">
                         Vacant
