@@ -9,11 +9,26 @@
 -- Value mapping (verified against every EmploymentRecord.status write path
 -- in the codebase before writing this migration -- see PR description):
 --   INACTIVE      -> PENDING   (submitted_for_review_at stays NULL)
---   UNDER_REVIEW  -> PENDING   (submitted_for_review_at backfilled to updated_at,
---                                the closest available proxy for "when it was
---                                submitted" -- same class of proxy-timestamp
---                                caveat already accepted in the 20260806000000
---                                manager/RM vacancy-history migration)
+--   UNDER_REVIEW  -> PENDING   (submitted_for_review_at backfilled to updated_at
+--                                -- ***APPROXIMATE, NOT THE REAL SUBMISSION
+--                                TIME***. updated_at is bumped by ANY edit to
+--                                the row, not only a submit-for-review action,
+--                                so a record last touched for an unrelated
+--                                reason (e.g. a skills edit) after entering
+--                                UNDER_REVIEW gets a later, wrong timestamp
+--                                here. This is a one-time backfill limitation,
+--                                not a bug in the ongoing system: after this
+--                                migration, every future submitted_for_review_at
+--                                is written by submitForReview() itself
+--                                (service.ts) at the actual moment of
+--                                submission, and is exact from that point on.
+--                                Only pre-migration UNDER_REVIEW rows carry the
+--                                approximated value -- do not treat this column
+--                                as precise for records that predate this
+--                                migration. Same class of proxy-timestamp
+--                                caveat already accepted (and disclosed) in the
+--                                20260806000000 manager/RM vacancy-history
+--                                migration.)
 --   ACTIVE        -> ACTIVE    (unchanged)
 --   REJECTED      -> REJECTED  (unchanged)
 --   DEACTIVATED   -> DELETED   (NOT the new DEACTIVATED -- see below)
@@ -47,10 +62,12 @@ BEGIN;
     ADD COLUMN "employment_cycle" INTEGER NOT NULL DEFAULT 1;
 
   -- Backfill submitted_for_review_at for rows that were UNDER_REVIEW, before
-  -- the enum cast below erases that distinction. updated_at is the closest
-  -- available proxy for "when it was submitted for review" -- there is no
+  -- the enum cast below erases that distinction. HISTORICAL TIMESTAMP
+  -- APPROXIMATION: updated_at is the closest available proxy for "when it
+  -- was submitted for review", NOT the true submission time -- there is no
   -- transition log to read a precise timestamp from (EmploymentStatusHistory
-  -- is created fresh by this same migration, see below).
+  -- is created fresh by this same migration, see the header comment above
+  -- for the full caveat). Backfilled rows must not be treated as exact.
   UPDATE "EmploymentRecord"
     SET "submitted_for_review_at" = "updated_at"
     WHERE "status" = 'UNDER_REVIEW';

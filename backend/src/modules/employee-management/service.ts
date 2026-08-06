@@ -414,6 +414,16 @@ export class EmployeeManagementService extends BaseService {
       allowUnassignedGroup: true,
     });
 
+    // assertTransition(PENDING, ACTIVE) alone cannot express this: the
+    // transition table has no notion of PENDING's own sub-state
+    // (submitted_for_review_at), so without this check an application that
+    // was never submitted for review could be approved directly (found in
+    // review, 2026-08-06). submitForReview() is the only writer of this
+    // field, so its absence means exactly "never submitted."
+    if (!record.submitted_for_review_at) {
+      throw new ConflictError('Cannot approve an application that has not been submitted for review');
+    }
+
     const updated = await this.prisma.$transaction(async (tx) => {
       const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
       return this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
