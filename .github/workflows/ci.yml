@@ -2,7 +2,25 @@ name: CI
 
 on:
   push:
-    branches: ['feature/**', 'fix/**', 'develop', 'main']
+    # Prefix list verified against this repo's own branch history rather than
+    # assumed: `feat/` (62 branches) is the most-used prefix here and was
+    # NEVER matched by the previous list, which had `feature/**` but not
+    # `feat/**`. `docs/`, `chore/`, `refactor/`, `ci/` and `claude/` were
+    # likewise unmatched. The gap was masked because any branch with an open
+    # PR still gets covered by the `pull_request` trigger below -- but a push
+    # BEFORE a PR exists got zero coverage, and the masking disappears
+    # entirely if a `branches:` filter is ever re-added to `pull_request`.
+    branches:
+      - 'feat/**'
+      - 'feature/**'
+      - 'fix/**'
+      - 'docs/**'
+      - 'chore/**'
+      - 'refactor/**'
+      - 'ci/**'
+      - 'claude/**'
+      - develop
+      - main
   pull_request:
     # No `branches:` filter: a PR stacked on another feature branch (e.g.
     # feat/regional-manager-lifecycle onto feat/regional-manager-authorization,
@@ -23,6 +41,14 @@ on:
     # `synchronize` event; re-run the workflow manually (Actions tab -> Re-run
     # jobs) or push any commit after retargeting to pick up default coverage.
     types: [opened, synchronize, reopened]
+  # Manual trigger. Added 2026-08-07 after a GitHub Actions incident in which
+  # webhook delivery was throttled platform-wide: push and pull_request events
+  # were silently dropped, so a PR sat with zero CI runs and there was NO way
+  # to start one -- neither workflow declared workflow_dispatch, and the
+  # Actions tab offers no run button without it. Re-running a previous run
+  # doesn't help when no run was ever created. This is the break-glass path
+  # for that case.
+  workflow_dispatch:
   workflow_call:
 
 # Least-privilege default token for every job; CI only needs to read the repo.

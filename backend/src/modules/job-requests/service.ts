@@ -779,6 +779,24 @@ export class JobRequestService extends BaseService {
             day: wr.shift_date,
           },
         });
+
+        // Deferred-bug batch (2026-08-07): a broadcast accept never wrote a
+        // CalendarEntry, only a WorkerAssignment -- placeOnCalendar() (the
+        // manual-placement path) is the only other WorkerAssignment creation
+        // site and it writes both rows in one transaction (see its comment
+        // above). Without this, the calendar grid (which reads exclusively
+        // from CalendarEntry, not WorkerAssignment) never showed a shift a
+        // worker got by accepting a broadcast.
+        await tx.calendarEntry.create({
+          data: {
+            assignment_id: assignment.id,
+            worker_id: actor.userId,
+            hotel_id: wr.hotel_id,
+            day: wr.shift_date,
+            placed_by_id: wr.created_by_id,
+          },
+        });
+
         return assignment.id;
       });
     } catch (error) {

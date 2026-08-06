@@ -4,6 +4,7 @@ import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.j
 import { notificationService } from '../notifications/service.js';
 import { geoService } from '../geo/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
+import { getEnv } from '../../config/env.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
 // pure predicates, so suites mocking the permissions middleware need not stub them.
 import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
@@ -88,6 +89,30 @@ export class AttendanceService extends BaseService {
     }
 
     const now = new Date();
+
+    // Deferred-bug batch (2026-08-07): workers were able to check in an
+    // unbounded amount of time before their shift, with no upper bound at
+    // all. RULE-002 (early arrival still resolves PRESENT, not LATE) stays
+    // intact for arrivals inside this window; only arrivals earlier than the
+    // window are rejected. Configurable (ATTENDANCE_EARLY_CHECK_IN_GRACE_
+    // MINUTES, default 2h per user direction) rather than hardcoded, same
+    // convention as every other business-rule threshold in config/env.ts.
+    if (existing.expected_start) {
+      const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
+      const minutesEarly = Math.floor(
+        (existing.expected_start.getTime() - now.getTime()) / 60000
+      );
+      if (minutesEarly > graceMinutes) {
+        await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_TOO_EARLY', 'ATTENDANCE', existing.id, {
+          assignment_id: input.assignment_id,
+          minutes_early: minutesEarly,
+        });
+        throw new ForbiddenError(
+          `Check-in denied: too early. Check-in opens ${graceMinutes / 60} hours before the shift starts.`
+        );
+      }
+    }
+
     const minutesLate = existing.expected_start
       ? Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000))
       : null;

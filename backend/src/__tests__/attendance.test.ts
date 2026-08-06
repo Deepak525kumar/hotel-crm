@@ -48,6 +48,7 @@ jest.mock('../config/env.js', () => ({
     JWT_ACCESS_EXPIRY: '1h',
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
+    ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: 120,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
@@ -137,6 +138,54 @@ describe('AttendanceService', () => {
       const updateCall = mockAttendance.updateMany.mock.calls[0][0].data;
       expect(updateCall.status).toBe('LATE');
       expect(updateCall.minutes_late).toBeGreaterThan(0);
+    });
+
+    it('deferred-bug fix: rejects with ForbiddenError when checking in more than 2 hours before expected_start', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
+      // 2h30m out, comfortably past the 2h window. Deliberately NOT 2h+1min:
+      // the service floors (expected_start - now) to whole minutes, and the
+      // sub-millisecond gap between computing this value and the service
+      // reading `now` floors 121 down to exactly 120, landing on the boundary
+      // rather than past it -- a self-inflicted flake, not a real guard gap.
+      const tooEarlyStart = new Date(Date.now() + 150 * 60000);
+      mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: tooEarlyStart }));
+
+      await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'CHECK_IN_DENIED_TOO_EARLY',
+            resource_type: 'ATTENDANCE',
+          }),
+        })
+      );
+    });
+
+    it('deferred-bug fix: allows check-in exactly at the 2-hour grace boundary', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
+      const atBoundary = new Date(Date.now() + 120 * 60000); // exactly 2h from now
+      mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: atBoundary }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date() })
+      );
+
+      await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
+
+      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('deferred-bug fix: does not apply the early-check-in guard when expected_start is null', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
+      mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: null }));
+      mockAttendance.findUniqueOrThrow.mockResolvedValue(
+        makeRecord({ status: 'PRESENT', check_in_at: new Date(), expected_start: null })
+      );
+
+      await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
+
+      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
     it('review fix (concurrency): rejects with ConflictError when a concurrent caller already checked in between the read and the compare-and-swap', async () => {
