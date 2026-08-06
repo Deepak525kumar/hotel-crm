@@ -302,7 +302,7 @@ into it, but conceptually: #1 and the new "assignment completed but request stil
 belong together (calendar/assignment status-sync); #4 and #5/#6 are UI-surface bugs, not a natural
 fit for any one batch below.
 
-**Batch — calendar/assignment status sync** (item #1 below + one new item):
+**Batch — calendar/assignment status sync** (item #1 below + two new items):
 - Worker accepted a broadcast job but it's not in the calendar (see #1 below, full detail).
 - **Assignment marked completed but the work request still shows pending** — likely the same class
   of bug as #1: some downstream read (work-request status) isn't reacting to an upstream write
@@ -310,6 +310,14 @@ fit for any one batch below.
   fulfillment status off `WorkerAssignment.status` synchronously, or whether it's cached/derived
   incorrectly. Investigate both together — a shared root cause (status change not propagating to
   a dependent read) is plausible but not yet confirmed.
+- **Assignments should not be able to start before their assigned date/time.** Not yet reproduced —
+  need to determine whether this means (a) `AssignmentService.update()` allows a transition to
+  `IN_PROGRESS` with no check against `WorkerAssignment.day`/a shift start time, (b) attendance
+  check-in has no guard against checking in early, or (c) both. Check
+  `assignments/service.ts#update()` (`ALLOWED_TRANSITIONS`, ~line 186) for any date/time
+  comparison before allowing `CONFIRMED → IN_PROGRESS` — on a first read there does not appear to
+  be one, but confirm rather than assume, and check the attendance module's check-in path
+  separately since "start" could mean either.
 
 **Batch — dashboard/analytics visibility** (4 new items, all in Analytics/reporting territory —
 confirmed in this session's lifecycle research that the Analytics module currently has **zero**
