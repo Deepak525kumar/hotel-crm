@@ -1,15 +1,19 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-06 (employment-lifecycle rework: PR #354 merged to `main`).
+Last updated: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
 
-Current status: **All prior-session work (#345–354) merged to `main`, local `main` synced.** PR
-#354 (schema/migration + service-layer transitions, combined per the user's "combine similar PRs"
-instruction) is merged — see §3.5 below for what shipped, what an adversarial review and a
-governance-conflict resolution caught along the way, and the CI debugging story (a real,
-pre-existing `import.meta`/CJS-ESM landmine in `config/env.ts` that PR #354 was the first change
-to trip). PRs 3–5 (frontend UI,
-blocklist enforcement, docs+test sync) are not yet started. 13 unrelated deferred items (6 from the
-prior session + 11 new) are batched and still queued behind this — see §4.
+Current status: **The employment-lifecycle rework is complete.** All prior-session work
+(#345–357) is merged to `main`, local `main` synced. PRs #354 (schema/migration + service-layer,
+combined per the user's "combine similar PRs" instruction), #355 (frontend lifecycle UI), #356
+(blocklist removal + real enforcement — an adversarial review caught and fixed a critical IDOR
+before merge), and #357 (`MODULE_SPEC.md` doc sync to the shipped model) are all merged — see §3.5
+below for the full story on each, including two genuine incident-response threads worth knowing
+about: (1) a real, pre-existing `import.meta`/CJS-ESM landmine in `config/env.ts` that #354 was the
+first change to trip (found and fixed, not a regression this rework caused); (2) a GitHub-wide
+Actions platform outage (confirmed via githubstatus.com, `Actions: major_outage`) that blocked CI
+on #356/#357 — both were merged after full local verification substituted for CI, per explicit user
+instruction, not by skipping verification. 13 unrelated deferred items (6 from the prior session +
+11 new) are batched and now the active work — see §4.
 
 ---
 
@@ -304,25 +308,72 @@ harness (`Forward · Rollback · Recovery`) green — also caught and fixed two 
 ordering issue, and a redundant transaction wrapper conflicting with the harness's own `--single-transaction`).
 Merged as commit `a25308b`.
 
-**Remaining PRs** (see the plan file for full detail on each; PR 5's test-rewrite half is DONE, folded
-into #354 — see above):
-- **PR 3 — Frontend lifecycle UI** (not started). No deactivate/rehire/delete/restore UI exists at
-  all today. Needs: new `employeesApi` client methods, dedupe the copy-pasted `STATUS_TONE`/`STATUS_LABEL`
-  maps (`WorkerOnboardingCard.tsx` and `org-chart/page.tsx`), net-new action buttons, a "Deleted"
-  badge+date+reason wherever a deleted person is surfaced via the admin-only `include_deleted`
-  search, and an SWR cache-invalidation checklist (8 surfaces named in the plan).
-- **PR 4 — Blocklist removal + real enforcement** (not started). Separate, already-scoped work:
-  blocklist entries have no removal path, and the blocklist enforces nothing today
-  (`isWorkerEligibleForHotel` never checks it).
-- **PR 5 — Remaining docs sync** (not started; test-rewrite half already shipped in #354). Revise
-  `docs/03-modules/employee-management/MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12` and
-  `.claude/knowledge/MODULE_MEMORY.yaml` to reflect the new permanent lifecycle (currently still
-  describe the old terminal 5-state model — #354 amended ADR-030, not this spec). Add the dedicated
-  permission-matrix test file the plan calls for (every transition × every role including
-  checker/worker denials) if not considered already covered by `employee-management-scope-authz.test.ts`'s
-  new route-level coverage from #354.
+### 3.6. PR #355 — merged (frontend lifecycle UI)
 
-Full 21-scenario end-to-end verification list (including the environment's no-live-DB constraint)
+New `employeesApi` client methods for all 8 lifecycle actions; `EmploymentStatus`/`EmploymentRecord`
+types updated to the new 5-value enum; new shared `lib/employmentStatus.ts` deduping the
+`STATUS_TONE`/`STATUS_LABEL` maps that were previously copy-pasted in `WorkerOnboardingCard.tsx` and
+`org-chart/page.tsx`; net-new action buttons (deactivate/reactivate/rehire/delete/restore) with
+required-reason modals for deactivate/delete; a "Deleted" badge/date/reason display.
+
+**Review (the user directly, not a subagent this round) caught a real gap**: every button rendered
+for every viewer regardless of role — the frontend relied entirely on backend authorization with no
+UI visibility gating (including Admin-only delete/restore rendering for a manager). Fixed:
+`WorkerOnboardingGate` widened from admin-only to admit manager/RM (matching the six now-scoped
+backend actions); the three still-admin-only actions (create/delete/restore) gated via a new
+`useEmploymentPermissions()` hook — a named-capability hook (`canDeleteEmployment`, etc.), not
+inline role-string checks, per a direct follow-up ask to avoid role checks scattering across
+components as this surface grows. `refresh()` also broadened to revalidate org-chart/analytics SWR
+caches via a key-matching predicate, not just the employment-record cache. `tsc`/`eslint`/`next
+build` all clean.
+
+### 3.7. PR #356 — merged (blocklist removal + real enforcement)
+
+`isWorkerEligibleForHotel()` (`lib/roster-scope.ts`, the single choke point already used by
+reassignment and broadcast-accept) now also checks the blocklist — previously it existed as pure
+audit-log data, created and readable but enforced nowhere. New `DELETE
+/employees/hotels/:hotel_id/blocklist/:entry_id` endpoint. Per an explicit user decision, also
+fixed a separate gap found while tracing the enforcement path: `placeOnCalendar()` (manual calendar
+placement) never checked worker eligibility at all, only the acting manager's own scope — now uses
+the same check as the other two assignment-creation paths.
+
+**Adversarial review (Opus) found and fixed one CRITICAL bug**: `removeBlocklist()` took only an
+entry id and never verified it belonged to the hotel in the route path — `checkHotelAccess()`
+validates the *path's* hotel_id, but the service silently ignored it, so a manager scoped to hotel
+h1 could delete a blocklist entry belonging to hotel h2 just by knowing/guessing its id, fully
+bypassing the route-level scope check. Proven end-to-end (204 where 403/404 was expected) before the
+fix landed: `removeBlocklist()` now takes `hotelId` alongside `entryId` and 404s (not 403, to avoid
+confirming the id exists elsewhere) on a mismatch. Regression tests added at both the service-unit
+and full-route levels reproducing the exact scenario.
+
+**GitHub Actions outage during this PR** (confirmed via `githubstatus.com` — `Actions:
+major_outage`, `Pages: major_outage`, not an account billing issue as first suspected): CI never
+ran. Cancel/rerun attempts on the queue both failed with contradictory state errors, consistent
+with a platform-wide incident, not something fixable from this repo's side. Merged after full local
+verification (backend `tsc`/`eslint`/103-suite-2265-test run, migration harness pairing, frontend
+`tsc`/`eslint`/`next build`, both `.claude/tooling/*.js` validation scripts) substituted for CI, per
+explicit user instruction — not a shortcut taken unilaterally.
+
+### 3.8. PR #357 — merged (`MODULE_SPEC.md` doc sync)
+
+`SPEC-EMP-001` (FROZEN, v0.2.7) still described the terminal 5-state lifecycle that #354 replaced in
+code — ADR-030's amendment covered the permission-matrix side, this spec covered the lifecycle-model
+side and was still stale. Amended to v0.2.8 following the doc's own precedented "Correction" pattern
+(Document Control table entry), citing the shipped implementation + the ADR-030 amendment as
+authority — **a deliberate "pragmatic sync" scope decision**, not the full formal process this
+repo's documentation discipline would otherwise call for (updating
+`CONFIRMED_REQUIREMENTS_REGISTER.md`/`PIVOT_DESIGN_DOCUMENT.md` first). CRR/PDD are explicitly
+flagged as NOT updated and still stale on this point — a future documentation pass should reconcile
+them, but this correction didn't block on that. Updated: `REQ-EMP-002`/`RULE-EMP-02/03`, the full
+State and Lifecycle section, the interface catalog (retired `IF-EMP-LifecycleSignal`/
+`IF-EMP-Deactivate`, added the 8 real endpoints + `IF-EMP-RemoveBlocklist`), the events table, the
+permission matrix, plus a stale cross-reference in `docs/03-modules/documents/MODULE_SPEC.md` and a
+forward-note (not an amendment) on `ADR-023`. Also merged during the GitHub Actions outage, same
+local-verification substitution as #356 (docs-only — `repository-integrity-check.js`/
+`context-loader.js --validate` both exit 0).
+
+**The employment-lifecycle rework is now fully shipped end to end.** Full 21-scenario end-to-end
+verification list (including the environment's no-live-DB constraint)
 is in the plan file — not yet run, since PRs 3–5 aren't fully built.
 
 ## 4. Deferred bug reports — 6 from the prior session + 11 new, none investigated yet
@@ -533,26 +584,26 @@ picked up.
 
 ## 8. Immediate next action for whoever resumes
 
-**PR #354 is merged** (schema/migration + service-layer + ADR-030 amendment + full test rewrite —
-see §3.5). `main` is synced locally. Next:
+**The employment-lifecycle rework is fully shipped** — PRs #354, #355, #356, #357 are all merged
+(see §§3.5–3.8). `main` is synced locally. Next:
 
-1. **PR 3 — Frontend lifecycle UI.** No deactivate/rehire/delete/restore UI exists at all yet
-   (confirmed in research: the frontend only has create→submit→approve/reject). See section 3's
-   "Remaining PRs" for the concrete scope (new API client methods, dedupe `STATUS_TONE`/
-   `STATUS_LABEL`, new action buttons, deleted badge, SWR invalidation checklist).
-2. **PR 4 — Blocklist removal + enforcement**, then **PR 5 — remaining docs sync**
-   (`MODULE_SPEC.md`'s `REQ-EMP-002`/`RULE-EMP-02/03/12`, `.claude/knowledge/MODULE_MEMORY.yaml` —
-   the test-rewrite half of the original PR 5 scope already shipped in #354).
-3. Every PR gets the same bar already established this session: `tsc --noEmit`/`eslint` clean, the
-   FULL test suite green (not just the touched files — #354's CI debugging showed an unmocked
-   import chain in one module can break suites in another), independent adversarial review (an
-   Opus subagent, per this session's "decisional tasks → Opus subagent" instruction) before
-   considering it done, and the user merges — never self-merge.
-4. Once PRs 3–5 land, run the full 21-scenario end-to-end verification list from the plan file
-   (`~/.claude/plans/expressive-floating-koala.md`).
-5. Only after the lifecycle work is fully shipped: triage the 13 deferred items in section 4 —
-   group into the 4 batches already identified there, each batch or item likely becomes its own
-   PR, per this repo's established one-logical-change-per-PR discipline.
-6. **CI re-run discipline (new this session):** after fixing a failing CI check, re-run only that
-   specific failed job rather than the whole workflow, where GitHub's re-run API allows scoping to
-   one job.
+1. **Triage the 13 deferred items in section 4** — group into the 4 batches already identified
+   there (calendar/assignment status sync, dashboard/analytics visibility, missing UI controls,
+   Leave & Sickness module as a new feature), plus the standalone zirove copyright/footer item.
+   Each batch or item likely becomes its own PR, per this repo's established
+   one-logical-change-per-PR discipline.
+2. Optionally: run the full 21-scenario end-to-end verification list from the plan file
+   (`~/.claude/plans/expressive-floating-koala.md`) if a real environment with DB/auth access
+   becomes available — not done yet, since this session never had one (see §6's environment
+   limitations).
+3. Every PR gets the same bar established across #354–357: `tsc --noEmit`/`eslint` clean, the FULL
+   test suite green (not just touched files — #354's CI debugging showed an unmocked import chain
+   in one module can break suites in another), independent adversarial review (an Opus subagent)
+   before considering it done, and the user merges — never self-merge.
+4. **CI re-run discipline:** after fixing a failing CI check, re-run only that specific failed job
+   rather than the whole workflow, where GitHub's re-run API allows scoping to one job.
+5. **If GitHub Actions is down again** (check `https://www.githubstatus.com/api/v2/components.json`
+   for the `Actions` component before assuming it's an account/billing issue — #356/#357 both hit a
+   real platform-wide outage, not a config problem): full local verification substituting for CI is
+   an accepted pattern in this repo now, but only merge that way with the user's explicit
+   go-ahead each time, not as a standing default.
