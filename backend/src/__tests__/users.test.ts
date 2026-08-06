@@ -1121,4 +1121,150 @@ describe('UserService', () => {
       );
     });
   });
+  // ── Exhaustive role-transition matrix ─────────────────────────────────────
+  //
+  // Every ordered pair of the 5 roles (20 transitions). The invariant under
+  // test is the one the whole redesign exists to enforce: after ANY role
+  // change, a prior manager/RM posting the user no longer qualifies for must
+  // be vacated in the same transaction -- never left pointing at them.
+  //
+  // Why exhaustive rather than a few representative cases: the vacate
+  // branches are guarded on `newRole !== 'MANAGER'` / `newRole !==
+  // 'REGIONAL_MANAGER'`, so which pairs skip a vacate is decided by the
+  // branch conditions, not by statement order. A partial matrix would leave
+  // exactly those skip conditions untested -- which is where the original
+  // bug lived.
+  describe('updateUserRole — exhaustive role-transition matrix', () => {
+    const ROLES = ['worker', 'checker', 'manager', 'admin', 'regional_manager'] as const;
+    type RoleName = (typeof ROLES)[number];
+    const upper = (r: RoleName) => r.toUpperCase();
+
+    // Assignment payload required for the destination role, so a transition
+    // INTO manager/RM has somewhere to land.
+    const payloadFor = (to: RoleName) =>
+      to === 'manager'
+        ? { hotel_id: 'h_new' }
+        : to === 'regional_manager'
+          ? { hotel_group_id: 'g_new' }
+          : {};
+
+    const pairs: Array<[RoleName, RoleName]> = [];
+    for (const from of ROLES) for (const to of ROLES) if (from !== to) pairs.push([from, to]);
+
+    it.each(pairs)('%s -> %s vacates any prior posting and lands on the new role', async (from, to) => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: upper(from), permissions: [], is_active: true, deleted_at: null,
+      });
+      // The user currently holds whatever posting their OLD role implies.
+      mockHotel.findMany.mockResolvedValue(from === 'manager' ? [{ id: 'h_old' }] : []);
+      mockHotelGroup.findUnique.mockImplementation(async (args: any) => {
+        // Ownership lookup (by regional_manager_user_id) vs target lookup (by id).
+        if (args?.where?.regional_manager_user_id) {
+          return from === 'regional_manager' ? { id: 'g_old' } : null;
+        }
+        return { id: args?.where?.id ?? 'g_new', regional_manager_user_id: null };
+      });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ id: 'er1' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: upper(to), permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: to, ...payloadFor(to) }, 'admin_actor', 'admin');
+
+      // 1. The role itself always lands.
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'u1' }, data: expect.objectContaining({ role: upper(to) }) })
+      );
+
+      // 2. Leaving MANAGER always vacates the old hotel. (Staying MANAGER is
+      //    a transfer, asserted separately -- the old hotel is still vacated,
+      //    but with reason TRANSFERRED rather than DEMOTED.)
+      if (from === 'manager') {
+        expect(mockHotel.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'h_old' },
+            data: expect.objectContaining({ manager_user_id: null }),
+          })
+        );
+      }
+
+      // 3. Leaving REGIONAL_MANAGER always vacates the old group.
+      if (from === 'regional_manager') {
+        expect(mockHotelGroup.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'g_old' },
+            data: expect.objectContaining({ regional_manager_user_id: null }),
+          })
+        );
+      }
+
+      // 4. The core invariant, stated directly: the user never ends up
+      //    holding a manager posting AND an RM posting at once.
+      const assignedHotel = (mockHotel.update as jest.Mock).mock.calls.some(
+        (c: any) => c[0]?.data?.manager_user_id === 'u1'
+      );
+      const assignedGroup = (mockHotelGroup.update as jest.Mock).mock.calls.some(
+        (c: any) => c[0]?.data?.regional_manager_user_id === 'u1'
+      );
+      expect(assignedHotel && assignedGroup).toBe(false);
+
+      // 5. Everything is one atomic unit -- a vacate can never commit
+      //    without its paired assignment, or vice versa.
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    // The two same-role cases the matrix above excludes (from !== to), both
+    // of which are transfers rather than role changes.
+    it('manager -> manager transfers hotels, vacating the old one as TRANSFERRED (not DEMOTED)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findMany.mockResolvedValue([{ id: 'h_old' }]);
+      mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin');
+
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'h_old' },
+          data: expect.objectContaining({ manager_user_id: null, manager_vacancy_reason: 'TRANSFERRED' }),
+        })
+      );
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'h_new' }, data: expect.objectContaining({ manager_user_id: 'u1' }) })
+      );
+    });
+
+    it('regional_manager -> regional_manager transfers groups, vacating the old one as TRANSFERRED', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotelGroup.findUnique.mockImplementation(async (args: any) => {
+        if (args?.where?.regional_manager_user_id) return { id: 'g_old' };
+        return { id: 'g_new', regional_manager_user_id: null };
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g_new' }, 'admin_actor', 'admin');
+
+      expect(mockHotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'g_old' },
+          data: expect.objectContaining({ regional_manager_user_id: null, regional_manager_vacancy_reason: 'TRANSFERRED' }),
+        })
+      );
+      expect(mockHotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'g_new' }, data: expect.objectContaining({ regional_manager_user_id: 'u1' }) })
+      );
+    });
+  });
 });
