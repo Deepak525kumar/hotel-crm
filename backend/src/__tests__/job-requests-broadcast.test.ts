@@ -412,6 +412,85 @@ describe('JobRequestService.raiseBroadcast', () => {
   });
 });
 
+// ── Derived fill status (2026-08-07) ─────────────────────────────────────
+//
+// WorkRequestStatus declares PARTIALLY_FILLED and FILLED, but no write site
+// ever set either -- a fully staffed broadcast read OPEN forever. They are
+// now derived at read time from skill_slots.confirmed_count (the column that
+// IS maintained) rather than stored, so a second write path cannot drift out
+// of sync with the first.
+describe('JobRequestService fill status (derived)', () => {
+  let service: JobRequestService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new JobRequestService();
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+  });
+
+  const getStatus = async (slots: Array<Record<string, unknown>>, stored = 'OPEN') => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({
+        status: stored,
+        skill_slots: slots.map((o) => makeSkillSlotRow(o)),
+      })
+    );
+    const dto = await service.getById('jr1', { userId: 'admin1', role: 'admin', scope: null } as any);
+    return dto;
+  };
+
+  it('reports OPEN while no slot has been claimed', async () => {
+    const dto = await getStatus([{ headcount: 2, confirmed_count: 0 }]);
+    expect(dto.status).toBe('OPEN');
+    expect(dto.workers_confirmed).toBe(0);
+  });
+
+  it('reports PARTIALLY_FILLED once some but not all slots are claimed', async () => {
+    const dto = await getStatus([{ headcount: 3, confirmed_count: 1 }]);
+    expect(dto.status).toBe('PARTIALLY_FILLED');
+    expect(dto.workers_confirmed).toBe(1);
+  });
+
+  it('reports FILLED once every slot is at headcount', async () => {
+    const dto = await getStatus([
+      { id: 'slot1', skill: 'CLEANER', headcount: 2, confirmed_count: 2 },
+      { id: 'slot2', skill: 'WAITER', headcount: 1, confirmed_count: 1 },
+    ]);
+    expect(dto.status).toBe('FILLED');
+    expect(dto.workers_confirmed).toBe(3);
+  });
+
+  it('reports PARTIALLY_FILLED when one skill is full but another is not', async () => {
+    const dto = await getStatus([
+      { id: 'slot1', skill: 'CLEANER', headcount: 2, confirmed_count: 2 },
+      { id: 'slot2', skill: 'WAITER', headcount: 2, confirmed_count: 0 },
+    ]);
+    expect(dto.status).toBe('PARTIALLY_FILLED');
+  });
+
+  // A cancelled or expired request is not "partially filled" regardless of
+  // what its slots say -- the manual/terminal state has to win, or cancelling
+  // a half-staffed broadcast would appear to un-cancel it.
+  it.each(['CANCELLED', 'EXPIRED', 'DRAFT'])(
+    'leaves a %s request unchanged even with claimed slots',
+    async (stored) => {
+      const dto = await getStatus([{ headcount: 2, confirmed_count: 1 }], stored);
+      expect(dto.status).toBe(stored);
+    }
+  );
+
+  // Marketplace requests have no per-slot data, so there is nothing to derive
+  // from and the stored status must pass through untouched.
+  it('leaves a marketplace request (no skill slots) on its stored status', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({ status: 'OPEN', skill_slots: [], workers_confirmed: 4 })
+    );
+    const dto = await service.getById('jr1', { userId: 'admin1', role: 'admin', scope: null } as any);
+    expect(dto.status).toBe('OPEN');
+    expect(dto.workers_confirmed).toBe(4);
+  });
+});
+
 describe('JobRequestService.getBroadcastEligibility', () => {
   let service: JobRequestService;
 

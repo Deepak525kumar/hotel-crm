@@ -39,9 +39,14 @@ interface Actor {
   scope?: UserScope | null;
 }
 
-// Allowed status transitions for a WorkRequest. PARTIALLY_FILLED/FILLED are
-// driven by the assignment pipeline (later PR) — managers may only move a
-// request through the manual states below. EXPIRED is set by a scheduled job.
+// Allowed MANUAL status transitions for a WorkRequest. PARTIALLY_FILLED and
+// FILLED are absent by design, not by omission: as of 2026-08-07 they are
+// derived at read time from skill_slots (see deriveFillStatus below) rather
+// than stored, so there is no transition into them to authorize. The earlier
+// version of this comment promised a "later PR" would write them from the
+// assignment pipeline; that PR never landed and the derived approach replaces
+// it -- one maintained source (confirmed_count) instead of two that can
+// disagree. EXPIRED is set by a scheduled job.
 const ALLOWED_TRANSITIONS: Partial<Record<WorkRequestStatus, WorkRequestStatus[]>> = {
   [WorkRequestStatus.DRAFT]: [WorkRequestStatus.OPEN, WorkRequestStatus.CANCELLED],
   [WorkRequestStatus.OPEN]: [WorkRequestStatus.CANCELLED],
@@ -49,6 +54,51 @@ const ALLOWED_TRANSITIONS: Partial<Record<WorkRequestStatus, WorkRequestStatus[]
 };
 
 export class JobRequestService extends BaseService {
+  /**
+   * Fill state, derived at read time (2026-08-07).
+   *
+   * WorkRequestStatus declares PARTIALLY_FILLED and FILLED, but nothing ever
+   * wrote either: every write site sets DRAFT, OPEN, CANCELLED or EXPIRED,
+   * confirmed by grep across the whole module. The comment on
+   * ALLOWED_TRANSITIONS said they were "driven by the assignment pipeline
+   * (later PR)" -- that PR never landed, so a fully-staffed broadcast still
+   * read OPEN forever.
+   *
+   * Derived rather than stored, deliberately. skill_slots.confirmed_count is
+   * already the maintained source of truth (acceptBroadcast increments,
+   * cancellation decrements) and this file's own raiseBroadcast() doc calls
+   * skill_slots "the SOLE authority for any decision logic". Storing a second
+   * copy would mean two write paths that can disagree -- exactly the drift
+   * class already fixed twice in this codebase. A derived value cannot go
+   * stale.
+   *
+   * Only applies to broadcasts (rows with skill slots). A marketplace request
+   * has no per-slot data, so its status is left exactly as stored.
+   */
+  private deriveFillStatus(
+    stored: WorkRequestStatus,
+    skillSlots?: JobRequestSkillSlot[]
+  ): WorkRequestStatus {
+    // Terminal/manual states always win: a cancelled or expired request is
+    // not "partially filled" no matter what its slots say, and a DRAFT has
+    // not been published yet.
+    if (
+      stored === WorkRequestStatus.CANCELLED ||
+      stored === WorkRequestStatus.EXPIRED ||
+      stored === WorkRequestStatus.DRAFT
+    ) {
+      return stored;
+    }
+    if (!skillSlots || skillSlots.length === 0) return stored;
+
+    const needed = skillSlots.reduce((sum, s) => sum + s.headcount, 0);
+    const confirmed = skillSlots.reduce((sum, s) => sum + s.confirmed_count, 0);
+    if (needed === 0) return stored;
+    if (confirmed >= needed) return WorkRequestStatus.FILLED;
+    if (confirmed > 0) return WorkRequestStatus.PARTIALLY_FILLED;
+    return stored;
+  }
+
   private toDto(wr: JobRequest, skillSlots?: JobRequestSkillSlot[]): WorkRequestDto {
     return {
       id: wr.id,
@@ -56,7 +106,14 @@ export class JobRequestService extends BaseService {
       created_by_id: wr.created_by_id,
       position: wr.position,
       workers_needed: wr.workers_needed,
-      workers_confirmed: wr.workers_confirmed,
+      // Same dead-column problem as the analytics dashboard fix: the stored
+      // workers_confirmed is written by nothing. Derive it from the slots
+      // that ARE maintained, falling back to the stored value for a
+      // marketplace row that has no slots.
+      workers_confirmed:
+        skillSlots && skillSlots.length > 0
+          ? skillSlots.reduce((sum, s) => sum + s.confirmed_count, 0)
+          : wr.workers_confirmed,
       shift_date: wr.shift_date.toISOString().slice(0, 10),
       shift_start_time: wr.shift_start_time,
       shift_end_time: wr.shift_end_time,
@@ -64,7 +121,7 @@ export class JobRequestService extends BaseService {
       currency: wr.currency,
       description: wr.description,
       requirements: wr.requirements,
-      status: wr.status,
+      status: this.deriveFillStatus(wr.status, skillSlots),
       published_at: wr.published_at?.toISOString() ?? null,
       expires_at: wr.expires_at?.toISOString() ?? null,
       filled_at: wr.filled_at?.toISOString() ?? null,
