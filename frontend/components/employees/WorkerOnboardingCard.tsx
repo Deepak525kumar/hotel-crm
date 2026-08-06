@@ -22,8 +22,10 @@ import {
   Modal,
   Select,
   Skeleton,
+  Textarea,
 } from "@/components/ui";
-import type { EmploymentStatus, SkillTag } from "@/lib/types";
+import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
+import type { DeactivationReason, SkillTag } from "@/lib/types";
 
 // Mirrors the backend `SkillTag` Prisma enum (schema.prisma) — a fixed,
 // schema-level enum (REQ-EMP-003), not an admin-managed lookup table, so it
@@ -37,67 +39,59 @@ const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
   { value: "WAITER", label: "Waiter" },
 ];
 
-const STATUS_TONE: Record<EmploymentStatus, "warning" | "success" | "neutral" | "danger"> = {
-  INACTIVE: "warning",
-  UNDER_REVIEW: "warning",
-  ACTIVE: "success",
-  REJECTED: "danger",
-  DEACTIVATED: "neutral",
-};
-
-const STATUS_LABEL: Record<EmploymentStatus, string> = {
-  INACTIVE: "Onboarding started",
-  UNDER_REVIEW: "Ready for approval",
-  ACTIVE: "Active",
-  REJECTED: "Rejected",
-  DEACTIVATED: "Deactivated",
-};
+// Mirrors the backend DeactivationReason Prisma enum (schema.prisma) — a
+// fixed set, same reasoning as SKILL_OPTIONS above.
+const DEACTIVATION_REASON_OPTIONS: { value: DeactivationReason; label: string }[] = [
+  { value: "TEMPORARY_LEAVE", label: "Temporary leave" },
+  { value: "SEASONAL", label: "Seasonal" },
+  { value: "SUSPENDED", label: "Suspended" },
+];
 
 /**
  * Stands in for the unbuilt Onboarding module (MODULE_SPEC.md: "Onboarding
  * orchestration... Onboarding module" is a separate, unbuilt owner) by
- * driving Employee Management's existing primitives directly:
- * `POST /employees`, `POST /employees/:id/lifecycle-signal`. Named for the
- * process it represents, not the module whose APIs it calls.
+ * driving Employee Management's existing primitives directly: `POST
+ * /employees` plus the lifecycle-action endpoints (`submit-for-review`,
+ * `approve`, `reject`, `deactivate`, `reactivate`, `rehire`, `delete`,
+ * `restore` — REQ-EMP-002 rework, 2026-08-06). Named for the process it
+ * represents, not the module whose APIs it calls.
  *
- * The Under-Review -> Active step is a real, spec-confirmed review decision
- * (MODULE_SPEC.md State and Lifecycle: "Under Review — onboarding complete;
- * application in the manager pool") that the unbuilt Onboarding module would
- * normally own — this card lets an Admin perform it directly since no other
- * caller exists yet (`lifecycle-signal`'s own Admin-gate, OD-EMP-09, is the
- * same stopgap). Kept as two explicit actions ("Confirm onboarding complete"
- * then "Approve for work") rather than one combined button so the UI doesn't
- * imply a review took place when nothing was reviewed.
+ * The Pending -> Active step is a real, spec-confirmed review decision that
+ * the unbuilt Onboarding module would normally own — this card lets an
+ * authorized actor (Admin, or a scoped Manager/Regional Manager per ADR-030
+ * §3 C-16) perform it directly since no other caller exists yet. Kept as two
+ * explicit actions ("Confirm onboarding complete" then "Approve for work")
+ * rather than one combined button so the UI doesn't imply a review took
+ * place when nothing was reviewed.
  *
  * TEMPORARY ORCHESTRATION UI, not the long-term owner of onboarding: once a
- * real Onboarding module exists and drives these transitions itself (via
- * `IF-EMP-LifecycleSignal`, unchanged), this card should become mostly
- * read-only — reflecting onboarding progress driven elsewhere rather than
- * performing the actions. Do not build further orchestration logic on top of
- * this card; extend the future Onboarding module instead.
+ * real Onboarding module exists and drives these transitions itself, this
+ * card should become mostly read-only — reflecting onboarding progress
+ * driven elsewhere rather than performing the actions. Do not build further
+ * orchestration logic on top of this card; extend the future Onboarding
+ * module instead.
  */
 export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const { data: record, isLoading, error } = useEmploymentRecord(userId);
   const [createOpen, setCreateOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
+  const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const action = useAsyncAction();
 
   const refresh = () => mutate(["employment-record", userId]);
 
   const onSubmitForReview = () =>
-    action
-      .run(
-        () => employeesApi.lifecycleSignal(record!.employee_id, { signal: "submitted_for_review" }),
-        { key: "submit" },
-      )
-      .finally(refresh);
+    action.run(() => employeesApi.submitForReview(record!.employee_id), { key: "submit" }).finally(refresh);
 
   const onReject = () =>
-    action
-      .run(() => employeesApi.lifecycleSignal(record!.employee_id, { signal: "rejected" }), {
-        key: "reject",
-      })
-      .finally(refresh);
+    action.run(() => employeesApi.reject(record!.employee_id), { key: "reject" }).finally(refresh);
+
+  const onReactivate = () =>
+    action.run(() => employeesApi.reactivate(record!.employee_id), { key: "reactivate" }).finally(refresh);
+
+  const onRehire = () =>
+    action.run(() => employeesApi.rehire(record!.employee_id), { key: "rehire" }).finally(refresh);
 
   return (
     <>
@@ -128,14 +122,36 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               <DataList>
                 <DataRow
                   label="Status"
-                  value={<Badge tone={STATUS_TONE[record.status]}>{STATUS_LABEL[record.status]}</Badge>}
+                  value={
+                    <Badge tone={EMPLOYMENT_STATUS_TONE[record.status]}>
+                      {EMPLOYMENT_STATUS_LABEL[record.status]}
+                    </Badge>
+                  }
                 />
                 <DataRow label="Employee ID" value={record.employee_id} />
                 <DataRow label="Job title" value={record.job_title} />
                 <DataRow label="Start date" value={formatDate(record.start_date)} />
+                {record.status === "DEACTIVATED" && record.deactivation_reason && (
+                  <DataRow label="Deactivation reason" value={record.deactivation_reason} />
+                )}
+                {record.status === "DELETED" && (
+                  <>
+                    <DataRow
+                      label="Deleted"
+                      value={
+                        <span className="text-red-700">
+                          {record.deleted_at ? formatDate(record.deleted_at) : "—"}
+                        </span>
+                      }
+                    />
+                    {record.deleted_reason && (
+                      <DataRow label="Reason" value={record.deleted_reason} />
+                    )}
+                  </>
+                )}
               </DataList>
 
-              {record.status === "INACTIVE" && (
+              {record.status === "PENDING" && !record.submitted_for_review_at && (
                 <div className="border-t border-gray-100 pt-4">
                   <p className="mb-2 text-sm text-gray-500">
                     Paperwork/checks pending before this worker can be reviewed for approval.
@@ -150,7 +166,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 </div>
               )}
 
-              {record.status === "UNDER_REVIEW" && (
+              {record.status === "PENDING" && record.submitted_for_review_at && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
                   <Button size="sm" onClick={() => setApproveOpen(true)}>
                     Approve for work
@@ -166,6 +182,56 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 </div>
               )}
 
+              {record.status === "ACTIVE" && (
+                <div className="border-t border-gray-100 pt-4">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeactivateOpen(true)}
+                  >
+                    Deactivate (temporary pause)
+                  </Button>
+                </div>
+              )}
+
+              {record.status === "DEACTIVATED" && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="mb-2 text-sm text-gray-500">
+                    Temporarily paused — this worker is still employed and can return directly.
+                  </p>
+                  <Button size="sm" onClick={onReactivate} loading={action.isPending("reactivate")}>
+                    Reactivate
+                  </Button>
+                </div>
+              )}
+
+              {record.status === "REJECTED" && (
+                <div className="border-t border-gray-100 pt-4">
+                  <Button size="sm" onClick={onRehire} loading={action.isPending("rehire")}>
+                    Rehire
+                  </Button>
+                </div>
+              )}
+
+              {(record.status === "ACTIVE" ||
+                record.status === "DEACTIVATED" ||
+                record.status === "REJECTED") && (
+                <div className="border-t border-gray-100 pt-4">
+                  <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
+                    Delete (left the company)
+                  </Button>
+                </div>
+              )}
+
+              {record.status === "DELETED" && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="mb-2 text-sm text-gray-500">
+                    A restored record must go through approval again before becoming active.
+                  </p>
+                  <RestoreButton employeeId={record.employee_id} onDone={refresh} />
+                </div>
+              )}
+
               <FormError>{action.error}</FormError>
             </div>
           )}
@@ -178,14 +244,49 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
         onClose={() => setCreateOpen(false)}
       />
       {record && (
-        <ApproveModal
-          userId={userId}
-          employeeId={record.employee_id}
-          open={approveOpen}
-          onClose={() => setApproveOpen(false)}
-        />
+        <>
+          <ApproveModal
+            userId={userId}
+            employeeId={record.employee_id}
+            open={approveOpen}
+            onClose={() => setApproveOpen(false)}
+          />
+          <DeactivateModal
+            userId={userId}
+            employeeId={record.employee_id}
+            open={deactivateOpen}
+            onClose={() => setDeactivateOpen(false)}
+          />
+          <DeleteModal
+            userId={userId}
+            employeeId={record.employee_id}
+            open={deleteOpen}
+            onClose={() => setDeleteOpen(false)}
+          />
+        </>
       )}
     </>
+  );
+}
+
+// Admin-only (DELETED -> PENDING is not exposed to a scoped manager per
+// ADR-030 §3 note ³ — delete/restore cross the account boundary). Not
+// gated inline here since the backend already denies non-admin callers;
+// this button simply won't do anything useful for a non-admin, matching
+// how the rest of this card relies on the API's own authorization rather
+// than duplicating role checks client-side.
+function RestoreButton({ employeeId, onDone }: { employeeId: string; onDone: () => void }) {
+  const action = useAsyncAction();
+  const onRestore = () =>
+    action.run(() => employeesApi.restore(employeeId), { key: "restore" }).finally(onDone);
+
+  return (
+    <div className="space-y-2">
+      <Button size="sm" onClick={onRestore} loading={action.pending}>
+        Restore (start a new employment cycle)
+      </Button>
+      <FormError>{action.error}</FormError>
+    </div>
   );
 }
 
@@ -325,8 +426,7 @@ function ApproveModal({
   const onSubmit = () => {
     approve.run(
       () =>
-        employeesApi.lifecycleSignal(employeeId, {
-          signal: "approved",
+        employeesApi.approve(employeeId, {
           ...(hotelGroupId.trim() ? { hotel_group_id: hotelGroupId.trim() } : {}),
         }),
       {
@@ -371,6 +471,158 @@ function ApproveModal({
           ]}
         />
         <FormError>{approve.error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
+function DeactivateModal({
+  userId,
+  employeeId,
+  open,
+  onClose,
+}: {
+  userId: string;
+  employeeId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState<DeactivationReason | "">("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const deactivate = useAsyncAction();
+
+  const reset = () => {
+    setReason("");
+    setFieldError(null);
+  };
+
+  const handleClose = () => {
+    if (deactivate.pending) return;
+    reset();
+    onClose();
+  };
+
+  const onSubmit = () => {
+    setFieldError(null);
+    if (!reason) {
+      setFieldError("A reason is required.");
+      return;
+    }
+    deactivate.run(() => employeesApi.deactivate(employeeId, { deactivation_reason: reason }), {
+      onSuccess: async () => {
+        await mutate(["employment-record", userId]);
+        reset();
+        onClose();
+      },
+    });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Deactivate (temporary pause)"
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={deactivate.pending}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={deactivate.pending}>
+            Deactivate
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          This worker stays employed and can be reactivated directly, with no re-approval. Future
+          assignments are cancelled. If this person has left the company, use Delete instead.
+        </p>
+        <Select
+          label="Reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value as DeactivationReason)}
+          options={[
+            { value: "", label: "Select a reason…" },
+            ...DEACTIVATION_REASON_OPTIONS,
+          ]}
+        />
+        <FormError>{fieldError ?? deactivate.error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
+function DeleteModal({
+  userId,
+  employeeId,
+  open,
+  onClose,
+}: {
+  userId: string;
+  employeeId: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const deleteAction = useAsyncAction();
+
+  const reset = () => {
+    setReason("");
+    setFieldError(null);
+  };
+
+  const handleClose = () => {
+    if (deleteAction.pending) return;
+    reset();
+    onClose();
+  };
+
+  const onSubmit = () => {
+    setFieldError(null);
+    if (!reason.trim()) {
+      setFieldError("A reason is required.");
+      return;
+    }
+    deleteAction.run(() => employeesApi.deleteEmployee(employeeId, { deleted_reason: reason.trim() }), {
+      onSuccess: async () => {
+        await mutate(["employment-record", userId]);
+        reset();
+        onClose();
+      },
+    });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Delete (left the company)"
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={deleteAction.pending}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={onSubmit} loading={deleteAction.pending}>
+            Delete
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500">
+          This also deactivates the worker&apos;s account and cancels their future assignments. It
+          can be reversed with Restore, which requires re-approval before the worker becomes
+          active again.
+        </p>
+        <Textarea
+          label="Reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          placeholder="e.g. Resigned, contract ended"
+        />
+        <FormError>{fieldError ?? deleteAction.error}</FormError>
       </div>
     </Modal>
   );

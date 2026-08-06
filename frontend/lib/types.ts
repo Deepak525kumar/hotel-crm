@@ -1057,8 +1057,24 @@ export interface SetBlocklistInput {
   reason: string;
 }
 
-/** Mirrors the backend `EmploymentStatus` enum (prisma/schema.prisma). */
-export type EmploymentStatus = "INACTIVE" | "UNDER_REVIEW" | "ACTIVE" | "REJECTED" | "DEACTIVATED";
+/**
+ * Mirrors the backend `EmploymentStatus` enum (prisma/schema.prisma).
+ *
+ * Permanent, non-terminal lifecycle (2026-08-06 rework, PR #354): every
+ * state can return to ACTIVE — no state is a dead end, so rehire never
+ * requires a duplicate User. PENDING collapses the old INACTIVE/UNDER_REVIEW
+ * distinction; see `submitted_for_review_at` on `EmploymentRecord` below for
+ * that sub-state instead (null = old INACTIVE, non-null = old UNDER_REVIEW).
+ *
+ * DEACTIVATED means a temporary pause only (leave/seasonal/suspension) and
+ * always reactivates directly to ACTIVE. DELETED means the person left the
+ * company and is the same action as User-level soft delete; its return is a
+ * true rehire, gated through PENDING (re-approval required).
+ */
+export type EmploymentStatus = "PENDING" | "ACTIVE" | "DEACTIVATED" | "REJECTED" | "DELETED";
+
+/** Reason a DEACTIVATED (temporary pause) transition was made — required for that transition. */
+export type DeactivationReason = "TEMPORARY_LEAVE" | "SEASONAL" | "SUSPENDED";
 
 /**
  * General-profile view of `EmploymentRecord` (special-category fields
@@ -1074,9 +1090,18 @@ export interface EmploymentRecord {
   job_title: string;
   start_date: string;
   status: EmploymentStatus;
+  /** Sub-state of PENDING only: null = not yet submitted, non-null = awaiting approval. */
+  submitted_for_review_at: string | null;
+  /** Set only while DEACTIVATED (temporary pause); null otherwise. */
+  deactivation_reason: DeactivationReason | null;
+  /** Free-text reason captured when status becomes DELETED. */
+  deleted_reason: string | null;
+  /** Increments only on a DELETED -> PENDING rehire; unchanged on every other transition. */
+  employment_cycle: number;
   marked_suitable: boolean;
   hotel_group_id: string | null;
   skills: SkillTag[];
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1125,11 +1150,33 @@ export interface CreateEmploymentInput {
   skills?: SkillTag[];
 }
 
-/** Body of `POST /employees/:employee_id/lifecycle-signal`. */
-export interface LifecycleSignalInput {
-  signal: "submitted_for_review" | "approved" | "rejected";
-  /** Explicit fallback only — normally auto-resolved from the approving admin's own scope (ADR-023 §4). */
+/*
+ * Lifecycle action inputs (REQ-EMP-002 rework, 2026-08-06). One schema per
+ * action, mirroring the backend's split away from a single generic
+ * `{signal, ...}` body — deactivate/delete need required fields no other
+ * action has, so one endpoint per action keeps each contract independently
+ * readable (backend/src/modules/employee-management/types.ts).
+ */
+
+/** Body of `POST /employees/:employee_id/approve`. */
+export interface ApproveEmploymentInput {
+  /** Explicit fallback only — normally auto-resolved from the approving actor's own scope (ADR-023 §4). */
   hotel_group_id?: string;
+}
+
+/** Body of `POST /employees/:employee_id/reject`. */
+export interface RejectEmploymentInput {
+  reason?: string;
+}
+
+/** Body of `POST /employees/:employee_id/deactivate` — reason required (temporary pause). */
+export interface DeactivateEmploymentInput {
+  deactivation_reason: DeactivationReason;
+}
+
+/** Body of `POST /employees/:employee_id/delete` — reason required (left the company). */
+export interface DeleteEmploymentInput {
+  deleted_reason: string;
 }
 
 /* -------------------------------------------------------------------------- */
