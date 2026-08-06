@@ -37,17 +37,15 @@ export default function HotelGroupDetailPage() {
 
   const { data: group, isLoading, error } = useHotelGroup(id);
   const { users: managers } = useRegionalManagerCandidates();
-  // Hotels carrying this group id (the list endpoint doesn't filter by group,
-  // so we request a wide page and narrow client-side).
-  const { hotels } = useHotels({ limit: 100 });
+  // Server-side filtered by hotel_group_id — previously this fetched a flat
+  // page of up to 100 hotels and filtered client-side, which silently
+  // dropped a group's hotels once the platform had more than 100 hotels
+  // total (or when they didn't happen to sort into that first page).
+  const { hotels: groupHotels } = useHotels({ hotel_group_id: id, limit: 100 });
 
   const manager = useMemo(
     () => managers.find((m) => m.id === group?.regional_manager_user_id),
     [managers, group],
-  );
-  const groupHotels = useMemo(
-    () => hotels.filter((h) => h.hotel_group_id === id),
-    [hotels, id],
   );
 
   return (

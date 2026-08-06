@@ -65,6 +65,13 @@ export const ListHotelsQuerySchema = z.object({
   search: z.string().optional(),
   is_active: z.enum(['true', 'false']).optional(),
   country: z.string().optional(),
+  // Filters hotels belonging to a specific HotelGroup (frontend: the hotel
+  // group detail page's "Hotels in this group" list). Previously the only
+  // way to get this was fetching a flat page of hotels (capped at `limit`'s
+  // max of 100) and filtering client-side -- silently dropping any group
+  // hotels past the first 100 hotels platform-wide, or when the group's
+  // hotels weren't sorted into that first page at all.
+  hotel_group_id: z.string().optional(),
 });
 
 export type CreateHotelRequest = z.infer<typeof CreateHotelSchema>;

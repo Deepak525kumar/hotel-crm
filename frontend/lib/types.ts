@@ -233,6 +233,8 @@ export interface ListHotelsQuery {
   country?: string;
   page?: number;
   limit?: number;
+  /** Filters to hotels belonging to a specific HotelGroup. */
+  hotel_group_id?: string;
 }
 
 /* -------------------------------------------------------------------------- */
