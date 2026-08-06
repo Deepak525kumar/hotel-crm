@@ -34,6 +34,12 @@ const mockPrisma = {
   roomsCompletedEntry: {
     aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // getHotelSummary's confirmed-headcount source (2026-08-07): the real
+  // figure lives on JobRequestSkillSlot.confirmed_count, not on the
+  // never-written JobRequest.workers_confirmed column.
+  jobRequestSkillSlot: {
+    aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   workerOverallRating: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
@@ -66,7 +72,10 @@ describe('Analytics rooms_completed wiring (ADR-028, OQ-ANALYTICS-03)', () => {
     mockPrisma.jobRequest.groupBy.mockResolvedValue(makeGroupByResult([]));
     mockPrisma.jobRequest.aggregate.mockResolvedValue({
       _count: { id: 0 },
-      _sum: { workers_needed: 0, workers_confirmed: 0 },
+      _sum: { workers_needed: 0 },
+    });
+    mockPrisma.jobRequestSkillSlot.aggregate.mockResolvedValue({
+      _sum: { confirmed_count: 0 },
     });
     mockPrisma.workerAssignment.count.mockResolvedValue(0);
     mockPrisma.workerAssignment.groupBy.mockResolvedValue(makeGroupByResult([]));
@@ -105,6 +114,54 @@ describe('Analytics rooms_completed wiring (ADR-028, OQ-ANALYTICS-03)', () => {
     });
     const stats = await service.getDashboardStats(undefined);
     expect(stats.rooms_completed).toEqual({ total: 0, entries: 0 });
+  });
+
+  // Confirmed-headcount source (2026-08-07). JobRequest.workers_confirmed is
+  // declared and read but written by NOTHING anywhere in the codebase, so
+  // this figure was previously always 0 -- the hotel dashboard reported
+  // "N needed, 0 confirmed" regardless of actual staffing.
+  // JobRequestSkillSlot.confirmed_count is the column that IS maintained
+  // (incremented by acceptBroadcast, decremented when a broadcast-derived
+  // assignment is cancelled), so the real figure was already one table over.
+  it('getHotelSummary reads confirmed headcount from skill slots, not the never-written workers_confirmed column', async () => {
+    mockPrisma.jobRequest.aggregate.mockResolvedValue({
+      _count: { id: 3 },
+      // Deliberately non-zero: if the implementation regressed to reading
+      // this column, the assertion below would see 99 instead of 7.
+      _sum: { workers_needed: 10, workers_confirmed: 99 },
+    });
+    mockPrisma.jobRequestSkillSlot.aggregate.mockResolvedValue({
+      _sum: { confirmed_count: 7 },
+    });
+
+    const summary = await service.getHotelSummary('h1');
+
+    expect(summary.open_requests.workers_needed).toBe(10);
+    expect(summary.open_requests.workers_confirmed).toBe(7);
+
+    // Scoped to this hotel's open/partially-filled requests, not platform-wide.
+    expect(mockPrisma.jobRequestSkillSlot.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          job_request: expect.objectContaining({ hotel_id: 'h1' }),
+        }),
+        _sum: { confirmed_count: true },
+      })
+    );
+  });
+
+  it('getHotelSummary reports zero confirmed when no slots are filled', async () => {
+    mockPrisma.jobRequest.aggregate.mockResolvedValue({
+      _count: { id: 2 },
+      _sum: { workers_needed: 5 },
+    });
+    mockPrisma.jobRequestSkillSlot.aggregate.mockResolvedValue({
+      _sum: { confirmed_count: null },
+    });
+
+    const summary = await service.getHotelSummary('h1');
+
+    expect(summary.open_requests.workers_confirmed).toBe(0);
   });
 
   it('getHotelSummary surfaces rooms_completed scoped to the hotel', async () => {

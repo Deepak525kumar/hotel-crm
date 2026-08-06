@@ -261,6 +261,7 @@ export class AnalyticsService extends BaseService {
 
     const [
       openRequestsAgg,
+      confirmedSlotsAgg,
       activeAssignments,
       todayAttendanceGroups,
       qualityAgg,
@@ -275,7 +276,27 @@ export class AnalyticsService extends BaseService {
           status: { in: [WorkRequestStatus.OPEN, WorkRequestStatus.PARTIALLY_FILLED] },
         },
         _count: { id: true },
-        _sum: { workers_needed: true, workers_confirmed: true },
+        _sum: { workers_needed: true },
+      }),
+      // Confirmed headcount comes from JobRequestSkillSlot.confirmed_count,
+      // NOT JobRequest.workers_confirmed (2026-08-07). That column is
+      // declared and read but written by nothing anywhere in the codebase,
+      // so this aggregate previously reported confirmed staffing as 0 for
+      // every hotel, always -- a dashboard that showed "N needed, 0
+      // confirmed" no matter how fully staffed the shifts were.
+      //
+      // confirmed_count IS maintained correctly: acceptBroadcast()
+      // increments it (job-requests/service.ts) and cancelling a
+      // broadcast-derived assignment decrements it (assignments/service.ts),
+      // so the real figure was already available one table over.
+      this.prisma.jobRequestSkillSlot.aggregate({
+        where: {
+          job_request: {
+            hotel_id: hotelId,
+            status: { in: [WorkRequestStatus.OPEN, WorkRequestStatus.PARTIALLY_FILLED] },
+          },
+        },
+        _sum: { confirmed_count: true },
       }),
       this.prisma.workerAssignment.count({
         where: { hotel_id: hotelId, status: AssignmentStatus.IN_PROGRESS },
@@ -314,7 +335,10 @@ export class AnalyticsService extends BaseService {
 
     const aggResult = openRequestsAgg as {
       _count: { id: number };
-      _sum: { workers_needed: number | null; workers_confirmed: number | null };
+      _sum: { workers_needed: number | null };
+    };
+    const confirmedResult = confirmedSlotsAgg as {
+      _sum: { confirmed_count: number | null };
     };
     const qualAvg = (qualityAgg as { _avg: { score: number | null } })._avg.score;
 
@@ -323,7 +347,7 @@ export class AnalyticsService extends BaseService {
       open_requests: {
         count: aggResult._count.id,
         workers_needed: aggResult._sum.workers_needed ?? 0,
-        workers_confirmed: aggResult._sum.workers_confirmed ?? 0,
+        workers_confirmed: confirmedResult._sum.confirmed_count ?? 0,
       },
       active_assignments: activeAssignments as number,
       today_attendance: {
