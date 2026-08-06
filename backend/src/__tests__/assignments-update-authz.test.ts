@@ -136,7 +136,12 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
 
   it('allows a worker to transition their OWN assignment (200)', async () => {
     testAuth = { userId: 'w1', role: 'worker' };
-    currentAssignment = makeAssignment({ worker_id: 'w1' });
+    currentAssignment = makeAssignment({ worker_id: 'w1', hotel_id: 'h1' });
+    // Self-action eligibility (2026-08-07): starting/completing your own
+    // shift is now re-checked against isWorkerEligibleForHotel(), so this
+    // fixture must describe an eligible worker -- previously the self branch
+    // skipped the check entirely and membership was irrelevant here.
+    membershipHotelIds = ['h1'];
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
@@ -283,7 +288,11 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
       { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
     ])('worker: $label their own assignment (200)', async ({ body, fromStatus }) => {
       testAuth = { userId: 'w1', role: 'worker' };
-      currentAssignment = makeAssignment({ worker_id: 'w1', hotel_id: 'h9', status: fromStatus });
+      // h1 + membership: an ELIGIBLE worker, so this stays a test of the
+      // status-transition guard rather than accidentally becoming an
+      // eligibility test (2026-08-07).
+      currentAssignment = makeAssignment({ worker_id: 'w1', hotel_id: 'h1', status: fromStatus });
+      membershipHotelIds = ['h1'];
       const res = await request(makeApp()).patch('/assignments/a1').send(body);
       expect(res.status).toBe(200);
     });

@@ -111,6 +111,17 @@ describe('AssignmentService', () => {
     mockNotification.create.mockResolvedValue({ id: 'notif-default' });
     mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
     mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
+    // Self-action eligibility (2026-08-07): a worker starting/completing
+    // their OWN assignment is now re-checked against isWorkerEligibleForHotel().
+    // Default every fixture worker to eligible (ACTIVE, same group as the
+    // hotel, not blocklisted) so only tests specifically about losing
+    // eligibility need to say otherwise.
+    mockEmploymentRecord.findUnique.mockResolvedValue({
+      id: 'er1',
+      status: 'ACTIVE',
+      hotel_group_id: 'g1',
+    });
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
   });
 
   describe('update', () => {
@@ -137,6 +148,82 @@ describe('AssignmentService', () => {
       const data = mockWorkerAssignment.update.mock.calls[0][0].data;
       expect(data.status).toBe('IN_PROGRESS');
       expect(data.started_at).toBeInstanceOf(Date);
+    });
+
+    // ── Self-action eligibility (2026-08-07) ──────────────────────────────
+    //
+    // The eligibility check previously ran only when a worker acted on
+    // SOMEONE ELSE's assignment (`if (assignment.worker_id !== actorId)`), so
+    // acting on your own -- the common case -- skipped it entirely. A worker
+    // who had since been deactivated, or blocklisted at this hotel, could
+    // still start and complete the shift. Both verified reachable before the
+    // fix.
+    describe('self-action eligibility', () => {
+      it('blocks a DEACTIVATED worker from starting their own shift', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({
+          id: 'er1',
+          status: 'DEACTIVATED',
+          hotel_group_id: 'g1',
+        });
+
+        await expect(
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+        expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+      });
+
+      // The sharper case: EmployeeBlocklistEntry enforcement was wired into
+      // isWorkerEligibleForHotel() (REQ-EMP-005 / RULE-EMP-07) specifically so
+      // a blocked worker could not work that hotel. This path bypassed it.
+      it('blocks a worker blocklisted at this hotel from starting their own shift', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'blocked' });
+
+        await expect(
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+        expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+      });
+
+      it('blocks an ineligible worker from completing their own shift', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', status: 'IN_PROGRESS' })
+        );
+        mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'blocked' });
+
+        await expect(
+          service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker')
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      });
+
+      // Deliberately NOT gated. A worker who has lost eligibility must still
+      // be able to drop the shift -- blocking that would strand the
+      // assignment CONFIRMED with nobody able to release it.
+      it('still allows an ineligible worker to CANCEL their own shift', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', status: 'CANCELLED', cancelled_at: new Date() })
+        );
+        mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'blocked' });
+
+        await service.update('a1', { status: 'CANCELLED' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
+
+      it('allows an eligible worker to start their own shift (no regression)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ worker_id: 'w1', status: 'IN_PROGRESS', started_at: new Date() })
+        );
+
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
     });
 
     it('transitions IN_PROGRESS -> COMPLETED and sets completed_at', async () => {

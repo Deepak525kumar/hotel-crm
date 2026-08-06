@@ -162,6 +162,33 @@ export class AssignmentService extends BaseService {
       if (assignment.worker_id !== actorId) {
         const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
         if (!eligible) throw new ForbiddenError('Cannot access this assignment');
+      } else if (
+        input.status === AssignmentStatus.IN_PROGRESS ||
+        input.status === AssignmentStatus.COMPLETED
+      ) {
+        // Self-action eligibility (2026-08-07). The branch above only checked
+        // eligibility when a worker acted on SOMEONE ELSE's assignment, so a
+        // worker acting on their OWN skipped the check entirely -- and
+        // starting/completing your own shift is the common case, not the
+        // edge case.
+        //
+        // That let a worker who had since been DEACTIVATED, or blocklisted
+        // at this specific hotel, still start and complete the shift. Both
+        // verified reachable before this fix. The blocklist case is the
+        // sharper one: EmployeeBlocklistEntry enforcement was deliberately
+        // wired into isWorkerEligibleForHotel() (REQ-EMP-005 / RULE-EMP-07)
+        // precisely so a blocked worker could not work that hotel, and this
+        // path bypassed it.
+        //
+        // Scoped to IN_PROGRESS/COMPLETED -- the transitions that mean "I am
+        // working this shift". CANCELLED is deliberately NOT gated: a worker
+        // who has lost eligibility must still be able to drop the shift, and
+        // blocking that would strand the assignment CONFIRMED with nobody
+        // able to release it.
+        const stillEligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
+        if (!stillEligible) {
+          throw new ForbiddenError('You are no longer eligible to work at this hotel');
+        }
       }
     }
 
