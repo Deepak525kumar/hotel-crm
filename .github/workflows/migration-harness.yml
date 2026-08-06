@@ -7,13 +7,36 @@ name: Migration Harness
 
 on:
   push:
-    branches: ['feature/**', 'fix/**', 'develop', 'main']
+    # Prefix list verified against this repo's own branch history rather than
+    # assumed: `feat/` (62 branches) is the most-used prefix here and was
+    # NEVER matched by the previous list, which had `feature/**` but not
+    # `feat/**`. `docs/`, `chore/`, `refactor/`, `ci/` and `claude/` were
+    # likewise unmatched. The gap was masked because any branch with an open
+    # PR still gets covered by the `pull_request` trigger below -- but a push
+    # BEFORE a PR exists got zero coverage, and the masking disappears
+    # entirely if a `branches:` filter is ever re-added to `pull_request`.
+    branches:
+      - 'feat/**'
+      - 'feature/**'
+      - 'fix/**'
+      - 'docs/**'
+      - 'chore/**'
+      - 'refactor/**'
+      - 'ci/**'
+      - 'claude/**'
+      - develop
+      - main
     paths:
       - 'backend/prisma/migrations/**'
       - 'backend/prisma/harness/**'
       - 'backend/prisma/schema.prisma'
       - 'backend/scripts/migrate-harness.sh'
       - '.github/workflows/migration-harness.yml'
+  # Manual trigger -- see ci.yml's identical addition for the full rationale
+  # (2026-08-07 Actions incident: webhook delivery throttled, events dropped,
+  # and no way to start a run without this).
+  workflow_dispatch:
+
   pull_request:
     # No `branches:` filter — see ci.yml's identical fix for the full
     # rationale: a PR stacked on another feature branch (base ref not
