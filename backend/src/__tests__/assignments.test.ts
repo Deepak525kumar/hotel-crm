@@ -51,6 +51,10 @@ const mockEmployeeBlocklistEntry = {
   findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
+const mockJobRequest = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
@@ -60,6 +64,11 @@ const mockPrisma = {
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
+  // Early-start guard: resolveScheduledStart() reads the linked JobRequest's
+  // shift_date/shift_start_time and the hotel's timezone. Defaults to null (no
+  // linked request) so the guard is a no-op for fixtures that don't opt in --
+  // matching a calendar-placed assignment, which has no shift time.
+  jobRequest: mockJobRequest,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -73,6 +82,10 @@ jest.mock('../config/env.js', () => ({
     JWT_ACCESS_EXPIRY: '1h',
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
+    // Early-start guard reads this; without it graceMinutes is undefined and
+    // `minutesEarly > undefined` is always false, so the guard silently never
+    // fires and its tests pass vacuously.
+    ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: 120,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
@@ -148,6 +161,138 @@ describe('AssignmentService', () => {
       const data = mockWorkerAssignment.update.mock.calls[0][0].data;
       expect(data.status).toBe('IN_PROGRESS');
       expect(data.started_at).toBeInstanceOf(Date);
+    });
+
+    // ── Early-start guard (2026-08-07) ────────────────────────────────────
+    //
+    // A shift could previously be started at any time: ALLOWED_TRANSITIONS
+    // validated only the state machine, never the shift's own scheduled
+    // start. Shares ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES with the
+    // attendance check-in guard so both paths answer "how early is too
+    // early" identically.
+    describe('early-start guard', () => {
+      const shiftAt = (offsetMinutes: number) => {
+        const d = new Date(Date.now() + offsetMinutes * 60000);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        return {
+          // shift_date is @db.Date -- date-only, read back in UTC.
+          shift_date: new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())),
+          shift_start_time: `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`,
+        };
+      };
+
+      it('rejects starting a shift well before its scheduled start', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+        // UTC hotel so the wall-clock string maps to the instant directly,
+        // keeping this test about the guard rather than zone conversion.
+        // Same mock serves isWorkerEligibleForHotel (hotel_group_id) and
+        // resolveScheduledStart (timezone) -- must satisfy both, since the
+        // eligibility check now runs first.
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
+        mockJobRequest.findUnique.mockResolvedValue(shiftAt(300)); // 5h out
+
+        await expect(
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+        ).rejects.toMatchObject({ name: 'ConflictError' });
+
+        expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+      });
+
+      it('allows starting inside the grace window', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
+        );
+        // Same mock serves isWorkerEligibleForHotel (hotel_group_id) and
+        // resolveScheduledStart (timezone) -- must satisfy both, since the
+        // eligibility check now runs first.
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
+        mockJobRequest.findUnique.mockResolvedValue(shiftAt(60)); // 1h out
+
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
+
+      it('allows starting a shift already underway', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
+        );
+        // Same mock serves isWorkerEligibleForHotel (hotel_group_id) and
+        // resolveScheduledStart (timezone) -- must satisfy both, since the
+        // eligibility check now runs first.
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
+        mockJobRequest.findUnique.mockResolvedValue(shiftAt(-30)); // started 30m ago
+
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
+
+      // A calendar-placed assignment has a day but no time (#365). The guard
+      // must skip rather than block -- treating "no time" as "too early"
+      // would make those shifts unstartable.
+      it('does not apply when the assignment has no linked request (calendar placement)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(
+          makeAssignment({ work_request_id: null, job_request_id: null })
+        );
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
+        );
+
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+        expect(mockJobRequest.findUnique).not.toHaveBeenCalled();
+      });
+
+      // The guard governs starting a shift, not finishing or cancelling one.
+      it('does not apply to COMPLETED or CANCELLED transitions', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'COMPLETED', completed_at: new Date() })
+        );
+        // Same mock serves isWorkerEligibleForHotel (hotel_group_id) and
+        // resolveScheduledStart (timezone) -- must satisfy both, since the
+        // eligibility check now runs first.
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
+        mockJobRequest.findUnique.mockResolvedValue(shiftAt(600)); // far future
+
+        await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
+
+      // Timezone correctness is the risky part of this guard: shift_start_time
+      // is a bare wall-clock "HH:MM", so the same string is a different
+      // instant per hotel. A naive UTC read would be wrong by the offset --
+      // here 2h in summer, enough to flip the decision.
+      it('interprets shift_start_time in the hotel timezone, not UTC', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
+        );
+        // 12:00 in Europe/Berlin on 2026-07-01 is 10:00 UTC (CEST, +2).
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'Europe/Berlin' });
+        mockJobRequest.findUnique.mockResolvedValue({
+          shift_date: new Date(Date.UTC(2026, 6, 1)),
+          shift_start_time: '12:00',
+        });
+
+        // Freeze "now" at 09:30 UTC -- 30 minutes before the shift's true
+        // 10:00 UTC start, so inside the window. Read as UTC instead, the
+        // start would look like 12:00 UTC (2h30m out) and be rejected.
+        const realNow = Date.now;
+        Date.now = () => Date.UTC(2026, 6, 1, 9, 30);
+        try {
+          await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        } finally {
+          Date.now = realNow;
+        }
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalled();
+      });
     });
 
     // ── Self-action eligibility (2026-08-07) ──────────────────────────────

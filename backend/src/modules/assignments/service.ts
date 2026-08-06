@@ -15,6 +15,7 @@ import { isHotelInScope } from '../../middleware/permissions.js';
 // pure predicates, so suites mocking the permissions middleware need not stub them.
 import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import { getPrisma } from '../../lib/db.js';
+import { getEnv } from '../../config/env.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
 import { notificationService } from '../notifications/service.js';
@@ -74,6 +75,76 @@ export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<bo
     select: { id: true },
   });
   return existing === null;
+}
+
+/**
+ * Resolves an assignment's scheduled start instant, or null when the
+ * assignment has no shift time to resolve.
+ *
+ * WorkerAssignment carries no start-time column of its own -- a time is only
+ * reachable through a linked JobRequest (shift_date + shift_start_time).
+ * placeOnCalendar() leaves BOTH work_request_id and job_request_id null
+ * (service.ts, calendar-placement branch), so a calendar-placed assignment
+ * has a day but no time and returns null here. That is a data-model gap, not
+ * an oversight -- tracked in #365. Callers must treat null as "no time-based
+ * rule can apply", never as "allowed" or "denied".
+ *
+ * Timezone: shift_start_time is a bare "HH:MM" wall-clock string and
+ * shift_date is date-only, so producing a real instant needs the hotel's
+ * zone. Hotel.timezone is used when present, falling back to Europe/Berlin
+ * -- the same anchor calendar/service.ts already uses for "today"
+ * (OD-CAL-04, pending a platform-wide timezone decision). Deliberately reuses
+ * that established fallback rather than inventing a second convention.
+ */
+async function resolveScheduledStart(
+  tx: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
+  assignment: { work_request_id: string | null; job_request_id: string | null; hotel_id: string }
+): Promise<Date | null> {
+  const requestId = assignment.work_request_id ?? assignment.job_request_id;
+  if (!requestId) return null;
+
+  const request = await tx.jobRequest.findUnique({
+    where: { id: requestId },
+    select: { shift_date: true, shift_start_time: true },
+  });
+  if (!request?.shift_date || !request.shift_start_time) return null;
+
+  const match = /^(\d{2}):(\d{2})$/.exec(request.shift_start_time);
+  if (!match) return null;
+  const [, hh, mm] = match;
+
+  const hotel = await tx.hotel.findUnique({
+    where: { id: assignment.hotel_id },
+    select: { timezone: true },
+  });
+  const zone = hotel?.timezone || 'Europe/Berlin';
+
+  // shift_date is @db.Date -- read it in UTC to get the calendar date without
+  // the local-midnight shift a getFullYear()/getMonth() read would introduce.
+  const y = request.shift_date.getUTCFullYear();
+  const mo = request.shift_date.getUTCMonth() + 1;
+  const d = request.shift_date.getUTCDate();
+
+  // Interpret Y-M-D HH:MM as a wall-clock time in `zone`. Build a UTC guess,
+  // measure what that instant reads as in the target zone, and correct by the
+  // difference. One correction pass is sufficient for fixed offsets and for
+  // every DST case except a wall-clock time inside a spring-forward gap,
+  // which does not exist and is resolved to the post-transition instant.
+  const guess = Date.UTC(y, mo - 1, d, Number(hh), Number(mm));
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(new Date(guess)).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value])
+  ) as Record<string, string>;
+  const asRead = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour) % 24, Number(parts.minute), Number(parts.second)
+  );
+  return new Date(guess + (guess - asRead));
 }
 
 export class AssignmentService extends BaseService {
@@ -217,7 +288,32 @@ export class AssignmentService extends BaseService {
     const next = input.status as AssignmentStatus;
     const data: Prisma.WorkerAssignmentUpdateInput = { status: next };
 
-    if (next === AssignmentStatus.IN_PROGRESS) data.started_at = new Date();
+    // Early-start guard (2026-08-07). A shift could previously be started at
+    // any time -- ALLOWED_TRANSITIONS validated only the state machine, with
+    // no comparison against the shift's own scheduled start. Reuses the same
+    // window as the attendance check-in guard
+    // (ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES, default 2h) so "how early is
+    // too early" has ONE answer across both paths rather than drifting.
+    //
+    // Applies only where a scheduled start actually exists. A calendar-placed
+    // assignment has a day but no time (no linked JobRequest), so
+    // resolveScheduledStart() returns null and no time rule can be applied --
+    // deliberately skipped, not silently allowed. Tracked in #365; that gap
+    // is a data-model limitation, not an exemption anyone chose.
+    if (next === AssignmentStatus.IN_PROGRESS) {
+      const scheduledStart = await resolveScheduledStart(this.prisma, assignment);
+      if (scheduledStart) {
+        const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
+        const minutesEarly = Math.floor((scheduledStart.getTime() - Date.now()) / 60000);
+        if (minutesEarly > graceMinutes) {
+          throw new ConflictError(
+            `Cannot start this shift yet: it is scheduled to begin in ${minutesEarly} minutes. ` +
+              `A shift may be started at most ${graceMinutes / 60} hours before its scheduled start.`
+          );
+        }
+      }
+      data.started_at = new Date();
+    }
     if (next === AssignmentStatus.COMPLETED) data.completed_at = new Date();
     if (next === AssignmentStatus.CANCELLED) {
       data.cancelled_at = new Date();
