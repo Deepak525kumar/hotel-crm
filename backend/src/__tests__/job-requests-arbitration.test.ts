@@ -55,12 +55,19 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// isWorkerEligibleForHotel() also now checks the hotel blocklist (REQ-EMP-005
+// / RULE-EMP-07 rework, 2026-08-06).
+const mockEmployeeBlocklistEntry = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   jobRequest: mockJobRequest,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -70,11 +77,13 @@ const mockPrisma = {
 // default so each test only needs to override the specific field it cares
 // about (e.g. `skills`) rather than re-stating the whole eligibility chain.
 mockEmploymentRecord.findUnique.mockResolvedValue({
+  id: 'emp1',
   status: 'ACTIVE',
   hotel_group_id: 'g1',
   skills: ['CLEANER'],
 });
 mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({

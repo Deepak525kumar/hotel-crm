@@ -328,6 +328,16 @@ export class EmployeeManagementController {
     },
   ];
 
+  async removeBlocklist(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      await employeeManagementService.removeBlocklist(req.auth, req.params['hotel_id']!, req.params['entry_id']!);
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   getOrgChart = [
     validateParams(OrgChartParamsSchema),
     async (req: Request, res: Response, next: NextFunction) => {

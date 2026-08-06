@@ -524,6 +524,20 @@ export class AssignmentService extends BaseService {
       }
     }
 
+    // REQ-EMP-005 / RULE-EMP-07 rework (2026-08-06): unlike reassign()
+    // (line ~315) and broadcast-accept (job-requests/service.ts), manual
+    // calendar placement never checked whether the WORKER being placed is
+    // eligible at this hotel at all -- only whether the acting manager is.
+    // A manager could place a worker outside their own hotel group, or one
+    // this hotel had explicitly blocklisted, with no check catching either.
+    // isWorkerEligibleForHotel() covers both (group-grain eligibility, per
+    // roster-scope.ts's module doc comment, plus the blocklist check added
+    // in this same change).
+    const workerEligible = await isWorkerEligibleForHotel(input.worker_id, input.hotel_id);
+    if (!workerEligible) {
+      throw new ForbiddenError('This worker is not eligible at this hotel');
+    }
+
     const day = new Date(`${input.day}T00:00:00.000Z`);
 
     let created;

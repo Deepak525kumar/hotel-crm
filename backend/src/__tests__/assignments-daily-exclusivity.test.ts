@@ -34,9 +34,34 @@ const mockCalendarEntry = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// placeOnCalendar() now calls isWorkerEligibleForHotel() unconditionally
+// (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06 — previously only the
+// ACTING manager's own hotel scope was checked, never the placed worker's
+// eligibility at all). Default every fixture worker to ACTIVE in the same
+// group as hotel h1, not blocklisted, so this file's existing
+// exclusivity-focused tests don't need to separately stub eligibility.
+const mockEmploymentRecord = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
+    status: 'ACTIVE',
+    hotel_group_id: 'g1',
+    id: 'emp_w1',
+  }),
+};
+const mockHotel = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
+    hotel_group_id: 'g1',
+  }),
+};
+const mockEmployeeBlocklistEntry = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
+  employmentRecord: mockEmploymentRecord,
+  hotel: mockHotel,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -91,6 +116,9 @@ describe('Daily-exclusivity partial unique index (PR 9.6)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AssignmentService();
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', id: 'emp_w1' });
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
   });
 
   describe('placeOnCalendar() — second same-day active assignment for the same worker', () => {

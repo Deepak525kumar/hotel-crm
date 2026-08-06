@@ -62,6 +62,13 @@ const hotelGroups: Record<string, any> = {
   },
 };
 
+// Mutable (not `const`, reset per describe.beforeEach below) since
+// removeBlocklist tests actually delete from this map.
+let blocklistEntries: Record<string, any> = {
+  bl_h1: { id: 'bl_h1', hotel_id: 'h1', employment_record_id: 'emp_1', reason: 'No-show', created_by_id: 'adm_1', created_at: new Date() },
+  bl_h2: { id: 'bl_h2', hotel_id: 'h2', employment_record_id: 'emp_1', reason: 'No-show', created_by_id: 'adm_1', created_at: new Date() },
+};
+
 const groupEmploymentRecords: Record<string, any[]> = {
   g1: [
     {
@@ -121,6 +128,12 @@ const mockDb = {
   employeeBlocklistEntry: {
     create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
     findMany: async () => [],
+    findUnique: async ({ where }: any) => blocklistEntries[where.id] ?? null,
+    delete: async ({ where }: any) => {
+      const entry = blocklistEntries[where.id];
+      delete blocklistEntries[where.id];
+      return entry;
+    },
   },
   hotel: {
     findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
@@ -179,6 +192,11 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
     // mutates the shared fixture object in place via mockDb above.
     employmentRecords['E-001'].status = 'ACTIVE';
     employmentRecords['E-001'].submitted_for_review_at = null;
+    // removeBlocklist tests delete from this map; reset between tests.
+    blocklistEntries = {
+      bl_h1: { id: 'bl_h1', hotel_id: 'h1', employment_record_id: 'emp_1', reason: 'No-show', created_by_id: 'adm_1', created_at: new Date() },
+      bl_h2: { id: 'bl_h2', hotel_id: 'h2', employment_record_id: 'emp_1', reason: 'No-show', created_by_id: 'adm_1', created_at: new Date() },
+    };
   });
 
   describe('POST /employees/hotels/:hotel_id/blocklist — manager hotel-scope enforcement (FIND-001)', () => {
@@ -205,6 +223,55 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
         .post('/employees/hotels/h2/blocklist')
         .send({ employee_id: 'E-001', reason: 'No-show' });
       expect(res.status).toBe(201);
+    });
+  });
+
+  // IF-EMP-RemoveBlocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06):
+  // same authorization shape as the POST above -- whoever can add a block
+  // can also remove one, hotel-scoped the same way.
+  describe('DELETE /employees/hotels/:hotel_id/blocklist/:entry_id — manager hotel-scope enforcement', () => {
+    it('allows a manager to remove a block within their in-scope hotel (204)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['employees:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).delete('/employees/hotels/h1/blocklist/bl_h1');
+      expect(res.status).toBe(204);
+    });
+
+    it('denies a manager removing a block at an out-of-scope hotel (403)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['employees:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).delete('/employees/hotels/h2/blocklist/bl_h2');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('allows an admin to remove a block at any hotel (204)', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).delete('/employees/hotels/h2/blocklist/bl_h2');
+      expect(res.status).toBe(204);
+    });
+
+    it('denies a worker outright (403)', async () => {
+      testAuth = { userId: 'w_1', role: 'worker', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).delete('/employees/hotels/h1/blocklist/bl_h1');
+      expect(res.status).toBe(403);
+    });
+
+    it('returns 404 for an entry that does not exist', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).delete('/employees/hotels/h1/blocklist/bl_missing');
+      expect(res.status).toBe(404);
+    });
+
+    // IDOR regression, end-to-end (found by adversarial review, 2026-08-06):
+    // checkHotelAccess() validates only the PATH's hotel_id (h1 here) --
+    // it has no visibility into which hotel the target entry_id actually
+    // belongs to. A manager scoped to h1 who supplies bl_h2 (an entry that
+    // genuinely belongs to h2, a hotel they cannot access) must be denied,
+    // not silently succeed against the wrong hotel's data.
+    it('does NOT delete an entry belonging to a DIFFERENT hotel than the path, even for an in-scope manager (404, entry survives)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['employees:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).delete('/employees/hotels/h1/blocklist/bl_h2');
+      expect(res.status).toBe(404);
+      expect(blocklistEntries['bl_h2']).toBeDefined();
     });
   });
 

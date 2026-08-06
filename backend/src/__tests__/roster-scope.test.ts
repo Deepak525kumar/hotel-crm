@@ -21,10 +21,14 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+const mockEmployeeBlocklistEntry = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
 
 const mockPrisma = {
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -91,16 +95,33 @@ describe('isWorkerEligibleForHotel', () => {
     await expect(isWorkerEligibleForHotel('u1', 'h1')).resolves.toBe(false);
   });
 
-  it('allows when the target hotel is in the worker group', async () => {
-    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1' }));
+  it('allows when the target hotel is in the worker group and not blocklisted', async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1', id: 'emp1' }));
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
     await expect(isWorkerEligibleForHotel('u1', 'h1')).resolves.toBe(true);
   });
 
   it('denies when the target hotel is in a different group', async () => {
-    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1' }));
+    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1', id: 'emp1' }));
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
     await expect(isWorkerEligibleForHotel('u1', 'h1')).resolves.toBe(false);
+  });
+
+  // REQ-EMP-005 / RULE-EMP-07 rework (2026-08-06): the blocklist was
+  // previously created/readable but enforced nowhere. These pin the fix.
+  it('denies when the worker is group-eligible but blocklisted at this specific hotel', async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1', id: 'emp1' }));
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'block1' });
+    await expect(isWorkerEligibleForHotel('u1', 'h1')).resolves.toBe(false);
+  });
+
+  it('does not query the blocklist at all when group-eligibility already denies (short-circuits before the extra query)', async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue(makeRecord({ hotel_group_id: 'g1', id: 'emp1' }));
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+    await expect(isWorkerEligibleForHotel('u1', 'h1')).resolves.toBe(false);
+    expect(mockEmployeeBlocklistEntry.findUnique).not.toHaveBeenCalled();
   });
 });
 

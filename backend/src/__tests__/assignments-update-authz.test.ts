@@ -83,6 +83,10 @@ jest.mock('../lib/db.js', () => {
       findUnique: async ({ where }: any) =>
         membershipHotelIds.includes(where.id) ? { hotel_group_id: 'g1' } : { hotel_group_id: 'g2' },
     },
+    // isWorkerEligibleForHotel() (roster-scope.ts) now also checks the hotel
+    // blocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default to
+    // "not blocked" for every fixture worker in this suite.
+    employeeBlocklistEntry: { findUnique: async () => null },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0 },
     workerOverallRating: { upsert: async () => ({}) },

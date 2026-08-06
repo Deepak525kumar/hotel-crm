@@ -230,6 +230,37 @@ export class EmployeeManagementService extends BaseService {
     return entry;
   }
 
+  // IF-EMP-RemoveBlocklist / v0 (REQ-EMP-005 / RULE-EMP-07 rework,
+  // 2026-08-06): blocklist entries previously had no removal path at all —
+  // once created, an entry was permanent even after the underlying reason
+  // no longer applied.
+  //
+  // IDOR FIX (found by adversarial review, 2026-08-06): this method used to
+  // take only `entryId` on the premise that it was "the same authorization
+  // shape as setBlocklist()" — it is not. setBlocklist() takes hotelId from
+  // the checkHotelAccess()-validated path and WRITES it into the row, so its
+  // effect is structurally confined to the hotel the route validated.
+  // removeBlocklist() addresses a row by opaque id, so the path's hotel_id
+  // was being validated by the route middleware and then silently ignored
+  // by the service -- a manager scoped to hotel h1 could delete an entry
+  // belonging to hotel h2 by simply knowing/guessing its id, fully bypassing
+  // checkHotelAccess(). Fixed by requiring the entry's own hotel_id to match
+  // the route's hotelId, 404ing on mismatch (not 403, so a caller outside
+  // this hotel cannot use the response to confirm the id exists elsewhere).
+  async removeBlocklist(actor: AuthContext, hotelId: string, entryId: string) {
+    const entry = await this.prisma.employeeBlocklistEntry.findUnique({ where: { id: entryId } });
+    if (!entry || entry.hotel_id !== hotelId) {
+      throw new NotFoundError('Blocklist entry not found');
+    }
+
+    await this.prisma.employeeBlocklistEntry.delete({ where: { id: entryId } });
+
+    await this.logAudit(actor.userId, actor.role, 'employee.blocklist.remove', 'EMPLOYEE_BLOCKLIST_ENTRY', entryId, {
+      hotel_id: entry.hotel_id,
+      employment_record_id: entry.employment_record_id,
+    });
+  }
+
   // ── Special category / export / deactivate ──────────────────────────────
 
   // IF-EMP-GetSpecialCategory / v0 (REQ-EMP-007 / RULE-EMP-09, G4 FIND-002

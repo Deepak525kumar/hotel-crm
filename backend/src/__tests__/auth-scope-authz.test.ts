@@ -15,11 +15,16 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+// isWorkerEligibleForHotel() (roster-scope.ts) now checks the hotel
+// blocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default to
+// "not blocked" so this scope-authz suite doesn't need to know about it.
+const mockBlocklistEntryFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotel: { findUnique: mockHotelFindUnique },
+    employeeBlocklistEntry: { findUnique: mockBlocklistEntryFindUnique },
   }),
 }));
 
@@ -44,6 +49,7 @@ describe('resolveHotelAccess scope-authz (OQ-AUTH-06 / SIR-AUTH-003)', () => {
   beforeEach(() => {
     mockEmploymentRecordFindUnique.mockReset();
     mockHotelFindUnique.mockReset();
+    mockBlocklistEntryFindUnique.mockReset().mockResolvedValue(null);
   });
 
   describe('manager', () => {

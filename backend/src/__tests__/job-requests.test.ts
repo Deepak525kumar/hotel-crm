@@ -51,10 +51,17 @@ const mockJobRequestSkillSlot = {
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// isWorkerEligibleForHotel() (roster-scope.ts) now checks the hotel
+// blocklist too (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06).
+const mockEmployeeBlocklistEntry = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   hotel: mockHotel,
   jobRequest: mockWorkRequest,
   employmentRecord: mockEmploymentRecord,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   workerAssignment: mockWorkerAssignment,
@@ -79,6 +86,7 @@ mockRating.aggregate.mockResolvedValue({ _avg: { score: 0 }, _count: 0 });
 mockAttendance.count.mockResolvedValue(0);
 mockWorkerOverallRating.upsert.mockResolvedValue({});
 mockJobRequestSkillSlot.update.mockResolvedValue({});
+mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../config/env.js', () => ({
