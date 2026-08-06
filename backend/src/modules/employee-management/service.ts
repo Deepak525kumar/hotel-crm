@@ -530,13 +530,39 @@ export class EmployeeManagementService extends BaseService {
       ]);
     }
 
-    const updated = await this.prisma.$transaction((tx) =>
-      this.applyTransition(tx, record, EmploymentStatus.DEACTIVATED, {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.applyTransition(tx, record, EmploymentStatus.DEACTIVATED, {
         actorUserId: actor.userId,
         reason,
         data: { deactivation_reason: reason },
-      })
-    );
+      });
+
+      // Session invalidation (2026-08-07). DELETED (delete(),
+      // deactivateForContractLapse()) and DELETED -> PENDING (restore())
+      // all bump token_generation; DEACTIVATED did not, which left a paused
+      // employee holding a valid access token for up to JWT_ACCESS_EXPIRY.
+      //
+      // That gap was real, not theoretical: middleware/auth.ts only reads
+      // User.is_active / deleted_at / token_generation and never consults
+      // EmploymentRecord.status, and deactivate() deliberately touches
+      // neither User column (a pause is not an account revocation). So
+      // nothing else in the request pipeline would have noticed.
+      //
+      // Scheduling paths did fail closed already -- roster-scope.ts gates on
+      // status === ACTIVE -- but the modules that don't route through it
+      // (documents, hr, consent, notifications) had no employment check at
+      // all, so a just-paused worker could still read contracts and payslips
+      // until their token expired naturally.
+      //
+      // Bumping here does NOT revoke the account: is_active stays true and
+      // deleted_at stays null, so the person can re-authenticate. It ends
+      // the CURRENT session, which is the correct granularity for "no longer
+      // cleared to work, but still an employee" -- and reactivate() needs no
+      // counterpart bump, since a fresh login already picks up ACTIVE.
+      await bumpTokenGeneration(tx, record.user_id);
+
+      return result;
+    });
 
     // After the transition commits, not inside it — see
     // cancelFutureAssignments()'s own note on the transaction boundary.

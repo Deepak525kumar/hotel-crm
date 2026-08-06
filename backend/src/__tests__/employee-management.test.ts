@@ -262,6 +262,62 @@ describe('EmployeeManagementService', () => {
       expect(result.status).toBe(EmploymentStatus.DEACTIVATED);
       expect(result.deleted_at).toBeNull();
     });
+
+    // Session-invalidation gap found 2026-08-07. DELETED and DELETED ->
+    // PENDING both bumped token_generation; DEACTIVATED did not, so a paused
+    // employee kept a valid access token until it expired naturally
+    // (JWT_ACCESS_EXPIRY, 15m default). middleware/auth.ts reads only
+    // User.is_active / deleted_at / token_generation and never consults
+    // EmploymentRecord.status, and deactivate() intentionally touches neither
+    // User column -- so nothing else in the pipeline caught it. Scheduling
+    // failed closed via roster-scope.ts's ACTIVE gate, but documents/hr/
+    // consent/notifications have no employment check at all.
+    it('bumps token_generation so the paused employee\'s current session ends immediately', async () => {
+      const record = fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
+      mockPrisma.employmentRecord.update.mockResolvedValue({
+        ...record,
+        status: EmploymentStatus.DEACTIVATED,
+        deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+        deleted_at: null,
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+
+      await service.deactivate(admin as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE);
+
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: record.user_id },
+          data: expect.objectContaining({ token_generation: { increment: 1 } }),
+        })
+      );
+    });
+
+    // The bump must NOT escalate into an account revocation: a pause leaves
+    // the person an employee who can log back in, unlike DELETED.
+    it('does not deactivate or soft-delete the User account (a pause is not a revocation)', async () => {
+      const record = fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
+      mockPrisma.employmentRecord.update.mockResolvedValue({
+        ...record,
+        status: EmploymentStatus.DEACTIVATED,
+        deactivation_reason: DeactivationReason.SEASONAL,
+        deleted_at: null,
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+
+      await service.deactivate(admin as any, 'E-001', DeactivationReason.SEASONAL);
+
+      for (const call of (mockPrisma.user.update as jest.Mock).mock.calls) {
+        const data = (call[0] as { data: Record<string, unknown> }).data;
+        expect(data).not.toHaveProperty('is_active');
+        expect(data).not.toHaveProperty('deleted_at');
+      }
+    });
   });
 
   describe('getSkills (REQ-EMP-003)', () => {
