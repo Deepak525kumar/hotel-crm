@@ -1,8 +1,57 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { parseBackoffScheduleMs } from '../modules/notifications/outbox-backoff.js';
+
+// --- Module-directory resolution that is safe in BOTH module formats ---------
+//
+// This repo is ESM at build/runtime (`"type": "module"`; `node dist/server.js`),
+// where `__dirname` does not exist and `import.meta.url` is the correct way to
+// locate a module. Under Jest, however, the entire test run is CommonJS: Jest
+// only takes its native-ESM code path when the runner is started with
+// `NODE_OPTIONS=--experimental-vm-modules`, which this project does not set (see
+// `package.json` "test": "jest --forceExit"). Without that flag every module —
+// including this one — goes through `jest-runtime`'s `requireModule`, which
+// passes `supportsStaticESM: false` to the transformer. ts-jest then forces
+// `module: CommonJS` for the file regardless of the `module: "ESNext"` in the
+// inline tsconfig of the jest `transform` entry, and `import.meta` is a syntax
+// error under CommonJS (TS1343).
+//
+// Writing `import.meta.url` literally in this file therefore breaks any test
+// suite whose import graph reaches `config/env.ts` without mocking it.
+//
+// `process.argv[1]` is not usable here either: it points at the entrypoint, not
+// at this module. Instead this resolves the backend root from `__dirname` when
+// running as CommonJS (Jest), and otherwise walks up from the running
+// entrypoint's directory looking for the `package.json` that marks the backend
+// root — which is exactly the anchor the old `import.meta.url` computation was
+// reaching for (`dist/config/env.js` -> `backend/`).
+declare const __dirname: string | undefined;
+
+function backendRoot(): string {
+  // CommonJS (ts-jest under Jest): `__dirname` is provided by the module
+  // wrapper, and this file lives at `backend/src/config/` -> `backend/`.
+  if (typeof __dirname !== 'undefined') {
+    return resolve(__dirname, '..', '..');
+  }
+
+  // Native ESM (production `node dist/server.js`). Walk up from the entrypoint
+  // directory until a directory containing both `package.json` and `.env`-able
+  // layout is found; fall back to the entrypoint's grandparent, which matches
+  // the previous `dist/config/env.js -> backend/` relationship.
+  const entry = process.argv[1];
+  let dir = entry ? dirname(resolve(entry)) : process.cwd();
+  for (let i = 0; i < 10; i += 1) {
+    if (existsSync(resolve(dir, 'package.json'))) {
+      return dir;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return process.cwd();
+}
 
 // Release-audit fix: `z.coerce.boolean()` coerces ANY non-empty string —
 // including the literal string `"false"` and `"0"` — to `true` (it's
@@ -278,13 +327,13 @@ export function loadEnv(): Env {
   if (envConfig) return envConfig;
 
   // Load backend/.env into process.env before validation. The path is resolved
-  // relative to this module (dist/config/env.js -> backend/.env) rather than the
-  // current working directory, so it loads regardless of where `npm start` is
+  // from the backend root (see `backendRoot()` above) rather than the current
+  // working directory, so it loads regardless of where `npm start` is
   // launched from. dotenv does not override variables already present in
   // process.env, so real environment variables injected by the orchestrator in
   // production take precedence over the .env file — making this safe for both
   // local and deployed environments.
-  const envPath = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '.env');
+  const envPath = resolve(backendRoot(), '.env');
   dotenv.config({ path: envPath });
 
   const parsed = envSchema.safeParse(process.env);
