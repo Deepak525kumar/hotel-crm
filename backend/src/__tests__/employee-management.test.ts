@@ -13,13 +13,28 @@ import { DeactivationReason, EmploymentStatus, SkillTag } from '@prisma/client';
  * of special-category fields (REQ-EMP-007 / RULE-EMP-09).
  */
 
-const mockPrisma = {
+const mockPrisma: any = {
   employmentRecord: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  // Every lifecycle transition writes exactly one row here in the same
+  // transaction as the status change (applyTransition(), service.ts).
+  employmentStatusHistory: {
+    create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  // deactivate()/delete() cancel future assignments via
+  // cancelFutureAssignments() -- default to an empty result so tests that
+  // don't care about the assignment-cancellation cascade aren't forced to
+  // mock it explicitly.
+  workerAssignment: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  },
+  user: {
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   employeeBlocklistEntry: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -40,6 +55,10 @@ const mockPrisma = {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // applyTransition() and delete()/restore()/deactivateForContractLapse()
+  // run inside $transaction(tx => ...); the mock just invokes the callback
+  // with itself, so every tx.X call hits the same mocked collections above.
+  $transaction: jest.fn((cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -176,33 +195,40 @@ describe('EmployeeManagementService', () => {
     });
   });
 
-  describe('lifecycle transitions (REQ-EMP-002 / RULE-EMP-02, 03, 12)', () => {
+  describe('lifecycle transitions (REQ-EMP-002 rework, 2026-08-06: permanent, non-terminal lifecycle)', () => {
+    // Every state can return to ACTIVE (or, for DELETED, to PENDING en route
+    // to ACTIVE) -- see constants.ts's ALLOWED_TRANSITIONS. No state is
+    // terminal, which is the entire point of the rework: rehire never
+    // requires a duplicate User.
     it.each([
-      [EmploymentStatus.PENDING, EmploymentStatus.PENDING],
       [EmploymentStatus.PENDING, EmploymentStatus.ACTIVE],
       [EmploymentStatus.PENDING, EmploymentStatus.REJECTED],
       [EmploymentStatus.ACTIVE, EmploymentStatus.DEACTIVATED],
+      [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.DELETED],
+      [EmploymentStatus.REJECTED, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.REJECTED, EmploymentStatus.DELETED],
+      [EmploymentStatus.DELETED, EmploymentStatus.PENDING],
     ])('allows %s -> %s', (from, to) => {
       expect(() => assertTransition(from, to)).not.toThrow();
     });
 
     it.each([
-      [EmploymentStatus.PENDING, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.PENDING, EmploymentStatus.PENDING],
+      [EmploymentStatus.PENDING, EmploymentStatus.DEACTIVATED],
+      [EmploymentStatus.PENDING, EmploymentStatus.DELETED],
       [EmploymentStatus.ACTIVE, EmploymentStatus.PENDING],
-      [EmploymentStatus.PENDING, EmploymentStatus.REJECTED],
-      [EmploymentStatus.REJECTED, EmploymentStatus.ACTIVE],
-      [EmploymentStatus.DEACTIVATED, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.REJECTED],
+      [EmploymentStatus.REJECTED, EmploymentStatus.PENDING],
+      [EmploymentStatus.REJECTED, EmploymentStatus.REJECTED],
+      [EmploymentStatus.DELETED, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.DELETED, EmploymentStatus.DEACTIVATED],
+      [EmploymentStatus.DELETED, EmploymentStatus.REJECTED],
     ])('rejects illegal transition %s -> %s', (from, to) => {
       expect(() => assertTransition(from, to)).toThrow();
-    });
-
-    it('rejects INACTIVE -> ACTIVE (illegal, must go through UNDER_REVIEW)', () => {
-      expect(() => assertTransition(EmploymentStatus.PENDING, EmploymentStatus.ACTIVE)).toThrow();
-    });
-
-    it('rejects ACTIVE -> UNDER_REVIEW (illegal)', () => {
-      expect(() => assertTransition(EmploymentStatus.ACTIVE, EmploymentStatus.PENDING)).toThrow();
     });
 
     it('has no Suspended state anywhere in the enum or transition table', () => {
@@ -210,7 +236,7 @@ describe('EmployeeManagementService', () => {
       expect(allStates).not.toContain('SUSPENDED');
     });
 
-    it('deactivate() enforces the transition table via the service', async () => {
+    it('deactivate() requires a DeactivationReason and rejects PENDING (only ACTIVE -> DEACTIVATED is legal)', async () => {
       const record = fakeRecord({ status: EmploymentStatus.PENDING });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
 
@@ -218,14 +244,21 @@ describe('EmployeeManagementService', () => {
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
-    it('deactivate() succeeds from Active', async () => {
-      const record = fakeRecord({ status: EmploymentStatus.ACTIVE });
+    it('deactivate() succeeds from Active, does not set deleted_at (temporary pause, not a departure)', async () => {
+      const record = fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
-      mockPrisma.employmentRecord.update.mockResolvedValue({ ...record, status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() });
+      mockPrisma.employmentRecord.update.mockResolvedValue({
+        ...record,
+        status: EmploymentStatus.DEACTIVATED,
+        deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+        deleted_at: null,
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.deactivate(admin as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE);
       expect(result.status).toBe(EmploymentStatus.DEACTIVATED);
+      expect(result.deleted_at).toBeNull();
     });
   });
 
@@ -329,37 +362,43 @@ describe('EmployeeManagementService', () => {
     });
   });
 
-  // IF-EMP-LifecycleSignal (RULE-EMP-03; hotel_group_id assignment per
-  // ADR-023 §4). Authorization + the full signal->status transition path,
-  // exercised through the service (not only the assertTransition unit).
-  describe('lifecycleSignal (IF-EMP-LifecycleSignal / RULE-EMP-03 / ADR-023 §4)', () => {
-    it('rejects a non-admin actor (internal-only transport, OD-EMP-09)', async () => {
+  // Lifecycle actions (REQ-EMP-002 rework, 2026-08-06). Authorization +
+  // the full action->status transition path, exercised through the service
+  // (not only the assertTransition unit). submitForReview/approve/reject
+  // now admit admin OR a scoped manager/regional_manager (assertLifecycleAuthority()) --
+  // no longer the pre-rework admin-only "internal transport" gate.
+  describe('lifecycle actions (submitForReview / approve / reject)', () => {
+    it('submitForReview denies a role that is neither admin nor a scoped manager/RM', async () => {
       await expect(
         service.submitForReview(
-          { userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any,
+          { userId: 'w_1', role: 'worker', permissions: [], scope: null } as any,
           'E-001'
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
-    it('submitted_for_review moves Inactive -> Under Review', async () => {
+    it('submitForReview sets submitted_for_review_at, stays PENDING', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
-      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
+      );
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.submitForReview(admin as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.PENDING);
+      expect(result.submitted_for_review_at).not.toBeNull();
     });
 
-    it('approved moves Under Review -> Active and sets hotel_group_id from the approving manager group (ADR-023 §4)', async () => {
+    it('approve moves PENDING -> ACTIVE and sets hotel_group_id from the approving manager group (ADR-023 §4)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.PENDING, hotel_group_id: null })
+        fakeRecord({ status: EmploymentStatus.PENDING, hotel_group_id: null, submitted_for_review_at: new Date() })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.ACTIVE, hotel_group_id: 'g1' })
       );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.approve(admin as any, 'E-001');
@@ -369,21 +408,115 @@ describe('EmployeeManagementService', () => {
       expect(updateArg.data.hotel_group?.connect.id).toBe('g1');
     });
 
-    it('rejected moves Under Review -> Rejected', async () => {
+    it('approve rejects a PENDING record that was never submitted for review', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: null })
+      );
+      await expect(service.approve(admin as any, 'E-001')).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('reject moves PENDING -> REJECTED', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
       mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.REJECTED }));
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.reject(admin as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.REJECTED);
     });
 
-    it('rejects an illegal signal transition (approved from Inactive) and does not write', async () => {
-      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
+    it('approve rejects an illegal transition (already ACTIVE) and does not write', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, submitted_for_review_at: new Date() })
+      );
       await expect(service.approve(admin as any, 'E-001')).rejects.toMatchObject({
         name: 'ValidationError',
       });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('rehire / reactivate / delete / restore (REQ-EMP-002 rework)', () => {
+    it('reactivate moves DEACTIVATED -> ACTIVE directly, no re-approval', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, deactivation_reason: DeactivationReason.TEMPORARY_LEAVE })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, deactivation_reason: null })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.reactivate(admin as any, 'E-001');
+      expect(result.status).toBe(EmploymentStatus.ACTIVE);
+    });
+
+    it('rehire moves REJECTED -> ACTIVE directly, employment_cycle unchanged', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.REJECTED, employment_cycle: 1 })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.rehire(admin as any, 'E-001');
+      expect(result.status).toBe(EmploymentStatus.ACTIVE);
+      expect(result.employment_cycle).toBe(1);
+    });
+
+    it('delete requires admin (a scoped manager is denied)', async () => {
+      await expect(
+        service.delete({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001', 'Resigned')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('delete requires a non-blank deleted_reason', async () => {
+      await expect(service.delete(admin as any, 'E-001', '   ')).rejects.toMatchObject({ name: 'ValidationError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('delete moves ACTIVE -> DELETED, soft-deletes the User (Decision 1: DELETED == deleteUser())', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.ACTIVE }));
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DELETED, deleted_reason: 'Resigned', deleted_at: new Date() })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.delete(admin as any, 'E-001', 'Resigned');
+      expect(result.status).toBe(EmploymentStatus.DELETED);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user_1' }, data: expect.objectContaining({ is_active: false }) })
+      );
+    });
+
+    it('restore requires admin', async () => {
+      await expect(
+        service.restore({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('restore moves DELETED -> PENDING, increments employment_cycle, un-deletes the User', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DELETED, employment_cycle: 1, deleted_at: new Date() })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, employment_cycle: 2, deleted_at: null })
+      );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.restore(admin as any, 'E-001');
+      expect(result.status).toBe(EmploymentStatus.PENDING);
+      expect(result.employment_cycle).toBe(2);
+      const historyCall = mockPrisma.employmentStatusHistory.create.mock.calls[0][0] as { data: { employment_cycle: number } };
+      expect(historyCall.data.employment_cycle).toBe(2);
     });
   });
 
@@ -396,7 +529,8 @@ describe('EmployeeManagementService', () => {
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
-    it('deactivate rejects a non-admin actor', async () => {
+    it('deactivate rejects a manager with no scope claim (deny-by-default, isWorkerInGroupScope)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.ACTIVE }));
       await expect(
         service.deactivate({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE)
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
@@ -420,7 +554,13 @@ describe('EmployeeManagementService', () => {
     });
   });
 
-  describe('deactivateForContractLapse (ADR-045, HR implementation PR 5)', () => {
+  // *** BEHAVIOR CHANGE (2026-08-06 rework) *** -- this method now produces
+  // DELETED, not DEACTIVATED (service.ts's own prominent comment above the
+  // method explains why: a lapsed, non-continued contract means the person
+  // left, which is the DELETED case, not a temporary pause). It also now
+  // soft-deletes the User account and bumps token_generation, since DELETED
+  // is unified with deleteUser() (Decision 1) -- neither happened before.
+  describe('deactivateForContractLapse (ADR-045, HR implementation PR 5; DELETED since the 2026-08-06 rework)', () => {
     it('is a no-op when no employment record exists for the user (best-effort)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
       await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
@@ -428,29 +568,34 @@ describe('EmployeeManagementService', () => {
       expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
     });
 
-    it('is idempotent when the record is already DEACTIVATED', async () => {
+    it('is idempotent when the record is already DELETED', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.DEACTIVATED })
+        fakeRecord({ status: EmploymentStatus.DELETED })
       );
       await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
-    it('deactivates an ACTIVE record with no actor.role gate (internal cross-module call)', async () => {
+    it('moves an ACTIVE record to DELETED, soft-deletes the User, no actor.role gate (internal cross-module call)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.ACTIVE })
       );
       mockPrisma.employmentRecord.update.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.DEACTIVATED })
+        fakeRecord({ status: EmploymentStatus.DELETED, deleted_reason: 'contract_lapse_manual' })
       );
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
 
       await service.deactivateForContractLapse('user_1', 'contract_lapse_manual');
 
       expect(mockPrisma.employmentRecord.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'emp_1' },
-          data: expect.objectContaining({ status: EmploymentStatus.DEACTIVATED }),
+          data: expect.objectContaining({ status: EmploymentStatus.DELETED }),
         })
+      );
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'user_1' }, data: expect.objectContaining({ is_active: false }) })
       );
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -459,9 +604,9 @@ describe('EmployeeManagementService', () => {
       );
     });
 
-    it('rejects an illegal transition (e.g. from REJECTED, matching assertTransition)', async () => {
+    it('rejects an illegal transition (e.g. from PENDING, matching assertTransition -- PENDING has no direct edge to DELETED)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.REJECTED })
+        fakeRecord({ status: EmploymentStatus.PENDING })
       );
       await expect(
         service.deactivateForContractLapse('user_1', 'contract_lapse_manual')
@@ -493,9 +638,9 @@ describe('EmployeeManagementService', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null for a soft-deleted record instead of resurfacing deactivated history', async () => {
+    it('returns null for a soft-deleted (DELETED) record instead of resurfacing it', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() })
+        fakeRecord({ status: EmploymentStatus.DELETED, deleted_at: new Date() })
       );
 
       const result = await service.getByUserId(admin, 'user_1');
