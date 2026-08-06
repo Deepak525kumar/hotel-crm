@@ -21,11 +21,19 @@ jest.mock('../config/feature-flags.js', () => ({
 
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+// isWorkerEligibleForHotel() (roster-scope.ts) now checks the hotel
+// blocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default to
+// "not blocked" so existing eligibility-path tests don't need to know
+// about it unless they're specifically testing it.
+const mockBlocklistEntryFindUnique = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(
+  null,
+);
 
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     hotel: { findUnique: mockHotelFindUnique },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
+    employeeBlocklistEntry: { findUnique: mockBlocklistEntryFindUnique },
   }),
 }));
 
@@ -120,6 +128,7 @@ describe('resolveWorkerScope / checkWorkerScope (ADR-030 C-10)', () => {
   beforeEach(() => {
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
+    mockBlocklistEntryFindUnique.mockReset().mockResolvedValue(null);
   });
 
   it('allows admin unconditionally, with no DB query', async () => {
@@ -199,6 +208,7 @@ describe('checkHotelAccess middleware', () => {
   beforeEach(() => {
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
+    mockBlocklistEntryFindUnique.mockReset().mockResolvedValue(null);
   });
 
   it('allows admins to access any hotel (PATCH-04 §4c bypass)', async () => {
@@ -317,6 +327,7 @@ describe('resolveHotelAccess (Epic 3 centralization seam)', () => {
   beforeEach(() => {
     mockHotelFindUnique.mockReset();
     mockEmploymentRecordFindUnique.mockReset();
+    mockBlocklistEntryFindUnique.mockReset().mockResolvedValue(null);
   });
 
   // admin and checker keep the unconditional cross-hotel bypass (unchanged).

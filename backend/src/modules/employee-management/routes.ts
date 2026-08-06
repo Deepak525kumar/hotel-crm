@@ -143,6 +143,17 @@ router.post(
   requirePermission('employees:write'),
   ...controller.setBlocklist
 );
+// Removal (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06): same authorization
+// shape as the POST above -- whoever can add a block can also remove one.
+// :hotel_id in the path (not just :entry_id) so checkHotelAccess() can scope
+// a manager/RM the same way it already does for GET/POST.
+router.delete(
+  '/hotels/:hotel_id/blocklist/:entry_id',
+  checkHotelAccess(),
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  (req, res, next) => controller.removeBlocklist(req, res, next)
+);
 
 // Org chart (REQ-EMP-013 / RULE-EMP-08) — Regional Manager (their own
 // group) and Admin only; group-ownership scoping enforced service-side

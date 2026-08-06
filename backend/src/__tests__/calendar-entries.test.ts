@@ -48,10 +48,23 @@ const mockOutboxEvent = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// placeOnCalendar() now calls isWorkerEligibleForHotel() unconditionally
+// (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default every fixture
+// worker to ACTIVE/eligible/not-blocklisted so this suite's existing
+// placement tests don't need to separately stub eligibility.
+const mockEmploymentRecord = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+const mockEmployeeBlocklistEntry = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
   hotel: mockHotel,
+  employmentRecord: mockEmploymentRecord,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -110,6 +123,13 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     service = new AssignmentService();
     mockNotification.create.mockResolvedValue({ id: 'notif-default' });
     mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
+    // Default the placed WORKER (not the acting manager's own scope, which
+    // individual tests below set explicitly) to ACTIVE/eligible/not-
+    // blocklisted at whatever hotel a test targets, matching the fixture
+    // hotel_group_id 'g1' tests already use for the actor-scope checks.
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', id: 'emp_w1' });
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
   });
 
   describe('placeOnCalendar', () => {

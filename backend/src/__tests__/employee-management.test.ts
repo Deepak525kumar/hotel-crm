@@ -38,7 +38,9 @@ const mockPrisma: any = {
   },
   employeeBlocklistEntry: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    delete: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -306,6 +308,66 @@ describe('EmployeeManagementService', () => {
 
       expect(result.reason).toBe('No-show repeatedly');
       expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // IF-EMP-RemoveBlocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06):
+  // blocklist entries previously had no removal path at all.
+  describe('removeBlocklist (REQ-EMP-005 / RULE-EMP-07 rework)', () => {
+    it('throws NotFoundError for an unknown entry id', async () => {
+      mockPrisma.employeeBlocklistEntry.findUnique.mockResolvedValue(null);
+      await expect(service.removeBlocklist(admin as any, 'h1', 'bl_missing')).rejects.toMatchObject({
+        name: 'NotFoundError',
+      });
+      expect(mockPrisma.employeeBlocklistEntry.delete).not.toHaveBeenCalled();
+    });
+
+    // IDOR regression (found by adversarial review, 2026-08-06): the route's
+    // checkHotelAccess() only ever validates the PATH's hotel_id -- it has
+    // no way to know which hotel the target entry actually belongs to. If
+    // the service doesn't independently re-check entry.hotel_id against the
+    // path's hotelId, a caller scoped to h1 could delete an h2 entry just by
+    // knowing/guessing its id, silently bypassing the route-level scope
+    // check entirely. This must 404, not delete.
+    it('throws NotFoundError (not a silent delete) when the entry belongs to a DIFFERENT hotel than the one requested', async () => {
+      mockPrisma.employeeBlocklistEntry.findUnique.mockResolvedValue({
+        id: 'bl_h2',
+        hotel_id: 'h2',
+        employment_record_id: 'emp_1',
+        reason: 'No-show repeatedly',
+        created_by_id: 'admin_1',
+        created_at: new Date(),
+      });
+      await expect(service.removeBlocklist(admin as any, 'h1', 'bl_h2')).rejects.toMatchObject({
+        name: 'NotFoundError',
+      });
+      expect(mockPrisma.employeeBlocklistEntry.delete).not.toHaveBeenCalled();
+    });
+
+    it('deletes the entry and audits the removal, citing the hotel and employment record', async () => {
+      mockPrisma.employeeBlocklistEntry.findUnique.mockResolvedValue({
+        id: 'bl_1',
+        hotel_id: 'h1',
+        employment_record_id: 'emp_1',
+        reason: 'No-show repeatedly',
+        created_by_id: 'admin_1',
+        created_at: new Date(),
+      });
+      mockPrisma.employeeBlocklistEntry.delete.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.removeBlocklist(admin as any, 'h1', 'bl_1');
+
+      expect(mockPrisma.employeeBlocklistEntry.delete).toHaveBeenCalledWith({ where: { id: 'bl_1' } });
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: 'employee.blocklist.remove',
+            resource_id: 'bl_1',
+            details: expect.objectContaining({ hotel_id: 'h1', employment_record_id: 'emp_1' }),
+          }),
+        })
+      );
     });
   });
 

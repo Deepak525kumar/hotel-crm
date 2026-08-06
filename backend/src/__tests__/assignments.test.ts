@@ -43,9 +43,18 @@ const mockOutboxEvent = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// isWorkerEligibleForHotel() (roster-scope.ts) now checks the hotel
+// blocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default to
+// "not blocked" so existing eligibility-path tests don't need to know
+// about the blocklist unless they're specifically testing it.
+const mockEmployeeBlocklistEntry = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
+  employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   hotel: mockHotel,
   rating: mockRating,
   attendance: mockAttendance,
@@ -101,6 +110,7 @@ describe('AssignmentService', () => {
     mockJobRequestSkillSlot.update.mockResolvedValue({});
     mockNotification.create.mockResolvedValue({ id: 'notif-default' });
     mockOutboxEvent.create.mockResolvedValue({ id: 'outbox-default' });
+    mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
   });
 
   describe('update', () => {

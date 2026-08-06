@@ -55,10 +55,32 @@ export async function resolveWorkerGroupScope(userId: string): Promise<UserScope
  * Forward case (#1-4, #6): is this worker eligible to act at this hotel?
  * Reuses the existing `isHotelInScope()` hotel->group resolution rather than
  * reimplementing it.
+ *
+ * Also enforces the hotel blocklist (REQ-EMP-005 / RULE-EMP-07,
+ * 2026-08-06 wiring): `EmployeeBlocklistEntry` previously existed as
+ * pure audit-log data — created and readable, but checked by nothing. A
+ * blocked worker could still be broadcast-accepted, reassigned, or
+ * scheduled at the exact hotel they were blocked from. This is the single
+ * choke point every caller already goes through (see the module doc
+ * comment above), so the check lands here once rather than at each of the
+ * 5 call sites individually.
  */
 export async function isWorkerEligibleForHotel(userId: string, hotelId: string): Promise<boolean> {
   const scope = await resolveWorkerGroupScope(userId);
-  return isHotelInScope(scope, hotelId);
+  if (!(await isHotelInScope(scope, hotelId))) return false;
+
+  const prisma = getPrisma();
+  const record = await prisma.employmentRecord.findUnique({
+    where: { user_id: userId },
+    select: { id: true },
+  });
+  if (!record) return false; // unreachable in practice (resolveWorkerGroupScope already required one), but keeps this function total rather than assuming its caller's shape.
+
+  const blocked = await prisma.employeeBlocklistEntry.findUnique({
+    where: { hotel_id_employment_record_id: { hotel_id: hotelId, employment_record_id: record.id } },
+    select: { id: true },
+  });
+  return !blocked;
 }
 
 /**
