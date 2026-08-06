@@ -40,7 +40,10 @@ const mockPrisma = {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // resolveScope() uses findMany + orderBy id as of 2026-08-07 (deterministic
+    // scope for a manager assigned to multiple hotels). Defaults to [] --
+    // these suites are not about scope resolution.
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
   },
   // Supports both the array form ($transaction([...])) and the callback
   // form ($transaction(async (tx) => ...)) used by ADR-031 PR-4's

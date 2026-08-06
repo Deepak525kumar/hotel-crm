@@ -14,6 +14,7 @@ import { getEnv } from '../../config/env.js';
 import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
 import { AuthResponse, AuditLogQuery, AuditLogEntryDto } from './types.js';
 import { notificationService } from '../notifications/service.js';
+import { logger } from '../../lib/logger.js';
 
 // ADR-031 D-4 (PR-4): the sole seam through which `User.token_generation` may
 // be incremented. `backend-auth` is the authoritative writer (ADR-017,
@@ -65,12 +66,48 @@ export class AuthService extends BaseService {
       return { type: 'hotel_group', hotel_group_id: group.id };
     }
 
-    const hotel = await this.prisma.hotel.findFirst({
+    // Deterministic ordering (2026-08-07). Unlike
+    // HotelGroup.regional_manager_user_id above, Hotel.manager_user_id has NO
+    // unique constraint (schema.prisma) -- nothing at the database level stops
+    // one user from being manager of several hotels. This findFirst carried
+    // no orderBy, so a manager in that state got an ARBITRARY hotel as their
+    // JWT scope, and the row Postgres happened to return could differ between
+    // logins: the same person could silently gain and lose access to a hotel
+    // just by re-authenticating.
+    //
+    // That is the identical defect already fixed one branch up for Regional
+    // Managers (see the findUnique comment above, which records findFirst
+    // "silently picked one of an RM's groups arbitrarily"). The RM case was
+    // closed by a unique FK; this one cannot be, because multi-hotel
+    // management may become a real requirement.
+    //
+    // Ordering by id makes the choice stable and repeatable rather than
+    // dependent on physical row order. It does NOT make picking one of
+    // several correct -- it makes the current behaviour deterministic and
+    // auditable while the product question stays open. The service layer
+    // enforces one hotel per manager on the write path
+    // (users/service.ts#updateUserRole), but pre-existing rows and any direct
+    // database write can still violate it, so this read must stay total.
+    const hotels = await this.prisma.hotel.findMany({
       where: { manager_user_id: userId },
       select: { id: true },
+      orderBy: { id: 'asc' },
     });
-    if (hotel) {
-      return { type: 'hotel', hotel_id: hotel.id };
+    if (hotels.length > 0) {
+      if (hotels.length > 1) {
+        logger.warn(
+          'auth_scope_multi_hotel_manager: manager is assigned to multiple hotels; ' +
+            'JWT scope covers only the lowest-id hotel. Hotel.manager_user_id has no ' +
+            'unique constraint, so this state is reachable despite the service-layer ' +
+            'one-hotel rule.',
+          {
+            user_id: userId,
+            hotel_ids: hotels.map((h) => h.id),
+            scope_hotel_id: hotels[0]!.id,
+          }
+        );
+      }
+      return { type: 'hotel', hotel_id: hotels[0]!.id };
     }
 
     return null;

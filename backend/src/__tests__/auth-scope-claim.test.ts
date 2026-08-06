@@ -39,7 +39,11 @@ const mockPrisma = {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   hotel: {
-    findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // Deterministic scope (2026-08-07): resolveScope now uses findMany +
+    // orderBy id, not findFirst -- Hotel.manager_user_id has no unique
+    // constraint, so an unordered findFirst returned an arbitrary hotel and
+    // a multi-hotel manager's scope could change between logins.
+    findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   $transaction: jest.fn(async (ops: Promise<unknown>[]) => Promise.all(ops)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -122,7 +126,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
 
       // Admin short-circuits before any association lookup.
       expect(mockPrisma.hotelGroup.findUnique).not.toHaveBeenCalled();
-      expect(mockPrisma.hotel.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.hotel.findMany).not.toHaveBeenCalled();
     });
 
     // `resolveScope()` is role-agnostic below the admin short-circuit: it
@@ -189,7 +193,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -205,7 +209,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         baseUser({ id: 'hm_1', email: 'hm@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_7' });
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_7' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -213,10 +217,43 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       const payload = decodeAccessToken(result.access_token);
 
       expect(payload.scope).toEqual({ type: 'hotel', hotel_id: 'hotel_7' });
-      expect(mockPrisma.hotel.findFirst).toHaveBeenCalledWith({
+      expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith({
         where: { manager_user_id: 'hm_1' },
         select: { id: true },
+        orderBy: { id: 'asc' },
       });
+    });
+
+    // Determinism (2026-08-07). Hotel.manager_user_id has NO unique
+    // constraint, unlike HotelGroup.regional_manager_user_id, so one user
+    // CAN be manager of several hotels -- via pre-existing data or a direct
+    // database write, even though the service layer now enforces one hotel
+    // per manager on the write path. The old unordered findFirst returned an
+    // arbitrary row, so such a manager's JWT scope could differ between
+    // logins: silently gaining and losing access to a hotel just by
+    // re-authenticating. Ordering by id makes the choice stable.
+    it('a manager of multiple hotels always resolves to the same (lowest-id) hotel', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({ id: 'hm_multi', email: 'multi@test.com', role: 'MANAGER', password_hash: realPasswordHash })
+      );
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_a' }, { id: 'hotel_b' }]);
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const first = decodeAccessToken(
+        (await service.login({ email: 'multi@test.com', password: 'password123' })).access_token
+      );
+      const second = decodeAccessToken(
+        (await service.login({ email: 'multi@test.com', password: 'password123' })).access_token
+      );
+
+      expect(first.scope).toEqual({ type: 'hotel', hotel_id: 'hotel_a' });
+      // The point of the fix: repeatable, not merely non-null.
+      expect(second.scope).toEqual(first.scope);
+      expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: { id: 'asc' } })
+      );
     });
 
     it('plain worker/checker (both association lookups miss) → scope: null', async () => {
@@ -224,7 +261,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         baseUser({ id: 'w_1', email: 'worker@test.com', role: 'WORKER', password_hash: realPasswordHash })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -239,7 +276,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         baseUser({ id: 'c_1', email: 'checker@test.com', role: 'CHECKER', password_hash: realPasswordHash })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -249,12 +286,12 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.scope).toBeNull();
     });
 
-    it('precedence: user is BOTH regional manager and hotel manager → resolves to hotel_group (RM wins), hotel.findFirst never called', async () => {
+    it('precedence: user is BOTH regional manager and hotel manager → resolves to hotel_group (RM wins), hotel.findMany never called', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(
         baseUser({ id: 'both_1', email: 'both@test.com', role: 'MANAGER', password_hash: realPasswordHash })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_99' });
-      mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_99' });
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_99' }]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -262,7 +299,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       const payload = decodeAccessToken(result.access_token);
 
       expect(payload.scope).toEqual({ type: 'hotel_group', hotel_group_id: 'group_99' });
-      expect(mockPrisma.hotel.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.hotel.findMany).not.toHaveBeenCalled();
     });
   });
 
@@ -273,7 +310,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         baseUser({ id: 'new_worker_1', email: 'newworker@test.com', role: 'WORKER' })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -315,7 +352,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
         baseUser({ id: 'hm_refresh_1', email: 'hmrefresh@test.com', role: 'MANAGER' })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
-      mockPrisma.hotel.findFirst.mockResolvedValue({ id: 'hotel_55' });
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_55' }]);
       mockPrisma.session.update.mockResolvedValue({});
 
       const result = await service.refreshToken({ refresh_token: signedRefresh });
