@@ -5,7 +5,7 @@ import { mutate } from "swr";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useHotelGroups } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useAuthStore } from "@/stores/auth";
+import { useEmploymentPermissions } from "@/hooks/useEmploymentPermissions";
 import { employeesApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import {
@@ -80,14 +80,13 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const action = useAsyncAction();
 
-  // create/delete/restore stay Admin-only at the route
-  // (employee-management/routes.ts) even though this card is now reachable
-  // by manager/RM (WorkerOnboardingGate widened for the six scoped actions,
-  // 2026-08-06). Hide the three Admin-only actions for a non-admin viewer
-  // rather than showing a button that always 403s — the backend remains the
-  // actual authority (this is visibility, not a second enforcement layer),
-  // but a scoped manager should never see a control they can't use.
-  const isAdmin = useAuthStore((s) => s.user?.role) === "admin";
+  // Named capabilities, not a raw role check — see useEmploymentPermissions
+  // for the full role->capability mapping and its own caveat (role-only,
+  // not a substitute for the backend's group-scope check on a specific
+  // record). Hides the Admin-only actions for a non-admin viewer rather
+  // than showing a button that always 403s.
+  const { canCreateEmployment, canDeleteEmployment, canRestoreEmployment } =
+    useEmploymentPermissions();
 
   // Refreshes this card's own cache entry plus every other SWR cache whose
   // key could now be stale after a lifecycle transition: the org chart (any
@@ -136,7 +135,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
           ) : !record ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-500">Not yet onboarded.</p>
-              {isAdmin ? (
+              {canCreateEmployment ? (
                 <Button size="sm" onClick={() => setCreateOpen(true)}>
                   Start onboarding
                 </Button>
@@ -264,7 +263,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               {(record.status === "ACTIVE" ||
                 record.status === "DEACTIVATED" ||
                 record.status === "REJECTED") &&
-                isAdmin && (
+                canDeleteEmployment && (
                   <div className="border-t border-gray-100 pt-4">
                     <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
                       Delete (left the company)
@@ -272,7 +271,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   </div>
                 )}
 
-              {record.status === "DELETED" && isAdmin && (
+              {record.status === "DELETED" && canRestoreEmployment && (
                 <div className="border-t border-gray-100 pt-4">
                   <p className="mb-2 text-sm text-gray-500">
                     A restored record must go through approval again before becoming active.
