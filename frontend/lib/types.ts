@@ -131,9 +131,34 @@ export interface UpdateUserInput {
   is_active?: boolean;
 }
 
-/** Body of `PUT /users/:id/role` (admin-only, ADR-030 D-4a). */
+/**
+ * Body of `PUT /users/:id/role` (admin-only, ADR-030 D-4a).
+ *
+ * Person-centric assignment redesign (2026-08-07): this is now the SINGLE
+ * authoritative write path for both a user's role AND their organizational
+ * assignment. Assigning `manager` with a `hotel_id` writes that hotel's
+ * `manager_user_id`; assigning `regional_manager` with a `hotel_group_id`
+ * writes that group's `regional_manager_user_id`. Incompatible prior
+ * assignments are vacated automatically in the same transaction, so a stale
+ * pointer (the same person showing as both a Hotel Manager and a Regional
+ * Manager) can no longer occur.
+ *
+ * All assignment fields are optional: the vacancy model allows a
+ * hotel/group to sit unassigned, and symmetrically allows a manager to hold
+ * the role without a current posting.
+ */
 export interface UpdateUserRoleInput {
   role: Role;
+  /** Target hotel when assigning `manager`. Rejected for any other role. */
+  hotel_id?: string;
+  /** Target group when assigning `regional_manager`, or a worker/checker's employment group. */
+  hotel_group_id?: string;
+  /**
+   * A worker/checker's primary/home hotel — display and default-selection
+   * only. Does NOT restrict scheduling: eligibility remains group-grain
+   * (REQ-EMP-012), so a worker may still be assigned any hotel in their group.
+   */
+  primary_hotel_id?: string | null;
 }
 
 /** Query params accepted by `GET /users`. */
@@ -217,10 +242,6 @@ export interface UpdateHotelInput {
   accepting_jobs?: boolean;
   /** Group assignment is update-only (assigned after creation, ADR-023). `null` clears it. */
   hotel_group_id?: string | null;
-  /** Hotel Manager assignment is update-only (assigned after creation, ADR-025) — the sole source of that manager's JWT scope claim. `null` clears it. */
-  manager_user_id?: string | null;
-  /** Only read when manager_user_id is explicitly cleared to null; ignored otherwise. */
-  manager_vacancy_reason?: ManagerVacancyReason;
   /** GD-14/OD-GEO-004: admin-only manual entry, no geocoding service. */
   latitude?: number;
   longitude?: number;
@@ -259,20 +280,22 @@ export interface HotelGroup {
   updated_at: string;
 }
 
-/** Body of `POST /crm/hotel-groups` (admin-only). */
+/**
+ * Body of `POST /crm/hotel-groups` (admin-only).
+ *
+ * Person-centric assignment redesign (2026-08-07): no longer carries
+ * `regional_manager_user_id`. A group is created vacant; its RM is assigned
+ * afterwards from that person's own page via `PUT /users/:id/role`, the
+ * single authoritative role+assignment write path.
+ */
 export interface CreateHotelGroupInput {
   name: string;
-  regional_manager_user_id: string;
   billing_info?: string;
 }
 
 /** Body of `PATCH /crm/hotel-groups/:id` (admin-only). */
 export interface UpdateHotelGroupInput {
   name?: string;
-  /** `null` clears the assignment (2026-08-06 vacancy model). */
-  regional_manager_user_id?: string | null;
-  /** Only read when regional_manager_user_id is explicitly cleared to null; ignored otherwise. */
-  regional_manager_vacancy_reason?: ManagerVacancyReason;
   billing_info?: string;
 }
 
@@ -1102,6 +1125,14 @@ export interface EmploymentRecord {
   employment_cycle: number;
   marked_suitable: boolean;
   hotel_group_id: string | null;
+  /**
+   * Primary/home hotel — display and default-selection only (person-centric
+   * assignment redesign, 2026-08-07). Explicitly NOT an eligibility
+   * restriction: scheduling eligibility remains group-grain via
+   * `hotel_group_id` (REQ-EMP-012, frozen), so a worker may still be assigned
+   * any hotel in their group regardless of this value.
+   */
+  primary_hotel_id: string | null;
   skills: SkillTag[];
   deleted_at: string | null;
   created_at: string;

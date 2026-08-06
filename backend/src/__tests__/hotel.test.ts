@@ -274,143 +274,24 @@ describe('CrmService - Hotels', () => {
     // JWT scope claim (auth/service.ts#resolveScope) — these lock the write
     // path plus the token-generation bump that invalidates any live token
     // minted under the pre-change scope.
-    describe('manager_user_id assignment (ADR-025)', () => {
-      it('assigns manager_user_id when it references an existing user holding the Manager role', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: null };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_mgr', role: 'MANAGER', deleted_at: null });
-        mockPrisma.hotel.update.mockResolvedValue({ ...hotel, manager_user_id: 'u_mgr' });
-        mockPrisma.auditLog.create.mockResolvedValue({});
+    // Person-centric assignment redesign (2026-08-07): updateHotel no longer
+    // accepts manager_user_id (or manager_assigned_at/vacated_at/
+    // vacancy_reason). Manager assignment moved to
+    // users/service.ts#updateUserRole -- the single authoritative role+
+    // assignment write path -- so the ADR-025 assignment/validation/TOCTOU/
+    // lock-order/token-bump coverage that lived in this describe now lives
+    // in users.test.ts's "updateUserRole - person-centric assignment" block.
+    it('never writes manager_user_id, even indirectly', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Old', manager_user_id: 'mgr_1' });
+      mockPrisma.hotel.update.mockResolvedValue({ id: 'h1', name: 'New' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
 
-        const result = await service.updateHotel('h1', { manager_user_id: 'u_mgr' }, 'admin_1', 'admin');
+      await service.updateHotel('h1', { name: 'New' }, 'admin_1', 'admin');
 
-        expect(result.manager_user_id).toBe('u_mgr');
-        const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: { manager_user_id: string } }>;
-        expect(updateCall[0]?.data.manager_user_id).toBe('u_mgr');
-        // No prior manager to invalidate; only the incoming manager's token is bumped.
-        expect(mockPrisma.user.update).toHaveBeenCalledTimes(1);
-        expect(mockPrisma.user.update).toHaveBeenCalledWith({
-          where: { id: 'u_mgr' },
-          data: { token_generation: { increment: 1 } },
-        });
-      });
-
-      it('rejects assignment to a user who does not hold the Manager role', async () => {
-        mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Hotel X', manager_user_id: null });
-        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_worker', role: 'WORKER', deleted_at: null });
-
-        await expect(
-          service.updateHotel('h1', { manager_user_id: 'u_worker' }, 'admin_1', 'admin')
-        ).rejects.toMatchObject({ name: 'ValidationError' });
-        expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
-      });
-
-      it('rejects assignment to a nonexistent user without writing', async () => {
-        mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Hotel X', manager_user_id: null });
-        mockPrisma.user.findUnique.mockResolvedValue(null);
-
-        await expect(
-          service.updateHotel('h1', { manager_user_id: 'nonexistent' }, 'admin_1', 'admin')
-        ).rejects.toMatchObject({ name: 'ValidationError' });
-        expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
-      });
-
-      it('bumps both outgoing and incoming manager token_generation on reassignment', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_new', role: 'MANAGER', deleted_at: null });
-        mockPrisma.hotel.update.mockResolvedValue({ ...hotel, manager_user_id: 'u_new' });
-        mockPrisma.auditLog.create.mockResolvedValue({});
-
-        await service.updateHotel('h1', { manager_user_id: 'u_new' }, 'admin_1', 'admin');
-
-        expect(mockPrisma.user.update).toHaveBeenCalledTimes(2);
-        expect(mockPrisma.user.update).toHaveBeenCalledWith({
-          where: { id: 'u_old' },
-          data: { token_generation: { increment: 1 } },
-        });
-        expect(mockPrisma.user.update).toHaveBeenCalledWith({
-          where: { id: 'u_new' },
-          data: { token_generation: { increment: 1 } },
-        });
-      });
-
-      it('clears manager_user_id and bumps the outgoing manager token_generation when explicitly set to null', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.hotel.update.mockResolvedValue({ ...hotel, manager_user_id: null });
-        mockPrisma.auditLog.create.mockResolvedValue({});
-
-        const result = await service.updateHotel('h1', { manager_user_id: null }, 'admin_1', 'admin');
-
-        expect(result.manager_user_id).toBeNull();
-        expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-        expect(mockPrisma.user.update).toHaveBeenCalledTimes(1);
-        expect(mockPrisma.user.update).toHaveBeenCalledWith({
-          where: { id: 'u_old' },
-          data: { token_generation: { increment: 1 } },
-        });
-      });
-
-      it('does not bump any token_generation when manager_user_id is left unchanged', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.hotel.update.mockResolvedValue(hotel);
-        mockPrisma.auditLog.create.mockResolvedValue({});
-
-        await service.updateHotel('h1', { name: 'Renamed Hotel' }, 'admin_1', 'admin');
-
-        expect(mockPrisma.user.findUnique).not.toHaveBeenCalled();
-        expect(mockPrisma.user.update).not.toHaveBeenCalled();
-      });
-
-      it('does not bump token_generation when re-assigning the same manager_user_id', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_same' };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_same', role: 'MANAGER', deleted_at: null });
-        mockPrisma.hotel.update.mockResolvedValue(hotel);
-        mockPrisma.auditLog.create.mockResolvedValue({});
-
-        await service.updateHotel('h1', { manager_user_id: 'u_same' }, 'admin_1', 'admin');
-
-        expect(mockPrisma.user.update).not.toHaveBeenCalled();
-      });
-
-      // Post-review fix (mirrors updateHotelGroup's #339 lock-ordering
-      // pattern): assertHotelManagerExists() runs BEFORE the transaction and
-      // its row lock, so its result can be stale by commit time. Simulates
-      // that race by having the pre-lock check see MANAGER, but the re-check
-      // under lock (a second tx.user.findUnique call) see a role that
-      // changed out from under it -- e.g. a concurrent updateUserRole()
-      // demotion that committed in the gap.
-      it('rejects under lock even if the pre-lock existence check passed (TOCTOU close)', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: null };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.user.findUnique
-          .mockResolvedValueOnce({ id: 'u_target', role: 'MANAGER', deleted_at: null }) // pre-lock assertHotelManagerExists
-          .mockResolvedValueOnce({ id: 'u_target', role: 'WORKER', deleted_at: null }); // re-check under lock
-
-        await expect(
-          service.updateHotel('h1', { manager_user_id: 'u_target' }, 'admin_1', 'admin')
-        ).rejects.toMatchObject({ name: 'ValidationError' });
-        expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
-        expect(mockPrisma.user.update).not.toHaveBeenCalled();
-      });
-
-      it('locks the affected manager user row(s), then the Hotel row itself, before writing', async () => {
-        const hotel = { id: 'h1', name: 'Hotel X', hotel_group_id: null, manager_user_id: 'u_old' };
-        mockPrisma.hotel.findUnique.mockResolvedValue(hotel);
-        mockPrisma.user.findUnique.mockResolvedValue({ id: 'u_new', role: 'MANAGER', deleted_at: null });
-        mockPrisma.hotel.update.mockResolvedValue({ ...hotel, manager_user_id: 'u_new' });
-        mockPrisma.auditLog.create.mockResolvedValue({});
-
-        await service.updateHotel('h1', { manager_user_id: 'u_new' }, 'admin_1', 'admin');
-
-        // 2 manager user-row locks (u_old, u_new) + 1 Hotel-row lock, in that
-        // order -- User-then-Hotel, matching updateUserRole/updateHotelGroup's
-        // shared lock-ordering invariant (see the method's own comment).
-        expect(mockPrisma.$queryRaw).toHaveBeenCalledTimes(3);
-      });
+      const updateCall = (mockPrisma.hotel.update as jest.Mock).mock.calls[0] as Array<{ data: Record<string, unknown> }>;
+      expect(updateCall[0]?.data).not.toHaveProperty('manager_user_id');
+      // No token bump either: this path can no longer change anyone's scope.
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
   });
 

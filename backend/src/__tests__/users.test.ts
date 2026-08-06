@@ -33,12 +33,18 @@ const mockPrisma = {
   // makes getPrisma() return this mockPrisma everywhere.
   employmentRecord: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // Person-centric assignment redesign (2026-08-07): updateUserRole writes
+    // a worker/checker's hotel_group_id (existing eligibility field) and
+    // primary_hotel_id (new, display-only).
+    update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
   },
   regionalManagerAssignmentHistory: {
     updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
   },
   hotelManagerAssignmentHistory: {
     updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   // updateUserRole()'s Decision-11 race fix (post-#339 review) takes a
@@ -470,18 +476,12 @@ describe('UserService', () => {
       expect(mockPrisma.user.update).not.toHaveBeenCalled();
     });
 
-    it('forbids a manager from elevating an existing user to admin', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
-        phone: null, permissions: [], is_active: true, deleted_at: null,
-      });
-
-      await expect(
-        service.updateUser('u_worker', { role: 'admin' }, 'manager_actor', 'manager', null)
-      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can assign admin role' });
-
-      expect(mockPrisma.user.update).not.toHaveBeenCalled();
-    });
+    // Person-centric assignment redesign (2026-08-07): the "manager elevates
+    // a user to admin via PUT /users/:id" case this used to assert is now
+    // structurally impossible -- `role` was removed from UpdateUserSchema
+    // entirely, so the payload cannot express a role change and is rejected
+    // at the schema boundary before reaching the service. Role changes are
+    // admin-only via PUT /users/:id/role (updateUserRole), covered there.
 
     it('allows an admin to modify an existing admin account (workflow preserved)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
@@ -684,24 +684,10 @@ describe('UserService', () => {
 
     // ADR-031 D-4/C-5: a role change or deactivation must bump
     // token_generation atomically with the state change that motivates it.
-    it('bumps token_generation on a role change', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
-        phone: null, permissions: [], is_active: true, deleted_at: null,
-      });
-      mockPrisma.user.update.mockResolvedValue({
-        id: 'u_worker', email: 'worker@test.com', first_name: 'Work', last_name: 'Er',
-        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
-      });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await service.updateUser('u_worker', { role: 'manager' }, 'admin_actor', 'admin', null);
-
-      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
-      expect(mockPrisma.user.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'u_worker' }, data: expect.objectContaining({ token_generation: { increment: 1 } }) })
-      );
-    });
+    // Person-centric assignment redesign (2026-08-07): the role-change half
+    // of this moved to updateUserRole (PUT /users/:id/role), the sole role
+    // write path -- its own suite asserts the bump. updateUser can no longer
+    // change a role at all, so only the deactivation case remains here.
 
     it('bumps token_generation on deactivation (is_active -> false)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
@@ -953,6 +939,185 @@ describe('UserService', () => {
       expect(updateCall[0]?.data.deleted_at).toBeInstanceOf(Date);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ token_generation: { increment: 1 } }) })
+      );
+    });
+  });
+
+  // ── Person-centric assignment redesign (2026-08-07) ────────────────────────
+  //
+  // updateUserRole() is now the SOLE write path for both role AND
+  // manager/RM assignment. crm/service.ts#updateHotel/#updateHotelGroup no
+  // longer accept manager_user_id/regional_manager_user_id at all, so the
+  // assignment coverage that used to live in hotel.test.ts /
+  // hotel-group.test.ts lives here instead -- these tests are that coverage,
+  // not additional/optional cases.
+  //
+  // Root bug this closes: two independent role-write paths existed
+  // (PUT /users/:id and PUT /users/:id/role) and only the latter vacated a
+  // stale Hotel.manager_user_id / HotelGroup.regional_manager_user_id, so a
+  // role change through the wrong endpoint left the person still displayed
+  // as a hotel's manager (or a group's RM) forever.
+  describe('updateUserRole — person-centric assignment', () => {
+    const adminActor = { actorId: 'admin_actor', actorRole: 'admin' };
+
+    beforeEach(() => {
+      mockHotel.findMany.mockResolvedValue([]);
+      mockHotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.auditLog.create.mockResolvedValue({});
+    });
+
+    it('assigns a manager to a hotel, writing the hotel row and an assignment-history entry', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h1', manager_user_id: null, deleted_at: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'm@test.com', first_name: 'M', last_name: 'Gr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole);
+
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'h1' },
+          data: expect.objectContaining({ manager_user_id: 'u1', manager_vacated_at: null, manager_vacancy_reason: null }),
+        })
+      );
+      expect(mockPrisma.hotelManagerAssignmentHistory.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ hotel_id: 'h1', manager_user_id: 'u1' }) })
+      );
+    });
+
+    it('rejects assigning a manager to a hotel that already has a DIFFERENT manager (one manager per hotel)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h1', manager_user_id: 'someone_else', deleted_at: null });
+
+      await expect(
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+
+      expect(mockHotel.update).not.toHaveBeenCalled();
+    });
+
+    it('transfers a manager from hotel A to hotel B in ONE transaction: A vacated (TRANSFERRED) and B assigned', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findMany.mockResolvedValue([{ id: 'hA' }]);
+      mockHotel.findUnique.mockResolvedValue({ id: 'hB', manager_user_id: null, deleted_at: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'm@test.com', first_name: 'M', last_name: 'Gr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'hB' }, adminActor.actorId, adminActor.actorRole);
+
+      // Old hotel vacated with TRANSFERRED (not DEMOTED — they're still a manager).
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'hA' },
+          data: expect.objectContaining({ manager_user_id: null, manager_vacancy_reason: 'TRANSFERRED' }),
+        })
+      );
+      // New hotel assigned, same transaction (one $transaction call total).
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'hB' }, data: expect.objectContaining({ manager_user_id: 'u1' }) })
+      );
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('promoting MANAGER -> REGIONAL_MANAGER vacates the old hotel AND assigns the group in one transaction (no dual-role drift)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotel.findMany.mockResolvedValue([{ id: 'hA' }]);
+      mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: null });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+        phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole);
+
+      // This is the exact drift the redesign exists to prevent: the old hotel
+      // manager slot MUST be cleared in the same transaction that grants the
+      // RM role, or the user shows as both Hotel Manager and Regional Manager.
+      expect(mockHotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'hA' }, data: expect.objectContaining({ manager_user_id: null }) })
+      );
+      expect(mockHotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'g1' }, data: expect.objectContaining({ regional_manager_user_id: 'u1' }) })
+      );
+      expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects assigning an RM to a group that already has a DIFFERENT regional manager', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'other_rm' });
+
+      await expect(
+        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+
+      expect(mockHotelGroup.update).not.toHaveBeenCalled();
+    });
+
+    it('writes hotel_group_id and primary_hotel_id onto a worker\'s EmploymentRecord', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'w1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ id: 'er1' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'w1', email: 'w@test.com', first_name: 'W', last_name: 'Kr',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole(
+        'w1', { role: 'worker', hotel_group_id: 'g1', primary_hotel_id: 'h1' },
+        adminActor.actorId, adminActor.actorRole
+      );
+
+      expect(mockPrisma.employmentRecord.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'er1' },
+          data: expect.objectContaining({ hotel_group_id: 'g1', primary_hotel_id: 'h1' }),
+        })
+      );
+    });
+
+    // REQ-EMP-012 (frozen): primary_hotel_id is display/default-selection
+    // only. Eligibility stays group-grain -- a worker may work ANY hotel in
+    // their group. roster-scope.ts must never read primary_hotel_id; this
+    // test documents the boundary at the write side.
+    it('does not require primary_hotel_id, and rejects it for non-worker roles', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+
+      await expect(
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1', primary_hotel_id: 'h2' }, adminActor.actorId, adminActor.actorRole)
+      ).rejects.toMatchObject({ name: 'ValidationError' });
+    });
+
+    it('allows demoting an RM to plain manager without forcing an immediate hotel posting (vacancy model)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'rm1', role: 'REGIONAL_MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'rm1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+
+      await service.updateUserRole('rm1', { role: 'manager' }, adminActor.actorId, adminActor.actorRole);
+
+      expect(mockHotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'g1' }, data: expect.objectContaining({ regional_manager_user_id: null }) })
       );
     });
   });

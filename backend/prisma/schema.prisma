@@ -531,6 +531,9 @@ model Hotel {
   // assignments at this hotel.
   calendar_entries           CalendarEntry[]
   manager_assignment_history HotelManagerAssignmentHistory[]
+  // Person-centric assignment redesign (2026-08-07): display/default-selection
+  // only -- see EmploymentRecord.primary_hotel_id.
+  employment_records_primary EmploymentRecord[]              @relation("employment_primary_hotel")
 
   @@index([country])
   @@index([is_active])
@@ -625,6 +628,15 @@ model EmploymentRecord {
   marked_suitable         Boolean             @default(false) // probation milestone flag, not a status
   hotel_group_id          String? // ADR-023 §4, group-grain, nullable until hire-approval
   hotel_group             HotelGroup?         @relation("employment_group", fields: [hotel_group_id], references: [id], onDelete: SetNull)
+  // Person-centric assignment redesign (2026-08-07): DISPLAY/DEFAULT-SELECTION
+  // ONLY -- deliberately NOT an eligibility restriction. A worker's actual
+  // eligibility to work a hotel remains governed exclusively by
+  // hotel_group_id above via roster-scope.ts (REQ-EMP-012: a worker may work
+  // ANY hotel in their assigned group). This field must never be read by
+  // roster-scope.ts or any eligibility check -- it exists solely so the UI
+  // has a sensible default hotel to preselect for a worker/checker.
+  primary_hotel_id        String?
+  primary_hotel           Hotel?              @relation("employment_primary_hotel", fields: [primary_hotel_id], references: [id], onDelete: SetNull)
   skills                  SkillTag[] // fixed set (REQ-EMP-003)
   personal_data           Json? // Personalfragebogen non-special data (REQ-EMP-011)
   konfession              String? // special-category (RULE-EMP-09) — never on general profile
@@ -638,6 +650,7 @@ model EmploymentRecord {
 
   @@index([hotel_group_id])
   @@index([status])
+  @@index([primary_hotel_id])
 }
 
 // Append-only lifecycle transition log (2026-08-06 rework). Every

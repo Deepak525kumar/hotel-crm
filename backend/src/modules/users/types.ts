@@ -18,11 +18,20 @@ export const CreateUserSchema = z.object({
 // caller may touch `role` was decided by an `if` inside the service, not by
 // the route/schema. Kept unmodified for the flag-off compatibility
 // guarantee; do not extend it — extend UpdateUserProfileSchema instead.
+//
+// Person-centric assignment redesign (2026-08-07): `role` REMOVED. This was
+// the second of two independent role-change paths (the other being
+// PUT /users/:id/role -> updateUserRole) and, unlike that one, had NO logic
+// to vacate a stale Hotel.manager_user_id / HotelGroup.regional_manager_user_id
+// when a Manager/RM's role changed here — a real data-integrity bug (a user
+// could keep showing as a hotel's Manager after losing the role via this
+// endpoint). updateUserRole is now the SOLE path for role and
+// manager/RM/group assignment changes; this method only ever touches
+// first_name/last_name/phone/is_active.
 export const UpdateUserSchema = z.object({
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
   phone: z.string().nullable().optional(),
-  role: z.enum(['worker', 'checker', 'manager', 'admin']).optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -43,10 +52,27 @@ export const UpdateUserProfileSchema = z
 
 // ADR-030 D-4a: the dedicated, Admin-only role-assignment endpoint
 // (PUT /users/:id/role). `.strict()` so no profile field can ride along —
-// this route does exactly one thing.
+// this route does exactly one thing (role + the assignment that goes with it).
+//
+// Person-centric assignment redesign (2026-08-07): this is now the SOLE
+// write path for Hotel.manager_user_id / HotelGroup.regional_manager_user_id
+// / EmploymentRecord.hotel_group_id + primary_hotel_id — see
+// users/service.ts#updateUserRole for the full transaction. Field usage by
+// target role:
+//   - role: 'manager'          -> hotel_id required
+//   - role: 'regional_manager' -> hotel_group_id required
+//   - role: 'worker'|'checker' -> hotel_group_id optional (existing
+//                                 eligibility semantics, unchanged), plus
+//                                 primary_hotel_id optional (new,
+//                                 display/default-selection only — never an
+//                                 eligibility check, see roster-scope.ts)
+//   - role: 'admin'            -> none of the above apply
 export const UpdateUserRoleSchema = z
   .object({
     role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']),
+    hotel_id: z.string().min(1).optional(),
+    hotel_group_id: z.string().min(1).optional(),
+    primary_hotel_id: z.string().min(1).nullable().optional(),
   })
   .strict();
 

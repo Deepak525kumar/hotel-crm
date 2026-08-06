@@ -42,15 +42,13 @@ export const UpdateHotelSchema = z.object({
   // update-only, not part of CreateHotelSchema. `null` clears the
   // assignment (distinct from omitting the field, which leaves it as-is).
   hotel_group_id: z.string().min(1).nullable().optional(),
-  // ADR-025: dedicated Hotel Manager assigned after hotel creation (CRR
-  // §11), same update-only shape as hotel_group_id above — this is also
-  // the write path for `Hotel.manager_user_id`, the sole source of a Hotel
-  // Manager's JWT scope claim (auth/service.ts#resolveScope). `null` clears
-  // the assignment.
-  manager_user_id: z.string().min(1).nullable().optional(),
-  // Only read when manager_user_id is explicitly cleared to null; ignored
-  // otherwise (an assignment overwrites any prior vacancy state outright).
-  manager_vacancy_reason: ManagerVacancyReasonSchema.optional(),
+  // Person-centric assignment redesign (2026-08-07): manager_user_id /
+  // manager_vacancy_reason REMOVED from this schema. `Hotel.manager_user_id`
+  // is now written exclusively by users/service.ts#updateUserRole (PUT
+  // /users/:id/role) — the two-writer split (this method + updateUserRole)
+  // was the exact bug this redesign fixes: only updateUserRole had correct
+  // vacate-on-demotion logic, so a manager's role changing via this endpoint
+  // could leave a stale manager_user_id pointer behind.
   // GD-14/OD-GEO-001/004 (SPEC-GEO-001): hotel-coordinate source of truth,
   // admin-only manual entry (this route is already admin-only per
   // requireRoleFlagged(['admin','manager'], 'admin') in routes.ts — no new
@@ -80,24 +78,24 @@ export type ListHotelsQuery = z.infer<typeof ListHotelsQuerySchema>;
 
 // HotelGroup (Epic 5 PR 5.2, ADR-023): {id, name, billing_info, regional_manager_user_id}.
 // Creation/modification is Admin-only (REQ-CRM-010: Regional/Property Managers "manage
-// assigned hotels but not create hotels or modify hotel groups"). regional_manager_user_id
-// is required — ADR-023: "One HotelGroup has exactly one assigned Regional Manager."
+// assigned hotels but not create hotels or modify hotel groups").
+//
+// Person-centric assignment redesign (2026-08-07): regional_manager_user_id
+// REMOVED from both schemas below. `HotelGroup.regional_manager_user_id` is
+// now written exclusively by users/service.ts#updateUserRole (PUT
+// /users/:id/role) — this method no longer accepts it at all. A HotelGroup
+// may therefore be created (or left) with no RM assigned yet; this is a
+// legitimate transitional state, mirroring the existing vacancy model
+// already in place for a Hotel with no manager (ManagerVacancyReason /
+// NOT_ASSIGNED). The RM is assigned afterward via the person-centric flow.
 export const CreateHotelGroupSchema = z.object({
   name: z.string().min(1).max(200),
   billing_info: z.string().max(2000).optional(),
-  regional_manager_user_id: z.string().min(1),
 });
 
 export const UpdateHotelGroupSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   billing_info: z.string().max(2000).optional(),
-  // Nullable (2026-08-06 vacancy model): a group may be demoted to no RM
-  // rather than requiring an immediate replacement. `null` clears the
-  // assignment; omitting the field leaves it unchanged.
-  regional_manager_user_id: z.string().min(1).nullable().optional(),
-  // Only read when regional_manager_user_id is explicitly cleared to null;
-  // ignored otherwise.
-  regional_manager_vacancy_reason: ManagerVacancyReasonSchema.optional(),
 });
 
 export const ListHotelGroupsQuerySchema = z.object({

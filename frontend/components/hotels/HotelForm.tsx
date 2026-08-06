@@ -10,7 +10,7 @@ import {
   Input,
   Select,
 } from "@/components/ui";
-import type { Hotel, HotelGroup, UserSummary } from "@/lib/types";
+import type { Hotel, HotelGroup } from "@/lib/types";
 
 /** Inline pin icon for the "use current location" button — no icon set in the ui barrel. */
 function LocationIcon() {
@@ -55,8 +55,6 @@ export interface HotelFormValues {
   is_active: boolean;
   accepting_jobs: boolean;
   hotel_group_id: string;
-  /** "" = unassigned, same convention as hotel_group_id. */
-  manager_user_id: string;
   /** GD-14/OD-GEO-001/004: hotel-coordinate source of truth for
    * backend-geo's distance-check. Empty string = not yet set (matches
    * hotel_group_id's own "" = unassigned convention). */
@@ -74,7 +72,6 @@ function toValues(hotel?: Hotel | null): HotelFormValues {
     is_active: hotel?.is_active ?? true,
     accepting_jobs: hotel?.accepting_jobs ?? true,
     hotel_group_id: hotel?.hotel_group_id ?? "",
-    manager_user_id: hotel?.manager_user_id ?? "",
     latitude: hotel?.latitude != null ? String(hotel.latitude) : "",
     longitude: hotel?.longitude != null ? String(hotel.longitude) : "",
   };
@@ -85,8 +82,6 @@ export interface HotelFormProps {
   hotel?: Hotel | null;
   /** Groups for the assignment selector. */
   groups?: HotelGroup[];
-  /** Candidate Hotel Managers (role=manager) for the assignment selector. */
-  managers?: UserSummary[];
   submitting?: boolean;
   error?: string | null;
   onSubmit: (values: HotelFormValues) => void;
@@ -102,7 +97,6 @@ export function HotelForm({
   mode,
   hotel,
   groups = [],
-  managers = [],
   submitting = false,
   error,
   onSubmit,
@@ -206,23 +200,12 @@ export function HotelForm({
             </Select>
           </div>
 
-          <Select
-            label="Hotel manager"
-            hint={
-              mode === "create"
-                ? "Optional — can also be assigned later. Determines this manager's access scope."
-                : "Determines this manager's access scope."
-            }
-            value={form.manager_user_id}
-            onChange={(e) => set("manager_user_id", e.target.value)}
-          >
-            <option value="">Unassigned</option>
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.first_name} {m.last_name}
-              </option>
-            ))}
-          </Select>
+          {/* Person-centric assignment redesign (2026-08-07): the hotel
+              manager picker was removed from this form. Manager assignment is
+              made from the person's own page (/users/:id) via the single
+              authoritative role+assignment endpoint, which writes
+              Hotel.manager_user_id. The hotel detail page displays who
+              currently holds the role. */}
 
           {mode === "edit" && (
             <>
