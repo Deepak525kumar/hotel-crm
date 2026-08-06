@@ -317,6 +317,15 @@ const envSchema = z.object({
   // narrowing of the confirmed requirement.
   HR_PAYSLIP_ESCALATION_AFTER_MS: z.coerce.number().int().positive().default(259200000),
   HR_PAYSLIP_ESCALATION_BATCH_SIZE: z.coerce.number().int().positive().default(100),
+
+  // Deferred-bug batch (2026-08-07): workers could previously check in an
+  // unbounded amount of time before their shift. RULE-002 (early arrival
+  // still resolves PRESENT, not LATE) is preserved inside this window --
+  // only arrivals earlier than the window are rejected. User-specified
+  // default of 2 hours, exposed as a configurable env var rather than a
+  // hardcoded literal, matching this file's convention for every other
+  // business-rule threshold.
+  ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: z.coerce.number().int().positive().default(120),
 });
 
 type Env = z.infer<typeof envSchema>;

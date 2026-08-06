@@ -40,6 +40,14 @@ const mockWorkerAssignment = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Deferred-bug batch (2026-08-07): acceptBroadcast() now also writes a
+// CalendarEntry in the same transaction (see the fix's own comment in
+// service.ts), so the calendar grid — which reads exclusively from
+// CalendarEntry, not WorkerAssignment — actually shows the accepted shift.
+const mockCalendarEntry = {
+  create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 // isWorkerEligibleForHotel() (roster-scope.ts) reads employmentRecord.findUnique
 // itself (status/hotel_group_id) before this service's own skill check reads
 // it a second time (skills) -- both calls hit this same mock function, so its
@@ -65,6 +73,7 @@ const mockPrisma = {
   jobRequest: mockJobRequest,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
   workerAssignment: mockWorkerAssignment,
+  calendarEntry: mockCalendarEntry,
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
@@ -218,6 +227,7 @@ describe('JobRequestService.acceptBroadcast', () => {
     mockWorkerAssignment.findFirst.mockResolvedValue(null); // free that day
     mockJobRequestSkillSlot.updateMany.mockResolvedValue({ count: 1 }); // claim succeeds
     mockWorkerAssignment.create.mockResolvedValue({ id: 'a1' });
+    mockCalendarEntry.create.mockResolvedValue({ id: 'ce1' });
 
     const result = await service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' });
 
@@ -243,6 +253,14 @@ describe('JobRequestService.acceptBroadcast', () => {
         hotel_id: 'h1',
         assigned_by_id: 'mgr1', // the broadcast's own created_by_id, not the worker
         status: 'CONFIRMED',
+      }),
+    });
+    expect(mockCalendarEntry.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        assignment_id: 'a1',
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        placed_by_id: 'mgr1',
       }),
     });
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
@@ -333,6 +351,7 @@ describe('JobRequestService.acceptBroadcast', () => {
       mockWorkerAssignment.create.mockImplementation(async ({ data }: any) => ({
         id: `assignment-for-${data.worker_id}`,
       }));
+      mockCalendarEntry.create.mockResolvedValue({ id: 'ce1' });
 
       // Two workers race for the same single-headcount slot. In this
       // deterministic mock, call order is the race outcome — the first
@@ -374,6 +393,7 @@ describe('JobRequestService.acceptBroadcast', () => {
         createCallCount += 1;
         return { id: `assignment-for-${data.worker_id}` };
       });
+      mockCalendarEntry.create.mockResolvedValue({ id: 'ce1' });
 
       await Promise.all([
         service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' }),
