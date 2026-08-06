@@ -5,6 +5,7 @@ import { mutate } from "swr";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useHotelGroups } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useAuthStore } from "@/stores/auth";
 import { employeesApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import {
@@ -79,7 +80,30 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const action = useAsyncAction();
 
-  const refresh = () => mutate(["employment-record", userId]);
+  // create/delete/restore stay Admin-only at the route
+  // (employee-management/routes.ts) even though this card is now reachable
+  // by manager/RM (WorkerOnboardingGate widened for the six scoped actions,
+  // 2026-08-06). Hide the three Admin-only actions for a non-admin viewer
+  // rather than showing a button that always 403s — the backend remains the
+  // actual authority (this is visibility, not a second enforcement layer),
+  // but a scoped manager should never see a control they can't use.
+  const isAdmin = useAuthStore((s) => s.user?.role) === "admin";
+
+  // Refreshes this card's own cache entry plus every other SWR cache whose
+  // key could now be stale after a lifecycle transition: the org chart (any
+  // group — this component doesn't know which key it's cached under without
+  // an extra fetch, so a broad predicate is cheaper than tracking hotel_group_id
+  // through every action), and analytics/dashboard aggregates that surface
+  // employment-status-derived counts. Revalidates rather than clears — a
+  // matched key refetches, it isn't dropped.
+  const refresh = () => {
+    mutate(["employment-record", userId]);
+    mutate(
+      (key) =>
+        Array.isArray(key) &&
+        (key[0] === "org-chart" || key[0] === "analytics-stats" || key[0] === "analytics-leaderboard"),
+    );
+  };
 
   const onSubmitForReview = () =>
     action.run(() => employeesApi.submitForReview(record!.employee_id), { key: "submit" }).finally(refresh);
@@ -112,9 +136,13 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
           ) : !record ? (
             <div className="space-y-4">
               <p className="text-sm text-gray-500">Not yet onboarded.</p>
-              <Button size="sm" onClick={() => setCreateOpen(true)}>
-                Start onboarding
-              </Button>
+              {isAdmin ? (
+                <Button size="sm" onClick={() => setCreateOpen(true)}>
+                  Start onboarding
+                </Button>
+              ) : (
+                <p className="text-sm text-gray-400">Only an Admin can start onboarding.</p>
+              )}
               <FormError>{action.error}</FormError>
             </div>
           ) : (
@@ -131,6 +159,13 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 <DataRow label="Employee ID" value={record.employee_id} />
                 <DataRow label="Job title" value={record.job_title} />
                 <DataRow label="Start date" value={formatDate(record.start_date)} />
+                {/* Only meaningful once it can exceed 1 — a first-time hire
+                    reading "Employment cycle: 1" for every worker is noise,
+                    not information. Shows starting with the first rehire
+                    (DELETED -> PENDING), the only transition that increments it. */}
+                {record.employment_cycle > 1 && (
+                  <DataRow label="Employment cycle" value={String(record.employment_cycle)} />
+                )}
                 {record.status === "DEACTIVATED" && record.deactivation_reason && (
                   <DataRow label="Deactivation reason" value={record.deactivation_reason} />
                 )}
@@ -207,6 +242,19 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
 
               {record.status === "REJECTED" && (
                 <div className="border-t border-gray-100 pt-4">
+                  {/* rehire() (service.ts) never resolves/connects
+                      hotel_group_id, unlike approve() — a REJECTED record
+                      commonly has none (it was never approved), so a rehire
+                      can land ACTIVE but group-less/unassignable with no way
+                      to fix it from here. Backend gap, not fixable from this
+                      component; flag rather than silently promise a group
+                      gets set. */}
+                  {!record.hotel_group_id && (
+                    <p className="mb-2 text-sm text-amber-600">
+                      This record has no hotel group. Rehiring won&apos;t set one — the worker
+                      will become Active but unassignable until a group is set separately.
+                    </p>
+                  )}
                   <Button size="sm" onClick={onRehire} loading={action.isPending("rehire")}>
                     Rehire
                   </Button>
@@ -215,15 +263,16 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
 
               {(record.status === "ACTIVE" ||
                 record.status === "DEACTIVATED" ||
-                record.status === "REJECTED") && (
-                <div className="border-t border-gray-100 pt-4">
-                  <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
-                    Delete (left the company)
-                  </Button>
-                </div>
-              )}
+                record.status === "REJECTED") &&
+                isAdmin && (
+                  <div className="border-t border-gray-100 pt-4">
+                    <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
+                      Delete (left the company)
+                    </Button>
+                  </div>
+                )}
 
-              {record.status === "DELETED" && (
+              {record.status === "DELETED" && isAdmin && (
                 <div className="border-t border-gray-100 pt-4">
                   <p className="mb-2 text-sm text-gray-500">
                     A restored record must go through approval again before becoming active.

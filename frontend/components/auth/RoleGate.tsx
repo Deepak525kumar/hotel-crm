@@ -208,16 +208,26 @@ export function JobDispatchPhase2WriteGate({
 }
 
 /**
- * Worker onboarding (create EmploymentRecord + drive its lifecycle signal to
- * Active). Matches `employee-management/routes.ts`'s create/lifecycle-signal
- * routes exactly (`requireRole('admin')`) — narrower than `DocumentsGate`/
- * `HrPayrollGate`: `manager` is deliberately EXCLUDED here, unlike those
- * gates, because this module's write routes never admit it (OD-EMP-08
- * restricts creation/bulk-import/lifecycle-signal to Admin only). The
- * read-side lookup (`getByUserId`) uses the broader `employees:read`
- * permission, but this gate stays Admin-only since every *action* the card
- * behind it exposes (create, submit-for-review, approve, reject) is
- * Admin-only at the route.
+ * Worker onboarding + lifecycle (create EmploymentRecord and drive its
+ * status through submit-for-review/approve/reject/deactivate/reactivate/
+ * rehire/delete/restore).
+ *
+ * Widened from Admin-only (2026-08-06, ADR-030 §3 C-16 amendment,
+ * `employee-management/routes.ts`): six of the eight actions behind this
+ * gate now admit `admin`/`manager`/`regional_manager` at the route
+ * (`requireRole(['admin', 'manager', 'regional_manager'])`) — only `create`
+ * and `delete`/`restore` remain `requireRole('admin')`. This gate now
+ * matches the WIDEST action behind it (manager/RM can reach the card at
+ * all); `WorkerOnboardingCard` itself gates the still-Admin-only actions
+ * individually via `useAuthStore`'s current role, since a single outer gate
+ * can't express "some buttons inside are narrower than others."
+ *
+ * NOTE: this widens visibility only, not the backend's own group-scope
+ * narrowing (`isWorkerInGroupScope`) — a manager/RM can see and attempt
+ * every scoped action from here even for a worker outside their own hotel
+ * group, and the backend will correctly deny it. `AuthUser` carries no
+ * `hotel_group_id`/scope claim client-side to narrow against locally; doing
+ * so would require a backend/type change beyond this gate's scope.
  */
 export function WorkerOnboardingGate({
   fallback = null,
@@ -227,7 +237,7 @@ export function WorkerOnboardingGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
