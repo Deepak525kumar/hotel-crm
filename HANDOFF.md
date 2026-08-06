@@ -1,6 +1,9 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
+Last updated: 2026-08-07 (PR #358 open: hotel-group hotels filter + regional manager display +
+raw-id-across-the-app sweep — see §1.5).
+
+Previous update: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
 
 Current status: **The employment-lifecycle rework is complete.** All prior-session work
 (#345–357) is merged to `main`, local `main` synced. PRs #354 (schema/migration + service-layer,
@@ -42,10 +45,43 @@ notification race conditions, timezone validation bug) are fixed. Every fix abov
 an *independent* adversarial review, not just self-review — that pattern caught a real bug in every
 single PR from #348 onward. Keep using it.
 
-## 2. What's open — **nothing**
+## 1.5. PR #358 (open, `fix/hotel-group-hotels-filter`) — hotel-group/hotel-detail bugs + app-wide raw-id sweep
 
-No open PRs as of this handoff. Confirmed via `gh pr list --state all` — everything through #353 is
-merged, and no branch has been created for the (unstarted) lifecycle rework.
+Started from two directly-reported bugs, then expanded into a full audit per an explicit "test
+yourself, find as many similar bugs as you can and fix them" directive covering assignments, work
+requests, and notifications.
+
+**Original two fixes:**
+1. Hotel group detail's "Hotels in this group" list silently dropped entries past the first 100
+   hotels platform-wide (client-side filter on a capped, unfiltered page). Added a server-side
+   `hotel_group_id` filter to `GET /crm/hotels` (`ListHotelsQuerySchema` + `CrmService.listHotels`)
+   — composes correctly with the existing worker roster-scope filter (separate `where` keys, ANDed).
+2. Hotel detail page never showed the Regional Manager (only Hotel Manager existed). Added a
+   "Regional manager" row mirroring the existing Manager row's pattern (link, resolved name,
+   vacancy state).
+
+**Follow-up sweep — resolves deferred item #4 below** (raw worker ID in "Placement details"): that
+report turned out to be one instance of a pattern repeated across most job-related UI. Audited every
+list/detail page that should show worker/hotel/job context and fixed each occurrence via the
+existing `useUsersByIds`/`useHotel`/`useWorkRequest` hooks:
+- Assignments (list + detail): worker name, hotel name, work-request position/shift resolved.
+- Calendar placements (`assignments/calendar-entries/page.tsx`): worker name + hotel column added
+  (this was the sibling list the original calendar-grid fix missed).
+- Attendance (list + detail): worker/hotel/verified-by names resolved; assignment link fixed.
+- Geo check-ins (list): worker/hotel names resolved (detail page was already correct).
+- Work requests / broadcasts (list + detail, both surfaces): added missing hotel name; work request
+  detail now also shows who created it.
+- Notifications (list + detail): added the previously-never-shown hotel column/row; `data`'s
+  deep-link ids (`assignment_id`, `work_request_id`, `worker_id`, etc.) now render as real links via
+  a `DATA_KEY_ROUTES` map instead of a raw key/value text dump.
+
+Verified: `tsc --noEmit` clean, `eslint` clean, `next build` succeeds, backend suite unaffected
+(frontend-only change). CI (Vercel preview build) green. Could not drive the live authenticated app
+in this environment (see §6).
+
+## 2. What's open
+
+**PR #358** (see §1.5 above) — awaiting review/merge.
 
 ## 3. The employment-lifecycle rework (research complete, PR 1 implemented, PRs 3–5 remaining)
 
@@ -467,18 +503,10 @@ picked up.
    multi-day leave request vs. single-day sick/vacation mark). Clarify which before assuming
    AbsencesCard needs fixing vs. a genuinely new feature is being asked for.
 
-4. **Raw worker ID showing in the UI**: `"Placement details / Worker / cmsf8ibj20000bsraxeppebhs /
-   Hotel / MAYANK MALHOTRA / Day / 2026-08-03"` — a raw cuid is rendering instead of a resolved
-   worker name in a "Placement details" view. **This looks like a regression or an unfixed
-   instance of a bug already fixed once this session**: an earlier summary records fixing a
-   near-identical bug (raw worker ID `cmsf8ibj20000bsraxeppebhs` — note, possibly literally the
-   same ID — showing in a placement-details modal) by adding `useUsersByIds`
-   (`frontend/hooks/useHotels.ts`) to resolve names, used in the calendar grid
-   (`frontend/app/(protected)/calendar/page.tsx`). Either that fix didn't cover every
-   "Placement details" surface in the app, or there's a second, different modal/card with the same
-   pattern that never got the `useUsersByIds` treatment. Find every place that renders a
-   `worker_id` directly without resolving it — grep for `.worker_id}` in JSX across
-   `frontend/app` and `frontend/components`, not just the calendar page.
+4. **RESOLVED in PR #358 (§1.5).** Raw worker ID showing in "Placement details" was one instance of
+   a pattern repeated across `assignments/calendar-entries/page.tsx` (the exact sibling list the
+   original calendar-grid fix missed) plus assignments, attendance, geo-checkins, work requests,
+   broadcasts, and notifications. All fixed via `useUsersByIds`/`useHotel`/`useWorkRequest`.
 
 5. **No Settings tab; want it at the bottom of the sidebar, with the profile button moved above
    it (out of the navbar).** This is a UI reorganization request layered on top of the just-shipped
