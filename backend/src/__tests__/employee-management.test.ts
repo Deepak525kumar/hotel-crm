@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { EmploymentStatus, SkillTag } from '@prisma/client';
+import { DeactivationReason, EmploymentStatus, SkillTag } from '@prisma/client';
 
 /**
  * Service-level regression suite for Epic 5 PR 5.6 (SPEC-EMP-001 v0.2.0).
@@ -64,7 +64,7 @@ function fakeRecord(overrides: Partial<Record<string, unknown>> = {}) {
     employee_id: 'E-001',
     job_title: 'Cleaner',
     start_date: new Date('2026-01-01'),
-    status: EmploymentStatus.INACTIVE,
+    status: EmploymentStatus.PENDING,
     marked_suitable: false,
     hotel_group_id: null,
     skills: [] as SkillTag[],
@@ -89,7 +89,7 @@ describe('EmployeeManagementService', () => {
   describe('createEmployee', () => {
     it('creates a record starting Inactive (REQ-EMP-001)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
-      const created = fakeRecord({ status: EmploymentStatus.INACTIVE });
+      const created = fakeRecord({ status: EmploymentStatus.PENDING });
       mockPrisma.employmentRecord.create.mockResolvedValue(created);
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -100,10 +100,10 @@ describe('EmployeeManagementService', () => {
         start_date: new Date('2026-01-01'),
       });
 
-      expect(result.status).toBe(EmploymentStatus.INACTIVE);
+      expect(result.status).toBe(EmploymentStatus.PENDING);
       expect(mockPrisma.employmentRecord.create).toHaveBeenCalledTimes(1);
       const createCall = mockPrisma.employmentRecord.create.mock.calls[0][0] as { data: { status: string } };
-      expect(createCall.data.status).toBe(EmploymentStatus.INACTIVE);
+      expect(createCall.data.status).toBe(EmploymentStatus.PENDING);
       expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
     });
 
@@ -178,31 +178,31 @@ describe('EmployeeManagementService', () => {
 
   describe('lifecycle transitions (REQ-EMP-002 / RULE-EMP-02, 03, 12)', () => {
     it.each([
-      [EmploymentStatus.INACTIVE, EmploymentStatus.UNDER_REVIEW],
-      [EmploymentStatus.UNDER_REVIEW, EmploymentStatus.ACTIVE],
-      [EmploymentStatus.UNDER_REVIEW, EmploymentStatus.REJECTED],
+      [EmploymentStatus.PENDING, EmploymentStatus.PENDING],
+      [EmploymentStatus.PENDING, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.PENDING, EmploymentStatus.REJECTED],
       [EmploymentStatus.ACTIVE, EmploymentStatus.DEACTIVATED],
     ])('allows %s -> %s', (from, to) => {
       expect(() => assertTransition(from, to)).not.toThrow();
     });
 
     it.each([
-      [EmploymentStatus.INACTIVE, EmploymentStatus.ACTIVE],
-      [EmploymentStatus.ACTIVE, EmploymentStatus.UNDER_REVIEW],
-      [EmploymentStatus.INACTIVE, EmploymentStatus.REJECTED],
+      [EmploymentStatus.PENDING, EmploymentStatus.ACTIVE],
+      [EmploymentStatus.ACTIVE, EmploymentStatus.PENDING],
+      [EmploymentStatus.PENDING, EmploymentStatus.REJECTED],
       [EmploymentStatus.REJECTED, EmploymentStatus.ACTIVE],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.ACTIVE],
-      [EmploymentStatus.DEACTIVATED, EmploymentStatus.INACTIVE],
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
     ])('rejects illegal transition %s -> %s', (from, to) => {
       expect(() => assertTransition(from, to)).toThrow();
     });
 
     it('rejects INACTIVE -> ACTIVE (illegal, must go through UNDER_REVIEW)', () => {
-      expect(() => assertTransition(EmploymentStatus.INACTIVE, EmploymentStatus.ACTIVE)).toThrow();
+      expect(() => assertTransition(EmploymentStatus.PENDING, EmploymentStatus.ACTIVE)).toThrow();
     });
 
     it('rejects ACTIVE -> UNDER_REVIEW (illegal)', () => {
-      expect(() => assertTransition(EmploymentStatus.ACTIVE, EmploymentStatus.UNDER_REVIEW)).toThrow();
+      expect(() => assertTransition(EmploymentStatus.ACTIVE, EmploymentStatus.PENDING)).toThrow();
     });
 
     it('has no Suspended state anywhere in the enum or transition table', () => {
@@ -211,10 +211,10 @@ describe('EmployeeManagementService', () => {
     });
 
     it('deactivate() enforces the transition table via the service', async () => {
-      const record = fakeRecord({ status: EmploymentStatus.UNDER_REVIEW });
+      const record = fakeRecord({ status: EmploymentStatus.PENDING });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
 
-      await expect(service.deactivate(admin as any, 'E-001')).rejects.toMatchObject({ name: 'ValidationError' });
+      await expect(service.deactivate(admin as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE)).rejects.toMatchObject({ name: 'ValidationError' });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
@@ -224,7 +224,7 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.update.mockResolvedValue({ ...record, status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.deactivate(admin as any, 'E-001');
+      const result = await service.deactivate(admin as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE);
       expect(result.status).toBe(EmploymentStatus.DEACTIVATED);
     });
   });
@@ -335,27 +335,26 @@ describe('EmployeeManagementService', () => {
   describe('lifecycleSignal (IF-EMP-LifecycleSignal / RULE-EMP-03 / ADR-023 §4)', () => {
     it('rejects a non-admin actor (internal-only transport, OD-EMP-09)', async () => {
       await expect(
-        service.lifecycleSignal(
+        service.submitForReview(
           { userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any,
-          'E-001',
-          'submitted_for_review'
+          'E-001'
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
     it('submitted_for_review moves Inactive -> Under Review', async () => {
-      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.INACTIVE }));
-      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.UNDER_REVIEW }));
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
+      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.lifecycleSignal(admin as any, 'E-001', 'submitted_for_review');
-      expect(result.status).toBe(EmploymentStatus.UNDER_REVIEW);
+      const result = await service.submitForReview(admin as any, 'E-001');
+      expect(result.status).toBe(EmploymentStatus.PENDING);
     });
 
     it('approved moves Under Review -> Active and sets hotel_group_id from the approving manager group (ADR-023 §4)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.UNDER_REVIEW, hotel_group_id: null })
+        fakeRecord({ status: EmploymentStatus.PENDING, hotel_group_id: null })
       );
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
       mockPrisma.employmentRecord.update.mockResolvedValue(
@@ -363,7 +362,7 @@ describe('EmployeeManagementService', () => {
       );
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.lifecycleSignal(admin as any, 'E-001', 'approved');
+      const result = await service.approve(admin as any, 'E-001');
 
       expect(result.status).toBe(EmploymentStatus.ACTIVE);
       const updateArg = mockPrisma.employmentRecord.update.mock.calls[0][0] as { data: { hotel_group?: { connect: { id: string } } } };
@@ -371,17 +370,17 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejected moves Under Review -> Rejected', async () => {
-      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.UNDER_REVIEW }));
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
       mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.REJECTED }));
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.lifecycleSignal(admin as any, 'E-001', 'rejected');
+      const result = await service.reject(admin as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.REJECTED);
     });
 
     it('rejects an illegal signal transition (approved from Inactive) and does not write', async () => {
-      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.INACTIVE }));
-      await expect(service.lifecycleSignal(admin as any, 'E-001', 'approved')).rejects.toMatchObject({
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
+      await expect(service.approve(admin as any, 'E-001')).rejects.toMatchObject({
         name: 'ValidationError',
       });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
@@ -399,7 +398,7 @@ describe('EmployeeManagementService', () => {
 
     it('deactivate rejects a non-admin actor', async () => {
       await expect(
-        service.deactivate({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001')
+        service.deactivate({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE)
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });

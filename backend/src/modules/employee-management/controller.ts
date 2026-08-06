@@ -1,13 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import { employeeManagementService } from './service.js';
 import {
+  ApproveEmployeeSchema,
   BlocklistQuerySchema,
   BulkImportSchema,
   ByUserParamsSchema,
   CreateEmployeeSchema,
-  LifecycleSignalSchema,
+  DeactivateEmployeeSchema,
+  DeleteEmployeeSchema,
   OrgChartParamsSchema,
   ProfileHistoryQuerySchema,
+  RejectEmployeeSchema,
   SetBlocklistSchema,
   SpecialCategoryParamsSchema,
   type SpecialCategoryField,
@@ -138,10 +141,18 @@ export class EmployeeManagementController {
     }
   }
 
-  async deactivate(req: Request, res: Response, next: NextFunction) {
+  // ── Lifecycle actions (REQ-EMP-002 rework, 2026-08-06) ──────────────────
+  // One handler per transition, replacing the single lifecycle-signal
+  // endpoint — see types.ts for why the generic {signal, ...} body could not
+  // carry the rework's per-action required fields. All seven return the
+  // updated general profile with 200, matching the shape the pre-rework
+  // deactivate/lifecycleSignal handlers already returned.
+
+  // PENDING -> PENDING (submitted_for_review_at only; not a status change).
+  async submitForReview(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
-      const result = await employeeManagementService.deactivate(req.auth, req.params['employee_id']!);
+      const result = await employeeManagementService.submitForReview(req.auth, req.params['employee_id']!);
       res.status(200).json({
         status: 'success',
         data: result,
@@ -152,17 +163,34 @@ export class EmployeeManagementController {
     }
   }
 
-  lifecycleSignal = [
-    validateBody(LifecycleSignalSchema),
+  approve = [
+    validateBody(ApproveEmployeeSchema),
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const { signal, hotel_group_id } = req.body;
-        const result = await employeeManagementService.lifecycleSignal(
+        const result = await employeeManagementService.approve(req.auth, req.params['employee_id']!, {
+          hotel_group_id: req.body.hotel_group_id,
+        });
+        res.status(200).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  reject = [
+    validateBody(RejectEmployeeSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.reject(
           req.auth,
           req.params['employee_id']!,
-          signal,
-          { hotel_group_id }
+          req.body.reason
         );
         res.status(200).json({
           status: 'success',
@@ -174,6 +202,90 @@ export class EmployeeManagementController {
       }
     },
   ];
+
+  deactivate = [
+    validateBody(DeactivateEmployeeSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.deactivate(
+          req.auth,
+          req.params['employee_id']!,
+          req.body.deactivation_reason
+        );
+        res.status(200).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  async reactivate(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await employeeManagementService.reactivate(req.auth, req.params['employee_id']!);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async rehire(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await employeeManagementService.rehire(req.auth, req.params['employee_id']!);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  deleteEmployee = [
+    validateBody(DeleteEmployeeSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.delete(
+          req.auth,
+          req.params['employee_id']!,
+          req.body.deleted_reason
+        );
+        res.status(200).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  async restore(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await employeeManagementService.restore(req.auth, req.params['employee_id']!);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 
   getBlocklist = [
     validateQuery(BlocklistQuerySchema),

@@ -1,5 +1,13 @@
-import { EmploymentStatus, EmploymentRecord, Prisma, SkillTag } from '@prisma/client';
+import {
+  AssignmentStatus,
+  DeactivationReason,
+  EmploymentStatus,
+  EmploymentRecord,
+  Prisma,
+  SkillTag,
+} from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import type { DatabaseTransaction } from '../../lib/db.js';
 import {
   ConflictError,
   ForbiddenError,
@@ -7,8 +15,10 @@ import {
   ValidationError,
 } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
-import { isScopedManagerRole } from '../../lib/scope.js';
+import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
 import type { AuthContext } from '../../lib/types.js';
+import { bumpTokenGeneration } from '../auth/service.js';
+import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import {
   assertTransition,
   ASSESSMENT_BASIS,
@@ -21,7 +31,6 @@ import {
 } from './constants.js';
 import type {
   CreateEmployeeRequest,
-  LifecycleSignal,
   ProfileHistoryQuery,
   SpecialCategoryField,
 } from './types.js';
@@ -77,7 +86,12 @@ export class EmployeeManagementService extends BaseService {
         employee_id: data.employee_id,
         job_title: data.job_title,
         start_date: data.start_date,
-        status: EmploymentStatus.INACTIVE,
+        // 2026-08-06 rework: INACTIVE/UNDER_REVIEW collapsed into PENDING;
+        // "submitted for review" is now the submitted_for_review_at sub-state
+        // (schema.prisma EmploymentStatus comment), not a separate status. A
+        // freshly-created record is PENDING with submitted_for_review_at null,
+        // exactly what the old INACTIVE meant.
+        status: EmploymentStatus.PENDING,
         skills: data.skills ?? [],
         personal_data: data.personal_data
           ? (data.personal_data as Prisma.InputJsonValue)
@@ -266,20 +280,452 @@ export class EmployeeManagementService extends BaseService {
     return record;
   }
 
-  // IF-EMP-Deactivate / v0 (Admin-driven soft delete; history retained).
-  async deactivate(actor: AuthContext, employeeId: string) {
-    if (actor.role !== 'admin') {
-      throw new ForbiddenError('Only Admin may deactivate an employee');
+  // ── Lifecycle transitions (REQ-EMP-002 rework, 2026-08-06) ──────────────
+  //
+  // Every EmploymentStatus write on this platform goes through
+  // applyTransition() below — no other method here, and no other module, may
+  // update EmploymentRecord.status or employment_cycle directly (stated as an
+  // invariant on the EmploymentStatusHistory model in schema.prisma). That is
+  // what makes EmploymentStatusHistory a complete, append-only log rather
+  // than a best-effort one: the status write and its history row are the same
+  // transaction, so a transition can never commit unlogged and a log row can
+  // never describe a transition that didn't commit.
+
+  /**
+   * The single status-write seam (see the section note above).
+   *
+   * Takes the caller's transaction client rather than opening its own: every
+   * caller below already needs to join other writes to the same commit (the
+   * approval group connect, the User soft-delete + token_generation bump),
+   * and a helper that opened its own transaction could not be composed into
+   * those without a nested-transaction workaround. `DatabaseTransaction` is
+   * the repository-owned alias (lib/db.ts, ADR-029 GD-01), not
+   * Prisma.TransactionClient directly.
+   *
+   * employment_cycle increments on DELETED -> PENDING only — a rehire after
+   * the person left — and is carried forward unchanged on every other edge
+   * (schema.prisma EmploymentRecord.employment_cycle). The history row records
+   * the cycle the transition occurred *within*, so the incrementing edge's own
+   * row carries the NEW cycle: that row is the boundary marker cycle N starts
+   * at, which is exactly how schema.prisma defines a cycle interval ("cycle N
+   * spans from the DELETED -> PENDING row bearing employment_cycle = N to the
+   * next such row, or to now").
+   */
+  private async applyTransition(
+    tx: DatabaseTransaction,
+    record: EmploymentRecord,
+    toStatus: EmploymentStatus,
+    opts: {
+      reason?: string | null;
+      actorUserId: string | null;
+      data?: Prisma.EmploymentRecordUpdateInput;
     }
+  ): Promise<EmploymentRecord> {
+    assertTransition(record.status, toStatus);
+
+    const isRehire =
+      record.status === EmploymentStatus.DELETED && toStatus === EmploymentStatus.PENDING;
+    const nextCycle = isRehire ? record.employment_cycle + 1 : record.employment_cycle;
+
+    const updated = await tx.employmentRecord.update({
+      where: { id: record.id },
+      data: {
+        ...(opts.data ?? {}),
+        status: toStatus,
+        ...(isRehire ? { employment_cycle: nextCycle } : {}),
+      },
+    });
+
+    await tx.employmentStatusHistory.create({
+      data: {
+        employment_record_id: record.id,
+        from_status: record.status,
+        to_status: toStatus,
+        reason: opts.reason ?? null,
+        actor_user_id: opts.actorUserId,
+        employment_cycle: nextCycle,
+      },
+    });
+
+    return updated;
+  }
+
+  /**
+   * PENDING -> PENDING: onboarding submitted for review.
+   *
+   * Not a status change — submitted_for_review_at is a sub-state of PENDING
+   * (schema.prisma), so this deliberately does NOT call applyTransition():
+   * PENDING -> PENDING is not in ALLOWED_TRANSITIONS and must not be, or
+   * every other same-state write would become legal too.
+   *
+   * Decision: no EmploymentStatusHistory row is written here. That table's
+   * stated contract is one row per *status* transition (schema.prisma), and
+   * it is the source of truth for employment-cycle boundaries — inserting
+   * from_status == to_status rows for a non-transition would make every
+   * consumer that reads it filter them back out, and the audit need is
+   * already met by both the audit log entry below and the
+   * submitted_for_review_at timestamp itself, which is durable on the record.
+   */
+  async submitForReview(actor: AuthContext, employeeId: string) {
     const record = await this.findRecordOrThrow(employeeId);
-    assertTransition(record.status, EmploymentStatus.DEACTIVATED);
+    await this.assertLifecycleAuthority(actor, record, 'submit an employee for review', {
+      allowUnassignedGroup: true,
+    });
+
+    if (record.status !== EmploymentStatus.PENDING) {
+      throw new ConflictError('Only a Pending employment record may be submitted for review');
+    }
 
     const updated = await this.prisma.employmentRecord.update({
       where: { id: record.id },
-      data: { status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() },
+      data: { submitted_for_review_at: new Date() },
     });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.deactivate', 'EMPLOYMENT_RECORD', record.id, {});
+    await this.logAudit(
+      actor.userId,
+      actor.role,
+      'employee.lifecycle.submitted_for_review',
+      'EMPLOYMENT_RECORD',
+      record.id,
+      { submitted_for_review_at: updated.submitted_for_review_at }
+    );
+
+    this.logDomainEvent('EVT-EMP-submitted_for_review', record.employee_id, EmploymentStatus.PENDING);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * PENDING -> ACTIVE (hire approval).
+   *
+   * ADR-023 §4's group resolution is unchanged in substance, only in
+   * placement: it now runs inside the transition's transaction so the
+   * resolved hotel_group_id and the ACTIVE status commit together — an
+   * approval can no longer half-apply (status ACTIVE, group unset) if the
+   * connect fails. Resolution order: (1) the actor's own HotelGroup as its
+   * Regional Manager, (2) the group of a Hotel the actor manages, (3) an
+   * explicit hotel_group_id in the payload. If none resolve, hotel_group_id
+   * is left null — PROVISIONAL, unchanged from the pre-rework behavior: the
+   * record becomes Active but unassignable until a group is set.
+   */
+  async approve(actor: AuthContext, employeeId: string, payload?: { hotel_group_id?: string }) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'approve an employee', {
+      allowUnassignedGroup: true,
+    });
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
+      return this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+        actorUserId: actor.userId,
+        data: resolvedGroupId ? { hotel_group: { connect: { id: resolvedGroupId } } } : {},
+      });
+    });
+
+    await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.approved', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.ACTIVE,
+      hotel_group_id: updated.hotel_group_id,
+    });
+
+    this.logDomainEvent('EVT-EMP-approved', record.employee_id, EmploymentStatus.ACTIVE);
+
+    return toGeneralProfile(updated);
+  }
+
+  /** PENDING -> REJECTED (hire application declined). */
+  async reject(actor: AuthContext, employeeId: string, reason?: string) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'reject an employee', {
+      allowUnassignedGroup: true,
+    });
+
+    const updated = await this.prisma.$transaction((tx) =>
+      this.applyTransition(tx, record, EmploymentStatus.REJECTED, {
+        actorUserId: actor.userId,
+        reason: reason ?? null,
+      })
+    );
+
+    await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.rejected', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.REJECTED,
+      reason: reason ?? null,
+    });
+
+    this.logDomainEvent('EVT-EMP-rejected', record.employee_id, EmploymentStatus.REJECTED);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * ACTIVE -> DEACTIVATED: a TEMPORARY pause (leave / seasonal / suspension).
+   *
+   * Deliberately does NOT set deleted_at, unlike the pre-rework deactivate()
+   * this replaces. That old coupling (status DEACTIVATED always paired with
+   * deleted_at) is what made DEACTIVATED mean "left the company" — the
+   * 20260806123146_employment_lifecycle_rework migration remapped every such
+   * historical row to DELETED for exactly that reason. "Left the company" is
+   * now delete() below; DEACTIVATED is a pause the person returns from via
+   * reactivate(), with the employment record and its group intact.
+   *
+   * Future assignments are still cancelled: a paused worker cannot be
+   * expected to show up for shifts already on the calendar.
+   */
+  async deactivate(actor: AuthContext, employeeId: string, reason: DeactivationReason) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'deactivate an employee');
+
+    // RULE-EMP-02 rework: deactivation_reason is required for this edge
+    // (schema.prisma EmploymentRecord.deactivation_reason). Validated here
+    // and not only at the Zod boundary, because deactivate() is reachable
+    // from any in-process caller, not just the route.
+    if (!reason || !Object.values(DeactivationReason).includes(reason)) {
+      throw new ValidationError('deactivation_reason is required', [
+        {
+          field: 'deactivation_reason',
+          message: `Must be one of ${Object.values(DeactivationReason).join(', ')}`,
+        },
+      ]);
+    }
+
+    const updated = await this.prisma.$transaction((tx) =>
+      this.applyTransition(tx, record, EmploymentStatus.DEACTIVATED, {
+        actorUserId: actor.userId,
+        reason,
+        data: { deactivation_reason: reason },
+      })
+    );
+
+    // After the transition commits, not inside it — see
+    // cancelFutureAssignments()'s own note on the transaction boundary.
+    await this.cancelFutureAssignments(record.user_id, `Employee deactivated (${reason})`, actor.userId);
+
+    await this.logAudit(actor.userId, actor.role, 'employee.deactivate', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.DEACTIVATED,
+      deactivation_reason: reason,
+    });
+
+    this.logDomainEvent('EVT-EMP-deactivated', record.employee_id, EmploymentStatus.DEACTIVATED);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * DEACTIVATED -> ACTIVE: the paused employee returns.
+   *
+   * Direct, with no re-approval and no group re-resolution: deactivate()
+   * never cleared hotel_group_id (the person never left the group, they were
+   * paused within it), so the record is immediately assignable again. This is
+   * the whole point of the DEACTIVATED/DELETED split — only a DELETED return
+   * is a true rehire, and that one is gated through PENDING.
+   */
+  async reactivate(actor: AuthContext, employeeId: string) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'reactivate an employee');
+
+    const updated = await this.prisma.$transaction((tx) =>
+      this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+        actorUserId: actor.userId,
+        // Clear the pause reason: it described a pause that has now ended,
+        // and leaving it set would make an ACTIVE record read as if it were
+        // still on leave. The history row retains it permanently.
+        data: { deactivation_reason: null },
+      })
+    );
+
+    await this.logAudit(actor.userId, actor.role, 'employee.reactivate', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.ACTIVE,
+    });
+
+    this.logDomainEvent('EVT-EMP-reactivated', record.employee_id, EmploymentStatus.ACTIVE);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * REJECTED -> ACTIVE: a previously-declined applicant is taken on after all.
+   *
+   * Direct rather than back through PENDING: a REJECTED record was never
+   * approved, so there is no prior employment cycle to close and reopen —
+   * employment_cycle stays 1 (applyTransition increments only on
+   * DELETED -> PENDING). Note this edge does NOT resolve hotel_group_id the
+   * way approve() does, since a rejected record may legitimately have none;
+   * see assertLifecycleAuthority()'s note on what that means for scoping.
+   */
+  async rehire(actor: AuthContext, employeeId: string) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'rehire an employee', {
+      allowUnassignedGroup: true,
+    });
+
+    const updated = await this.prisma.$transaction((tx) =>
+      this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+        actorUserId: actor.userId,
+      })
+    );
+
+    await this.logAudit(actor.userId, actor.role, 'employee.rehire', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.ACTIVE,
+    });
+
+    this.logDomainEvent('EVT-EMP-rehired', record.employee_id, EmploymentStatus.ACTIVE);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * ACTIVE/DEACTIVATED/REJECTED -> DELETED: the person left the company.
+   *
+   * DELETED == deleteUser() (schema.prisma EmploymentRecord.deleted_at,
+   * "Decision 1"): this is ONE action across both records, not an employment
+   * change that a separate admin step later mirrors onto the account. The
+   * EmploymentRecord soft-delete, the User soft-delete, and the
+   * token_generation bump therefore commit in a single transaction —
+   * reproducing users/service.ts#deleteUser's own ADR-031 D-4 (C-5) shape
+   * (a deleted account must never remain authorizable on an already-issued
+   * access token) rather than approximating it. bumpTokenGeneration() is
+   * imported from backend-auth, the sole authoritative writer of that column
+   * (ADR-031 D-4 PR-4); this module never increments it directly.
+   *
+   * Admin-only, unrestricted scope: unlike the approve/reject/deactivate/
+   * reactivate/rehire set, this crosses the account boundary — it revokes
+   * platform access, not just employment status — so the blast radius is
+   * strictly larger than anything a scope-bound manager is trusted with.
+   */
+  async delete(actor: AuthContext, employeeId: string, deletedReason: string) {
+    if (actor.role !== 'admin') {
+      throw new ForbiddenError('Only Admin may delete an employee');
+    }
+
+    if (!deletedReason || !deletedReason.trim()) {
+      throw new ValidationError('deleted_reason is required', [
+        { field: 'deleted_reason', message: 'Reason must not be blank' },
+      ]);
+    }
+    const reason = deletedReason.trim();
+
+    const record = await this.findRecordOrThrow(employeeId);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const result = await this.applyTransition(tx, record, EmploymentStatus.DELETED, {
+        actorUserId: actor.userId,
+        reason,
+        data: { deleted_reason: reason, deleted_at: now },
+      });
+
+      await tx.user.update({
+        where: { id: record.user_id },
+        data: { deleted_at: now, is_active: false },
+      });
+      await bumpTokenGeneration(tx, record.user_id);
+
+      return result;
+    });
+
+    // After the account is revoked, not before: a cancellation cascade that
+    // failed mid-way would otherwise leave a still-authorizable account.
+    await this.cancelFutureAssignments(record.user_id, `Employee deleted (${reason})`, actor.userId);
+
+    await this.logAudit(actor.userId, actor.role, 'employee.delete', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.DELETED,
+      deleted_reason: reason,
+    });
+    await this.logAudit(actor.userId, actor.role, 'MODIFY', 'USER', record.user_id, {
+      action: 'token_generation_bumped',
+      reason: 'employment_deleted',
+    });
+
+    this.logDomainEvent('EVT-EMP-deleted', record.employee_id, EmploymentStatus.DELETED);
+
+    return toGeneralProfile(updated);
+  }
+
+  /**
+   * DELETED -> PENDING: a former employee is taken back on (a true rehire).
+   *
+   * Lands in PENDING, not ACTIVE — the person must be re-approved, which is
+   * what makes this distinct from reactivate()'s direct return. applyTransition()
+   * increments employment_cycle on exactly this edge.
+   *
+   * The User account is un-soft-deleted here (the DELETED == deleteUser()
+   * unification runs in both directions), but token_generation is bumped
+   * AGAIN rather than left alone. That is deliberate, not a copy-paste of
+   * delete(): any access token minted before the delete is still floating
+   * around, and restoring the account must not silently re-validate it.
+   * Sessions stay invalidated; the restored account's access is for
+   * onboarding/profile completion only while PENDING, and full operational
+   * access resumes only when approve() moves it to ACTIVE.
+   *
+   * Admin-only, same account-boundary rationale as delete().
+   */
+  async restore(actor: AuthContext, employeeId: string) {
+    if (actor.role !== 'admin') {
+      throw new ForbiddenError('Only Admin may restore an employee');
+    }
+
+    // findRecordOrThrow() does not filter deleted_at (see its own note), so a
+    // soft-deleted record is resolvable here — which restore() requires.
+    const record = await this.findRecordOrThrow(employeeId);
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await this.applyTransition(tx, record, EmploymentStatus.PENDING, {
+        actorUserId: actor.userId,
+        data: {
+          deleted_at: null,
+          deleted_reason: null,
+          // A restored record starts its new cycle un-submitted: the previous
+          // cycle's onboarding submission says nothing about this one.
+          submitted_for_review_at: null,
+          deactivation_reason: null,
+          // Same reasoning extends to probation: marked_suitable is a
+          // milestone earned by working the previous cycle, not a fact about
+          // the person that survives a full leave-and-return. Left uncleared,
+          // a cycle-2 PENDING record would read as already past probation
+          // before the rehired person has worked a single day (found in
+          // adversarial review, 2026-08-06).
+          marked_suitable: false,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: record.user_id },
+        data: { deleted_at: null, is_active: true },
+      });
+      await bumpTokenGeneration(tx, record.user_id);
+
+      return result;
+    });
+
+    // TODO (out of scope for this PR): trigger the restored user's
+    // re-onboarding credential flow. The only existing mechanism is
+    // auth/service.ts#requestPasswordReset, which is email-keyed, silently
+    // no-ops for a user it considers unavailable, and is designed as an
+    // unauthenticated self-service entry point — calling it from an
+    // admin-initiated restore would be repurposing it, not reusing it. An
+    // admin-initiated credential-issuance seam does not exist yet; adding one
+    // is new auth infrastructure and belongs in its own change. Until then a
+    // restored user must go through the normal /auth/password-reset flow
+    // themselves, which works because this method sets is_active = true and
+    // clears deleted_at above (requestPasswordReset's own preconditions).
+
+    await this.logAudit(actor.userId, actor.role, 'employee.restore', 'EMPLOYMENT_RECORD', record.id, {
+      from: record.status,
+      to: EmploymentStatus.PENDING,
+      employment_cycle: updated.employment_cycle,
+    });
+    await this.logAudit(actor.userId, actor.role, 'MODIFY', 'USER', record.user_id, {
+      action: 'token_generation_bumped',
+      reason: 'employment_restored',
+    });
+
+    this.logDomainEvent('EVT-EMP-restored', record.employee_id, EmploymentStatus.PENDING);
+
     return toGeneralProfile(updated);
   }
 
@@ -287,9 +733,9 @@ export class EmployeeManagementService extends BaseService {
   // narrow, purpose-built internal method for backend-hr's contract-lapse
   // trigger (ADR-040: manager-confirmed "do not continue" action, or
   // manager silence past a deadline detected by HR's own scheduled job —
-  // both call this the same way). No actor.role gate, unlike deactivate()/
-  // lifecycleSignal() above: this is an internal cross-module call, not a
-  // user-facing route, and ADR-040's manager-only/scheduled-job rules
+  // both call this the same way). No actor.role gate, unlike the
+  // user-facing lifecycle methods above: this is an internal cross-module
+  // call, not a route, and ADR-040's manager-only/scheduled-job rules
   // already gate the caller (backend-hr) before this method is ever
   // reached — mirroring the same authorization-boundary shape ADR-032
   // established for every other direct in-process cross-module call on this
@@ -297,83 +743,226 @@ export class EmployeeManagementService extends BaseService {
   // user_id (backend-hr only holds Contract.worker_id, a User.id), not
   // employee_id like findRecordOrThrow() above -- HR has no reason to know
   // employee-management's own human-facing employee_id.
+  //
+  // *** BEHAVIOR CHANGE (2026-08-06 rework) — READ BEFORE CHANGING ***
+  // This method now produces DELETED, not DEACTIVATED. Under the reworked
+  // lifecycle DEACTIVATED means a temporary pause the employee returns from
+  // (leave/seasonal/suspension), whereas an expired, non-continued contract
+  // means the person has left the company — the former-employee case, which
+  // is DELETED by definition (schema.prisma EmploymentStatus). This is not a
+  // renaming: DELETED is unified with User soft-delete, so a contract lapse
+  // now ALSO deactivates the account (deleted_at, is_active = false) and
+  // invalidates the worker's sessions via token_generation, none of which
+  // happened before. That consequence is intended — an ex-employee retaining
+  // a live login was the pre-rework gap, not a feature — but it is a real,
+  // observable escalation of what HR's lapse action does, so any future
+  // change to make lapse reversible must go through restore() (DELETED ->
+  // PENDING -> ACTIVE), not by pointing this back at deactivate().
   async deactivateForContractLapse(userId: string, reason: string): Promise<void> {
     const record = await this.prisma.employmentRecord.findUnique({ where: { user_id: userId } });
-    if (!record) return; // no employment record to deactivate -- nothing to do (best-effort, matches OD-CAL-06 precedent)
-    if (record.status === EmploymentStatus.DEACTIVATED) return; // idempotent -- already deactivated
+    if (!record) return; // no employment record to act on -- nothing to do (best-effort, matches OD-CAL-06 precedent)
+    if (record.status === EmploymentStatus.DELETED) return; // idempotent -- already gone
 
-    assertTransition(record.status, EmploymentStatus.DEACTIVATED);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const now = new Date();
+      // actorUserId is null, not a synthesized id: the actor is the platform
+      // itself (HR's scheduled job or an in-process call), and
+      // EmploymentStatusHistory.actor_user_id is nullable precisely for this
+      // "system-driven transition" case (schema.prisma).
+      const result = await this.applyTransition(tx, record, EmploymentStatus.DELETED, {
+        actorUserId: null,
+        reason,
+        data: { deleted_reason: reason, deleted_at: now },
+      });
 
-    await this.prisma.employmentRecord.update({
-      where: { id: record.id },
-      data: { status: EmploymentStatus.DEACTIVATED, deleted_at: new Date() },
+      await tx.user.update({
+        where: { id: record.user_id },
+        data: { deleted_at: now, is_active: false },
+      });
+      await bumpTokenGeneration(tx, record.user_id);
+
+      return result;
     });
+
+    await this.cancelFutureAssignments(record.user_id, 'Contract lapsed', null);
 
     await this.logAudit(null, 'system', 'employee.deactivate.contract_lapse', 'EMPLOYMENT_RECORD', record.id, {
       reason,
+      to: EmploymentStatus.DELETED,
     });
 
-    logger.info('domain_event', { event: 'EVT-EMP-deactivated', employmentRecordId: record.id, reason });
+    logger.info('domain_event', {
+      event: 'EVT-EMP-deleted',
+      employmentRecordId: updated.id,
+      reason,
+    });
   }
 
-  // ── Lifecycle signal (internal, Onboarding-driven) ──────────────────────
+  /**
+   * Cancels every future active WorkerAssignment for a worker whose
+   * employment just ended or paused, one at a time through
+   * AssignmentService.update().
+   *
+   * Shape and rationale are lifted from job-requests/service.ts#
+   * cascadeCancelAssignments (that method is JobRequest-keyed and private to
+   * its own module, so it cannot be called for a worker-keyed cascade — this
+   * is the same delegation pattern re-keyed, not a second implementation of
+   * "what happens when an assignment is cancelled"). Per-row rather than a
+   * bulk updateMany precisely so every one of AssignmentService.update()'s
+   * own side effects fires per assignment: the WorkerOverallRating recompute,
+   * the JobRequestSkillSlot.confirmed_count decrement for a broadcast-accepted
+   * assignment, and the cancellation notification to the worker.
+   *
+   * Runs AFTER the employment transaction commits, not inside it:
+   * AssignmentService.update() opens its own transaction and is not
+   * composable into an outer one (the same boundary job-requests' cascade and
+   * CalendarService.autoCancelSameDayAssignment already accept). A crash
+   * between the two leaves the employment record transitioned with
+   * assignments still active — the identical, already-accepted tradeoff of
+   * that existing delegation, not a new risk.
+   *
+   * "Future" is day >= today (UTC midnight): today's assignment counts as
+   * future because a worker deactivated mid-morning still should not be
+   * expected on a shift later that day. Past assignments are historical fact
+   * and are never rewritten. The status filter reuses
+   * ACTIVE_ASSIGNMENT_STATUSES (assignments/service.ts) rather than
+   * re-listing CONFIRMED/IN_PROGRESS, so it stays in lock-step with the DB
+   * partial index that defines that set.
+   *
+   * Note on JobRequest.status: cancelling a slot-bound assignment decrements
+   * JobRequestSkillSlot.confirmed_count (inside AssignmentService.update()),
+   * which can drop a slot back below its headcount. No FILLED -> OPEN flip is
+   * performed or needed — verified 2026-08-06: no code path in this
+   * repository ever writes WorkRequestStatus.FILLED (the only reference is
+   * analytics/service.ts reading a count), so a broadcast whose slots refill
+   * is still OPEN and immediately acceptable again. If a future PR introduces
+   * a FILLED writer, it must also add the inbound FILLED -> OPEN edge to
+   * job-requests/service.ts's ALLOWED_TRANSITIONS, which does not have one.
+   */
+  private async cancelFutureAssignments(
+    workerId: string,
+    cancellationReason: string,
+    actorUserId: string | null
+  ): Promise<void> {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
 
-  private static readonly SIGNAL_TARGET: Record<LifecycleSignal, EmploymentStatus> = {
-    submitted_for_review: EmploymentStatus.UNDER_REVIEW,
-    approved: EmploymentStatus.ACTIVE,
-    rejected: EmploymentStatus.REJECTED,
-  };
+    const assignments = await this.prisma.workerAssignment.findMany({
+      where: {
+        worker_id: workerId,
+        day: { gte: today },
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+      },
+      select: { id: true },
+    });
 
-  // IF-EMP-LifecycleSignal / v0: Onboarding-driven transitions. No dedicated
-  // service-to-service auth mechanism exists in this codebase, so the
-  // transport boundary is Admin-only at the route (OD-EMP-09).
-  async lifecycleSignal(
+    for (const assignment of assignments) {
+      await assignmentService.update(
+        assignment.id,
+        { status: AssignmentStatus.CANCELLED, cancellation_reason: cancellationReason },
+        // Real actor id (never '') so AssignmentService.update()'s
+        // worker-initiated-vs-not notification branch (actorId ===
+        // assignment.worker_id) still routes correctly for the audit log and
+        // the "who gets notified" decision.
+        //
+        // actorRole is hardcoded to 'admin', NOT actor.role, regardless of
+        // who actually triggered this cascade (a scoped manager/RM via
+        // deactivate()/delete(), or the system via
+        // deactivateForContractLapse()). This is deliberate, not a shortcut:
+        // AssignmentService.update() runs its OWN authorization check against
+        // actorRole/actorScope (isSelfScopedRole / isScopedManagerRole +
+        // isHotelInScope, assignments/service.ts ~157-180) — a second,
+        // independent, HOTEL-grain gate on top of the GROUP-grain
+        // authorization assertLifecycleAuthority() already performed on the
+        // *employment* action that triggered this cascade. Passing the real
+        // actor/role/scope through was found to fail in two ways: (a) role
+        // 'system' (no real actor) falls through isSelfScopedRole's role list
+        // to `true`, routing the cancel through isWorkerEligibleForHotel('')
+        // which always denies; (b) a scoped manager authorized to deactivate
+        // a worker across their whole hotel GROUP could still be denied by
+        // update()'s narrower per-HOTEL check on a sibling hotel in the same
+        // group, aborting the cascade mid-loop with some assignments already
+        // cancelled. The employment-lifecycle service is the sole authority
+        // that already decided this cascade may proceed; re-authorizing each
+        // individual cancellation against a stricter, differently-grained
+        // policy is incorrect, not merely redundant. 'admin' is unrestricted
+        // by both of update()'s checks, which correctly reflects that no
+        // further authorization is being deferred to this call.
+        actorUserId ?? '',
+        'admin',
+        null
+      );
+    }
+  }
+
+  /**
+   * Authorization for the employment-status lifecycle actions that stay
+   * within employment (submit-for-review/approve/reject/deactivate/
+   * reactivate/rehire).
+   *
+   * Admin is unrestricted. A scope-bound manager (Hotel Manager or Regional
+   * Manager, per isScopedManagerRole) may act only within their own group —
+   * the same group-grain question assertVisibility()/isRecordInScope() below
+   * already answer for reads, here through the shared isWorkerInGroupScope()
+   * primitive (lib/scope.ts, ADR-030 PR-1 C-10) since this is a scoped
+   * *write*. Every other role is denied outright.
+   *
+   * `allowUnassignedGroup` (do not read its absence-handling as an
+   * oversight): isWorkerInGroupScope() denies when the record has no
+   * hotel_group_id (lib/scope.ts, deny-by-default), and hotel_group_id is
+   * only ever set at approve() (ADR-023 §4) — so a PENDING or REJECTED
+   * record is *always* group-less until the first approval it ever
+   * receives. Checking the record's group for submit-for-review/approve/
+   * reject/rehire would therefore deny every manager/RM unconditionally,
+   * collapsing that entire tier of the permission matrix to admin-only by
+   * accident rather than by decision (found in adversarial review,
+   * 2026-08-06). For exactly those four group-less-eligible actions, this
+   * method instead checks whether the ACTOR owns a group at all
+   * (resolveApprovalGroupId — the same resolution approve() itself uses to
+   * pick the group a newly-approved record gets connected to), not whether
+   * that group matches the record's (there is nothing yet to match against).
+   * This is authorization by "is this actor a manager/RM who owns a group",
+   * which is the correct question for onboarding an unassigned applicant —
+   * NOT by inferring and checking the record's intended group from the
+   * actor, which would let the actor supply the very value being checked.
+   * deactivate()/reactivate() do NOT set this flag: by the time either can
+   * fire the record is ACTIVE or DEACTIVATED, which only ever follows a
+   * completed approve(), so hotel_group_id is already set and the ordinary
+   * record-group check applies.
+   */
+  private async assertLifecycleAuthority(
     actor: AuthContext,
-    employeeId: string,
-    signal: LifecycleSignal,
-    payload?: { hotel_group_id?: string }
-  ) {
-    if (actor.role !== 'admin') {
-      throw new ForbiddenError('Lifecycle signals are internal-only');
-    }
+    record: EmploymentRecord,
+    action: string,
+    opts: { allowUnassignedGroup?: boolean } = {}
+  ): Promise<void> {
+    if (actor.role === 'admin') return;
 
-    const record = await this.findRecordOrThrow(employeeId);
-    const target = EmployeeManagementService.SIGNAL_TARGET[signal];
-    assertTransition(record.status, target);
-
-    const data: Prisma.EmploymentRecordUpdateInput = { status: target };
-
-    if (signal === 'approved') {
-      // ADR-023 §4: hotel_group_id is set at Under Review -> Active from the
-      // approving manager's own group. Resolution order: (1) the actor's own
-      // HotelGroup as its Regional Manager, (2) the group of a Hotel the
-      // actor manages, (3) an explicit hotel_group_id in the payload. If
-      // none resolve, hotel_group_id is left null — PROVISIONAL, the record
-      // becomes Active but unassignable until a group is set by a follow-up
-      // action outside this PR's scope.
-      const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
-      if (resolvedGroupId) {
-        data.hotel_group = { connect: { id: resolvedGroupId } };
+    if (isScopedManagerRole(actor.role)) {
+      if (record.hotel_group_id === null && opts.allowUnassignedGroup) {
+        const ownGroupId = await this.resolveApprovalGroupId(actor);
+        if (!ownGroupId) {
+          throw new ForbiddenError(`Cannot ${action}: you do not manage a hotel group`);
+        }
+        return;
       }
+
+      const inScope = await isWorkerInGroupScope(actor.scope ?? null, record.user_id);
+      if (!inScope) {
+        throw new ForbiddenError(`Cannot ${action} outside your group`);
+      }
+      return;
     }
 
-    const updated = await this.prisma.employmentRecord.update({ where: { id: record.id }, data });
+    throw new ForbiddenError(`Insufficient permissions to ${action}`);
+  }
 
-    await this.logAudit(actor.userId, actor.role, `employee.lifecycle.${signal}`, 'EMPLOYMENT_RECORD', record.id, {
-      from: record.status,
-      to: target,
-    });
-
-    // OD-EMP-09: no event bus exists in this codebase (every module records
-    // published_events: none-observed); domain events are represented as a
-    // structured log line only.
-    logger.info('domain_event', {
-      event: `EVT-EMP-${signal}`,
-      employee_id: record.employee_id,
-      status: target,
-    });
-
-    return toGeneralProfile(updated);
+  // OD-EMP-09: no event bus exists in this codebase (every module records
+  // published_events: none-observed); domain events are represented as a
+  // structured log line only. Centralized here so every lifecycle method
+  // emits the identical shape.
+  private logDomainEvent(event: string, employeeId: string, status: EmploymentStatus): void {
+    logger.info('domain_event', { event, employee_id: employeeId, status });
   }
 
   private async resolveApprovalGroupId(actor: AuthContext, explicitGroupId?: string): Promise<string | null> {
@@ -521,6 +1110,11 @@ export class EmployeeManagementService extends BaseService {
 
   // ── Shared helpers ───────────────────────────────────────────────────────
 
+  // Deliberately does NOT filter on deleted_at (and never did, despite
+  // getByUserId's comment above claiming it "now enforces" that invariant --
+  // getByUserId does its own filtering, which is what actually holds). Kept
+  // as-is: restore() must be able to resolve a DELETED, soft-deleted record
+  // by employee_id, which a deleted_at filter here would make impossible.
   private async findRecordOrThrow(employeeId: string): Promise<EmploymentRecord> {
     const record = await this.prisma.employmentRecord.findUnique({ where: { employee_id: employeeId } });
     if (!record) throw new NotFoundError('Employment record not found');
