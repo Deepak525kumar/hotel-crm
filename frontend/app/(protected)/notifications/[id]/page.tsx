@@ -3,7 +3,7 @@
 import { useParams } from "next/navigation";
 import { useNotification } from "@/hooks/useNotifications";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useHotel } from "@/hooks/useHotels";
+import { useHotel, useUsersByIds } from "@/hooks/useHotels";
 import { notificationsApi } from "@/lib/api";
 import {
   NotificationTypeBadge,
@@ -45,6 +45,15 @@ const DATA_KEY_ROUTES: Record<string, (v: string) => string> = {
   hotel_id: (v) => `/hotels/${v}`,
 };
 
+/** Keys whose value is a user id we can resolve to a display name. */
+const USER_DATA_KEYS = new Set([
+  "worker_id",
+  "new_worker_id",
+  "unassigned_by_id",
+  "actor_id",
+  "user_id",
+]);
+
 const DATA_KEY_LABELS: Record<string, string> = {
   assignment_id: "Assignment",
   previous_assignment_id: "Previous assignment",
@@ -65,6 +74,12 @@ export default function NotificationDetailPage() {
 
   const { notification, isLoading, error, mutate } = useNotification(id);
   const { data: hotel } = useHotel(notification?.hotel_id ?? undefined);
+  const dataUserIds = notification?.data
+    ? Object.entries(notification.data)
+        .filter(([key]) => USER_DATA_KEYS.has(key))
+        .map(([, value]) => String(value))
+    : [];
+  const usersById = useUsersByIds(dataUserIds);
 
   const mark = useAsyncAction();
 
@@ -176,13 +191,19 @@ export default function NotificationDetailPage() {
             {dataEntries.map(([key, value]) => {
               const stringValue = String(value);
               const toHref = DATA_KEY_ROUTES[key];
+              const user = USER_DATA_KEYS.has(key) ? usersById.get(stringValue) : undefined;
+              const linkText = user
+                ? `${user.first_name} ${user.last_name}`
+                : key === "hotel_id" && hotel
+                  ? hotel.name
+                  : "View";
               return (
                 <DataRow
                   key={key}
                   label={DATA_KEY_LABELS[key] ?? key}
                   value={
                     toHref ? (
-                      <TextLink href={toHref(stringValue)}>View</TextLink>
+                      <TextLink href={toHref(stringValue)}>{linkText}</TextLink>
                     ) : (
                       stringValue
                     )
