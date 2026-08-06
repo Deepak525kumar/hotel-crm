@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useGeoCheckins } from "@/hooks/useGeoCheckins";
+import { useHotel, useUsersByIds } from "@/hooks/useHotels";
 import { GeoCheckinsGate } from "@/components/auth/RoleGate";
 import { GeofenceResultBadge } from "@/components/geo/GeofenceResultBadge";
 import { formatDateTime } from "@/lib/format";
@@ -20,10 +21,34 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
-
+import type { GeoCheckin } from "@/lib/types";
 
 const PER_PAGE = 20;
 const COLUMNS = 5;
+
+function GeoCheckinRow({ record: r }: { record: GeoCheckin }) {
+  const { data: hotel } = useHotel(r.hotel_id);
+  const peopleById = useUsersByIds([r.worker_id]);
+  const worker = peopleById.get(r.worker_id);
+
+  return (
+    <TR>
+      <TD className="font-medium">
+        <TextLink href={`/geo-checkins/${r.id}`} className="block">
+          {worker ? `${worker.first_name} ${worker.last_name}` : "View check-in"}
+        </TextLink>
+      </TD>
+      <TD>
+        <TextLink href={`/hotels/${r.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
+      </TD>
+      <TD>{formatDateTime(r.checked_at)}</TD>
+      <TD>{Math.round(r.distance_meters)}m</TD>
+      <TD>
+        <GeofenceResultBadge insideRadius={r.inside_radius} />
+      </TD>
+    </TR>
+  );
+}
 
 function GeoCheckinsList() {
   const [page, setPage] = useState(1);
@@ -73,19 +98,7 @@ function GeoCheckinsList() {
               ) : (
                 <TBody>
                   {records.map((r) => (
-                    <TR key={r.id}>
-                      <TD className="font-medium">
-                        <TextLink href={`/geo-checkins/${r.id}`} className="block">
-                          {r.worker_id}
-                        </TextLink>
-                      </TD>
-                      <TD>{r.hotel_id}</TD>
-                      <TD>{formatDateTime(r.checked_at)}</TD>
-                      <TD>{Math.round(r.distance_meters)}m</TD>
-                      <TD>
-                        <GeofenceResultBadge insideRadius={r.inside_radius} />
-                      </TD>
-                    </TR>
+                    <GeoCheckinRow key={r.id} record={r} />
                   ))}
                 </TBody>
               )}

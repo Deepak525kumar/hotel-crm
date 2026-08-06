@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
-import { useUserOptions } from "@/hooks/useHotels";
+import { useHotel, useUserOptions, useUsersByIds } from "@/hooks/useHotels";
+import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { ApiError, assignmentsApi, qualityApi } from "@/lib/api";
@@ -34,6 +35,14 @@ export default function AssignmentDetailPage() {
   const { id } = params;
 
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
+  const { data: hotel } = useHotel(assignment?.hotel_id);
+  const { data: workRequest } = useWorkRequest(assignment?.work_request_id);
+  const peopleIds = assignment
+    ? [assignment.worker_id, assignment.assigned_by_id]
+    : [];
+  const peopleById = useUsersByIds(peopleIds);
+  const worker = assignment ? peopleById.get(assignment.worker_id) : undefined;
+  const assignedBy = assignment ? peopleById.get(assignment.assigned_by_id) : undefined;
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -154,19 +163,48 @@ export default function AssignmentDetailPage() {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            <DataRow label="Worker" value={assignment.worker_id} />
+            <DataRow
+              label="Worker"
+              value={
+                <TextLink href={`/users/${assignment.worker_id}`}>
+                  {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
+                </TextLink>
+              }
+            />
+            <DataRow
+              label="Hotel"
+              value={
+                <TextLink href={`/hotels/${assignment.hotel_id}`}>
+                  {hotel?.name ?? "View hotel"}
+                </TextLink>
+              }
+            />
             <DataRow
               label="Work request"
               value={
                 <TextLink
                   href={`/requests/${assignment.work_request_id}`}
                 >
-                  {assignment.work_request_id}
+                  {workRequest?.position ?? "View request"}
                 </TextLink>
               }
             />
-            <DataRow label="Hotel" value={assignment.hotel_id} />
-            <DataRow label="Assigned by" value={assignment.assigned_by_id} />
+            <DataRow
+              label="Shift"
+              value={
+                workRequest
+                  ? `${workRequest.shift_date} · ${workRequest.shift_start_time}–${workRequest.shift_end_time}`
+                  : "—"
+              }
+            />
+            <DataRow
+              label="Assigned by"
+              value={
+                <TextLink href={`/users/${assignment.assigned_by_id}`}>
+                  {assignedBy ? `${assignedBy.first_name} ${assignedBy.last_name}` : "View user"}
+                </TextLink>
+              }
+            />
             <DataRow
               label="Confirmed"
               value={formatDateTime(assignment.confirmed_at)}

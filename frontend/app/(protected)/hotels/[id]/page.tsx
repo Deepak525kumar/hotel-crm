@@ -34,8 +34,15 @@ export default function HotelDetailPage() {
 
   const { data: hotel, isLoading, error } = useHotel(id);
   const { data: group } = useHotelGroup(hotel?.hotel_group_id);
-  const managerById = useUsersByIds(hotel?.manager_user_id ? [hotel.manager_user_id] : []);
+  const managerIds = [
+    ...(hotel?.manager_user_id ? [hotel.manager_user_id] : []),
+    ...(group?.regional_manager_user_id ? [group.regional_manager_user_id] : []),
+  ];
+  const managerById = useUsersByIds(managerIds);
   const manager = hotel?.manager_user_id ? managerById.get(hotel.manager_user_id) : undefined;
+  const regionalManager = group?.regional_manager_user_id
+    ? managerById.get(group.regional_manager_user_id)
+    : undefined;
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
@@ -138,6 +145,29 @@ export default function HotelDetailPage() {
                           hotel.manager_vacancy_reason !== "NOT_ASSIGNED" &&
                           ` (${hotel.manager_vacancy_reason.toLowerCase()})`}
                       </span>
+                    )
+                  }
+                />
+                <DataRow
+                  label="Regional manager"
+                  value={
+                    group?.regional_manager_user_id ? (
+                      <TextLink href={`/users/${group.regional_manager_user_id}`}>
+                        {regionalManager
+                          ? `${regionalManager.first_name} ${regionalManager.last_name}`
+                          : "View regional manager"}
+                      </TextLink>
+                    ) : hotel.hotel_group_id ? (
+                      <span className="text-gray-500">
+                        Vacant
+                        {group?.regional_manager_vacated_at &&
+                          ` since ${formatDateTime(group.regional_manager_vacated_at)}`}
+                        {group?.regional_manager_vacancy_reason &&
+                          group.regional_manager_vacancy_reason !== "NOT_ASSIGNED" &&
+                          ` (${group.regional_manager_vacancy_reason.toLowerCase()})`}
+                      </span>
+                    ) : (
+                      <span className="text-gray-500">No hotel group assigned</span>
                     )
                   }
                 />

@@ -15,12 +15,13 @@ export class CrmService extends BaseService {
   // ── Hotels ─────────────────────────────────────────────────────────────────
 
   async listHotels(query: ListHotelsQuery, actorRole: string, actorId?: string) {
-    const { page, limit, search, is_active, country } = query;
+    const { page, limit, search, is_active, country, hotel_group_id } = query;
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
     if (is_active !== undefined) where['is_active'] = is_active === 'true';
     if (country) where['country'] = { equals: country, mode: 'insensitive' };
+    if (hotel_group_id) where['hotel_group_id'] = hotel_group_id;
     if (search) {
       where['OR'] = [
         { name: { contains: search, mode: 'insensitive' } },

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useAttendanceRecord } from "@/hooks/useAttendance";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useHotel, useUsersByIds } from "@/hooks/useHotels";
 import { ApiError, attendanceApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -42,6 +43,14 @@ export default function AttendanceDetailPage() {
 
   const { data: record, isLoading, error, mutate } = useAttendanceRecord(id);
   const currentUserId = useAuthStore((s) => s.user?.id);
+  const { data: hotel } = useHotel(record?.hotel_id);
+  const peopleIds = record
+    ? [record.worker_id, ...(record.verified_by_id ? [record.verified_by_id] : [])]
+    : [];
+  const peopleById = useUsersByIds(peopleIds);
+  const worker = record ? peopleById.get(record.worker_id) : undefined;
+  const verifiedBy =
+    record?.verified_by_id ? peopleById.get(record.verified_by_id) : undefined;
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewStatus, setReviewStatus] =
@@ -167,20 +176,41 @@ export default function AttendanceDetailPage() {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            <DataRow label="Worker" value={record.worker_id} />
             <DataRow
-              label="Assignment"
+              label="Worker"
               value={
-                <TextLink
-                  href={`/assignments/${record.assignment_id}`}
-                >
-                  {record.assignment_id}
+                <TextLink href={`/users/${record.worker_id}`}>
+                  {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
                 </TextLink>
               }
             />
-            <DataRow label="Hotel" value={record.hotel_id} />
+            <DataRow
+              label="Assignment"
+              value={
+                <TextLink href={`/assignments/${record.assignment_id}`}>
+                  View assignment
+                </TextLink>
+              }
+            />
+            <DataRow
+              label="Hotel"
+              value={
+                <TextLink href={`/hotels/${record.hotel_id}`}>
+                  {hotel?.name ?? "View hotel"}
+                </TextLink>
+              }
+            />
             {record.verified_by_id && (
-              <DataRow label="Verified by" value={record.verified_by_id} />
+              <DataRow
+                label="Verified by"
+                value={
+                  <TextLink href={`/users/${record.verified_by_id}`}>
+                    {verifiedBy
+                      ? `${verifiedBy.first_name} ${verifiedBy.last_name}`
+                      : "View user"}
+                  </TextLink>
+                }
+              />
             )}
             {record.verified_at && (
               <DataRow
