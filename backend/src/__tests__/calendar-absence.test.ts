@@ -174,6 +174,21 @@ describe('CalendarService.markAbsence', () => {
     expect(result.kind).toBe('SICK');
   });
 
+  // Regression (2026-08-07): the auto-cancel lookup used the legacy
+  // `work_request: { shift_date }` join, which never matches a
+  // calendar-placed or broadcast-accepted assignment (work_request_id is null
+  // on both). A worker marking themselves sick left their shift CONFIRMED and
+  // the manager still saw a staffed slot for someone who would not arrive.
+  it('looks up the shift to auto-cancel by the denormalized day column, not the work_request relation', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+
+    await service.markAbsence('w1', { day: '2026-07-28', kind: 'SICK' });
+
+    const where = mockWorkerAssignment.findFirst.mock.calls[0][0].where;
+    expect(where.day).toEqual(new Date('2026-07-28T00:00:00.000Z'));
+    expect(where.work_request).toBeUndefined();
+  });
+
   it('auto-cancels an existing same-day CONFIRMED/IN_PROGRESS assignment via AssignmentService.update (no direct Calendar write)', async () => {
     mockWorkerAssignment.findFirst.mockResolvedValue({
       id: 'a1',
@@ -306,12 +321,36 @@ describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', (
 
   it('is today-only: reads today\'s date regardless of any other input', async () => {
     await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
-    expect(mockWorkerAssignment.findFirst.mock.calls[0][0].where.work_request.shift_date).toEqual(
+    // Filters on the denormalized `day` column, not the legacy work_request
+    // relation join (2026-08-07): work_request_id is null for every assignment
+    // the current creation paths produce, so the old join matched nothing.
+    expect(mockWorkerAssignment.findFirst.mock.calls[0][0].where.day).toEqual(
       new Date('2026-07-27T00:00:00.000Z')
     );
     expect(mockCalendarAbsence.findUnique.mock.calls[0][0].where).toEqual({
       worker_id_day: { worker_id: 'w1', day: new Date('2026-07-27T00:00:00.000Z') } ,
     });
+  });
+
+  // Regression (2026-08-07). Both getAvailability() and
+  // autoCancelSameDayAssignment() filtered via `work_request: { shift_date }`.
+  // Neither current creation path sets work_request_id -- placeOnCalendar()
+  // and acceptBroadcast() both write null -- and a Prisma nested to-one filter
+  // never matches a null relation, so the calendar was blind to every modern
+  // assignment: it reported a fully-booked worker as available, and marking
+  // yourself sick left the shift CONFIRMED.
+  //
+  // Asserting the WHERE shape rather than a boolean is deliberate: with the
+  // old join the mock still returns whatever it is told to, so an
+  // outcome-only test passes against the bug.
+  it('queries by the denormalized day column, never the work_request relation', async () => {
+    await service.getAvailability('w1', { userId: 'w1', role: 'worker' });
+
+    const where = mockWorkerAssignment.findFirst.mock.calls[0][0].where;
+    expect(where.day).toEqual(new Date('2026-07-27T00:00:00.000Z'));
+    // The specific defect: a relation join here matches no calendar-placed or
+    // broadcast-accepted row.
+    expect(where.work_request).toBeUndefined();
   });
 
   it('returns available=false when assigned today (CONFIRMED/IN_PROGRESS)', async () => {
