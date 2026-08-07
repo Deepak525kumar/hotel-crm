@@ -1,12 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { APP_OWNER } from "@/lib/config";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useAuth } from "@/hooks/useAuth";
-import { Badge } from "@/components/ui";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { cn } from "@/lib/cn";
@@ -114,7 +112,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           }
         }}
         className={cn(
-          "hidden shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 md:flex",
+          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 md:flex",
           sidebarExpanded ? "w-60" : "w-16",
         )}
       >
@@ -174,17 +172,6 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             {user && <NotificationsBell />}
-            {user && (
-              <Link
-                href="/profile"
-                className="flex items-center gap-2 rounded-md px-2 py-1 text-sm hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
-              >
-                <span className="hidden text-gray-700 sm:inline">
-                  {user.first_name} {user.last_name}
-                </span>
-                <Badge tone="info">{user.role}</Badge>
-              </Link>
-            )}
             <button
               type="button"
               onClick={handleLogout}

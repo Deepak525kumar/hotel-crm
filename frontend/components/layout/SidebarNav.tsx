@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/hooks/useAuth";
+import { Badge } from "@/components/ui";
 import type { Role } from "@/lib/types";
 
 export interface NavItem {
@@ -90,31 +91,84 @@ export function SidebarNav({
   const pathname = usePathname();
   const { user } = useAuth();
 
+  const items = NAV.filter(
+    (item) => !item.roles || (user && item.roles.includes(user.role)),
+  );
+  // Settings is excluded from the scrolling feature list and rendered in its
+  // own pinned footer below instead (see the `<footer>` below) — it's a
+  // destination users go looking for, not one they navigate between like the
+  // feature routes above, so it should never scroll out of reach and should
+  // sit visually apart from them, not just last-in-list.
+  const featureItems = items.filter((item) => item.href !== "/settings");
+  const settingsItem = items.find((item) => item.href === "/settings");
+
+  const renderLink = (item: NavItem) => {
+    const active =
+      pathname === item.href || pathname.startsWith(`${item.href}/`);
+    const Icon = item.icon;
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        onClick={onNavigate}
+        aria-current={active ? "page" : undefined}
+        title={collapsed ? item.label : undefined}
+        className={cn(
+          "flex items-center rounded-md py-2 text-sm font-medium",
+          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
+          // Collapsed: no horizontal padding/gap at all, so the 20px
+          // icon has the full 64px rail (minus the outer `nav` padding)
+          // to center in -- `px-3` on top of that would leave only
+          // 16px, clipping the icon on every render of the (default,
+          // most-common) collapsed state.
+          collapsed ? "justify-center px-0" : "justify-between gap-3 px-3",
+          active
+            ? "bg-blue-50 text-blue-700"
+            : "text-gray-700 hover:bg-gray-100",
+        )}
+      >
+        <span
+          className={cn(
+            "flex items-center overflow-hidden",
+            collapsed ? "gap-0" : "gap-3",
+          )}
+        >
+          <Icon className="h-5 w-5 shrink-0" aria-hidden />
+          <span
+            className={cn(
+              "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200",
+              collapsed ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100",
+            )}
+          >
+            {item.label}
+          </span>
+        </span>
+      </Link>
+    );
+  };
+
   return (
-    <nav className="flex-1 space-y-1 p-3">
-      {NAV.filter(
-        (item) => !item.roles || (user && item.roles.includes(user.role)),
-      ).map((item) => {
-        const active =
-          pathname === item.href || pathname.startsWith(`${item.href}/`);
-        const Icon = item.icon;
-        return (
+    // The rail itself is `sticky`/fixed-height (AppShell); this wrapper
+    // splits into a scrolling <nav> for feature routes and a separate,
+    // never-scrolling <footer> for profile + Settings pinned to the very
+    // bottom of the rail -- the divider border is the visual gap that keeps
+    // it from reading as just another (last) nav item.
+    <div className="flex min-h-0 flex-1 flex-col">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
+        {featureItems.map(renderLink)}
+      </nav>
+      <footer className="space-y-1 border-t border-gray-200 p-3">
+        {user && (
           <Link
-            key={item.href}
-            href={item.href}
+            href="/profile"
             onClick={onNavigate}
-            aria-current={active ? "page" : undefined}
-            title={collapsed ? item.label : undefined}
+            aria-current={pathname === "/profile" ? "page" : undefined}
+            title={collapsed ? "Profile" : undefined}
             className={cn(
               "flex items-center rounded-md py-2 text-sm font-medium",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-              // Collapsed: no horizontal padding/gap at all, so the 20px
-              // icon has the full 64px rail (minus the outer `nav` padding)
-              // to center in -- `px-3` on top of that would leave only
-              // 16px, clipping the icon on every render of the (default,
-              // most-common) collapsed state.
               collapsed ? "justify-center px-0" : "justify-between gap-3 px-3",
-              active
+              pathname === "/profile"
                 ? "bg-blue-50 text-blue-700"
                 : "text-gray-700 hover:bg-gray-100",
             )}
@@ -125,19 +179,24 @@ export function SidebarNav({
                 collapsed ? "gap-0" : "gap-3",
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" aria-hidden />
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-700">
+                {user.first_name?.[0]}
+                {user.last_name?.[0]}
+              </span>
               <span
                 className={cn(
-                  "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200",
+                  "flex items-center gap-2 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200",
                   collapsed ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100",
                 )}
               >
-                {item.label}
+                {user.first_name} {user.last_name}
+                <Badge tone="info">{user.role}</Badge>
               </span>
             </span>
           </Link>
-        );
-      })}
-    </nav>
+        )}
+        {settingsItem && renderLink(settingsItem)}
+      </footer>
+    </div>
   );
 }
