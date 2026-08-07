@@ -638,8 +638,22 @@ export const hotelsApi = {
     apiFetch<Hotel>(`/crm/hotels/${id}`, { method: "PATCH", body: input }),
 
   /** Soft-delete (deactivate) a hotel. Admin-only backend-side; returns 204. */
+  /**
+   * Soft delete: removes the hotel from operations but preserves history and
+   * leaves it restorable. Never destroys the row -- a true purge, if ever
+   * needed, is a separate operation.
+   */
   remove: (id: string) =>
     apiFetch<void>(`/crm/hotels/${id}`, { method: "DELETE" }),
+
+  // Entity lifecycle (2026-08-07). Deactivate/reactivate are the temporary,
+  // reversible pair; restore is the inverse of remove().
+  deactivate: (id: string) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}/deactivate`, { method: "POST" }),
+  reactivate: (id: string) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}/reactivate`, { method: "POST" }),
+  restore: (id: string) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}/restore`, { method: "POST" }),
 };
 
 /** Hotel Groups API matching the backend `/crm/hotel-groups/*` routes. */
@@ -658,8 +672,16 @@ export const hotelGroupsApi = {
       body: input,
     }),
 
+  /** Soft delete, as of 2026-08-07 -- previously destroyed the row. */
   remove: (id: string) =>
     apiFetch<void>(`/crm/hotel-groups/${id}`, { method: "DELETE" }),
+
+  deactivate: (id: string) =>
+    apiFetch<HotelGroup>(`/crm/hotel-groups/${id}/deactivate`, { method: "POST" }),
+  reactivate: (id: string) =>
+    apiFetch<HotelGroup>(`/crm/hotel-groups/${id}/reactivate`, { method: "POST" }),
+  restore: (id: string) =>
+    apiFetch<HotelGroup>(`/crm/hotel-groups/${id}/restore`, { method: "POST" }),
 };
 
 /** Analytics API matching the backend `/analytics/*` routes (manager/admin). */

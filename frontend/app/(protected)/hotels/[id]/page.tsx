@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { LifecycleCard } from "@/components/crm/LifecycleCard";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup, useUsersByIds } from "@/hooks/useHotels";
-import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
@@ -20,8 +19,6 @@ import {
   CardTitle,
   DataList,
   DataRow,
-  FormError,
-  Modal,
   PageHeader,
   Skeleton,
   TextLink,
@@ -44,25 +41,20 @@ export default function HotelDetailPage() {
     ? managerById.get(group.regional_manager_user_id)
     : undefined;
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const deactivate = useAsyncAction();
-
-  const onDeactivate = () =>
-    deactivate.run(
-      async () => {
-        await hotelsApi.remove(id);
-        await Promise.all([
-          globalMutate(["hotel", id]),
-          globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
-        ]);
-      },
-      {
-        onSuccess: () => {
-          setConfirmOpen(false);
-          router.push("/hotels");
-        },
-      },
-    );
+  // One invalidation set for every lifecycle transition: all four change
+  // whether this hotel appears in operational lists, so the detail row and
+  // every list key must both be refreshed.
+  const runLifecycle = async (fn: () => Promise<unknown>, leavesPage = false) => {
+    const result = await fn();
+    await Promise.all([
+      globalMutate(["hotel", id]),
+      globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
+    ]);
+    // A deleted hotel is no longer visible on its own detail page, so stay
+    // there only for the reversible transitions.
+    if (leavesPage) router.push("/hotels");
+    return result;
+  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -194,55 +186,20 @@ export default function HotelDetailPage() {
           <BlocklistCard hotelId={id} />
 
           <HotelWriteGate>
-            {hotel.is_active && (
-              <Card className="border-red-100">
-                <CardContent className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      Deactivate hotel
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Hides the hotel from workers and closes it to new staffing.
-                    </p>
-                  </div>
-                  <Button
-                    variant="danger"
-                    onClick={() => setConfirmOpen(true)}
-                  >
-                    Deactivate
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+            <LifecycleCard
+              label="hotel"
+              isActive={hotel.is_active}
+              deletedAt={hotel.deleted_at ?? null}
+              onDeactivate={() => runLifecycle(() => hotelsApi.deactivate(id))}
+              onReactivate={() => runLifecycle(() => hotelsApi.reactivate(id))}
+              onDelete={() => runLifecycle(() => hotelsApi.remove(id), true)}
+              onRestore={() => runLifecycle(() => hotelsApi.restore(id))}
+            />
           </HotelWriteGate>
         </>
       )}
 
-      <Modal
-        open={confirmOpen}
-        onClose={() => !deactivate.pending && setConfirmOpen(false)}
-        title="Deactivate hotel"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              onClick={() => setConfirmOpen(false)}
-              disabled={deactivate.pending}
-            >
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={onDeactivate} loading={deactivate.pending}>
-              Deactivate
-            </Button>
-          </>
-        }
-      >
-        <p className="text-sm text-gray-600">
-          This deactivates <span className="font-medium">{hotel?.name}</span>. You
-          can reactivate it later from the edit screen.
-        </p>
-        <FormError className="mt-3">{deactivate.error}</FormError>
-      </Modal>
+
     </div>
   );
 }
