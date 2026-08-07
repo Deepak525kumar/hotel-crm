@@ -14,6 +14,7 @@ import {
   BarChart3,
   Building2,
   Building,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -62,6 +63,11 @@ export const NAV: NavItem[] = [
   { href: "/users", label: "Users", icon: UsersIcon, roles: ["admin", "manager", "regional_manager"] },
   // Notifications moved to a navbar bell icon (AppShell) -- no longer a
   // sidebar entry.
+  // Deliberately last and deliberately unrestricted: settings is per-user
+  // (session info + a pointer to /profile), not an admin surface, so every
+  // role sees it. Keep it at the bottom -- it's a destination users go
+  // looking for, not one they navigate between like the feature routes above.
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 /**
