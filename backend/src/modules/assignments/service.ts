@@ -205,11 +205,10 @@ export class AssignmentService extends BaseService {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
 
-    if (isSelfScopedRole(actor.role)) {
-      if (assignment.worker_id !== actor.userId) {
-        const eligible = await isWorkerEligibleForHotel(actor.userId, assignment.hotel_id);
-        if (!eligible) throw new ForbiddenError('Cannot access this assignment');
-      }
+    // Hotel eligibility answers "could this worker be assigned here", never
+    // "is this worker's assignment" -- ownership is the gate (IDOR fix).
+    if (isSelfScopedRole(actor.role) && assignment.worker_id !== actor.userId) {
+      throw new ForbiddenError('Cannot access this assignment');
     }
 
     return this.toDto(assignment);
@@ -230,9 +229,10 @@ export class AssignmentService extends BaseService {
     // worker-roster eligibility check (an individual-grain model) instead of
     // treating it as management. ADR-030 §3 C-24 grants RM `✓ᶜ` on assignments.
     if (isSelfScopedRole(actorRole)) {
+      // Same ownership gate as getById() above (IDOR fix): hotel eligibility
+      // answers "could be assigned", never "is theirs".
       if (assignment.worker_id !== actorId) {
-        const eligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
-        if (!eligible) throw new ForbiddenError('Cannot access this assignment');
+        throw new ForbiddenError('Cannot access this assignment');
       } else if (
         input.status === AssignmentStatus.IN_PROGRESS ||
         input.status === AssignmentStatus.COMPLETED

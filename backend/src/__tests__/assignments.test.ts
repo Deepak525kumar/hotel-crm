@@ -785,29 +785,38 @@ describe('AssignmentService', () => {
       expect(dto.id).toBe('a1');
     });
 
-    // Worker roster access (Epic 5 PR 5.7/5.8, site #2): reads the
-    // EmploymentRecord group scope, deny-by-default.
-    describe('worker roster access', () => {
-      it('allows a worker whose EmploymentRecord group matches the assignment hotel group', async () => {
-        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
-        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
-        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    // IDOR fix (2026-08-08): hotel eligibility answers "could this worker be
+    // assigned here", never "is this worker's assignment" -- so ownership,
+    // not eligibility, is the gate.
+    describe('ownership gate (IDOR fix)', () => {
+      it('allows a worker to read their OWN assignment regardless of eligibility state (positive ownership case)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1', hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue(null);
         const dto = await service.getById('a1', { userId: 'w1', role: 'worker' });
         expect(dto.id).toBe('a1');
       });
 
-      it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
+      it('denies a worker reading another worker\'s assignment even with a matching EmploymentRecord group', async () => {
         mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
-        mockEmploymentRecord.findUnique.mockResolvedValue(null);
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
         await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
           name: 'ForbiddenError',
         });
       });
 
-      it('denies a worker whose EmploymentRecord group does not match the assignment hotel group', async () => {
+      it('denies a checker reading another worker\'s assignment (checker is self-scoped in this module)', async () => {
         mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
         mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
-        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g2' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        await expect(service.getById('a1', { userId: 'c1', role: 'checker' })).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
+
+      it('denies a worker with no EmploymentRecord reading another worker\'s assignment (deny-by-default, unchanged)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue(null);
         await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
           name: 'ForbiddenError',
         });
@@ -815,19 +824,41 @@ describe('AssignmentService', () => {
     });
   });
 
-  // Worker roster access (Epic 5 PR 5.7/5.8, site #3): mirrors site #2 for
-  // update()'s worker-branch membership check.
-  describe('update — worker roster access', () => {
-    it('allows a worker whose EmploymentRecord group matches the assignment hotel group', async () => {
-      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
-      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'IN_PROGRESS' }));
+  // IDOR fix (2026-08-08): mirrors the getById ownership gate above for
+  // update()'s worker-branch check.
+  describe('update — ownership gate (IDOR fix)', () => {
+    it('allows a worker to update their OWN assignment (positive ownership case)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1', hotel_id: 'h1', status: 'CONFIRMED' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ worker_id: 'w1', hotel_id: 'h1', status: 'IN_PROGRESS' }));
+      // Self-action eligibility (separate, pre-existing check for IN_PROGRESS/
+      // COMPLETED transitions) still requires an eligible worker -- this
+      // fixture is eligible so the test isolates the ownership gate itself.
       mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
       mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
       const dto = await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
       expect(dto.status).toBe('IN_PROGRESS');
     });
 
-    it('denies a worker with no EmploymentRecord (deny-by-default)', async () => {
+    it('denies a worker updating another worker\'s assignment even with a matching EmploymentRecord group', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await expect(
+        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+    });
+
+    it('denies a checker updating another worker\'s assignment (checker is self-scoped in this module)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await expect(
+        service.update('a1', { status: 'IN_PROGRESS' }, 'c1', 'checker')
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('denies a worker with no EmploymentRecord updating another worker\'s assignment (deny-by-default, unchanged)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
       mockEmploymentRecord.findUnique.mockResolvedValue(null);
       await expect(
