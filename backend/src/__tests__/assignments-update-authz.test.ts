@@ -56,6 +56,8 @@ jest.mock('../lib/logger.js', () => ({
 
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
+    // Early-start guard shares the attendance check-in window.
+    ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: 120,
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
     JWT_ACCESS_EXPIRY: '1h',
     JWT_REFRESH_EXPIRY: '7d',
@@ -87,6 +89,10 @@ jest.mock('../lib/db.js', () => {
     // blocklist (REQ-EMP-005 / RULE-EMP-07 rework, 2026-08-06) -- default to
     // "not blocked" for every fixture worker in this suite.
     employeeBlocklistEntry: { findUnique: async () => null },
+    // Early-start guard (2026-08-07): null = no linked JobRequest, so
+    // resolveScheduledStart() finds no shift time and the guard correctly
+    // does not apply. This suite is about authorization, not scheduling.
+    jobRequest: { findUnique: async () => null },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0 },
     workerOverallRating: { upsert: async () => ({}) },
