@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useAttendanceRecord } from "@/hooks/useAttendance";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useHotel, useUsersByIds } from "@/hooks/useHotels";
+import { useHotel } from "@/hooks/useHotels";
 import { ApiError, attendanceApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -44,13 +45,6 @@ export default function AttendanceDetailPage() {
   const { data: record, isLoading, error, mutate } = useAttendanceRecord(id);
   const currentUserId = useAuthStore((s) => s.user?.id);
   const { data: hotel } = useHotel(record?.hotel_id);
-  const peopleIds = record
-    ? [record.worker_id, ...(record.verified_by_id ? [record.verified_by_id] : [])]
-    : [];
-  const peopleById = useUsersByIds(peopleIds);
-  const worker = record ? peopleById.get(record.worker_id) : undefined;
-  const verifiedBy =
-    record?.verified_by_id ? peopleById.get(record.verified_by_id) : undefined;
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewStatus, setReviewStatus] =
@@ -179,9 +173,7 @@ export default function AttendanceDetailPage() {
             <DataRow
               label="Worker"
               value={
-                <TextLink href={`/users/${record.worker_id}`}>
-                  {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
-                </TextLink>
+                <UserRef userId={record.worker_id} fallback="The assigned worker" />
               }
             />
             <DataRow
@@ -204,11 +196,7 @@ export default function AttendanceDetailPage() {
               <DataRow
                 label="Verified by"
                 value={
-                  <TextLink href={`/users/${record.verified_by_id}`}>
-                    {verifiedBy
-                      ? `${verifiedBy.first_name} ${verifiedBy.last_name}`
-                      : "View user"}
-                  </TextLink>
+                  <UserRef userId={record.verified_by_id} fallback="A manager" />
                 }
               />
             )}

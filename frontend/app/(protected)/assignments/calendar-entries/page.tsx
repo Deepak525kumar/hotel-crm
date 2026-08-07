@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { UserRef } from "@/components/users/UserRef";
 import Link from "next/link";
 import { useCalendarEntries } from "@/hooks/useAssignments";
-import { useHotel, useUsersByIds } from "@/hooks/useHotels";
+import { useHotel } from "@/hooks/useHotels";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { formatDate } from "@/lib/format";
 import {
@@ -29,15 +30,11 @@ const COLUMNS = 4;
 
 function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
   const { data: hotel } = useHotel(entry.hotel_id);
-  const peopleById = useUsersByIds([entry.worker_id]);
-  const worker = peopleById.get(entry.worker_id);
 
   return (
     <TR>
       <TD className="font-medium">
-        <TextLink href={`/users/${entry.worker_id}`}>
-          {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
-        </TextLink>
+        <UserRef userId={entry.worker_id} fallback="The assigned worker" />
       </TD>
       <TD>
         <TextLink href={`/hotels/${entry.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
