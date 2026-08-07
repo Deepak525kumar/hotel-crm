@@ -5,7 +5,7 @@ export const CreateUserSchema = z.object({
   password: z.string().min(8),
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
-  phone: z.string().optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
   // `regional_manager` added (Regional Manager V1 lifecycle PR): POST /users
   // is requireRole('admin')-only, so no elevation-guard exercise like
   // updateUser's role !== 'admin' check applies — every caller who reaches
@@ -31,7 +31,7 @@ export const CreateUserSchema = z.object({
 export const UpdateUserSchema = z.object({
   first_name: z.string().min(1).max(100).optional(),
   last_name: z.string().min(1).max(100).optional(),
-  phone: z.string().nullable().optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').nullable().optional(),
   is_active: z.boolean().optional(),
 });
 
@@ -45,7 +45,7 @@ export const UpdateUserProfileSchema = z
   .object({
     first_name: z.string().min(1).max(100).optional(),
     last_name: z.string().min(1).max(100).optional(),
-    phone: z.string().nullable().optional(),
+    phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').nullable().optional(),
     is_active: z.boolean().optional(),
   })
   .strict();
