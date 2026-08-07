@@ -766,6 +766,77 @@ describe('UserService', () => {
     });
   });
 
+  // IDOR fix (2026-08-08): updateUserProfile() (the FEATURE_GD02_MATRIX-on
+  // path, replacing updateUser above) had isWorkerInGroupScope but no
+  // equivalent to updateUser's target-role check -- a manager/RM in-group
+  // could tamper with another manager's, RM's, or admin's profile as long
+  // as the target happened to carry a matching-group EmploymentRecord.
+  describe('updateUserProfile (IDOR fix, 2026-08-08)', () => {
+    it('forbids a manager from modifying a fellow manager, even one in scope', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_mgr2', role: 'MANAGER', first_name: 'Other', last_name: 'Mgr',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+
+      await expect(
+        service.updateUserProfile('u_mgr2', { first_name: 'Changed' }, 'manager_actor', 'manager', { type: 'global' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can modify manager or admin accounts' });
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('allows a manager to modify their own profile (self-edit exemption)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'manager_actor', role: 'MANAGER', first_name: 'Self', last_name: 'Mgr',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'manager_actor', email: 'mgr@test.com', first_name: 'Changed', last_name: 'Mgr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUserProfile(
+        'manager_actor', { first_name: 'Changed' }, 'manager_actor', 'manager', { type: 'global' }
+      );
+      expect(result.first_name).toBe('Changed');
+      expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('allows a manager to modify an in-scope worker (unchanged target-role class)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'my_group' });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_worker', email: 'worker@test.com', first_name: 'Changed', last_name: 'Er',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUserProfile(
+        'u_worker', { first_name: 'Changed' }, 'manager_actor', 'manager', { type: 'hotel_group', hotel_group_id: 'my_group' }
+      );
+      expect(result.first_name).toBe('Changed');
+    });
+
+    it('allows an admin to modify any account regardless of target role', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_mgr2', role: 'MANAGER', first_name: 'Other', last_name: 'Mgr',
+        phone: null, permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u_mgr2', email: 'mgr2@test.com', first_name: 'Changed', last_name: 'Mgr',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.updateUserProfile('u_mgr2', { first_name: 'Changed' }, 'admin_actor', 'admin', null);
+      expect(result.first_name).toBe('Changed');
+    });
+  });
+
   describe('updateUserRole', () => {
     it('always bumps token_generation on an assigned role change', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({

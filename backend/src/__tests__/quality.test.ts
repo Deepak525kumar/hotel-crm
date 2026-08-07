@@ -561,10 +561,44 @@ describe('Quality getLeaderboard — hotel_id filter', () => {
     mockWorkerOverallRating.count.mockResolvedValue(0);
   });
 
-  it('applies no filter when hotelId is empty', async () => {
+  it('applies no filter when hotelId is empty and no actor is supplied (admin/internal caller)', async () => {
     await service.getLeaderboard('');
     const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
     expect(where).toEqual({});
+  });
+
+  // IDOR fix (2026-08-08): the bare GET /leaderboard route (no hotelId, no
+  // checkHotelAccess()) previously applied no scoping whatsoever once
+  // hotelId was empty -- any manager/RM holding quality:read got the
+  // platform-wide leaderboard regardless of their scope claim.
+  describe('manager/regional_manager scope when hotelId is empty (IDOR fix, 2026-08-08)', () => {
+    it("scopes a hotel-scoped manager's leaderboard to their own hotel's group", async () => {
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      await service.getLeaderboard('', 1, 25, { role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } });
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({ worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } } });
+    });
+
+    it("scopes a regional_manager's leaderboard to their hotel_group", async () => {
+      await service.getLeaderboard('', 1, 25, {
+        role: 'regional_manager',
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      });
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({ worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } } });
+    });
+
+    it('denies (no rows) a manager with no scope claim', async () => {
+      await service.getLeaderboard('', 1, 25, { role: 'manager', scope: null });
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({ worker: { employment_record: { hotel_group_id: '__none__' } } });
+    });
+
+    it('does not scope-restrict an admin leaderboard', async () => {
+      await service.getLeaderboard('', 1, 25, { role: 'admin', scope: { type: 'global' } });
+      const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+      expect(where).toEqual({});
+    });
   });
 
   it('filters via the employment_record relation at the resolved hotel group', async () => {

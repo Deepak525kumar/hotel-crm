@@ -769,6 +769,48 @@ describe('AssignmentService', () => {
       const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
       expect(where.worker_id).toBeUndefined();
     });
+
+    // IDOR fix (2026-08-08): list() previously ran no manager-scope check at
+    // all -- update()/reassign()/placeOnCalendar() in this file already
+    // scope a manager/regional_manager, but list() let a manager read every
+    // assignment platform-wide.
+    describe('manager/regional_manager scope (IDOR fix, 2026-08-08)', () => {
+      it("scopes a hotel-scoped manager's list to their own hotel only", async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([]);
+        mockWorkerAssignment.count.mockResolvedValue(0);
+        await service.list({ page: 1, per_page: 20 } as any, {
+          userId: 'mgr1',
+          role: 'manager',
+          scope: { type: 'hotel', hotel_id: 'h1' },
+        });
+        const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
+        expect(where.hotel_id).toBe('h1');
+      });
+
+      it("scopes a regional_manager's list to their hotel_group only", async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([]);
+        mockWorkerAssignment.count.mockResolvedValue(0);
+        await service.list({ page: 1, per_page: 20 } as any, {
+          userId: 'rm1',
+          role: 'regional_manager',
+          scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+        });
+        const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
+        expect(where.hotel).toEqual({ hotel_group_id: 'g1' });
+      });
+
+      it('denies (empty-in) a manager with no scope claim', async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([]);
+        mockWorkerAssignment.count.mockResolvedValue(0);
+        await service.list({ page: 1, per_page: 20 } as any, {
+          userId: 'mgr1',
+          role: 'manager',
+          scope: null,
+        });
+        const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
+        expect(where.hotel_id).toEqual({ in: [] });
+      });
+    });
   });
 
   describe('getById', () => {
@@ -820,6 +862,45 @@ describe('AssignmentService', () => {
         await expect(service.getById('a1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
           name: 'ForbiddenError',
         });
+      });
+    });
+
+    // IDOR fix (2026-08-08): getById() previously ran no manager-scope check
+    // at all -- a manager/RM could read any single assignment by id, unscoped.
+    describe('manager/regional_manager scope (IDOR fix, 2026-08-08)', () => {
+      it('allows a manager to read an in-scope assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        const dto = await service.getById('a1', {
+          userId: 'mgr1',
+          role: 'manager',
+          scope: { type: 'hotel', hotel_id: 'h1' },
+        });
+        expect(dto.id).toBe('a1');
+      });
+
+      it('denies a manager reading an out-of-scope assignment', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h9' }));
+        await expect(
+          service.getById('a1', { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h1' } })
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      });
+
+      it("allows a regional_manager to read an assignment in their hotel_group", async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h9' }));
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        const dto = await service.getById('a1', {
+          userId: 'rm1',
+          role: 'regional_manager',
+          scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+        });
+        expect(dto.id).toBe('a1');
+      });
+
+      it('denies a manager with no scope claim (deny-by-default)', async () => {
+        mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1' }));
+        await expect(
+          service.getById('a1', { userId: 'mgr1', role: 'manager', scope: null })
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
       });
     });
   });

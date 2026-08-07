@@ -370,6 +370,121 @@ describe('AttendanceService', () => {
       expect(data.minutes_worked).toBeGreaterThanOrEqual(55);
     });
 
+    // Time-manipulation fix (2026-08-08): a worker's own check_out_at was
+    // previously taken verbatim from the request body, letting a worker
+    // submit an arbitrary future timestamp to inflate minutes_worked. The
+    // server now always uses its own clock for a worker's checkout,
+    // regardless of what the client supplied.
+    describe('checkout time manipulation fix (2026-08-08)', () => {
+      it("ignores a worker-supplied future check_out_at, using server time instead", async () => {
+        const checkIn = new Date(Date.now() - 60 * 60000); // 1 hour ago
+        const farFuture = new Date('2099-01-01T00:00:00Z').toISOString();
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: checkIn })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ check_in_at: checkIn }));
+        const before = Date.now();
+        await service.update('att1', { check_out_at: farFuture }, 'w1', 'worker');
+        const after = Date.now();
+        const data = mockAttendance.update.mock.calls[0][0].data;
+        expect(data.check_out_at.getTime()).toBeGreaterThanOrEqual(before);
+        expect(data.check_out_at.getTime()).toBeLessThanOrEqual(after);
+        // ~60 minutes, not the ~73-year gap a far-future timestamp would produce.
+        expect(data.minutes_worked).toBeLessThan(120);
+      });
+
+      it('still honors a manager-supplied check_out_at (more-trusted correction path, unchanged)', async () => {
+        const checkIn = new Date('2026-07-01T08:00:00Z');
+        const managerSupplied = new Date('2026-07-01T16:00:00Z').toISOString();
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: checkIn, status: 'PRESENT' })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ check_in_at: checkIn }));
+        await service.update('att1', { check_out_at: managerSupplied }, 'mgr1', 'admin');
+        const data = mockAttendance.update.mock.calls[0][0].data;
+        expect(data.check_out_at.toISOString()).toBe(new Date(managerSupplied).toISOString());
+        expect(data.minutes_worked).toBe(480); // exactly 8 hours, from the supplied value
+      });
+    });
+
+    // Checkout geofence fix (2026-08-08): checkIn() has always enforced a
+    // geofence when one is configured; checkout previously enforced nothing
+    // at all, letting a worker check in on-site, leave, and check out from
+    // anywhere.
+    describe('checkout geofence fix (2026-08-08)', () => {
+      it('denies a worker checkout outside the geofence radius', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date() })
+        );
+        mockVerifyGeofence.mockResolvedValue({
+          status: 'verified',
+          insideRadius: false,
+          distanceMeters: 500,
+        });
+        await expect(
+          service.update(
+            'att1',
+            { check_out_at: new Date().toISOString(), latitude: 1, longitude: 1 },
+            'w1',
+            'worker'
+          )
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      });
+
+      it('denies a worker checkout with no location when the hotel has a geofence configured', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date() })
+        );
+        mockIsGeofenceConfigured.mockResolvedValue(true);
+        await expect(
+          service.update('att1', { check_out_at: new Date().toISOString() }, 'w1', 'worker')
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      });
+
+      it('allows a worker checkout inside the geofence radius', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date() })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ check_in_at: new Date() }));
+        mockVerifyGeofence.mockResolvedValue({
+          status: 'verified',
+          insideRadius: true,
+          distanceMeters: 10,
+        });
+        await expect(
+          service.update(
+            'att1',
+            { check_out_at: new Date().toISOString(), latitude: 1, longitude: 1 },
+            'w1',
+            'worker'
+          )
+        ).resolves.toBeDefined();
+      });
+
+      it('allows a worker checkout with no location when no geofence is configured for the hotel', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date() })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ check_in_at: new Date() }));
+        mockIsGeofenceConfigured.mockResolvedValue(false);
+        await expect(
+          service.update('att1', { check_out_at: new Date().toISOString() }, 'w1', 'worker')
+        ).resolves.toBeDefined();
+      });
+
+      it('does not apply the geofence check to a manager-driven checkout', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date() })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ check_in_at: new Date() }));
+        mockIsGeofenceConfigured.mockResolvedValue(true);
+        await expect(
+          service.update('att1', { check_out_at: new Date().toISOString() }, 'mgr1', 'admin')
+        ).resolves.toBeDefined();
+        expect(mockVerifyGeofence).not.toHaveBeenCalled();
+      });
+    });
+
     it('blocks worker from setting verification fields', async () => {
       mockAttendance.findUnique.mockResolvedValue(
         makeRecord({ worker_id: 'w1', check_in_at: new Date() })

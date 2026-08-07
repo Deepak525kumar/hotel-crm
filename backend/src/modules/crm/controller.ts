@@ -15,7 +15,12 @@ export class CrmController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const result = await crmService.listHotels(req.query as never, req.auth.role, req.auth.userId);
+        const result = await crmService.listHotels(
+          req.query as never,
+          req.auth.role,
+          req.auth.userId,
+          req.auth.scope ?? null
+        );
         res.status(200).json({
           status: 'success',
           data: result.hotels,

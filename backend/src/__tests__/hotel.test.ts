@@ -28,6 +28,51 @@ const mockPrisma = {
     create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
     updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
   },
+  // Cascade-cancel fix (2026-08-08): deactivateHotel()/deleteHotel() now
+  // delegate to jobRequestService/assignmentService (real singletons, not
+  // mocked -- they call getPrisma() internally, hitting this same mock).
+  // No active rows in any lifecycle test fixture here, so an empty result
+  // makes the cascade a no-op by default; unless a specific test opts in.
+  jobRequest: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
+  workerAssignment: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
+  },
+  // AssignmentService.update() (invoked by the cascade above) also touches
+  // these on any CANCELLED transition (refreshWorkerOverallRating,
+  // notification enqueue) -- defaulted to empty/no-op so the cascade tests
+  // don't need to know AssignmentService's own internals.
+  rating: {
+    aggregate: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
+      _avg: { score: 0 },
+      _count: 0,
+    }),
+  },
+  attendance: {
+    count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
+  },
+  workerOverallRating: {
+    upsert: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+  },
+  jobRequestSkillSlot: {
+    update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
+  },
+  notification: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'notif-1' }),
+  },
+  outboxEvent: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'outbox-1' }),
+  },
+  employmentRecord: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  },
   // updateHotel()'s manager-change path takes a row lock on the affected
   // user(s) before writing, mirroring updateHotelGroup's RM-transfer fix.
   $queryRaw: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
@@ -135,6 +180,89 @@ describe('CrmService - Hotels', () => {
       expect(mockListEligibleHotelIds).not.toHaveBeenCalled();
       const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
       expect(findManyCall[0]?.where.id).toBeUndefined();
+    });
+
+    // IDOR fix (2026-08-08): a manager/regional_manager previously got NO
+    // scope filtering here at all -- only the is_active override, which
+    // narrows the default filter, not which hotels are visible. Any manager
+    // could list every hotel platform-wide.
+    describe('manager/regional_manager scope (IDOR fix, 2026-08-08)', () => {
+      it("scopes a hotel-scoped manager's list to their own hotel only", async () => {
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.count.mockResolvedValue(0);
+
+        await service.listHotels(
+          { page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined },
+          'manager',
+          'mgr_1',
+          { type: 'hotel', hotel_id: 'h1' }
+        );
+
+        const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
+        expect(findManyCall[0]?.where.id).toBe('h1');
+      });
+
+      it("scopes a regional_manager's list to their hotel_group only", async () => {
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.count.mockResolvedValue(0);
+
+        await service.listHotels(
+          { page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined },
+          'regional_manager',
+          'rm_1',
+          { type: 'hotel_group', hotel_group_id: 'g1' }
+        );
+
+        const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{
+          where: { hotel_group_id?: unknown };
+        }>;
+        expect(findManyCall[0]?.where.hotel_group_id).toBe('g1');
+      });
+
+      it('denies (no rows) a manager with no scope claim', async () => {
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.count.mockResolvedValue(0);
+
+        await service.listHotels(
+          { page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined },
+          'manager',
+          'mgr_1',
+          null
+        );
+
+        const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
+        expect(findManyCall[0]?.where.id).toBe('__none__');
+      });
+
+      it("denies (no rows) a hotel-scoped manager who passes a different hotel_group_id filter", async () => {
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.count.mockResolvedValue(0);
+
+        await service.listHotels(
+          { page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined, hotel_group_id: 'g_other' },
+          'manager',
+          'mgr_1',
+          { type: 'hotel', hotel_id: 'h1' }
+        );
+
+        const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
+        expect(findManyCall[0]?.where.id).toBe('h1');
+      });
+
+      it('does not scope-restrict an admin list', async () => {
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.count.mockResolvedValue(0);
+
+        await service.listHotels(
+          { page: 1, limit: 20, country: undefined, search: undefined, is_active: undefined },
+          'admin',
+          'adm_1',
+          { type: 'global' }
+        );
+
+        const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { id?: unknown } }>;
+        expect(findManyCall[0]?.where.id).toBeUndefined();
+      });
     });
   });
 
@@ -383,6 +511,144 @@ describe('CrmService - Hotels', () => {
         (service as never as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]!('h1', 'a1', 'admin')
       ).rejects.toMatchObject({ name: 'ConflictError' });
       expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+    });
+
+    // Cascade-cancel fix (2026-08-08): deactivate/delete previously only
+    // touched the Hotel row; active JobRequests and WorkerAssignments at
+    // that hotel stayed OPEN/CONFIRMED indefinitely.
+    describe('cascade-cancel hotel work (2026-08-08 fix)', () => {
+      it('deactivateHotel cancels active job requests and assignments at the hotel', async () => {
+        mockPrisma.hotel.findUnique.mockResolvedValue(active);
+        mockPrisma.jobRequest.findMany.mockResolvedValue([{ id: 'jr1' }]);
+        const jrBase = {
+          id: 'jr1',
+          hotel_id: 'h1',
+          created_by_id: 'admin_1',
+          position: 'cleaner',
+          workers_needed: 2,
+          workers_confirmed: 0,
+          shift_date: new Date('2026-07-01T00:00:00Z'),
+          shift_start_time: '08:00',
+          shift_end_time: '16:00',
+          hourly_rate: null,
+          currency: 'EUR',
+          description: null,
+          requirements: null,
+          published_at: null,
+          expires_at: null,
+          filled_at: null,
+          cancelled_at: null,
+          cancellation_reason: null,
+          created_at: new Date('2026-06-01T00:00:00Z'),
+          updated_at: new Date('2026-06-01T00:00:00Z'),
+        };
+        mockPrisma.jobRequest.findUnique.mockResolvedValue({ ...jrBase, status: 'OPEN' });
+        mockPrisma.jobRequest.update.mockResolvedValue({
+          ...jrBase,
+          status: 'CANCELLED',
+          cancellation_reason: 'The hotel was deactivated or deleted',
+        });
+        mockPrisma.workerAssignment.findMany.mockResolvedValue([{ id: 'a1' }]);
+        mockPrisma.workerAssignment.findUnique.mockResolvedValue({
+          id: 'a1',
+          hotel_id: 'h1',
+          worker_id: 'w1',
+          assigned_by_id: 'admin_1',
+          status: 'CONFIRMED',
+          confirmed_at: new Date('2026-06-01T00:00:00Z'),
+          started_at: null,
+          completed_at: null,
+          cancelled_at: null,
+          cancellation_reason: null,
+          updated_at: new Date('2026-06-01T00:00:00Z'),
+          work_request_id: null,
+          job_request_id: null,
+          skill_slot_id: null,
+        });
+        mockPrisma.workerAssignment.update.mockResolvedValue({
+          id: 'a1',
+          hotel_id: 'h1',
+          worker_id: 'w1',
+          assigned_by_id: 'admin_1',
+          status: 'CANCELLED',
+          confirmed_at: new Date('2026-06-01T00:00:00Z'),
+          started_at: null,
+          completed_at: null,
+          cancelled_at: new Date(),
+          cancellation_reason: 'The hotel was deactivated or deleted',
+          updated_at: new Date(),
+        });
+
+        await service.deactivateHotel('h1', 'admin_1', 'admin');
+
+        expect(mockPrisma.jobRequest.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'jr1' },
+            data: expect.objectContaining({ status: 'CANCELLED' }),
+          })
+        );
+        expect(mockPrisma.workerAssignment.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'a1' },
+            data: expect.objectContaining({ status: 'CANCELLED' }),
+          })
+        );
+      });
+
+      it('deleteHotel cancels active job requests and assignments at the hotel', async () => {
+        mockPrisma.hotel.findUnique.mockResolvedValue(active);
+        mockPrisma.jobRequest.findMany.mockResolvedValue([]);
+        mockPrisma.workerAssignment.findMany.mockResolvedValue([{ id: 'a2' }]);
+        mockPrisma.workerAssignment.findUnique.mockResolvedValue({
+          id: 'a2',
+          hotel_id: 'h1',
+          worker_id: 'w2',
+          assigned_by_id: 'admin_1',
+          status: 'IN_PROGRESS',
+          confirmed_at: new Date('2026-06-01T00:00:00Z'),
+          started_at: new Date('2026-06-01T08:00:00Z'),
+          completed_at: null,
+          cancelled_at: null,
+          cancellation_reason: null,
+          updated_at: new Date('2026-06-01T00:00:00Z'),
+          work_request_id: null,
+          job_request_id: null,
+          skill_slot_id: null,
+        });
+        mockPrisma.workerAssignment.update.mockResolvedValue({
+          id: 'a2',
+          hotel_id: 'h1',
+          worker_id: 'w2',
+          assigned_by_id: 'admin_1',
+          status: 'CANCELLED',
+          confirmed_at: new Date('2026-06-01T00:00:00Z'),
+          started_at: new Date('2026-06-01T08:00:00Z'),
+          completed_at: null,
+          cancelled_at: new Date(),
+          cancellation_reason: 'The hotel was deactivated or deleted',
+          updated_at: new Date(),
+        });
+
+        await service.deleteHotel('h1', 'admin_1', 'admin');
+
+        expect(mockPrisma.workerAssignment.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'a2' },
+            data: expect.objectContaining({ status: 'CANCELLED' }),
+          })
+        );
+      });
+
+      it('does not touch job requests or assignments when none are active at the hotel', async () => {
+        mockPrisma.hotel.findUnique.mockResolvedValue(active);
+        mockPrisma.jobRequest.findMany.mockResolvedValue([]);
+        mockPrisma.workerAssignment.findMany.mockResolvedValue([]);
+
+        await service.deactivateHotel('h1', 'admin_1', 'admin');
+
+        expect(mockPrisma.jobRequest.update).not.toHaveBeenCalled();
+        expect(mockPrisma.workerAssignment.update).not.toHaveBeenCalled();
+      });
     });
 
     it('rejects double-delete and restore-of-a-live-hotel', async () => {

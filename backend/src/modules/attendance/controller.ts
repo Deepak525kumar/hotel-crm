@@ -90,7 +90,8 @@ export async function updateAttendance(req: Request, res: Response, next: NextFu
       parsed.data,
       req.auth!.userId,
       req.auth!.role,
-      req.auth!.scope ?? null
+      req.auth!.scope ?? null,
+      req.ip
     );
     res.status(200).json({
       status: 'success',

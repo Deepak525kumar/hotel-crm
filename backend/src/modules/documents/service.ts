@@ -10,13 +10,19 @@
 //   - Personalfragebogen / consent / retention-sweep (respective modules)
 //
 // GD-16 authorised actors: self-upload (worker) + manager-upload only.
-// Hotel-scoped read is enforced in routes.ts via checkHotelAccess().
+// Group-scoped read for GET /documents/:document_id is enforced HERE, in
+// getDocument() (isWorkerInGroupScope) -- corrected 2026-08-08: this comment
+// previously claimed routes.ts's checkHotelAccess() gated it, but that route
+// has no scope middleware at all (FIND-SEC-DOC-01's own routes.ts comment
+// says the same; neither was true until this fix).
 
 import { DocumentCategory, Prisma } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { generateStorageKey, getStorageClient } from './storage.js';
+import { isWorkerInGroupScope } from '../../lib/scope.js';
+import type { UserScope } from '../../lib/jwt.js';
 import type {
   WorkerDocumentDto,
   DocumentCompleteness,
@@ -157,7 +163,8 @@ export class DocumentService extends BaseService {
   async getDocument(
     documentId: string,
     actorId: string,
-    actorRole: string
+    actorRole: string,
+    actorScope?: UserScope | null
   ): Promise<WorkerDocumentDto> {
     const doc = await this.prisma.workerDocument.findUnique({
       where: { id: documentId },
@@ -167,6 +174,19 @@ export class DocumentService extends BaseService {
     // WORKER can only access their own document.
     if (actorRole === 'worker' && doc.worker_id !== actorId) {
       throw new ForbiddenError('Workers may only access their own documents');
+    } else if (actorRole === 'manager' || actorRole === 'regional_manager') {
+      // IDOR fix (2026-08-08): routes.ts has no checkHotelAccess()/
+      // checkWorkerScope() on this route at all -- FIND-SEC-DOC-01's own
+      // comment there says ownership binding is enforced HERE, in the
+      // service, but this branch never existed. A manager/RM fell through
+      // both checks entirely and could download any document platform-wide
+      // by id. Reuses isWorkerInGroupScope (documents are group-grain, same
+      // as the worker's own EmploymentRecord.hotel_group_id, not
+      // hotel-grain -- there is no hotel_id on WorkerDocument itself).
+      const inScope = await isWorkerInGroupScope(actorScope ?? null, doc.worker_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot access this document');
+      }
     }
 
     const storage = await getStorageClient();

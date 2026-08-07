@@ -13,6 +13,10 @@ const mockWorkerDocumentCreate = jest.fn() as jest.MockedFunction<(...args: any[
 const mockWorkerDocumentFindMany = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockWorkerDocumentFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+// IDOR fix (2026-08-08): getDocument()'s manager/RM branch resolves scope
+// via isWorkerInGroupScope (lib/scope.ts), which reads these two.
+const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -30,6 +34,8 @@ jest.mock('../lib/db.js', () => ({
       findMany: mockWorkerDocumentFindMany,
       findUnique: mockWorkerDocumentFindUnique,
     },
+    employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
+    hotel: { findUnique: mockHotelFindUnique },
     auditLog: { create: mockAuditLogCreate },
   }),
 }));
@@ -175,6 +181,55 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
       await expect(service.getDocument('d1', 'w1', 'worker')).rejects.toBeInstanceOf(
         ForbiddenError
       );
+    });
+
+    // IDOR fix (2026-08-08): routes.ts has no checkHotelAccess()/
+    // checkWorkerScope() on GET /documents/:document_id at all, and
+    // getDocument() previously only checked ownership for actorRole ===
+    // 'worker' -- a manager/RM fell through both checks entirely and could
+    // download any document platform-wide by id.
+    describe('manager/regional_manager scope (IDOR fix, 2026-08-08)', () => {
+      it("allows a manager to fetch a document for a worker in their hotel's group", async () => {
+        mockWorkerDocumentFindUnique.mockResolvedValue({
+          id: 'd1',
+          worker_id: 'w2',
+          s3_key: 'k',
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+        mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        const result = await service.getDocument('d1', 'mgr1', 'manager', { type: 'hotel', hotel_id: 'h1' });
+        expect(result.id).toBe('d1');
+      });
+
+      it('denies a manager fetching a document for a worker outside their scope', async () => {
+        mockWorkerDocumentFindUnique.mockResolvedValue({ id: 'd1', worker_id: 'w2', s3_key: 'k' });
+        mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g_other' });
+        mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        await expect(
+          service.getDocument('d1', 'mgr1', 'manager', { type: 'hotel', hotel_id: 'h1' })
+        ).rejects.toBeInstanceOf(ForbiddenError);
+      });
+
+      it('denies a regional_manager with no scope claim (deny-by-default)', async () => {
+        mockWorkerDocumentFindUnique.mockResolvedValue({ id: 'd1', worker_id: 'w2', s3_key: 'k' });
+        await expect(
+          service.getDocument('d1', 'rm1', 'regional_manager', null)
+        ).rejects.toBeInstanceOf(ForbiddenError);
+      });
+
+      it('allows an admin to fetch any document (unconditional bypass)', async () => {
+        mockWorkerDocumentFindUnique.mockResolvedValue({
+          id: 'd1',
+          worker_id: 'w2',
+          s3_key: 'k',
+          created_at: new Date(),
+          updated_at: new Date(),
+        });
+        const result = await service.getDocument('d1', 'adm1', 'admin', { type: 'global' });
+        expect(result.id).toBe('d1');
+      });
     });
   });
 

@@ -8,12 +8,19 @@ import {
 } from './types.js';
 import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope.js';
 import { listEligibleHotelIds } from '../../lib/roster-scope.js';
+import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
+import { jobRequestService } from '../job-requests/service.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
   // ── Hotels ─────────────────────────────────────────────────────────────────
 
-  async listHotels(query: ListHotelsQuery, actorRole: string, actorId?: string) {
+  async listHotels(
+    query: ListHotelsQuery,
+    actorRole: string,
+    actorId?: string,
+    actorScope?: UserScope | null
+  ) {
     const { page, limit, search, is_active, country, hotel_group_id, include_deleted } = query;
     const skip = (page - 1) * limit;
 
@@ -57,6 +64,32 @@ export class CrmService extends BaseService {
     if (actorRole === 'worker') {
       const eligibleHotelIds = actorId ? await listEligibleHotelIds(actorId) : [];
       where['id'] = { in: eligibleHotelIds };
+    } else if (isScopedManagerRole(actorRole)) {
+      // IDOR fix (2026-08-08): a manager/regional_manager previously got NO
+      // scope filtering here at all -- the is_active override above narrows
+      // only the active-flag default, not which hotels are visible. The
+      // DETAIL route (GET /hotels/:id) already scopes via checkHotelAccess();
+      // this LIST route had nothing equivalent, leaking every hotel
+      // platform-wide to any manager. Finer-grained than
+      // resolveNonAdminScopeFilter() (which always collapses to group,
+      // correct for listHotelGroups() but too coarse here): a hotel-scoped
+      // manager sees only their one hotel, matching isHotelInScope's own
+      // per-type behavior elsewhere (attendance/job-requests list()).
+      const scope = actorScope ?? null;
+      if (!scope) {
+        where['id'] = '__none__';
+      } else if (scope.type === 'hotel') {
+        // Intersect with any caller-supplied id/group filter rather than
+        // overwrite it -- a manager asking for a hotel or group outside
+        // their own scope gets zero rows, not a silently substituted result.
+        where['id'] = where['id'] && where['id'] !== scope.hotel_id ? '__none__' : scope.hotel_id;
+      } else if (scope.type === 'hotel_group') {
+        where['hotel_group_id'] =
+          where['hotel_group_id'] && where['hotel_group_id'] !== scope.hotel_group_id
+            ? '__none__'
+            : scope.hotel_group_id;
+      }
+      // scope.type === 'global' -> no added restriction.
     }
 
     const [hotels, total] = await Promise.all([
@@ -198,6 +231,7 @@ export class CrmService extends BaseService {
       data: { is_active: false },
     });
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'deactivate', name: hotel.name }, ip);
+    await this.cascadeCancelHotelWork(hotelId, actorId, actorRole);
     return result;
   }
 
@@ -242,7 +276,59 @@ export class CrmService extends BaseService {
       data: { is_active: false, deleted_at: new Date() },
     });
     await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip);
+    await this.cascadeCancelHotelWork(hotelId, actorId, actorRole);
     return result;
+  }
+
+  /**
+   * Cascade fix (2026-08-08): deactivate/delete previously only ever touched
+   * the Hotel row itself -- every JobRequest and WorkerAssignment at that
+   * hotel stayed OPEN/CONFIRMED/IN_PROGRESS indefinitely, so a worker could
+   * still travel to and attempt to check into a shift at a hotel that had
+   * just been paused or permanently closed.
+   *
+   * Runs AFTER the parent's own update commits, same "delegates to the
+   * owning service's own transaction, not composed into this one" boundary
+   * job-requests/service.ts#cascadeCancelAssignments already established for
+   * the identical class of problem (a crash between the two leaves the
+   * hotel deactivated/deleted but some work still active -- the same
+   * accepted tradeoff that precedent already carries).
+   *
+   * Two independent passes, not one: cancelling every cancellable JobRequest
+   * (DRAFT/OPEN/PARTIALLY_FILLED, via ALLOWED_TRANSITIONS) already
+   * cascade-cancels ITS OWN linked assignments (job-requests/service.ts), but
+   * a FILLED JobRequest is not itself cancellable and a calendar-placed
+   * WorkerAssignment has no JobRequest at all -- so any active assignment at
+   * the hotel still needs its own direct pass to be caught in both cases.
+   */
+  private async cascadeCancelHotelWork(hotelId: string, actorId: string, actorRole: string): Promise<void> {
+    const actor = { userId: actorId, role: actorRole, scope: null };
+
+    const jobRequests = await this.prisma.jobRequest.findMany({
+      where: { hotel_id: hotelId, status: { in: ['DRAFT', 'OPEN', 'PARTIALLY_FILLED'] } },
+      select: { id: true },
+    });
+    for (const jr of jobRequests) {
+      await jobRequestService.update(
+        jr.id,
+        { status: 'CANCELLED', cancellation_reason: 'The hotel was deactivated or deleted' },
+        actor
+      );
+    }
+
+    const assignments = await this.prisma.workerAssignment.findMany({
+      where: { hotel_id: hotelId, status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
+      select: { id: true },
+    });
+    for (const a of assignments) {
+      await assignmentService.update(
+        a.id,
+        { status: 'CANCELLED', cancellation_reason: 'The hotel was deactivated or deleted' },
+        actorId,
+        actorRole,
+        null
+      );
+    }
   }
 
   /**

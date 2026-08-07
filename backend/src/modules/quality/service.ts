@@ -272,9 +272,21 @@ export class QualityService extends BaseService {
     return rating;
   }
 
-  async getLeaderboard(hotelId: string, page = 1, perPage = 25) {
+  async getLeaderboard(
+    hotelId: string,
+    page = 1,
+    perPage = 25,
+    actor?: { role: string; scope?: UserScope | null }
+  ) {
     let where: Record<string, unknown> = {};
     if (hotelId) {
+      // Group-grain, not hotel-grain, by design: EmploymentRecord's roster
+      // eligibility is group-scoped (REQ-EMP-012, a worker may work ANY
+      // hotel in their assigned group) and EmploymentRecord.primary_hotel_id
+      // is explicitly documented as DISPLAY-ONLY -- "must never be read by
+      // ... any eligibility check" (schema.prisma). There is no per-hotel
+      // work-history field to leaderboard against, so resolving hotelId to
+      // its hotel_group_id is the correct existing behavior, unchanged here.
       const hotel = await this.prisma.hotel.findUnique({
         where: { id: hotelId },
         select: { hotel_group_id: true },
@@ -284,6 +296,32 @@ export class QualityService extends BaseService {
           employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' },
         },
       };
+    } else if (actor && isScopedManagerRole(actor.role)) {
+      // IDOR fix (2026-08-08): the bare GET /leaderboard route (no
+      // checkHotelAccess(), no hotel_id) previously applied no scoping
+      // whatsoever once hotelId was empty -- any manager/RM holding
+      // quality:read got the platform-wide leaderboard regardless of scope.
+      // Scoped to the manager's own group (or their single hotel's group,
+      // for a hotel-scoped manager -- same group-grain limitation as above,
+      // since there is no narrower signal available).
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        where = { worker: { employment_record: { hotel_group_id: '__none__' } } };
+      } else if (scope.type === 'hotel') {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: scope.hotel_id },
+          select: { hotel_group_id: true },
+        });
+        where = {
+          worker: {
+            employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__', status: 'ACTIVE' },
+          },
+        };
+      } else if (scope.type === 'hotel_group') {
+        where = { worker: { employment_record: { hotel_group_id: scope.hotel_group_id, status: 'ACTIVE' } } };
+      }
+      // scope.type === 'global' -> no added restriction (unreachable for a
+      // scoped-manager role in practice, kept for type completeness).
     }
 
     const skip = (page - 1) * perPage;

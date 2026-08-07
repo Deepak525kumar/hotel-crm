@@ -30,6 +30,7 @@ export async function listAssignments(
     const { data, total } = await assignmentService.list(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     const { page, per_page } = parsed.data;
     sendPaginated(
@@ -59,6 +60,7 @@ export async function getAssignment(
     const result = await assignmentService.getById(req.params.id, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
