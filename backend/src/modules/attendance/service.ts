@@ -213,13 +213,22 @@ export class AttendanceService extends BaseService {
 
   async getById(
     id: string,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<AttendanceDto> {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
 
     if (isSelfScopedRole(actor.role, { checkerIsSelfScoped: false })) {
       if (record.worker_id !== actor.userId) {
+        throw new ForbiddenError('Cannot access this attendance record');
+      }
+    } else if (isScopedManagerRole(actor.role)) {
+      // IDOR fix (2026-08-08): list()/update() in this same file already
+      // scope a manager/regional_manager to their own hotel/hotel_group
+      // claim -- getById() never did, so a manager could read any single
+      // attendance record platform-wide by id.
+      const inScope = await isHotelInScope(actor.scope ?? null, record.hotel_id);
+      if (!inScope) {
         throw new ForbiddenError('Cannot access this attendance record');
       }
     }
