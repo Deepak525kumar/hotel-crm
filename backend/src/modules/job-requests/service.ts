@@ -16,6 +16,7 @@ import {
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
 import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
+import { refreshWorkerOverallRating } from '../quality/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -836,6 +837,14 @@ export class JobRequestService extends BaseService {
             day: wr.shift_date,
           },
         });
+
+        // Aggregate refresh (2026-08-07): total_assignments counts ALL of a
+        // worker's rows regardless of status (quality/service.ts:41), so
+        // accepting a broadcast changes it. Without this the aggregate went
+        // stale, and because the upsert in refreshWorkerOverallRating() is
+        // the only creator of a WorkerOverallRating row, a worker whose only
+        // activity was accepting broadcasts never appeared on the leaderboard.
+        await refreshWorkerOverallRating(tx, actor.userId);
 
         // Deferred-bug batch (2026-08-07): a broadcast accept never wrote a
         // CalendarEntry, only a WorkerAssignment -- placeOnCalendar() (the

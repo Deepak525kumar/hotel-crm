@@ -38,6 +38,8 @@ const mockJobRequestSkillSlot = {
 const mockWorkerAssignment = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // refreshWorkerOverallRating() counts a worker's rows (quality/service.ts:41).
+  count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
 };
 
 // Deferred-bug batch (2026-08-07): acceptBroadcast() now also writes a
@@ -74,6 +76,14 @@ const mockPrisma = {
   jobRequestSkillSlot: mockJobRequestSkillSlot,
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
+  // refreshWorkerOverallRating() (quality/service.ts) now runs inside the
+  // assignment-CREATION transactions too, not only on status changes -- the
+  // aggregate counts all of a worker's rows regardless of status, so creating
+  // one changes it. These mocks back that recompute; the suites below are not
+  // about rating maths, so the values are inert.
+  rating: { aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ _avg: { score: null }, _count: 0 }) },
+  attendance: { count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(0) },
+  workerOverallRating: { upsert: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({}) },
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
@@ -150,6 +160,10 @@ describe('JobRequestService.acceptBroadcast', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockWorkerAssignment.count.mockResolvedValue(0);
+    mockPrisma.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    mockPrisma.attendance.count.mockResolvedValue(0);
+    mockPrisma.workerOverallRating.upsert.mockResolvedValue({});
     service = new JobRequestService();
   });
 

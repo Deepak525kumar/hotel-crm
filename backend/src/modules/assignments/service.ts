@@ -476,9 +476,19 @@ export class AssignmentService extends BaseService {
         // GD-04, same rule update() follows: REASSIGNED is a terminal
         // outcome for the OLD worker that never completes the shift, same
         // aggregate-affecting shape as CANCELLED -- their completion rate
-        // must reflect it. The new worker has no rating-affecting event yet
-        // (a fresh CONFIRMED row), so only one recompute is needed here.
+        // must reflect it.
         await refreshWorkerOverallRating(tx, assignment.worker_id);
+        // Correction (2026-08-07): this previously refreshed ONLY the old
+        // worker, reasoning that "the new worker has no rating-affecting
+        // event yet (a fresh CONFIRMED row)". That is wrong --
+        // refreshWorkerOverallRating() computes total_assignments as a count
+        // of ALL the worker's rows regardless of status
+        // (quality/service.ts:41), so a fresh CONFIRMED row IS
+        // aggregate-affecting. Worse, the upsert there is the only creator of
+        // a WorkerOverallRating row, so a worker whose sole activity is being
+        // reassigned onto shifts had no row at all and was missing from the
+        // leaderboard entirely.
+        await refreshWorkerOverallRating(tx, input.worker_id);
 
         // Job-dispatch lifecycle notification fix (2026-08-05): both
         // affected workers were previously left uninformed -- the old
@@ -685,6 +695,15 @@ export class AssignmentService extends BaseService {
             day,
           },
         });
+
+        // Aggregate refresh (2026-08-07): total_assignments counts ALL of a
+        // worker's rows regardless of status (quality/service.ts:41), so
+        // creating one here changes it. Without this, placeOnCalendar() left
+        // the aggregate stale -- and since the upsert in
+        // refreshWorkerOverallRating() is the only creator of a
+        // WorkerOverallRating row, a worker who had only ever been placed on
+        // a calendar had no row at all and never appeared on the leaderboard.
+        await refreshWorkerOverallRating(tx, input.worker_id);
 
         const calendarEntry = await tx.calendarEntry.create({
           data: {
