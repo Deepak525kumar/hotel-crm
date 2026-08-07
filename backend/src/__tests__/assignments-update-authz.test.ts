@@ -6,14 +6,17 @@ import type { Request, Response, NextFunction } from 'express';
  * updated for the 2026-08-05 product decision narrowing manager/
  * regional_manager to their own hotel/group scope (previously unrestricted
  * platform-wide -- this file's own history is the record of that original,
- * now-superseded, fix).
+ * now-superseded, fix), and again for the 2026-08-08 IDOR fix below.
  *
- * Guards `AssignmentService.update()` (PATCH /assignments/:id): a worker may
- * act only on their own assignment (worker_id match) or one at a hotel in
- * their ACTIVE EmploymentRecord's hotel group; a manager/regional_manager
- * may act only on an assignment at a hotel within their own scope claim
- * (isHotelInScope -- same primitive placeOnCalendar()/moveCalendarEntry()
- * use); admin remains unrestricted.
+ * Guards `AssignmentService.update()` (PATCH /assignments/:id): a worker (or
+ * any other self-scoped role, e.g. checker) may act ONLY on their own
+ * assignment (worker_id match) -- hotel/group eligibility or membership is
+ * NEVER sufficient for one self-scoped actor to read or drive another's
+ * assignment (IDOR fix, 2026-08-08: hotel eligibility answers "could be
+ * assigned here", never "is this actor's assignment"). A manager/
+ * regional_manager may act only on an assignment at a hotel within their own
+ * scope claim (isHotelInScope -- same primitive placeOnCalendar()/
+ * moveCalendarEntry() use); admin remains unrestricted.
  *
  * These tests exercise the real assignments router stack end-to-end via
  * supertest, asserting the guard is enforced. Removing it re-opens the
@@ -165,14 +168,20 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
     expect(res.body.error).toBe('ForbiddenError');
   });
 
-  it('allows a worker transitioning another worker\'s assignment when holding an ACTIVE hotel membership (200)', async () => {
+  // IDOR regression (2026-08-08): hotel eligibility/membership previously
+  // substituted for ownership once the assignment belonged to someone else,
+  // letting any worker eligible at a hotel read AND drive the lifecycle of a
+  // stranger's assignment there. Eligibility is irrelevant to "whose
+  // assignment is this" -- ownership is the only thing that may grant access.
+  it('denies a worker transitioning another worker\'s assignment even WITH an ACTIVE hotel membership (403)', async () => {
     testAuth = { userId: 'w1', role: 'worker' };
     currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h1' });
     membershipHotelIds = ['h1'];
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ForbiddenError');
   });
 
   it('allows a manager whose hotel scope claim matches the assignment\'s hotel (200)', async () => {
@@ -312,6 +321,20 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
       membershipHotelIds = [];
       const res = await request(makeApp()).patch('/assignments/a1').send(body);
       expect(res.status).toBe(403);
+    });
+
+    // IDOR regression (2026-08-08): same as above, but WITH hotel
+    // membership -- proves ownership is the gate, not eligibility.
+    it.each([
+      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
+      { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
+    ])('worker: $label ANOTHER worker\'s assignment even WITH an ACTIVE hotel membership (403)', async ({ body, fromStatus }) => {
+      testAuth = { userId: 'w1', role: 'worker' };
+      currentAssignment = makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: fromStatus });
+      membershipHotelIds = ['h1'];
+      const res = await request(makeApp()).patch('/assignments/a1').send(body);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
     });
   });
 });
