@@ -86,6 +86,100 @@ export class CrmController {
     }
   }
 
+  // Entity lifecycle (2026-08-07): ACTIVE <-> DEACTIVATED for temporary
+  // operational changes, and -> DELETED -> restore for permanent removal
+  // from operations with history preserved. See crm/service.ts for why the
+  // two are distinct in kind rather than degree.
+  async deactivateHotel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.deactivateHotel(
+        req.params['hotel_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reactivateHotel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.reactivateHotel(
+        req.params['hotel_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreHotel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.restoreHotel(
+        req.params['hotel_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async deactivateHotelGroup(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.deactivateHotelGroup(
+        req.params['hotel_group_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async reactivateHotelGroup(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.reactivateHotelGroup(
+        req.params['hotel_group_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreHotelGroup(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.restoreHotelGroup(
+        req.params['hotel_group_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // ── Hotel Groups (Epic 5 PR 5.2) ────────────────────────────────────────────
 
   listHotelGroups = [

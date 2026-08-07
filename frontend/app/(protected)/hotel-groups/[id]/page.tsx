@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { mutate as globalMutate } from "swr";
+import { LifecycleCard } from "@/components/crm/LifecycleCard";
+import { hotelGroupsApi } from "@/lib/api";
+import { useParams, useRouter } from "next/navigation";
 import { useHotelGroup, useHotels, useUsersByIds } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
@@ -31,6 +34,22 @@ export default function HotelGroupDetailPage() {
   const id = params.id;
 
   const { data: group, isLoading, error } = useHotelGroup(id);
+  const router = useRouter();
+
+  // Every lifecycle transition changes whether this group appears in
+  // operational lists, so refresh the detail row and all list keys together.
+  const runLifecycle = async (fn: () => Promise<unknown>, leavesPage = false) => {
+    const result = await fn();
+    await Promise.all([
+      globalMutate(["hotel-group", id]),
+      globalMutate((key) => Array.isArray(key) && key[0] === "hotel-groups"),
+      // Member hotels' group association is unaffected by a soft delete, but
+      // hotel lists surface group names -- keep them consistent.
+      globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
+    ]);
+    if (leavesPage) router.push("/hotel-groups");
+    return result;
+  };
 
   // Server-side filtered by hotel_group_id — previously this fetched a flat
   // page of up to 100 hotels and filtered client-side, which silently
@@ -177,6 +196,21 @@ export default function HotelGroupDetailPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Hotel groups had no lifecycle controls at all before 2026-08-07 --
+              the only option was a hard delete that destroyed the row and
+              silently detached every member hotel. */}
+          <RoleGate allow={["admin"]}>
+            <LifecycleCard
+              label="hotel group"
+              isActive={group.is_active}
+              deletedAt={group.deleted_at ?? null}
+              onDeactivate={() => runLifecycle(() => hotelGroupsApi.deactivate(id))}
+              onReactivate={() => runLifecycle(() => hotelGroupsApi.reactivate(id))}
+              onDelete={() => runLifecycle(() => hotelGroupsApi.remove(id), true)}
+              onRestore={() => runLifecycle(() => hotelGroupsApi.restore(id))}
+            />
+          </RoleGate>
         </>
       )}
     </div>

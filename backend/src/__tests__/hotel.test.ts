@@ -2,6 +2,9 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const mockPrisma = {
   hotel: {
+    // Asserted NEVER to be called: delete is soft, and a hard delete belongs
+    // in a separate PURGE operation.
+    delete: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -312,6 +315,133 @@ describe('CrmService - Hotels', () => {
       await expect(service.getHotel('nonexistent', 'actor', 'admin')).rejects.toMatchObject({
         name: 'NotFoundError',
       });
+    });
+  });
+
+  // Entity lifecycle (2026-08-07). DEACTIVATED and DELETED are distinct in
+  // kind, not degree: deactivation is a reversible operational pause;
+  // deletion removes the hotel from operations entirely and returns only
+  // through an explicit admin restore.
+  describe('lifecycle', () => {
+    const active = { id: 'h1', name: 'Grand', is_active: true, deleted_at: null };
+    const deactivated = { id: 'h1', name: 'Grand', is_active: false, deleted_at: null };
+    const deleted = { id: 'h1', name: 'Grand', is_active: false, deleted_at: new Date('2026-08-01') };
+
+    beforeEach(() => {
+      mockPrisma.hotel.update.mockResolvedValue({ id: 'h1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+    });
+
+    it('deactivate touches is_active only, never deleted_at', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(active);
+      await service.deactivateHotel('h1', 'a1', 'admin');
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: false } })
+      );
+    });
+
+    it('reactivate returns a deactivated hotel to active', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(deactivated);
+      await service.reactivateHotel('h1', 'a1', 'admin');
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: true } })
+      );
+    });
+
+    it('delete sets deleted_at AND is_active=false, so the columns cannot disagree', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(active);
+      await service.deleteHotel('h1', 'a1', 'admin');
+      const data = (mockPrisma.hotel.update as jest.Mock).mock.calls[0][0] as { data: { is_active: boolean; deleted_at: Date } };
+      expect(data.data.is_active).toBe(false);
+      expect(data.data.deleted_at).toBeInstanceOf(Date);
+    });
+
+    it('delete never removes the row (PURGE is a separate operation)', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(active);
+      await service.deleteHotel('h1', 'a1', 'admin');
+      expect(mockPrisma.hotel.delete).not.toHaveBeenCalled();
+    });
+
+    it('restore clears both columns together', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(deleted);
+      await service.restoreHotel('h1', 'a1', 'admin');
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: true, deleted_at: null } })
+      );
+    });
+
+    // Deactivate/reactivate are for the temporary pause only. A deleted hotel
+    // must be restored first -- otherwise "reactivate" would half-resurrect it
+    // (is_active true, deleted_at still set), which is the exact broken state
+    // this lifecycle exists to eliminate.
+    it.each([
+      ['deactivateHotel'],
+      ['reactivateHotel'],
+    ])('%s refuses to operate on a deleted hotel', async (method) => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(deleted);
+      await expect(
+        (service as never as Record<string, (...a: unknown[]) => Promise<unknown>>)[method]!('h1', 'a1', 'admin')
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects double-delete and restore-of-a-live-hotel', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(deleted);
+      await expect(service.deleteHotel('h1', 'a1', 'admin')).rejects.toMatchObject({ name: 'ConflictError' });
+      mockPrisma.hotel.findUnique.mockResolvedValue(active);
+      await expect(service.restoreHotel('h1', 'a1', 'admin')).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+  });
+
+  // The point of the whole change: a deleted entity must not appear in normal
+  // operational reads. Asserting the WHERE clause, not just the result -- the
+  // mock returns whatever it is told, so a result-only test passes against the
+  // unfiltered query.
+  describe('deleted entities are invisible to operational reads', () => {
+  // mock.calls entries are `unknown`; one narrowing helper beats casting at
+  // every assertion.
+  const findManyWhere = () =>
+    ((mockPrisma.hotel.findMany as jest.Mock).mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+    }).where;
+
+    it('listHotels excludes deleted by default', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+      await service.listHotels({ page: 1, limit: 20 } as never, 'admin');
+      expect(findManyWhere().deleted_at).toBeNull();
+    });
+
+    it('listHotels admits deleted only for an admin passing include_deleted', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+      await service.listHotels({ page: 1, limit: 20, include_deleted: 'true' } as never, 'admin');
+      expect(findManyWhere().deleted_at).toBeUndefined();
+    });
+
+    // A non-admin cannot widen their own visibility by passing the flag.
+    it('listHotels ignores include_deleted for a non-admin', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+      await service.listHotels({ page: 1, limit: 20, include_deleted: 'true' } as never, 'manager');
+      expect(findManyWhere().deleted_at).toBeNull();
+    });
+
+    // 404 rather than 403: a caller who should not see the hotel should not
+    // learn that it exists.
+    it('getHotel reports a deleted hotel as not found', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: false, deleted_at: new Date(),
+      });
+      await expect(service.getHotel('h1', 'a1', 'admin')).rejects.toMatchObject({ name: 'NotFoundError' });
+    });
+
+    it('getHotel surfaces a deleted hotel to an admin viewing the archive', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: false, deleted_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      await expect(service.getHotel('h1', 'a1', 'admin', undefined, true)).resolves.toBeDefined();
     });
   });
 

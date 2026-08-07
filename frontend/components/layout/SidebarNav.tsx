@@ -13,6 +13,7 @@ import {
   MapPin,
   BarChart3,
   Building2,
+  Archive,
   Building,
   Settings,
   type LucideIcon,
@@ -56,6 +57,9 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotels", label: "Hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
+  // Deleted entities are invisible everywhere else by design, so the archive
+  // is their only reachable surface. Admin-only, matching the backend gate.
+  { href: "/archive", label: "Archive", icon: Archive, roles: ["admin"] },
   // Backend (GET /users, GET/PUT /users/:id) is scope-correct for manager
   // and regional_manager (2026-08-06 scope fixes) -- this nav entry was the
   // last remaining place a manager/RM had no way to browse or open their

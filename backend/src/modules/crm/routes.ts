@@ -43,6 +43,13 @@ router.post('/hotels', requireRoleFlagged(['admin', 'manager'], 'admin'), requir
 router.get('/hotels/:hotel_id', checkHotelAccess(), requirePermission('hotels:read'), (req, res, next) => crmController.getHotel(req, res, next));
 router.patch('/hotels/:hotel_id', checkHotelAccess(), requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.updateHotel);
 router.delete('/hotels/:hotel_id', requireRole('admin'), (req, res, next) => crmController.deleteHotel(req, res, next));
+// Entity lifecycle (2026-08-07). POST, not DELETE/PATCH: these are state
+// transitions on an existing resource, not removals or field edits.
+// Deactivate/reactivate are the temporary pair; restore is the inverse of
+// delete and is admin-only, matching the delete it reverses.
+router.post('/hotels/:hotel_id/deactivate', requireRole('admin'), (req, res, next) => crmController.deactivateHotel(req, res, next));
+router.post('/hotels/:hotel_id/reactivate', requireRole('admin'), (req, res, next) => crmController.reactivateHotel(req, res, next));
+router.post('/hotels/:hotel_id/restore', requireRole('admin'), (req, res, next) => crmController.restoreHotel(req, res, next));
 
 // Hotel Groups CRUD (Epic 5 PR 5.2, ADR-023). Creation/modification is
 // Admin-only — REQ-CRM-010: Regional/Property Managers "manage assigned
@@ -74,5 +81,8 @@ router.get(
 );
 router.patch('/hotel-groups/:hotel_group_id', requireRole('admin'), requirePermissionFlagged('hotels:write', 'hotel_groups:write'), ...crmController.updateHotelGroup);
 router.delete('/hotel-groups/:hotel_group_id', requireRole('admin'), (req, res, next) => crmController.deleteHotelGroup(req, res, next));
+router.post('/hotel-groups/:hotel_group_id/deactivate', requireRole('admin'), (req, res, next) => crmController.deactivateHotelGroup(req, res, next));
+router.post('/hotel-groups/:hotel_group_id/reactivate', requireRole('admin'), (req, res, next) => crmController.reactivateHotelGroup(req, res, next));
+router.post('/hotel-groups/:hotel_group_id/restore', requireRole('admin'), (req, res, next) => crmController.restoreHotelGroup(req, res, next));
 
 export default router;

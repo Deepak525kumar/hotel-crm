@@ -272,15 +272,89 @@ describe('CrmService - Hotel Groups', () => {
     });
   });
 
+  // Entity lifecycle parity (2026-08-07): HotelGroup previously had no
+  // lifecycle columns at all and only supported hard delete. It now shares
+  // Hotel's model exactly.
+  describe('lifecycle', () => {
+    const active = { id: 'hg_1', name: 'Berlin', is_active: true, deleted_at: null };
+    const deleted = { id: 'hg_1', name: 'Berlin', is_active: false, deleted_at: new Date('2026-08-01') };
+
+    beforeEach(() => {
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+    });
+
+    it('deactivate touches is_active only', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(active);
+      await service.deactivateHotelGroup('hg_1', 'a1', 'admin');
+      expect(mockPrisma.hotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: false } })
+      );
+    });
+
+    it('reactivate returns a deactivated group to active', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ ...active, is_active: false });
+      await service.reactivateHotelGroup('hg_1', 'a1', 'admin');
+      expect(mockPrisma.hotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: true } })
+      );
+    });
+
+    it('restore clears both columns together', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(deleted);
+      await service.restoreHotelGroup('hg_1', 'a1', 'admin');
+      expect(mockPrisma.hotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: true, deleted_at: null } })
+      );
+    });
+
+    it('deactivate/reactivate refuse to operate on a deleted group', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(deleted);
+      await expect(service.deactivateHotelGroup('hg_1', 'a1', 'admin')).rejects.toMatchObject({ name: 'ConflictError' });
+      await expect(service.reactivateHotelGroup('hg_1', 'a1', 'admin')).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
+    });
+
+    it('listHotelGroups excludes deleted by default', async () => {
+      mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+      mockPrisma.hotelGroup.count.mockResolvedValue(0);
+      await service.listHotelGroups({ page: 1, limit: 20 } as never, { role: 'admin', scope: null });
+      const where = ((mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0]![0] as {
+        where: Record<string, unknown>;
+      }).where;
+      expect(where.deleted_at).toBeNull();
+    });
+
+    it('getHotelGroup reports a deleted group as not found', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(deleted);
+      await expect(
+        service.getHotelGroup('hg_1', 'a1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'NotFoundError' });
+    });
+  });
+
   describe('deleteHotelGroup', () => {
-    it('hard-deletes the hotel group', async () => {
+    // BEHAVIOUR CHANGE (2026-08-07): this is now a SOFT delete. It previously
+    // issued prisma.hotelGroup.delete, destroying the row and detaching every
+    // member hotel via ON DELETE SET NULL -- irreversible, and it silently
+    // orphaned hotels. Hotel and HotelGroup now share one lifecycle, so the
+    // group is marked deleted and stays restorable.
+    it('soft-deletes the hotel group, leaving member hotels attached', async () => {
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group' });
       mockPrisma.hotelGroup.delete.mockResolvedValue({ id: 'hg_1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.deleteHotelGroup('hg_1', 'admin_1', 'admin');
 
-      expect(mockPrisma.hotelGroup.delete).toHaveBeenCalledWith({ where: { id: 'hg_1' } });
+      expect(mockPrisma.hotelGroup.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'hg_1' },
+          data: expect.objectContaining({ is_active: false, deleted_at: expect.any(Date) }),
+        })
+      );
+      // The row must survive: a hard delete could not be restored, and would
+      // detach every member hotel.
+      expect(mockPrisma.hotelGroup.delete).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when the hotel group does not exist', async () => {

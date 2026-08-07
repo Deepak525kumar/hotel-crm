@@ -262,6 +262,8 @@ export interface UpdateHotelInput {
 
 /** Query params accepted by `GET /crm/hotels`. */
 export interface ListHotelsQuery {
+  /** Admin-only archived view. Deleted hotels are excluded from every other read. */
+  include_deleted?: "true" | "false";
   search?: string;
   is_active?: "true" | "false";
   country?: string;
@@ -289,6 +291,9 @@ export interface HotelGroup {
   regional_manager_assigned_at: string | null;
   regional_manager_vacated_at: string | null;
   regional_manager_vacancy_reason: ManagerVacancyReason | null;
+  /** Entity lifecycle (2026-08-07): groups now match Hotel's model. */
+  is_active: boolean;
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -314,6 +319,8 @@ export interface UpdateHotelGroupInput {
 
 /** Query params accepted by `GET /crm/hotel-groups`. */
 export interface ListHotelGroupsQuery {
+  /** Admin-only archived view. Deleted groups are excluded from every other read. */
+  include_deleted?: "true" | "false";
   page?: number;
   limit?: number;
 }
