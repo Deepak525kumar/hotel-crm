@@ -59,7 +59,12 @@ export function signTokens(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): Jw
 export function verifyAccessToken(token: string): AccessTokenPayload | null {
   const env = getEnv();
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as AccessTokenPayload;
+    // Explicit algorithms allow-list (security review, 2026-08-08): without
+    // this, jwt.verify() accepts whatever algorithm the token's own header
+    // claims, including 'none' or a mismatched algorithm -- the classic
+    // algorithm-confusion forgery class. Tokens are always signed HS256
+    // (see signAccessToken above), so verification must require exactly that.
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as AccessTokenPayload;
     return decoded;
   } catch (error) {
     if (error instanceof jwt.TokenExpiredError) {
@@ -76,7 +81,7 @@ export function verifyAccessToken(token: string): AccessTokenPayload | null {
 export function verifyRefreshToken(token: string): RefreshTokenPayload | null {
   const env = getEnv();
   try {
-    const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
+    const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET, { algorithms: ['HS256'] }) as RefreshTokenPayload;
     if (decoded.type !== 'refresh') {
       return null;
     }
