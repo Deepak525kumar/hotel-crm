@@ -628,6 +628,15 @@ export const hotelsApi = {
   /** Soft-delete (deactivate) a hotel. Admin-only backend-side; returns 204. */
   remove: (id: string) =>
     apiFetch<void>(`/crm/hotels/${id}`, { method: "DELETE" }),
+
+  /**
+   * Reverses `remove()`. Admin-only. Needed because the soft delete sets both
+   * `is_active: false` and `deleted_at`, and the edit form can only flip
+   * `is_active` — leaving a hotel visible in CRM lists but rejected by work
+   * requests and manager assignment, with no way back.
+   */
+  reactivate: (id: string) =>
+    apiFetch<Hotel>(`/crm/hotels/${id}/reactivate`, { method: "POST" }),
 };
 
 /** Hotel Groups API matching the backend `/crm/hotel-groups/*` routes. */

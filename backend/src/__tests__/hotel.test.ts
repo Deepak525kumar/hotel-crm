@@ -315,6 +315,83 @@ describe('CrmService - Hotels', () => {
     });
   });
 
+  // Added 2026-08-07. deleteHotel() sets is_active=false AND deleted_at, but
+  // nothing could clear deleted_at again -- updateHotel() never touches that
+  // column. Flipping is_active back via the edit form left the hotel
+  // half-restored: visible in CRM lists (which ignore deleted_at) but rejected
+  // by job-requests and manager assignment (which check it).
+  describe('reactivateHotel', () => {
+    it('clears BOTH is_active and deleted_at', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: false, deleted_at: new Date('2026-08-01'),
+      });
+      mockPrisma.hotel.update.mockResolvedValue({ id: 'h1', name: 'Grand', is_active: true, deleted_at: null });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.reactivateHotel('h1', 'admin_1', 'admin');
+
+      // Both together: clearing only one reproduces the half-restored state.
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'h1' },
+          data: { is_active: true, deleted_at: null },
+        })
+      );
+    });
+
+    it('audit-logs the reactivation', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: false, deleted_at: new Date('2026-08-01'),
+      });
+      mockPrisma.hotel.update.mockResolvedValue({ id: 'h1', is_active: true, deleted_at: null });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.reactivateHotel('h1', 'admin_1', 'admin');
+
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ action: 'MODIFY', resource_type: 'HOTEL' }),
+        })
+      );
+    });
+
+    it('rejects reactivating a hotel that is already fully active', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: true, deleted_at: null,
+      });
+
+      await expect(service.reactivateHotel('h1', 'admin_1', 'admin')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+      expect(mockPrisma.hotel.update).not.toHaveBeenCalled();
+    });
+
+    // The half-restored case: is_active was flipped back via the edit form but
+    // deleted_at is still set. Reactivate must still repair it, not treat the
+    // hotel as already active.
+    it('repairs a half-restored hotel (is_active true but deleted_at still set)', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Grand', is_active: true, deleted_at: new Date('2026-08-01'),
+      });
+      mockPrisma.hotel.update.mockResolvedValue({ id: 'h1', is_active: true, deleted_at: null });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.reactivateHotel('h1', 'admin_1', 'admin');
+
+      expect(mockPrisma.hotel.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { is_active: true, deleted_at: null } })
+      );
+    });
+
+    it('throws NotFoundError for an unknown hotel', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue(null);
+
+      await expect(service.reactivateHotel('nope', 'admin_1', 'admin')).rejects.toMatchObject({
+        name: 'NotFoundError',
+      });
+    });
+  });
+
   describe('deleteHotel', () => {
     it('soft-deletes by deactivating', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Hotel', is_active: true });

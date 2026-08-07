@@ -1,5 +1,5 @@
 import { BaseService } from '../../lib/base-service.js';
-import { NotFoundError, ValidationError, ForbiddenError } from '../../lib/errors.js';
+import { ConflictError, NotFoundError, ValidationError, ForbiddenError } from '../../lib/errors.js';
 import {
   CreateHotelRequest, UpdateHotelRequest,
   ListHotelsQuery,
@@ -282,6 +282,43 @@ export class CrmService extends BaseService {
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
+    return result;
+  }
+
+  /**
+   * Reverses deleteHotel(). Admin-only, mirroring the delete it undoes.
+   *
+   * Added 2026-08-07: deleteHotel() sets BOTH is_active=false and deleted_at,
+   * but nothing could clear deleted_at again -- updateHotel() never touches
+   * that column, so flipping is_active back through the edit form left the
+   * hotel half-restored. That mattered because the two columns are read
+   * inconsistently across the codebase: CRM's own getHotel()/listHotels()
+   * ignore deleted_at entirely (so the hotel still appeared in lists), while
+   * job-requests/service.ts:152,483 and users/service.ts:514 reject a hotel
+   * with deleted_at set. The result was a hotel that looked present but
+   * silently could not take work requests or a manager assignment, with no
+   * way back.
+   */
+  async reactivateHotel(hotelId: string, actorId: string, actorRole: string, ip?: string) {
+    const hotel = await this.prisma.hotel.findUnique({ where: { id: hotelId } });
+    if (!hotel) throw new NotFoundError('Hotel not found');
+
+    if (hotel.is_active && hotel.deleted_at === null) {
+      throw new ConflictError('Hotel is already active');
+    }
+
+    // Clear both columns together. Clearing only one is exactly the
+    // half-restored state described above.
+    const result = await this.prisma.hotel.update({
+      where: { id: hotelId },
+      data: { is_active: true, deleted_at: null },
+    });
+
+    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, {
+      action: 'reactivate',
+      name: hotel.name,
+    }, ip);
+
     return result;
   }
 

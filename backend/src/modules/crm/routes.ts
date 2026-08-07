@@ -43,6 +43,9 @@ router.post('/hotels', requireRoleFlagged(['admin', 'manager'], 'admin'), requir
 router.get('/hotels/:hotel_id', checkHotelAccess(), requirePermission('hotels:read'), (req, res, next) => crmController.getHotel(req, res, next));
 router.patch('/hotels/:hotel_id', checkHotelAccess(), requireRoleFlagged(['admin', 'manager'], 'admin'), requirePermission('hotels:write'), ...crmController.updateHotel);
 router.delete('/hotels/:hotel_id', requireRole('admin'), (req, res, next) => crmController.deleteHotel(req, res, next));
+// Admin-only, mirroring the delete it reverses. POST rather than DELETE since
+// it is a state transition on an existing resource, not a removal.
+router.post('/hotels/:hotel_id/reactivate', requireRole('admin'), (req, res, next) => crmController.reactivateHotel(req, res, next));
 
 // Hotel Groups CRUD (Epic 5 PR 5.2, ADR-023). Creation/modification is
 // Admin-only — REQ-CRM-010: Regional/Property Managers "manage assigned

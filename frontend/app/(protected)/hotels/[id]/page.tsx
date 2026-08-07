@@ -46,6 +46,21 @@ export default function HotelDetailPage() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
+  const reactivate = useAsyncAction();
+
+  const onReactivate = () =>
+    reactivate.run(
+      async () => {
+        await hotelsApi.reactivate(id);
+        // Same invalidation set as deactivate: the detail row plus every
+        // hotels list, since is_active/deleted_at change what those return.
+        await Promise.all([
+          globalMutate(["hotel", id]),
+          globalMutate((key) => Array.isArray(key) && key[0] === "hotels"),
+        ]);
+      },
+      { errorMessage: "Could not reactivate this hotel. Please try again." },
+    );
 
   const onDeactivate = () =>
     deactivate.run(
@@ -194,7 +209,7 @@ export default function HotelDetailPage() {
           <BlocklistCard hotelId={id} />
 
           <HotelWriteGate>
-            {hotel.is_active && (
+            {hotel.is_active ? (
               <Card className="border-red-100">
                 <CardContent className="flex items-center justify-between gap-4">
                   <div>
@@ -212,6 +227,31 @@ export default function HotelDetailPage() {
                     Deactivate
                   </Button>
                 </CardContent>
+              </Card>
+            ) : (
+              /* Added 2026-08-07: deactivating was one-way from the UI. The
+                 card above only renders while is_active, so once deactivated
+                 there was no control left anywhere to bring the hotel back. */
+              <Card>
+                <CardContent className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      Reactivate hotel
+                    </p>
+                    <p className="text-sm text-gray-500">
+                      Makes the hotel visible to workers again and reopens it for
+                      staffing and manager assignment.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={onReactivate}
+                    loading={reactivate.pending}
+                    className="shrink-0"
+                  >
+                    Reactivate
+                  </Button>
+                </CardContent>
+                <FormError className="px-6 pb-4">{reactivate.error}</FormError>
               </Card>
             )}
           </HotelWriteGate>

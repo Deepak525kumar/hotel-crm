@@ -86,6 +86,23 @@ export class CrmController {
     }
   }
 
+  // Reverses deleteHotel(); see crmService.reactivateHotel() for why both
+  // is_active and deleted_at must be cleared together.
+  async reactivateHotel(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await crmService.reactivateHotel(
+        req.params['hotel_id']!,
+        req.auth.userId,
+        req.auth.role,
+        req.ip
+      );
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // ── Hotel Groups (Epic 5 PR 5.2) ────────────────────────────────────────────
 
   listHotelGroups = [
