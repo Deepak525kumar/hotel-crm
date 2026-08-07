@@ -87,7 +87,8 @@ export class DocumentController {
       const result = await documentService.getDocument(
         req.params.document_id,
         req.auth.userId,
-        req.auth.role
+        req.auth.role,
+        req.auth.scope ?? null
       );
       res.status(200).json({
         status: 'success',
