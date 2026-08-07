@@ -61,6 +61,14 @@ const mockEmployeeBlocklistEntry = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Critical fix (2026-08-08): placeOnCalendar()/reassign() now check
+// isWorkerAbsentOnDay() before creating an assignment -- default every
+// fixture worker to "no absence marked" so existing placement tests don't
+// need to separately stub this.
+const mockCalendarAbsence = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   // placeOnCalendar() now refreshes WorkerOverallRating in-transaction
   // (2026-08-07): the aggregate counts a worker's rows regardless of status.
@@ -72,6 +80,7 @@ const mockPrisma = {
   hotel: mockHotel,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
+  calendarAbsence: mockCalendarAbsence,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -137,6 +146,7 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', id: 'emp_w1' });
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
     mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
+    mockCalendarAbsence.findUnique.mockResolvedValue(null);
   });
 
   describe('placeOnCalendar', () => {
@@ -170,6 +180,21 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
 
       expect(result.assignment.work_request_id).toBeNull();
       expect(result.calendar_entry.assignment_id).toBe('a1');
+    });
+
+    // Critical fix (2026-08-08): "a worker should not be allowed to be
+    // placed if he has applied sick or holiday for the specific date".
+    it('refuses to place a worker who has a SICK/VACATION absence marked for that day', async () => {
+      mockCalendarAbsence.findUnique.mockResolvedValue({ id: 'abs1' });
+
+      await expect(
+        service.placeOnCalendar(
+          { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
+          { userId: 'mgr1', role: 'admin' }
+        )
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('does not emit any notification (no broadcast fires — TRULE-002-adjacent negative assertion)', async () => {

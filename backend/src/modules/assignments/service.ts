@@ -78,6 +78,34 @@ export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<bo
 }
 
 /**
+ * Critical fix (2026-08-08): a worker who marked themselves (or was marked
+ * by a manager) SICK or on VACATION for a day could still be placed on a
+ * new assignment that same day -- calendar/service.ts's markAbsence()
+ * auto-cancels an assignment that ALREADY EXISTS when the absence is
+ * marked, but nothing checked the reverse direction: creating a NEW
+ * assignment never consulted CalendarAbsence at all. Every worker-
+ * assignment creation path (placeOnCalendar, reassign, acceptBroadcast)
+ * must call this before creating a row.
+ *
+ * Deliberately a separate helper from isWorkerFreeOnDay() above, not folded
+ * into it: that one enforces the active-assignment exclusivity invariant
+ * (TRULE-006, backed by a DB unique index); this enforces a distinct
+ * business rule (a declared absence blocks new placement) with no DB
+ * constraint behind it -- CalendarAbsence and WorkerAssignment are
+ * independent tables with no FK between them. Same read-only,
+ * pre-filter-only caveat as isWorkerFreeOnDay(): not a replacement for a
+ * DB-level guarantee, since none exists for this rule.
+ */
+export async function isWorkerAbsentOnDay(workerId: string, day: Date): Promise<boolean> {
+  const prisma = getPrisma();
+  const absence = await prisma.calendarAbsence.findUnique({
+    where: { worker_id_day: { worker_id: workerId, day } },
+    select: { id: true },
+  });
+  return absence !== null;
+}
+
+/**
  * Resolves an assignment's scheduled start instant, or null when the
  * assignment has no shift time to resolve.
  *
@@ -466,6 +494,12 @@ export class AssignmentService extends BaseService {
       throw new ConflictError('The new worker already has an assignment for this day');
     }
 
+    // Critical fix (2026-08-08): block reassigning to a worker who has a
+    // declared SICK/VACATION absence on this day.
+    if (await isWorkerAbsentOnDay(input.worker_id, assignment.day)) {
+      throw new ConflictError('The new worker has a sick/vacation absence marked for this day');
+    }
+
     let result;
     try {
       result = await this.prisma.$transaction(async (tx) => {
@@ -693,6 +727,14 @@ export class AssignmentService extends BaseService {
     }
 
     const day = new Date(`${input.day}T00:00:00.000Z`);
+
+    // Critical fix (2026-08-08): block placement on a day the worker has a
+    // declared SICK/VACATION absence -- see isWorkerAbsentOnDay()'s doc
+    // comment above for why this is a separate check from the eligibility
+    // ones above it.
+    if (await isWorkerAbsentOnDay(input.worker_id, day)) {
+      throw new ConflictError('Worker has a sick/vacation absence marked for this day');
+    }
 
     let created;
     try {

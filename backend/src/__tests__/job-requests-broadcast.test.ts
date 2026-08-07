@@ -51,11 +51,19 @@ const mockOutboxEvent = {
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Critical fix (2026-08-08): acceptBroadcast()/getBroadcastEligibility() now
+// exclude workers with a SICK/VACATION absence marked that day.
+const mockCalendarAbsence = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+};
+
 const mockPrisma = {
   hotel: mockHotel,
   jobRequest: mockJobRequest,
   employmentRecord: mockEmploymentRecord,
   workerAssignment: mockWorkerAssignment,
+  calendarAbsence: mockCalendarAbsence,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -497,6 +505,7 @@ describe('JobRequestService.getBroadcastEligibility', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     service = new JobRequestService();
+    mockCalendarAbsence.findMany.mockResolvedValue([]);
   });
 
   it('throws NotFoundError when the job request does not exist', async () => {
@@ -555,6 +564,27 @@ describe('JobRequestService.getBroadcastEligibility', () => {
       ]);
     // w1 already has an active assignment that day; w2 is free.
     mockWorkerAssignment.findMany.mockResolvedValue([{ worker_id: 'w1' }]);
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots[0].eligible_count).toBe(1);
+  });
+
+  // Critical fix (2026-08-08): "a worker should not be allowed to be placed
+  // if he has applied sick or holiday for the specific date" -- extended to
+  // the eligibility list a manager sees, not just the accept path itself.
+  it('excludes workers with a SICK/VACATION absence marked that day from the eligible set', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: ['CLEANER'] },
+      ]);
+    mockWorkerAssignment.findMany.mockResolvedValue([]); // neither busy
+    // w1 has a declared absence that day; w2 does not.
+    mockCalendarAbsence.findMany.mockResolvedValue([{ worker_id: 'w1' }]);
 
     const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
 
