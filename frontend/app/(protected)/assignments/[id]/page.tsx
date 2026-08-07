@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
-import { useHotel, useUserOptions, useUsersByIds } from "@/hooks/useHotels";
+import { useHotel, useUserOptions } from "@/hooks/useHotels";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -37,12 +38,6 @@ export default function AssignmentDetailPage() {
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
   const { data: hotel } = useHotel(assignment?.hotel_id);
   const { data: workRequest } = useWorkRequest(assignment?.work_request_id);
-  const peopleIds = assignment
-    ? [assignment.worker_id, assignment.assigned_by_id]
-    : [];
-  const peopleById = useUsersByIds(peopleIds);
-  const worker = assignment ? peopleById.get(assignment.worker_id) : undefined;
-  const assignedBy = assignment ? peopleById.get(assignment.assigned_by_id) : undefined;
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -166,9 +161,7 @@ export default function AssignmentDetailPage() {
             <DataRow
               label="Worker"
               value={
-                <TextLink href={`/users/${assignment.worker_id}`}>
-                  {worker ? `${worker.first_name} ${worker.last_name}` : "View worker"}
-                </TextLink>
+                <UserRef userId={assignment.worker_id} fallback="The assigned worker" />
               }
             />
             <DataRow
@@ -200,9 +193,7 @@ export default function AssignmentDetailPage() {
             <DataRow
               label="Assigned by"
               value={
-                <TextLink href={`/users/${assignment.assigned_by_id}`}>
-                  {assignedBy ? `${assignedBy.first_name} ${assignedBy.last_name}` : "View user"}
-                </TextLink>
+                <UserRef userId={assignment.assigned_by_id} fallback="A manager" />
               }
             />
             <DataRow

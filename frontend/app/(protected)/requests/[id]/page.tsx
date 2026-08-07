@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
-import { useHotel, useUsersByIds } from "@/hooks/useHotels";
+import { useHotel } from "@/hooks/useHotels";
 import { ApiError, workRequestsApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
@@ -32,9 +33,6 @@ export default function WorkRequestDetailPage() {
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
   const action = useAsyncAction();
   const { data: hotel } = useHotel(request?.hotel_id);
-  const creatorIds = request?.created_by_id ? [request.created_by_id] : [];
-  const creatorById = useUsersByIds(creatorIds);
-  const creator = request?.created_by_id ? creatorById.get(request.created_by_id) : undefined;
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -126,9 +124,7 @@ export default function WorkRequestDetailPage() {
             <DataRow
               label="Created by"
               value={
-                <TextLink href={`/users/${request.created_by_id}`}>
-                  {creator ? `${creator.first_name} ${creator.last_name}` : "View user"}
-                </TextLink>
+                <UserRef userId={request.created_by_id} fallback="A manager" />
               }
             />
             <DataRow label="Shift date" value={request.shift_date} />
