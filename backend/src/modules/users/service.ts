@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
-import { NotFoundError, ConflictError, ForbiddenError } from '../../lib/errors.js';
+import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import {
@@ -218,11 +218,6 @@ export class UserService extends BaseService {
       throw new ForbiddenError('Only admins can modify admin accounts');
     }
 
-    // Prevent non-admins from elevating to admin
-    if (data.role === 'admin' && actorRole !== 'admin') {
-      throw new ForbiddenError('Only admins can assign admin role');
-    }
-
     // This is the flag-off (default) legacy path — it never had a scope
     // check at all, so a manager/regional_manager reachable at the route
     // (`requireRole(['admin','manager','regional_manager'])`) could update
@@ -248,14 +243,15 @@ export class UserService extends BaseService {
       if (!inScope) throw new ForbiddenError('User not in your scope');
     }
 
-    const newRole = data.role ? (data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN') : user.role;
     const newIsActive = data.is_active ?? user.is_active;
 
-    // ADR-031 D-4 (C-5): a role change or deactivation must invalidate
-    // already-issued access tokens atomically with the state change itself —
-    // a bump committed separately from its trigger could be lost, leaving a
-    // demoted/deactivated user holding a valid token.
-    const shouldBump = newRole !== user.role || (newIsActive === false && user.is_active !== false);
+    // ADR-031 D-4 (C-5): a deactivation must invalidate already-issued access
+    // tokens atomically with the state change itself — a bump committed
+    // separately from its trigger could be lost, leaving a deactivated user
+    // holding a valid token. `role` no longer flows through this method at
+    // all (see UpdateUserSchema's comment) — updateUserRole is the sole
+    // trigger for a role-change bump.
+    const shouldBump = newIsActive === false && user.is_active !== false;
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const result = await tx.user.update({
@@ -267,7 +263,6 @@ export class UserService extends BaseService {
           // column — passing it through collides with any other user who
           // also has no phone number, surfacing as a false "already exists".
           phone: data.phone !== undefined ? (data.phone?.trim() || null) : user.phone,
-          role: newRole,
           is_active: newIsActive,
         },
         select: {
@@ -289,7 +284,7 @@ export class UserService extends BaseService {
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { fields: Object.keys(data) }, ip);
     if (shouldBump) {
-      await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: newRole !== user.role ? 'role_change' : 'deactivation' }, ip);
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', userId, { action: 'token_generation_bumped', reason: 'deactivation' }, ip);
     }
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
@@ -365,6 +360,13 @@ export class UserService extends BaseService {
   // admin-only route makes this defense-in-depth rather than a live gap
   // (only admin ever reaches this method), but the check costs nothing to
   // keep and documents the invariant explicitly.
+  //
+  // Person-centric assignment redesign (2026-08-07): this is now the SOLE
+  // write path for Hotel.manager_user_id, HotelGroup.regional_manager_user_id,
+  // and EmploymentRecord.hotel_group_id/primary_hotel_id. `updateUser` (PUT
+  // /users/:id) no longer accepts `role` at all, closing the data-integrity
+  // bug where a role change via that endpoint could leave a stale manager/RM
+  // pointer behind. See UpdateUserRoleSchema's comment for the payload shape.
   async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, ip?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
@@ -377,6 +379,36 @@ export class UserService extends BaseService {
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
+
+    // Target-assignment payload validation, at the boundary: a hotel_id is
+    // only meaningful for the manager role, a hotel_group_id only for
+    // regional_manager (or as a worker/checker's EmploymentRecord group).
+    // Reject a mismatched pairing rather than silently ignoring it -- a
+    // caller sending { role: 'worker', hotel_id } has misunderstood the API
+    // and should be told, not have the field quietly dropped.
+    //
+    // Deliberately NOT requiring hotel_id/hotel_group_id when assigning
+    // manager/regional_manager: the vacancy model (2026-08-06) established
+    // that a hotel/group may sit vacant and, symmetrically, a manager may
+    // hold the role without a current posting. Demoting an RM to plain
+    // manager, or promoting a worker ahead of deciding their hotel, are both
+    // legitimate -- forcing a hotel_id here would make the first impossible.
+    // The assignment is simply skipped when no target is supplied.
+    if (data.hotel_id && newRole !== 'MANAGER') {
+      throw new ValidationError('hotel_id is only valid when assigning the manager role', [
+        { field: 'hotel_id', message: 'Only valid when role is manager' },
+      ]);
+    }
+    if (data.hotel_group_id && newRole !== 'REGIONAL_MANAGER' && newRole !== 'WORKER' && newRole !== 'CHECKER') {
+      throw new ValidationError('hotel_group_id is only valid for regional_manager, worker, or checker', [
+        { field: 'hotel_group_id', message: 'Not valid for this role' },
+      ]);
+    }
+    if (data.primary_hotel_id && newRole !== 'WORKER' && newRole !== 'CHECKER') {
+      throw new ValidationError('primary_hotel_id is only valid for worker or checker', [
+        { field: 'primary_hotel_id', message: 'Only valid for worker or checker' },
+      ]);
+    }
 
     // ADR-031 D-4 (C-5): the token_generation bump commits in the same
     // transaction as the role write, so a demotion can never be committed
@@ -408,6 +440,11 @@ export class UserService extends BaseService {
 
       const now = new Date();
 
+      // Vacate this user's OWN prior manager/RM slot whenever they are
+      // leaving that role — covers both "moving away" (any newRole) and, for
+      // MANAGER -> REGIONAL_MANAGER in one call, ensures the stale hotel
+      // manager slot is cleared in the SAME transaction as the new RM
+      // assignment below (never left dangling between two separate calls).
       if (user.role === 'REGIONAL_MANAGER' && newRole !== 'REGIONAL_MANAGER') {
         const ownedGroup = await tx.hotelGroup.findUnique({
           where: { regional_manager_user_id: userId },
@@ -431,28 +468,153 @@ export class UserService extends BaseService {
       }
 
       // Same demotion-vacates-the-assignment behavior for a Hotel Manager
-      // being demoted, mirroring the RM branch above -- this guard never
-      // existed before (Hotel.manager_user_id had no ownership check at
-      // all), so a demoted MANAGER could silently keep a hotel's
-      // manager_user_id pointing at them with no actual manager authority.
-      if (user.role === 'MANAGER' && newRole !== 'MANAGER') {
+      // being demoted/transitioning away, mirroring the RM branch above --
+      // this guard never existed before (Hotel.manager_user_id had no
+      // ownership check at all), so a demoted MANAGER could silently keep a
+      // hotel's manager_user_id pointing at them with no actual manager
+      // authority. Also covers the same-hotel transfer case below (a
+      // MANAGER being reassigned to a DIFFERENT hotel in the same call):
+      // the OLD hotel is vacated here (reason TRANSFERRED), and the NEW
+      // hotel is assigned further down.
+      if (user.role === 'MANAGER' && (newRole !== 'MANAGER' || data.hotel_id !== undefined)) {
         const managedHotels = await tx.hotel.findMany({
           where: { manager_user_id: userId },
           select: { id: true },
         });
+        const isTransferringAway = newRole === 'MANAGER';
         for (const hotel of managedHotels) {
+          // If staying MANAGER, only vacate hotels OTHER than the target
+          // (i.e. an actual transfer); if leaving MANAGER entirely, vacate
+          // every hotel this user currently manages.
+          if (isTransferringAway && hotel.id === data.hotel_id) continue;
           await tx.hotel.update({
             where: { id: hotel.id },
             data: {
               manager_user_id: null,
               manager_assigned_at: null,
               manager_vacated_at: now,
-              manager_vacancy_reason: 'DEMOTED',
+              manager_vacancy_reason: isTransferringAway ? 'TRANSFERRED' : 'DEMOTED',
             },
           });
           await tx.hotelManagerAssignmentHistory.updateMany({
             where: { hotel_id: hotel.id, manager_user_id: userId, unassigned_at: null },
-            data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'DEMOTED' },
+            data: { unassigned_at: now, unassigned_by_id: actorId, reason: isTransferringAway ? 'TRANSFERRED' : 'DEMOTED' },
+          });
+        }
+      }
+
+      // ── New assignment: role = manager ──────────────────────────────────
+      if (newRole === 'MANAGER' && data.hotel_id) {
+        // Lock the target hotel row before reading/writing it — closes the
+        // TOCTOU window between this read and the write below (two
+        // concurrent assignments targeting the same hotel must serialize,
+        // not both believe the slot is free).
+        await tx.$queryRaw`SELECT id FROM "Hotel" WHERE id = ${data.hotel_id} FOR UPDATE`;
+        const targetHotel = await tx.hotel.findUnique({ where: { id: data.hotel_id } });
+        if (!targetHotel || targetHotel.deleted_at) {
+          throw new NotFoundError('Target hotel not found');
+        }
+        // One manager per hotel, enforced here at the service level — Hotel.
+        // manager_user_id has no DB unique constraint (unlike HotelGroup.
+        // regional_manager_user_id, which is @unique), so this business rule
+        // must be checked explicitly rather than relying on the schema.
+        if (targetHotel.manager_user_id && targetHotel.manager_user_id !== userId) {
+          throw new ConflictError('Hotel already has a different manager assigned');
+        }
+
+        if (targetHotel.manager_user_id !== userId) {
+          await tx.hotel.update({
+            where: { id: data.hotel_id },
+            data: {
+              manager_user_id: userId,
+              manager_assigned_at: now,
+              manager_vacated_at: null,
+              manager_vacancy_reason: null,
+            },
+          });
+          await tx.hotelManagerAssignmentHistory.create({
+            data: {
+              hotel_id: data.hotel_id,
+              manager_user_id: userId,
+              assigned_at: now,
+              assigned_by_id: actorId,
+            },
+          });
+        }
+      }
+
+      // ── New assignment: role = regional_manager ─────────────────────────
+      if (newRole === 'REGIONAL_MANAGER' && data.hotel_group_id) {
+        await tx.$queryRaw`SELECT id FROM "HotelGroup" WHERE id = ${data.hotel_group_id} FOR UPDATE`;
+        const targetGroup = await tx.hotelGroup.findUnique({ where: { id: data.hotel_group_id } });
+        if (!targetGroup) {
+          throw new NotFoundError('Target hotel group not found');
+        }
+        // regional_manager_user_id IS @unique in the schema, but the
+        // business rule is still checked explicitly here (rather than
+        // relying on the DB to reject with an opaque unique-violation) so
+        // the caller gets a clean ConflictError, consistent with the manager
+        // branch above.
+        if (targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== userId) {
+          throw new ConflictError('Hotel group already has a different regional manager assigned');
+        }
+
+        if (targetGroup.regional_manager_user_id !== userId) {
+          // If this same user currently manages a DIFFERENT group, vacate it
+          // first (transfer, mirroring the manager branch's own-hotel
+          // transfer handling).
+          const ownedGroup = await tx.hotelGroup.findUnique({
+            where: { regional_manager_user_id: userId },
+            select: { id: true },
+          });
+          if (ownedGroup && ownedGroup.id !== data.hotel_group_id) {
+            await tx.hotelGroup.update({
+              where: { id: ownedGroup.id },
+              data: {
+                regional_manager_user_id: null,
+                regional_manager_assigned_at: null,
+                regional_manager_vacated_at: now,
+                regional_manager_vacancy_reason: 'TRANSFERRED',
+              },
+            });
+            await tx.regionalManagerAssignmentHistory.updateMany({
+              where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: userId, unassigned_at: null },
+              data: { unassigned_at: now, unassigned_by_id: actorId, reason: 'TRANSFERRED' },
+            });
+          }
+
+          await tx.hotelGroup.update({
+            where: { id: data.hotel_group_id },
+            data: {
+              regional_manager_user_id: userId,
+              regional_manager_assigned_at: now,
+              regional_manager_vacated_at: null,
+              regional_manager_vacancy_reason: null,
+            },
+          });
+          await tx.regionalManagerAssignmentHistory.create({
+            data: {
+              hotel_group_id: data.hotel_group_id,
+              regional_manager_user_id: userId,
+              assigned_at: now,
+              assigned_by_id: actorId,
+            },
+          });
+        }
+      }
+
+      // ── worker/checker: EmploymentRecord.hotel_group_id (existing
+      // eligibility semantics, unchanged) + primary_hotel_id (new,
+      // display/default-selection only — never read by roster-scope.ts) ──
+      if ((newRole === 'WORKER' || newRole === 'CHECKER') && (data.hotel_group_id !== undefined || data.primary_hotel_id !== undefined)) {
+        const employmentRecord = await tx.employmentRecord.findUnique({ where: { user_id: userId }, select: { id: true } });
+        if (employmentRecord) {
+          await tx.employmentRecord.update({
+            where: { id: employmentRecord.id },
+            data: {
+              ...(data.hotel_group_id !== undefined ? { hotel_group_id: data.hotel_group_id } : {}),
+              ...(data.primary_hotel_id !== undefined ? { primary_hotel_id: data.primary_hotel_id } : {}),
+            },
           });
         }
       }

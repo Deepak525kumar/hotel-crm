@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
-import { useHotelGroup, useRegionalManagerCandidates } from "@/hooks/useHotels";
+import { useHotelGroup } from "@/hooks/useHotels";
 import { ApiError, hotelGroupsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
@@ -17,7 +17,6 @@ function EditHotelGroup() {
   const router = useRouter();
 
   const { data: group, isLoading, error } = useHotelGroup(id);
-  const { users: managers, isLoading: managersLoading } = useRegionalManagerCandidates();
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,15 +26,6 @@ function EditHotelGroup() {
     setSubmitting(true);
     const payload: UpdateHotelGroupInput = {
       name: values.name,
-      // Omitting the field leaves the assignment unchanged; an empty
-      // selection only sends `null` (clear) when the group currently has an
-      // RM to clear, so re-visiting this form without touching the selector
-      // never accidentally vacates it.
-      ...(values.regional_manager_user_id
-        ? { regional_manager_user_id: values.regional_manager_user_id }
-        : group?.regional_manager_user_id
-          ? { regional_manager_user_id: null }
-          : {}),
       billing_info: values.billing_info,
     };
     try {
@@ -85,8 +75,6 @@ function EditHotelGroup() {
         <HotelGroupForm
           mode="edit"
           group={group}
-          managers={managers}
-          managersLoading={managersLoading}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}

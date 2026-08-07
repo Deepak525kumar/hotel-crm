@@ -7,21 +7,18 @@ import {
   CardContent,
   FormError,
   Input,
-  Select,
   Textarea,
 } from "@/components/ui";
-import type { HotelGroup, UserSummary } from "@/lib/types";
+import type { HotelGroup } from "@/lib/types";
 
 export interface HotelGroupFormValues {
   name: string;
-  regional_manager_user_id: string;
   billing_info: string;
 }
 
 function toValues(group?: HotelGroup | null): HotelGroupFormValues {
   return {
     name: group?.name ?? "",
-    regional_manager_user_id: group?.regional_manager_user_id ?? "",
     billing_info: group?.billing_info ?? "",
   };
 }
@@ -29,21 +26,25 @@ function toValues(group?: HotelGroup | null): HotelGroupFormValues {
 export interface HotelGroupFormProps {
   mode: "create" | "edit";
   group?: HotelGroup | null;
-  /** Candidate regional managers (managers/admins). */
-  managers: UserSummary[];
-  managersLoading?: boolean;
   submitting?: boolean;
   error?: string | null;
   onSubmit: (values: HotelGroupFormValues) => void;
   onCancel?: () => void;
 }
 
-/** Presentational hotel-group form for create and edit. */
+/**
+ * Presentational hotel-group form for create and edit.
+ *
+ * Person-centric assignment redesign (2026-08-07): this form no longer
+ * assigns a Regional Manager. Assignment is now made from the person's own
+ * page (`/users/:id`), which writes `HotelGroup.regional_manager_user_id`
+ * via the single authoritative role+assignment endpoint
+ * (`PUT /users/:id/role`). A group is created vacant and assigned an RM
+ * afterwards. The group detail page displays who currently holds the role.
+ */
 export function HotelGroupForm({
   mode,
   group,
-  managers,
-  managersLoading = false,
   submitting = false,
   error,
   onSubmit,
@@ -65,11 +66,7 @@ export function HotelGroupForm({
     });
   };
 
-  // Vacancy model (2026-08-06): create still requires an RM (ADR-023's
-  // original "one HotelGroup has exactly one assigned RM" invariant at
-  // creation time); edit allows leaving it unassigned (vacant), since a
-  // group can now go through a demotion/transfer gap.
-  const valid = form.name.trim() && (mode === "edit" || form.regional_manager_user_id);
+  const valid = Boolean(form.name.trim());
 
   return (
     <Card>
@@ -82,21 +79,6 @@ export function HotelGroupForm({
             onChange={(e) => set("name", e.target.value)}
             placeholder="e.g. Northern Region"
           />
-
-          <Select
-            label="Regional manager"
-            required={mode === "create"}
-            value={form.regional_manager_user_id}
-            onChange={(e) => set("regional_manager_user_id", e.target.value)}
-            placeholder={mode === "create" ? (managersLoading ? "Loading managers…" : "Select a manager") : undefined}
-          >
-            {mode === "edit" && <option value="">Vacant (unassigned)</option>}
-            {managers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.first_name} {m.last_name} — {m.email}
-              </option>
-            ))}
-          </Select>
 
           <Textarea
             label="Billing info (optional)"

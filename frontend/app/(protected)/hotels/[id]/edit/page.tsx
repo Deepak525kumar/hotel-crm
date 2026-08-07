@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
-import { useHotel, useHotelGroups, useUserOptions } from "@/hooks/useHotels";
+import { useHotel, useHotelGroups } from "@/hooks/useHotels";
 import { ApiError, hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
@@ -18,7 +18,6 @@ function EditHotel() {
 
   const { data: hotel, isLoading, error } = useHotel(id);
   const { groups } = useHotelGroups({ limit: 100 });
-  const { users: managers } = useUserOptions({ role: "manager" });
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -42,11 +41,6 @@ function EditHotel() {
         ? { hotel_group_id: values.hotel_group_id }
         : hotel?.hotel_group_id
           ? { hotel_group_id: null }
-          : {}),
-      ...(values.manager_user_id
-        ? { manager_user_id: values.manager_user_id }
-        : hotel?.manager_user_id
-          ? { manager_user_id: null }
           : {}),
       // GD-14/OD-GEO-001/004: only send coordinates when both fields are
       // filled in — same "omitted = leave unchanged" convention as
@@ -105,7 +99,6 @@ function EditHotel() {
           mode="edit"
           hotel={hotel}
           groups={groups}
-          managers={managers}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}

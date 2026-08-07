@@ -74,49 +74,26 @@ describe('CrmService - Hotel Groups', () => {
     service = new CrmService();
   });
 
+  // Person-centric assignment redesign (2026-08-07): createHotelGroup no
+  // longer accepts (or requires) regional_manager_user_id. A group is created
+  // vacant and its RM is assigned afterwards via
+  // users/service.ts#updateUserRole -- the same vacancy model Hotel already
+  // used, now applied symmetrically. The RM-validation cases that lived here
+  // (nonexistent / soft-deleted / not-yet-an-RM target) moved with the write
+  // path; see users.test.ts.
   describe('createHotelGroup', () => {
-    it('creates and returns a hotel group when the regional manager exists and already holds the role', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      const fake = { id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1', created_at: new Date(), updated_at: new Date() };
+    it('creates a hotel group with no regional manager assigned', async () => {
+      const fake = { id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: null, created_at: new Date(), updated_at: new Date() };
       mockPrisma.hotelGroup.create.mockResolvedValue(fake);
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin');
+      const result = await service.createHotelGroup({ name: 'Berlin Group' }, 'admin_1', 'admin');
 
       expect(result.name).toBe('Berlin Group');
       expect(mockPrisma.hotelGroup.create).toHaveBeenCalledTimes(1);
       expect(mockPrisma.auditLog.create).toHaveBeenCalledTimes(1);
-    });
-
-    it('rejects when regional_manager_user_id does not reference an existing user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'nonexistent' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-      expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
-    });
-
-    it('rejects when regional_manager_user_id references a soft-deleted user', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: new Date(), role: 'REGIONAL_MANAGER' });
-
-      await expect(
-        service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-      expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
-    });
-
-    // Regional Manager V1 Decision 12: the target must already hold
-    // REGIONAL_MANAGER. Previously assertRegionalManagerExists only checked
-    // the user existed, so a WORKER/MANAGER row could be written into
-    // regional_manager_user_id with no actual RM authority ever granted.
-    it('rejects when regional_manager_user_id references a user who is not yet a Regional Manager', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_1', deleted_at: null, role: 'MANAGER' });
-
-      await expect(
-        service.createHotelGroup({ name: 'Berlin Group', regional_manager_user_id: 'mgr_1' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-      expect(mockPrisma.hotelGroup.create).not.toHaveBeenCalled();
+      const createCall = (mockPrisma.hotelGroup.create as jest.Mock).mock.calls[0] as Array<{ data: Record<string, unknown> }>;
+      expect(createCall[0]?.data).not.toHaveProperty('regional_manager_user_id');
     });
   });
 
@@ -255,140 +232,35 @@ describe('CrmService - Hotel Groups', () => {
     });
   });
 
+  // Person-centric assignment redesign (2026-08-07): updateHotelGroup no
+  // longer accepts regional_manager_user_id at all -- RM assignment moved to
+  // users/service.ts#updateUserRole, the single authoritative role+assignment
+  // write path. The RM transfer/history/token-bump coverage that used to live
+  // in this describe now lives in users.test.ts's
+  // "updateUserRole - person-centric assignment" block. Only non-RM field
+  // updates remain here.
   describe('updateHotelGroup', () => {
-    it('updates the regional manager when the new user exists and already holds the role', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' });
+    it('updates non-assignment fields (name, billing_info)', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null });
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Munich Group', billing_info: 'VAT-123' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
+      const result = await service.updateHotelGroup('hg_1', { name: 'Munich Group', billing_info: 'VAT-123' }, 'admin_1', 'admin');
 
-      expect(result.regional_manager_user_id).toBe('rm_2');
-      const updateCall = (mockPrisma.hotelGroup.update as jest.Mock).mock.calls[0] as Array<{ data: { regional_manager_user_id: string } }>;
-      expect(updateCall[0]?.data.regional_manager_user_id).toBe('rm_2');
+      expect(result.name).toBe('Munich Group');
     });
 
-    // Post-#339 review finding: a transfer previously left both RMs' access
-    // tokens carrying a stale `scope` claim (minted at login/refresh, never
-    // re-derived per-request) for up to JWT_ACCESS_EXPIRY — the outgoing RM
-    // kept acting on the old group, the incoming RM couldn't act on the new
-    // one until they refreshed. Both must be invalidated in the SAME
-    // transaction as the group write.
-    it('bumps token_generation for BOTH the outgoing and incoming RM on transfer', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
-
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'rm_1' },
-        data: { token_generation: { increment: 1 } },
-      });
-      expect(mockPrisma.user.update).toHaveBeenCalledWith({
-        where: { id: 'rm_2' },
-        data: { token_generation: { increment: 1 } },
-      });
-      expect(mockPrisma.user.update).toHaveBeenCalledTimes(2);
-    });
-
-    it('does NOT bump token_generation for a non-RM field change (name only)', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Munich Group', regional_manager_user_id: 'rm_1' });
+    it('never writes regional_manager_user_id, even indirectly', async () => {
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null });
+      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Munich Group' });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.updateHotelGroup('hg_1', { name: 'Munich Group' }, 'admin_1', 'admin');
 
+      const updateCall = (mockPrisma.hotelGroup.update as jest.Mock).mock.calls[0] as Array<{ data: Record<string, unknown> }>;
+      expect(updateCall[0]?.data).not.toHaveProperty('regional_manager_user_id');
+      // No token bump either: this path can no longer change anyone's scope.
       expect(mockPrisma.user.update).not.toHaveBeenCalled();
-    });
-
-    it('does NOT bump token_generation when regional_manager_user_id is set to its current value (no-op)', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_1', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      mockPrisma.hotelGroup.update.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_1' });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_1' }, 'admin_1', 'admin');
-
-      expect(mockPrisma.user.update).not.toHaveBeenCalled();
-    });
-
-    // Race-closure follow-up (second-review pass on #339): assertRegionalManagerExists
-    // (the D12 check) runs BEFORE the transaction/row-lock, so its result can
-    // be stale by the time the lock is actually held — a concurrent
-    // updateUserRole() demotion could commit in that exact gap. This asserts
-    // the role is RE-CHECKED under the lock, not just before it: simulates the
-    // target's role having changed between the outer assertion and the
-    // in-transaction re-read (mockResolvedValueOnce for the first call, a
-    // different value for the second — both resolve through the same mock
-    // since $transaction hands the callback `mockPrisma` itself as `tx`).
-    it('re-checks the new RM still holds the role INSIDE the transaction, not only before it', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique
-        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' }) // outer assertRegionalManagerExists — passes
-        .mockResolvedValueOnce({ id: 'rm_2', deleted_at: null, role: 'MANAGER' }); // in-transaction re-check — demoted concurrently, must now fail
-
-      await expect(
-        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-
-      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
-      expect(mockPrisma.user.update).not.toHaveBeenCalled();
-    });
-
-    // Deadlock-avoidance follow-up (post-#339 review): updateUserRole()
-    // (users/service.ts) locks the target User row FIRST, then reads
-    // HotelGroup. A concurrent transfer here must lock in the SAME order —
-    // User before HotelGroup — or the two operations deadlock instead of
-    // cleanly serializing under Postgres. This asserts the row lock
-    // ($queryRaw ... FOR UPDATE) is taken before the HotelGroup write, AND
-    // that the HotelGroup row itself is also explicitly locked (not just
-    // re-read) before that write -- closing the same
-    // concurrent-write-on-the-same-row race fixed for Hotel in updateHotel().
-    it('locks the RM user row(s), then the HotelGroup row itself, before writing the HotelGroup row (deadlock-avoidance lock order)', async () => {
-      const callOrder: string[] = [];
-      mockPrisma.$queryRaw.mockImplementation(async (query: unknown) => {
-        const sql = String(query);
-        callOrder.push(sql.includes('"HotelGroup"') ? 'hotelgroup-lock' : 'user-lock');
-        return [];
-      });
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'rm_2', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      mockPrisma.hotelGroup.update.mockImplementation(async () => {
-        callOrder.push('hotelgroup-write');
-        return { id: 'hg_1', name: 'Berlin Group', regional_manager_user_id: 'rm_2' };
-      });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_2' }, 'admin_1', 'admin');
-
-      // Locks BOTH RM user rows (outgoing rm_1, incoming rm_2), THEN the
-      // HotelGroup row itself, all before the HotelGroup write.
-      expect(callOrder).toEqual(['user-lock', 'user-lock', 'hotelgroup-lock', 'hotelgroup-write']);
-    });
-
-    // Regional Manager V1 Decision 12: this is the live "transfer" path — the
-    // successor must already hold REGIONAL_MANAGER, not merely exist.
-    it('rejects transferring to a user who is not yet a Regional Manager', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'mgr_2', deleted_at: null, role: 'MANAGER' });
-
-      await expect(
-        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'mgr_2' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
-    });
-
-    it('rejects reassignment to a nonexistent user without writing', async () => {
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_1' });
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-
-      await expect(
-        service.updateHotelGroup('hg_1', { regional_manager_user_id: 'nonexistent' }, 'admin_1', 'admin')
-      ).rejects.toMatchObject({ name: 'ValidationError' });
-      expect(mockPrisma.hotelGroup.update).not.toHaveBeenCalled();
     });
 
     it('throws NotFoundError when the hotel group does not exist', async () => {
@@ -397,84 +269,6 @@ describe('CrmService - Hotel Groups', () => {
       await expect(
         service.updateHotelGroup('nonexistent', { name: 'New Name' }, 'admin_1', 'admin')
       ).rejects.toMatchObject({ name: 'NotFoundError' });
-    });
-
-    // Multi-hop chain (A -> B -> C): verifies the history table ends up with
-    // exactly two CLOSED rows (A, B — each unassigned_at set, no overlap) and
-    // one OPEN row (C — unassigned_at still null), rather than trusting each
-    // hop's call shape in isolation. Uses a stateful fake in place of the
-    // jest.fn mock so `updateMany`/`create` actually mutate a shared array,
-    // the same way Postgres would.
-    it('produces a clean, non-overlapping history chain across A -> B -> C reassignment', async () => {
-      const rows: Array<{
-        hotel_group_id: string; regional_manager_user_id: string;
-        assigned_at: Date; unassigned_at: Date | null; unassigned_by_id: string | null; reason: string | null;
-      }> = [];
-      const fakeHistory = {
-        create: jest.fn(async ({ data }: { data: typeof rows[number] }) => {
-          rows.push({ ...data, unassigned_at: null, unassigned_by_id: null, reason: null });
-          return data;
-        }),
-        updateMany: jest.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
-          let count = 0;
-          for (const row of rows) {
-            if (
-              row.hotel_group_id === where['hotel_group_id'] &&
-              row.regional_manager_user_id === where['regional_manager_user_id'] &&
-              row.unassigned_at === null
-            ) {
-              Object.assign(row, data);
-              count += 1;
-            }
-          }
-          return { count };
-        }),
-      };
-      mockPrisma.regionalManagerAssignmentHistory = fakeHistory as unknown as typeof mockPrisma.regionalManagerAssignmentHistory;
-
-      let group: { id: string; name: string; billing_info: string | null; regional_manager_user_id: string } = {
-        id: 'hg_1', name: 'Berlin Group', billing_info: null, regional_manager_user_id: 'rm_a',
-      };
-      mockPrisma.hotelGroup.findUnique.mockImplementation(async () => group);
-      mockPrisma.hotelGroup.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
-        group = { ...group, ...data } as typeof group;
-        return group;
-      });
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'x', deleted_at: null, role: 'REGIONAL_MANAGER' });
-      mockPrisma.auditLog.create.mockResolvedValue({});
-
-      // A -> B
-      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_b' }, 'admin_1', 'admin');
-      // B -> C
-      await service.updateHotelGroup('hg_1', { regional_manager_user_id: 'rm_c' }, 'admin_1', 'admin');
-
-      // rm_a's assignment pre-dates this test's fake history table (it was
-      // never `create`d through this service — it's the group's initial
-      // state, same as a pre-existing HotelGroup this migration's backfill
-      // never wrote a history row for) — so rm_a produces no row at all
-      // (its updateMany no-ops, matching-nothing, rather than erroring).
-      // Only rm_b (created on the first hop, closed on the second) and rm_c
-      // (created on the second hop, still open) are fully observed here.
-      expect(rows).toHaveLength(2);
-      const rowB = rows.find((r) => r.regional_manager_user_id === 'rm_b')!;
-      const rowC = rows.find((r) => r.regional_manager_user_id === 'rm_c')!;
-      expect(rowB).toBeDefined();
-      expect(rowC).toBeDefined();
-      expect(rowB.unassigned_at).not.toBeNull();
-      expect(rowC.unassigned_at).toBeNull(); // still the current RM
-      // No overlap: B's assignment must not have been recorded as unassigned
-      // before it was ever created (a real overlap bug would show up as an
-      // unassigned_at earlier than or equal to its own assigned_at).
-      expect(rowB.unassigned_at!.getTime()).toBeGreaterThanOrEqual(rowB.assigned_at.getTime());
-      // And B's close must not postdate C's own open (no window where BOTH
-      // rows are simultaneously open, i.e. no overlapping "current" RM).
-      expect(rowB.unassigned_at!.getTime()).toBeLessThanOrEqual(rowC.assigned_at.getTime());
-      expect(group.regional_manager_user_id).toBe('rm_c');
-
-      mockPrisma.regionalManagerAssignmentHistory = {
-        create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
-        updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
-      };
     });
   });
 

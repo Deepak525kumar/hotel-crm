@@ -21,6 +21,7 @@ import { DocumentsCard } from "@/components/documents/DocumentsCard";
 import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
 import { ContractCard } from "@/components/hr/ContractCard";
 import { WorkerOnboardingCard } from "@/components/employees/WorkerOnboardingCard";
+import { AssignmentCard } from "@/components/users/AssignmentCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import {
@@ -176,6 +177,13 @@ function UserDetail() {
               </CardContent>
             </Card>
           )}
+
+          {/* Person-centric assignment (2026-08-07): organizational
+              assignment originates here, from the person. Admin-gated because
+              the underlying endpoint (PUT /users/:id/role) is admin-only. */}
+          <RoleGate allow={["admin"]}>
+            <AssignmentCard user={user} />
+          </RoleGate>
 
           {user.role === "worker" && (
             <WorkerOnboardingGate>
