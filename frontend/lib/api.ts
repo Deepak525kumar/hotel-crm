@@ -812,6 +812,15 @@ export const hrApi = {
   createPayrollRequest: (input: CreatePayslipRequestInput) =>
     apiFetch<PayslipRequest>("/hr/payroll", { method: "POST", body: input }),
 
+  /**
+   * Worker self-service (POST /hr/payslip-requests, requireRole('worker')):
+   * worker_id is always req.auth.userId server-side, never client-supplied
+   * -- only the period is sent. Distinct endpoint from createPayrollRequest
+   * above, which is the manager/admin-initiated equivalent.
+   */
+  requestPayslip: (input: { period_start: string; period_end: string }) =>
+    apiFetch<PayslipRequest>("/hr/payslip-requests", { method: "POST", body: input }),
+
   /** Marks a REQUESTED payslip request as fulfilled (payslip emailed). */
   fulfilPayrollRequest: (requestId: string) =>
     apiFetch<PayslipRequest>(`/hr/payroll/${requestId}/fulfil`, {
