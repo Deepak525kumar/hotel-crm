@@ -91,17 +91,24 @@ export function UserDeactivateGate({
 
 /**
  * SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16): worker document upload/view.
- * GD-16's actor model is self-upload (worker) + manager-upload only. Unlike
+ * GD-16's actor model is self-upload (worker) + manager-upload only.
  * `regional_manager` INCLUDED per an explicit project-owner decision
  * (2026-08-04, Regional Manager V1 scoping) that reverses `OD-DOC-007`/`GD-16`
  * ("broader Regional-Manager access explicitly not adopted") in favour of
- * ADR-030 D-5 / PDD §5.4. The backend now admits it at every layer:
+ * ADR-030 D-5 / PDD §5.4. The backend admits it at every layer:
  * `documents/routes.ts`'s five role gates, and `resolveWorkerScope()`
  * (middleware/permissions.ts) special-cases `regional_manager` alongside
  * `manager` via `isScopedManagerRole()`. See documents/routes.ts's governance
  * note; `OD-DOC-007` still needs a superseding Decision Record (tracked for
  * the documentation-synchronization PR) — this comment is the authority trail
  * until that record exists, not a substitute for it.
+ *
+ * `worker` INCLUDED (2026-08-08 fix): this gate had omitted it despite the
+ * "self-upload (worker)" actor model stated above and the backend's own
+ * `documents/routes.ts` five role gates all admitting `worker` for
+ * self-access. A worker landing on `/users/:id` for their own id (reachable
+ * by direct URL even without a sidebar link) previously saw no Documents
+ * card at all.
  */
 export function DocumentsGate({
   fallback = null,
@@ -111,7 +118,7 @@ export function DocumentsGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager", "worker"]} fallback={fallback}>
       {children}
     </RoleGate>
   );
@@ -125,6 +132,11 @@ export function DocumentsGate({
  * permissions.ts) special-casing it alongside `manager` via
  * `isScopedManagerRole()`. `GeoCheckinsGate` below remains admin/manager-only
  * by contrast — SPEC-GEO-001/GD-14 named only those two roles, unlike HR.
+ *
+ * `worker` INCLUDED (2026-08-08 fix): `hr/routes.ts`'s `GET /hr/payroll`
+ * already admits `worker` for self-access (own payslip requests). This gate
+ * had omitted it, hiding the ContractCard/PayslipRequestsCard from a worker
+ * viewing their own `/users/:id` page even though the backend served them.
  */
 export function HrPayrollGate({
   fallback = null,
@@ -134,7 +146,7 @@ export function HrPayrollGate({
   children: ReactNode;
 }) {
   return (
-    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
+    <RoleGate allow={["admin", "manager", "regional_manager", "worker"]} fallback={fallback}>
       {children}
     </RoleGate>
   );

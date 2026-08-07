@@ -66,6 +66,7 @@ export async function getAttendanceById(req: Request, res: Response, next: NextF
     const result = await attendanceService.getById(req.params.id, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     res.status(200).json({
       status: 'success',

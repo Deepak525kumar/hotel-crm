@@ -422,10 +422,11 @@ enum ManagerVacancyReason {
 }
 
 // HotelGroup: ADR-023 — first-class entity aggregating hotels under one Regional
-// Manager with shared billing. Owned by backend-crm. Additive only in this
-// migration — no reader/writer consumes it yet (Epic 5 PR 5.1; CRUD lands in
-// PR 5.2). One Regional Manager per HotelGroup; a Regional Manager may manage
-// several groups (ADR-023 §1), hence the FK lives on HotelGroup, not User.
+// Manager with shared billing. Owned by backend-crm. The FK lives on
+// HotelGroup, not User, because ADR-023 §1 originally left open whether one
+// Regional Manager could manage several groups; Regional Manager V1 Decision
+// 1 (2026-08-05, PR #339) closed that question the other way -- exactly one
+// group per Regional Manager -- and added @unique below to enforce it.
 //
 // regional_manager_user_id is nullable (relaxed from the original non-null
 // @unique — a group may now go temporarily vacant, e.g. on demotion, rather

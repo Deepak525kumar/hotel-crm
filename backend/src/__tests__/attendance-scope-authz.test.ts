@@ -243,4 +243,63 @@ describe('Attendance scope authorization (ATT OQ-02 / SIR-ATT-002)', () => {
       expect(capturedListWhere.hotel_id).toEqual({ in: [] });
     });
   });
+
+  // IDOR fix (2026-08-08): getById() never accepted or checked actor.scope
+  // at all -- list() and update() in the same file already scope a
+  // manager/regional_manager correctly, but getById() let a manager read
+  // any single attendance record platform-wide by id, unscoped.
+  describe('GET /attendance/:id — manager scope enforcement (IDOR fix, 2026-08-08)', () => {
+    it('allows a manager to read an in-scope record (200)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).get('/attendance/att_h1');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager reading an out-of-scope record (403)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).get('/attendance/att_h2');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('allows a regional_manager to read an in-group record (200)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+      };
+      const res = await request(makeApp()).get('/attendance/att_h1');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a regional_manager reading an out-of-group record (403)', async () => {
+      testAuth = {
+        userId: 'rm_1',
+        role: 'regional_manager',
+        permissions: [],
+        scope: { type: 'hotel_group', hotel_group_id: 'g_other' },
+      };
+      const res = await request(makeApp()).get('/attendance/att_h1');
+      expect(res.status).toBe(403);
+    });
+
+    it('denies a manager with no scope claim (deny-by-default, 403)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/attendance/att_h1');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows an admin to read any record (200)', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/attendance/att_h2');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows a checker to read any record (cross-hotel preserved, 200)', async () => {
+      testAuth = { userId: 'chk_1', role: 'checker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/attendance/att_h2');
+      expect(res.status).toBe(200);
+    });
+  });
 });

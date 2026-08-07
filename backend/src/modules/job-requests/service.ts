@@ -202,7 +202,7 @@ export class JobRequestService extends BaseService {
 
   async list(
     query: ListWorkRequestsQuery,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<{ data: WorkRequestDto[]; total: number }> {
     const where: Prisma.JobRequestWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
@@ -229,6 +229,21 @@ export class JobRequestService extends BaseService {
           ? query.hotel_id
           : '__none__'
         : { in: hotelIds };
+    } else if (isScopedManagerRole(actor.role)) {
+      // IDOR fix (2026-08-08): create()/update()/raiseBroadcast() in this
+      // same file already scope a manager/regional_manager to their own
+      // hotel/hotel_group claim -- list() never did, so a manager could
+      // read every work request platform-wide. Same isHotelInScope-shaped
+      // narrowing as attendance/service.ts's list().
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        where.hotel_id = { in: [] };
+      } else if (scope.type === 'hotel') {
+        where.hotel_id = scope.hotel_id;
+      } else if (scope.type === 'hotel_group') {
+        where.hotel = { hotel_group_id: scope.hotel_group_id };
+      }
+      // scope.type === 'global' -> no added restriction.
     }
 
     const [records, total] = await Promise.all([
@@ -251,7 +266,7 @@ export class JobRequestService extends BaseService {
 
   async getById(
     id: string,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<WorkRequestDto> {
     const wr = await this.prisma.jobRequest.findUnique({
       where: { id },
@@ -262,6 +277,11 @@ export class JobRequestService extends BaseService {
     if (isSelfScopedRole(actor.role)) {
       const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
       if (!eligible) throw new ForbiddenError('Cannot access this work request');
+    } else if (isScopedManagerRole(actor.role)) {
+      // IDOR fix (2026-08-08): same gap as list() above -- a manager/RM
+      // could read any single work request by id, unscoped.
+      const inScope = await isHotelInScope(actor.scope ?? null, wr.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot access this work request');
     }
 
     const dto = this.toDto(wr, wr.skill_slots);

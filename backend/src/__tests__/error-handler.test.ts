@@ -88,4 +88,19 @@ describe('Global Prisma error mapping (P1-01)', () => {
       expect.objectContaining({ error: expect.objectContaining({ code: 'INTERNAL_ERROR' }) })
     );
   });
+
+  // Malformed-JSON error code regression (security review, 2026-08-08):
+  // express.json() throws a bare SyntaxError for an unparseable body, which
+  // previously got a 400 status but the generic 500-shaped INTERNAL_ERROR
+  // code -- a client reading the code, not the status, would misclassify a
+  // client-fault (their own malformed JSON) as a server fault.
+  it('maps a malformed-JSON SyntaxError to 400 INVALID_REQUEST, not INTERNAL_ERROR', () => {
+    const res = makeRes();
+    const err = new SyntaxError('Unexpected token } in JSON at position 12');
+    errorHandler(err, makeReq(), res as unknown as Response, next);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.objectContaining({ code: 'INVALID_REQUEST' }) })
+    );
+  });
 });
