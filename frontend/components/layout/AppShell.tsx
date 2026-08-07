@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { APP_OWNER } from "@/lib/config";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
@@ -202,8 +203,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             positioning, and nothing overlapping the page itself. The year is
             computed per render rather than hardcoded so it never goes stale. */}
         <footer className="px-4 pb-4 text-center text-xs text-gray-400 sm:px-6">
-          &copy; {new Date().getFullYear()} Zirove. All rights reserved. This
-          application is owned and developed by Zirove.
+          &copy; {new Date().getFullYear()} {APP_OWNER}. All rights reserved.
+          This application is owned and developed by {APP_OWNER}.
         </footer>
       </div>
     </div>

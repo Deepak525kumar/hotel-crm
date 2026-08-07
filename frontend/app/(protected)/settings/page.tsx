@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
+import { APP_COMMIT_SHA, APP_NAME, APP_OWNER, APP_VERSION } from "@/lib/config";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import {
   Card,
@@ -68,6 +69,32 @@ export default function SettingsPage() {
             To change your name, phone number or password, go to{" "}
             <TextLink href="/profile">your profile</TextLink>.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>About</CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow label="Application" value={APP_NAME} />
+            <DataRow label="Version" value={APP_VERSION} />
+            {/* Shown for support, not for users: a bug report is far more
+                actionable when it names the exact build. Absent on a local dev
+                build, where a SHA would be misleading rather than useful. */}
+            <DataRow
+              label="Build"
+              value={
+                APP_COMMIT_SHA ? (
+                  <span className="font-mono text-xs">{APP_COMMIT_SHA}</span>
+                ) : (
+                  <span className="text-gray-500">Local development build</span>
+                )
+              }
+            />
+            <DataRow label="Owner" value={APP_OWNER} />
+          </DataList>
         </CardContent>
       </Card>
 
