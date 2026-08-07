@@ -1,12 +1,19 @@
-import { AssignmentStatus, CalendarAbsenceKind, EmploymentStatus, OutboxSourceModule, OutboxTransport } from '@prisma/client';
+import { AssignmentStatus, CalendarAbsence, CalendarAbsenceKind, EmploymentStatus, OutboxSourceModule, OutboxTransport } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { NotImplementedError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
-import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
+import { isScopedManagerRole, isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AssignmentService } from '../assignments/service.js';
 import { notificationService } from '../notifications/service.js';
-import type { MarkAbsenceInput, CalendarAbsenceDto, AvailabilityDto, ListAbsencesQuery } from './types.js';
+import type {
+  MarkAbsenceInput,
+  MarkAbsenceForWorkerInput,
+  MoveCalendarAbsenceInput,
+  CalendarAbsenceDto,
+  AvailabilityDto,
+  ListAbsencesQuery,
+} from './types.js';
 
 // Calendar depends directly on AssignmentService because GD-12 (event bus)
 // is unresolved -- the target design (EVT-CAL-SickVacationMarked) would
@@ -54,6 +61,33 @@ export class CalendarService extends BaseService {
   // it must never mask the fact that the mark itself succeeded, and must
   // not block the (also best-effort) manager notification.
   async markAbsence(workerId: string, input: MarkAbsenceInput): Promise<CalendarAbsenceDto> {
+    return this.markAbsenceInternal(workerId, input, { userId: workerId, role: 'worker' });
+  }
+
+  // Manager/RM/admin marks or corrects an absence on a worker's behalf
+  // (2026-08-08 feature). Group-scoped the same way every other
+  // manager-on-a-worker's-behalf write in this codebase is
+  // (isWorkerInGroupScope, e.g. users/service.ts#updateUserProfile,
+  // documents/service.ts#getDocument) -- admin unrestricted.
+  async markAbsenceForWorker(
+    input: MarkAbsenceForWorkerInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<CalendarAbsenceDto> {
+    if (actor.role !== 'admin') {
+      const inScope = await isWorkerInGroupScope(actor.scope ?? null, input.worker_id);
+      if (!inScope) {
+        throw new ForbiddenError("Cannot mark this worker's absence");
+      }
+    }
+    const { worker_id, ...rest } = input;
+    return this.markAbsenceInternal(worker_id, rest, actor);
+  }
+
+  private async markAbsenceInternal(
+    workerId: string,
+    input: MarkAbsenceInput,
+    actor: { userId: string; role: string }
+  ): Promise<CalendarAbsenceDto> {
     const today = todayInCalendarTimezone();
     if (input.day < today) {
       throw new ConflictError('Cannot mark a past day sick or vacation');
@@ -61,14 +95,30 @@ export class CalendarService extends BaseService {
 
     // RULE-CAL-03's transition model only states (none) -> sick|vacation and
     // is silent on re-marking an already-marked day. Last write wins (upsert
-    // overwrites kind) -- not spec-mandated, but consistent with REQ-CAL-T03's
-    // "no cap, no approval" intent: the worker may freely correct their own
-    // mark rather than being blocked by a prior one.
+    // overwrites kind/reason/marked_by) -- not spec-mandated, but consistent
+    // with REQ-CAL-T03's "no cap, no approval" intent: the worker (or now, a
+    // manager on their behalf) may freely correct an existing mark rather
+    // than being blocked by a prior one.
     const day = new Date(`${input.day}T00:00:00.000Z`);
+    const reason = input.reason ?? null;
     const absence = await this.prisma.calendarAbsence.upsert({
       where: { worker_id_day: { worker_id: workerId, day } },
-      create: { worker_id: workerId, day, kind: input.kind as CalendarAbsenceKind },
-      update: { kind: input.kind as CalendarAbsenceKind },
+      create: {
+        worker_id: workerId,
+        day,
+        kind: input.kind as CalendarAbsenceKind,
+        reason,
+        marked_by_id: actor.userId,
+      },
+      update: { kind: input.kind as CalendarAbsenceKind, reason, marked_by_id: actor.userId },
+    });
+
+    // Audit trail (2026-08-08 feature): every calendar-absence write is
+    // logged, regardless of actor -- self-service or manager-on-behalf-of.
+    await this.logAudit(actor.userId, actor.role, 'MARK_ABSENCE', 'CALENDAR_ABSENCE', absence.id, {
+      worker_id: workerId,
+      day: input.day,
+      kind: input.kind,
     });
 
     try {
@@ -78,12 +128,83 @@ export class CalendarService extends BaseService {
     }
 
     try {
-      await this.notifyManager(workerId, input.day, input.kind);
+      await this.notifyAboutAbsence(workerId, actor.userId, input.day, input.kind, 'marked');
     } catch (error) {
-      logger.error('calendar_absence_notify_manager_failed', { workerId, day: input.day, error });
+      logger.error('calendar_absence_notify_failed', { workerId, day: input.day, error });
     }
 
     return this.toDto(absence);
+  }
+
+  // Drag-to-move (2026-08-08 feature): mirrors
+  // AssignmentService.moveCalendarEntry()'s shape -- day-only move, same
+  // scope check, same P2002-to-ConflictError translation (RULE-CAL-03's
+  // one-mark-per-worker-per-day @@unique constraint). Self-service (the
+  // owning worker) or a manager/RM/admin acting on the worker's behalf, per
+  // the same group-scope rule markAbsenceForWorker() uses.
+  async moveAbsence(
+    absenceId: string,
+    input: MoveCalendarAbsenceInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<CalendarAbsenceDto> {
+    const existing = await this.prisma.calendarAbsence.findUnique({ where: { id: absenceId } });
+    if (!existing) throw new NotFoundError('Absence not found');
+
+    const isSelf = existing.worker_id === actor.userId;
+    if (!isSelf) {
+      if (actor.role === 'admin') {
+        // unrestricted
+      } else if (isScopedManagerRole(actor.role)) {
+        const inScope = await isWorkerInGroupScope(actor.scope ?? null, existing.worker_id);
+        if (!inScope) throw new ForbiddenError('Cannot move this absence');
+      } else {
+        throw new ForbiddenError('Cannot move this absence');
+      }
+    }
+
+    const today = todayInCalendarTimezone();
+    if (input.day < today) {
+      throw new ConflictError('Cannot move an absence to a past day');
+    }
+
+    const day = new Date(`${input.day}T00:00:00.000Z`);
+
+    let updated: CalendarAbsence;
+    try {
+      updated = await this.prisma.calendarAbsence.update({
+        where: { id: absenceId },
+        data: { day, marked_by_id: actor.userId },
+      });
+    } catch (error) {
+      const isP2002 =
+        error instanceof Object &&
+        'code' in error &&
+        (error as { code?: string }).code === 'P2002';
+      if (isP2002) {
+        throw new ConflictError('Worker already has an absence marked for this day');
+      }
+      throw error;
+    }
+
+    await this.logAudit(actor.userId, actor.role, 'MOVE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
+      worker_id: existing.worker_id,
+      from_day: existing.day.toISOString().slice(0, 10),
+      to_day: input.day,
+    });
+
+    try {
+      await this.autoCancelSameDayAssignment(existing.worker_id, day);
+    } catch (error) {
+      logger.error('calendar_absence_auto_cancel_failed', { workerId: existing.worker_id, day: input.day, error });
+    }
+
+    try {
+      await this.notifyAboutAbsence(existing.worker_id, actor.userId, input.day, updated.kind, 'moved');
+    } catch (error) {
+      logger.error('calendar_absence_notify_failed', { workerId: existing.worker_id, day: input.day, error });
+    }
+
+    return this.toDto(updated);
   }
 
   // New (calendar grid view): manager/regional_manager read of absences
@@ -227,12 +348,31 @@ export class CalendarService extends BaseService {
     );
   }
 
-  // Resolves the worker's Hotel Group's Regional Manager as "the responsible
-  // manager" (EmploymentRecord/HotelGroup, the current roster model --
-  // HotelWorker is retired, ADR-022). Best-effort: an unassigned/inactive
-  // worker has no group and no notification is sent, rather than guessing a
-  // fallback recipient (OD-CAL-06 leaves the formal contract open).
-  private async notifyManager(workerId: string, day: string, kind: string): Promise<void> {
+  // Notifies across whichever direction the actor did NOT already know
+  // about (2026-08-08 feature, extending RULE-CAL-06's original
+  // worker-marks-self -> notify-manager flow to the new manager-marks-
+  // on-worker's-behalf direction too -- "everything marked on calendar
+  // should push a notification to the responsible manager AND worker; same
+  // for other hierarchies"):
+  //   - actor is the worker themself (self-service) -> notify the
+  //     responsible Regional Manager only (unchanged behavior).
+  //   - actor is someone else (a manager/RM/admin acting on the worker's
+  //     behalf) -> notify the WORKER (they weren't the one who acted), and
+  //     still notify the RM unless the RM IS the actor (no point notifying
+  //     yourself of your own action).
+  // "Same scenario for different hierarchies": resolved via the SAME
+  // responsible-RM lookup regardless of which hierarchy tier acted --
+  // whether a Hotel Manager, Regional Manager, or Admin performed the
+  // mark/move, the worker's own Regional Manager is still the one who
+  // needs to know, per REQ-EMP-012's group-grain roster model (there is no
+  // deeper manager hierarchy below RM in this system to notify instead).
+  private async notifyAboutAbsence(
+    workerId: string,
+    actorId: string,
+    day: string,
+    kind: string,
+    action: 'marked' | 'moved'
+  ): Promise<void> {
     const [worker, record] = await Promise.all([
       this.prisma.user.findUnique({
         where: { id: workerId },
@@ -243,6 +383,27 @@ export class CalendarService extends BaseService {
         select: { status: true, hotel_group_id: true },
       }),
     ]);
+
+    const actedOnBehalf = actorId !== workerId;
+    const verb = action === 'moved' ? 'moved' : 'marked';
+
+    if (actedOnBehalf) {
+      await notificationService.enqueue({
+        recipientId: workerId,
+        type: 'CALENDAR_ABSENCE_MARKED_FOR_WORKER',
+        title: 'Your calendar was updated',
+        message: `A manager ${verb} ${day} as ${kind.toLowerCase()} on your calendar.`,
+        data: { worker_id: workerId, day, kind, marked_by_id: actorId },
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.CALENDAR,
+        producerService: 'CalendarService',
+      });
+    }
+
+    // Best-effort: an unassigned/inactive worker has no group and no RM
+    // notification is sent, rather than guessing a fallback recipient
+    // (OD-CAL-06 leaves the formal contract open) -- unchanged from the
+    // original self-service-only behavior.
     if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
 
     const group = await this.prisma.hotelGroup.findUnique({
@@ -250,16 +411,20 @@ export class CalendarService extends BaseService {
       select: { id: true, regional_manager_user_id: true },
     });
     // Vacancy model (2026-08-06): regional_manager_user_id can now be null
-    // if the group is between RMs -- no one to notify, best-effort skip
-    // (matches this method's own no-op-on-missing-record convention above).
+    // if the group is between RMs -- no one to notify, best-effort skip.
     if (!group || !group.regional_manager_user_id) return;
+    // The RM acting on their own group's worker already knows -- don't
+    // notify them of their own action.
+    if (group.regional_manager_user_id === actorId) return;
 
     await notificationService.enqueue({
       recipientId: group.regional_manager_user_id,
       type: 'CALENDAR_ABSENCE_MARKED',
-      title: 'Worker marked sick/vacation',
-      message: `${worker?.first_name} ${worker?.last_name} marked ${day} as ${kind.toLowerCase()}.`,
-      data: { worker_id: workerId, day, kind },
+      title: actedOnBehalf ? 'Worker calendar updated' : 'Worker marked sick/vacation',
+      message: actedOnBehalf
+        ? `${worker?.first_name} ${worker?.last_name}'s ${day} was ${verb} as ${kind.toLowerCase()}.`
+        : `${worker?.first_name} ${worker?.last_name} marked ${day} as ${kind.toLowerCase()}.`,
+      data: { worker_id: workerId, day, kind, marked_by_id: actorId },
       transports: [OutboxTransport.PUSH],
       sourceModule: OutboxSourceModule.CALENDAR,
       producerService: 'CalendarService',
@@ -271,6 +436,8 @@ export class CalendarService extends BaseService {
     worker_id: string;
     day: Date;
     kind: CalendarAbsenceKind;
+    reason: string | null;
+    marked_by_id: string | null;
     created_at: Date;
     updated_at: Date;
   }): CalendarAbsenceDto {
@@ -279,6 +446,8 @@ export class CalendarService extends BaseService {
       worker_id: a.worker_id,
       day: a.day.toISOString().slice(0, 10),
       kind: a.kind,
+      reason: a.reason,
+      marked_by_id: a.marked_by_id,
       created_at: a.created_at.toISOString(),
       updated_at: a.updated_at.toISOString(),
     };

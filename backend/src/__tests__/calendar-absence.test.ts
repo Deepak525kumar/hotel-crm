@@ -14,6 +14,7 @@ const mockCalendarAbsence = {
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 const mockWorkerAssignment = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -168,8 +169,14 @@ describe('CalendarService.markAbsence', () => {
 
     expect(mockCalendarAbsence.upsert).toHaveBeenNthCalledWith(2, {
       where: { worker_id_day: { worker_id: 'w1', day: new Date('2026-07-28T00:00:00.000Z') } },
-      create: { worker_id: 'w1', day: new Date('2026-07-28T00:00:00.000Z'), kind: 'SICK' },
-      update: { kind: 'SICK' },
+      create: {
+        worker_id: 'w1',
+        day: new Date('2026-07-28T00:00:00.000Z'),
+        kind: 'SICK',
+        reason: null,
+        marked_by_id: 'w1',
+      },
+      update: { kind: 'SICK', reason: null, marked_by_id: 'w1' },
     });
     expect(result.kind).toBe('SICK');
   });
@@ -440,5 +447,273 @@ describe('CalendarService.getAvailability (REQ-CAL-T06/RULE-CAL-08, ADR-021)', (
       });
       expect(result).toBeDefined();
     });
+  });
+});
+
+// Reason/manager-on-behalf-of/drag-to-move feature (2026-08-08): "mark
+// attendance feature should also be in the calendar as a draggable and
+// also include reason text box in it. and reason should be mandatory" +
+// "both manager and the worker should be able to mark attendance. but
+// everythings should be logged" + "same scenario could be possible for
+// different hierarchies".
+describe('CalendarService.markAbsenceForWorker (manager-on-behalf-of, 2026-08-08 feature)', () => {
+  let service: CalendarService;
+  let restoreClock: () => void;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new CalendarService();
+    restoreClock = fixedToday('2026-07-27');
+    mockCalendarAbsence.upsert.mockResolvedValue({
+      id: 'abs1',
+      worker_id: 'w1',
+      day: new Date('2026-07-28T00:00:00.000Z'),
+      kind: 'VACATION',
+      reason: 'Family trip',
+      marked_by_id: 'mgr1',
+      created_at: new Date('2026-07-27T00:00:00.000Z'),
+      updated_at: new Date('2026-07-27T00:00:00.000Z'),
+    });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+    mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'rm1' });
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Ada', last_name: 'Lovelace' });
+  });
+
+  afterEach(() => restoreClock());
+
+  it("allows a manager to mark an in-group worker's absence and records marked_by_id", async () => {
+    await service.markAbsenceForWorker(
+      { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+      { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+    const call = mockCalendarAbsence.upsert.mock.calls[0][0];
+    expect(call.create.marked_by_id).toBe('mgr1');
+    expect(call.create.reason).toBe('Family trip');
+  });
+
+  it("denies a manager marking a worker outside their scope (ForbiddenError)", async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g_other' });
+    await expect(
+      service.markAbsenceForWorker(
+        { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      )
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    expect(mockCalendarAbsence.upsert).not.toHaveBeenCalled();
+  });
+
+  it('allows an admin unconditionally, cross-group', async () => {
+    await expect(
+      service.markAbsenceForWorker(
+        { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+        { userId: 'admin1', role: 'admin' }
+      )
+    ).resolves.toBeDefined();
+  });
+
+  // "everythings should be logged"
+  it('writes an audit log entry for the mark', async () => {
+    await service.markAbsenceForWorker(
+      { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+      { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+    expect(mockAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'MARK_ABSENCE',
+          actor_id: 'mgr1',
+          resource_type: 'CALENDAR_ABSENCE',
+        }),
+      })
+    );
+  });
+
+  // "should push a notification to the resp manager, and resp worker"
+  it('notifies the worker when a manager marks on their behalf', async () => {
+    await service.markAbsenceForWorker(
+      { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+      { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+    const workerNotif = mockNotification.create.mock.calls.find(
+      (c: any) => c[0].data.user_id === 'w1'
+    );
+    expect(workerNotif).toBeDefined();
+    expect(workerNotif![0].data.type).toBe('CALENDAR_ABSENCE_MARKED_FOR_WORKER');
+  });
+
+  it("does not double-notify the RM when the RM is the one who acted", async () => {
+    await service.markAbsenceForWorker(
+      { worker_id: 'w1', day: '2026-07-28', kind: 'VACATION', reason: 'Family trip' },
+      { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+    const rmNotif = mockNotification.create.mock.calls.find((c: any) => c[0].data.user_id === 'rm1');
+    expect(rmNotif).toBeUndefined();
+  });
+});
+
+describe('MarkAbsenceSchema — reason (2026-08-08 feature: mandatory for VACATION, optional for SICK)', () => {
+  it('rejects a VACATION mark with no reason', async () => {
+    const { MarkAbsenceSchema } = await import('../modules/calendar/types.js');
+    const result = MarkAbsenceSchema.safeParse({ day: '2026-08-01', kind: 'VACATION' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects a VACATION mark with an empty-string reason', async () => {
+    const { MarkAbsenceSchema } = await import('../modules/calendar/types.js');
+    const result = MarkAbsenceSchema.safeParse({ day: '2026-08-01', kind: 'VACATION', reason: '   ' });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts a VACATION mark with a reason', async () => {
+    const { MarkAbsenceSchema } = await import('../modules/calendar/types.js');
+    const result = MarkAbsenceSchema.safeParse({
+      day: '2026-08-01',
+      kind: 'VACATION',
+      reason: 'Family trip',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  // Deliberately NOT mandatory -- see schema.prisma's CalendarAbsence.reason
+  // comment for why (GDPR special-category / health-data avoidance).
+  it('accepts a SICK mark with no reason', async () => {
+    const { MarkAbsenceSchema } = await import('../modules/calendar/types.js');
+    const result = MarkAbsenceSchema.safeParse({ day: '2026-08-01', kind: 'SICK' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts a SICK mark WITH a reason too (optional, not forbidden)', async () => {
+    const { MarkAbsenceSchema } = await import('../modules/calendar/types.js');
+    const result = MarkAbsenceSchema.safeParse({
+      day: '2026-08-01',
+      kind: 'SICK',
+      reason: 'Doctor appointment',
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('CalendarService.moveAbsence (drag-to-move, 2026-08-08 feature)', () => {
+  let service: CalendarService;
+  let restoreClock: () => void;
+
+  const existingAbsence = {
+    id: 'abs1',
+    worker_id: 'w1',
+    day: new Date('2026-07-28T00:00:00.000Z'),
+    kind: 'VACATION' as const,
+    reason: 'Family trip',
+    marked_by_id: 'w1',
+    created_at: new Date('2026-07-27T00:00:00.000Z'),
+    updated_at: new Date('2026-07-27T00:00:00.000Z'),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new CalendarService();
+    restoreClock = fixedToday('2026-07-27');
+    mockCalendarAbsence.findUnique.mockResolvedValue(existingAbsence);
+    mockCalendarAbsence.update.mockResolvedValue({
+      ...existingAbsence,
+      day: new Date('2026-07-29T00:00:00.000Z'),
+    });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+    mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'rm1' });
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Ada', last_name: 'Lovelace' });
+  });
+
+  afterEach(() => restoreClock());
+
+  it('throws NotFoundError for an unknown absence', async () => {
+    mockCalendarAbsence.findUnique.mockResolvedValue(null);
+    await expect(
+      service.moveAbsence('missing', { day: '2026-07-29' }, { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  it('allows the owning worker to move their own absence (self-service)', async () => {
+    const result = await service.moveAbsence(
+      'abs1',
+      { day: '2026-07-29' },
+      { userId: 'w1', role: 'worker' }
+    );
+    expect(result.day).toBe('2026-07-29');
+  });
+
+  it("allows a manager in scope to move a worker's absence on their behalf", async () => {
+    await expect(
+      service.moveAbsence(
+        'abs1',
+        { day: '2026-07-29' },
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      )
+    ).resolves.toBeDefined();
+  });
+
+  it("denies a manager out of scope (ForbiddenError)", async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g_other' });
+    await expect(
+      service.moveAbsence(
+        'abs1',
+        { day: '2026-07-29' },
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      )
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+  });
+
+  it("denies a different worker who is neither the owner nor a manager (ForbiddenError)", async () => {
+    await expect(
+      service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'w2', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+  });
+
+  it('allows an admin unconditionally', async () => {
+    await expect(
+      service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'admin1', role: 'admin' })
+    ).resolves.toBeDefined();
+  });
+
+  it('rejects moving an absence to a past day', async () => {
+    await expect(
+      service.moveAbsence('abs1', { day: '2026-07-01' }, { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+  });
+
+  it('translates a P2002 (worker already has an absence that day) into ConflictError', async () => {
+    mockCalendarAbsence.update.mockRejectedValue({ code: 'P2002' });
+    await expect(
+      service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+  });
+
+  it('writes an audit log entry for the move', async () => {
+    await service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'w1', role: 'worker' });
+    expect(mockAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: 'MOVE_ABSENCE', actor_id: 'w1' }),
+      })
+    );
+  });
+
+  it('notifies the worker when a manager moves the absence on their behalf', async () => {
+    await service.moveAbsence(
+      'abs1',
+      { day: '2026-07-29' },
+      { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+    const workerNotif = mockNotification.create.mock.calls.find(
+      (c: any) => c[0].data.user_id === 'w1'
+    );
+    expect(workerNotif).toBeDefined();
+  });
+
+  it('does not notify the worker when they move their own absence (self-service, no on-behalf-of notification)', async () => {
+    await service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'w1', role: 'worker' });
+    const workerNotif = mockNotification.create.mock.calls.find(
+      (c: any) => c[0].data.user_id === 'w1'
+    );
+    expect(workerNotif).toBeUndefined();
   });
 });
