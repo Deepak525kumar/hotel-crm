@@ -120,6 +120,45 @@ describe('ConsentService (SPEC-CONSENT-001)', () => {
       const result = await service.checkStatus('w1', 'daily-access-gate');
       expect(result.status).toBe('absent');
     });
+
+    // Timezone fix (2026-08-08): isSameCalendarDay previously compared
+    // getUTCFullYear/getUTCMonth/getUTCDate, disagreeing with the rest of
+    // the platform's Europe/Berlin day anchor (calendar/service.ts's
+    // CALENDAR_TIMEZONE, OD-CAL-04) for part of every day (the CET/CEST
+    // offset). These two instants are on DIFFERENT UTC calendar dates but
+    // the SAME Berlin calendar date (2026-01-15 CET, UTC+1) -- the old
+    // getUTC*-based comparison would have called them different days.
+    it('treats two instants as the same day when they share a Berlin calendar date but differ in UTC (timezone fix)', async () => {
+      const lateBerlinEvening = new Date('2026-01-15T23:30:00+01:00'); // 22:30 UTC, still Jan 15 in Berlin
+      const earlyBerlinMorning = new Date('2026-01-15T00:30:00+01:00'); // 2026-01-14T23:30:00Z -- Jan 14 in UTC, Jan 15 in Berlin
+      mockConsentRecordFindFirst.mockResolvedValue(
+        makeRecord({ decided_at: earlyBerlinMorning, notice_version: 'v1' })
+      );
+      jest.useFakeTimers({ now: lateBerlinEvening, doNotFake: ['setImmediate', 'nextTick'] });
+      try {
+        const result = await service.checkStatus('w1', 'daily-access-gate');
+        expect(result.status).toBe('granted');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('treats two instants on the same UTC calendar date but different Berlin dates as different days (timezone fix)', async () => {
+      // 2026-01-15T00:30:00Z is Jan 15 in UTC but still Jan 14 in Berlin (01:30 CET).
+      // 2026-01-15T23:30:00Z is Jan 15 in UTC AND Jan 16 in Berlin (00:30 CET, past midnight).
+      const decidedAt = new Date('2026-01-15T00:30:00Z');
+      const checkedAt = new Date('2026-01-15T23:30:00Z');
+      mockConsentRecordFindFirst.mockResolvedValue(
+        makeRecord({ decided_at: decidedAt, notice_version: 'v1' })
+      );
+      jest.useFakeTimers({ now: checkedAt, doNotFake: ['setImmediate', 'nextTick'] });
+      try {
+        const result = await service.checkStatus('w1', 'daily-access-gate');
+        expect(result.status).toBe('absent');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('requestConsent — OD-CONSENT-009/ADR-037 (language fallback)', () => {

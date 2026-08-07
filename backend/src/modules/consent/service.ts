@@ -320,12 +320,24 @@ export class ConsentService extends BaseService {
   }
 }
 
+// Timezone fix (2026-08-08): compared calendar dates via getUTCFullYear/
+// getUTCMonth/getUTCDate, but the rest of the platform anchors "today" to
+// Europe/Berlin (calendar/service.ts's CALENDAR_TIMEZONE, OD-CAL-04,
+// matching Hotel.timezone's own default). A UTC day boundary disagrees with
+// a Berlin day boundary for part of every day (the CET/CEST offset), so a
+// worker near midnight Berlin time could be told they'd already granted
+// consent "today" when they hadn't (or the reverse) by the rest of the
+// platform's clock. Same Intl.DateTimeFormat('en-CA', {timeZone}) approach
+// as calendar/service.ts's todayInCalendarTimezone(), applied to an
+// arbitrary Date rather than always "now".
+const CONSENT_TIMEZONE = 'Europe/Berlin';
+
+function calendarDateInZone(d: Date): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CONSENT_TIMEZONE }).format(d);
+}
+
 function isSameCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getUTCFullYear() === b.getUTCFullYear() &&
-    a.getUTCMonth() === b.getUTCMonth() &&
-    a.getUTCDate() === b.getUTCDate()
-  );
+  return calendarDateInZone(a) === calendarDateInZone(b);
 }
 
 export { CONSENT_INSTANCE };
