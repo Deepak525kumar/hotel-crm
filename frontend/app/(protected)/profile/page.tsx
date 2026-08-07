@@ -6,6 +6,7 @@ import { AbsencesCard } from "@/components/calendar/AbsencesCard";
 import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { ConsentCard } from "@/components/consent/ConsentCard";
 import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
+import { EditProfileCard } from "@/components/profile/EditProfileCard";
 import { formatDateTime } from "@/lib/format";
 import {
   ActiveBadge,
@@ -63,6 +64,8 @@ export default function ProfilePage() {
           </DataList>
         </CardContent>
       </Card>
+
+      <EditProfileCard user={user} />
 
       {user.permissions.length > 0 && (
         <Card>

@@ -7,6 +7,7 @@ import type {
   Assignment,
   Attendance,
   AuthUser,
+  UpdateProfileInput,
   Availability,
   BroadcastEligibilityDto,
   CalendarAbsence,
@@ -320,6 +321,17 @@ export const authApi = {
     }),
 
   me: () => apiFetch<AuthUser>("/auth/me"),
+
+  /**
+   * `PUT /auth/profile` (auth/routes.ts). The endpoint has existed since the
+   * auth module was built but no client method called it, so the profile page
+   * was read-only with no way to edit your own name or phone.
+   */
+  updateProfile: (input: UpdateProfileInput) =>
+    apiFetch<AuthUser>("/auth/profile", {
+      method: "PUT",
+      body: input,
+    }),
 
   logout: (refreshToken: string | null) =>
     apiFetch<{ message: string }>("/auth/logout", {
