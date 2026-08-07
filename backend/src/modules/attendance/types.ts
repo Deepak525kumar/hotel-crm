@@ -14,10 +14,15 @@ export const CheckInSchema = z.object({
   message: 'latitude and longitude must both be provided together',
 });
 
+// Checkout geofence fix (2026-08-08): mirrors CheckInSchema's optional
+// latitude/longitude pair -- required together, not individually, so a
+// caller cannot supply one without the other. Same "both or neither" refine.
 export const UpdateAttendanceSchema = z
   .object({
     check_out_at: z.string().datetime().optional(),
     notes: z.string().max(1000).optional(),
+    latitude: z.number().min(-90).max(90).optional(),
+    longitude: z.number().min(-180).max(180).optional(),
     // Manager-only verification fields
     status: z
       .enum(['PRESENT', 'ABSENT', 'LATE', 'PARTIAL', 'EXCUSED'])
@@ -26,7 +31,10 @@ export const UpdateAttendanceSchema = z
     minutes_worked: z.number().int().min(0).optional(),
     is_verified: z.boolean().optional(),
   })
-  .refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' });
+  .refine((d) => Object.keys(d).length > 0, { message: 'At least one field required' })
+  .refine((d) => (d.latitude === undefined) === (d.longitude === undefined), {
+    message: 'latitude and longitude must both be provided together',
+  });
 
 export const ListAttendanceQuerySchema = z.object({
   hotel_id: z.string().optional(),

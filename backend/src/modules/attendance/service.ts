@@ -241,7 +241,8 @@ export class AttendanceService extends BaseService {
     input: UpdateAttendanceInput,
     actorId: string,
     actorRole: string,
-    actorScope: UserScope | null = null
+    actorScope: UserScope | null = null,
+    actorIp?: string
   ): Promise<AttendanceDto> {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
@@ -277,12 +278,50 @@ export class AttendanceService extends BaseService {
       if (record.check_out_at !== null) {
         throw new ConflictError('Already checked out');
       }
+
+      // Checkout geofence fix (2026-08-08): checkIn() enforces a geofence
+      // (verifyGeofence / isGeofenceConfigured, lines ~68-89) so a worker
+      // must be on-site to start a shift; checkout enforced nothing at all,
+      // letting a worker check in on-site, leave, and check out from
+      // anywhere -- undermining the entire point of the check-in geofence.
+      // Same required-when-configured shape as checkIn, not optional: an
+      // optional check here would ship infrastructure nobody could rely on
+      // until every caller opts in.
+      if (input.check_out_at !== undefined) {
+        if (input.latitude !== undefined && input.longitude !== undefined) {
+          const verification = await geoService.verifyGeofence(
+            actorId,
+            { hotel_id: record.hotel_id, latitude: input.latitude, longitude: input.longitude },
+            actorRole,
+            actorIp
+          );
+          if (verification.status === 'verified' && !verification.insideRadius) {
+            await this.logAudit(actorId, actorRole, 'CHECK_OUT_DENIED_GEOFENCE', 'ATTENDANCE', record.id, {
+              distance_meters: verification.distanceMeters,
+            });
+            throw new ForbiddenError('Check-out denied: outside the hotel geofence');
+          }
+        } else if (await geoService.isGeofenceConfigured(record.hotel_id)) {
+          await this.logAudit(actorId, actorRole, 'CHECK_OUT_DENIED_GEOFENCE', 'ATTENDANCE', record.id, {
+            reason: 'location_not_supplied',
+          });
+          throw new ForbiddenError('Location permission is required to check out at this hotel');
+        }
+      }
     }
 
     const data: Prisma.AttendanceUpdateInput = {};
 
     if (input.check_out_at !== undefined) {
-      const checkOutTime = new Date(input.check_out_at);
+      // Time-manipulation fix (2026-08-08): a worker's own check-out time was
+      // taken verbatim from the request body and used unchanged to compute
+      // minutes_worked -- unlike checkIn(), which only ever uses server time
+      // (`new Date()`, line ~91). A worker could submit an arbitrary future
+      // (or past) check_out_at to inflate or deflate their own paid minutes.
+      // A manager correcting a record after the fact is a distinct, already
+      // more-trusted action (same tier as the minutes_worked/status override
+      // below) and keeps using the value they supplied.
+      const checkOutTime = isWorker ? new Date() : new Date(input.check_out_at);
       data.check_out_at = checkOutTime;
       if (record.check_in_at) {
         data.minutes_worked = Math.max(
