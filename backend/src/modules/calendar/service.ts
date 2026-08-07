@@ -180,7 +180,16 @@ export class CalendarService extends BaseService {
         where: {
           worker_id: workerId,
           status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
-          work_request: { shift_date: today },
+          // Denormalized `day`, not the legacy `work_request` relation join
+          // (2026-08-07). Neither current assignment-creation path populates
+          // work_request_id -- placeOnCalendar() (assignments/service.ts) and
+          // acceptBroadcast() (job-requests/service.ts) both set it null --
+          // and Prisma's nested to-one filter never matches a row whose
+          // relation is null, so this query silently returned nothing for
+          // every modern assignment. PR 9.6 moved the codebase to the `day`
+          // column for exactly this reason; isWorkerFreeOnDay() already
+          // filters on it, and calendar was the last consumer of the old join.
+          day: today,
         },
         select: { id: true },
       }),
@@ -198,7 +207,11 @@ export class CalendarService extends BaseService {
       where: {
         worker_id: workerId,
         status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
-        work_request: { shift_date: day },
+        // See getAvailability() above for why the relation join matched
+        // nothing. The user-visible effect here was worse: marking yourself
+        // sick left the shift CONFIRMED, so the manager still saw a staffed
+        // slot for someone who would not arrive.
+        day,
       },
     });
     if (!existing) return;
