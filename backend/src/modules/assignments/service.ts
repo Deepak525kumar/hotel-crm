@@ -167,7 +167,7 @@ export class AssignmentService extends BaseService {
 
   async list(
     query: ListAssignmentsQuery,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<{ data: AssignmentDto[]; total: number }> {
     const where: Prisma.WorkerAssignmentWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
@@ -185,6 +185,22 @@ export class AssignmentService extends BaseService {
       where.worker_id = query.worker_id;
     }
 
+    // IDOR fix (2026-08-08): list() ran no manager-scope check at all --
+    // update()/reassign()/placeOnCalendar() in this same file already scope
+    // a manager/regional_manager to their own hotel/hotel_group claim, but
+    // list() let a manager read every assignment platform-wide.
+    if (isScopedManagerRole(actor.role)) {
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        where.hotel_id = { in: [] };
+      } else if (scope.type === 'hotel') {
+        where.hotel_id = scope.hotel_id;
+      } else if (scope.type === 'hotel_group') {
+        where.hotel = { hotel_group_id: scope.hotel_group_id };
+      }
+      // scope.type === 'global' -> no added restriction.
+    }
+
     const [records, total] = await Promise.all([
       this.prisma.workerAssignment.findMany({
         where,
@@ -200,7 +216,7 @@ export class AssignmentService extends BaseService {
 
   async getById(
     id: string,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<AssignmentDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
@@ -209,6 +225,11 @@ export class AssignmentService extends BaseService {
     // "is this worker's assignment" -- ownership is the gate (IDOR fix).
     if (isSelfScopedRole(actor.role) && assignment.worker_id !== actor.userId) {
       throw new ForbiddenError('Cannot access this assignment');
+    } else if (isScopedManagerRole(actor.role)) {
+      // IDOR fix (2026-08-08): same gap as list() above -- a manager/RM
+      // could read any single assignment by id, unscoped.
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot access this assignment');
     }
 
     return this.toDto(assignment);
