@@ -90,12 +90,24 @@ export function errorHandler(
         request_id,
       },
     });
+  } else if (error instanceof SyntaxError) {
+    // Malformed JSON body (express.json()'s body-parser throws SyntaxError
+    // before any route handler runs) is a client fault, not a server fault
+    // -- code must match the 400 status, not the generic 500 INTERNAL_ERROR.
+    res.status(HTTP_STATUS.BAD_REQUEST).json({
+      status: 'error',
+      error: {
+        code: ERROR_CODES.INVALID_REQUEST,
+        message: env.NODE_ENV === 'production' ? 'Malformed request body' : error.message,
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        request_id,
+      },
+    });
   } else {
     // Generic error response
-    const statusCode =
-      error instanceof SyntaxError ? HTTP_STATUS.BAD_REQUEST : HTTP_STATUS.INTERNAL_SERVER_ERROR;
-
-    res.status(statusCode).json({
+    res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
       status: 'error',
       error: {
         code: ERROR_CODES.INTERNAL_ERROR,
