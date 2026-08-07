@@ -672,6 +672,11 @@ describe('AssignmentService', () => {
       );
 
       await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+      // Refreshes BOTH workers as of 2026-08-07: total_assignments counts a
+      // worker's rows regardless of status, so the NEW worker's fresh
+      // CONFIRMED row is aggregate-affecting too -- and without it a worker
+      // whose only activity is being reassigned onto shifts never gets a
+      // WorkerOverallRating row at all (the upsert is its only creator).
 
       expect(mockWorkerAssignment.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -691,7 +696,7 @@ describe('AssignmentService', () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'REASSIGNED' }));
       await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
-      expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
+      expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(2);
       expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     });
 

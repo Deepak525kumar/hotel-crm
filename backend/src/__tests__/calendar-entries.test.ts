@@ -19,6 +19,8 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
  */
 
 const mockWorkerAssignment = {
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -60,6 +62,11 @@ const mockEmployeeBlocklistEntry = {
 };
 
 const mockPrisma = {
+  // placeOnCalendar() now refreshes WorkerOverallRating in-transaction
+  // (2026-08-07): the aggregate counts a worker's rows regardless of status.
+  rating: { aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ _avg: { score: null }, _count: 0 }) },
+  workerOverallRating: { upsert: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({}) },
+  attendance: { count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(0) },
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
   hotel: mockHotel,
