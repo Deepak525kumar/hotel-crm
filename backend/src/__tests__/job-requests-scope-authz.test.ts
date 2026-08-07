@@ -103,6 +103,34 @@ jest.mock('../lib/db.js', () => ({
     },
     jobRequest: {
       findUnique: async ({ where }: any) => workRequests[where.id] ?? null,
+      // LIST manager-scope regression (2026-08-08): filters the fixture set
+      // by the same where-clause shape the service builds (hotel_id direct
+      // match or { in: [...] }, or hotel.hotel_group_id via the mocked
+      // `hotels` lookup below) well enough to prove out-of-scope rows never
+      // reach the response, without reimplementing Prisma's query engine.
+      findMany: async ({ where }: any) => {
+        const rows = Object.values(workRequests);
+        const hotelIdFilter = where?.hotel_id;
+        const groupFilter = where?.hotel?.hotel_group_id;
+        return rows.filter((wr: any) => {
+          if (groupFilter !== undefined) return hotels[wr.hotel_id]?.hotel_group_id === groupFilter;
+          if (hotelIdFilter === undefined) return true;
+          if (typeof hotelIdFilter === 'string') return wr.hotel_id === hotelIdFilter;
+          if (hotelIdFilter?.in) return hotelIdFilter.in.includes(wr.hotel_id);
+          return true;
+        });
+      },
+      count: async ({ where }: any) => {
+        const hotelIdFilter = where?.hotel_id;
+        const groupFilter = where?.hotel?.hotel_group_id;
+        return Object.values(workRequests).filter((wr: any) => {
+          if (groupFilter !== undefined) return hotels[wr.hotel_id]?.hotel_group_id === groupFilter;
+          if (hotelIdFilter === undefined) return true;
+          if (typeof hotelIdFilter === 'string') return wr.hotel_id === hotelIdFilter;
+          if (hotelIdFilter?.in) return hotelIdFilter.in.includes(wr.hotel_id);
+          return true;
+        }).length;
+      },
       create: async ({ data }: any) => ({
         id: 'wr_new',
         version: 0,
@@ -219,6 +247,67 @@ describe('Work-request scope authorization', () => {
       const res = await request(makeApp())
         .patch('/work-requests/wr_h2')
         .send({ status: 'CANCELLED', cancellation_reason: 'no demand' });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  // IDOR fix (2026-08-08): list()/getById() previously ran no manager-scope
+  // check at all -- create()/update() above already did. A manager could
+  // read every work request platform-wide via GET /work-requests or
+  // GET /work-requests/:id regardless of their scope claim.
+  describe('LIST (manager-scope IDOR fix, 2026-08-08)', () => {
+    it("scopes a hotel-scoped manager's list to their own hotel only", async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).get('/work-requests');
+      expect(res.status).toBe(200);
+      const ids = res.body.data.map((wr: any) => wr.id);
+      expect(ids).toContain('wr_h1');
+      expect(ids).not.toContain('wr_h2');
+    });
+
+    it("scopes a regional_manager's list to their hotel_group only", async () => {
+      testAuth = { userId: 'rm_1', role: 'regional_manager', permissions: ['staffing:write'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      const res = await request(makeApp()).get('/work-requests');
+      expect(res.status).toBe(200);
+      const ids = res.body.data.map((wr: any) => wr.id);
+      expect(ids).toContain('wr_h1');
+      expect(ids).not.toContain('wr_h2');
+    });
+
+    it('denies all rows to a scoped manager with no scope claim (deny-by-default)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: null };
+      const res = await request(makeApp()).get('/work-requests');
+      expect(res.status).toBe(200);
+      expect(res.body.data).toEqual([]);
+    });
+
+    it('does not scope an admin (sees both hotels)', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: { type: 'global' } };
+      const res = await request(makeApp()).get('/work-requests');
+      expect(res.status).toBe(200);
+      const ids = res.body.data.map((wr: any) => wr.id);
+      expect(ids).toContain('wr_h1');
+      expect(ids).toContain('wr_h2');
+    });
+  });
+
+  describe('GET /:id (manager-scope IDOR fix, 2026-08-08)', () => {
+    it('allows a manager to read a work request for an in-scope hotel (200)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).get('/work-requests/wr_h1');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager reading a work request for an out-of-scope hotel (403)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['staffing:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).get('/work-requests/wr_h2');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('allows an admin to read a work request cross-hotel (200)', async () => {
+      testAuth = { userId: 'adm_1', role: 'admin', permissions: ['staffing:write'], scope: { type: 'global' } };
+      const res = await request(makeApp()).get('/work-requests/wr_h2');
       expect(res.status).toBe(200);
     });
   });

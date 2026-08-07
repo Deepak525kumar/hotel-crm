@@ -50,6 +50,7 @@ export async function listWorkRequests(
     const { data, total } = await jobRequestService.list(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     const { page, per_page } = parsed.data;
     sendPaginated(
@@ -79,6 +80,7 @@ export async function getWorkRequest(
     const result = await jobRequestService.getById(req.params.id, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
     });
     sendSuccess(res, result, { requestId: req.requestId });
   } catch (error) {
