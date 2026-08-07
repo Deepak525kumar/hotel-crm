@@ -124,6 +124,19 @@ export interface CreateUserInput {
  * which rejects a `role` key at the schema boundary (400) rather than
  * silently ignoring it. Use `usersApi.updateRole()` for a role change.
  */
+/**
+ * Body of `PUT /auth/profile` — editing your OWN profile. Mirrors the
+ * backend's UpdateProfileSchema (auth/validation.ts): every field optional,
+ * phone must be E.164 if supplied. Distinct from UpdateUserInput, which is an
+ * admin/manager editing SOMEONE ELSE.
+ */
+export interface UpdateProfileInput {
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  profile_photo_url?: string;
+}
+
 export interface UpdateUserInput {
   first_name?: string;
   last_name?: string;

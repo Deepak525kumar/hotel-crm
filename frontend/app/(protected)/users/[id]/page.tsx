@@ -8,7 +8,7 @@ import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAvailability } from "@/hooks/useCalendar";
-import { usersApi } from "@/lib/api";
+import { authApi, usersApi } from "@/lib/api";
 import {
   DocumentsGate,
   HrPayrollGate,
@@ -55,6 +55,21 @@ function UserDetail() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
+
+  const [passwordResetSentAt, setPasswordResetSentAt] = useState<Date | null>(null);
+  const passwordReset = useAsyncAction();
+  // Guarded rather than `user!`: this component renders its loading/error
+  // states inline instead of returning early, so `user` is genuinely
+  // nullable at hook scope. The button only exists once the card renders
+  // (which implies a loaded user), but a no-op beats a runtime crash if that
+  // ever stops being true.
+  const sendPasswordReset = () => {
+    if (!user) return;
+    passwordReset.run(() => authApi.requestPasswordReset(user.email), {
+      onSuccess: () => setPasswordResetSentAt(new Date()),
+      errorMessage: "Could not send a reset link. Please try again.",
+    });
+  };
 
   const [revokeConfirmOpen, setRevokeConfirmOpen] = useState(false);
   const [sessionsRevokedAt, setSessionsRevokedAt] = useState<Date | null>(null);
@@ -201,6 +216,37 @@ function UserDetail() {
               <PayslipRequestsCard workerId={id} />
             </HrPayrollGate>
           )}
+
+          {/* Admin-triggered password reset. The reset flow itself already
+              existed (POST /auth/password-reset) but was reachable only from
+              the logged-OUT login screen, so an admin had no way to help a
+              user who could not get in. Sends to the account's own email; the
+              admin never sees or sets the password. */}
+          <RoleGate allow={["admin"]}>
+            <Card>
+              <CardContent className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Reset password
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    {passwordResetSentAt
+                      ? `Reset link sent at ${formatDateTime(passwordResetSentAt.toISOString())}.`
+                      : `Emails a password reset link to ${user.email}. Their current password keeps working until they complete the reset.`}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={sendPasswordReset}
+                  loading={passwordReset.pending}
+                  className="shrink-0"
+                >
+                  Send reset link
+                </Button>
+              </CardContent>
+              <FormError className="px-6 pb-4">{passwordReset.error}</FormError>
+            </Card>
+          </RoleGate>
 
           <RoleGate allow={["admin"]}>
             <Card>
