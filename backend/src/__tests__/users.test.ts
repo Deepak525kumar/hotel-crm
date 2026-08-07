@@ -14,6 +14,10 @@ const mockHotel = {
 // still owns a hotel group before permitting demotion.
 const mockHotelGroup = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // Single-posting invariant (2026-08-07) reads the END STATE back inside the
+  // transaction via findFirst, rather than trusting the conditional
+  // vacate/assign branches above it.
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
   update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
 };
 
@@ -74,11 +78,46 @@ jest.mock('../config/env.js', () => ({
 
 import { UserService } from '../modules/users/service.js';
 
+let hotelRows: Map<string, string>;
+let groupRow: { id: string; rm: string } | null;
+
 describe('UserService', () => {
   let service: UserService;
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // The single-posting invariant reads Hotel/HotelGroup back AFTER the
+    // vacate+assign writes, so these mocks must reflect those writes the way
+    // the database would. A static stub returning the pre-vacate row would
+    // make the invariant reject a transition that actually cleared it.
+    hotelRows = new Map();
+    groupRow = null;
+    mockHotel.findMany.mockImplementation(async ({ where }: any) =>
+      [...hotelRows.entries()]
+        .filter(([, mgr]) => mgr === where?.manager_user_id)
+        .map(([id]) => ({ id })),
+    );
+    mockHotel.update.mockImplementation(async ({ where, data }: any) => {
+      if (data?.manager_user_id !== undefined) {
+        if (data.manager_user_id === null) hotelRows.delete(where.id);
+        else hotelRows.set(where.id, data.manager_user_id);
+      }
+      return { id: where.id, ...data };
+    });
+    mockHotelGroup.findFirst.mockImplementation(async ({ where }: any) =>
+      groupRow && groupRow.rm === where?.regional_manager_user_id
+        ? { id: groupRow.id }
+        : null,
+    );
+    mockHotelGroup.update.mockImplementation(async ({ where, data }: any) => {
+      if (data?.regional_manager_user_id !== undefined) {
+        groupRow =
+          data.regional_manager_user_id === null
+            ? null
+            : { id: where.id, rm: data.regional_manager_user_id };
+      }
+      return { id: where.id, ...data };
+    });
     service = new UserService();
   });
 
@@ -794,7 +833,8 @@ describe('UserService', () => {
         mockPrisma.user.findUnique.mockResolvedValue({
           id: 'mgr1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
         });
-        mockHotel.findMany.mockResolvedValue([{ id: 'h1' }, { id: 'h2' }]);
+        hotelRows.set('h1', 'mgr1');
+        hotelRows.set('h2', 'mgr1');
         mockPrisma.user.update.mockResolvedValue({
           id: 'mgr1', email: 'mgr@test.com', first_name: 'M', last_name: 'G',
           phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
@@ -832,7 +872,10 @@ describe('UserService', () => {
 
         await service.updateUserRole('w1', { role: 'checker' }, 'admin_actor', 'admin');
 
-        expect(mockHotel.findMany).not.toHaveBeenCalled();
+        // The single-posting invariant (2026-08-07) reads Hotel back on every
+        // call, so "never queried Hotel" is no longer the right assertion.
+        // The intent -- this path performs no Hotel WRITE -- is unchanged.
+        expect(mockHotel.update).not.toHaveBeenCalled();
       });
 
       it('allows demoting a regional_manager who owns NO hotel group', async () => {
@@ -961,7 +1004,7 @@ describe('UserService', () => {
     const adminActor = { actorId: 'admin_actor', actorRole: 'admin' };
 
     beforeEach(() => {
-      mockHotel.findMany.mockResolvedValue([]);
+      // no hotels held
       mockHotelGroup.findUnique.mockResolvedValue(null);
       mockPrisma.auditLog.create.mockResolvedValue({});
     });
@@ -1006,7 +1049,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
       });
-      mockHotel.findMany.mockResolvedValue([{ id: 'hA' }]);
+      hotelRows.set('hA', 'u1');
       mockHotel.findUnique.mockResolvedValue({ id: 'hB', manager_user_id: null, deleted_at: null });
       mockPrisma.user.update.mockResolvedValue({
         id: 'u1', email: 'm@test.com', first_name: 'M', last_name: 'Gr',
@@ -1033,7 +1076,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
       });
-      mockHotel.findMany.mockResolvedValue([{ id: 'hA' }]);
+      hotelRows.set('hA', 'u1');
       mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: null });
       mockPrisma.user.update.mockResolvedValue({
         id: 'u1', email: 'rm@test.com', first_name: 'R', last_name: 'M',
@@ -1121,6 +1164,128 @@ describe('UserService', () => {
       );
     });
   });
+  // ── Single-posting invariant (2026-08-07) ────────────────────────────────
+  //
+  // Requested at review: make "one user = one organizational posting" an
+  // explicit backend guarantee rather than an emergent property of the
+  // vacate/assign branches. Asserted on the END STATE inside the transaction,
+  // so a violation rolls back instead of committing.
+  //
+  // These tests bypass the normal branches by seeding a stale row directly --
+  // simulating pre-existing bad data or a direct database write, which is
+  // exactly what the invariant exists to catch. Hotel.manager_user_id has no
+  // unique constraint, so the database cannot enforce this itself.
+  describe('updateUserRole — single organizational posting invariant', () => {
+    beforeEach(() => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+    });
+
+    it('rejects an end state holding BOTH a hotel and a group posting', async () => {
+      // ADMIN -> REGIONAL_MANAGER: the MANAGER vacate branch does not fire
+      // (the user was not a MANAGER), so a pre-existing hotel posting -- bad
+      // data, or a direct database write -- survives into the end state
+      // alongside the new group posting. That combination is what the
+      // invariant exists to catch.
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'ADMIN', permissions: [], is_active: true, deleted_at: null,
+      });
+      hotelRows.set('h_stale', 'u1');
+      mockHotelGroup.findUnique.mockImplementation(async (args: any) =>
+        args?.where?.regional_manager_user_id ? null : { id: 'g1', regional_manager_user_id: null },
+      );
+      // Assigning the group succeeds; the hotel posting is still there.
+      mockHotelGroup.update.mockImplementation(async ({ where, data }: any) => {
+        if (data?.regional_manager_user_id) groupRow = { id: where.id, rm: data.regional_manager_user_id };
+        return { id: where.id, ...data };
+      });
+
+      // Assert the MESSAGE, not just ConflictError: several invariant clauses
+      // throw the same error type, so a type-only assertion is satisfied by
+      // whichever clause happens to fire first and would not detect this one
+      // being removed.
+      await expect(
+        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, 'admin_actor', 'admin')
+      ).rejects.toThrow(/both a Hotel Manager and a Regional Manager/);
+    });
+
+    // Pins the group-side role-mismatch clause specifically: a stale GROUP
+    // posting surviving onto a role that does not authorize it. Neither
+    // vacate branch fires for ADMIN -> WORKER.
+    it('rejects a non-RM role left holding a group posting', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'ADMIN', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      groupRow = { id: 'g_stale', rm: 'u1' };
+
+      await expect(
+        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin')
+      ).rejects.toThrow(/cannot hold a Regional Manager posting/);
+    });
+
+    it('rejects an end state managing more than one hotel', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      hotelRows.set('h_stale', 'u1');
+      mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
+
+      await expect(
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin')
+      ).rejects.toThrow(/more than one hotel/);
+    });
+
+    // A posting must match the role authorizing it: resolveScope() mints the
+    // JWT scope claim straight from these columns, so a worker left pointing
+    // at a hotel would carry manager scope.
+    it('rejects a non-manager role left holding a hotel posting', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'ADMIN', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'WORKER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      // ADMIN -> WORKER: neither vacate branch fires (the user was not a
+      // MANAGER/RM), so a stale hotel posting survives -- precisely the gap.
+      hotelRows.set('h_stale', 'u1');
+
+      await expect(
+        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin')
+      ).rejects.toThrow(/cannot hold a Hotel Manager posting/);
+    });
+
+    it('allows a clean single-hotel manager posting', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u1', role: 'WORKER', permissions: [], is_active: true, deleted_at: null,
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',
+        phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({ id: 'er1' });
+      mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
+
+      await expect(
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin')
+      ).resolves.toBeDefined();
+    });
+  });
+
   // ── Exhaustive role-transition matrix ─────────────────────────────────────
   //
   // Every ordered pair of the 5 roles (20 transitions). The invariant under
@@ -1156,7 +1321,8 @@ describe('UserService', () => {
         id: 'u1', role: upper(from), permissions: [], is_active: true, deleted_at: null,
       });
       // The user currently holds whatever posting their OLD role implies.
-      mockHotel.findMany.mockResolvedValue(from === 'manager' ? [{ id: 'h_old' }] : []);
+      if (from === 'manager') hotelRows.set('h_old', 'u1');
+      if (from === 'regional_manager') groupRow = { id: 'g_old', rm: 'u1' };
       mockHotelGroup.findUnique.mockImplementation(async (args: any) => {
         // Ownership lookup (by regional_manager_user_id) vs target lookup (by id).
         if (args?.where?.regional_manager_user_id) {
@@ -1221,7 +1387,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u1', role: 'MANAGER', permissions: [], is_active: true, deleted_at: null,
       });
-      mockHotel.findMany.mockResolvedValue([{ id: 'h_old' }]);
+      hotelRows.set('h_old', 'u1');
       mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
       mockPrisma.user.update.mockResolvedValue({
         id: 'u1', email: 'u@test.com', first_name: 'U', last_name: 'One',

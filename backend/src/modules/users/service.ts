@@ -619,6 +619,53 @@ export class UserService extends BaseService {
         }
       }
 
+      // ── Invariant: one user holds at most ONE organizational posting ──
+      //
+      // Asserted on the END STATE rather than trusted from the branches
+      // above. Those vacate/assign branches are conditional on the incoming
+      // role, so each is individually correct but none of them proves the
+      // combination is. This check does, and it runs inside the same
+      // transaction -- a violation rolls the whole thing back rather than
+      // committing a user who is simultaneously a Hotel Manager and a
+      // Regional Manager.
+      //
+      // Deliberately a read-back, not a re-derivation from `data`: it catches
+      // a stale row this call did not touch (pre-existing bad data, or a
+      // direct database write) as well as a logic error introduced here
+      // later. Hotel.manager_user_id has no unique constraint, so the
+      // database cannot enforce this itself -- see auth/service.ts's
+      // resolveScope(), which has to tolerate the multi-hotel case for the
+      // same reason.
+      const [managedHotels, managedGroup] = await Promise.all([
+        tx.hotel.findMany({ where: { manager_user_id: userId }, select: { id: true } }),
+        tx.hotelGroup.findFirst({
+          where: { regional_manager_user_id: userId },
+          select: { id: true },
+        }),
+      ]);
+
+      if (managedHotels.length > 0 && managedGroup) {
+        throw new ConflictError(
+          'A user cannot hold both a Hotel Manager and a Regional Manager posting'
+        );
+      }
+      if (managedHotels.length > 1) {
+        throw new ConflictError('A user cannot manage more than one hotel');
+      }
+      // A posting must match the role that authorizes it: resolveScope()
+      // mints a JWT scope claim straight from these columns, so a worker left
+      // pointing at a hotel would carry manager scope.
+      if (managedHotels.length > 0 && newRole !== 'MANAGER') {
+        throw new ConflictError(
+          `A ${newRole} cannot hold a Hotel Manager posting`
+        );
+      }
+      if (managedGroup && newRole !== 'REGIONAL_MANAGER') {
+        throw new ConflictError(
+          `A ${newRole} cannot hold a Regional Manager posting`
+        );
+      }
+
       const result = await tx.user.update({
         where: { id: userId },
         data: { role: newRole },
