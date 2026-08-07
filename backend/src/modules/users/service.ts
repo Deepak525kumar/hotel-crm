@@ -307,10 +307,20 @@ export class UserService extends BaseService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
-    // A scoped manager/regional_manager may only touch a profile within
-    // their own group — mirrors the HR module's identical worker-scope
-    // check (isWorkerInGroupScope), reused here rather than duplicated.
-    if (actorRole !== 'admin') {
+    // IDOR fix (2026-08-08): mirrors updateUser's C-15/SIR-AUTH-019 target-
+    // role check, missing here entirely -- isWorkerInGroupScope alone only
+    // verifies GROUP membership, never the target's ROLE, so a manager/RM
+    // in-group could tamper with another manager's, RM's, or admin's profile
+    // (name/phone/is_active) as long as that target happened to carry an
+    // EmploymentRecord in the same group. Self-edit is exempt, same as
+    // updateUser: a manager editing their OWN profile isn't "modifying a
+    // manager account" in the sense this guard exists to block, and it
+    // would otherwise incorrectly deny a manager/RM who (unlike a worker)
+    // may have no EmploymentRecord at all to resolve a group from.
+    if (actorRole !== 'admin' && userId !== actorId) {
+      if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
+        throw new ForbiddenError('Only admins can modify manager or admin accounts');
+      }
       const inScope = await isWorkerInGroupScope(actorScope, userId);
       if (!inScope) throw new ForbiddenError('User not in your scope');
     }
