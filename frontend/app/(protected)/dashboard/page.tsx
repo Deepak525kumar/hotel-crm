@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
-import { StaffingWriteGate } from "@/components/auth/RoleGate";
+import { RoleGate, StaffingWriteGate } from "@/components/auth/RoleGate";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
+import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { formatPercent, formatScore } from "@/lib/format";
 import {
@@ -148,6 +149,13 @@ export default function DashboardPage() {
       <StaffingWriteGate>
         <ManagerOverview />
       </StaffingWriteGate>
+
+      {/* GD-06: worker-only, self-scoped equivalent of ManagerOverview above
+          — no leaderboard, no other worker's data (see MyStatsCard's own
+          comment). Previously only reachable from /profile. */}
+      <RoleGate allow={["worker"]}>
+        <MyStatsCard />
+      </RoleGate>
     </div>
   );
 }
