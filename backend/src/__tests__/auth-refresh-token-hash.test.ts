@@ -114,7 +114,7 @@ describe('AuthService refresh-token hash-at-rest (OQ-AUTH-15)', () => {
     const { signRefreshToken } = await import('../lib/jwt.js');
     const token = signRefreshToken('user_1');
 
-    await service.refreshToken({ refresh_token: token });
+    await service.refreshToken(token);
 
     expect(mockPrisma.session.findFirst).toHaveBeenCalledWith({
       where: { refresh_token: sha256(token), user_id: 'user_1' },

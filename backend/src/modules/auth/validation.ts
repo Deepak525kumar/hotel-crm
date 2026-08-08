@@ -19,8 +19,14 @@ export const LoginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
+// Security #4 (2026-08-09): optional, not required. The web client sends no
+// body at all for /auth/refresh -- its refresh token travels in the
+// httpOnly cookie instead (controller.ts resolves cookie-vs-body before
+// calling the service). Mobile still sends this field. "at least one of
+// cookie or body must be present" is enforced in the controller, since a
+// Zod schema has no visibility into cookies.
 export const RefreshTokenSchema = z.object({
-  refresh_token: z.string().min(1, 'Refresh token is required'),
+  refresh_token: z.string().min(1, 'Refresh token is required').optional(),
 });
 
 export const UpdateProfileSchema = z.object({

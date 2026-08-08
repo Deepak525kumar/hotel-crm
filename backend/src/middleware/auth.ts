@@ -1,8 +1,24 @@
 import { Request, Response, NextFunction } from 'express';
 import { extractTokenFromHeader, verifyAccessToken } from '../lib/jwt.js';
+import { ACCESS_TOKEN_COOKIE } from '../lib/cookies.js';
 import { UnauthorizedError } from '../lib/errors.js';
 import { ERROR_CODES, ROLE_PERMISSIONS } from '../config/constants.js';
 import { getPrisma } from '../lib/db.js';
+
+/**
+ * Security #4 (2026-08-09): the access token may arrive either as an
+ * `Authorization: Bearer` header (mobile's only path, and the web app's
+ * path before this change) or as the `access_token` httpOnly cookie (the
+ * web app's path as of this change). The header wins when both are present
+ * -- an explicit credential should never be silently shadowed by an
+ * ambient cookie -- which also means this can never change mobile's
+ * existing behavior, since mobile never sends the cookie at all.
+ */
+function resolveAccessToken(req: Request): string | null {
+  const headerToken = extractTokenFromHeader(req.headers.authorization);
+  if (headerToken) return headerToken;
+  return (req.cookies?.[ACCESS_TOKEN_COOKIE] as string | undefined) ?? null;
+}
 
 // ADR-031 D-3 (PR-3, unconditional as of PR-7): the row shape both
 // middlewares read. Selecting only these four columns keeps the added read
@@ -63,8 +79,7 @@ export async function authMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
+    const token = resolveAccessToken(req);
 
     if (!token) {
       throw new UnauthorizedError('Missing authentication token');
@@ -107,8 +122,7 @@ export async function optionalAuthMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
-    const token = extractTokenFromHeader(authHeader);
+    const token = resolveAccessToken(req);
 
     if (token) {
       const payload = verifyAccessToken(token);

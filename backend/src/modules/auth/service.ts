@@ -11,7 +11,7 @@ import {
 } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../../config/constants.js';
 import { getEnv } from '../../config/env.js';
-import { SignupRequest, LoginRequest, RefreshTokenRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
+import { SignupRequest, LoginRequest, UpdateProfileRequest, PasswordResetRequestInput, PasswordResetConfirmInput } from './validation.js';
 import { AuthResponse, AuditLogQuery, AuditLogEntryDto } from './types.js';
 import { notificationService } from '../notifications/service.js';
 import { logger } from '../../lib/logger.js';
@@ -400,14 +400,19 @@ export class AuthService extends BaseService {
     };
   }
 
-  async refreshToken(data: RefreshTokenRequest): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token' | 'expires_in'>> {
-    const payload = verifyRefreshToken(data.refresh_token);
+  // Security #4 (2026-08-09): takes the raw token as a plain string rather
+  // than `RefreshTokenRequest` -- the controller resolves cookie-vs-body
+  // before calling this, so the service stays agnostic to where the token
+  // came from (same principle as every other service method never seeing
+  // request-transport details).
+  async refreshToken(rawRefreshToken: string): Promise<Pick<AuthResponse, 'access_token' | 'refresh_token' | 'expires_in'>> {
+    const payload = verifyRefreshToken(rawRefreshToken);
     if (!payload) {
       throw new UnauthorizedError('Invalid or expired refresh token');
     }
 
     const session = await this.prisma.session.findFirst({
-      where: { refresh_token: this.hashRefreshToken(data.refresh_token), user_id: payload.sub },
+      where: { refresh_token: this.hashRefreshToken(rawRefreshToken), user_id: payload.sub },
     });
     if (!session || session.expires_at < new Date()) {
       throw new UnauthorizedError('Session expired or not found');

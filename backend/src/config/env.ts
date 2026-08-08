@@ -113,6 +113,14 @@ const envSchema = z.object({
   // CORS
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
 
+  // Security #4 (2026-08-09): httpOnly auth cookies for the web frontend,
+  // set alongside the existing bearer-token body response (mobile is
+  // unaffected -- see lib/cookies.ts). Host-only cookie by default (no
+  // Domain attribute set) is correct today since the browser only ever
+  // talks to the same-origin Next.js proxy; reserved for a future
+  // multi-subdomain deploy, not read anywhere yet.
+  COOKIE_DOMAIN: z.string().optional(),
+
   // File Storage (AWS S3)
   AWS_REGION: z.string().default('eu-central-1'),
   S3_BUCKET: z.string().optional(),
