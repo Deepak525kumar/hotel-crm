@@ -120,6 +120,11 @@ enum NotificationType {
   REWORK_REQUIRED // to worker: verification failed, rework needed
   // Calendar events (SPEC-CALENDAR-001, RULE-CAL-06)
   CALENDAR_ABSENCE_MARKED // to manager: worker marked sick/vacation
+  // Calendar drag/reason feature (2026-08-08): the reverse direction --
+  // fired when a manager/RM/admin marks or moves an absence on a worker's
+  // behalf, so the worker learns about it rather than discovering it only
+  // by checking the calendar.
+  CALENDAR_ABSENCE_MARKED_FOR_WORKER // to worker: a manager marked/moved their sick/vacation entry
   // Job-dispatch broadcast events (Epic 9 PR 9.8, TREQ-003 delivery half)
   JOB_REQUEST_BROADCAST // to eligible worker: a skill-matched broadcast slot is open
   // Job-dispatch auto-close event (Epic 9 PR 9.10, TREQ-006)
@@ -324,6 +329,7 @@ model User {
   managed_hotel_groups                           HotelGroup[]                       @relation("regional_manager_of_group")
   managed_hotels                                 Hotel[]                            @relation("hotel_manager")
   calendar_absences                              CalendarAbsence[]                  @relation("calendar_absence_worker")
+  calendar_absences_marked                       CalendarAbsence[]                  @relation("calendar_absence_marked_by")
   // SPEC-DOCUMENTS-001 (GD-16): documents owned by this worker and uploads
   // performed by this user on behalf of a worker (manager contract-scan, RULE-DOC-04).
   worker_documents                               WorkerDocument[]                   @relation("documents_worker")
@@ -1268,6 +1274,26 @@ model CalendarAbsence {
   // Date-only (no time component); the specific day being marked, not a range.
   day        DateTime            @db.Date
   kind       CalendarAbsenceKind
+  // Reason text (2026-08-08 feature): mandatory for VACATION ("family trip",
+  // "personal day" -- low sensitivity), nullable for SICK. A SICK reason is
+  // deliberately NOT made mandatory: forcing detail on a sick day is exactly
+  // the health-data-collection pattern this model's "no health data" design
+  // (CRR §27 §353) exists to avoid -- GDPR special-category data (health)
+  // needs protections this system doesn't have. Enforced in the Zod schema
+  // (types.ts), not a DB-level CHECK, so the column itself stays plain
+  // nullable text.
+  reason     String?
+  // Who actually performed the mark/move (2026-08-08 feature: manager may now
+  // act on a worker's behalf, not just self-service) -- distinct from
+  // worker_id, whose absence this is. Nullable/SetNull rather than required:
+  // an actor account being later deleted must not cascade-delete the
+  // absence record itself, mirroring WorkerAssignment.assigned_by_id and
+  // CalendarEntry.placed_by_id's identical shape. AuditLog is the
+  // authoritative, immutable record of who/when for compliance; this column
+  // is a denormalized convenience for the calendar UI to show "marked by
+  // <manager>" without joining AuditLog.
+  marked_by_id String?
+  marked_by    User?               @relation("calendar_absence_marked_by", fields: [marked_by_id], references: [id], onDelete: SetNull)
   created_at DateTime            @default(now())
   updated_at DateTime            @updatedAt
 

@@ -867,14 +867,34 @@ export interface CalendarAbsence {
   worker_id: string;
   day: string;
   kind: AbsenceKind;
+  reason: string | null;
+  /** Who performed the mark/move -- the worker themself, or a manager/RM/admin
+   *  acting on their behalf (2026-08-08 feature). Null for pre-migration rows. */
+  marked_by_id: string | null;
   created_at: string;
   updated_at: string;
 }
 
-/** Body of `POST /calendar/my-absences` (REQ-CAL-T02/T03: self-scoped, no worker_id field). */
+/**
+ * Body of `POST /calendar/my-absences` (REQ-CAL-T02/T03: self-scoped, no
+ * worker_id field). `reason` is mandatory for VACATION, optional for SICK
+ * (2026-08-08 feature) -- enforced server-side; deliberately not made
+ * mandatory for SICK to avoid incentivizing health-detail disclosure.
+ */
 export interface MarkAbsenceInput {
   day: string; // ISO date (YYYY-MM-DD)
   kind: AbsenceKind;
+  reason?: string;
+}
+
+/** Body of `POST /calendar/absences` (manager/RM/admin marks on a worker's behalf). */
+export interface MarkAbsenceForWorkerInput extends MarkAbsenceInput {
+  worker_id: string;
+}
+
+/** Body of `PATCH /calendar/absences/:id/move` (drag-to-move on the calendar grid). */
+export interface MoveCalendarAbsenceInput {
+  day: string; // ISO date (YYYY-MM-DD)
 }
 
 /**

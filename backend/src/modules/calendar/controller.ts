@@ -1,6 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { calendarService } from './service.js';
-import { MarkAbsenceSchema, ListAbsencesQuerySchema } from './types.js';
+import {
+  MarkAbsenceSchema,
+  MarkAbsenceForWorkerSchema,
+  MoveCalendarAbsenceSchema,
+  ListAbsencesQuerySchema,
+} from './types.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
 
 function zodDetails(error: import('zod').ZodError) {
@@ -63,6 +68,55 @@ export class CalendarController {
       }
       const result = await calendarService.markAbsence(req.auth.userId, parsed.data);
       res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Manager/RM/admin marks or corrects an absence on a worker's behalf
+  // (2026-08-08 feature).
+  async markAbsenceForWorker(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const parsed = MarkAbsenceForWorkerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+        return;
+      }
+      const result = await calendarService.markAbsenceForWorker(parsed.data, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
+      res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // Drag-to-move on the calendar grid (2026-08-08 feature).
+  async moveAbsence(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const parsed = MoveCalendarAbsenceSchema.safeParse(req.body);
+      if (!parsed.success) {
+        next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+        return;
+      }
+      const result = await calendarService.moveAbsence(req.params.id, parsed.data, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
+      res.status(200).json({
         status: 'success',
         data: result,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
