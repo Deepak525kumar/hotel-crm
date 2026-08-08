@@ -116,31 +116,36 @@ export function SidebarNav({
         className={cn(
           "flex items-center rounded-md py-2 text-sm font-medium",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-          // Collapsed: no horizontal padding/gap at all, so the 20px
-          // icon has the full 64px rail (minus the outer `nav` padding)
-          // to center in -- `px-3` on top of that would leave only
-          // 16px, clipping the icon on every render of the (default,
-          // most-common) collapsed state.
-          collapsed ? "justify-center px-0" : "justify-between gap-3 px-3",
+          // Padding is transitioned, not snapped: previously `px-0` <-> `px-3`
+          // changed instantly while the label eased over 200ms, so the icon
+          // visibly jumped ahead of the text it was supposed to move with.
+          // `justify-start` in BOTH states (rather than justify-center when
+          // collapsed) keeps the icon's own box from being re-anchored
+          // mid-animation -- the rail's px-3 is what centres it in the 64px
+          // collapsed width, so it lands in the same place without a
+          // justify-content switch to fight the width transition.
+          "justify-start px-3 transition-[padding,background-color] duration-200 ease-out",
           active
             ? "bg-blue-50 text-blue-700"
             : "text-gray-700 hover:bg-gray-100",
         )}
       >
-        <span
-          className={cn(
-            "flex items-center overflow-hidden",
-            collapsed ? "gap-0" : "gap-3",
-          )}
-        >
+        <span className="flex min-w-0 items-center gap-3">
           <Icon className="h-5 w-5 shrink-0" aria-hidden />
+          {/* Grid-template-columns 0fr -> 1fr is the one way to animate
+              "collapse to nothing" without guessing a max-width. The old
+              `max-w-[10rem]` was an assumed label width: any label narrower
+              than 10rem finished its transition early and then sat still
+              while the rail kept widening, which is what read as stuttery.
+              A 0fr/1fr grid interpolates to the text's OWN width, so label
+              and rail finish together regardless of label length. */}
           <span
             className={cn(
-              "overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200",
-              collapsed ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100",
+              "grid transition-[grid-template-columns,opacity] duration-200 ease-out",
+              collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
             )}
           >
-            {item.label}
+            <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
           </span>
         </span>
       </Link>
@@ -165,32 +170,31 @@ export function SidebarNav({
             aria-current={pathname === "/profile" ? "page" : undefined}
             title={collapsed ? "Profile" : undefined}
             className={cn(
+              // Same transitioned-padding / justify-start treatment as
+              // renderLink above -- see its comment for why.
               "flex items-center rounded-md py-2 text-sm font-medium",
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
-              collapsed ? "justify-center px-0" : "justify-between gap-3 px-3",
+              "justify-start px-3 transition-[padding,background-color] duration-200 ease-out",
               pathname === "/profile"
                 ? "bg-blue-50 text-blue-700"
                 : "text-gray-700 hover:bg-gray-100",
             )}
           >
-            <span
-              className={cn(
-                "flex items-center overflow-hidden",
-                collapsed ? "gap-0" : "gap-3",
-              )}
-            >
+            <span className="flex min-w-0 items-center gap-3">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-700">
                 {user.first_name?.[0]}
                 {user.last_name?.[0]}
               </span>
               <span
                 className={cn(
-                  "flex items-center gap-2 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200",
-                  collapsed ? "max-w-0 opacity-0" : "max-w-[10rem] opacity-100",
+                  "grid transition-[grid-template-columns,opacity] duration-200 ease-out",
+                  collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
                 )}
               >
-                {user.first_name} {user.last_name}
-                <Badge tone="info">{user.role}</Badge>
+                <span className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+                  {user.first_name} {user.last_name}
+                  <Badge tone="info">{user.role}</Badge>
+                </span>
               </span>
             </span>
           </Link>
