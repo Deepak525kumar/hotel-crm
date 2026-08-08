@@ -5,19 +5,19 @@
  * variables so they are inlined for the browser bundle at build time.
  */
 
-const DEFAULT_API_BASE_URL = "http://localhost:3001/api/v1";
-
 /**
- * Base URL for the backend API, including the version prefix
- * (e.g. `http://localhost:3001/api/v1`). Trailing slashes are stripped
- * so callers can safely concatenate paths beginning with `/`.
+ * Security #4 (2026-08-09): always a relative path, in both dev and prod.
+ * next.config.ts's rewrites() proxy `/api/*` to the backend server-side in
+ * BOTH `next dev` and production, so every browser-visible request stays
+ * same-origin -- which is what lets the backend set plain SameSite=Lax
+ * httpOnly auth cookies instead of needing SameSite=None+CSRF. A
+ * cross-port direct call (this used to be `http://localhost:3001/api/v1`
+ * in dev) would defeat that entirely, so there is no environment-variable
+ * override here anymore -- if you need to bypass the proxy locally, point
+ * BACKEND_INTERNAL_URL (next.config.ts, server-only) at a different
+ * backend instead of changing this.
  */
-export const API_BASE_URL = (
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
-).replace(/\/+$/, "");
-
-/** localStorage key under which the auth store persists its state. */
-export const AUTH_STORAGE_KEY = "hotel-crm.auth";
+export const API_BASE_URL = "/api/v1";
 
 /**
  * Pivot cutover feature flag (S0-4): toggles the dispatch model between the
