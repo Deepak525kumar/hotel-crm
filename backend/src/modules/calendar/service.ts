@@ -1,6 +1,6 @@
 import { AssignmentStatus, CalendarAbsence, CalendarAbsenceKind, EmploymentStatus, OutboxSourceModule, OutboxTransport } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
-import { NotImplementedError, ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
+import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
@@ -31,14 +31,6 @@ function todayInCalendarTimezone(): string {
 }
 
 export class CalendarService extends BaseService {
-  async getDailyOperations(_hotelId: string, _date: string) {
-    throw new NotImplementedError('Calendar daily operations are not yet implemented');
-  }
-
-  async createDailyOperation(_hotelId: string, _data: Record<string, unknown>) {
-    throw new NotImplementedError('Calendar daily operations are not yet implemented');
-  }
-
   // REQ-CAL-T02: worker's own calendar view (this module's absence entries
   // only; assignment facts are read from Job Dispatch/assignments elsewhere).
   async getOwnAbsences(workerId: string): Promise<CalendarAbsenceDto[]> {

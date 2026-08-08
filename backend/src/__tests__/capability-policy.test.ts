@@ -115,9 +115,18 @@ function isDenied(result: unknown): boolean {
  * `support/route-registry.ts` emits (`<module>:<METHOD> <path>`).
  *
  * Only capabilities with a live HTTP surface are mapped. A capability with no
- * route (C-04 `hotels:operate`, C-16 employee operational transitions, C-32
- * report export) is asserted at the token level only — a missing route is not
- * a gate violation, and inventing one here would fabricate a requirement.
+ * route (C-04 `hotels:operate`, C-32 report export, and as of 2026-08-08
+ * C-25 "Write calendar operations") is asserted at the token level only — a
+ * missing route is not a gate violation, and inventing one here would
+ * fabricate a requirement.
+ *
+ * C-25 lost its surface when the calendar daily-operations routes were
+ * removed: ADR-051 resolved OD-CAL-10 by removing the `DailyOperation` shape
+ * from the Calendar module entirely, leaving both routes as
+ * NotImplementedError stubs no client ever called. The capability row itself
+ * (ADR-030 §3 C-25, token `staffing:write`) is untouched and still
+ * token-asserted — if the operations feature is rebuilt under whichever
+ * module Requirements Intake assigns it, its routes get mapped back here.
  * Routes are asserted to exist, so a rename fails loudly rather than silently
  * skipping the capability.
  */
@@ -155,7 +164,6 @@ const CAPABILITY_ROUTES: Record<string, string[]> = {
   'C-22': ['employee-management:POST /hotels/:hotel_id/blocklist'],
   'C-23': ['job-requests:POST /', 'job-requests:PATCH /:id'],
   'C-24': ['assignments:POST /:id/rooms-completed'],
-  'C-25': ['calendar:GET /hotels/:hotel_id/operations', 'calendar:POST /hotels/:hotel_id/operations'],
   'C-27': ['quality:POST /verifications', 'quality:POST /ratings'],
   'C-28': ['quality:GET /leaderboard'],
   'C-29': ['hr:POST /contracts', 'hr:POST /payroll'],
