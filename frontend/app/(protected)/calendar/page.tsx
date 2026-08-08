@@ -8,10 +8,9 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
-import { ApiError, assignmentsApi } from "@/lib/api";
+import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
-  Badge,
   Button,
   Card,
   Checkbox,
@@ -21,6 +20,7 @@ import {
   PageHeader,
   Select,
   Skeleton,
+  Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
 
@@ -61,11 +61,6 @@ const DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric", month: "short"
 const MONTH_DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric" });
 const MONTH_TITLE_LABEL = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
 
-const ABSENCE_TONE: Record<AbsenceKind, "warning" | "neutral"> = {
-  SICK: "warning",
-  VACATION: "neutral",
-};
-
 type CalendarView = "week" | "month";
 
 export default function CalendarGridPage() {
@@ -73,6 +68,7 @@ export default function CalendarGridPage() {
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [addDay, setAddDay] = useState<string | null>(null);
+  const [markAbsenceDay, setMarkAbsenceDay] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<CalendarEntryDto | null>(null);
 
   // Month view always renders a fixed 6-week (42-day) grid; week view
@@ -129,6 +125,7 @@ export default function CalendarGridPage() {
 
   const [moveError, setMoveError] = useState<string | null>(null);
   const [movingEntryId, setMovingEntryId] = useState<string | null>(null);
+  const [movingAbsenceId, setMovingAbsenceId] = useState<string | null>(null);
   const canWrite = user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
 
   const onMoveEntry = async (entryId: string, newDay: string) => {
@@ -156,6 +153,34 @@ export default function CalendarGridPage() {
       setMoveError(err instanceof ApiError ? err.message : "Failed to move the placement. Please try again.");
     } finally {
       setMovingEntryId(null);
+    }
+  };
+
+  // Drag-to-move an absence (2026-08-08 feature) -- same optimistic-mutate
+  // shape as onMoveEntry above, against the absences cache key.
+  const onMoveAbsence = async (absenceId: string, newDay: string) => {
+    setMoveError(null);
+    setMovingAbsenceId(absenceId);
+    try {
+      await mutate(
+        ["calendar-absences", { from, to }],
+        async (current: CalendarAbsence[] = []) => {
+          const moved = await calendarApi.moveAbsence(absenceId, newDay);
+          return current.map((a) => (a.id === absenceId ? moved : a));
+        },
+        {
+          optimisticData: (current: CalendarAbsence[] = []) =>
+            current.map((a) => (a.id === absenceId ? { ...a, day: newDay } : a)),
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+    } catch (err) {
+      setMoveError(
+        err instanceof ApiError ? err.message : "Failed to move the absence. Please try again.",
+      );
+    } finally {
+      setMovingAbsenceId(null);
     }
   };
 
@@ -242,8 +267,11 @@ export default function CalendarGridPage() {
                 loading={isLoading}
                 canWrite={canWrite}
                 movingEntryId={movingEntryId}
+                movingAbsenceId={movingAbsenceId}
                 onAdd={() => setAddDay(key)}
+                onMarkAbsence={() => setMarkAbsenceDay(key)}
                 onMoveEntry={onMoveEntry}
+                onMoveAbsence={onMoveAbsence}
                 onSelectEntry={setEditingEntry}
               />
             );
@@ -252,6 +280,13 @@ export default function CalendarGridPage() {
       )}
 
       {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
+      {markAbsenceDay && (
+        <MarkAbsenceForWorkerModal
+          day={markAbsenceDay}
+          range={{ from, to }}
+          onClose={() => setMarkAbsenceDay(null)}
+        />
+      )}
       {editingEntry && (
         <EditEntryModal
           entry={editingEntry}
@@ -281,6 +316,10 @@ const MONTH_VIEW_VISIBLE_ITEMS = 3;
  * handler never mistakes an unrelated browser drag (e.g. dragging text or a
  * link) for a calendar-entry move. */
 const PLACEMENT_DRAG_TYPE = "application/x-calendar-entry-id";
+/** Same namespacing for a dragged absence (2026-08-08 feature) -- a distinct
+ * type from PLACEMENT_DRAG_TYPE so one drop handler can tell which kind of
+ * item was dropped and call the matching endpoint, rather than guessing. */
+const ABSENCE_DRAG_TYPE = "application/x-calendar-absence-id";
 
 function DayCell({
   date,
@@ -293,8 +332,11 @@ function DayCell({
   loading,
   canWrite,
   movingEntryId,
+  movingAbsenceId,
   onAdd,
+  onMarkAbsence,
   onMoveEntry,
+  onMoveAbsence,
   onSelectEntry,
 }: {
   date: Date;
@@ -307,8 +349,11 @@ function DayCell({
   loading: boolean;
   canWrite: boolean;
   movingEntryId: string | null;
+  movingAbsenceId: string | null;
   onAdd: () => void;
+  onMarkAbsence: () => void;
   onMoveEntry: (entryId: string, newDay: string) => void;
+  onMoveAbsence: (absenceId: string, newDay: string) => void;
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
   const isToday = dayKey === toDateKey(new Date());
@@ -321,7 +366,7 @@ function DayCell({
   const items = isMonth
     ? [
         ...entries.map((e) => ({ type: "entry" as const, id: e.id, workerId: e.worker_id, entry: e })),
-        ...absences.map((a) => ({ type: "absence" as const, id: a.id, workerId: a.worker_id, kind: a.kind })),
+        ...absences.map((a) => ({ type: "absence" as const, id: a.id, workerId: a.worker_id, absence: a })),
       ]
     : null;
   const visibleItems = items?.slice(0, MONTH_VIEW_VISIBLE_ITEMS);
@@ -330,8 +375,16 @@ function DayCell({
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
+    // Two distinct namespaced types (2026-08-08 feature): read both rather
+    // than assume, so a dropped absence never gets sent to the
+    // move-placement endpoint or vice versa.
     const entryId = e.dataTransfer.getData(PLACEMENT_DRAG_TYPE);
-    if (entryId) onMoveEntry(entryId, dayKey);
+    if (entryId) {
+      onMoveEntry(entryId, dayKey);
+      return;
+    }
+    const absenceId = e.dataTransfer.getData(ABSENCE_DRAG_TYPE);
+    if (absenceId) onMoveAbsence(absenceId, dayKey);
   };
 
   return (
@@ -359,16 +412,33 @@ function DayCell({
           </div>
         </div>
         <StaffingWriteGate>
-          <button
-            type="button"
-            onClick={onAdd}
-            aria-label={`Add calendar entry for ${dayKey}`}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={onAdd}
+              aria-label={`Add calendar entry for ${dayKey}`}
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            {/* Manager-on-behalf-of absence marking (2026-08-08 feature) --
+                POST /calendar/absences, group-scoped server-side. Same
+                StaffingWriteGate as the add-entry button beside it, since
+                marking a worker's day unavailable is a scheduling write. */}
+            <button
+              type="button"
+              onClick={onMarkAbsence}
+              title="Mark a worker absent on this day"
+              aria-label={`Mark a worker absent on ${dayKey}`}
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </StaffingWriteGate>
       </div>
       <div className={isMonth ? "min-h-[64px] space-y-1 p-1.5" : "min-h-[88px] space-y-1.5 p-2"}>
@@ -391,9 +461,14 @@ function DayCell({
                   onSelect={onSelectEntry}
                 />
               ) : (
-                <div key={item.id} className="truncate rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                  {workerNameById.get(item.workerId) ?? item.workerId} · {item.kind === "SICK" ? "Sick" : "Vacation"}
-                </div>
+                <AbsenceTag
+                  key={item.id}
+                  absence={item.absence}
+                  label={workerNameById.get(item.workerId) ?? item.workerId}
+                  draggable={canWrite}
+                  moving={movingAbsenceId === item.id}
+                  size="sm"
+                />
               ),
             )}
             {hiddenCount > 0 && <div className="text-[11px] text-gray-400">+{hiddenCount} more</div>}
@@ -412,10 +487,14 @@ function DayCell({
               />
             ))}
             {absences.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-1">
-                <span className="truncate text-xs text-gray-600">{workerNameById.get(a.worker_id) ?? a.worker_id}</span>
-                <Badge tone={ABSENCE_TONE[a.kind]}>{a.kind === "SICK" ? "Sick" : "Vacation"}</Badge>
-              </div>
+              <AbsenceTag
+                key={a.id}
+                absence={a}
+                label={workerNameById.get(a.worker_id) ?? a.worker_id}
+                draggable={canWrite}
+                moving={movingAbsenceId === a.id}
+                size="md"
+              />
             ))}
             {entries.length === 0 && absences.length === 0 && (
               <div className="pt-2 text-center text-xs text-gray-400">No entries</div>
@@ -469,6 +548,64 @@ function PlacementTag({
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * A single absence tag (2026-08-08 feature). Draggable on the same
+ * `canWrite` role set PlacementTag uses -- moving a worker's declared
+ * absence to a different day is a scheduling write, so it belongs to the
+ * same gate. The backend's own ownership/group-scope check
+ * (CalendarService.moveAbsence) is the authoritative one; a worker moving
+ * their OWN absence is also permitted server-side, but the grid itself is a
+ * manager surface, so this UI only offers the gesture to `canWrite` roles.
+ *
+ * Red/amber tone by kind so availability reads at a glance (SICK = red,
+ * VACATION = amber) against a placement's blue -- see ABSENCE_TONE.
+ */
+function AbsenceTag({
+  absence,
+  label,
+  draggable,
+  moving,
+  size,
+}: {
+  absence: CalendarAbsence;
+  label: string;
+  draggable: boolean;
+  moving: boolean;
+  size: "sm" | "md";
+}) {
+  const isSick = absence.kind === "SICK";
+  const title = [
+    `${label} · ${isSick ? "Sick" : "Vacation"}`,
+    absence.reason ? `Reason: ${absence.reason}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return (
+    <div
+      draggable={draggable}
+      title={title}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(ABSENCE_DRAG_TYPE, absence.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={[
+        "block w-full truncate rounded text-left font-medium",
+        isSick
+          ? "bg-red-50 text-red-700 hover:bg-red-100"
+          : "bg-amber-50 text-amber-700 hover:bg-amber-100",
+        size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
+        draggable ? "cursor-grab active:cursor-grabbing" : undefined,
+        moving ? "opacity-50" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {label} · {isSick ? "Sick" : "Vacation"}
+    </div>
   );
 }
 
@@ -730,6 +867,155 @@ function AddEntryModal({
 }
 
 /**
+ * Manager/RM/admin marks a worker absent on a given day (2026-08-08
+ * feature) -- the on-behalf-of counterpart to the worker's own
+ * self-service AbsencesCard modal. Posts to /calendar/absences, which is
+ * group-scoped server-side (isWorkerInGroupScope): a manager can only mark
+ * workers on their own group's roster, and the server stays authoritative
+ * regardless of what this picker offers.
+ *
+ * No hotel selector, unlike AddEntryModal: an absence is a property of the
+ * worker's day, not of any hotel, and the backend resolves scope through
+ * the worker's own EmploymentRecord. The worker list is likewise already
+ * group-narrowed server-side by GET /users.
+ */
+function MarkAbsenceForWorkerModal({
+  day,
+  range,
+  onClose,
+}: {
+  day: string;
+  range: { from: string; to: string };
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { users: workers, isLoading: workersLoading } = useUserOptions({
+    role: "worker",
+    search: debouncedSearch || undefined,
+    limit: 20,
+  });
+  const [workerId, setWorkerId] = useState("");
+  const [kind, setKind] = useState<AbsenceKind>("SICK");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Mirrors the backend's MarkAbsenceSchema refine and the worker-facing
+  // AbsencesCard modal: required for VACATION, optional for SICK (avoiding
+  // an incentive to disclose health details -- see schema.prisma's
+  // CalendarAbsence.reason).
+  const reasonRequired = kind === "VACATION";
+  const valid = workerId && (!reasonRequired || reason.trim().length > 0);
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!valid) return;
+    setSubmitting(true);
+    const trimmed = reason.trim();
+    try {
+      await mutate(
+        ["calendar-absences", range],
+        async (current: CalendarAbsence[] = []) => {
+          const created = await calendarApi.markAbsenceForWorker({
+            worker_id: workerId,
+            day,
+            kind,
+            ...(trimmed ? { reason: trimmed } : {}),
+          });
+          // Upsert semantics server-side (re-marking an already-marked day
+          // overwrites it), so replace a same-worker/same-day row rather
+          // than appending a duplicate.
+          return [...current.filter((a) => !(a.worker_id === workerId && a.day === day)), created];
+        },
+        { revalidate: false },
+      );
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Failed to mark the absence. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Mark absent · ${day}`}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={submitting} disabled={!valid}>
+            Mark absent
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Worker</label>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+          />
+          <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+            {workersLoading ? (
+              <div className="p-3 text-sm text-gray-400">Searching…</div>
+            ) : workers.length === 0 ? (
+              <div className="p-3 text-sm text-gray-400">No workers found.</div>
+            ) : (
+              workers.map((w) => {
+                const label = `${w.first_name} ${w.last_name}`;
+                const selected = workerId === w.id;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setWorkerId(w.id)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                      selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                    }`}
+                  >
+                    <span className="truncate">{label}</span>
+                    <span className="truncate text-xs text-gray-400">{w.email}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+        <Select
+          label="Type"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as AbsenceKind)}
+          options={[
+            { value: "SICK", label: "Sick" },
+            { value: "VACATION", label: "Vacation" },
+          ]}
+        />
+        <Textarea
+          label={reasonRequired ? "Reason" : "Reason (optional)"}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+          placeholder={reasonRequired ? "e.g. approved leave, personal days" : "Optional"}
+          // Shown in both states -- see AbsencesCard's matching hint for why
+          // the warning is not conditional on SICK being selected.
+          hint={`${reasonRequired ? "Required for vacation." : "Optional."} Do not enter medical details.`}
+        />
+        <FormError>{error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
+/**
  * Inline-edit affordance for an existing placement: shows its details and
  * offers to cancel it. Hotel and worker are never editable here (day-only
  * move is what drag/drop already covers, per the same product decision) --
@@ -803,9 +1089,15 @@ function EditEntryModal({
           <span className="text-gray-500">Day</span>
           <span className="font-medium text-gray-900">{entry.day}</span>
         </div>
-        <p className="text-xs text-gray-400">
-          To move this placement to a different day, drag it to the destination day cell.
-        </p>
+        {/* Gated on canWrite: dragging is only offered to the roles
+            PlacementTag actually sets draggable for (same StaffingWriteGate
+            set). A worker/checker sees this modal read-only, so the hint
+            described a gesture they cannot perform. */}
+        {canWrite && (
+          <p className="text-xs text-gray-400">
+            To move this placement to a different day, drag it to the destination day cell.
+          </p>
+        )}
         <FormError>{error}</FormError>
       </div>
     </Modal>

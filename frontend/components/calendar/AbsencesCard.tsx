@@ -19,6 +19,7 @@ import {
   Modal,
   Select,
   Skeleton,
+  Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, CalendarAbsence } from "@/lib/types";
 
@@ -35,7 +36,12 @@ const KIND_TONE: Record<AbsenceKind, "warning" | "neutral"> = {
 function AbsenceRow({ absence }: { absence: CalendarAbsence }) {
   return (
     <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
-      <p className="text-sm font-medium text-gray-900">{formatDate(absence.day)}</p>
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-gray-900">{formatDate(absence.day)}</p>
+        {absence.reason && (
+          <p className="truncate text-xs text-gray-500">{absence.reason}</p>
+        )}
+      </div>
       <Badge tone={KIND_TONE[absence.kind]}>{KIND_LABEL[absence.kind]}</Badge>
     </li>
   );
@@ -93,12 +99,21 @@ export function AbsencesCard() {
 function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [day, setDay] = useState("");
   const [kind, setKind] = useState<AbsenceKind>("SICK");
+  const [reason, setReason] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const mark = useAsyncAction();
+
+  // Reason is mandatory for VACATION, optional for SICK (2026-08-08
+  // feature). Deliberately not required for SICK: forcing detail on a sick
+  // day risks capturing health data (GDPR special-category) -- see
+  // schema.prisma's CalendarAbsence.reason comment. Mirrors the backend's
+  // own MarkAbsenceSchema refine; the server remains authoritative.
+  const reasonRequired = kind === "VACATION";
 
   const reset = () => {
     setDay("");
     setKind("SICK");
+    setReason("");
     setFieldError(null);
   };
 
@@ -114,14 +129,22 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
       setFieldError("Date is required.");
       return;
     }
+    if (reasonRequired && !reason.trim()) {
+      setFieldError("Reason is required for a vacation absence.");
+      return;
+    }
 
-    mark.run(() => calendarApi.markOwnAbsence({ day, kind }), {
-      onSuccess: async () => {
-        await mutate(["my-absences"]);
-        reset();
-        onClose();
-      },
-    });
+    const trimmed = reason.trim();
+    mark.run(
+      () => calendarApi.markOwnAbsence({ day, kind, ...(trimmed ? { reason: trimmed } : {}) }),
+      {
+        onSuccess: async () => {
+          await mutate(["my-absences"]);
+          reset();
+          onClose();
+        },
+      }
+    );
   };
 
   return (
@@ -163,6 +186,22 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
             { value: "SICK", label: "Sick" },
             { value: "VACATION", label: "Vacation" },
           ]}
+        />
+        <Textarea
+          label={reasonRequired ? "Reason" : "Reason (optional)"}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+          // Deliberately non-medical framing: a SICK reason is optional and
+          // must not invite health details (GDPR special-category) -- see
+          // this component's reasonRequired comment and schema.prisma's
+          // CalendarAbsence.reason.
+          placeholder={reasonRequired ? "e.g. family trip, personal days" : "Optional"}
+          // The do-not-enter-medical-details warning shows in BOTH states,
+          // not only for SICK: someone can type the reason first and switch
+          // kind after, and a warning that appears only once the sensitive
+          // option is selected is easy to miss entirely.
+          hint={`${reasonRequired ? "Required for vacation." : "Optional."} Do not enter medical details.`}
         />
         <FormError>{fieldError ?? mark.error}</FormError>
       </div>
