@@ -102,6 +102,14 @@ export interface AssignmentDto {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   updated_at: string;
+  // 2026-08-09: the RoomsCompletedEntry attached to this assignment, if one
+  // has been logged (ADR-028's manager-entered post-shift count). Null until
+  // POST /:id/rooms-completed is called — never fabricated as 0, since "not
+  // yet entered" and "zero rooms" are different facts. Visibility follows
+  // getById()/list()'s EXISTING ownership/scope gate (worker sees own,
+  // manager/RM sees in-scope, admin sees all) -- no separate check needed,
+  // since this is read-only exposure of data the caller could already see.
+  rooms_completed: RoomsCompletedEntryDto | null;
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03).

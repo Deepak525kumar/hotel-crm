@@ -5,7 +5,7 @@ import { mutate } from "swr";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
+import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
@@ -1016,6 +1016,129 @@ function MarkAbsenceForWorkerModal({
 }
 
 /**
+ * Rooms-completed view/edit, shown inside EditEntryModal only once the
+ * assignment is COMPLETED (2026-08-09) -- logging/editing a count before
+ * the shift has finished doesn't describe anything real yet, and the
+ * backend enforces the same rule (409 otherwise). Everyone who can open
+ * the placement-details modal sees this if it applies to them (workers see
+ * their own); only canWrite roles get the edit control, matching the
+ * manager-only POST/PATCH /assignments/:id/rooms-completed routes.
+ */
+function RoomsCompletedSection({
+  assignmentId,
+  canWrite,
+}: {
+  assignmentId: string;
+  canWrite: boolean;
+}) {
+  const { data: assignment, isLoading } = useAssignment(assignmentId);
+  const [editing, setEditing] = useState(false);
+  const [rooms, setRooms] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (isLoading || !assignment || assignment.status !== "COMPLETED") return null;
+
+  const existing = assignment.rooms_completed;
+
+  const startEditing = () => {
+    setRooms(existing ? String(existing.rooms_completed) : "");
+    setNotes(existing?.notes ?? "");
+    setError(null);
+    setEditing(true);
+  };
+
+  const onSave = async () => {
+    const parsed = Number(rooms);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      setError("Enter a whole number of rooms (0 or more).");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const input = { rooms_completed: parsed, notes: notes.trim() || undefined };
+      const updated = existing
+        ? await assignmentsApi.updateRoomsCompleted(assignmentId, input)
+        : await assignmentsApi.logRoomsCompleted(assignmentId, input);
+      await mutate(
+        ["assignment", assignmentId],
+        { ...assignment, rooms_completed: updated },
+        { revalidate: false },
+      );
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-100 pt-3">
+      <p className="mb-2 text-sm font-medium text-gray-700">Rooms completed</p>
+      {editing ? (
+        <div className="space-y-2">
+          <Input
+            label="Rooms completed"
+            type="number"
+            min={0}
+            step={1}
+            value={rooms}
+            onChange={(e) => setRooms(e.target.value)}
+          />
+          <Textarea
+            label="Notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={1000}
+          />
+          <FormError>{error}</FormError>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onSave} loading={saving}>
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : existing ? (
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Count</span>
+            <span className="font-medium text-gray-900">{existing.rooms_completed}</span>
+          </div>
+          {existing.notes && (
+            <div className="flex justify-between gap-4">
+              <span className="shrink-0 text-gray-500">Notes</span>
+              <span className="text-right text-gray-700">{existing.notes}</span>
+            </div>
+          )}
+          {canWrite && (
+            <Button size="sm" variant="outline" className="mt-1" onClick={startEditing}>
+              Edit
+            </Button>
+          )}
+        </div>
+      ) : canWrite ? (
+        <Button size="sm" variant="outline" onClick={startEditing}>
+          Log rooms completed
+        </Button>
+      ) : (
+        <p className="text-sm text-gray-500">Not yet logged.</p>
+      )}
+    </div>
+  );
+}
+
+/**
  * Inline-edit affordance for an existing placement: shows its details and
  * offers to cancel it. Hotel and worker are never editable here (day-only
  * move is what drag/drop already covers, per the same product decision) --
@@ -1098,6 +1221,7 @@ function EditEntryModal({
             To move this placement to a different day, drag it to the destination day cell.
           </p>
         )}
+        <RoomsCompletedSection assignmentId={entry.assignment_id} canWrite={canWrite} />
         <FormError>{error}</FormError>
       </div>
     </Modal>

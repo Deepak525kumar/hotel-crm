@@ -629,6 +629,8 @@ export interface Assignment {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   updated_at: string;
+  /** Null until POST /:id/rooms-completed is called for this assignment. */
+  rooms_completed: RoomsCompletedEntry | null;
 }
 
 /** Query params accepted by `GET /assignments`. */

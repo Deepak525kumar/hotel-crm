@@ -211,7 +211,7 @@ async function resolveScheduledStart(
 }
 
 export class AssignmentService extends BaseService {
-  private toDto(a: WorkerAssignment): AssignmentDto {
+  private toDto(a: WorkerAssignment, roomsCompleted: RoomsCompletedEntry | null = null): AssignmentDto {
     return {
       id: a.id,
       work_request_id: a.work_request_id,
@@ -225,6 +225,7 @@ export class AssignmentService extends BaseService {
       cancelled_at: a.cancelled_at?.toISOString() ?? null,
       cancellation_reason: a.cancellation_reason,
       updated_at: a.updated_at.toISOString(),
+      rooms_completed: roomsCompleted ? this.toRoomsCompletedDto(roomsCompleted) : null,
     };
   }
 
@@ -274,7 +275,20 @@ export class AssignmentService extends BaseService {
       this.prisma.workerAssignment.count({ where }),
     ]);
 
-    return { data: records.map((r) => this.toDto(r)), total };
+    // Batched, not N+1: one query for the whole page rather than one per row.
+    const roomsCompletedEntries = records.length
+      ? await this.prisma.roomsCompletedEntry.findMany({
+          where: { assignment_id: { in: records.map((r) => r.id) } },
+        })
+      : [];
+    const roomsCompletedByAssignment = new Map(
+      roomsCompletedEntries.map((rc) => [rc.assignment_id, rc])
+    );
+
+    return {
+      data: records.map((r) => this.toDto(r, roomsCompletedByAssignment.get(r.id) ?? null)),
+      total,
+    };
   }
 
   async getById(
@@ -295,7 +309,11 @@ export class AssignmentService extends BaseService {
       if (!inScope) throw new ForbiddenError('Cannot access this assignment');
     }
 
-    return this.toDto(assignment);
+    const roomsCompleted = await this.prisma.roomsCompletedEntry.findUnique({
+      where: { assignment_id: id },
+    });
+
+    return this.toDto(assignment, roomsCompleted);
   }
 
   async update(
@@ -661,9 +679,18 @@ export class AssignmentService extends BaseService {
   ): Promise<RoomsCompletedEntryDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignmentId },
-      select: { id: true, hotel_id: true, worker_id: true },
+      select: { id: true, hotel_id: true, worker_id: true, status: true },
     });
     if (!assignment) throw new NotFoundError('Assignment not found');
+
+    // 2026-08-09: the model exists to record a POST-shift count (ADR-028's
+    // own framing), so logging one before the shift has finished doesn't
+    // describe anything real yet. Checked before the scope gate below so a
+    // manager gets the same clear error regardless of whether they'd also
+    // fail the scope check.
+    if (assignment.status !== AssignmentStatus.COMPLETED) {
+      throw new ConflictError('Rooms completed can only be logged for a completed assignment');
+    }
 
     // isScopedManagerRole: ADR-030 §3 C-24 grants regional_manager `✓ᶜ` on
     // assignments and the route gate now admits it — so an RM MUST be
@@ -702,6 +729,60 @@ export class AssignmentService extends BaseService {
     });
 
     return this.toRoomsCompletedDto(entry);
+  }
+
+  // 2026-08-09: correction path for an already-logged rooms-completed entry.
+  // POST above stays strict-create/409-on-repeat (its existing, tested
+  // contract, unchanged) -- this is a separate endpoint rather than turning
+  // POST into an upsert, so the "second POST always 409s" behavior already
+  // relied upon elsewhere keeps working exactly as before.
+  async updateRoomsCompleted(
+    assignmentId: string,
+    input: LogRoomsCompletedInput,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<RoomsCompletedEntryDto> {
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignmentId },
+      select: { id: true, hotel_id: true, status: true },
+    });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+
+    if (assignment.status !== AssignmentStatus.COMPLETED) {
+      throw new ConflictError('Rooms completed can only be edited for a completed assignment');
+    }
+
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot edit rooms completed for this hotel');
+      }
+    }
+
+    const existing = await this.prisma.roomsCompletedEntry.findUnique({
+      where: { assignment_id: assignmentId },
+    });
+    if (!existing) {
+      throw new NotFoundError('No rooms-completed entry exists for this assignment yet');
+    }
+
+    const updated = await this.prisma.roomsCompletedEntry.update({
+      where: { assignment_id: assignmentId },
+      data: {
+        rooms_completed: input.rooms_completed,
+        notes: input.notes ?? null,
+      },
+    });
+
+    await this.logAudit(
+      actor.userId,
+      actor.role,
+      'UPDATE_ROOMS_COMPLETED',
+      'ROOMS_COMPLETED_ENTRY',
+      updated.id,
+      { assignment_id: assignmentId, rooms_completed: input.rooms_completed }
+    );
+
+    return this.toRoomsCompletedDto(updated);
   }
 
   private toCalendarEntryDto(c: CalendarEntry): CalendarEntryDto {

@@ -11,6 +11,7 @@ import {
   moveCalendarEntry,
   reassignAssignment,
   updateAssignment,
+  updateRoomsCompleted,
 } from './controller.js';
 
 const router = Router();
@@ -101,6 +102,14 @@ router.post(
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('staffing:write'),
   logRoomsCompleted
+);
+
+// 2026-08-09: correction path — same RBAC shape as the POST above.
+router.patch(
+  '/:id/rooms-completed',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('staffing:write'),
+  updateRoomsCompleted
 );
 
 // Job-dispatch lifecycle feature (2026-08-05): atomic reassign, replacing
