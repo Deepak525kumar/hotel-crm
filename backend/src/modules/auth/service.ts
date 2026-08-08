@@ -73,6 +73,16 @@ export class AuthService extends BaseService {
   ): Promise<void> {
     const streakStartedAt = user.failed_login_since ?? new Date();
 
+    // Consecutive-failure streaks persist until a successful login resets them;
+    // there is intentionally no time-based expiry window here. 3 failures today
+    // and 2 more three months later still sum to a threshold-crossing streak of
+    // 5 -- this is deliberate (TRULE-AUTH-002's "notify and never block" makes
+    // the notification the only cost of a stale streak, and a slow,
+    // low-and-slow credential-guessing attempt spread over months is exactly
+    // the pattern a rolling window would hide). A future SPEC-AUTH-001
+    // amendment could add one; until then, do not assume a rolling window
+    // exists when reasoning about this counter.
+    //
     // `increment` rather than a read-computed `failed_login_count: nextCount`:
     // two concurrent failed attempts (a real scenario -- it's the exact
     // shape a credential-guessing script produces) would otherwise both read
