@@ -1,3 +1,17 @@
+/**
+ * This module (and API_BASE_URL, lib/config.ts) is written for BROWSER/
+ * client-side use only, reached through the Next.js rewrite proxy
+ * (next.config.ts's rewrites()) so auth cookies stay same-origin (Security
+ * #4, 2026-08-09). Every current caller is a client component/hook.
+ *
+ * API_BASE_URL is deliberately a bare relative path ("/api/v1") — that only
+ * resolves correctly when `fetch` runs in a browser (or anywhere else with
+ * an ambient request/origin to resolve against). If this module is ever
+ * imported from a Server Component or other Node-side code, a relative URL
+ * will fail there (Node's fetch requires an absolute URL unless a request
+ * context supplies one) — that caller would need its own absolute-URL
+ * fetch to the backend directly, not this file's apiFetch/buildUrl.
+ */
 import { API_BASE_URL } from "@/lib/config";
 import { useAuthStore } from "@/stores/auth";
 import type {

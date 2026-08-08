@@ -16,6 +16,11 @@
  * override here anymore -- if you need to bypass the proxy locally, point
  * BACKEND_INTERNAL_URL (next.config.ts, server-only) at a different
  * backend instead of changing this.
+ *
+ * Browser/client-side only (see lib/api.ts's own note): a relative URL
+ * resolves against the page's origin, which only exists when `fetch` runs
+ * in a browser. A Server Component or other Node-side caller would need an
+ * absolute backend URL of its own, not this constant.
  */
 export const API_BASE_URL = "/api/v1";
 
