@@ -355,7 +355,7 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_55' }]);
       mockPrisma.session.update.mockResolvedValue({});
 
-      const result = await service.refreshToken({ refresh_token: signedRefresh });
+      const result = await service.refreshToken(signedRefresh);
       const payload = decodeAccessToken(result.access_token);
 
       expect(payload.scope).toEqual({ type: 'hotel', hotel_id: 'hotel_55' });

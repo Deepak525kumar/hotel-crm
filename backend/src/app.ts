@@ -1,4 +1,5 @@
 import express, { Express } from 'express';
+import cookieParser from 'cookie-parser';
 import { getEnv } from './config/env.js';
 import { requestLoggerMiddleware } from './middleware/requestLogger.js';
 // import { authMiddleware } from './middleware/auth.js';
@@ -13,11 +14,22 @@ export function createApp(): Express {
   // Middleware
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
+  // Security #4 (2026-08-09): parses the httpOnly auth cookies the web
+  // frontend now sends (lib/cookies.ts) -- must run before any route that
+  // calls authMiddleware/optionalAuthMiddleware, both of which read
+  // req.cookies as a fallback to the Authorization header.
+  app.use(cookieParser());
 
   // Request logging
   app.use(requestLoggerMiddleware);
 
   // CORS (basic setup)
+  //
+  // Access-Control-Allow-Credentials stays required even with the frontend's
+  // same-origin Next.js rewrite proxy in front (2026-08-09): the proxy makes
+  // the BROWSER same-origin, but the actual HTTP request Express sees still
+  // arrives cross-origin (proxy host -> this host) with cookies attached, and
+  // both mobile apps' direct (non-proxied) calls need these headers too.
   app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', env.CORS_ORIGIN);
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
