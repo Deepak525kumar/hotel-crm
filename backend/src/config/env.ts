@@ -326,6 +326,19 @@ const envSchema = z.object({
   // hardcoded literal, matching this file's convention for every other
   // business-rule threshold.
   ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: z.coerce.number().int().positive().default(120),
+
+  // SPEC-AUTH-001 TREQ-AUTH-007 (2026-08-08): "N consecutive failed logins
+  // for an account -> the responsible manager is notified". The spec leaves
+  // N unspecified, so it is a named, configurable threshold here rather than
+  // a magic number, matching this file's convention for every other
+  // business-rule threshold. 5 is a conventional default -- high enough that
+  // ordinary typos don't page anyone, low enough to surface a real
+  // credential-guessing attempt.
+  //
+  // This is a NOTIFICATION threshold, never a lockout threshold
+  // (TRULE-AUTH-002: "notify and never block"). Crossing it must not affect
+  // whether a subsequent login is accepted.
+  AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: z.coerce.number().int().positive().default(5),
 });
 
 type Env = z.infer<typeof envSchema>;
