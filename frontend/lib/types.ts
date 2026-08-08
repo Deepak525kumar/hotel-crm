@@ -398,6 +398,20 @@ export interface WorkerStats {
     late: number;
     absent: number;
   };
+  total_assignments: number;
+  /** Percentage (0-100), present+late over total. `null` with no attendance history. */
+  attendance_rate: number | null;
+  current_month: {
+    assignments: number;
+    completed: number;
+    average_rating: number | null;
+  };
+  /** Newest first, capped server-side — a summary slice, not full history. */
+  recent_ratings: Array<{
+    assignment_id: string;
+    rating: number;
+    created_at: string;
+  }>;
 }
 
 /** Per-hotel operational summary from `GET /analytics/hotel-summary/:id`. */

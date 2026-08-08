@@ -33,12 +33,18 @@ const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+const mockRating = {
+  aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerOverallRating: mockWorkerOverallRating,
   hotel: mockHotel,
   workerAssignment: mockWorkerAssignment,
   roomsCompletedEntry: mockRoomsCompletedEntry,
   attendance: mockAttendance,
+  rating: mockRating,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -91,10 +97,21 @@ describe('Analytics getLeaderboard — hotel_id filter', () => {
 describe('Analytics getWorkerStats (GD-06)', () => {
   let service: AnalyticsService;
 
+  // workerAssignment.count() is called 4x in Promise.all order:
+  // completed_assignments, total_assignments, current_month.assignments,
+  // current_month.completed. mockResolvedValueOnce chains match that order.
+  function mockAssignmentCounts(completed: number, total: number, monthAssignments: number, monthCompleted: number) {
+    mockWorkerAssignment.count
+      .mockResolvedValueOnce(completed)
+      .mockResolvedValueOnce(total)
+      .mockResolvedValueOnce(monthAssignments)
+      .mockResolvedValueOnce(monthCompleted);
+  }
+
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AnalyticsService();
-    mockWorkerAssignment.count.mockResolvedValue(7);
+    mockAssignmentCounts(7, 10, 2, 1);
     mockRoomsCompletedEntry.aggregate.mockResolvedValue({ _sum: { rooms_completed: 42 } });
     mockWorkerOverallRating.findUnique.mockResolvedValue({ average_score: 88.5 });
     mockAttendance.groupBy.mockResolvedValue([
@@ -103,19 +120,27 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       { status: 'ABSENT', _count: { id: 2 } },
     ]);
     mockAttendance.count.mockResolvedValue(8);
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 91 } });
+    mockRating.findMany.mockResolvedValue([
+      { assignment_id: 'a1', score: 95, created_at: new Date('2026-08-05T00:00:00Z') },
+      { assignment_id: 'a2', score: 80, created_at: new Date('2026-08-01T00:00:00Z') },
+    ]);
   });
 
   it('scopes every query to the given worker_id — never a different worker', async () => {
     await service.getWorkerStats('w1');
 
-    expect(mockWorkerAssignment.count.mock.calls[0][0].where).toEqual({
-      worker_id: 'w1',
-      status: 'COMPLETED',
-    });
+    for (const call of mockWorkerAssignment.count.mock.calls) {
+      expect(call[0].where).toMatchObject({ worker_id: 'w1' });
+    }
     expect(mockRoomsCompletedEntry.aggregate.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     expect(mockWorkerOverallRating.findUnique.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     expect(mockAttendance.groupBy.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
     expect(mockAttendance.count.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
+    for (const call of mockRating.aggregate.mock.calls) {
+      expect(call[0].where).toMatchObject({ worker_id: 'w1' });
+    }
+    expect(mockRating.findMany.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
   });
 
   it('never reads or returns another worker\'s data — result shape matches WorkerStats exactly', async () => {
@@ -125,15 +150,25 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       rooms_completed: 42,
       average_rating: 88.5,
       attendance: { total: 8, present: 5, late: 1, absent: 2 },
+      total_assignments: 10,
+      attendance_rate: 75, // (5 present + 1 late) / 8 total = 75%
+      current_month: { assignments: 2, completed: 1, average_rating: 91 },
+      recent_ratings: [
+        { assignment_id: 'a1', rating: 95, created_at: '2026-08-05T00:00:00.000Z' },
+        { assignment_id: 'a2', rating: 80, created_at: '2026-08-01T00:00:00.000Z' },
+      ],
     });
   });
 
-  it('returns null average_rating and zeroed fields when the worker has no data yet', async () => {
-    mockWorkerAssignment.count.mockResolvedValue(0);
+  it('returns null average_rating/attendance_rate and empty arrays when the worker has no data yet', async () => {
+    mockWorkerAssignment.count.mockReset();
+    mockAssignmentCounts(0, 0, 0, 0);
     mockRoomsCompletedEntry.aggregate.mockResolvedValue({ _sum: { rooms_completed: null } });
     mockWorkerOverallRating.findUnique.mockResolvedValue(null);
     mockAttendance.groupBy.mockResolvedValue([]);
     mockAttendance.count.mockResolvedValue(0);
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: null } });
+    mockRating.findMany.mockResolvedValue([]);
 
     const result = await service.getWorkerStats('w-new');
     expect(result).toEqual({
@@ -141,7 +176,30 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       rooms_completed: 0,
       average_rating: null,
       attendance: { total: 0, present: 0, late: 0, absent: 0 },
+      total_assignments: 0,
+      attendance_rate: null,
+      current_month: { assignments: 0, completed: 0, average_rating: null },
+      recent_ratings: [],
     });
+  });
+
+  it('caps recent_ratings at RECENT_RATINGS_LIMIT (5) via take, newest first via orderBy', async () => {
+    await service.getWorkerStats('w1');
+    const call = mockRating.findMany.mock.calls[0][0];
+    expect(call.take).toBe(5);
+    expect(call.orderBy).toEqual({ created_at: 'desc' });
+  });
+
+  it('response contains no peer-identifying fields — only this worker\'s own data', async () => {
+    const result = await service.getWorkerStats('w1');
+    const keys = Object.keys(result);
+    // No rank/position, no other-worker names, no leaderboard-shaped fields —
+    // this asserts the GD-06 boundary at the type level, not just by review.
+    expect(keys).not.toContain('position');
+    expect(keys).not.toContain('rank');
+    expect(keys).not.toContain('name');
+    expect(keys).not.toContain('worker_id');
+    expect(result.recent_ratings.every((r) => !('rated_by' in r) && !('worker_id' in r))).toBe(true);
   });
 });
 
