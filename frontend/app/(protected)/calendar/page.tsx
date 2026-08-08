@@ -20,8 +20,9 @@ import {
   PageHeader,
   Select,
   Skeleton,
+  Textarea,
 } from "@/components/ui";
-import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+import type { AbsenceKind, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -67,6 +68,7 @@ export default function CalendarGridPage() {
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [addDay, setAddDay] = useState<string | null>(null);
+  const [markAbsenceDay, setMarkAbsenceDay] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<CalendarEntryDto | null>(null);
 
   // Month view always renders a fixed 6-week (42-day) grid; week view
@@ -267,6 +269,7 @@ export default function CalendarGridPage() {
                 movingEntryId={movingEntryId}
                 movingAbsenceId={movingAbsenceId}
                 onAdd={() => setAddDay(key)}
+                onMarkAbsence={() => setMarkAbsenceDay(key)}
                 onMoveEntry={onMoveEntry}
                 onMoveAbsence={onMoveAbsence}
                 onSelectEntry={setEditingEntry}
@@ -277,6 +280,13 @@ export default function CalendarGridPage() {
       )}
 
       {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
+      {markAbsenceDay && (
+        <MarkAbsenceForWorkerModal
+          day={markAbsenceDay}
+          range={{ from, to }}
+          onClose={() => setMarkAbsenceDay(null)}
+        />
+      )}
       {editingEntry && (
         <EditEntryModal
           entry={editingEntry}
@@ -324,6 +334,7 @@ function DayCell({
   movingEntryId,
   movingAbsenceId,
   onAdd,
+  onMarkAbsence,
   onMoveEntry,
   onMoveAbsence,
   onSelectEntry,
@@ -340,6 +351,7 @@ function DayCell({
   movingEntryId: string | null;
   movingAbsenceId: string | null;
   onAdd: () => void;
+  onMarkAbsence: () => void;
   onMoveEntry: (entryId: string, newDay: string) => void;
   onMoveAbsence: (absenceId: string, newDay: string) => void;
   onSelectEntry: (entry: CalendarEntryDto) => void;
@@ -400,16 +412,33 @@ function DayCell({
           </div>
         </div>
         <StaffingWriteGate>
-          <button
-            type="button"
-            onClick={onAdd}
-            aria-label={`Add calendar entry for ${dayKey}`}
-            className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={onAdd}
+              aria-label={`Add calendar entry for ${dayKey}`}
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
+              </svg>
+            </button>
+            {/* Manager-on-behalf-of absence marking (2026-08-08 feature) --
+                POST /calendar/absences, group-scoped server-side. Same
+                StaffingWriteGate as the add-entry button beside it, since
+                marking a worker's day unavailable is a scheduling write. */}
+            <button
+              type="button"
+              onClick={onMarkAbsence}
+              title="Mark a worker absent on this day"
+              aria-label={`Mark a worker absent on ${dayKey}`}
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </StaffingWriteGate>
       </div>
       <div className={isMonth ? "min-h-[64px] space-y-1 p-1.5" : "min-h-[88px] space-y-1.5 p-2"}>
@@ -832,6 +861,157 @@ function AddEntryModal({
             </ul>
           </div>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * Manager/RM/admin marks a worker absent on a given day (2026-08-08
+ * feature) -- the on-behalf-of counterpart to the worker's own
+ * self-service AbsencesCard modal. Posts to /calendar/absences, which is
+ * group-scoped server-side (isWorkerInGroupScope): a manager can only mark
+ * workers on their own group's roster, and the server stays authoritative
+ * regardless of what this picker offers.
+ *
+ * No hotel selector, unlike AddEntryModal: an absence is a property of the
+ * worker's day, not of any hotel, and the backend resolves scope through
+ * the worker's own EmploymentRecord. The worker list is likewise already
+ * group-narrowed server-side by GET /users.
+ */
+function MarkAbsenceForWorkerModal({
+  day,
+  range,
+  onClose,
+}: {
+  day: string;
+  range: { from: string; to: string };
+  onClose: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const { users: workers, isLoading: workersLoading } = useUserOptions({
+    role: "worker",
+    search: debouncedSearch || undefined,
+    limit: 20,
+  });
+  const [workerId, setWorkerId] = useState("");
+  const [kind, setKind] = useState<AbsenceKind>("SICK");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Mirrors the backend's MarkAbsenceSchema refine and the worker-facing
+  // AbsencesCard modal: required for VACATION, optional for SICK (avoiding
+  // an incentive to disclose health details -- see schema.prisma's
+  // CalendarAbsence.reason).
+  const reasonRequired = kind === "VACATION";
+  const valid = workerId && (!reasonRequired || reason.trim().length > 0);
+
+  const onSubmit = async () => {
+    setError(null);
+    if (!valid) return;
+    setSubmitting(true);
+    const trimmed = reason.trim();
+    try {
+      await mutate(
+        ["calendar-absences", range],
+        async (current: CalendarAbsence[] = []) => {
+          const created = await calendarApi.markAbsenceForWorker({
+            worker_id: workerId,
+            day,
+            kind,
+            ...(trimmed ? { reason: trimmed } : {}),
+          });
+          // Upsert semantics server-side (re-marking an already-marked day
+          // overwrites it), so replace a same-worker/same-day row rather
+          // than appending a duplicate.
+          return [...current.filter((a) => !(a.worker_id === workerId && a.day === day)), created];
+        },
+        { revalidate: false },
+      );
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiError ? err.message : "Failed to mark the absence. Please try again.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Mark absent · ${day}`}
+      footer={
+        <>
+          <Button variant="outline" onClick={onClose} disabled={submitting}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={submitting} disabled={!valid}>
+            Mark absent
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <div className="flex flex-col gap-1">
+          <label className="text-sm font-medium text-gray-700">Worker</label>
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name or email…"
+          />
+          <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+            {workersLoading ? (
+              <div className="p-3 text-sm text-gray-400">Searching…</div>
+            ) : workers.length === 0 ? (
+              <div className="p-3 text-sm text-gray-400">No workers found.</div>
+            ) : (
+              workers.map((w) => {
+                const label = `${w.first_name} ${w.last_name}`;
+                const selected = workerId === w.id;
+                return (
+                  <button
+                    key={w.id}
+                    type="button"
+                    onClick={() => setWorkerId(w.id)}
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                      selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                    }`}
+                  >
+                    <span className="truncate">{label}</span>
+                    <span className="truncate text-xs text-gray-400">{w.email}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+        <Select
+          label="Type"
+          value={kind}
+          onChange={(e) => setKind(e.target.value as AbsenceKind)}
+          options={[
+            { value: "SICK", label: "Sick" },
+            { value: "VACATION", label: "Vacation" },
+          ]}
+        />
+        <Textarea
+          label={reasonRequired ? "Reason" : "Reason (optional)"}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={500}
+          placeholder={reasonRequired ? "e.g. approved leave, personal days" : "Optional"}
+          hint={
+            reasonRequired
+              ? "Required for vacation."
+              : "Optional. Please don't record medical details."
+          }
+        />
+        <FormError>{error}</FormError>
       </div>
     </Modal>
   );
