@@ -197,11 +197,11 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
           // this component's reasonRequired comment and schema.prisma's
           // CalendarAbsence.reason.
           placeholder={reasonRequired ? "e.g. family trip, personal days" : "Optional"}
-          hint={
-            reasonRequired
-              ? "Required for vacation."
-              : "Optional. Please don't include medical details."
-          }
+          // The do-not-enter-medical-details warning shows in BOTH states,
+          // not only for SICK: someone can type the reason first and switch
+          // kind after, and a warning that appears only once the sensitive
+          // option is selected is easy to miss entirely.
+          hint={`${reasonRequired ? "Required for vacation." : "Optional."} Do not enter medical details.`}
         />
         <FormError>{fieldError ?? mark.error}</FormError>
       </div>

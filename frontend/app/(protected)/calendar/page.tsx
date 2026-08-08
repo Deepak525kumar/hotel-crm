@@ -1005,11 +1005,9 @@ function MarkAbsenceForWorkerModal({
           onChange={(e) => setReason(e.target.value)}
           maxLength={500}
           placeholder={reasonRequired ? "e.g. approved leave, personal days" : "Optional"}
-          hint={
-            reasonRequired
-              ? "Required for vacation."
-              : "Optional. Please don't record medical details."
-          }
+          // Shown in both states -- see AbsencesCard's matching hint for why
+          // the warning is not conditional on SICK being selected.
+          hint={`${reasonRequired ? "Required for vacation." : "Optional."} Do not enter medical details.`}
         />
         <FormError>{error}</FormError>
       </div>

@@ -153,6 +153,14 @@ describe('CalendarService.markAbsence', () => {
   // supports allowing the worker to freely correct their own mark, so this
   // pins the chosen (not spec-mandated) behavior: last write wins via
   // upsert, rather than rejecting a kind change outright.
+  //
+  // This is also the overlap guarantee: a worker can never hold both
+  // VACATION and SICK on the same day. Two layers enforce it -- the
+  // kind-agnostic @@unique([worker_id, day]) in schema.prisma, and this
+  // upsert being keyed on that same composite, so a second mark of a
+  // DIFFERENT kind replaces the row rather than adding one. (The move path
+  // can still collide with an existing row and translates P2002 to
+  // ConflictError -- asserted in the moveAbsence suite below.)
   it('overwrites kind when re-marking an already-marked day (last write wins, not spec-mandated but consistent with no-approval intent)', async () => {
     mockCalendarAbsence.upsert.mockResolvedValue({
       id: 'abs1',
@@ -186,6 +194,11 @@ describe('CalendarService.markAbsence', () => {
       update: { kind: 'SICK', reason: null, marked_by_id: 'w1' },
     });
     expect(result.kind).toBe('SICK');
+    // Both marks went through upsert on the same composite key -- never a
+    // bare create() that could add a second same-day row of the other kind.
+    expect(mockCalendarAbsence.upsert).toHaveBeenCalledTimes(2);
+    const keys = mockCalendarAbsence.upsert.mock.calls.map((c: any) => c[0].where);
+    expect(keys[0]).toEqual(keys[1]);
   });
 
   // Regression (2026-08-07): the auto-cancel lookup used the legacy
