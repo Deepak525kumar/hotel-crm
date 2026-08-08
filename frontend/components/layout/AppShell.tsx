@@ -18,12 +18,26 @@ import { cn } from "@/lib/cn";
  */
 const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
   <div
-    className={cn(
-      "flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 font-semibold text-gray-900 transition-[padding] duration-200",
-      collapsed ? "justify-center px-0" : "px-6",
-    )}
+    // px-4 in both states (rather than px-0 <-> px-6) so the "H" sits at
+    // the same x as the nav icons below it and nothing has to slide.
+    className="flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 px-4 font-semibold text-gray-900"
   >
-    {collapsed ? "H" : "Hotel CRM"}
+    {/* The wordmark previously swapped its text content outright ("H" <->
+        "Hotel CRM") the instant `collapsed` flipped, so it popped a frame
+        ahead of the rail's easing width. Rendering the "H" permanently and
+        animating only the remainder ("otel CRM") means the glyph never
+        moves or re-renders -- the tail just grows out of it, on the same
+        0fr/1fr grid + 200ms ease-out every other label in the rail uses. */}
+    <span aria-hidden>H</span>
+    <span
+      className={cn(
+        "grid transition-[grid-template-columns,opacity] duration-200 ease-out",
+        collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
+      )}
+    >
+      <span className="overflow-hidden whitespace-nowrap">otel CRM</span>
+    </span>
+    <span className="sr-only">Hotel CRM</span>
   </div>
 );
 
@@ -112,7 +126,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           }
         }}
         className={cn(
-          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 md:flex",
+          // ease-out (not the default ease) and a shared 200ms duration
+          // across every animated property in the rail -- the width here,
+          // the link padding, and the label grid in SidebarNav. Previously
+          // these used different property sets and no explicit curve, so
+          // they visibly finished at different moments.
+          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-out md:flex",
           sidebarExpanded ? "w-60" : "w-16",
         )}
       >
