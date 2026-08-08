@@ -15,7 +15,13 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
-import { isWorkerFreeOnDay, isWorkerAbsentOnDay, ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
+import {
+  isWorkerFreeOnDay,
+  isWorkerAbsentOnDay,
+  ACTIVE_ASSIGNMENT_STATUSES,
+  BLOCKING_ABSENCE_KINDS,
+  assignmentService,
+} from '../assignments/service.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
@@ -699,8 +705,19 @@ export class JobRequestService extends BaseService {
     // VACATION absence that day must not appear as eligible for a
     // broadcast slot -- same batched-query shape as busyAssignments above
     // (one query for the whole roster, not one per worker).
+    //
+    // Filters on BLOCKING_ABSENCE_KINDS explicitly rather than treating any
+    // CalendarAbsence row as blocking, so a future informational kind
+    // (TRAINING, NOTE, ...) added to the enum cannot silently start
+    // excluding workers from staffing -- see isWorkerAbsentOnDay()'s own
+    // doc comment (assignments/service.ts), which this mirrors. Day-grain,
+    // not time-grain: a partial-day absence blocks the whole day.
     const absences = await this.prisma.calendarAbsence.findMany({
-      where: { worker_id: { in: rosterWorkerIds }, day: wr.shift_date },
+      where: {
+        worker_id: { in: rosterWorkerIds },
+        day: wr.shift_date,
+        kind: { in: BLOCKING_ABSENCE_KINDS },
+      },
       select: { worker_id: true },
     });
     const absentWorkerIds = new Set(absences.map((a) => a.worker_id));

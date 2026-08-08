@@ -58,7 +58,7 @@ const mockJobRequest = {
 // Critical fix (2026-08-08): reassign() now checks isWorkerAbsentOnDay()
 // before reassigning to a new worker -- default to "no absence marked".
 const mockCalendarAbsence = {
-  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
 const mockPrisma = {
@@ -142,7 +142,7 @@ describe('AssignmentService', () => {
       hotel_group_id: 'g1',
     });
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
-    mockCalendarAbsence.findUnique.mockResolvedValue(null);
+    mockCalendarAbsence.findFirst.mockResolvedValue(null);
   });
 
   describe('update', () => {
@@ -621,7 +621,7 @@ describe('AssignmentService', () => {
     // placed if he has applied sick or holiday for the specific date".
     it('rejects a new worker who has a SICK/VACATION absence marked for that day (ConflictError)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
-      mockCalendarAbsence.findUnique.mockResolvedValue({ id: 'abs1' });
+      mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
       await expect(
         service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
       ).rejects.toMatchObject({ name: 'ConflictError' });

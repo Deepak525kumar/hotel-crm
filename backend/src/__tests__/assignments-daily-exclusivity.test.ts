@@ -60,7 +60,7 @@ const mockEmployeeBlocklistEntry = {
 // Critical fix (2026-08-08): placeOnCalendar() now checks
 // isWorkerAbsentOnDay() before creating an assignment.
 const mockCalendarAbsence = {
-  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
 const mockPrisma = {

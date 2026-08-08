@@ -66,7 +66,7 @@ const mockEmployeeBlocklistEntry = {
 // fixture worker to "no absence marked" so existing placement tests don't
 // need to separately stub this.
 const mockCalendarAbsence = {
-  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
 const mockPrisma = {
@@ -146,7 +146,7 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', id: 'emp_w1' });
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
     mockEmployeeBlocklistEntry.findUnique.mockResolvedValue(null);
-    mockCalendarAbsence.findUnique.mockResolvedValue(null);
+    mockCalendarAbsence.findFirst.mockResolvedValue(null);
   });
 
   describe('placeOnCalendar', () => {
@@ -185,7 +185,7 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     // Critical fix (2026-08-08): "a worker should not be allowed to be
     // placed if he has applied sick or holiday for the specific date".
     it('refuses to place a worker who has a SICK/VACATION absence marked for that day', async () => {
-      mockCalendarAbsence.findUnique.mockResolvedValue({ id: 'abs1' });
+      mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
 
       await expect(
         service.placeOnCalendar(
@@ -195,6 +195,27 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       ).rejects.toMatchObject({ name: 'ConflictError' });
       expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
       expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    // Guards against an implicit "any CalendarAbsence row blocks staffing"
+    // regression: CalendarAbsenceKind is {SICK, VACATION} today, so a
+    // row-existence test would pass for the wrong reason. Pinning the
+    // explicit `kind: { in: [...] }` filter means adding an informational
+    // kind (TRAINING, NOTE, ...) to the enum cannot silently start
+    // preventing staffing -- see BLOCKING_ABSENCE_KINDS.
+    it('filters the absence lookup to the blocking kinds explicitly, not any absence row', async () => {
+      mockWorkerAssignment.create.mockResolvedValue(makeAssignmentRow());
+      mockCalendarEntry.create.mockResolvedValue(makeCalendarEntryRow());
+
+      await service.placeOnCalendar(
+        { worker_id: 'w1', hotel_id: 'h1', day: '2026-08-01' },
+        { userId: 'mgr1', role: 'admin' }
+      );
+
+      const where = mockCalendarAbsence.findFirst.mock.calls[0][0].where;
+      expect(where.kind).toEqual({ in: ['SICK', 'VACATION'] });
+      expect(where.worker_id).toBe('w1');
+      expect(where.day).toEqual(new Date('2026-08-01T00:00:00.000Z'));
     });
 
     it('does not emit any notification (no broadcast fires — TRULE-002-adjacent negative assertion)', async () => {

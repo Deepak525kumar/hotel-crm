@@ -1,6 +1,7 @@
 import {
   Prisma,
   WorkerAssignment,
+  CalendarAbsenceKind,
   CalendarEntry,
   AssignmentStatus,
   RoomsCompletedEntry,
@@ -78,6 +79,23 @@ export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<bo
 }
 
 /**
+ * Absence kinds that BLOCK new staffing, enumerated explicitly rather than
+ * treating every CalendarAbsence row as blocking.
+ *
+ * CalendarAbsenceKind is {SICK, VACATION} today, so "any row" and "these
+ * two" happen to coincide -- but only coincidentally. If an informational
+ * kind is ever added to the enum (TRAINING, NOTE, REMINDER, ...), an
+ * implicit "a row exists therefore they are unavailable" test would
+ * silently start blocking staffing for something that was never meant to.
+ * Adding a kind to the enum must be a deliberate decision to add it here
+ * too, not an accident of row existence.
+ */
+export const BLOCKING_ABSENCE_KINDS: CalendarAbsenceKind[] = [
+  CalendarAbsenceKind.SICK,
+  CalendarAbsenceKind.VACATION,
+];
+
+/**
  * Critical fix (2026-08-08): a worker who marked themselves (or was marked
  * by a manager) SICK or on VACATION for a day could still be placed on a
  * new assignment that same day -- calendar/service.ts's markAbsence()
@@ -86,6 +104,19 @@ export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<bo
  * assignment never consulted CalendarAbsence at all. Every worker-
  * assignment creation path (placeOnCalendar, reassign, acceptBroadcast)
  * must call this before creating a row.
+ *
+ * DAY-GRAIN, NOT TIME-GRAIN. The name is literal: this answers "is this
+ * worker absent at all on this calendar day", never "is this worker absent
+ * during this shift's hours". CalendarAbsence has no time component -- its
+ * `day` column is `@db.Date` and the model stores a whole-day flag, by
+ * design (SPEC-CALENDAR-001 REQ-CAL-T08). So a half-day absence cannot be
+ * expressed today, and a morning-only sick mark blocks the entire day's
+ * staffing, including an evening shift the worker could in principle have
+ * worked. That is the accepted MVP behaviour (fail-safe: over-block rather
+ * than staff someone who declared themselves unavailable), NOT an
+ * oversight. Supporting partial-day absences would need a schema change
+ * (start/end time on CalendarAbsence) plus an overlap test against the
+ * shift's own window here -- do not assume time-granular behaviour exists.
  *
  * Deliberately a separate helper from isWorkerFreeOnDay() above, not folded
  * into it: that one enforces the active-assignment exclusivity invariant
@@ -98,8 +129,12 @@ export async function isWorkerFreeOnDay(workerId: string, day: Date): Promise<bo
  */
 export async function isWorkerAbsentOnDay(workerId: string, day: Date): Promise<boolean> {
   const prisma = getPrisma();
-  const absence = await prisma.calendarAbsence.findUnique({
-    where: { worker_id_day: { worker_id: workerId, day } },
+  // findFirst + an explicit kind filter, not findUnique on the
+  // (worker_id, day) key: the unique key alone would match ANY kind, which
+  // is precisely the implicit behaviour BLOCKING_ABSENCE_KINDS exists to
+  // avoid.
+  const absence = await prisma.calendarAbsence.findFirst({
+    where: { worker_id: workerId, day, kind: { in: BLOCKING_ABSENCE_KINDS } },
     select: { id: true },
   });
   return absence !== null;

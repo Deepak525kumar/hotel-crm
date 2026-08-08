@@ -74,7 +74,7 @@ const mockEmployeeBlocklistEntry = {
 // Critical fix (2026-08-08): acceptBroadcast() now checks
 // isWorkerAbsentOnDay() before claiming a slot.
 const mockCalendarAbsence = {
-  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
 const mockPrisma = {
@@ -171,7 +171,7 @@ describe('JobRequestService.acceptBroadcast', () => {
     mockPrisma.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     mockPrisma.attendance.count.mockResolvedValue(0);
     mockPrisma.workerOverallRating.upsert.mockResolvedValue({});
-    mockCalendarAbsence.findUnique.mockResolvedValue(null);
+    mockCalendarAbsence.findFirst.mockResolvedValue(null);
     service = new JobRequestService();
   });
 
@@ -249,7 +249,7 @@ describe('JobRequestService.acceptBroadcast', () => {
       skills: ['CLEANER'],
     });
     mockWorkerAssignment.findFirst.mockResolvedValue(null); // free that day
-    mockCalendarAbsence.findUnique.mockResolvedValue({ id: 'abs1' });
+    mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
     await expect(
       service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' })
     ).rejects.toMatchObject({ name: 'ConflictError' });

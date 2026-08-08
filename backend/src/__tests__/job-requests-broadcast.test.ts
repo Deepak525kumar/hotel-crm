@@ -591,6 +591,25 @@ describe('JobRequestService.getBroadcastEligibility', () => {
     expect(dto.slots[0].eligible_count).toBe(1);
   });
 
+  // Mirrors calendar-entries.test.ts's equivalent assertion: pins the
+  // explicit blocking-kind filter so a future informational
+  // CalendarAbsenceKind cannot silently start excluding workers from the
+  // eligible set -- see BLOCKING_ABSENCE_KINDS (assignments/service.ts).
+  it('filters the batched absence lookup to the blocking kinds explicitly, not any absence row', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }])
+      .mockResolvedValueOnce([{ user_id: 'w1', skills: ['CLEANER'] }]);
+    mockWorkerAssignment.findMany.mockResolvedValue([]);
+    mockCalendarAbsence.findMany.mockResolvedValue([]);
+
+    await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    const where = mockCalendarAbsence.findMany.mock.calls[0][0].where;
+    expect(where.kind).toEqual({ in: ['SICK', 'VACATION'] });
+  });
+
   it('computes a distinct eligible set per skill slot on a multi-skill broadcast', async () => {
     mockJobRequest.findUnique.mockResolvedValue(
       makeJobRequestRow({
