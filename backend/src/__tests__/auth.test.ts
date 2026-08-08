@@ -2,12 +2,37 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 
+// TREQ-AUTH-007: backs the `user.update` mock's simulated running counter
+// (see its comment below) -- reset in `beforeEach` so tests don't leak state.
+let mockFailedLoginCounters: Record<string, number> | null = null;
+
 // Mock the Prisma client before any imports that use it
 const mockPrisma = {
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
-    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // TREQ-AUTH-007: recordFailedLogin() reads the post-write count off this
+    // call's return value (an atomic `increment`, not a client-computed
+    // literal -- see the service comment on why). The default implementation
+    // mirrors real Postgres UPDATE ... SET x = x + 1 semantics: a per-user
+    // running counter seeded from `findUnique`'s row on first use, then
+    // incremented on every subsequent `update` call regardless of how many
+    // requests are in flight concurrently -- exactly the guarantee that
+    // makes the atomic form race-safe. (A version keyed off "whatever
+    // findUnique last resolved" would collapse two concurrent increments
+    // back into the same lost-update bug this mock exists to catch.)
+    update: jest.fn(async (args: any) => {
+      const inc = args?.data?.failed_login_count?.increment;
+      if (typeof inc !== 'number') return {};
+      const id = args.where.id;
+      if (mockFailedLoginCounters === null) mockFailedLoginCounters = {};
+      if (!(id in mockFailedLoginCounters)) {
+        const seed: any = await (mockPrisma.user.findUnique as jest.Mock).mock.results[0]?.value;
+        mockFailedLoginCounters[id] = seed?.failed_login_count ?? 0;
+      }
+      mockFailedLoginCounters[id] += inc;
+      return { failed_login_count: mockFailedLoginCounters[id] };
+    }) as jest.MockedFunction<(...args: any[]) => any>,
     // TREQ-AUTH-007: the admin-fallback recipient lookup when a failing
     // account has no responsible Regional Manager. Defaults to none so
     // suites that aren't about the escalation are unaffected.
@@ -88,6 +113,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFailedLoginCounters = null;
     mockPrisma.notification.create.mockResolvedValue({ id: 'fake-notification-id' });
     mockPrisma.outboxEvent.create.mockResolvedValue({});
     service = new AuthService();
@@ -257,6 +283,29 @@ describe('AuthService', () => {
         ...overrides,
       });
 
+      // Proves the fix for a race the original version of this code had: a
+      // client-computed `failed_login_count: user.failed_login_count + 1`
+      // loses an increment when two failed attempts overlap (both read the
+      // same starting count, both write the same next value). An atomic
+      // `{ increment: 1 }` cannot lose one -- each of N concurrent calls to
+      // the mock above independently adds 1 on top of whatever the DB
+      // already holds, the same guarantee Postgres's UPDATE ... SET
+      // x = x + 1 gives under real concurrent transactions.
+      it('does not lose an increment when two failed attempts race', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 0 }));
+
+        const results = await Promise.all([
+          service.login({ email: 'user@test.com', password: 'wrongpassword' }).catch((e) => e),
+          service.login({ email: 'user@test.com', password: 'wrongpassword' }).catch((e) => e),
+        ]);
+        expect(results).toHaveLength(2);
+
+        const counts = (
+          await Promise.all(mockPrisma.user.update.mock.results.map((r: any) => r.value))
+        ).map((v: any) => v?.failed_login_count);
+        expect(counts.sort()).toEqual([1, 2]);
+      });
+
       it('increments the consecutive-failure counter on a wrong password', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 2 }));
 
@@ -267,7 +316,7 @@ describe('AuthService', () => {
         expect(mockPrisma.user.update).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: 'u1' },
-            data: expect.objectContaining({ failed_login_count: 3 }),
+            data: expect.objectContaining({ failed_login_count: { increment: 1 } }),
           })
         );
       });

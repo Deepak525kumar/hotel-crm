@@ -71,13 +71,25 @@ export class AuthService extends BaseService {
     reason: string,
     ip?: string
   ): Promise<void> {
-    const nextCount = user.failed_login_count + 1;
     const streakStartedAt = user.failed_login_since ?? new Date();
 
-    await this.prisma.user.update({
+    // `increment` rather than a read-computed `failed_login_count: nextCount`:
+    // two concurrent failed attempts (a real scenario -- it's the exact
+    // shape a credential-guessing script produces) would otherwise both read
+    // the same starting count and one increment would be lost, which both
+    // undercounts the streak and can suppress the threshold-crossing
+    // notification entirely. `increment` is a single atomic UPDATE ... SET
+    // x = x + 1, so no attempt is dropped under concurrency.
+    // `failed_login_since` keeps the read-then-write (best-effort) shape --
+    // it only feeds the notification's "since <time>" text, so a race
+    // occasionally overwriting it with a slightly later timestamp is
+    // cosmetic, not a correctness or security concern.
+    const updated = await this.prisma.user.update({
       where: { id: user.id },
-      data: { failed_login_count: nextCount, failed_login_since: streakStartedAt },
+      data: { failed_login_count: { increment: 1 }, failed_login_since: streakStartedAt },
+      select: { failed_login_count: true },
     });
+    const nextCount = updated.failed_login_count;
 
     await this.logAudit(user.id, user.role, 'LOGIN_FAILED', 'USER', user.id, {
       email: user.email,
