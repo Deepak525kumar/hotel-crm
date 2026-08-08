@@ -4,6 +4,7 @@ import { useState } from "react";
 import { mutate } from "swr";
 import { useWorkerPayslipRequests } from "@/hooks/usePayslipRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useAuth } from "@/hooks/useAuth";
 import { hrApi } from "@/lib/api";
 import { formatDate, formatDateTime } from "@/lib/format";
 import {
@@ -33,10 +34,12 @@ const STATUS_LABEL: Record<PayslipRequestStatus, string> = {
 
 function PayslipRequestRow({
   request,
+  canFulfil,
   onFulfil,
   fulfilling,
 }: {
   request: PayslipRequest;
+  canFulfil: boolean;
   onFulfil: () => void;
   fulfilling: boolean;
 }) {
@@ -53,7 +56,9 @@ function PayslipRequestRow({
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Badge tone={STATUS_TONE[request.status]}>{STATUS_LABEL[request.status]}</Badge>
-        {request.status === "REQUESTED" && (
+        {/* Fulfil (POST /hr/payroll/:id/fulfil) is admin/manager/regional_manager-only
+            server-side -- gated here too so a worker never sees a button that only 403s. */}
+        {canFulfil && request.status === "REQUESTED" && (
           <Button size="sm" variant="outline" onClick={onFulfil} loading={fulfilling}>
             Mark fulfilled
           </Button>
@@ -64,16 +69,22 @@ function PayslipRequestRow({
 }
 
 /**
- * SPEC-HR-001 (REVIEW @0.2.9, ADR-039): a worker's payslip-request list, plus
- * Manager/Admin actions to create a request on the worker's behalf and mark
- * a REQUESTED one fulfilled. Mirrors DocumentsCard's structure exactly.
- * Rendering this component behind an unauthorized role is safe — the
- * backend (`requireRole(['admin','manager'])`, `hr/routes.ts`) is the
- * authoritative enforcement point regardless of this component's own
- * caller — but callers should still wrap it in `HrPayrollGate` so an
- * out-of-scope viewer doesn't see a UI that will only ever 403.
+ * SPEC-HR-001 (REVIEW @0.2.9, ADR-039): a worker's payslip-request list.
+ * Two distinct create paths, gated to the roles the backend actually
+ * accepts them from: a worker requests their own payslip
+ * (POST /hr/payslip-requests, requireRole('worker')); a manager/admin/RM
+ * creates one on the worker's behalf (POST /hr/payroll, requireRole(['admin',
+ * 'manager','regional_manager'])). "Mark fulfilled" (POST /hr/payroll/:id/fulfil)
+ * is manager/admin/RM-only and hidden entirely for a worker viewer (2026-08-08
+ * fix: this component previously showed both actions unconditionally to every
+ * viewer, including a worker, who would only ever get a 403 -- and had no path
+ * to the worker's own self-request endpoint at all).
  */
 export function PayslipRequestsCard({ workerId }: { workerId: string }) {
+  const { user } = useAuth();
+  const isSelfWorker = user?.role === "worker" && user.id === workerId;
+  const canManage =
+    user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
   const { data: requests, isLoading, error } = useWorkerPayslipRequests(workerId);
   const [createOpen, setCreateOpen] = useState(false);
   const fulfil = useAsyncAction();
@@ -92,9 +103,11 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Payslip requests</CardTitle>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            New request
-          </Button>
+          {(isSelfWorker || canManage) && (
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              New request
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {error ? (
@@ -118,6 +131,7 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
                   <PayslipRequestRow
                     key={r.id}
                     request={r}
+                    canFulfil={canManage}
                     onFulfil={() => onFulfil(r.id)}
                     fulfilling={fulfil.isPending(r.id)}
                   />
@@ -131,6 +145,7 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
 
       <CreatePayslipRequestModal
         workerId={workerId}
+        selfService={isSelfWorker}
         open={createOpen}
         onClose={() => setCreateOpen(false)}
       />
@@ -140,10 +155,15 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
 
 function CreatePayslipRequestModal({
   workerId,
+  selfService,
   open,
   onClose,
 }: {
   workerId: string;
+  /** True when the viewer is the worker requesting their OWN payslip
+   *  (POST /hr/payslip-requests) rather than a manager acting on their
+   *  behalf (POST /hr/payroll). */
+  selfService: boolean;
   open: boolean;
   onClose: () => void;
 }) {
@@ -177,11 +197,13 @@ function CreatePayslipRequestModal({
 
     create.run(
       () =>
-        hrApi.createPayrollRequest({
-          worker_id: workerId,
-          period_start: periodStart,
-          period_end: periodEnd,
-        }),
+        selfService
+          ? hrApi.requestPayslip({ period_start: periodStart, period_end: periodEnd })
+          : hrApi.createPayrollRequest({
+              worker_id: workerId,
+              period_start: periodStart,
+              period_end: periodEnd,
+            }),
       {
         onSuccess: async () => {
           await mutate(["payslip-requests", workerId]);

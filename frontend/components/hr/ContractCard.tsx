@@ -49,7 +49,12 @@ const STATUS_LABEL: Record<ContractStatus, string> = {
  */
 export function ContractCard({ workerId }: { workerId: string }) {
   const { user } = useAuth();
-  const isManagerOrAdmin = user?.role === "admin" || user?.role === "manager";
+  // regional_manager included (2026-08-08 fix): every contract action route
+  // in hr/routes.ts (contract-scan/confirm/extend/lapse) already admits
+  // admin/manager/regional_manager -- this flag omitted RM, hiding every
+  // action button from an RM even though the backend would have allowed it.
+  const isManagerOrAdmin =
+    user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
   const { data: contract, isLoading, error } = useWorkerContract(workerId);
   const [createOpen, setCreateOpen] = useState(false);
   const action = useAsyncAction();
