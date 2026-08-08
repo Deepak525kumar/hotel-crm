@@ -57,6 +57,11 @@ const mockHotel = {
 const mockEmployeeBlocklistEntry = {
   findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
+// Critical fix (2026-08-08): placeOnCalendar() now checks
+// isWorkerAbsentOnDay() before creating an assignment.
+const mockCalendarAbsence = {
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
 
 const mockPrisma = {
   // refreshWorkerOverallRating() (quality/service.ts) now runs inside the
@@ -72,6 +77,7 @@ const mockPrisma = {
   employmentRecord: mockEmploymentRecord,
   hotel: mockHotel,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
+  calendarAbsence: mockCalendarAbsence,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };

@@ -15,7 +15,13 @@ import {
   listEligibleHotelIds,
   listEligibleWorkerIds,
 } from '../../lib/roster-scope.js';
-import { isWorkerFreeOnDay, ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
+import {
+  isWorkerFreeOnDay,
+  isWorkerAbsentOnDay,
+  ACTIVE_ASSIGNMENT_STATUSES,
+  BLOCKING_ABSENCE_KINDS,
+  assignmentService,
+} from '../assignments/service.js';
 import { refreshWorkerOverallRating } from '../quality/service.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
@@ -694,7 +700,31 @@ export class JobRequestService extends BaseService {
       select: { worker_id: true },
     });
     const busyWorkerIds = new Set(busyAssignments.map((a) => a.worker_id));
-    const freeWorkerIds = new Set(rosterWorkerIds.filter((workerId) => !busyWorkerIds.has(workerId)));
+
+    // Critical fix (2026-08-08): a roster worker with a declared SICK/
+    // VACATION absence that day must not appear as eligible for a
+    // broadcast slot -- same batched-query shape as busyAssignments above
+    // (one query for the whole roster, not one per worker).
+    //
+    // Filters on BLOCKING_ABSENCE_KINDS explicitly rather than treating any
+    // CalendarAbsence row as blocking, so a future informational kind
+    // (TRAINING, NOTE, ...) added to the enum cannot silently start
+    // excluding workers from staffing -- see isWorkerAbsentOnDay()'s own
+    // doc comment (assignments/service.ts), which this mirrors. Day-grain,
+    // not time-grain: a partial-day absence blocks the whole day.
+    const absences = await this.prisma.calendarAbsence.findMany({
+      where: {
+        worker_id: { in: rosterWorkerIds },
+        day: wr.shift_date,
+        kind: { in: BLOCKING_ABSENCE_KINDS },
+      },
+      select: { worker_id: true },
+    });
+    const absentWorkerIds = new Set(absences.map((a) => a.worker_id));
+
+    const freeWorkerIds = new Set(
+      rosterWorkerIds.filter((workerId) => !busyWorkerIds.has(workerId) && !absentWorkerIds.has(workerId))
+    );
 
     const slots = skillSlots.map((slot) => {
       const eligibleWorkerIds = rosterWorkerIds.filter(
@@ -829,6 +859,12 @@ export class JobRequestService extends BaseService {
     const free = await isWorkerFreeOnDay(actor.userId, wr.shift_date);
     if (!free) {
       throw new ConflictError('Already assigned that day');
+    }
+
+    // Critical fix (2026-08-08): block accepting a broadcast slot on a day
+    // the worker has a declared SICK/VACATION absence.
+    if (await isWorkerAbsentOnDay(actor.userId, wr.shift_date)) {
+      throw new ConflictError('You have a sick/vacation absence marked for this day');
     }
 
     let assignmentId: string | null = null;

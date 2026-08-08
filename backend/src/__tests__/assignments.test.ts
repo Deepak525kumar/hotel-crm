@@ -55,10 +55,17 @@ const mockJobRequest = {
   findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
+// Critical fix (2026-08-08): reassign() now checks isWorkerAbsentOnDay()
+// before reassigning to a new worker -- default to "no absence marked".
+const mockCalendarAbsence = {
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
+  calendarAbsence: mockCalendarAbsence,
   hotel: mockHotel,
   rating: mockRating,
   attendance: mockAttendance,
@@ -135,6 +142,7 @@ describe('AssignmentService', () => {
       hotel_group_id: 'g1',
     });
     mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockCalendarAbsence.findFirst.mockResolvedValue(null);
   });
 
   describe('update', () => {
@@ -603,6 +611,17 @@ describe('AssignmentService', () => {
     it('rejects a new worker who already has an assignment that day (ConflictError)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
       mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'other' });
+      await expect(
+        service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+    });
+
+    // Critical fix (2026-08-08): "a worker should not be allowed to be
+    // placed if he has applied sick or holiday for the specific date".
+    it('rejects a new worker who has a SICK/VACATION absence marked for that day (ConflictError)', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
       await expect(
         service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' })
       ).rejects.toMatchObject({ name: 'ConflictError' });

@@ -71,11 +71,18 @@ const mockEmployeeBlocklistEntry = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// Critical fix (2026-08-08): acceptBroadcast() now checks
+// isWorkerAbsentOnDay() before claiming a slot.
+const mockCalendarAbsence = {
+  findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   jobRequest: mockJobRequest,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
+  calendarAbsence: mockCalendarAbsence,
   // refreshWorkerOverallRating() (quality/service.ts) now runs inside the
   // assignment-CREATION transactions too, not only on status changes -- the
   // aggregate counts all of a worker's rows regardless of status, so creating
@@ -164,6 +171,7 @@ describe('JobRequestService.acceptBroadcast', () => {
     mockPrisma.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     mockPrisma.attendance.count.mockResolvedValue(0);
     mockPrisma.workerOverallRating.upsert.mockResolvedValue({});
+    mockCalendarAbsence.findFirst.mockResolvedValue(null);
     service = new JobRequestService();
   });
 
@@ -225,6 +233,23 @@ describe('JobRequestService.acceptBroadcast', () => {
       skills: ['CLEANER'],
     });
     mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'existing-assignment' }); // isWorkerFreeOnDay -> false
+    await expect(
+      service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'ConflictError' });
+    expect(mockJobRequestSkillSlot.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Critical fix (2026-08-08): "a worker should not be allowed to be placed
+  // if he has applied sick or holiday for the specific date".
+  it('rejects a worker with a SICK/VACATION absence marked that day (ConflictError, before attempting a claim)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    mockEmploymentRecord.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      hotel_group_id: 'g1',
+      skills: ['CLEANER'],
+    });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null); // free that day
+    mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
     await expect(
       service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' })
     ).rejects.toMatchObject({ name: 'ConflictError' });
