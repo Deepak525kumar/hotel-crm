@@ -1091,9 +1091,15 @@ function EditEntryModal({
           <span className="text-gray-500">Day</span>
           <span className="font-medium text-gray-900">{entry.day}</span>
         </div>
-        <p className="text-xs text-gray-400">
-          To move this placement to a different day, drag it to the destination day cell.
-        </p>
+        {/* Gated on canWrite: dragging is only offered to the roles
+            PlacementTag actually sets draggable for (same StaffingWriteGate
+            set). A worker/checker sees this modal read-only, so the hint
+            described a gesture they cannot perform. */}
+        {canWrite && (
+          <p className="text-xs text-gray-400">
+            To move this placement to a different day, drag it to the destination day cell.
+          </p>
+        )}
         <FormError>{error}</FormError>
       </div>
     </Modal>

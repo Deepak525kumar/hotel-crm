@@ -31,6 +31,12 @@ const mockEmploymentRecord = {
 const mockHotelGroup = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+// isHotelInScope()'s hotel_group branch (reached when a MANAGER-initiated
+// auto-cancel calls AssignmentService.update()) resolves the assignment's
+// own hotel -> group.
+const mockHotel = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
 const mockRating = {
   aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -56,6 +62,7 @@ const mockPrisma = {
   user: mockUser,
   employmentRecord: mockEmploymentRecord,
   hotelGroup: mockHotelGroup,
+  hotel: mockHotel,
   rating: mockRating,
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
@@ -231,6 +238,98 @@ describe('CalendarService.markAbsence', () => {
     expect(mockWorkerAssignment.update).toHaveBeenCalledTimes(1);
     const call = mockWorkerAssignment.update.mock.calls[0][0];
     expect(call.data.status).toBe('CANCELLED');
+  });
+
+  // Regression (2026-08-08): autoCancelSameDayAssignment() hardcoded
+  // (workerId, 'worker') as the actor. AssignmentService.update() branches
+  // its cancellation notification on `actorId === assignment.worker_id`
+  // ("notify whoever did NOT initiate it"), so when a MANAGER marked a
+  // worker sick, that hardcoded actor took the worker-initiated branch:
+  // the shift was cancelled and the WORKER was never told, because the code
+  // believed they had cancelled it themselves. The real actor is now passed
+  // through, so the manager-initiated case notifies the worker.
+  it('notifies the WORKER when a manager marks them sick on a day they were assigned', async () => {
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+    mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'rm1' });
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1', worker_id: 'w1', status: 'CONFIRMED' });
+    mockWorkerAssignment.findUnique.mockResolvedValue({
+      id: 'a1',
+      status: 'CONFIRMED',
+      worker_id: 'w1',
+      hotel_id: 'h1',
+      assigned_by_id: 'mgr_who_placed_it',
+    });
+    mockWorkerAssignment.update.mockResolvedValue({
+      id: 'a1',
+      status: 'CANCELLED',
+      worker_id: 'w1',
+      hotel_id: 'h1',
+      work_request_id: null,
+      assigned_by_id: 'mgr_who_placed_it',
+      confirmed_at: new Date(),
+      started_at: null,
+      completed_at: null,
+      cancelled_at: new Date(),
+      cancellation_reason: 'Marked sick/vacation by a manager',
+      updated_at: new Date(),
+    });
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 0 }, _count: 0 });
+    mockWorkerAssignment.count.mockResolvedValue(0);
+    mockAttendance.count.mockResolvedValue(0 as never);
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockNotification.create.mockResolvedValue({ id: 'n1' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'o1' });
+
+    await service.markAbsenceForWorker(
+      { worker_id: 'w1', day: '2026-07-28', kind: 'SICK' },
+      { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+    );
+
+    // The shift-cancellation notification must go to the worker, not to
+    // whoever originally placed the shift -- the manager initiated this.
+    const cancelNotif = mockNotification.create.mock.calls.find(
+      (c: any) => c[0].data.type === 'ASSIGNMENT_CANCELLED'
+    );
+    expect(cancelNotif).toBeDefined();
+    expect(cancelNotif![0].data.user_id).toBe('w1');
+  });
+
+  it('still notifies the placing manager when the WORKER marks themselves sick (unchanged self-service behaviour)', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1', worker_id: 'w1', status: 'CONFIRMED' });
+    mockWorkerAssignment.findUnique.mockResolvedValue({
+      id: 'a1',
+      status: 'CONFIRMED',
+      worker_id: 'w1',
+      hotel_id: 'h1',
+      assigned_by_id: 'mgr_who_placed_it',
+    });
+    mockWorkerAssignment.update.mockResolvedValue({
+      id: 'a1',
+      status: 'CANCELLED',
+      worker_id: 'w1',
+      hotel_id: 'h1',
+      work_request_id: null,
+      assigned_by_id: 'mgr_who_placed_it',
+      confirmed_at: new Date(),
+      started_at: null,
+      completed_at: null,
+      cancelled_at: new Date(),
+      cancellation_reason: 'Worker marked sick/vacation',
+      updated_at: new Date(),
+    });
+    mockRating.aggregate.mockResolvedValue({ _avg: { score: 0 }, _count: 0 });
+    mockWorkerAssignment.count.mockResolvedValue(0);
+    mockAttendance.count.mockResolvedValue(0 as never);
+    mockNotification.create.mockResolvedValue({ id: 'n1' });
+    mockOutboxEvent.create.mockResolvedValue({ id: 'o1' });
+
+    await service.markAbsence('w1', { day: '2026-07-28', kind: 'SICK' });
+
+    const cancelNotif = mockNotification.create.mock.calls.find(
+      (c: any) => c[0].data.type === 'ASSIGNMENT_CANCELLED'
+    );
+    expect(cancelNotif).toBeDefined();
+    expect(cancelNotif![0].data.user_id).toBe('mgr_who_placed_it');
   });
 
   it('does not touch WorkerAssignment when no same-day assignment exists', async () => {

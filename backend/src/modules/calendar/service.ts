@@ -86,7 +86,7 @@ export class CalendarService extends BaseService {
   private async markAbsenceInternal(
     workerId: string,
     input: MarkAbsenceInput,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<CalendarAbsenceDto> {
     const today = todayInCalendarTimezone();
     if (input.day < today) {
@@ -122,7 +122,7 @@ export class CalendarService extends BaseService {
     });
 
     try {
-      await this.autoCancelSameDayAssignment(workerId, day);
+      await this.autoCancelSameDayAssignment(workerId, day, actor);
     } catch (error) {
       logger.error('calendar_absence_auto_cancel_failed', { workerId, day: input.day, error });
     }
@@ -193,7 +193,7 @@ export class CalendarService extends BaseService {
     });
 
     try {
-      await this.autoCancelSameDayAssignment(existing.worker_id, day);
+      await this.autoCancelSameDayAssignment(existing.worker_id, day, actor);
     } catch (error) {
       logger.error('calendar_absence_auto_cancel_failed', { workerId: existing.worker_id, day: input.day, error });
     }
@@ -323,7 +323,11 @@ export class CalendarService extends BaseService {
     return { worker_id: workerId, available: !assignedToday && !absenceToday };
   }
 
-  private async autoCancelSameDayAssignment(workerId: string, day: Date): Promise<void> {
+  private async autoCancelSameDayAssignment(
+    workerId: string,
+    day: Date,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<void> {
     const existing = await this.prisma.workerAssignment.findFirst({
       where: {
         worker_id: workerId,
@@ -340,11 +344,31 @@ export class CalendarService extends BaseService {
     // RULE-CAL-04/ADR-021: Calendar performs no assignment write itself --
     // delegates to the assignment owner's own service (enforces transitions,
     // recomputes WorkerOverallRating per GD-04, writes the audit log).
+    //
+    // The REAL actor is passed through (2026-08-08 fix), not a hardcoded
+    // (workerId, 'worker'). AssignmentService.update() branches its
+    // cancellation notification on `actorId === assignment.worker_id`
+    // ("only notify the party who did NOT initiate it"), so hardcoding the
+    // worker meant a MANAGER marking a worker sick took the
+    // worker-initiated branch: the shift was cancelled and the worker was
+    // never told, because the code believed they had done it themselves.
     await assignmentService.update(
       existing.id,
-      { status: 'CANCELLED', cancellation_reason: 'Worker marked sick/vacation' },
-      workerId,
-      'worker'
+      {
+        status: 'CANCELLED',
+        cancellation_reason:
+          actor.userId === workerId
+            ? 'Worker marked sick/vacation'
+            : 'Marked sick/vacation by a manager',
+      },
+      actor.userId,
+      actor.role,
+      // MUST be passed: AssignmentService.update() runs its own
+      // isScopedManagerRole -> isHotelInScope check, and a null scope denies.
+      // Omitting it made a manager-initiated auto-cancel throw ForbiddenError
+      // -- swallowed by the caller's best-effort try/catch, so the shift
+      // silently stayed CONFIRMED while the absence was recorded.
+      actor.scope ?? null
     );
   }
 
