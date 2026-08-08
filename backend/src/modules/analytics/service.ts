@@ -15,6 +15,11 @@ interface OverallRatingRow {
   worker: { first_name: string; last_name: string };
 }
 
+// GD-06 enhancement (2026-08-09): getWorkerStats()'s recent_ratings is a
+// summary-widget slice, not the worker's full rating history -- capped so
+// the self-scoped /my-stats response stays small regardless of tenure.
+const RECENT_RATINGS_LIMIT = 5;
+
 export class AnalyticsService extends BaseService {
   // Single source of truth for both /analytics/leaderboard and
   // /quality/leaderboard: the transactionally-maintained WorkerOverallRating
@@ -211,32 +216,69 @@ export class AnalyticsService extends BaseService {
   // admin/manager-only /stats route. Server-scoped to workerId — the caller
   // (controller) must pass only req.auth.userId, never a client-supplied id.
   async getWorkerStats(workerId: string): Promise<WorkerStats> {
-    const [completedAssignments, roomsCompletedAgg, overallRating, attendanceByStatus, totalAttendance] =
-      await Promise.all([
-        this.prisma.workerAssignment.count({
-          where: { worker_id: workerId, status: AssignmentStatus.COMPLETED },
-        }),
-        this.prisma.roomsCompletedEntry.aggregate({
-          where: { worker_id: workerId },
-          _sum: { rooms_completed: true },
-        }),
-        this.prisma.workerOverallRating.findUnique({
-          where: { worker_id: workerId },
-          select: { average_score: true },
-        }),
-        this.prisma.attendance.groupBy({
-          by: ['status'],
-          where: { worker_id: workerId },
-          _count: { id: true },
-        }),
-        this.prisma.attendance.count({ where: { worker_id: workerId } }),
-      ]);
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const [
+      completedAssignments,
+      totalAssignments,
+      roomsCompletedAgg,
+      overallRating,
+      attendanceByStatus,
+      totalAttendance,
+      monthAssignments,
+      monthCompleted,
+      monthRatingAgg,
+      recentRatings,
+    ] = await Promise.all([
+      this.prisma.workerAssignment.count({
+        where: { worker_id: workerId, status: AssignmentStatus.COMPLETED },
+      }),
+      this.prisma.workerAssignment.count({ where: { worker_id: workerId } }),
+      this.prisma.roomsCompletedEntry.aggregate({
+        where: { worker_id: workerId },
+        _sum: { rooms_completed: true },
+      }),
+      this.prisma.workerOverallRating.findUnique({
+        where: { worker_id: workerId },
+        select: { average_score: true },
+      }),
+      this.prisma.attendance.groupBy({
+        by: ['status'],
+        where: { worker_id: workerId },
+        _count: { id: true },
+      }),
+      this.prisma.attendance.count({ where: { worker_id: workerId } }),
+      // WorkerAssignment has no created_at column -- confirmed_at is the
+      // closest analog (set once at creation, @default(now()), never
+      // updated afterward) for "assignment created this month."
+      this.prisma.workerAssignment.count({
+        where: { worker_id: workerId, confirmed_at: { gte: monthStart } },
+      }),
+      this.prisma.workerAssignment.count({
+        where: { worker_id: workerId, status: AssignmentStatus.COMPLETED, confirmed_at: { gte: monthStart } },
+      }),
+      this.prisma.rating.aggregate({
+        where: { worker_id: workerId, created_at: { gte: monthStart } },
+        _avg: { score: true },
+      }),
+      this.prisma.rating.findMany({
+        where: { worker_id: workerId },
+        select: { assignment_id: true, score: true, created_at: true },
+        orderBy: { created_at: 'desc' },
+        take: RECENT_RATINGS_LIMIT,
+      }),
+    ]);
 
     const attMap = new Map(
       (attendanceByStatus as Array<{ status: AttendanceStatus; _count: { id: number } }>).map(
         (a) => [a.status, a._count.id]
       )
     );
+    const present = attMap.get(AttendanceStatus.PRESENT) ?? 0;
+    const late = attMap.get(AttendanceStatus.LATE) ?? 0;
+    const absent = attMap.get(AttendanceStatus.ABSENT) ?? 0;
 
     return {
       completed_assignments: completedAssignments,
@@ -246,10 +288,26 @@ export class AnalyticsService extends BaseService {
       average_rating: overallRating?.average_score ?? null,
       attendance: {
         total: totalAttendance,
-        present: attMap.get(AttendanceStatus.PRESENT) ?? 0,
-        late: attMap.get(AttendanceStatus.LATE) ?? 0,
-        absent: attMap.get(AttendanceStatus.ABSENT) ?? 0,
+        present,
+        late,
+        absent,
       },
+      total_assignments: totalAssignments,
+      attendance_rate:
+        totalAttendance > 0 ? Math.round(((present + late) / totalAttendance) * 100 * 100) / 100 : null,
+      current_month: {
+        assignments: monthAssignments,
+        completed: monthCompleted,
+        average_rating:
+          (monthRatingAgg as { _avg: { score: number | null } })._avg.score ?? null,
+      },
+      recent_ratings: (
+        recentRatings as Array<{ assignment_id: string; score: number; created_at: Date }>
+      ).map((r) => ({
+        assignment_id: r.assignment_id,
+        rating: r.score,
+        created_at: r.created_at.toISOString(),
+      })),
     };
   }
 

@@ -63,6 +63,27 @@ export interface WorkerStats {
     late: number;
     absent: number;
   };
+  // 2026-08-09 (GD-06 enhancement): every assignment ever created for this
+  // worker, any status -- not just COMPLETED (see completed_assignments
+  // above). No CANCELLED/REASSIGNED-specific filtering: "how many times have
+  // I been assigned at all" is the plain count, with no ambiguity to resolve.
+  total_assignments: number;
+  // Present+Late as a fraction of total (0-100), matching average_rating's
+  // 0-100 scale (ADR-026). `null` when total is 0 -- a worker with no
+  // attendance history has no rate to report, not a 0% rate.
+  attendance_rate: number | null;
+  current_month: {
+    assignments: number;
+    completed: number;
+    average_rating: number | null;
+  };
+  // Newest first, capped (see RECENT_RATINGS_LIMIT in service.ts) -- this is
+  // a summary widget, not the worker's full rating history.
+  recent_ratings: Array<{
+    assignment_id: string;
+    rating: number;
+    created_at: string;
+  }>;
 }
 
 export interface HotelSummary {
