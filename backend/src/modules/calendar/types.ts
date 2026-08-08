@@ -20,15 +20,6 @@ export const ListAbsencesQuerySchema = z.object({
 
 export type ListAbsencesQuery = z.infer<typeof ListAbsencesQuerySchema>;
 
-export interface DailyOperation {
-  id: string;
-  date: string;
-  room_count: number;
-  checkout_count: number;
-  stay_over_count: number;
-  notes?: string;
-}
-
 // SPEC-CALENDAR-001 REQ-CAL-T08 (narrow ADR-021 slice).
 export interface CalendarAbsenceDto {
   id: string;
