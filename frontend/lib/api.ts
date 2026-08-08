@@ -45,6 +45,7 @@ import type {
   LoginResponse,
   LogRoomsCompletedInput,
   MarkAbsenceInput,
+  MarkAbsenceForWorkerInput,
   Notification,
   PayslipRequest,
   RaiseBroadcastInput,
@@ -606,12 +607,31 @@ export const calendarApi = {
     apiFetch<CalendarAbsence>("/calendar/my-absences", { method: "POST", body: input }),
 
   /**
-   * Calendar grid view (admin/manager/regional_manager, view-only): absences
-   * across the caller's scoped team for a bounded date range. No write path —
-   * absence marking stays self-service only (see markOwnAbsence above).
+   * Calendar grid view (admin/manager/regional_manager): absences across the
+   * caller's scoped team for a bounded date range.
    */
   listAbsences: (query: ListAbsencesQuery) =>
     apiFetch<CalendarAbsence[]>(`/calendar/absences${toQuery({ ...query })}`),
+
+  /**
+   * Manager/RM/admin marks or corrects an absence on a worker's behalf
+   * (2026-08-08 feature) -- group-scoped server-side via
+   * isWorkerInGroupScope, distinct from markOwnAbsence's self-service path.
+   */
+  markAbsenceForWorker: (input: MarkAbsenceForWorkerInput) =>
+    apiFetch<CalendarAbsence>("/calendar/absences", { method: "POST", body: input }),
+
+  /**
+   * Drag-to-move on the calendar grid (2026-08-08 feature). Self-service
+   * (the owning worker) or a manager/RM/admin acting on the worker's
+   * behalf -- the backend's own ownership/group-scope check is the real
+   * gate (no route-level role restriction beyond authentication).
+   */
+  moveAbsence: (id: string, day: string) =>
+    apiFetch<CalendarAbsence>(`/calendar/absences/${id}/move`, {
+      method: "PATCH",
+      body: { day },
+    }),
 };
 
 /** Notifications API matching the backend `/notifications/*` routes. */

@@ -8,10 +8,9 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
-import { ApiError, assignmentsApi } from "@/lib/api";
+import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
-  Badge,
   Button,
   Card,
   Checkbox,
@@ -22,7 +21,7 @@ import {
   Select,
   Skeleton,
 } from "@/components/ui";
-import type { AbsenceKind, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -60,11 +59,6 @@ const WEEKDAY_LABEL = new Intl.DateTimeFormat("en", { weekday: "short" });
 const DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" });
 const MONTH_DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric" });
 const MONTH_TITLE_LABEL = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
-
-const ABSENCE_TONE: Record<AbsenceKind, "warning" | "neutral"> = {
-  SICK: "warning",
-  VACATION: "neutral",
-};
 
 type CalendarView = "week" | "month";
 
@@ -129,6 +123,7 @@ export default function CalendarGridPage() {
 
   const [moveError, setMoveError] = useState<string | null>(null);
   const [movingEntryId, setMovingEntryId] = useState<string | null>(null);
+  const [movingAbsenceId, setMovingAbsenceId] = useState<string | null>(null);
   const canWrite = user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
 
   const onMoveEntry = async (entryId: string, newDay: string) => {
@@ -156,6 +151,34 @@ export default function CalendarGridPage() {
       setMoveError(err instanceof ApiError ? err.message : "Failed to move the placement. Please try again.");
     } finally {
       setMovingEntryId(null);
+    }
+  };
+
+  // Drag-to-move an absence (2026-08-08 feature) -- same optimistic-mutate
+  // shape as onMoveEntry above, against the absences cache key.
+  const onMoveAbsence = async (absenceId: string, newDay: string) => {
+    setMoveError(null);
+    setMovingAbsenceId(absenceId);
+    try {
+      await mutate(
+        ["calendar-absences", { from, to }],
+        async (current: CalendarAbsence[] = []) => {
+          const moved = await calendarApi.moveAbsence(absenceId, newDay);
+          return current.map((a) => (a.id === absenceId ? moved : a));
+        },
+        {
+          optimisticData: (current: CalendarAbsence[] = []) =>
+            current.map((a) => (a.id === absenceId ? { ...a, day: newDay } : a)),
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+    } catch (err) {
+      setMoveError(
+        err instanceof ApiError ? err.message : "Failed to move the absence. Please try again.",
+      );
+    } finally {
+      setMovingAbsenceId(null);
     }
   };
 
@@ -242,8 +265,10 @@ export default function CalendarGridPage() {
                 loading={isLoading}
                 canWrite={canWrite}
                 movingEntryId={movingEntryId}
+                movingAbsenceId={movingAbsenceId}
                 onAdd={() => setAddDay(key)}
                 onMoveEntry={onMoveEntry}
+                onMoveAbsence={onMoveAbsence}
                 onSelectEntry={setEditingEntry}
               />
             );
@@ -281,6 +306,10 @@ const MONTH_VIEW_VISIBLE_ITEMS = 3;
  * handler never mistakes an unrelated browser drag (e.g. dragging text or a
  * link) for a calendar-entry move. */
 const PLACEMENT_DRAG_TYPE = "application/x-calendar-entry-id";
+/** Same namespacing for a dragged absence (2026-08-08 feature) -- a distinct
+ * type from PLACEMENT_DRAG_TYPE so one drop handler can tell which kind of
+ * item was dropped and call the matching endpoint, rather than guessing. */
+const ABSENCE_DRAG_TYPE = "application/x-calendar-absence-id";
 
 function DayCell({
   date,
@@ -293,8 +322,10 @@ function DayCell({
   loading,
   canWrite,
   movingEntryId,
+  movingAbsenceId,
   onAdd,
   onMoveEntry,
+  onMoveAbsence,
   onSelectEntry,
 }: {
   date: Date;
@@ -307,8 +338,10 @@ function DayCell({
   loading: boolean;
   canWrite: boolean;
   movingEntryId: string | null;
+  movingAbsenceId: string | null;
   onAdd: () => void;
   onMoveEntry: (entryId: string, newDay: string) => void;
+  onMoveAbsence: (absenceId: string, newDay: string) => void;
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
   const isToday = dayKey === toDateKey(new Date());
@@ -321,7 +354,7 @@ function DayCell({
   const items = isMonth
     ? [
         ...entries.map((e) => ({ type: "entry" as const, id: e.id, workerId: e.worker_id, entry: e })),
-        ...absences.map((a) => ({ type: "absence" as const, id: a.id, workerId: a.worker_id, kind: a.kind })),
+        ...absences.map((a) => ({ type: "absence" as const, id: a.id, workerId: a.worker_id, absence: a })),
       ]
     : null;
   const visibleItems = items?.slice(0, MONTH_VIEW_VISIBLE_ITEMS);
@@ -330,8 +363,16 @@ function DayCell({
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
+    // Two distinct namespaced types (2026-08-08 feature): read both rather
+    // than assume, so a dropped absence never gets sent to the
+    // move-placement endpoint or vice versa.
     const entryId = e.dataTransfer.getData(PLACEMENT_DRAG_TYPE);
-    if (entryId) onMoveEntry(entryId, dayKey);
+    if (entryId) {
+      onMoveEntry(entryId, dayKey);
+      return;
+    }
+    const absenceId = e.dataTransfer.getData(ABSENCE_DRAG_TYPE);
+    if (absenceId) onMoveAbsence(absenceId, dayKey);
   };
 
   return (
@@ -391,9 +432,14 @@ function DayCell({
                   onSelect={onSelectEntry}
                 />
               ) : (
-                <div key={item.id} className="truncate rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
-                  {workerNameById.get(item.workerId) ?? item.workerId} · {item.kind === "SICK" ? "Sick" : "Vacation"}
-                </div>
+                <AbsenceTag
+                  key={item.id}
+                  absence={item.absence}
+                  label={workerNameById.get(item.workerId) ?? item.workerId}
+                  draggable={canWrite}
+                  moving={movingAbsenceId === item.id}
+                  size="sm"
+                />
               ),
             )}
             {hiddenCount > 0 && <div className="text-[11px] text-gray-400">+{hiddenCount} more</div>}
@@ -412,10 +458,14 @@ function DayCell({
               />
             ))}
             {absences.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-1">
-                <span className="truncate text-xs text-gray-600">{workerNameById.get(a.worker_id) ?? a.worker_id}</span>
-                <Badge tone={ABSENCE_TONE[a.kind]}>{a.kind === "SICK" ? "Sick" : "Vacation"}</Badge>
-              </div>
+              <AbsenceTag
+                key={a.id}
+                absence={a}
+                label={workerNameById.get(a.worker_id) ?? a.worker_id}
+                draggable={canWrite}
+                moving={movingAbsenceId === a.id}
+                size="md"
+              />
             ))}
             {entries.length === 0 && absences.length === 0 && (
               <div className="pt-2 text-center text-xs text-gray-400">No entries</div>
@@ -469,6 +519,64 @@ function PlacementTag({
     >
       {label}
     </button>
+  );
+}
+
+/**
+ * A single absence tag (2026-08-08 feature). Draggable on the same
+ * `canWrite` role set PlacementTag uses -- moving a worker's declared
+ * absence to a different day is a scheduling write, so it belongs to the
+ * same gate. The backend's own ownership/group-scope check
+ * (CalendarService.moveAbsence) is the authoritative one; a worker moving
+ * their OWN absence is also permitted server-side, but the grid itself is a
+ * manager surface, so this UI only offers the gesture to `canWrite` roles.
+ *
+ * Red/amber tone by kind so availability reads at a glance (SICK = red,
+ * VACATION = amber) against a placement's blue -- see ABSENCE_TONE.
+ */
+function AbsenceTag({
+  absence,
+  label,
+  draggable,
+  moving,
+  size,
+}: {
+  absence: CalendarAbsence;
+  label: string;
+  draggable: boolean;
+  moving: boolean;
+  size: "sm" | "md";
+}) {
+  const isSick = absence.kind === "SICK";
+  const title = [
+    `${label} · ${isSick ? "Sick" : "Vacation"}`,
+    absence.reason ? `Reason: ${absence.reason}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return (
+    <div
+      draggable={draggable}
+      title={title}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(ABSENCE_DRAG_TYPE, absence.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      className={[
+        "block w-full truncate rounded text-left font-medium",
+        isSick
+          ? "bg-red-50 text-red-700 hover:bg-red-100"
+          : "bg-amber-50 text-amber-700 hover:bg-amber-100",
+        size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
+        draggable ? "cursor-grab active:cursor-grabbing" : undefined,
+        moving ? "opacity-50" : undefined,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {label} · {isSick ? "Sick" : "Vacation"}
+    </div>
   );
 }
 
