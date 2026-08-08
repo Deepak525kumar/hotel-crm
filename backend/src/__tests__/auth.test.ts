@@ -1,12 +1,47 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import crypto from 'node:crypto';
+import bcrypt from 'bcryptjs';
+
+// TREQ-AUTH-007: backs the `user.update` mock's simulated running counter
+// (see its comment below) -- reset in `beforeEach` so tests don't leak state.
+let mockFailedLoginCounters: Record<string, number> | null = null;
 
 // Mock the Prisma client before any imports that use it
 const mockPrisma = {
   user: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
-    update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // TREQ-AUTH-007: recordFailedLogin() reads the post-write count off this
+    // call's return value (an atomic `increment`, not a client-computed
+    // literal -- see the service comment on why). The default implementation
+    // mirrors real Postgres UPDATE ... SET x = x + 1 semantics: a per-user
+    // running counter seeded from `findUnique`'s row on first use, then
+    // incremented on every subsequent `update` call regardless of how many
+    // requests are in flight concurrently -- exactly the guarantee that
+    // makes the atomic form race-safe. (A version keyed off "whatever
+    // findUnique last resolved" would collapse two concurrent increments
+    // back into the same lost-update bug this mock exists to catch.)
+    update: jest.fn(async (args: any) => {
+      const inc = args?.data?.failed_login_count?.increment;
+      if (typeof inc !== 'number') return {};
+      const id = args.where.id;
+      if (mockFailedLoginCounters === null) mockFailedLoginCounters = {};
+      if (!(id in mockFailedLoginCounters)) {
+        const seed: any = await (mockPrisma.user.findUnique as jest.Mock).mock.results[0]?.value;
+        mockFailedLoginCounters[id] = seed?.failed_login_count ?? 0;
+      }
+      mockFailedLoginCounters[id] += inc;
+      return { failed_login_count: mockFailedLoginCounters[id] };
+    }) as jest.MockedFunction<(...args: any[]) => any>,
+    // TREQ-AUTH-007: the admin-fallback recipient lookup when a failing
+    // account has no responsible Regional Manager. Defaults to none so
+    // suites that aren't about the escalation are unaffected.
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  },
+  // TREQ-AUTH-007: resolves the failing account's responsible manager
+  // (EmploymentRecord -> HotelGroup -> regional_manager_user_id).
+  employmentRecord: {
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
   },
   session: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -66,6 +101,7 @@ jest.mock('../config/env.js', () => ({
     JWT_ACCESS_EXPIRY: '1h',
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
+    AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: 5,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
@@ -77,6 +113,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFailedLoginCounters = null;
     mockPrisma.notification.create.mockResolvedValue({ id: 'fake-notification-id' });
     mockPrisma.outboxEvent.create.mockResolvedValue({});
     service = new AuthService();
@@ -195,6 +232,8 @@ describe('AuthService', () => {
         deleted_at: null,
         role: 'WORKER',
         permissions: [],
+        failed_login_count: 0,
+        failed_login_since: null,
       });
 
       await expect(
@@ -212,11 +251,241 @@ describe('AuthService', () => {
         deleted_at: null,
         role: 'WORKER',
         permissions: [],
+        failed_login_count: 0,
+        failed_login_since: null,
       });
 
       await expect(
         service.login({ email: 'user@test.com', password: 'wrongpassword' })
       ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+    });
+
+    // SPEC-AUTH-001 TREQ-AUTH-007 / TRULE-AUTH-002 (2026-08-08): repeated
+    // failed logins escalate by NOTIFYING the responsible manager, never by
+    // locking the account or throttling further attempts. Before this, a
+    // failed login produced no audit entry, no counter and no notification
+    // at all -- the compensating control for the deliberate absence of
+    // app-layer rate limiting (TREQ-AUTH-008) simply did not exist.
+    describe('failed-login monitoring (TREQ-AUTH-007)', () => {
+      const failingUser = (overrides: Record<string, unknown> = {}) => ({
+        id: 'u1',
+        email: 'user@test.com',
+        password_hash: '$2a$12$notthehashofwrongpassword111111111111',
+        is_active: true,
+        deleted_at: null,
+        role: 'WORKER',
+        permissions: [],
+        failed_login_count: 0,
+        failed_login_since: null,
+        created_at: new Date('2026-01-01T00:00:00Z'),
+        updated_at: new Date('2026-01-01T00:00:00Z'),
+        token_generation: 0,
+        ...overrides,
+      });
+
+      // Proves the fix for a race the original version of this code had: a
+      // client-computed `failed_login_count: user.failed_login_count + 1`
+      // loses an increment when two failed attempts overlap (both read the
+      // same starting count, both write the same next value). An atomic
+      // `{ increment: 1 }` cannot lose one -- each of N concurrent calls to
+      // the mock above independently adds 1 on top of whatever the DB
+      // already holds, the same guarantee Postgres's UPDATE ... SET
+      // x = x + 1 gives under real concurrent transactions.
+      it('does not lose an increment when two failed attempts race', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 0 }));
+
+        const results = await Promise.all([
+          service.login({ email: 'user@test.com', password: 'wrongpassword' }).catch((e) => e),
+          service.login({ email: 'user@test.com', password: 'wrongpassword' }).catch((e) => e),
+        ]);
+        expect(results).toHaveLength(2);
+
+        const counts = (
+          await Promise.all(mockPrisma.user.update.mock.results.map((r: any) => r.value))
+        ).map((v: any) => v?.failed_login_count);
+        expect(counts.sort()).toEqual([1, 2]);
+      });
+
+      it('increments the consecutive-failure counter on a wrong password', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 2 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'u1' },
+            data: expect.objectContaining({ failed_login_count: { increment: 1 } }),
+          })
+        );
+      });
+
+      it('audits the failed attempt with the running count', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 1 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        const audit = mockPrisma.auditLog.create.mock.calls.find(
+          (c: any) => c[0].data.action === 'LOGIN_FAILED'
+        );
+        expect(audit).toBeDefined();
+        expect(audit![0].data.details).toMatchObject({
+          reason: 'invalid_password',
+          consecutive_failures: 2,
+        });
+      });
+
+      it('resets the counter on a successful login', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 3, failed_login_since: new Date() })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+
+        await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'u1' },
+            data: { failed_login_count: 0, failed_login_since: null },
+          })
+        );
+      });
+
+      it('issues no counter write on a successful login when the streak is already zero', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 0 })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+
+        await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+
+      it('notifies the responsible Regional Manager exactly when the threshold is crossed', async () => {
+        // 4 -> 5 with a threshold of 5.
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 4 }));
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+        mockPrisma.notification.create.mockResolvedValue({ id: 'n1' });
+        mockPrisma.outboxEvent.create.mockResolvedValue({ id: 'o1' });
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.notification.create).toHaveBeenCalledTimes(1);
+        const notif = mockPrisma.notification.create.mock.calls[0][0].data;
+        expect(notif.user_id).toBe('rm1');
+        expect(notif.type).toBe('REPEATED_FAILED_LOGINS');
+      });
+
+      it('does not notify below the threshold', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 3 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+      });
+
+      // Fires at `=== threshold`, not `>=`: a sustained attack should raise
+      // one alert per streak, not one per attempt after the fifth.
+      it('does not re-notify on every attempt once past the threshold', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 9 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+      });
+
+      it('falls back to admins when the failing account has no responsible Regional Manager', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 4 }));
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+        mockPrisma.user.findMany.mockResolvedValue([{ id: 'admin1' }, { id: 'admin2' }]);
+        mockPrisma.notification.create.mockResolvedValue({ id: 'n1' });
+        mockPrisma.outboxEvent.create.mockResolvedValue({ id: 'o1' });
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        const recipients = mockPrisma.notification.create.mock.calls.map((c: any) => c[0].data.user_id);
+        expect(recipients).toEqual(['admin1', 'admin2']);
+      });
+
+      it('never notifies the account holder about their own failed logins', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser({ failed_login_count: 4 }));
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+        // The only admin IS the account being attacked.
+        mockPrisma.user.findMany.mockResolvedValue([{ id: 'u1' }]);
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.notification.create).not.toHaveBeenCalled();
+      });
+
+      it('records a failed attempt against a DISABLED account too', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ is_active: false, failed_login_count: 1 })
+        );
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'pw' })
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+        const audit = mockPrisma.auditLog.create.mock.calls.find(
+          (c: any) => c[0].data.action === 'LOGIN_FAILED'
+        );
+        expect(audit![0].data.details).toMatchObject({ reason: 'account_disabled' });
+      });
+
+      // The monitoring must not become an account-existence oracle: an
+      // unknown email and a wrong password must be indistinguishable to the
+      // caller. (A disabled account is a deliberate, specified exception --
+      // REQ-AUTH-003 mandates its distinct 403, and its own test above
+      // asserts that contract.)
+      it('does not leak account existence: unknown email and wrong password return identical errors', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+        const unknown = await service
+          .login({ email: 'nobody@test.com', password: 'pw' })
+          .catch((e) => e);
+
+        mockPrisma.user.findUnique.mockResolvedValue(failingUser());
+        const wrongPw = await service
+          .login({ email: 'user@test.com', password: 'wrongpassword' })
+          .catch((e) => e);
+
+        expect(unknown.name).toBe(wrongPw.name);
+        expect(unknown.message).toBe(wrongPw.message);
+        expect(unknown.statusCode).toBe(wrongPw.statusCode);
+      });
+
+      it('audits an unknown-email attempt with a null actor and no counter write', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.login({ email: 'nobody@test.com', password: 'pw' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        const audit = mockPrisma.auditLog.create.mock.calls.find(
+          (c: any) => c[0].data.action === 'LOGIN_FAILED'
+        );
+        expect(audit).toBeDefined();
+        expect(audit![0].data.actor_id).toBeNull();
+        expect(audit![0].data.details).toMatchObject({ reason: 'user_not_found' });
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
     });
   });
 

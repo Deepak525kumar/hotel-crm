@@ -44,6 +44,143 @@ export class AuthService extends BaseService {
     return crypto.createHash('sha256').update(token).digest('hex');
   }
 
+  /**
+   * SPEC-AUTH-001 TREQ-AUTH-007 (2026-08-08): records one failed login
+   * against a KNOWN account and escalates by notification once the
+   * consecutive-failure threshold is crossed.
+   *
+   * This never blocks. TRULE-AUTH-002's confirmed pattern is "notify and
+   * never block": no caller reads failed_login_count to deny a login, the
+   * account is never locked, and no application-layer throttle is added
+   * (TREQ-AUTH-008 keeps rate limiting at the Nginx/Cloudflare edge). The
+   * counter exists solely to decide when to raise the alert.
+   *
+   * Fires EXACTLY at the threshold (`=== threshold`, not `>=`), so a
+   * sustained attack produces one notification per streak rather than one
+   * per attempt after the fifth -- the alert is the signal, and repeating it
+   * every attempt would bury it. A successful login resets the streak, so a
+   * later attack can alert again.
+   *
+   * Best-effort on the notification: the audit write and the counter are the
+   * durable record, so a notification failure is logged and swallowed rather
+   * than converted into a login-endpoint 500 (the same posture
+   * calendar/service.ts's own manager-notify already uses).
+   */
+  private async recordFailedLogin(
+    user: { id: string; role: UserRole; email: string; failed_login_count: number; failed_login_since: Date | null },
+    reason: string,
+    ip?: string
+  ): Promise<void> {
+    const streakStartedAt = user.failed_login_since ?? new Date();
+
+    // Consecutive-failure streaks persist until a successful login resets them;
+    // there is intentionally no time-based expiry window here. 3 failures today
+    // and 2 more three months later still sum to a threshold-crossing streak of
+    // 5 -- this is deliberate (TRULE-AUTH-002's "notify and never block" makes
+    // the notification the only cost of a stale streak, and a slow,
+    // low-and-slow credential-guessing attempt spread over months is exactly
+    // the pattern a rolling window would hide). A future SPEC-AUTH-001
+    // amendment could add one; until then, do not assume a rolling window
+    // exists when reasoning about this counter.
+    //
+    // `increment` rather than a read-computed `failed_login_count: nextCount`:
+    // two concurrent failed attempts (a real scenario -- it's the exact
+    // shape a credential-guessing script produces) would otherwise both read
+    // the same starting count and one increment would be lost, which both
+    // undercounts the streak and can suppress the threshold-crossing
+    // notification entirely. `increment` is a single atomic UPDATE ... SET
+    // x = x + 1, so no attempt is dropped under concurrency.
+    // `failed_login_since` keeps the read-then-write (best-effort) shape --
+    // it only feeds the notification's "since <time>" text, so a race
+    // occasionally overwriting it with a slightly later timestamp is
+    // cosmetic, not a correctness or security concern.
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { failed_login_count: { increment: 1 }, failed_login_since: streakStartedAt },
+      select: { failed_login_count: true },
+    });
+    const nextCount = updated.failed_login_count;
+
+    await this.logAudit(user.id, user.role, 'LOGIN_FAILED', 'USER', user.id, {
+      email: user.email,
+      reason,
+      consecutive_failures: nextCount,
+    }, ip);
+
+    const threshold = getEnv().AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD;
+    if (nextCount !== threshold) return;
+
+    try {
+      await this.notifyRepeatedFailedLogins(user, nextCount, streakStartedAt);
+    } catch (error) {
+      logger.error('auth_failed_login_notify_failed', { userId: user.id, error });
+    }
+  }
+
+  /**
+   * Resolves who hears about a repeated-failure streak.
+   *
+   * The worker's responsible manager is their Hotel Group's Regional Manager
+   * -- the same EmploymentRecord -> HotelGroup -> regional_manager_user_id
+   * chain calendar/service.ts and hr/service.ts already established.
+   *
+   * Unlike those, this falls back to ADMINS when no RM resolves. Their
+   * best-effort/no-fallback posture suits a routine operational alert about
+   * a worker; a credential-guessing attempt is a security signal, and the
+   * accounts most worth attacking (admins, managers) are exactly the ones
+   * with no EmploymentRecord and therefore no RM. Silently dropping the
+   * alert for precisely those accounts would defeat the requirement.
+   */
+  private async notifyRepeatedFailedLogins(
+    user: { id: string; email: string },
+    attempts: number,
+    since: Date
+  ): Promise<void> {
+    const record = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: user.id },
+      select: { hotel_group_id: true },
+    });
+
+    let recipientIds: string[] = [];
+    if (record?.hotel_group_id) {
+      const group = await this.prisma.hotelGroup.findUnique({
+        where: { id: record.hotel_group_id },
+        select: { regional_manager_user_id: true },
+      });
+      if (group?.regional_manager_user_id) recipientIds = [group.regional_manager_user_id];
+    }
+
+    if (recipientIds.length === 0) {
+      const admins = await this.prisma.user.findMany({
+        where: { role: UserRole.ADMIN, is_active: true, deleted_at: null },
+        select: { id: true },
+      });
+      recipientIds = admins.map((a) => a.id);
+    }
+
+    // Never notify the account holder themself: if the attempts are an
+    // attacker, the alert should not go to a mailbox the attacker is trying
+    // to reach; if they are the legitimate user fumbling their password,
+    // they already know.
+    recipientIds = recipientIds.filter((id) => id !== user.id);
+    if (recipientIds.length === 0) return;
+
+    for (const recipientId of recipientIds) {
+      await notificationService.enqueue({
+        recipientId,
+        type: NotificationType.REPEATED_FAILED_LOGINS,
+        title: 'Repeated failed logins',
+        message: `${attempts} consecutive failed login attempts for ${user.email} since ${since.toISOString()}.`,
+        // Deliberately no password/credential material, and no IP: this
+        // payload reaches a push transport.
+        data: { user_id: user.id, attempts, since: since.toISOString() },
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.AUTH,
+        producerService: 'AuthService',
+      });
+    }
+  }
+
   // PR 5.4 (ADR-023 §6 / ADR-025 §4): resolves the JWT scope claim from
   // read-only manager-association lookups. backend-auth never writes
   // Hotel/HotelGroup rows or manager assignments — this method only reads
@@ -183,14 +320,31 @@ export class AuthService extends BaseService {
   async login(data: LoginRequest, ip?: string): Promise<AuthResponse> {
     const user = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (!user || user.deleted_at) {
+      // No counter to increment and no manager to notify: there is no
+      // account. Audited with a null actor_id so the attempt is still
+      // visible to a security review (an unknown-email spray is exactly the
+      // pattern worth seeing), while the RESPONSE stays byte-identical to
+      // the wrong-password branch below -- TREQ-AUTH-007 monitoring must not
+      // become an account-existence oracle.
+      await this.logAudit(null, null, 'LOGIN_FAILED', 'USER', 'unknown', {
+        email: data.email,
+        reason: 'user_not_found',
+      }, ip);
       throw new UnauthorizedError('Invalid credentials');
     }
     if (!user.is_active) {
+      // Deliberately still a 403 with a distinct message: REQ-AUTH-003
+      // specifies this branch explicitly and its own tests assert it, so
+      // collapsing it into the generic 401 would be an unrequested change
+      // to a specified contract. Recorded as a failed attempt so a disabled
+      // account being hammered is still visible.
+      await this.recordFailedLogin(user, 'account_disabled', ip);
       throw new ForbiddenError('Account is disabled');
     }
 
     const valid = await bcrypt.compare(data.password, user.password_hash);
     if (!valid) {
+      await this.recordFailedLogin(user, 'invalid_password', ip);
       throw new UnauthorizedError('Invalid credentials');
     }
 
@@ -212,6 +366,15 @@ export class AuthService extends BaseService {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       },
     });
+
+    // TREQ-AUTH-007: a successful login ends the streak. Conditional so the
+    // common case (counter already 0) issues no write at all.
+    if (user.failed_login_count > 0) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { failed_login_count: 0, failed_login_since: null },
+      });
+    }
 
     await this.logAudit(user.id, user.role, 'LOGIN', 'USER', user.id, { email: user.email }, ip);
 

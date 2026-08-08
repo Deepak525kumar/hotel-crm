@@ -138,6 +138,10 @@ enum NotificationType {
   HR_CONTRACT_LAPSED // to the requesting worker: their contract lapsed and offboarding was triggered (ADR-040/ADR-045)
   // Consent implementation (SPEC-CONSENT-001 REQ-CONSENT-003/RULE-CONSENT-03, ADR-015/ADR-037)
   CONSENT_DECLINED // to the worker's responsible manager: a worker declined the daily access-gate consent notice
+  // SPEC-AUTH-001 TREQ-AUTH-007 / TRULE-AUTH-002 (2026-08-08): repeated failed
+  // logins escalate by NOTIFYING, never by locking the account or throttling
+  // further attempts (rate limiting is an edge concern, TREQ-AUTH-008).
+  REPEATED_FAILED_LOGINS // to the account holder's responsible manager (admin fallback): N consecutive failed logins
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -300,6 +304,16 @@ model User {
   email_verified_at DateTime?
   phone_verified_at DateTime?
   last_login_at     DateTime?
+  // TREQ-AUTH-007 (2026-08-08): consecutive failed-login counter driving the
+  // notify-the-manager escalation. NOT a lockout counter -- TRULE-AUTH-002's
+  // confirmed pattern is "notify and never block", so nothing anywhere reads
+  // this to deny a login; it only decides when to raise the alert. Reset to 0
+  // on every successful login.
+  failed_login_count Int      @default(0)
+  // When the most recent consecutive-failure streak began. Recorded so the
+  // notification can say "N attempts since <time>" rather than just a bare
+  // count, and so a future retention sweep can age out stale streaks.
+  failed_login_since DateTime?
   deleted_at        DateTime? // GDPR soft delete — keep row, null PII via separate job
   // ADR-031 M-1/D-3/D-4 (PR-2, enforced unconditionally as of PR-7): monotonic
   // revocation counter, mirrored into the access token's `token_generation`
