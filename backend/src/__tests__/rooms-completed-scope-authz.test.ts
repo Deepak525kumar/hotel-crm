@@ -55,6 +55,12 @@ jest.mock('../lib/db.js', () => ({
     hotel: {
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
     },
+    // review follow-up (PR #395 item A): logRoomsCompleted resolves the
+    // entering user's display name via one prisma.user.findUnique call
+    // after the create succeeds.
+    user: {
+      findUnique: async () => ({ first_name: 'Test', last_name: 'User' }),
+    },
     auditLog: { create: async () => undefined },
   }),
 }));

@@ -211,7 +211,11 @@ async function resolveScheduledStart(
 }
 
 export class AssignmentService extends BaseService {
-  private toDto(a: WorkerAssignment, roomsCompleted: RoomsCompletedEntry | null = null): AssignmentDto {
+  private toDto(
+    a: WorkerAssignment,
+    roomsCompleted: RoomsCompletedEntry | null = null,
+    roomsCompletedEnteredByName: string | null = null
+  ): AssignmentDto {
     return {
       id: a.id,
       work_request_id: a.work_request_id,
@@ -225,7 +229,9 @@ export class AssignmentService extends BaseService {
       cancelled_at: a.cancelled_at?.toISOString() ?? null,
       cancellation_reason: a.cancellation_reason,
       updated_at: a.updated_at.toISOString(),
-      rooms_completed: roomsCompleted ? this.toRoomsCompletedDto(roomsCompleted) : null,
+      rooms_completed: roomsCompleted
+        ? this.toRoomsCompletedDto(roomsCompleted, roomsCompletedEnteredByName)
+        : null,
     };
   }
 
@@ -285,8 +291,29 @@ export class AssignmentService extends BaseService {
       roomsCompletedEntries.map((rc) => [rc.assignment_id, rc])
     );
 
+    // review follow-up (PR #395 item A): resolve entered_by_id -> display
+    // name for the whole page in one batched query, same shape as the
+    // roomsCompletedEntries lookup above -- one findMany() for however many
+    // distinct enterers appear on this page, not one per row.
+    const entererIds = Array.from(
+      new Set(roomsCompletedEntries.map((rc) => rc.entered_by_id))
+    );
+    const enterers = entererIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: entererIds } },
+          select: { id: true, first_name: true, last_name: true },
+        })
+      : [];
+    const entererById = new Map(enterers.map((u) => [u.id, u]));
+
     return {
-      data: records.map((r) => this.toDto(r, roomsCompletedByAssignment.get(r.id) ?? null)),
+      data: records.map((r) => {
+        const roomsCompleted = roomsCompletedByAssignment.get(r.id) ?? null;
+        const enteredByName = roomsCompleted
+          ? AssignmentService.fullName(entererById.get(roomsCompleted.entered_by_id))
+          : null;
+        return this.toDto(r, roomsCompleted, enteredByName);
+      }),
       total,
     };
   }
@@ -312,8 +339,16 @@ export class AssignmentService extends BaseService {
     const roomsCompleted = await this.prisma.roomsCompletedEntry.findUnique({
       where: { assignment_id: id },
     });
+    const enteredByName = roomsCompleted
+      ? AssignmentService.fullName(
+          await this.prisma.user.findUnique({
+            where: { id: roomsCompleted.entered_by_id },
+            select: { first_name: true, last_name: true },
+          })
+        )
+      : null;
 
-    return this.toDto(assignment, roomsCompleted);
+    return this.toDto(assignment, roomsCompleted, enteredByName);
   }
 
   async update(
@@ -652,18 +687,31 @@ export class AssignmentService extends BaseService {
     };
   }
 
-  private toRoomsCompletedDto(r: RoomsCompletedEntry): RoomsCompletedEntryDto {
+  // enteredByName is a separate param (not a relation include on `r`) so
+  // every call site chooses its own fetch shape: list() batches one
+  // findMany() for the whole page rather than an include per row, while the
+  // single-record paths (getById, logRoomsCompleted, updateRoomsCompleted)
+  // fetch just the one name they need.
+  private toRoomsCompletedDto(
+    r: RoomsCompletedEntry,
+    enteredByName: string | null = null
+  ): RoomsCompletedEntryDto {
     return {
       id: r.id,
       assignment_id: r.assignment_id,
       hotel_id: r.hotel_id,
       worker_id: r.worker_id,
       entered_by_id: r.entered_by_id,
+      entered_by_name: enteredByName,
       rooms_completed: r.rooms_completed,
       notes: r.notes,
       created_at: r.created_at.toISOString(),
       updated_at: r.updated_at.toISOString(),
     };
+  }
+
+  private static fullName(u: { first_name: string; last_name: string } | null | undefined): string | null {
+    return u ? `${u.first_name} ${u.last_name}` : null;
   }
 
   // ADR-028 (OQ-ANALYTICS-03): manager-entered "rooms completed" count, one row
@@ -728,7 +776,17 @@ export class AssignmentService extends BaseService {
       rooms_completed: input.rooms_completed,
     });
 
-    return this.toRoomsCompletedDto(entry);
+    // entered_by_id === actor.userId here always (just created above), so
+    // this is a lookup of the acting user's own name -- same one-record cost
+    // getById() already pays for an existing entry, not a new query shape.
+    const enteredByName = AssignmentService.fullName(
+      await this.prisma.user.findUnique({
+        where: { id: actor.userId },
+        select: { first_name: true, last_name: true },
+      })
+    );
+
+    return this.toRoomsCompletedDto(entry, enteredByName);
   }
 
   // 2026-08-09: correction path for an already-logged rooms-completed entry.
@@ -782,7 +840,19 @@ export class AssignmentService extends BaseService {
       { assignment_id: assignmentId, rooms_completed: input.rooms_completed }
     );
 
-    return this.toRoomsCompletedDto(updated);
+    // entered_by_id is NOT necessarily actor.userId here -- a PATCH can
+    // correct an entry someone else originally logged (any in-scope
+    // manager/RM/admin may edit, per this method's own scope gate above), so
+    // the name resolved must be the ORIGINAL enterer's (updated.entered_by_id
+    // is unchanged by this update), not the editing actor's.
+    const enteredByName = AssignmentService.fullName(
+      await this.prisma.user.findUnique({
+        where: { id: updated.entered_by_id },
+        select: { first_name: true, last_name: true },
+      })
+    );
+
+    return this.toRoomsCompletedDto(updated, enteredByName);
   }
 
   private toCalendarEntryDto(c: CalendarEntry): CalendarEntryDto {

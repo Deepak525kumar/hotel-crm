@@ -79,6 +79,14 @@ export interface RoomsCompletedEntryDto {
   hotel_id: string;
   worker_id: string;
   entered_by_id: string;
+  // 2026-08-10 (review follow-up, PR #395 item A): the display name of
+  // entered_by_id at read time, so the calendar UI can show "logged by
+  // Jane Doe" without a second round-trip. Optional/nullable rather than
+  // always-present: the entering user may since have been deleted (User FK
+  // has no cascade/restrict tying RoomsCompletedEntry's lifetime to the
+  // entering user's), in which case entered_by_id is still a valid
+  // historical reference but there is no name to resolve.
+  entered_by_name?: string | null;
   rooms_completed: number;
   notes: string | null;
   created_at: string;

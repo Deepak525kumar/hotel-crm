@@ -24,11 +24,19 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// review follow-up (PR #395 item A): logRoomsCompleted/updateRoomsCompleted
+// each resolve the entering user's display name via one prisma.user.findUnique
+// call after their write succeeds.
+const mockUser = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   roomsCompletedEntry: mockRoomsCompletedEntry,
   auditLog: mockAuditLog,
   hotel: mockHotel,
+  user: mockUser,
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
@@ -59,6 +67,7 @@ describe('AssignmentService.logRoomsCompleted (ADR-028, OQ-ANALYTICS-03)', () =>
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AssignmentService();
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Test', last_name: 'Enterer' });
   });
 
   it('throws NotFoundError for an unknown assignment', async () => {
@@ -108,6 +117,48 @@ describe('AssignmentService.logRoomsCompleted (ADR-028, OQ-ANALYTICS-03)', () =>
       worker_id: 'w1',
       entered_by_id: 'adm1',
       rooms_completed: 12,
+    });
+  });
+
+  // review follow-up (PR #395 item C): a strict full-shape assertion, not
+  // field-by-field spot checks -- catches an accidental DTO regression (a
+  // dropped field, a renamed key) if toRoomsCompletedDto()/its Prisma
+  // include ever changes, which the field-by-field checks above would not
+  // (they only fail if the field they name is itself wrong).
+  it('returns the complete RoomsCompletedEntryDto shape, including the resolved entered_by_name', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue({
+      id: 'a1', hotel_id: 'h1', worker_id: 'w1', status: 'COMPLETED',
+    });
+    mockRoomsCompletedEntry.create.mockResolvedValue({
+      id: 'rce1',
+      assignment_id: 'a1',
+      hotel_id: 'h1',
+      worker_id: 'w1',
+      entered_by_id: 'mgr1',
+      rooms_completed: 12,
+      notes: null,
+      created_at: new Date('2026-07-22T00:00:00Z'),
+      updated_at: new Date('2026-07-22T00:00:00Z'),
+    });
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Jane', last_name: 'Doe' });
+
+    const dto = await service.logRoomsCompleted(
+      'a1',
+      { rooms_completed: 12 },
+      { userId: 'mgr1', role: 'admin' }
+    );
+
+    expect(dto).toEqual({
+      id: 'rce1',
+      assignment_id: 'a1',
+      hotel_id: 'h1',
+      worker_id: 'w1',
+      entered_by_id: 'mgr1',
+      entered_by_name: 'Jane Doe',
+      rooms_completed: 12,
+      notes: null,
+      created_at: '2026-07-22T00:00:00.000Z',
+      updated_at: '2026-07-22T00:00:00.000Z',
     });
   });
 
@@ -194,6 +245,7 @@ describe('AssignmentService.updateRoomsCompleted (correction path, 2026-08-09)',
   beforeEach(() => {
     jest.clearAllMocks();
     service = new AssignmentService();
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Test', last_name: 'Enterer' });
   });
 
   it('throws NotFoundError for an unknown assignment', async () => {
@@ -259,6 +311,42 @@ describe('AssignmentService.updateRoomsCompleted (correction path, 2026-08-09)',
     expect(mockRoomsCompletedEntry.update.mock.calls[0][0]).toMatchObject({
       where: { assignment_id: 'a1' },
       data: { rooms_completed: 20, notes: 'corrected count' },
+    });
+  });
+
+  // review follow-up (PR #395 item C): entered_by_name on a PATCH must
+  // resolve to the ORIGINAL enterer, not the editing actor -- a manager
+  // (mgr2) correcting an entry a different manager (mgr1) originally logged
+  // should still show mgr1's name, not mgr2's. Regression test for the
+  // updated.entered_by_id lookup in updateRoomsCompleted (service.ts), as
+  // distinct from logRoomsCompleted's actor.userId lookup above.
+  it('resolves entered_by_name to the ORIGINAL enterer, not the editing actor, on PATCH', async () => {
+    mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', hotel_id: 'h1', status: 'COMPLETED' });
+    mockRoomsCompletedEntry.findUnique.mockResolvedValue({ id: 'rce1', assignment_id: 'a1' });
+    mockRoomsCompletedEntry.update.mockResolvedValue({
+      id: 'rce1',
+      assignment_id: 'a1',
+      hotel_id: 'h1',
+      worker_id: 'w1',
+      entered_by_id: 'mgr1',
+      rooms_completed: 20,
+      notes: 'corrected count',
+      created_at: new Date('2026-08-01T00:00:00Z'),
+      updated_at: new Date('2026-08-09T00:00:00Z'),
+    });
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Original', last_name: 'Enterer' });
+
+    const dto = await service.updateRoomsCompleted(
+      'a1',
+      { rooms_completed: 20, notes: 'corrected count' },
+      { userId: 'mgr2', role: 'admin' }
+    );
+
+    expect(dto.entered_by_id).toBe('mgr1');
+    expect(dto.entered_by_name).toBe('Original Enterer');
+    expect(mockUser.findUnique).toHaveBeenCalledWith({
+      where: { id: 'mgr1' },
+      select: { first_name: true, last_name: true },
     });
   });
 
