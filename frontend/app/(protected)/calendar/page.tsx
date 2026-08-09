@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
-import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { useHotelOptions, useHotelOptionsInGroup } from "@/hooks/useWorkRequests";
+import { useHotelGroups } from "@/hooks/useHotels";
 import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
@@ -11,15 +12,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
+  Badge,
   Button,
   Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Checkbox,
+  EmptyState,
   FormError,
   Input,
   Modal,
   PageHeader,
   Select,
   Skeleton,
+  StatTile,
   Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
@@ -61,7 +68,20 @@ const DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric", month: "short"
 const MONTH_DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric" });
 const MONTH_TITLE_LABEL = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
 
-type CalendarView = "week" | "month";
+type CalendarView = "day" | "week" | "month";
+
+const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
+  { value: "day", label: "Day" },
+  { value: "week", label: "Week" },
+  { value: "month", label: "Month" },
+];
+
+const FULL_DAY_LABEL = new Intl.DateTimeFormat("en", {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
 
 export default function CalendarGridPage() {
   const { user } = useAuth();
@@ -76,11 +96,15 @@ export default function CalendarGridPage() {
   // cells is not a real virtualization case) -- the actual cost that scales
   // with range is the underlying data fetch, which useCalendarEntriesInRange
   // already pages through rather than truncate (see its own comment).
-  const gridStart = useMemo(
-    () => (view === "week" ? startOfWeek(anchor) : startOfMonthGrid(anchor)),
-    [view, anchor],
-  );
-  const dayCount = view === "week" ? 7 : 42;
+  const gridStart = useMemo(() => {
+    if (view === "day") {
+      const d = new Date(anchor);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return view === "week" ? startOfWeek(anchor) : startOfMonthGrid(anchor);
+  }, [view, anchor]);
+  const dayCount = view === "day" ? 1 : view === "week" ? 7 : 42;
   const days = useMemo(
     () => Array.from({ length: dayCount }, (_, i) => new Date(gridStart.getTime() + i * DAY_MS)),
     [gridStart, dayCount],
@@ -105,8 +129,8 @@ export default function CalendarGridPage() {
     canSeeAbsences ? { from, to } : null,
   );
 
-  const entriesByDay = useMemo(() => groupByDay(entries ?? [], (e) => e.day), [entries]);
-  const absencesByDay = useMemo(() => groupByDay(absences ?? [], (a) => a.day), [absences]);
+  // Unfiltered day-grouping; the hotel/group-filtered versions are derived
+  // further down, once the filter state they depend on is in scope.
 
   // Worker names for display -- the grid renders worker_id-keyed placements
   // and absences, but a Teams-style grid should show a name, not a raw id.
@@ -126,6 +150,103 @@ export default function CalendarGridPage() {
     for (const [id, u] of usersById) map.set(id, `${u.first_name} ${u.last_name}`);
     return map;
   }, [usersById]);
+
+  // Scope-driven filtering (2026-08-10). Three distinct shapes, driven by the
+  // scope the backend resolved for this user (AuthUser.scope_*), NOT by role
+  // alone -- a "manager" with no hotel assignment must not get a picker over
+  // hotels they don't manage:
+  //   admin            -> group picker + hotel picker (hotels narrowed to group)
+  //   regional_manager -> hotel picker over their own group's hotels
+  //   hotel manager    -> no picker; their one hotel, fixed
+  //   worker/checker   -> no picker; the backend already self-scopes their rows
+  // These filters are a VIEW convenience over data the server already scoped;
+  // they never widen what's visible.
+  const isAdmin = user?.role === "admin";
+  const scopeGroupId = user?.scope_hotel_group_id ?? null;
+  const scopeHotelId = user?.scope_hotel_id ?? null;
+
+  const [groupFilter, setGroupFilter] = useState<string>("");
+  const [hotelFilter, setHotelFilter] = useState<string>("");
+
+  // Admin picks a group first; an RM's group is fixed to their own.
+  const activeGroupId = isAdmin ? groupFilter || null : scopeGroupId;
+
+  const { groups } = useHotelGroups({ limit: 100 });
+  const { hotels: groupHotels } = useHotelOptionsInGroup(activeGroupId);
+  // Admin with no group selected still needs *some* hotel list to filter by;
+  // falls back to the platform-wide list rather than showing an empty picker.
+  const { hotels: allHotels } = useHotelOptions();
+  const hotelOptions = activeGroupId ? groupHotels : isAdmin ? allHotels : [];
+
+  // Resolve hotel_id -> name for the per-hotel breakdown headings. Uses
+  // whichever list is loaded plus the platform-wide list, so a heading never
+  // falls back to a raw id just because the narrower query hasn't resolved.
+  const hotelNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const h of [...allHotels, ...groupHotels]) map.set(h.id, h.name);
+    return map;
+  }, [allHotels, groupHotels]);
+
+  // A hotel manager is pinned to their own hotel with no picker; everyone
+  // else filters by whatever they selected (empty = no filter).
+  const effectiveHotelFilter = scopeHotelId ?? (hotelFilter || null);
+
+  const groupHotelIds = useMemo(
+    () => new Set(groupHotels.map((h) => h.id)),
+    [groupHotels],
+  );
+
+  /** Whether a hotel_id passes the currently-active hotel/group filter. */
+  const hotelPassesFilter = (hotelId: string): boolean => {
+    if (effectiveHotelFilter) return hotelId === effectiveHotelFilter;
+    if (activeGroupId && groupHotelIds.size > 0) return groupHotelIds.has(hotelId);
+    return true;
+  };
+
+  const filterEntries = (items: CalendarEntryDto[]): CalendarEntryDto[] =>
+    items.filter((e) => hotelPassesFilter(e.hotel_id));
+
+  // CalendarAbsence carries NO hotel_id -- an absence is a property of the
+  // worker's day, not of any hotel (schema.prisma: worker_id + day + kind,
+  // no hotel relation). So it cannot be hotel-filtered directly. Instead a
+  // worker is treated as belonging to the filtered hotel(s) if they have any
+  // placement there in the visible range; an absent worker with no placement
+  // anywhere in range has no derivable hotel and is shown under "Unassigned"
+  // rather than silently dropped -- dropping them would hide exactly the
+  // information (who is off) this view exists to surface.
+  const workerHotelIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const e of entries ?? []) {
+      const set = map.get(e.worker_id) ?? new Set<string>();
+      set.add(e.hotel_id);
+      map.set(e.worker_id, set);
+    }
+    return map;
+  }, [entries]);
+
+  const filterAbsences = (items: CalendarAbsence[]): CalendarAbsence[] =>
+    items.filter((a) => {
+      const hotels = workerHotelIds.get(a.worker_id);
+      if (!hotels || hotels.size === 0) return true; // no derivable hotel — keep
+      return Array.from(hotels).some(hotelPassesFilter);
+    });
+
+  const filteredEntries = useMemo(
+    () => filterEntries(entries ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, effectiveHotelFilter, activeGroupId, groupHotelIds],
+  );
+  const filteredAbsences = useMemo(
+    () => filterAbsences(absences ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [absences, effectiveHotelFilter, activeGroupId, groupHotelIds, workerHotelIds],
+  );
+
+  const entriesByDay = useMemo(() => groupByDay(filteredEntries, (e) => e.day), [filteredEntries]);
+  const absencesByDay = useMemo(
+    () => groupByDay(filteredAbsences, (a) => a.day),
+    [filteredAbsences],
+  );
 
   const isLoading = entriesLoading || (canSeeAbsences && absencesLoading);
 
@@ -194,13 +315,17 @@ export default function CalendarGridPage() {
     setAnchor((a) =>
       view === "week"
         ? new Date(a.getTime() - 7 * DAY_MS)
-        : new Date(a.getFullYear(), a.getMonth() - 1, 1),
+        : view === "day"
+          ? new Date(a.getTime() - DAY_MS)
+          : new Date(a.getFullYear(), a.getMonth() - 1, 1),
     );
   const goNext = () =>
     setAnchor((a) =>
       view === "week"
         ? new Date(a.getTime() + 7 * DAY_MS)
-        : new Date(a.getFullYear(), a.getMonth() + 1, 1),
+        : view === "day"
+          ? new Date(a.getTime() + DAY_MS)
+          : new Date(a.getFullYear(), a.getMonth() + 1, 1),
     );
   const goToday = () => setAnchor(new Date());
 
@@ -209,27 +334,26 @@ export default function CalendarGridPage() {
       <PageHeader
         title="Calendar"
         description={
-          view === "week"
-            ? "Worker placements and absences, one week at a time."
-            : MONTH_TITLE_LABEL.format(anchor)
+          view === "day"
+            ? FULL_DAY_LABEL.format(anchor)
+            : view === "week"
+              ? "Worker placements and absences, one week at a time."
+              : MONTH_TITLE_LABEL.format(anchor)
         }
         actions={
           <div className="flex items-center gap-2">
             <div className="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setView("week")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "week" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
-              >
-                Week
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("month")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "month" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
-              >
-                Month
-              </button>
+              {VIEW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setView(opt.value)}
+                  aria-pressed={view === opt.value}
+                  className={`px-3 py-1.5 text-sm font-medium ${view === opt.value ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
             <Button variant="outline" size="sm" onClick={goPrev}>
               ← Prev
@@ -255,6 +379,54 @@ export default function CalendarGridPage() {
         }
       />
 
+      {/* Scope filters. Rendered only for the roles that actually have a
+          choice to make: an admin picks a group then a hotel within it; a
+          Regional Manager picks a hotel within their own (fixed) group; a
+          Hotel Manager has exactly one hotel and gets a static label instead
+          of a one-option dropdown; workers/checkers get nothing, since the
+          backend already self-scopes their rows. */}
+      {(isAdmin || scopeGroupId || scopeHotelId) && (
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          {isAdmin && (
+            <div className="w-full sm:w-64">
+              <Select
+                label="Hotel group"
+                value={groupFilter}
+                onChange={(e) => {
+                  setGroupFilter(e.target.value);
+                  // A hotel selected under the previous group is meaningless
+                  // under a new one -- clear rather than silently keep an
+                  // out-of-group hotel filter applied.
+                  setHotelFilter("");
+                }}
+                placeholder="All groups"
+                options={groups.map((g) => ({ value: g.id, label: g.name }))}
+              />
+            </div>
+          )}
+          {scopeHotelId ? (
+            <div className="w-full sm:w-64">
+              <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Hotel</p>
+              <p className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
+                {hotelNameById.get(scopeHotelId) ?? "Your hotel"}
+              </p>
+            </div>
+          ) : (
+            <div className="w-full sm:w-64">
+              <Select
+                label="Hotel"
+                value={hotelFilter}
+                onChange={(e) => setHotelFilter(e.target.value)}
+                placeholder={
+                  isAdmin && !activeGroupId ? "All hotels" : "All hotels in group"
+                }
+                options={hotelOptions.map((h) => ({ value: h.id, label: h.name }))}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
       <FormError>{moveError}</FormError>
 
       {entriesError ? (
@@ -264,9 +436,11 @@ export default function CalendarGridPage() {
       ) : (
         <div
           className={
-            view === "week"
-              ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
-              : "grid grid-cols-7 gap-1.5"
+            view === "day"
+              ? "grid grid-cols-1 gap-3"
+              : view === "week"
+                ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
+                : "grid grid-cols-7 gap-1.5"
           }
         >
           {days.map((d) => {
@@ -294,6 +468,25 @@ export default function CalendarGridPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Per-hotel breakdown for the visible range. Shown in all three views:
+          in day view it's the point of the screen, in week/month it's the
+          "who is where, who is off" summary the grid's compact tags can't
+          convey. Uses the SAME filtered data the grid does, so the two can
+          never disagree. */}
+      {!entriesError && (
+        <RangeBreakdown
+          days={days}
+          view={view}
+          entriesByDay={entriesByDay}
+          absencesByDay={absencesByDay}
+          workerNameById={workerNameById}
+          hotelNameById={hotelNameById}
+          loading={isLoading}
+          canSeeAbsences={canSeeAbsences}
+          onSelectEntry={setEditingEntry}
+        />
       )}
 
       {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
@@ -328,6 +521,206 @@ function groupByDay<T>(items: T[], getDay: (item: T) => string): Map<string, T[]
   return map;
 }
 
+/** A day's placements/absences regrouped by hotel, for the breakdown panel. */
+interface HotelDayBucket {
+  hotelId: string;
+  entries: CalendarEntryDto[];
+}
+
+/**
+ * "Everything happening in the visible range, hotel by hotel."
+ *
+ * The grid above answers "which days are busy"; this answers "who exactly is
+ * where, and who is off" — the question the compact day-cell tags can't
+ * carry. Rendered for every view: it IS the day view's content, and
+ * summarises week/month.
+ *
+ * Absences are listed per DAY rather than per hotel, because a
+ * CalendarAbsence has no hotel_id (schema.prisma) — a worker is absent from
+ * their day, not from a particular hotel. Presenting them under a hotel
+ * heading would invent an association the data doesn't have.
+ */
+function RangeBreakdown({
+  days,
+  view,
+  entriesByDay,
+  absencesByDay,
+  workerNameById,
+  hotelNameById,
+  loading,
+  canSeeAbsences,
+  onSelectEntry,
+}: {
+  days: Date[];
+  view: CalendarView;
+  entriesByDay: Map<string, CalendarEntryDto[]>;
+  absencesByDay: Map<string, CalendarAbsence[]>;
+  workerNameById: Map<string, string>;
+  hotelNameById: Map<string, string>;
+  loading: boolean;
+  canSeeAbsences: boolean;
+  onSelectEntry: (entry: CalendarEntryDto) => void;
+}) {
+  // Only days that actually have something to show. In month view this keeps
+  // a 42-cell range from rendering 42 mostly-empty sections.
+  const activeDays = days.filter(
+    (d) =>
+      (entriesByDay.get(toDateKey(d))?.length ?? 0) > 0 ||
+      (absencesByDay.get(toDateKey(d))?.length ?? 0) > 0,
+  );
+
+  const totalPlacements = days.reduce(
+    (n, d) => n + (entriesByDay.get(toDateKey(d))?.length ?? 0),
+    0,
+  );
+  const allAbsences = days.flatMap((d) => absencesByDay.get(toDateKey(d)) ?? []);
+  const sickCount = allAbsences.filter((a) => a.kind === "SICK").length;
+  const vacationCount = allAbsences.filter((a) => a.kind === "VACATION").length;
+  const distinctWorkers = new Set(
+    days.flatMap((d) => (entriesByDay.get(toDateKey(d)) ?? []).map((e) => e.worker_id)),
+  ).size;
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>
+          {view === "day" ? "This day in detail" : "Range breakdown"}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile label="Placements" value={String(totalPlacements)} />
+          <StatTile label="Workers placed" value={String(distinctWorkers)} />
+          {canSeeAbsences && <StatTile label="Sick" value={String(sickCount)} />}
+          {canSeeAbsences && <StatTile label="On vacation" value={String(vacationCount)} />}
+        </div>
+
+        {activeDays.length === 0 ? (
+          <EmptyState
+            title="Nothing scheduled"
+            description={
+              view === "day"
+                ? "No placements or absences recorded for this day."
+                : "No placements or absences in this range."
+            }
+          />
+        ) : (
+          <div className="space-y-6">
+            {activeDays.map((d) => {
+              const key = toDateKey(d);
+              const dayEntries = entriesByDay.get(key) ?? [];
+              const dayAbsences = absencesByDay.get(key) ?? [];
+
+              // Regroup this day's placements by hotel.
+              const byHotel = new Map<string, HotelDayBucket>();
+              for (const e of dayEntries) {
+                const bucket = byHotel.get(e.hotel_id) ?? { hotelId: e.hotel_id, entries: [] };
+                bucket.entries.push(e);
+                byHotel.set(e.hotel_id, bucket);
+              }
+              const hotelBuckets = Array.from(byHotel.values()).sort((a, b) =>
+                (hotelNameById.get(a.hotelId) ?? a.hotelId).localeCompare(
+                  hotelNameById.get(b.hotelId) ?? b.hotelId,
+                ),
+              );
+
+              return (
+                <div key={key} className="space-y-3">
+                  {/* In day view the page header already names the date, so a
+                      second identical heading would be pure noise. */}
+                  {view !== "day" && (
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                      {FULL_DAY_LABEL.format(d)}
+                    </h3>
+                  )}
+
+                  {hotelBuckets.map((bucket) => (
+                    <div
+                      key={bucket.hotelId}
+                      className="rounded-md border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          {hotelNameById.get(bucket.hotelId) ?? bucket.hotelId}
+                        </span>
+                        <Badge tone="info">
+                          {bucket.entries.length}{" "}
+                          {bucket.entries.length === 1 ? "worker" : "workers"}
+                        </Badge>
+                      </div>
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {bucket.entries.map((e) => (
+                          <li key={e.id}>
+                            <button
+                              type="button"
+                              onClick={() => onSelectEntry(e)}
+                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                            >
+                              <span className="truncate text-gray-900 dark:text-gray-100">
+                                {workerNameById.get(e.worker_id) ?? e.worker_id}
+                              </span>
+                              <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                                Details →
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+
+                  {canSeeAbsences && dayAbsences.length > 0 && (
+                    <div className="rounded-md border border-gray-200 dark:border-gray-700">
+                      <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
+                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                          Unavailable
+                        </span>
+                      </div>
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+                        {dayAbsences.map((a) => (
+                          <li
+                            key={a.id}
+                            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+                          >
+                            <span className="truncate text-gray-900 dark:text-gray-100">
+                              {workerNameById.get(a.worker_id) ?? a.worker_id}
+                            </span>
+                            <span className="flex shrink-0 items-center gap-2">
+                              {a.reason && (
+                                <span className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                  {a.reason}
+                                </span>
+                              )}
+                              <Badge tone={a.kind === "SICK" ? "danger" : "warning"}>
+                                {a.kind === "SICK" ? "Sick" : "Vacation"}
+                              </Badge>
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const MONTH_VIEW_VISIBLE_ITEMS = 3;
 /** dataTransfer MIME type for a dragged placement -- namespaced so a drop
  * handler never mistakes an unrelated browser drag (e.g. dragging text or a
@@ -358,7 +751,7 @@ function DayCell({
 }: {
   date: Date;
   dayKey: string;
-  view: "week" | "month";
+  view: CalendarView;
   outsideCurrentMonth: boolean;
   entries: CalendarEntryDto[];
   absences: CalendarAbsence[];
