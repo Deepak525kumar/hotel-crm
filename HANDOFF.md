@@ -1,6 +1,8 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-09 (PR #395 open: rooms-completed data surfaced in the calendar UI — see §0).
+Last updated: 2026-08-09 (feature-scoping decisions recorded for dark mode, document templates,
+language switcher, contract-type workflow, and Leave & Sickness OCR — see §0.3. PRs #394/#395/#396
+open).
 
 **Note on this file's history below (§1–§8):** sections §1–§8 date from 2026-08-07 and earlier and
 were NOT kept current through the 2026-08-08/09 security-hardening + calendar-feature session
@@ -122,6 +124,37 @@ Both FROZEN specs; amending them follows their own protocol, not a routine edit:
   behavior from #385.
 - `SPEC-AUTH-001` (REQ-AUTH-003) — its "no failed-attempt counting or notification of any kind
   exists" line is now stale after #389.
+
+### §0.3 — Deferred feature scoping (explicit user decision, 2026-08-09)
+Of the 5 not-started items from §0.1, scoping was resolved for 2 (dark mode, document templates)
+and explicitly deferred for 3. **When asked "what's left," report these three as open/undecided —
+do not silently re-derive a scope for them.**
+
+**Deferred, no scope decided yet:**
+- **Contract-type detection + approval workflow.** "Middle time" was never defined — the user
+  said to leave it and note it as a later decision. Nothing to build until that's resolved.
+- **Leave & Sickness — OCR portion specifically.** The user deferred OCR (sick-note upload/
+  extraction, certificate reminders) without picking a scoping approach. Multi-day leave requests
+  + clash detection (the non-OCR half) are UNSTARTED too — the user's answer deferred the whole
+  item, not just OCR; don't assume the non-OCR half is authorized to build without checking back.
+
+**Scoped, ready to build (once picked up):**
+- **Dark mode**: manual toggle in Settings (Light/Dark/System), System defaults to
+  `prefers-color-scheme`, persisted (not an auth token, plain localStorage is fine here — do not
+  confuse with the httpOnly-cookie auth-token work, unrelated).
+- **Document templates**: **in-app fillable form templates** (not static file uploads) — a
+  template defines structured fields, filled through a form in the app, rendered to a document.
+  **Also requires digital signature capture** (explicit user requirement, not implied by "template"
+  alone) — this is a substantially bigger build than originally scoped (template designer, field
+  types, a rendering/PDF-generation step, and a signature-capture+storage mechanism with its own
+  legal/audit considerations). Needs its own implementation plan before starting, not a quick PR.
+- **Language switcher**: **full coverage**, not UI-only — "everything the user will see, be it
+  notifications or whatever, should be translated." This is a much larger scope than the original
+  UI-only framing: every notification-producing code path (in-app `Notification` records, any
+  future email/push text) needs translation, not just frontend component strings. Target
+  languages still unspecified — needs that decision plus an i18n architecture pass (message
+  catalog format, where translated notification text is generated — at write time per-recipient
+  locale, or at read time) before implementation starts.
 
 ---
 
