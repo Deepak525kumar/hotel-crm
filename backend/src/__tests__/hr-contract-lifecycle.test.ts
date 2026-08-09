@@ -57,12 +57,14 @@ const txClient = {
   contract: {
     create: mockContractCreate,
     findMany: mockContractFindMany,
+    count: jest.fn(() => Promise.resolve(0)),
     findFirst: mockContractFindFirst,
     update: mockContractUpdate,
   },
   payslipRequest: {
     create: mockPayslipRequestCreate,
     findMany: mockPayslipRequestFindMany,
+    count: jest.fn(() => Promise.resolve(0)),
     findUnique: mockPayslipRequestFindUnique,
     findUniqueOrThrow: mockPayslipRequestFindUniqueOrThrow,
     update: mockPayslipRequestUpdate,
@@ -263,7 +265,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
           where: { worker_id: 'w1', status: 'PENDING' },
         })
       );
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('lists all contracts when no filters are supplied', async () => {
@@ -512,7 +514,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} })
       );
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('scopes results to the manager\'s own hotel_group_id (ADR-043)', async () => {
@@ -862,8 +864,8 @@ describe('HrService.listPayroll — worker IDOR guard (OD-HR-10/FIND-SEC-HR-03)'
       { role: 'worker', userId: 'w1' }
     );
 
-    expect(result).toHaveLength(1);
-    expect(result[0].worker_id).toBe('w1');
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].worker_id).toBe('w1');
     // resolveNonAdminScopeFilter is never called for a worker-role caller —
     // the IDOR guard short-circuits before that branch.
     expect(mockResolveNonAdminScopeFilter).not.toHaveBeenCalled();
@@ -894,7 +896,7 @@ describe('HrService.listPayroll — worker IDOR guard (OD-HR-10/FIND-SEC-HR-03)'
       { role: 'worker', userId: 'w1' }
     );
 
-    expect(result).toHaveLength(1);
+    expect(result.data).toHaveLength(1);
     // Prisma must have been called with the forced filter, not an open query.
     expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ worker_id: 'w1' }) })

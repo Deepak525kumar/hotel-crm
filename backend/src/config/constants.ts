@@ -144,6 +144,15 @@ const MANAGER_PERMISSIONS = Object.freeze([
   // Manager may view/blocklist within scope; creation stays Admin-only
   // (enforced service-side, OD-EMP-08).
   'employees:read', 'employees:write',
+  // Document Templates module (2026-08-09): manager/RM may view template
+  // definitions (to pick one when initiating a fill), create/fill instances,
+  // and sign only their own COUNTERSIGNER-role blocks (enforced in
+  // document-templates/service.ts, not by this token alone) --
+  // document_templates:write (author/publish/archive a template) is
+  // deliberately Admin-only, not granted here.
+  'document_templates:read',
+  'document_instance:write',
+  'document_instance:read',
 ]) as string[];
 
 // ADR-031 D-1 (PR-3): ROLE_PERMISSIONS is now consulted on the request path
@@ -174,6 +183,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'audit:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): employee-management permissions.
     'employees:read', 'employees:write', 'employees:delete', 'employees:special_category:read',
+    // Document Templates module (2026-08-09): admin-only authorship
+    // (author/publish/archive templates) plus the same instance
+    // write/read tokens manager/RM hold (see MANAGER_PERMISSIONS' own note).
+    'document_templates:write', 'document_templates:read',
+    'document_instance:write', 'document_instance:read',
   ]) as string[],
   MANAGER: MANAGER_PERMISSIONS,
   // ADR-060 / ADR-030 §3 C-33: RM = Manager's operational set plus
@@ -215,6 +229,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // hr:read (held by admin/manager) is the broader token for the same route;
     // requirePayslipReadAccess() in hr/routes.ts enforces the role-specific split.
     'hr:payslip:read-own',
+    // Document Templates module (2026-08-09): a worker may fill/sign/read
+    // only their OWN (SUBJECT-role) document instance -- no proxy-fill
+    // (product decision). Split fill vs. sign into two tokens since
+    // "can enter field values" and "can execute a signing action" are
+    // different-enough capability weights that a future template may want
+    // to grant one without the other (e.g. a manager must co-sign before a
+    // worker's own signature is even offered).
+    'document_instance:fill-own',
+    'document_instance:sign-own',
+    'document_instance:read-own',
   ]) as string[],
 });
 

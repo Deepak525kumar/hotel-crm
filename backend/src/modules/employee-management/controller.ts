@@ -292,14 +292,17 @@ export class EmployeeManagementController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
+        const query = req.query as { employee_id?: string; page?: number; limit?: number };
         const result = await employeeManagementService.getBlocklist(req.auth, {
           hotelId: req.params['hotel_id']!,
-          employeeId: (req.query as { employee_id?: string }).employee_id,
+          employeeId: query.employee_id,
+          page: query.page,
+          limit: query.limit,
         });
         res.status(200).json({
           status: 'success',
-          data: result,
-          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+          data: result.data,
+          meta: { total: result.total, timestamp: new Date().toISOString(), request_id: req.requestId },
         });
       } catch (error) {
         next(error);

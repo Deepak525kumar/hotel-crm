@@ -143,6 +143,29 @@ jobs:
         run: npm ci
         working-directory: backend
 
+      # document-templates review follow-up (2026-08-10, PR #398): the
+      # `playwright` npm package (installed above) is NOT the Chromium
+      # browser binary itself -- that's a separate ~300MB download, cached
+      # here by Playwright's own version string (bumping the `playwright`
+      # dependency invalidates the cache correctly, matching how the
+      # upstream cache key convention is documented) so a normal PR run
+      # doesn't re-download it every time.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('backend/package-lock.json') }}
+
+      # review follow-up (item 3, 2026-08-10): `--no-install` forces npx to
+      # resolve the LOCALLY installed `playwright` version pinned in
+      # package.json (installed by `npm ci` above), the same guarantee
+      # deploy.sh's identical flag gives -- rather than npx silently
+      # fetching some other version from the registry if local resolution
+      # ever failed. Fails loudly instead of masking a version mismatch.
+      - name: Install Playwright's Chromium browser
+        run: npx --no-install playwright install --with-deps chromium
+        working-directory: backend
+
       - name: Typecheck
         run: npm run typecheck
         working-directory: backend

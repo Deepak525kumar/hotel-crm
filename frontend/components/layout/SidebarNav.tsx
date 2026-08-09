@@ -16,6 +16,7 @@ import {
   Archive,
   Building,
   Settings,
+  FileSignature,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -58,6 +59,14 @@ export const NAV: NavItem[] = [
   { href: "/analytics", label: "Analytics", icon: BarChart3, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotels", label: "Hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
+  // Document Templates + Digital Signature (2026-08-09): template authoring
+  // entry point for the roles that can read templates at all
+  // (document-templates/routes.ts's GET routes: admin/manager/
+  // regional_manager). A worker's own instances-to-sign live on their own
+  // `/users/[id]` profile instead (MyDocumentInstancesCard), not here — no
+  // proxy-fill/proxy-authoring means a worker never picks a template from a
+  // list, so a top-level nav entry for them would only ever be empty.
+  { href: "/document-templates", label: "Document templates", icon: FileSignature, roles: ["manager", "regional_manager", "admin"] },
   // Deleted entities are invisible everywhere else by design, so the archive
   // is their only reachable surface. Admin-only, matching the backend gate.
   { href: "/archive", label: "Archive", icon: Archive, roles: ["admin"] },

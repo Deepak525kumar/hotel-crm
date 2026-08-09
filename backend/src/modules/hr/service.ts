@@ -205,7 +205,7 @@ export class HrService extends BaseService {
   async listContracts(
     filters: ListContractsQuery = {},
     actor?: ServiceActor
-  ): Promise<ContractDto[]> {
+  ): Promise<{ data: ContractDto[]; total: number }> {
     const where: Prisma.ContractWhereInput = {
       ...(filters.worker_id ? { worker_id: filters.worker_id } : {}),
       ...(filters.status ? { status: filters.status as ContractStatus } : {}),
@@ -220,11 +220,19 @@ export class HrService extends BaseService {
       }
     }
 
-    const contracts = await this.prisma.contract.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-    });
-    return contracts.map((c) => this.toDto(c));
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+
+    const [contracts, total] = await Promise.all([
+      this.prisma.contract.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.contract.count({ where }),
+    ]);
+    return { data: contracts.map((c) => this.toDto(c)), total };
   }
 
   // ---------------------------------------------------------------------------
@@ -645,7 +653,7 @@ export class HrService extends BaseService {
   async listPayroll(
     filters: ListPayslipRequestsQuery = {},
     actor?: ServiceActor
-  ): Promise<PayslipRequestDto[]> {
+  ): Promise<{ data: PayslipRequestDto[]; total: number }> {
     // OD-HR-10 (FIND-SEC-HR-03, IDOR guard): a worker-role caller MUST be
     // scoped to their own PayslipRequest records only — the client-supplied
     // worker_id query param is never trusted for this role. Mirrors
@@ -675,11 +683,19 @@ export class HrService extends BaseService {
       }
     }
 
-    const requests = await this.prisma.payslipRequest.findMany({
-      where,
-      orderBy: { created_at: 'desc' },
-    });
-    return requests.map((r) => this.toPayslipDto(r));
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+
+    const [requests, total] = await Promise.all([
+      this.prisma.payslipRequest.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.payslipRequest.count({ where }),
+    ]);
+    return { data: requests.map((r) => this.toPayslipDto(r)), total };
   }
 
 

@@ -1,3 +1,11 @@
+import { z } from 'zod';
+
+// Page-size bounds for this module's list routes, matching
+// employee-management/constants.ts's DEFAULT_PAGE_SIZE/MAX_PAGE_SIZE so the
+// two modules' list endpoints behave identically.
+export const HR_DEFAULT_PAGE_SIZE = 50;
+export const HR_MAX_PAGE_SIZE = 100;
+
 // SPEC-HR-001 (REVIEW @0.2.9; ADR-012/ADR-014 bounded context).
 // Target-state shapes per ADR-039 (2026-07-28, resolving OD-HR-02):
 // CreateContractRequest carries no salary/compensation field; the
@@ -35,7 +43,22 @@ export interface ContractDto {
 export interface ListContractsQuery {
   worker_id?: string;
   status?: ContractStatusType;
+  page?: number;
+  limit?: number;
 }
+
+// Express hands every query param over as a STRING, and both list services
+// below pass page/limit straight into Prisma's skip/take, which require
+// numbers -- an unvalidated `?limit=20` reaches `take: "20"` and Prisma
+// rejects it at runtime. `z.coerce` is what converts them; the bounds stop
+// `?limit=1000000` from becoming an unbounded table scan. Mirrors
+// employee-management's BlocklistQuerySchema exactly.
+export const ListContractsQuerySchema = z.object({
+  worker_id: z.string().optional(),
+  status: z.enum(['PENDING', 'ACTIVE', 'EXTENDED', 'PERMANENT']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(HR_MAX_PAGE_SIZE).default(HR_DEFAULT_PAGE_SIZE),
+});
 
 export type PayslipRequestStatusType = 'REQUESTED' | 'FULFILLED';
 
@@ -62,4 +85,14 @@ export interface PayslipRequestDto {
 export interface ListPayslipRequestsQuery {
   worker_id?: string;
   status?: PayslipRequestStatusType;
+  page?: number;
+  limit?: number;
 }
+
+// See ListContractsQuerySchema for why coercion is required here.
+export const ListPayslipRequestsQuerySchema = z.object({
+  worker_id: z.string().optional(),
+  status: z.enum(['REQUESTED', 'FULFILLED']).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(HR_MAX_PAGE_SIZE).default(HR_DEFAULT_PAGE_SIZE),
+});

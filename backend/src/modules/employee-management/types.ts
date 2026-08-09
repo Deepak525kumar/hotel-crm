@@ -42,9 +42,10 @@ export const SetBlocklistSchema = z.object({
 
 export type SetBlocklistRequest = z.infer<typeof SetBlocklistSchema>;
 
-// IF-EMP-GetBlocklist / v0.
 export const BlocklistQuerySchema = z.object({
   employee_id: z.string().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
 });
 
 export type BlocklistQuery = z.infer<typeof BlocklistQuerySchema>;
