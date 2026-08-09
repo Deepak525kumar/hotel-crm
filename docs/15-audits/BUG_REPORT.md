@@ -113,7 +113,7 @@ None found. Every route flagged as having zero frontend/mobile callers has an ex
 ### Confirmed dead/broken client references (opposite direction — client calls a route that no longer exists correctly)
 | Reference | Issue |
 |---|---|
-| `frontend/lib/api.ts:341,350`, `mobile/worker-app/src/lib/api.ts:287-292` — `/work-requests/:id/applications/*` | Calls a retired module (`backend-work-applications`, removed Epic 9 PR 9.2/ADR-058). `DEPENDENCY_GRAPH.yaml` already flags this edge `status: broken`. **This is a live client-side bug**, not a documentation issue — worth a frontend/mobile PR before those flows are exercised. |
+| ~~`frontend/lib/api.ts:341,350`, `mobile/worker-app/src/lib/api.ts:287-292` — `/work-requests/:id/applications/*`~~ | ~~Calls a retired module (`backend-work-applications`, removed Epic 9 PR 9.2/ADR-058).~~ **FIXED (verified 2026-08-09):** both frontend and mobile references to `/work-requests/:id/applications/*` have been removed. No dead client references remain. |
 
 ---
 
@@ -123,8 +123,8 @@ Repo-wide `grep -rniE "TODO|FIXME|XXX|HACK|not implemented|NotImplementedError"`
 
 | Item | File | Category |
 |---|---|---|
-| `getDailyOperations`/`createDailyOperation` throw `NotImplementedError` | `backend/src/modules/calendar/service.ts:28,32` | **Disclosed deferral** — spec (ADR-051/OD-CAL-10) formally struck this scope; not MVP-blocking. |
-| `sendEmail`/`sendPushNotification` throw `NotImplementedError` | `backend/src/modules/notifications/service.ts:146,150` | **Noise/dead code** — zero call sites anywhere in backend; fully superseded by the Outbox/Worker/transport-handler path. Should be deleted, not fixed. |
+| ~~`getDailyOperations`/`createDailyOperation` throw `NotImplementedError`~~ | ~~`backend/src/modules/calendar/service.ts:28,32`~~ | **FIXED (verified 2026-08-09):** no `throw new NotImplementedError` remains anywhere in `backend/src`. Calendar operations stubs removed. |
+| ~~`sendEmail`/`sendPushNotification` throw `NotImplementedError`~~ | ~~`backend/src/modules/notifications/service.ts:146,150`~~ | **FIXED (verified 2026-08-09):** dead stubs deleted. No `NotImplementedError` throw remains in the notifications module. |
 | `backend-hr`'s original PR-4 comment ("payroll/payslip remains NotImplementedError until PR 4") | `backend/src/modules/hr/service.ts:1-8` | **Stale comment, not live code** — PR 4/5 have since landed; a skim-only reader of the top 8 lines would be misled. Housekeeping. |
 | `NotificationService.sendEmail throws NotImplementedError` comment inside auth | `backend/src/modules/auth/service.ts:307-309` | **Cross-module comment, not a gap in auth itself** — describes the (now-superseded) notifications state. |
 | `malware-scan.ts` `noOpScanner` (always returns clean) | `backend/src/modules/hr/malware-scan.ts:30-34` | **Disclosed stub** — pluggable interface, real reject-on-detect control flow wired in, no vendor plugged in yet (ADR-044). |
@@ -168,8 +168,8 @@ Additionally:
 
 ## 6. Hidden Architectural Drift
 
-- **ADR-016 (audit-log writer centralization) mismatch**: `backend/src/scripts/regional-manager-promotion.ts:60` calls `prisma.auditLog.create` directly, bypassing `BaseService`'s audit helper — a script-level writer outside the sanctioned path. No other ADR-016 violations found.
-- **`backend-work-applications` removal (Epic 9 PR 9.2 / ADR-058) has not fully propagated to clients**: `frontend/lib/api.ts` and `mobile/worker-app/src/lib/api.ts` both still call `/work-requests/:id/applications/*`, a route that no longer exists correctly server-side. `DEPENDENCY_GRAPH.yaml` already flags this edge `status: broken` — it is a known, tracked, but still-live client bug.
+- ~~**ADR-016 (audit-log writer centralization) mismatch**: `backend/src/scripts/regional-manager-promotion.ts:60` calls `prisma.auditLog.create` directly~~ — **FIXED (verified 2026-08-09):** no direct `prisma.auditLog.create` calls remain in `backend/src/scripts/`. All audit writes now go through `BaseService.logAudit`.
+- ~~**`backend-work-applications` removal (Epic 9 PR 9.2 / ADR-058) has not fully propagated to clients**~~ — **FIXED (verified 2026-08-09):** both `frontend/lib/api.ts` and `mobile/worker-app/src/lib/api.ts` no longer reference `/work-requests/:id/applications/*`. The dead client route has been cleaned up.
 - **`state-worker-overall-rating` cross-module reader drift**: quality module's spec still names `backend-work-applications` as a live downstream consumer of `WorkerOverallRating` — that module was physically deleted; the real consumer relationship no longer exists as described.
 - **Permissions-column removal (ADR-031 D-1/M-3)**: `User.permissions` was dropped from the schema and is now derived at request time via `ROLE_PERMISSIONS[role]` in `users/service.ts` (5 call sites) — a genuine, correctly-implemented architecture change, but **undisclosed in the users spec** (no ADR-031 forward-note exists at all, unlike ADR-022/030 which both got one).
 - **Geofence ownership split**: coordinate storage/retention for attendance moved to backend-geo's own `WorkerGeoCheckin` table (per `BOUNDARY_INDEX.yaml:124`) rather than living on the Attendance model as the attendance spec's target-state design implies — a real, sound architectural resolution that is disclosed asymmetrically (visible in geo's registry row, invisible in attendance's).
@@ -193,21 +193,21 @@ Additionally:
 ## 8. Open Decisions: Release Blockers vs Future Enhancements
 
 ### Release Blockers
-| ID | Module | Reasoning |
-|---|---|---|
-| SIR-AUTH-011 | auth | GDPR retention tier assignment required before G8 Release Readiness (register's own explicit requirement). |
-| OQ-USERS-05 / SIR-USERS-005 | users | `getUser` has no hotel/group scope check — cross-hotel PII read by any Admin/Manager. |
-| SIR-CRM-008 / OD-CRM-08 | crm | `per_page` vs `limit` param mismatch silently truncates hotel/hotel-group lists past 20 rows — functional data-loss bug. |
-| OQ-02 / SIR-QUAL-002 | quality | `WorkerOverallRating.average_score` redefinition is a BREAKING cross-consumer contract change, register-flagged. |
-| OQ-07 / SIR-QUAL-007 | quality | Leaderboard pagination is an authorized MUST (ADR-035) not yet implemented in code. |
-| SIR-HR-007 / OD-HR-15 | hr | Auth's 4 open High security findings require a formal human Risk Assessment before hr (which depends on auth middleware) can be considered production-safe. |
-| SIR-HR-017 / OD-HR-11 | hr | No GDPR retention tier assigned to the contract document/PDF/scan itself. |
-| Security FIND-002 | employee-management | Special-category field access-gating disposition reads as "disclosed, not implemented" rather than confirmed fixed — needs code-level verification. |
-| SIR-DOC-001 / OD-DOC-001 | documents | No GDPR retention tier registered for `WorkerDocument` despite backend-retention now being live. |
-| SIR-DOC-016 / OD-DOC-016 | documents | No malware/content scanning on identity/work-permit document uploads, despite HR having a ready ADR-044 precedent to reuse. |
-| OD-RETENTION-05 / SIR-RETENTION-003 (RBAC half) | retention | `GetDeletionAuditLog` route has no RBAC scope — open to any authenticated role. |
-| OQ-NOTIF-05 / SIR-NOTIF-005 | notifications | No cross-module authorization check on notification targeting — more exploitable now that HR and Consent are live producers. |
-| SIR-CHAT-020 (OD-CHAT-022) | chatbot | Synchronous blocking Claude API call with no timeout/backpressure policy — flagged release-blocking if/when the module is ever activated. |
+| ID | Module | Reasoning | Status (re-verified 2026-08-09) |
+|---|---|---|---|
+| SIR-AUTH-011 | auth | GDPR retention tier assignment required before G8 Release Readiness (register's own explicit requirement). | **Still OPEN** |
+| ~~OQ-USERS-05 / SIR-USERS-005~~ | ~~users~~ | ~~`getUser` has no hotel/group scope check — cross-hotel PII read by any Admin/Manager.~~ | **FIXED** — `getUser` now enforces `isWorkerInGroupScope` for scoped-manager roles with self-read exemption (`service.ts:139-145`). |
+| ~~SIR-CRM-008 / OD-CRM-08~~ | ~~crm~~ | ~~`per_page` vs `limit` param mismatch silently truncates hotel/hotel-group lists past 20 rows.~~ | **FIXED** — `ListHotelsQuerySchema` uses `limit` consistently; service destructures and paginates with the same `limit` value. No mismatch. |
+| OQ-02 / SIR-QUAL-002 | quality | `WorkerOverallRating.average_score` redefinition is a BREAKING cross-consumer contract change, register-flagged. | **Still OPEN** |
+| OQ-07 / SIR-QUAL-007 | quality | Leaderboard pagination is an authorized MUST (ADR-035) not yet implemented in code. | **Still OPEN** — `take: 50` hardcoded, no pagination params. |
+| SIR-HR-007 / OD-HR-15 | hr | Auth's 4 open High security findings require a formal human Risk Assessment before hr can be considered production-safe. | **Still OPEN** |
+| SIR-HR-017 / OD-HR-11 | hr | No GDPR retention tier assigned to the contract document/PDF/scan itself. | **Still OPEN** |
+| ~~Security FIND-002~~ | ~~employee-management~~ | ~~Special-category field access-gating disposition reads as "disclosed, not implemented".~~ | **FIXED** — `getSpecialCategory()` enforces admin-only with audit logging on both deny and allow branches (`service.ts:274-297`). |
+| SIR-DOC-001 / OD-DOC-001 | documents | No GDPR retention tier registered for `WorkerDocument` despite backend-retention now being live. | **Still OPEN** |
+| SIR-DOC-016 / OD-DOC-016 | documents | No malware/content scanning on identity/work-permit document uploads, despite HR having a ready ADR-044 precedent to reuse. | **Still OPEN** |
+| OD-RETENTION-05 / SIR-RETENTION-003 (RBAC half) | retention | `GetDeletionAuditLog` route has no RBAC scope — open to any authenticated role. | **Still OPEN** — route still has no `requireRole`/`requirePermission` gate. |
+| OQ-NOTIF-05 / SIR-NOTIF-005 | notifications | No cross-module authorization check on notification targeting — more exploitable now that HR and Consent are live producers. | **Still OPEN** |
+| SIR-CHAT-020 (OD-CHAT-022) | chatbot | Synchronous blocking Claude API call with no timeout/backpressure policy — flagged release-blocking if/when the module is ever activated. | **Still OPEN** (module still unbuilt) |
 
 ### Future Enhancements
 SIR-AUTH-008, SIR-AUTH-010, SIR-AUTH-017, SIR-AUTH-022, OQ-USERS-06, SIR-CRM-001/OD-CRM-01, SIR-CRM-003/OD-CRM-03, SIR-CRM-018, SIR-ATT-004/005/006/008, OQ-05/SIR-QUAL-006, OQ-08/SIR-QUAL-008, SIR-HR-013/OD-HR-05, HR `manualLapseContract` non-idempotency (untracked), SIR-DOC-002, SIR-DOC-003, SIR-DOC-019(b), OD-GEO-006/SIR-GEO-006, OD-GEO-009/SIR-GEO-009, SIR-CONSENT-008/OD-CONSENT-008, OD-RETENTION-10 (dormant), OD-RETENTION-04, OD-RETENTION-11/15/SIR-RETENTION-004, SIR-RETENTION-006, OD-COMPLIANCE-002/003/006/009/010/011/012, SIR-ANLY-008/009/010/011, and 15 of the 24 chatbot open decisions (all contingent on the module ever being built).
@@ -255,7 +255,7 @@ SIR-AUTH-007, SIR-AUTH-012, SIR-AUTH-015, OQ-USERS-07/SIR-USERS-007, SIR-CRM-009
 | notifications | ✅ Wired — inbox + push-token registration consumed by frontend and both mobile apps; admin `/outbox/*` routes intentionally internal-only. |
 | analytics | ✅ Wired — dashboard/leaderboard/stats consumed by frontend; `by-hotel` leaderboard variant unwired. |
 | **chatbot** | ❌ **Not built** — no code exists to wire. |
-| **Known client bug** | frontend + mobile-worker still call `/work-requests/:id/applications/*`, a route removed by Epic 9 — needs a client-side fix regardless of backend readiness. |
+| ~~**Known client bug**~~ | ~~frontend + mobile-worker still call `/work-requests/:id/applications/*`, a route removed by Epic 9.~~ **FIXED (verified 2026-08-09):** dead references removed from both frontend and mobile. |
 
 **Summary:** 11 of 18 modules are genuinely wired end-to-end. 4 modules (hr, employee-management, consent, compliance) are backend-complete but have zero client integration — 2 of these (hr, employee-management) are release-blocking gaps for a real manager-facing UI, not implementation gaps. 1 module (chatbot) has nothing to wire. 1 known client-side dead-route bug needs fixing before frontend/mobile work touches job applications.
 
@@ -285,17 +285,17 @@ This is a best-effort estimate, not a formally re-scored audit pass — treat th
 
 ## 11. What Remains Before Production Deployment
 
-Ordered punch-list, synthesized from all sections above:
+Ordered punch-list, synthesized from all sections above. Items struck through have been **verified fixed** in the 2026-08-09 re-verification pass.
 
-1. **Fix the known client bug**: frontend + mobile-worker calling the removed `/work-requests/:id/applications/*` route (§3, §6). Small, isolated, but will break in production the moment that path is exercised.
-2. **Close the 13 confirmed release-blockers** (§8) — the two cheapest/highest-leverage: `getUser` hotel-scope check (users) and the CRM `per_page`/`limit` param bug (both are small, contained fixes with security/data-loss impact).
+1. ~~**Fix the known client bug**: frontend + mobile-worker calling the removed `/work-requests/:id/applications/*` route (§3, §6).~~ **FIXED** — dead references removed from both frontend and mobile.
+2. **Close the remaining release-blockers** (§8) — ~~the two cheapest/highest-leverage (`getUser` hotel-scope check and CRM `per_page`/`limit` param bug) are both fixed~~. 10 of the original 13 remain open; see §8's updated table for per-item status.
 3. **hr and employee-management frontend/mobile integration** (§3, §9) — both are backend-complete and tested; this is the largest concrete gap between current state and a usable manager-facing product. Not a backend task.
 4. **Auth's 4 open High security findings** (SIR-HR-007/OD-HR-15) — needs a formal human Risk Assessment; blocks hr's own release readiness by dependency, independent of hr's own code quality.
 5. **GDPR retention-tier registration** for auth (User/Session/AuditLog), hr (contract documents), documents (WorkerDocument) — backend-retention is live; these modules just haven't called `IF-RETENTION-RegisterCategory` yet.
 6. **Malware scanning for backend-documents uploads** — HR already has the ADR-044 pattern to copy.
 7. **Quality leaderboard pagination** — ADR-035 already authorizes it as a MUST; just needs the `take: 50` → paginated query change.
 8. **Governance-doc synchronization pass**, specifically: `documents` and `hr` spec Interfaces tables (most severely stale), version-pointer corrections across 8 modules (§1), `DEPENDENCY_GRAPH.yaml` mount-line citations (§5) and its missing `backend-documents` entry, and the ~13 "resolved-but-mislabeled" register rows (§8) that need a human to formally close them.
-9. **Delete genuinely dead code**: `notifications/service.ts`'s `sendEmail`/`sendPushNotification` stubs (zero callers, fully superseded).
+9. ~~**Delete genuinely dead code**: `notifications/service.ts`'s `sendEmail`/`sendPushNotification` stubs (zero callers, fully superseded).~~ **FIXED** — stubs deleted; no `throw new NotImplementedError` remains anywhere in backend/src.
 10. **Owner assignment** across essentially every module (SYNC-001-class) — pure governance housekeeping, does not block technical work, but blocks further architecture-decision authority per the register's own rules.
 
 ---
@@ -303,3 +303,140 @@ Ordered punch-list, synthesized from all sections above:
 ## Recommendation
 
 **Backend is ready; frontend/mobile integration work can start in parallel now, with two carve-outs.** Sixteen of eighteen backend modules are functionally complete, tested (1648/1648 passing), and — for 11 of them — already correctly wired to real clients, which is strong evidence the API contracts are stable enough to build against. The remaining risk is concentrated, not diffuse: (1) hr and employee-management need their manager-facing UI built from scratch — this is exactly the kind of frontend work that should start now rather than wait, since the backend is done and tested; (2) the 13 release-blocking open decisions (mostly scope checks, pagination, retention-tier registration) are small, contained backend fixes that a small backend subteam can clear in parallel without blocking frontend work, as long as frontend does not build against the two known-broken surfaces (`work-applications`, and any assumption that `getUser`/CRM list pagination are already safe). Fix the client-side dead route first — it's the one item that will visibly break in the exact integration work about to start. Do not wait on chatbot, consent, retention, or compliance UI — those are correctly and deliberately deferred, not blocking.
+
+---
+
+## 12. Document Templates Module — Bug Audit (2026-08-09)
+
+**Branch:** `feat/document-templates` (uncommitted changes on top of `main`)
+**Scope:** New `backend/src/modules/document-templates/` module (5 files: `service.ts`, `controller.ts`, `routes.ts`, `pdf-renderer.ts`, `types.ts`) plus schema migration and route/permission wiring.
+**Health gates at time of audit:** Backend typecheck clean, frontend typecheck clean, backend lint clean, frontend lint clean, 2577/2577 tests passing (105 suites). No test failures — but no tests exist for this module (see BUG-DT-007).
+
+### BUG-DT-001 — `listSignatures` API always returns `null` signature URLs (Broken Feature)
+
+| Field | Value |
+|---|---|
+| Severity | **High** |
+| File | `backend/src/modules/document-templates/service.ts:632-636, 770-781` |
+| Route | `GET /document-instances/:id/signatures` |
+
+`listSignatures()` delegates to `this.toInstanceDto(instance).signatures`. In `toInstanceDto()`, `signature_image_url` is hardcoded to `null` (line 778) with a comment claiming the URL is "resolved lazily" by `listSignatures` callers. However, `listSignatures` itself never calls `getStorageClient()` or generates presigned S3 URLs — it returns `toInstanceDto()`'s output directly. Every signature in the response will have `signature_image_url: null`, making it impossible for any client to display captured signature images.
+
+The same issue affects `getInstance()` (line 407-410) — any endpoint returning an instance DTO will have null signature URLs.
+
+### BUG-DT-002 — Hotel Managers get zero results from `listInstances` (Authorization Scope Bug)
+
+| Field | Value |
+|---|---|
+| Severity | **High** |
+| File | `backend/src/modules/document-templates/service.ts:425-440` |
+| Route | `GET /document-instances` |
+
+When a hotel-scoped manager (`scope.type === 'hotel'`) calls `listInstances()` without an explicit `worker_id` query parameter, the service immediately returns `{ data: [], total: 0 }`:
+
+```typescript
+if (!scope || scope.type === 'hotel') {
+  return { data: [], total: 0 };
+}
+```
+
+This is inconsistent with the rest of the codebase. `isWorkerInGroupScope()` (`lib/scope.ts:130-134`) and `resolveNonAdminScopeFilter()` both resolve a hotel-scoped manager to their hotel's `hotel_group_id` and filter accordingly. The document-templates module should do the same — resolve the hotel to its group and filter instances by workers in that group — rather than returning empty results.
+
+### BUG-DT-003 — Content hash verification will always fail on re-render (Signing Integrity Bug)
+
+| Field | Value |
+|---|---|
+| Severity | **Medium** |
+| File | `backend/src/modules/document-templates/service.ts:586-590`, `pdf-renderer.ts:96-114` |
+
+In `signBlock()`, the `content_hash_at_signing` is computed by calling `renderSectionHtml(section, instance)` *before* the signature record is persisted. At render time, the current block is unsigned — so the rendered HTML contains `<div class="signature-line">&nbsp;</div>` for the block about to be signed. After the signature is saved, any subsequent re-render of the same section for audit/verification will include the `<img class="signature-image" .../>` tag instead, producing a different SHA-256 hash. This makes the stored `content_hash_at_signing` non-reproducible by design, defeating its stated purpose ("so a later 'what did they actually see' question is answerable").
+
+### BUG-DT-004 — Route mounting at `/` breaks modular encapsulation
+
+| Field | Value |
+|---|---|
+| Severity | **Low** |
+| File | `backend/src/routes/v1/index.ts:42` |
+
+`documentTemplateRoutes` is mounted at root `/`:
+```typescript
+router.use('/', documentTemplateRoutes);
+```
+
+Every other domain module is mounted on a scoped path (`/notifications`, `/analytics`, `/calendar`, `/documents`, `/geo`, `/retention`, etc.). While the routes internally use `/document-templates` and `/document-instances` prefixes, mounting at `/` is inconsistent with the established convention and creates a precedent for namespace collisions. Should be mounted at `/document-templates` with internal route paths adjusted.
+
+### BUG-DT-005 — Unbounded Playwright browser launches (Performance / DoS Risk)
+
+| Field | Value |
+|---|---|
+| Severity | **High** |
+| File | `backend/src/modules/document-templates/pdf-renderer.ts:160-168` |
+
+Every call to `renderInstanceToPdf()` — triggered by both `GET /document-instances/:id/preview` and `POST /document-instances/:id/finalize` — spawns a new headless Chromium process via `chromium.launch()` and tears it down in a `finally` block. There is no browser pool, no concurrency limit, and no reuse of browser instances.
+
+Under concurrent usage (e.g. multiple managers previewing documents simultaneously), this will spawn N Chromium processes in parallel. Each Chromium instance consumes ~100-300 MB of RAM. With no upper bound, this is a straightforward server resource exhaustion / denial-of-service vector — a single burst of preview requests could OOM the backend process.
+
+### BUG-DT-006 — Sensitive files in workspace root (Security / Compliance)
+
+| Field | Value |
+|---|---|
+| Severity | **Critical** |
+| Files | `Arbeitsvertrag_Alona_Likhoto_final.pdf` (130 KB, untracked), `hotelcrm-key1.pem` (1.6 KB, tracked) |
+
+Two sensitive files are present in the project root:
+
+1. **`Arbeitsvertrag_Alona_Likhoto_final.pdf`** — an untracked real employment contract containing personally identifiable information (PII). While `.gitignore` includes `*.pem`, it does not exclude PDF files. If accidentally committed, this would expose employee PII in the repository history.
+
+2. **`hotelcrm-key1.pem`** — a 1,678-byte RSA private key file. Despite `*.pem` being in `.gitignore`, this file is listed by `git status` as tracked content. This key should be stored in a secrets manager (e.g. AWS Secrets Manager per the project's own AGENTS.md guidance), not in the repository directory.
+
+### BUG-DT-007 — Zero test coverage for the new module
+
+| Field | Value |
+|---|---|
+| Severity | **Medium** |
+| File | `backend/src/__tests__/` (no `document-templates*.test.ts` exists) |
+
+The `document-templates` module adds ~1,800 lines of new code across 5 files (`service.ts` at 796 lines, `controller.ts` at 279, `routes.ts` at 216, `pdf-renderer.ts` at 170, `types.ts` at 213) including complex authorization logic (4 separate scope-check paths), template fork-on-edit, shared-key propagation, signature capture with content hashing, and PDF generation. None of this is covered by any automated test. The existing 2577 tests (105 suites) all pass but none exercise this module.
+
+This is inconsistent with the project's established pattern — every other module with comparable complexity has dedicated integration tests (e.g. `documents-upload.test.ts`, `documents-authz.test.ts`, `hr-authz.test.ts`, `hr-contract-lifecycle.test.ts`, `consent-authz.test.ts`).
+
+### Summary
+
+| ID | Severity | Category | One-line summary |
+|---|---|---|---|
+| BUG-DT-001 | High | Broken feature | `listSignatures` and all instance DTOs always return `null` signature image URLs |
+| BUG-DT-002 | High | Authorization | Hotel-scoped managers get zero results from `listInstances` |
+| BUG-DT-003 | Medium | Data integrity | `content_hash_at_signing` is non-reproducible on re-render |
+| BUG-DT-004 | Low | Convention | Route mounted at `/` instead of a scoped prefix |
+| BUG-DT-005 | High | Performance/DoS | Unbounded concurrent Chromium launches per PDF render |
+| BUG-DT-006 | Critical | Security | PII contract PDF and RSA private key in workspace root |
+| BUG-DT-007 | Medium | Test coverage | Zero automated tests for ~1,800 lines of new code |
+
+## 13. Re-Audit (2026-08-09) — Additional Findings
+
+During a secondary deep dive of the codebase, several new architectural and implementation bugs were discovered, primarily affecting pagination (DoS risks) and the `document-templates` module.
+
+### 13.1 Missing Pagination (DoS / Memory Exhaustion Risk)
+Several list endpoints use `.findMany()` queries without `skip` and `take` boundaries. While volume may be low initially, unbounded queries are a known performance/DoS vulnerability as data scales.
+- **`listTemplates`** (`backend/src/modules/document-templates/service.ts:64`): Returns all document templates without limit.
+- **`listContracts`** (`backend/src/modules/hr/service.ts:223`): Returns all contracts without limit.
+- **`listPayroll`** (`backend/src/modules/hr/service.ts:678`): Returns all payslip requests without limit.
+- **`getBlocklist`** (`backend/src/modules/employee-management/service.ts:203`): Returns all blocklist entries without limit.
+
+### 13.2 Document Templates — Architectural and Authorization Bugs
+- **BUG-DT-008: Proxy-fill constraint is unenforced (and unenforceable)**
+  - *Context*: A product decision specifically mandates "No proxy-fill: a worker fills only their own (SUBJECT-role) fields, and a manager fills only COUNTERSIGNER-role blocks".
+  - *Bug*: While `SignatureBlock` correctly carries a `signer_role`, the `DocumentTemplateField` model in Prisma has NO `signer_role` column. `upsertFieldValues` only validates that the actor has global fill-access to the instance. As a result, any actor with fill access can overwrite *any* field in the document, completely breaking the proxy-fill restriction.
+- **BUG-DT-009: Workers cannot read template schemas to fill them**
+  - *Context*: Workers need to know what fields to fill in an instance.
+  - *Bug*: `GET /document-templates/:id` is strictly limited to `['admin', 'manager', 'regional_manager']`. `getInstance` returns `DocumentInstanceDto`, which includes filled values and signature status, but NOT the empty schema/fields. This leaves workers entirely unable to load the template structure required to render a UI for filling in fields.
+
+### Updated Summary Table (New Findings)
+
+| ID | Severity | Category | One-line summary |
+|---|---|---|---|
+| BUG-PAG-01 | Medium | Performance | Missing pagination in `document-templates` (`listTemplates`) |
+| BUG-PAG-02 | Medium | Performance | Missing pagination in `hr` (`listContracts`, `listPayroll`) |
+| BUG-PAG-03 | Medium | Performance | Missing pagination in `employee-management` (`getBlocklist`) |
+| BUG-DT-008 | High | Security/Architecture | Proxy-fill constraint is entirely unenforced for template fields |
+| BUG-DT-009 | High | Logic/Flow | Workers (SUBJECT role) cannot fetch template schemas to fill them |
