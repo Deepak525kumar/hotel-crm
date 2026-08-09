@@ -481,13 +481,27 @@ export const assignmentsApi = {
 
   /**
    * ADR-028: logs the manager-entered rooms-completed count for this
-   * assignment. No GET counterpart exists backend-side — the created entry
-   * is only ever known from this call's own response, not re-fetchable.
-   * A second call for the same assignment 409s (ConflictError).
+   * assignment. Only valid once the assignment is COMPLETED (409 otherwise,
+   * 2026-08-09). Strict create — a second call for the same assignment 409s
+   * (ConflictError); use updateRoomsCompleted() below to correct an existing
+   * entry instead. The logged entry is also readable via
+   * `assignmentsApi.get(id).rooms_completed` (AssignmentDto), not just from
+   * this call's own response.
    */
   logRoomsCompleted: (id: string, input: LogRoomsCompletedInput) =>
     apiFetch<RoomsCompletedEntry>(`/assignments/${id}/rooms-completed`, {
       method: "POST",
+      body: input,
+    }),
+
+  /**
+   * Correction path for an already-logged rooms-completed entry (2026-08-09).
+   * Separate from logRoomsCompleted() above so POST's existing create-once/
+   * 409-on-repeat contract is untouched. 404s if nothing has been logged yet.
+   */
+  updateRoomsCompleted: (id: string, input: LogRoomsCompletedInput) =>
+    apiFetch<RoomsCompletedEntry>(`/assignments/${id}/rooms-completed`, {
+      method: "PATCH",
       body: input,
     }),
 

@@ -629,6 +629,8 @@ export interface Assignment {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   updated_at: string;
+  /** Null until POST /:id/rooms-completed is called for this assignment. */
+  rooms_completed: RoomsCompletedEntry | null;
 }
 
 /** Query params accepted by `GET /assignments`. */
@@ -659,6 +661,10 @@ export interface RoomsCompletedEntry {
   hotel_id: string;
   worker_id: string;
   entered_by_id: string;
+  /** Display name of entered_by_id, resolved server-side at read time.
+   * Nullable — a deleted entering user (unlikely in practice; the backend FK
+   * is onDelete: Restrict) would have an id but no resolvable name. */
+  entered_by_name?: string | null;
   rooms_completed: number;
   notes: string | null;
   created_at: string;
