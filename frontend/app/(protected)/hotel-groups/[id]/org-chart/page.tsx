@@ -36,7 +36,7 @@ function OrgChart() {
 
       {error ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-red-600">
+          <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
             {/* CRR §1:23 / ADR-060 — visible only to the group's own Regional
                 Manager and Admin; a scope mismatch surfaces as a 403 here. */}
             Failed to load this org chart. You may not have access to this
@@ -63,12 +63,12 @@ function OrgChart() {
                 <>
                   {chart.regional_manager.first_name}{" "}
                   {chart.regional_manager.last_name}{" "}
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 dark:text-gray-400">
                     ({chart.regional_manager.email})
                   </span>
                 </>
               ) : (
-                <span className="text-gray-500">Unassigned</span>
+                <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
               )}
             </CardContent>
           </Card>
@@ -99,7 +99,7 @@ function OrgChart() {
                           {h.manager ? (
                             `${h.manager.first_name} ${h.manager.last_name}`
                           ) : (
-                            <span className="text-gray-500">Unassigned</span>
+                            <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
                           )}
                         </TD>
                       </TR>
@@ -166,7 +166,7 @@ export default function OrgChartPage() {
       fallback={
         <div className="mx-auto max-w-3xl">
           <Card>
-            <CardContent className="text-sm text-gray-500">
+            <CardContent className="text-sm text-gray-500 dark:text-gray-400">
               Only Admins and Regional Managers can view org charts.
             </CardContent>
           </Card>

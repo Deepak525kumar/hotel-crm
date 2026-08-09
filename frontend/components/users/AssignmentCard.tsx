@@ -100,7 +100,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
       },
     );
 
-  const unassigned = <span className="text-gray-500">Unassigned</span>;
+  const unassigned = <span className="text-gray-500 dark:text-gray-400">Unassigned</span>;
 
   return (
     <>
@@ -154,7 +154,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                     primaryHotel ? (
                       <TextLink href={`/hotels/${primaryHotel.id}`}>{primaryHotel.name}</TextLink>
                     ) : (
-                      <span className="text-gray-500">Not set</span>
+                      <span className="text-gray-500 dark:text-gray-400">Not set</span>
                     )
                   }
                 />

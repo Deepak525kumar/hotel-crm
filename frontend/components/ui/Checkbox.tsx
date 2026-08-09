@@ -23,7 +23,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
       <div className="flex flex-col gap-1">
         <label
           htmlFor={checkboxId}
-          className="flex items-center gap-2 text-sm text-gray-700"
+          className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300"
         >
           <input
             ref={ref}
@@ -31,7 +31,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
             type="checkbox"
             aria-describedby={hintId}
             className={cn(
-              "h-4 w-4 rounded border-gray-300 text-blue-600",
+              "h-4 w-4 rounded border-gray-300 text-blue-600 dark:border-gray-700",
               "focus:ring-blue-500",
               className,
             )}
@@ -40,7 +40,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {label}
         </label>
         {hint && (
-          <p id={hintId} className="pl-6 text-sm text-gray-500">
+          <p id={hintId} className="pl-6 text-sm text-gray-500 dark:text-gray-400">
             {hint}
           </p>
         )}

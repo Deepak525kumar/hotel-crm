@@ -34,7 +34,7 @@ export function BreakdownBar({ segments }: { segments: BreakdownSegment[] }) {
   return (
     <div className="space-y-3">
       <div
-        className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-100"
+        className="flex h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
         role="img"
         aria-label={segments
           .map((s) => `${s.label}: ${s.value}`)
@@ -55,7 +55,7 @@ export function BreakdownBar({ segments }: { segments: BreakdownSegment[] }) {
         {segments.map((s) => (
           <li
             key={s.label}
-            className="flex items-center gap-2 text-sm text-gray-600"
+            className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400"
           >
             <span
               aria-hidden
@@ -65,7 +65,7 @@ export function BreakdownBar({ segments }: { segments: BreakdownSegment[] }) {
               )}
             />
             <span className="flex-1 truncate">{s.label}</span>
-            <span className="font-medium text-gray-900">{s.value}</span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">{s.value}</span>
           </li>
         ))}
       </ul>

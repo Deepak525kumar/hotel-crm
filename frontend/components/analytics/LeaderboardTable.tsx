@@ -31,7 +31,7 @@ export function LeaderboardTable({
 
   if (error) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-red-600">
+      <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
         Failed to load the leaderboard.
       </div>
     );
@@ -65,7 +65,7 @@ export function LeaderboardTable({
         <TBody>
           {rows.map((e) => (
             <TR key={e.worker_id}>
-              <TD className="font-medium text-gray-500">{e.position}</TD>
+              <TD className="font-medium text-gray-500 dark:text-gray-400">{e.position}</TD>
               <TD className="font-medium">{e.name}</TD>
               <TD className="text-right">{e.completed_tasks}</TD>
               <TD className="text-right">{e.total_tasks}</TD>

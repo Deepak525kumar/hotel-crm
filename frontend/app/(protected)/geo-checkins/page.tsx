@@ -68,7 +68,7 @@ function GeoCheckinsList() {
       <Card>
         <CardContent className="p-0">
           {error ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load geo check-ins. Please try again.
             </div>
           ) : (
@@ -117,7 +117,7 @@ export default function GeoCheckinsPage() {
     <GeoCheckinsGate
       fallback={
         <Card>
-          <CardContent className="text-sm text-gray-500">
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
             Geo check-ins are available to managers and admins.
           </CardContent>
         </Card>

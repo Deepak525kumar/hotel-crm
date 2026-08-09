@@ -166,6 +166,22 @@ do not silently re-derive a scope for them.**
 
 ---
 
+### Addendum, 2026-08-10 — PR #397 (dark mode) review follow-up, tracked not actioned
+
+Review feedback on PR #397 (`feat/dark-mode-toggle`) suggested tokenizing the dark-mode approach:
+instead of a `dark:` Tailwind variant on every affected utility class (repeated across the ~66-file
+surface that PR touches), introduce semantic classes (`bg-surface`, `bg-surface-secondary`,
+`text-primary`, `text-secondary`, `border-default`, ...) mapped to CSS variables in `globals.css`.
+That would make future palette/contrast tweaks a one-file change instead of a repo-wide sweep.
+
+**Explicitly NOT done now** — the reviewer's own call, agreed with: retrofitting tokens means
+re-touching every one of those ~66 files a second time for zero user-visible change, which is real
+scope and regression risk for a toggle that already works correctly. Left as `dark:`-variant-based
+for this PR. **Next person touching dark-mode styling broadly (not a one-off tweak) should consider
+this tokenization first**, rather than adding a 67th file's worth of `dark:` variants to the pile.
+
+---
+
 ## 1. What's merged (this session, chronological, oldest first)
 
 Every PR below is merged to `main`, CI-green, and — starting at #347 — independently re-reviewed by

@@ -35,7 +35,7 @@ function ManagerOverview() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-gray-900">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           Platform overview
         </h2>
         <TextLink
@@ -48,7 +48,7 @@ function ManagerOverview() {
 
       {error ? (
         <Card>
-          <CardContent className="py-8 text-center text-sm text-red-600">
+          <CardContent className="py-8 text-center text-sm text-red-600 dark:text-red-400">
             Couldn’t load platform stats.
           </CardContent>
         </Card>
@@ -112,7 +112,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle>Your account</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-700">
+          <CardContent className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
             <p>{user?.email}</p>
             {user && <RoleBadge role={user.role} />}
             <p>
@@ -135,7 +135,7 @@ export default function DashboardPage() {
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50"
+                    className="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
                   >
                     {l.label}
                   </Link>

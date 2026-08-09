@@ -5,7 +5,7 @@ export default function Loading() {
       <span
         aria-label="Loading"
         role="status"
-        className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600"
+        className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-500"
       />
     </div>
   );

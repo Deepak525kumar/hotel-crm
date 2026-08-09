@@ -87,11 +87,11 @@ function ArchiveContent() {
         </CardHeader>
         <CardContent className="p-0">
           {hotelsError ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load archived hotels.
             </div>
           ) : hotelsLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">Loading…</div>
+            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</div>
           ) : deletedHotels.length === 0 ? (
             <EmptyState
               title="No deleted hotels"
@@ -138,11 +138,11 @@ function ArchiveContent() {
         </CardHeader>
         <CardContent className="p-0">
           {groupsError ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load archived hotel groups.
             </div>
           ) : groupsLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500">Loading…</div>
+            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</div>
           ) : deletedGroups.length === 0 ? (
             <EmptyState
               title="No deleted hotel groups"
@@ -188,7 +188,7 @@ export default function ArchivePage() {
       allow={["admin"]}
       fallback={
         <Card>
-          <CardContent className="text-sm text-gray-500">
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
             Only admins can view the archive.
           </CardContent>
         </Card>

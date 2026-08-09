@@ -28,7 +28,7 @@ export function MyStatsCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
-          <p className="py-6 text-center text-sm text-red-600">
+          <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load your stats.
           </p>
         ) : isLoading || !stats ? (
@@ -48,7 +48,7 @@ export function MyStatsCard() {
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium text-gray-700">Attendance</p>
+              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Attendance</p>
               <BreakdownBar
                 segments={[
                   { label: "Present", value: stats.attendance.present, tone: "success" },
@@ -59,7 +59,7 @@ export function MyStatsCard() {
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium text-gray-700">This month</p>
+              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">This month</p>
               <div className="grid gap-4 sm:grid-cols-3">
                 <StatTile label="Shifts" value={stats.current_month.assignments} />
                 <StatTile label="Completed" value={stats.current_month.completed} />
@@ -72,14 +72,14 @@ export function MyStatsCard() {
 
             {stats.recent_ratings.length > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-700">Recent ratings</p>
+                <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Recent ratings</p>
                 <ul className="space-y-1">
                   {stats.recent_ratings.map((r) => (
                     <li
                       key={r.assignment_id}
                       className="flex items-center justify-between text-sm"
                     >
-                      <span className="text-gray-600">{formatDate(r.created_at)}</span>
+                      <span className="text-gray-600 dark:text-gray-400">{formatDate(r.created_at)}</span>
                       <span className="font-medium">{formatScore(r.rating, 0)}</span>
                     </li>
                   ))}

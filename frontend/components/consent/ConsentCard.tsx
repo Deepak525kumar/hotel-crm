@@ -101,7 +101,7 @@ export function ConsentCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
-          <p className="py-6 text-center text-sm text-red-600">
+          <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load your consent status.
           </p>
         ) : isLoading ? (
@@ -110,7 +110,7 @@ export function ConsentCard() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <Badge tone="success">Granted</Badge>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Decided {formatDateTime(status.decided_at)} · notice {status.notice_version}
               </p>
             </div>
@@ -126,7 +126,7 @@ export function ConsentCard() {
         ) : (
           <div className="space-y-3">
             {status?.status === "declined" && (
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 You previously declined this notice
                 {status.decided_at && ` on ${formatDateTime(status.decided_at)}`}. You can
                 review it again below.
@@ -142,11 +142,11 @@ export function ConsentCard() {
                 Review notice
               </Button>
             ) : (
-              <div className="space-y-3 rounded-md border border-gray-200 p-4">
-                <p className="text-xs text-gray-500">Notice version: {notice.notice_version}</p>
+              <div className="space-y-3 rounded-md border border-gray-200 p-4 dark:border-gray-800">
+                <p className="text-xs text-gray-500 dark:text-gray-400">Notice version: {notice.notice_version}</p>
                 <p
                   dir={notice.rtl ? "rtl" : "ltr"}
-                  className="text-sm text-gray-700"
+                  className="text-sm text-gray-700 dark:text-gray-300"
                 >
                   {notice.notice_content}
                 </p>

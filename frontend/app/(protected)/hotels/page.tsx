@@ -96,7 +96,7 @@ export default function HotelsPage() {
       <Card>
         <CardContent className="p-0">
           {error ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load hotels. Please try again.
             </div>
           ) : (
@@ -141,7 +141,7 @@ export default function HotelsPage() {
                       <TD>
                         {h.city}, {h.country}
                       </TD>
-                      <TD className="text-gray-500">{h.timezone}</TD>
+                      <TD className="text-gray-500 dark:text-gray-400">{h.timezone}</TD>
                       <TD>
                         <div className="flex items-center gap-2">
                           <ActiveBadge active={h.is_active} />

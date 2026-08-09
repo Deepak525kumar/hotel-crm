@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { SessionBootstrap } from "@/components/auth/SessionBootstrap";
 import "./globals.css";
 
@@ -26,11 +27,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      // next-themes sets the `dark` class client-side, after the server-
+      // rendered markup has none -- suppressHydrationWarning on the one
+      // element it mutates is next-themes' own documented pattern, not a
+      // blanket hydration-mismatch suppression.
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SessionBootstrap />
-        {children}
+        <ThemeProvider>
+          <SessionBootstrap />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

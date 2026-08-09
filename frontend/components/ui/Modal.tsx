@@ -110,20 +110,20 @@ export function Modal({
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl outline-none",
+          "relative z-10 w-full max-w-lg rounded-lg bg-white shadow-xl outline-none dark:bg-gray-900",
           className,
         )}
       >
         {title && (
-          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4">
-            <h2 id={titleId} className="text-base font-semibold text-gray-900">
+          <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 dark:border-gray-800">
+            <h2 id={titleId} className="text-base font-semibold text-gray-900 dark:text-gray-100">
               {title}
             </h2>
             <button
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-400"
             >
               <svg
                 width="20"
@@ -142,7 +142,7 @@ export function Modal({
         )}
         <div className="px-6 py-4">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4 dark:border-gray-800">
             {footer}
           </div>
         )}

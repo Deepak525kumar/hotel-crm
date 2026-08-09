@@ -100,7 +100,7 @@ export default function AttendanceDetailPage() {
           ← Back to attendance
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
               ? "This attendance record was not found."
               : "This attendance record was not found or could not be loaded."}
@@ -214,7 +214,7 @@ export default function AttendanceDetailPage() {
       {canCheckOut && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               You are checked in. Record your check-out to close out this shift.
             </div>
             <Button
@@ -234,7 +234,7 @@ export default function AttendanceDetailPage() {
       <RoleGate allow={["manager", "regional_manager", "admin", "checker"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               Review this attendance record. Set the final status and mark it
               verified.
             </div>

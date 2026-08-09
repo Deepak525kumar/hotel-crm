@@ -43,7 +43,7 @@ export function UserRef({
   // Skip the fetch entirely when the viewer lacks users:read -- it would 403.
   const byId = useUsersByIds(canViewUsers && userId ? [userId] : []);
 
-  if (!userId) return <span className="text-gray-500">{fallback}</span>;
+  if (!userId) return <span className="text-gray-500 dark:text-gray-400">{fallback}</span>;
 
   const resolved = byId.get(userId);
   const name = resolved ? `${resolved.first_name} ${resolved.last_name}` : null;
