@@ -26,6 +26,7 @@ const mockInstanceUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => 
 const mockFieldValueUpsert = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockSignatureBlockFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockInstanceSignatureCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockInstanceSignatureUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockHotelFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
@@ -62,7 +63,10 @@ jest.mock('../lib/db.js', () => ({
       update: mockInstanceUpdate,
     },
     documentInstanceFieldValue: { upsert: mockFieldValueUpsert },
-    documentInstanceSignature: { create: mockInstanceSignatureCreate },
+    documentInstanceSignature: {
+      create: mockInstanceSignatureCreate,
+      update: mockInstanceSignatureUpdate,
+    },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotel: { findUnique: mockHotelFindUnique },
     auditLog: { create: mockAuditLogCreate },
@@ -545,9 +549,7 @@ describe('DocumentTemplatesService', () => {
       );
       mockInstanceSignatureCreate.mockResolvedValue({});
       mockInstanceUpdate.mockResolvedValue({});
-      mockInstanceFindUnique.mockResolvedValueOnce(instance()).mockResolvedValueOnce(
-        instance({ status: 'AWAITING_SIGNATURES' })
-      );
+      mockInstanceFindUnique.mockResolvedValue(instance());
 
       const result = await service.signBlock('i1', 'b1', Buffer.from('png'), { userId: 'w1', role: 'worker' });
       expect(mockInstanceSignatureCreate).toHaveBeenCalled();
@@ -556,9 +558,7 @@ describe('DocumentTemplatesService', () => {
     });
 
     it('allows an in-scope manager to sign a COUNTERSIGNER block', async () => {
-      mockInstanceFindUnique
-        .mockResolvedValueOnce(instance())
-        .mockResolvedValueOnce(instance({ status: 'AWAITING_SIGNATURES' }));
+      mockInstanceFindUnique.mockResolvedValue(instance());
       mockSignatureBlockFindUnique.mockResolvedValue(countersignerBlock());
       mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });
       mockHotelFindUnique.mockResolvedValue({ hotel_group_id: 'g1' });

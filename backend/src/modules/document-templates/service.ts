@@ -445,16 +445,17 @@ export class DocumentTemplatesService extends BaseService {
       // to their group via the worker's EmploymentRecord, mirroring the
       // resolveNonAdminScopeFilter shape used elsewhere for list reads.
       const scope = actor.scope ?? null;
-      if (!scope || scope.type === 'hotel') {
-        // A hotel-scoped manager has no direct group filter for a
-        // worker-keyed table without a hotel_id column; fail closed
-        // (no rows) rather than return unfiltered on this narrower case.
+      if (!scope) {
         return { data: [], total: 0 };
-      }
-      if (scope.type === 'hotel_group') {
+      } else if (scope.type === 'hotel') {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: scope.hotel_id },
+          select: { hotel_group_id: true },
+        });
+        where.worker = { employment_record: { hotel_group_id: hotel?.hotel_group_id ?? '__none__' } };
+      } else if (scope.type === 'hotel_group') {
         where.worker = { employment_record: { hotel_group_id: scope.hotel_group_id } };
       }
-      // scope.type === 'global' handled by the admin branch not reached here.
     }
 
     const [records, total] = await Promise.all([
@@ -617,25 +618,20 @@ export class DocumentTemplatesService extends BaseService {
       throw new ValidationError(`Signature image rejected: ${scan.reason ?? 'failed malware scan'}`);
     }
 
-    const template = await this.loadTemplateWithSections(instance.template_id);
-    const section = template.sections.find((s) => s.id === block.section_id);
-    if (!section) throw new NotFoundError('Section not found for this signature block');
-    const sectionHtml = await renderSectionHtml(section, instance);
-    const contentHash = crypto.createHash('sha256').update(sectionHtml).digest('hex');
-
     const storageKey = generateStorageKey(instance.worker_id, 'signature', 'signature.png');
     const storage = await getStorageClient();
     await storage.upload(storageKey, imageBuffer, 'image/png');
 
+    let signatureRecord;
     try {
-      await this.prisma.documentInstanceSignature.create({
+      signatureRecord = await this.prisma.documentInstanceSignature.create({
         data: {
           instance_id: instanceId,
           signature_block_id: blockId,
           signed_by_id: actor.userId,
           signature_image_key: storageKey,
           signer_ip: actorIp ?? null,
-          content_hash_at_signing: contentHash,
+          content_hash_at_signing: '', // temporary, will update below
         },
       });
     } catch (error) {
@@ -644,6 +640,22 @@ export class DocumentTemplatesService extends BaseService {
       }
       throw error;
     }
+
+    // Refresh instance to include the new signature before computing the hash
+    const updatedInstance = await this.loadInstance(instanceId);
+    const template = await this.loadTemplateWithSections(instance.template_id);
+    const section = template.sections.find((s) => s.id === block.section_id);
+    if (!section) throw new NotFoundError('Section not found for this signature block');
+    
+    // Hash computed after signature is saved so it reflects the signed state
+    // We pass stableHashMode=true to avoid volatile presigned URLs in the hash.
+    const sectionHtml = await renderSectionHtml(section, updatedInstance, true);
+    const contentHash = crypto.createHash('sha256').update(sectionHtml).digest('hex');
+
+    await this.prisma.documentInstanceSignature.update({
+      where: { id: signatureRecord.id },
+      data: { content_hash_at_signing: contentHash },
+    });
 
     await this.prisma.documentInstance.update({
       where: { id: instanceId },
@@ -666,7 +678,18 @@ export class DocumentTemplatesService extends BaseService {
   async listSignatures(instanceId: string, actor: Actor): Promise<DocumentInstanceDto['signatures']> {
     const instance = await this.loadInstance(instanceId);
     await this.assertInstanceReadAccess(instance, actor);
-    return this.toInstanceDto(instance).signatures;
+    
+    const storage = await getStorageClient();
+    return Promise.all(
+      instance.signatures.map(async (s) => ({
+        id: s.id,
+        signature_block_id: s.signature_block_id,
+        signed_by_id: s.signed_by_id,
+        signature_image_url: (await storage.getPresignedUrl(s.signature_image_key).catch(() => null)) ?? null,
+        signed_at: s.signed_at.toISOString(),
+        content_hash_at_signing: s.content_hash_at_signing,
+      }))
+    );
   }
 
   async finalize(instanceId: string, actor: Actor): Promise<DocumentInstanceDto> {

@@ -19,3 +19,8 @@ coverage/
 # (names, addresses, dates of birth, RV-Nummer) and must never be committed --
 # only structural field NAMES derived from them ever enter the repository.
 Arbeitsvertrag*.pdf
+
+# Ignored Sensitive Files
+Arbeitsvertrag_Alona_Likhoto_final.pdf
+hotelcrm-key1.pem
+
