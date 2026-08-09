@@ -8,12 +8,22 @@ import pkg from "./package.json" with { type: "json" };
 // proxies server-side. This is what makes plain SameSite=Lax httpOnly
 // auth cookies work without a cross-origin SameSite=None+CSRF scheme --
 // see lib/cookies.ts on the backend.
-// A missing env var in production would silently proxy every /api request
-// to localhost:3001 on the Vercel server itself -- nothing is listening
-// there, so every request fails, but the failure looks like a generic
-// network error with no indication the real cause is a missing env var.
-// Failing at build time instead turns that into an immediate, legible error.
-if (process.env.NODE_ENV === "production" && !process.env.BACKEND_INTERNAL_URL) {
+// A missing env var on an actual deployment would silently proxy every
+// /api request to localhost:3001 on the server itself -- nothing is
+// listening there, so every request fails, but the failure looks like a
+// generic network error with no indication the real cause is a missing env
+// var. Failing at build time instead turns that into an immediate, legible
+// error.
+//
+// Scoped to `process.env.VERCEL` (set to "1" by Vercel on every build it
+// runs, https://vercel.com/docs/environment-variables/system-environment-variables)
+// rather than NODE_ENV === "production" alone: this repo's own CI
+// (.github/workflows/ci.yml) also runs `next build` with NODE_ENV=production
+// internally (Next.js always sets that for `next build`, regardless of what
+// the workflow passes in) purely to typecheck/lint/verify the build compiles
+// -- it never serves real traffic and has no BACKEND_INTERNAL_URL configured,
+// so requiring one there would fail every CI run for a var CI doesn't need.
+if (process.env.VERCEL && !process.env.BACKEND_INTERNAL_URL) {
   throw new Error(
     "BACKEND_INTERNAL_URL must be set in production for the /api rewrite proxy",
   );
