@@ -88,6 +88,12 @@ export default function CalendarGridPage() {
   const from = toDateKey(days[0]);
   const to = toDateKey(days[days.length - 1]);
   const currentMonth = anchor.getMonth();
+  // Whether today's date already falls inside the visible grid -- drives the
+  // Today control's toggle state (highlighted + inert when already there,
+  // rather than a plain nav button that looks the same regardless of where
+  // you're currently looking).
+  const todayKey = toDateKey(new Date());
+  const isOnToday = todayKey >= from && todayKey <= to;
 
   const { data: entries, isLoading: entriesLoading, error: entriesError } =
     useCalendarEntriesInRange({ from, to });
@@ -228,7 +234,18 @@ export default function CalendarGridPage() {
             <Button variant="outline" size="sm" onClick={goPrev}>
               ← Prev
             </Button>
-            <Button variant="outline" size="sm" onClick={goToday}>
+            {/* Today toggle: solid/active whenever today's date is already
+                inside the visible grid (and inert, since jumping to the
+                current view is a no-op), outline and clickable otherwise --
+                so the control also doubles as an at-a-glance "am I looking
+                at today or not" indicator, not just a jump action. */}
+            <Button
+              variant={isOnToday ? "primary" : "outline"}
+              size="sm"
+              onClick={goToday}
+              disabled={isOnToday}
+              aria-pressed={isOnToday}
+            >
               Today
             </Button>
             <Button variant="outline" size="sm" onClick={goNext}>
