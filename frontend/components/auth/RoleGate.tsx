@@ -254,3 +254,26 @@ export function WorkerOnboardingGate({
     </RoleGate>
   );
 }
+
+/**
+ * Document Templates authoring (`document_templates:write`) — every write
+ * route (`create`/`update`/`addSection`/`addField`/`addSignatureBlock`/
+ * `publish`/`archive`, document-templates/routes.ts) is `requireRole('admin')`
+ * with no manager/RM widening, unlike most other write gates in this file.
+ * Manager/regional_manager/admin can all still READ templates (to pick one
+ * when creating an instance) — this gate covers authoring only, not the
+ * template list/detail pages themselves.
+ */
+export function DocumentTemplatesWriteGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}

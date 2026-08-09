@@ -1,9 +1,111 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-07 (PR #358 open: hotel-group hotels filter + regional manager display +
+Last updated: 2026-08-09 (Document Templates + Digital Signature: built complete on the
+unmerged branch `feat/document-templates` — see §0 immediately below, which is the active
+work; everything from §1 down is prior-session history).
+
+Previous update: 2026-08-07 (PR #358 open: hotel-group hotels filter + regional manager display +
 raw-id-across-the-app sweep — see §1.5).
 
 Previous update: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
+
+---
+
+## 0. ACTIVE: Document Templates + Digital Signature (branch `feat/document-templates`, NOT merged, NO PR opened yet)
+
+**What it is.** An admin authors a reusable multi-section document template through the UI (no
+code change, no redeploy); a worker/manager creates a per-worker instance of it, fills the fields
+section by section, each required signer draws a signature, and once every signature block is
+signed it finalizes into a real PDF stored through the existing documents module. Requested
+directly by the project owner this session ("in app fillable form templates. we also need to get
+digital signature"), with a real German employment contract (`Arbeitsvertrag`) supplied as the
+reference for the *shape* the model must express.
+
+**Status: feature-complete and locally verified; never run against a real database or browser.**
+
+| Layer | State |
+|---|---|
+| Prisma schema + migration | 7 models, 4 enums, additive. Hand-authored SQL verified **byte-identical** to `prisma migrate diff` output; `down.sql` paired; `migrate-harness.sh check-pairs` passes |
+| Backend module | `backend/src/modules/document-templates/{routes,controller,service,types,pdf-renderer}.ts`, mounted in `routes/v1/index.ts` |
+| RBAC | 7 new tokens; 3 role-conditional wrappers each carrying the `@requiresPermission` annotation the static D-8 parser needs |
+| Backend tests | 41 new (29 service + 12 route-authz). **Full suite green: 107 suites / 2618 tests** |
+| Frontend | template CRUD (list/new/editor), instance flow (list/new/fill-sign wizard), `SignatureCaptureModal` (`signature_pad`), `MyDocumentInstancesCard` on `/users/[id]`, sidebar entry, `DocumentTemplatesWriteGate`. `tsc`/`eslint`/`build` all clean |
+| Docs | `docs/03-modules/document-templates/MODULE_SPEC.md` + `MODULE_REGISTRY.yaml` + `SPECIFICATION_INDEX.yaml` entries. `repository-integrity-check.js`: **0 real failures** |
+
+### 0.1 Three things that will bite whoever picks this up
+
+1. **DEPLOYMENT PREREQUISITE — `playwright` needs the Chromium binary (~300 MB) in every
+   environment that runs this code** (`npx playwright install --with-deps chromium`). An image
+   without it fails **at first PDF render, not at startup** — so the app looks perfectly healthy
+   until someone hits Preview or Finalize. The EC2 image and the CI runner both need this before
+   this branch ships. This is the single most likely way this module breaks in an environment
+   that otherwise looks fine.
+2. **No end-to-end run has ever happened.** The Playwright renderer is *mocked* in the test suite,
+   so the real PDF path — including the Chromium-missing failure mode — has zero automated
+   coverage, and no one has authored a full contract-shaped template through the UI and driven it
+   to a signed PDF. This is the top pre-merge task, and it needs a real environment (DB + auth +
+   browser), which this session never had.
+3. **The signature is attestation, not a legally-binding e-signature.** Drawn image + signer id
+   from `req.auth` + server timestamp + IP + SHA-256 `content_hash_at_signing`. Same trust level
+   `backend-hr`'s existing `confirmContractSigned()` already operates at. No cryptographic
+   signing, no eIDAS/PAdES. The owner was asked directly and confirmed this is what's wanted for
+   now. The UI carries the mandatory disclosure copy ("Recorded for audit purposes; not a
+   qualified electronic signature") — **do not let that string get dropped in a future refactor.**
+
+### 0.2 Design decisions the owner made explicitly (don't silently revisit these)
+
+- **Build the full shape in one larger PR**, not a walking skeleton — chosen over the plan
+  agent's own recommendation.
+- **Fork on edit**: editing a PUBLISHED template deep-copies it into a new DRAFT (`version + 1`,
+  `parent_template_id`) rather than mutating it, so a signed instance's text can never change
+  retroactively. The frontend editor handles the returned-id change and shows a one-time notice —
+  `documentTemplatesApi.updateTemplate`'s JSDoc warns every caller that `dto.id` may differ from
+  the id passed in.
+- **No proxy-fill in either direction.** A worker fills/signs only their own `SUBJECT` fields and
+  blocks; admin/manager only `COUNTERSIGNER` blocks. Enforced per-block in the service layer.
+- **SELECT added as a 6th field type**; **drawn-only** signature capture (no typed-name
+  fallback); **draft preview allowed** before all signatures collected; final PDF **reuses
+  `DocumentCategory.GENERAL`** (no new enum value).
+
+### 0.3 The spec is deliberately honest about provenance — read this before "fixing" it
+
+Every other `MODULE_SPEC.md` in this repo cites exact line numbers from CRR/PDD. **This feature
+appears in neither authoritative document**, and CRR §9 actually *excludes* signature capture for
+the contract case. So the spec carries an explicit Provenance note stating it's a first-party
+product decision from the 2026-08-09 owner session rather than fabricating citations it doesn't
+have, and it is `DRAFT` / **NOT FROZEN** — no G2 freeze was sought and no G4 review round was run
+(that's `OD-DOCTPL-08`). If a future pass "corrects" this by inventing CRR references, that is a
+regression, not a fix.
+
+### 0.4 Nine open decisions recorded in the spec (none silently resolved)
+
+`OD-DOCTPL-01` relationship to `backend-hr`'s contract flow and the unused `Contract.template_id`
+column — **deliberately undecided, needs an ADR**. `-02` no amend/re-sign/void path exists. `-03`
+`validation` is a `Json?` column with no evaluator behind it. `-04` **no retention tier assigned
+to any of the seven tables** — must be classified before this holds real data. `-05`
+`DocumentInstanceStatus.VOIDED` is defined but unreachable. `-06` PDF rendering launches Chromium
+synchronously per request, unqueued/unthrottled — a plausible DoS vector via repeated `/preview`
+calls. `-07` a template can be authored to collect CRR §27 special-category data with no
+restricted-visibility mechanism. `-08` no G4/G2. `-09` `body_template` renders as trusted admin
+markup (accepted by design, disclosed).
+
+### 0.5 Immediate next actions
+
+1. Open the PR. It has never been reviewed by anyone but the implementing session — get the
+   adversarial review this repo requires for changes of this size (§1's established bar).
+2. Get Chromium into the CI and EC2 images **before** merge (see 0.1.1).
+3. Do the end-to-end run in a real environment (see 0.1.2) — author the full contract-shaped
+   template, fill it, sign all blocks with a mix of worker and manager actors, finalize, open the
+   PDF, confirm every signature lands in the right section and `AuditLog` has one
+   `document_instance.sign` row per signature.
+4. Classify the retention tier (`OD-DOCTPL-04`) before this carries real employee data.
+
+### 0.6 Untracked file — do not commit
+
+`Arbeitsvertrag_Alona_Likhoto_final.pdf` in the repo root is a **real employee's contract**. It is
+untracked and must stay that way. No real personal data from it (name, address, DOB, RV-Nummer, or
+any filled value) appears anywhere in the code, tests, docs, or commit messages — only structural
+field *names* like `employee_name`. Keep it that way.
 
 Current status: **The employment-lifecycle rework is complete.** All prior-session work
 (#345–357) is merged to `main`, local `main` synced. PRs #354 (schema/migration + service-layer,

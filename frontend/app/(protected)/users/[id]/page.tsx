@@ -18,6 +18,7 @@ import {
 } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { DocumentsCard } from "@/components/documents/DocumentsCard";
+import { MyDocumentInstancesCard } from "@/components/document-templates/MyDocumentInstancesCard";
 import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
 import { ContractCard } from "@/components/hr/ContractCard";
 import { WorkerOnboardingCard } from "@/components/employees/WorkerOnboardingCard";
@@ -209,6 +210,12 @@ function UserDetail() {
           <DocumentsGate>
             <DocumentsCard workerId={id} />
           </DocumentsGate>
+
+          {user.role === "worker" && (
+            <DocumentsGate>
+              <MyDocumentInstancesCard workerId={id} />
+            </DocumentsGate>
+          )}
 
           {user.role === "worker" && (
             <HrPayrollGate>
