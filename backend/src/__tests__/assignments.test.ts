@@ -174,7 +174,7 @@ describe('AssignmentService', () => {
     it('transitions CONFIRMED -> IN_PROGRESS and sets started_at', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() }));
-      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
       const data = mockWorkerAssignment.update.mock.calls[0][0].data;
       expect(data.status).toBe('IN_PROGRESS');
       expect(data.started_at).toBeInstanceOf(Date);
@@ -209,7 +209,7 @@ describe('AssignmentService', () => {
         mockJobRequest.findUnique.mockResolvedValue(shiftAt(300)); // 5h out
 
         await expect(
-          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true)
         ).rejects.toMatchObject({ name: 'ConflictError' });
 
         expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
@@ -226,7 +226,7 @@ describe('AssignmentService', () => {
         mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
         mockJobRequest.findUnique.mockResolvedValue(shiftAt(60)); // 1h out
 
-        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
 
         expect(mockWorkerAssignment.update).toHaveBeenCalled();
       });
@@ -242,7 +242,7 @@ describe('AssignmentService', () => {
         mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
         mockJobRequest.findUnique.mockResolvedValue(shiftAt(-30)); // started 30m ago
 
-        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
 
         expect(mockWorkerAssignment.update).toHaveBeenCalled();
       });
@@ -258,7 +258,7 @@ describe('AssignmentService', () => {
           makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
         );
 
-        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
 
         expect(mockWorkerAssignment.update).toHaveBeenCalled();
         expect(mockJobRequest.findUnique).not.toHaveBeenCalled();
@@ -276,7 +276,7 @@ describe('AssignmentService', () => {
         mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1', timezone: 'UTC' });
         mockJobRequest.findUnique.mockResolvedValue(shiftAt(600)); // far future
 
-        await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+        await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker', undefined, true);
 
         expect(mockWorkerAssignment.update).toHaveBeenCalled();
       });
@@ -303,7 +303,7 @@ describe('AssignmentService', () => {
         const realNow = Date.now;
         Date.now = () => Date.UTC(2026, 6, 1, 9, 30);
         try {
-          await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+          await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
         } finally {
           Date.now = realNow;
         }
@@ -330,7 +330,7 @@ describe('AssignmentService', () => {
         });
 
         await expect(
-          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true)
         ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
         expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
@@ -344,7 +344,7 @@ describe('AssignmentService', () => {
         mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'blocked' });
 
         await expect(
-          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+          service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true)
         ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
         expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
@@ -357,7 +357,7 @@ describe('AssignmentService', () => {
         mockEmployeeBlocklistEntry.findUnique.mockResolvedValue({ id: 'blocked' });
 
         await expect(
-          service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker')
+          service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker', undefined, true)
         ).rejects.toMatchObject({ name: 'ForbiddenError' });
       });
 
@@ -382,7 +382,7 @@ describe('AssignmentService', () => {
           makeAssignment({ worker_id: 'w1', status: 'IN_PROGRESS', started_at: new Date() })
         );
 
-        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
 
         expect(mockWorkerAssignment.update).toHaveBeenCalled();
       });
@@ -391,7 +391,7 @@ describe('AssignmentService', () => {
     it('transitions IN_PROGRESS -> COMPLETED and sets completed_at', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED', completed_at: new Date() }));
-      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker', undefined, true);
       const data = mockWorkerAssignment.update.mock.calls[0][0].data;
       expect(data.status).toBe('COMPLETED');
       expect(data.completed_at).toBeInstanceOf(Date);
@@ -434,7 +434,7 @@ describe('AssignmentService', () => {
     it('does not include a cancellation_reason key in the audit log details for a non-cancelling transition', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
-      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
       const call = mockPrisma.auditLog.create.mock.calls.find(
         (c: any) => c[0].data.action === 'UPDATE_ASSIGNMENT'
       );
@@ -470,7 +470,7 @@ describe('AssignmentService', () => {
         makeAssignment({ status: 'IN_PROGRESS', skill_slot_id: 'slot1' })
       );
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED', skill_slot_id: 'slot1' }));
-      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker', undefined, true);
       expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
     });
 
@@ -513,7 +513,7 @@ describe('AssignmentService', () => {
       it('sends no cancellation notification for a non-cancelling transition', async () => {
         mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w1' }));
         mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
-        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+        await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
         expect(mockNotification.create).not.toHaveBeenCalled();
       });
     });
@@ -523,7 +523,7 @@ describe('AssignmentService', () => {
     it('refreshes WorkerOverallRating when a transition completes the assignment', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS', worker_id: 'w1' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
-      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker');
+      await service.update('a1', { status: 'COMPLETED' }, 'w1', 'worker', undefined, true);
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
       expect(mockWorkerOverallRating.upsert.mock.calls[0][0].where).toEqual({ worker_id: 'w1' });
@@ -542,7 +542,7 @@ describe('AssignmentService', () => {
     it('does not refresh WorkerOverallRating for a transition that does not affect the aggregate (CONFIRMED -> IN_PROGRESS)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'CONFIRMED', worker_id: 'w1' }));
       mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
-      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
       expect(mockWorkerOverallRating.upsert).not.toHaveBeenCalled();
     });
 
@@ -944,7 +944,7 @@ describe('AssignmentService', () => {
       // fixture is eligible so the test isolates the ownership gate itself.
       mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
       mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
-      const dto = await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker');
+      const dto = await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
       expect(dto.status).toBe('IN_PROGRESS');
     });
 
@@ -953,7 +953,7 @@ describe('AssignmentService', () => {
       mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
       mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
       await expect(
-        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true)
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
     });
@@ -971,7 +971,7 @@ describe('AssignmentService', () => {
       mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ worker_id: 'w2', hotel_id: 'h1', status: 'CONFIRMED' }));
       mockEmploymentRecord.findUnique.mockResolvedValue(null);
       await expect(
-        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker')
+        service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true)
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
   });

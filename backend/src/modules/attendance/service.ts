@@ -10,6 +10,8 @@ import { getEnv } from '../../config/env.js';
 import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
+import { assignmentService, resolveScheduledStart } from '../assignments/service.js';
+import { AssignmentStatus } from '@prisma/client';
 
 export class AttendanceService extends BaseService {
   private toDto(a: Attendance): AttendanceDto {
@@ -48,11 +50,52 @@ export class AttendanceService extends BaseService {
       throw new ForbiddenError('Can only check in to your own assignment');
     }
 
-    // Find the pre-created EXPECTED attendance record
-    const existing = await this.prisma.attendance.findUnique({
+    // Find the pre-created EXPECTED attendance record, or lazily create it (Bug 23)
+    let existing = await this.prisma.attendance.findUnique({
       where: { assignment_id: input.assignment_id },
     });
-    if (!existing) throw new NotFoundError('Attendance record not found');
+
+    if (!existing) {
+      const expectedStart = await resolveScheduledStart(this.prisma, assignment);
+      let expectedEnd: Date | null = null;
+      
+      if (expectedStart && assignment.job_request_id) {
+        const jobReq = await this.prisma.jobRequest.findUnique({
+          where: { id: assignment.job_request_id },
+          select: { shift_start_time: true, shift_end_time: true },
+        });
+        if (jobReq?.shift_start_time && jobReq?.shift_end_time) {
+          const [sh, sm] = jobReq.shift_start_time.split(':').map(Number);
+          const [eh, em] = jobReq.shift_end_time.split(':').map(Number);
+          let durationMinutes = (eh * 60 + em) - (sh * 60 + sm);
+          if (durationMinutes < 0) durationMinutes += 24 * 60;
+          expectedEnd = new Date(expectedStart.getTime() + durationMinutes * 60000);
+        }
+      }
+
+      try {
+        existing = await this.prisma.attendance.create({
+          data: {
+            assignment_id: assignment.id,
+            worker_id: assignment.worker_id,
+            hotel_id: assignment.hotel_id,
+            status: AttendanceStatus.EXPECTED,
+            expected_start: expectedStart,
+            expected_end: expectedEnd,
+          },
+        });
+      } catch (e: any) {
+        // Handle concurrent check-ins racing to create the same attendance row
+        if (e.code === 'P2002') {
+          existing = await this.prisma.attendance.findUniqueOrThrow({
+            where: { assignment_id: input.assignment_id },
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
+
     if (existing.status !== AttendanceStatus.EXPECTED) {
       throw new ConflictError('Already checked in');
     }
@@ -97,25 +140,31 @@ export class AttendanceService extends BaseService {
     // window are rejected. Configurable (ATTENDANCE_EARLY_CHECK_IN_GRACE_
     // MINUTES, default 2h per user direction) rather than hardcoded, same
     // convention as every other business-rule threshold in config/env.ts.
-    if (existing.expected_start) {
-      const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
-      const minutesEarly = Math.floor(
-        (existing.expected_start.getTime() - now.getTime()) / 60000
-      );
-      if (minutesEarly > graceMinutes) {
-        await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_TOO_EARLY', 'ATTENDANCE', existing.id, {
-          assignment_id: input.assignment_id,
-          minutes_early: minutesEarly,
-        });
-        throw new ForbiddenError(
-          `Check-in denied: too early. Check-in opens ${graceMinutes / 60} hours before the shift starts.`
-        );
-      }
+    // Bug 34: Enforce early-arrival check-in restrictions even if expected_start is null.
+    // If the shift lacks a scheduled time, it cannot be worked yet.
+    if (!existing.expected_start) {
+      throw new ForbiddenError('Check-in denied: shift lacks a scheduled start time. Contact your manager.');
     }
 
-    const minutesLate = existing.expected_start
-      ? Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000))
-      : null;
+    const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
+    const minutesEarly = Math.floor(
+      (existing.expected_start.getTime() - now.getTime()) / 60000
+    );
+    
+    if (minutesEarly > graceMinutes) {
+      await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_TOO_EARLY', 'ATTENDANCE', existing.id, {
+        assignment_id: input.assignment_id,
+        minutes_early: minutesEarly,
+      });
+      throw new ForbiddenError(
+        `Check-in denied: too early. Check-in opens ${graceMinutes / 60} hours before the shift starts.`
+      );
+    }
+
+    // Bug 14: Implement configurable tardiness grace period.
+    const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
+    const minutesLate = Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000));
+    const isLate = minutesLate > tardyGraceMinutes;
 
     // Review fix: compare-and-swap via updateMany's WHERE clause (same
     // pattern as hr/service.ts's fulfilPayslipRequest() review fix,
@@ -130,7 +179,7 @@ export class AttendanceService extends BaseService {
       where: { id: existing.id, status: AttendanceStatus.EXPECTED },
       data: {
         check_in_at: now,
-        status: minutesLate && minutesLate > 0 ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
+        status: isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
         minutes_late: minutesLate,
         notes: input.notes ?? existing.notes,
       },
@@ -151,6 +200,16 @@ export class AttendanceService extends BaseService {
       undefined,
       { status: existing.status, check_in_at: existing.check_in_at, minutes_late: existing.minutes_late },
       { status: updated.status, check_in_at: updated.check_in_at, minutes_late: updated.minutes_late }
+    );
+
+    // Bug 35 (Critical): Sync the assignment state so workers don't bypass attendance
+    await assignmentService.update(
+      input.assignment_id,
+      { status: AssignmentStatus.IN_PROGRESS },
+      actorId,
+      actorRole,
+      null,
+      true // internalBypass = true
     );
 
     return this.toDto(updated);
@@ -415,6 +474,22 @@ export class AttendanceService extends BaseService {
         is_verified: updated.is_verified,
       }
     );
+    // Bug 35 (Critical): Sync the assignment state so workers don't bypass attendance
+    if (input.check_out_at !== undefined && record.check_out_at === null) {
+      try {
+        await assignmentService.update(
+          record.assignment_id,
+          { status: AssignmentStatus.COMPLETED },
+          actorId,
+          actorRole,
+          actorScope,
+          true // internalBypass = true
+        );
+      } catch (err: any) {
+        // If it's already COMPLETED or CANCELLED, ignore the conflict
+        if (!(err instanceof ConflictError)) throw err;
+      }
+    }
 
     return this.toDto(updated);
   }

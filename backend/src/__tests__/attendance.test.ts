@@ -26,6 +26,7 @@ const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
+  jobRequest: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -42,6 +43,9 @@ jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 jest.mock('../modules/geo/service.js', () => ({
   geoService: { verifyGeofence: mockVerifyGeofence, isGeofenceConfigured: mockIsGeofenceConfigured },
 }));
+jest.mock('../modules/assignments/service.js', () => ({
+  assignmentService: { update: jest.fn<any>().mockResolvedValue({} as any) },
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -49,6 +53,7 @@ jest.mock('../config/env.js', () => ({
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
     ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: 120,
+    ATTENDANCE_TARDY_GRACE_MINUTES: 15,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
@@ -127,10 +132,11 @@ describe('AttendanceService', () => {
       expect(updateCall.status).toBe('PRESENT');
     });
 
-    it('marks LATE when arriving after expected_start', async () => {
+    it('marks LATE when arriving after expected_start and beyond grace period', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
-      const earlyStart = new Date(Date.now() - 30 * 60000); // 30 min ago
-      mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: earlyStart }));
+      mockAttendance.findUnique.mockResolvedValue(
+        makeRecord({ expected_start: new Date(Date.now() - 30 * 60000) }) // 30 minutes ago, > 15m grace
+      );
       mockAttendance.findUniqueOrThrow.mockResolvedValue(
         makeRecord({ status: 'LATE', check_in_at: new Date(), minutes_late: 30 })
       );
@@ -176,16 +182,13 @@ describe('AttendanceService', () => {
       expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
-    it('deferred-bug fix: does not apply the early-check-in guard when expected_start is null', async () => {
+    it('throws ForbiddenError when expected_start is null (Bug 34)', async () => {
       mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: null }));
-      mockAttendance.findUniqueOrThrow.mockResolvedValue(
-        makeRecord({ status: 'PRESENT', check_in_at: new Date(), expected_start: null })
-      );
-
-      await service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker');
-
-      expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
+      await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+        message: 'Check-in denied: shift lacks a scheduled start time. Contact your manager.',
+      });
     });
 
     it('review fix (concurrency): rejects with ConflictError when a concurrent caller already checked in between the read and the compare-and-swap', async () => {

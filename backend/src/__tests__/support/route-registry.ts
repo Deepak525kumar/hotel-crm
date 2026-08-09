@@ -361,12 +361,14 @@ export function parseRouteFile(moduleName: string, source: string): ParsedRoute[
   // parens". That was a latent bug: it only bit once a comment containing an
   // apostrophe happened to sit close enough above a route-registration call.
   source = stripComments(source);
-  const callRegex = /router\.(get|post|put|patch|delete)\(/g;
+  const callRegex = /(?:router|[a-zA-Z0-9]+Routes)\.(get|post|put|patch|delete)\(/g;
   let match: RegExpExecArray | null;
 
   while ((match = callRegex.exec(source)) !== null) {
     const method = match[1];
-    const openParenIdx = match.index + `router.${method}`.length;
+    // Need to find the actual match text to know where the open paren starts
+    const fullMatch = match[0];
+    const openParenIdx = match.index + fullMatch.length - 1;
     const chunk = extractBalancedParens(source, openParenIdx);
     const inner = chunk.slice(1, -1);
 

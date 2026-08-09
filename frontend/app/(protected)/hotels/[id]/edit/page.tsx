@@ -49,7 +49,9 @@ function EditHotel() {
       // "unconfigured" anyway (both are required for a valid distance-check).
       ...(values.latitude.trim() && values.longitude.trim()
         ? { latitude: Number(values.latitude), longitude: Number(values.longitude) }
-        : {}),
+        : hotel?.latitude != null || hotel?.longitude != null
+          ? { latitude: null, longitude: null }
+          : {}),
     };
     try {
       const updated = await hotelsApi.update(id, payload);

@@ -154,7 +154,9 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
     const res = await request(makeApp())
       .patch('/assignments/a1')
       .send({ status: 'IN_PROGRESS' });
-    expect(res.status).toBe(200);
+    // Bug 35 (Critical): Workers must use the Attendance module to start shifts
+    expect(res.status).toBe(403);
+    expect(res.body.error).toBe('ForbiddenError');
   });
 
   it('denies a worker transitioning ANOTHER worker\'s assignment with no hotel membership (403)', async () => {
@@ -299,7 +301,6 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
     });
 
     it.each([
-      { label: 'complete', body: { status: 'COMPLETED' }, fromStatus: 'IN_PROGRESS' as const },
       { label: 'cancel', body: { status: 'CANCELLED', cancellation_reason: 'no longer needed' }, fromStatus: 'CONFIRMED' as const },
     ])('worker: $label their own assignment (200)', async ({ body, fromStatus }) => {
       testAuth = { userId: 'w1', role: 'worker' };
@@ -310,6 +311,14 @@ describe('PATCH /assignments/:id authorization (FIND-SEC-001 / OQ-01 regression)
       membershipHotelIds = ['h1'];
       const res = await request(makeApp()).patch('/assignments/a1').send(body);
       expect(res.status).toBe(200);
+    });
+
+    it('worker: complete their own assignment (403) - must use Attendance module', async () => {
+      testAuth = { userId: 'w1', role: 'worker' };
+      currentAssignment = makeAssignment({ worker_id: 'w1', hotel_id: 'h1', status: 'IN_PROGRESS' });
+      membershipHotelIds = ['h1'];
+      const res = await request(makeApp()).patch('/assignments/a1').send({ status: 'COMPLETED' });
+      expect(res.status).toBe(403);
     });
 
     it.each([
