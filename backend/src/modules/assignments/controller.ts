@@ -226,6 +226,9 @@ export async function listCalendarEntries(
     const { data, total } = await assignmentService.listCalendarEntries(parsed.data, {
       userId: req.auth!.userId,
       role: req.auth!.role,
+      // IDOR fix (2026-08-10): the scope claim was previously not passed at
+      // all, so the service could not scope a manager/RM even in principle.
+      scope: req.auth!.scope ?? null,
     });
     const { page, per_page } = parsed.data;
     sendPaginated(

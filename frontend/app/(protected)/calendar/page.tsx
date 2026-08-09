@@ -12,76 +12,33 @@ import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
-  Badge,
   Button,
   Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
   Checkbox,
-  EmptyState,
   FormError,
   Input,
   Modal,
   PageHeader,
   Select,
   Skeleton,
-  StatTile,
   Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** YYYY-MM-DD in the local timezone (matches the backend's date-only day field). */
-function toDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Monday of the week containing `d`. */
-function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const dow = copy.getDay(); // 0 = Sunday
-  const diff = dow === 0 ? -6 : 1 - dow;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-/**
- * The Monday-to-Sunday grid start for the calendar month containing `d` --
- * i.e. the Monday of the week the 1st falls in, which may be in the
- * previous month. Always produces exactly 6 weeks (42 days), the standard
- * fixed-size month-grid layout (matches Google/Outlook-style calendars) so
- * the grid's row count never shifts between months.
- */
-function startOfMonthGrid(d: Date): Date {
-  const firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-  return startOfWeek(firstOfMonth);
-}
-
-const WEEKDAY_LABEL = new Intl.DateTimeFormat("en", { weekday: "short" });
-const DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" });
-const MONTH_DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric" });
-const MONTH_TITLE_LABEL = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
-
-type CalendarView = "day" | "week" | "month";
-
-const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-];
-
-const FULL_DAY_LABEL = new Intl.DateTimeFormat("en", {
-  weekday: "long",
-  day: "numeric",
-  month: "long",
-  year: "numeric",
-});
+import {
+  DAY_LABEL,
+  DAY_MS,
+  FULL_DAY_LABEL,
+  MONTH_DAY_LABEL,
+  MONTH_TITLE_LABEL,
+  VIEW_OPTIONS,
+  WEEKDAY_LABEL,
+  startOfMonthGrid,
+  startOfWeek,
+  toDateKey,
+  type CalendarView,
+} from "@/lib/calendar";
+import { CalendarFilters } from "@/components/calendar/CalendarFilters";
+import { RangeBreakdown } from "@/components/calendar/RangeBreakdown";
 
 export default function CalendarGridPage() {
   const { user } = useAuth();
@@ -379,53 +336,25 @@ export default function CalendarGridPage() {
         }
       />
 
-      {/* Scope filters. Rendered only for the roles that actually have a
-          choice to make: an admin picks a group then a hotel within it; a
-          Regional Manager picks a hotel within their own (fixed) group; a
-          Hotel Manager has exactly one hotel and gets a static label instead
-          of a one-option dropdown; workers/checkers get nothing, since the
-          backend already self-scopes their rows. */}
-      {(isAdmin || scopeGroupId || scopeHotelId) && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-          {isAdmin && (
-            <div className="w-full sm:w-64">
-              <Select
-                label="Hotel group"
-                value={groupFilter}
-                onChange={(e) => {
-                  setGroupFilter(e.target.value);
-                  // A hotel selected under the previous group is meaningless
-                  // under a new one -- clear rather than silently keep an
-                  // out-of-group hotel filter applied.
-                  setHotelFilter("");
-                }}
-                placeholder="All groups"
-                options={groups.map((g) => ({ value: g.id, label: g.name }))}
-              />
-            </div>
-          )}
-          {scopeHotelId ? (
-            <div className="w-full sm:w-64">
-              <p className="mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">Hotel</p>
-              <p className="rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-600 dark:border-gray-700 dark:text-gray-400">
-                {hotelNameById.get(scopeHotelId) ?? "Your hotel"}
-              </p>
-            </div>
-          ) : (
-            <div className="w-full sm:w-64">
-              <Select
-                label="Hotel"
-                value={hotelFilter}
-                onChange={(e) => setHotelFilter(e.target.value)}
-                placeholder={
-                  isAdmin && !activeGroupId ? "All hotels" : "All hotels in group"
-                }
-                options={hotelOptions.map((h) => ({ value: h.id, label: h.name }))}
-              />
-            </div>
-          )}
-        </div>
-      )}
+      <CalendarFilters
+        isAdmin={isAdmin}
+        scopeGroupId={scopeGroupId}
+        scopeHotelId={scopeHotelId}
+        groupFilter={groupFilter}
+        onGroupFilterChange={(groupId) => {
+          setGroupFilter(groupId);
+          // A hotel selected under the previous group is meaningless under a
+          // new one -- clear rather than silently keep an out-of-group hotel
+          // filter applied.
+          setHotelFilter("");
+        }}
+        hotelFilter={hotelFilter}
+        onHotelFilterChange={setHotelFilter}
+        activeGroupId={activeGroupId}
+        groups={groups}
+        hotelOptions={hotelOptions}
+        hotelNameById={hotelNameById}
+      />
 
       <FormError>{moveError}</FormError>
 
@@ -521,205 +450,6 @@ function groupByDay<T>(items: T[], getDay: (item: T) => string): Map<string, T[]
   return map;
 }
 
-/** A day's placements/absences regrouped by hotel, for the breakdown panel. */
-interface HotelDayBucket {
-  hotelId: string;
-  entries: CalendarEntryDto[];
-}
-
-/**
- * "Everything happening in the visible range, hotel by hotel."
- *
- * The grid above answers "which days are busy"; this answers "who exactly is
- * where, and who is off" — the question the compact day-cell tags can't
- * carry. Rendered for every view: it IS the day view's content, and
- * summarises week/month.
- *
- * Absences are listed per DAY rather than per hotel, because a
- * CalendarAbsence has no hotel_id (schema.prisma) — a worker is absent from
- * their day, not from a particular hotel. Presenting them under a hotel
- * heading would invent an association the data doesn't have.
- */
-function RangeBreakdown({
-  days,
-  view,
-  entriesByDay,
-  absencesByDay,
-  workerNameById,
-  hotelNameById,
-  loading,
-  canSeeAbsences,
-  onSelectEntry,
-}: {
-  days: Date[];
-  view: CalendarView;
-  entriesByDay: Map<string, CalendarEntryDto[]>;
-  absencesByDay: Map<string, CalendarAbsence[]>;
-  workerNameById: Map<string, string>;
-  hotelNameById: Map<string, string>;
-  loading: boolean;
-  canSeeAbsences: boolean;
-  onSelectEntry: (entry: CalendarEntryDto) => void;
-}) {
-  // Only days that actually have something to show. In month view this keeps
-  // a 42-cell range from rendering 42 mostly-empty sections.
-  const activeDays = days.filter(
-    (d) =>
-      (entriesByDay.get(toDateKey(d))?.length ?? 0) > 0 ||
-      (absencesByDay.get(toDateKey(d))?.length ?? 0) > 0,
-  );
-
-  const totalPlacements = days.reduce(
-    (n, d) => n + (entriesByDay.get(toDateKey(d))?.length ?? 0),
-    0,
-  );
-  const allAbsences = days.flatMap((d) => absencesByDay.get(toDateKey(d)) ?? []);
-  const sickCount = allAbsences.filter((a) => a.kind === "SICK").length;
-  const vacationCount = allAbsences.filter((a) => a.kind === "VACATION").length;
-  const distinctWorkers = new Set(
-    days.flatMap((d) => (entriesByDay.get(toDateKey(d)) ?? []).map((e) => e.worker_id)),
-  ).size;
-
-  if (loading) {
-    return (
-      <Card>
-        <CardContent className="space-y-3">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-20 w-full" />
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>
-          {view === "day" ? "This day in detail" : "Range breakdown"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-5">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Placements" value={String(totalPlacements)} />
-          <StatTile label="Workers placed" value={String(distinctWorkers)} />
-          {canSeeAbsences && <StatTile label="Sick" value={String(sickCount)} />}
-          {canSeeAbsences && <StatTile label="On vacation" value={String(vacationCount)} />}
-        </div>
-
-        {activeDays.length === 0 ? (
-          <EmptyState
-            title="Nothing scheduled"
-            description={
-              view === "day"
-                ? "No placements or absences recorded for this day."
-                : "No placements or absences in this range."
-            }
-          />
-        ) : (
-          <div className="space-y-6">
-            {activeDays.map((d) => {
-              const key = toDateKey(d);
-              const dayEntries = entriesByDay.get(key) ?? [];
-              const dayAbsences = absencesByDay.get(key) ?? [];
-
-              // Regroup this day's placements by hotel.
-              const byHotel = new Map<string, HotelDayBucket>();
-              for (const e of dayEntries) {
-                const bucket = byHotel.get(e.hotel_id) ?? { hotelId: e.hotel_id, entries: [] };
-                bucket.entries.push(e);
-                byHotel.set(e.hotel_id, bucket);
-              }
-              const hotelBuckets = Array.from(byHotel.values()).sort((a, b) =>
-                (hotelNameById.get(a.hotelId) ?? a.hotelId).localeCompare(
-                  hotelNameById.get(b.hotelId) ?? b.hotelId,
-                ),
-              );
-
-              return (
-                <div key={key} className="space-y-3">
-                  {/* In day view the page header already names the date, so a
-                      second identical heading would be pure noise. */}
-                  {view !== "day" && (
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                      {FULL_DAY_LABEL.format(d)}
-                    </h3>
-                  )}
-
-                  {hotelBuckets.map((bucket) => (
-                    <div
-                      key={bucket.hotelId}
-                      className="rounded-md border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-gray-800">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          {hotelNameById.get(bucket.hotelId) ?? bucket.hotelId}
-                        </span>
-                        <Badge tone="info">
-                          {bucket.entries.length}{" "}
-                          {bucket.entries.length === 1 ? "worker" : "workers"}
-                        </Badge>
-                      </div>
-                      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {bucket.entries.map((e) => (
-                          <li key={e.id}>
-                            <button
-                              type="button"
-                              onClick={() => onSelectEntry(e)}
-                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-                            >
-                              <span className="truncate text-gray-900 dark:text-gray-100">
-                                {workerNameById.get(e.worker_id) ?? e.worker_id}
-                              </span>
-                              <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                                Details →
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-
-                  {canSeeAbsences && dayAbsences.length > 0 && (
-                    <div className="rounded-md border border-gray-200 dark:border-gray-700">
-                      <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
-                        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          Unavailable
-                        </span>
-                      </div>
-                      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
-                        {dayAbsences.map((a) => (
-                          <li
-                            key={a.id}
-                            className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                          >
-                            <span className="truncate text-gray-900 dark:text-gray-100">
-                              {workerNameById.get(a.worker_id) ?? a.worker_id}
-                            </span>
-                            <span className="flex shrink-0 items-center gap-2">
-                              {a.reason && (
-                                <span className="truncate text-xs text-gray-500 dark:text-gray-400">
-                                  {a.reason}
-                                </span>
-                              )}
-                              <Badge tone={a.kind === "SICK" ? "danger" : "warning"}>
-                                {a.kind === "SICK" ? "Sick" : "Vacation"}
-                              </Badge>
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
 
 const MONTH_VIEW_VISIBLE_ITEMS = 3;
 /** dataTransfer MIME type for a dragged placement -- namespaced so a drop
