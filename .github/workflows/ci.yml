@@ -156,8 +156,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('backend/package-lock.json') }}
 
+      # review follow-up (item 3, 2026-08-10): `--no-install` forces npx to
+      # resolve the LOCALLY installed `playwright` version pinned in
+      # package.json (installed by `npm ci` above), the same guarantee
+      # deploy.sh's identical flag gives -- rather than npx silently
+      # fetching some other version from the registry if local resolution
+      # ever failed. Fails loudly instead of masking a version mismatch.
       - name: Install Playwright's Chromium browser
-        run: npx playwright install --with-deps chromium
+        run: npx --no-install playwright install --with-deps chromium
         working-directory: backend
 
       - name: Typecheck
