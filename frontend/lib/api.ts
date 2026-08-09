@@ -1,3 +1,17 @@
+/**
+ * This module (and API_BASE_URL, lib/config.ts) is written for BROWSER/
+ * client-side use only, reached through the Next.js rewrite proxy
+ * (next.config.ts's rewrites()) so auth cookies stay same-origin (Security
+ * #4, 2026-08-09). Every current caller is a client component/hook.
+ *
+ * API_BASE_URL is deliberately a bare relative path ("/api/v1") — that only
+ * resolves correctly when `fetch` runs in a browser (or anywhere else with
+ * an ambient request/origin to resolve against). If this module is ever
+ * imported from a Server Component or other Node-side code, a relative URL
+ * will fail there (Node's fetch requires an absolute URL unless a request
+ * context supplies one) — that caller would need its own absolute-URL
+ * fetch to the backend directly, not this file's apiFetch/buildUrl.
+ */
 import { API_BASE_URL } from "@/lib/config";
 import { useAuthStore } from "@/stores/auth";
 import type {
@@ -51,7 +65,6 @@ import type {
   RaiseBroadcastInput,
   Rating,
   RecordConsentDecisionInput,
-  RefreshResponse,
   RoomsCompletedEntry,
   QualityVerification,
   UpdateAssignmentInput,
@@ -178,41 +191,39 @@ async function parseEnvelope<T>(res: Response): Promise<ApiEnvelope<T>> {
 const TOKEN_REVOKED_CODE = "TOKEN_REVOKED";
 
 /**
- * Calls the backend refresh endpoint with the stored refresh token.
- * On success the new tokens are written to the store; on failure the
- * session is cleared. Returns the new access token, or `null`.
+ * Calls the backend refresh endpoint. The refresh token travels via the
+ * httpOnly cookie -- on success the backend's Set-Cookie response updates
+ * both cookies directly, nothing to write into the store. On failure the
+ * session is cleared. Returns whether the refresh succeeded.
  *
  * A module-level promise de-duplicates concurrent refreshes so a burst
  * of 401s only triggers a single refresh request.
  */
-let refreshInFlight: Promise<string | null> | null = null;
+let refreshInFlight: Promise<boolean> | null = null;
 
-function refreshAccessToken(): Promise<string | null> {
+function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
 
   refreshInFlight = (async () => {
-    const { refreshToken, setTokens, clear } = useAuthStore.getState();
-    if (!refreshToken) {
-      clear();
-      return null;
-    }
-
     try {
+      // Security #4: no body, no stored refresh token to read -- the
+      // refresh token travels in the httpOnly cookie automatically via
+      // `credentials: 'include'`. On success the backend's Set-Cookie
+      // response updates both cookies directly; there is nothing to write
+      // into the store here (compare to the old setTokens() call this
+      // replaced).
       const res = await fetch(buildUrl("/auth/refresh"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        credentials: "include",
       });
-      const envelope = await parseEnvelope<RefreshResponse>(res);
-      if (!res.ok || envelope.status === "error") {
-        clear();
-        return null;
+      if (!res.ok) {
+        useAuthStore.getState().clear();
+        return false;
       }
-      setTokens(envelope.data);
-      return envelope.data.access_token;
+      return true;
     } catch {
-      clear();
-      return null;
+      useAuthStore.getState().clear();
+      return false;
     } finally {
       refreshInFlight = null;
     }
@@ -225,7 +236,12 @@ function refreshAccessToken(): Promise<string | null> {
  * Typed fetch wrapper around the backend API.
  *
  * - Serialises `body` as JSON and sets the matching `Content-Type`.
- * - Attaches the bearer access token unless `auth: false`.
+ * - Sends `credentials: 'include'` so the browser attaches the httpOnly
+ *   auth cookies automatically (Security #4, 2026-08-09) -- there is no
+ *   token to read or attach as a header here anymore. `auth` stays as a
+ *   no-op option (kept so the ~40 existing call sites passing `auth: false`
+ *   for public endpoints don't all need touching); it no longer changes
+ *   what's sent, only whether a 401 triggers the refresh-and-retry below.
  * - On a 401, transparently refreshes the access token once and retries.
  * - Unwraps the success envelope, returning `data`; throws {@link ApiError}
  *   on any error response.
@@ -244,13 +260,10 @@ export async function apiFetch<T>(
   if (body !== undefined && !isFormData && !finalHeaders.has("Content-Type")) {
     finalHeaders.set("Content-Type", "application/json");
   }
-  if (auth) {
-    const token = useAuthStore.getState().accessToken;
-    if (token) finalHeaders.set("Authorization", `Bearer ${token}`);
-  }
 
   const res = await fetch(buildUrl(path), {
     ...rest,
+    credentials: "include",
     headers: finalHeaders,
     body: body === undefined ? undefined : isFormData ? (body as FormData) : JSON.stringify(body),
   });
@@ -277,8 +290,8 @@ export async function apiFetch<T>(
 
     // Attempt a single transparent refresh + retry on unauthorized.
     if (!_retried) {
-      const newToken = await refreshAccessToken();
-      if (newToken) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) {
         return apiFetch<T>(path, { ...options, _retried: true });
       }
     }
@@ -334,11 +347,10 @@ export const authApi = {
       body: input,
     }),
 
-  logout: (refreshToken: string | null) =>
-    apiFetch<{ message: string }>("/auth/logout", {
-      method: "POST",
-      body: refreshToken ? { refresh_token: refreshToken } : {},
-    }),
+  // Security #4: no refresh token to pass -- it travels via the httpOnly
+  // cookie, which the backend reads to identify and delete the right
+  // session, then clears both cookies in its response.
+  logout: () => apiFetch<{ message: string }>("/auth/logout", { method: "POST" }),
 
   requestPasswordReset: (email: string) =>
     apiFetch<{ message: string }>("/auth/password-reset", {

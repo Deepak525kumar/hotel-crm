@@ -1,22 +1,100 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-07 (PR #358 open: hotel-group hotels filter + regional manager display +
-raw-id-across-the-app sweep — see §1.5).
+Last updated: 2026-08-09 (PR #392 open: same-origin rewrite proxy + drop localStorage tokens,
+frontend half of security #4 — see §0).
 
-Previous update: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
+**Note on this file's history below (§1–§8):** sections §1–§8 date from 2026-08-07 and earlier and
+were NOT kept current through the 2026-08-08/09 security-hardening + calendar-feature session
+(PRs #379–#392). Treat everything below §0 as a historical snapshot of the employment-lifecycle
+rework and its immediate aftermath, not current status — §0 is the only section actively
+maintained now. Going forward this file is updated after every PR, not just at session boundaries.
 
-Current status: **The employment-lifecycle rework is complete.** All prior-session work
-(#345–357) is merged to `main`, local `main` synced. PRs #354 (schema/migration + service-layer,
-combined per the user's "combine similar PRs" instruction), #355 (frontend lifecycle UI), #356
-(blocklist removal + real enforcement — an adversarial review caught and fixed a critical IDOR
-before merge), and #357 (`MODULE_SPEC.md` doc sync to the shipped model) are all merged — see §3.5
-below for the full story on each, including two genuine incident-response threads worth knowing
-about: (1) a real, pre-existing `import.meta`/CJS-ESM landmine in `config/env.ts` that #354 was the
-first change to trip (found and fixed, not a regression this rework caused); (2) a GitHub-wide
-Actions platform outage (confirmed via githubstatus.com, `Actions: major_outage`) that blocked CI
-on #356/#357 — both were merged after full local verification substituted for CI, per explicit user
-instruction, not by skipping verification. 13 unrelated deferred items (6 from the prior session +
-11 new) are batched and now the active work — see §4.
+## 0. Current status (2026-08-09)
+
+**Security-hardening batch (original 12-item list) — 11 of 12 closed, 1 open.** See PR list below.
+Also shipped mid-batch: a full calendar-absence feature (manager+worker marking, drag-to-move,
+mandatory reason for VACATION), a failed-login monitoring/escalation feature (replacing the
+originally-requested rate-limiter per an explicit user decision — TREQ-AUTH-007), and removal of
+dead calendar-operations stub routes (ADR-051).
+
+### Merged, this session (chronological)
+| PR | What |
+|---|---|
+| #379 | Critical IDOR fix — `AssignmentService` ownership check (ITEM #11 of the original batch) |
+| #380 | JWT algorithm-confusion fix — `algorithms: ['HS256']` pinned on `jwt.verify()` (#5) |
+| #381 | Sidebar fixed in place, profile moved to a pinned footer above Settings |
+| #382 | Malformed-JSON error code, phone validation, JobRequest/Attendance manager-scope IDORs, worker RoleGate gap (#3, #10, part of #11/#12) |
+| #383 | Checkout manipulation/geofence, hotel cascade, remaining manager-scope IDORs (#12) |
+| #384 | Gated `PayslipRequestsCard` actions to backend-allowed roles |
+| #385 | **Critical bug** (not from the audit report) — block placing a worker on a day they have a declared SICK/VACATION absence; explicit `BLOCKING_ABSENCE_KINDS` list + day-grain semantics documented per review |
+| #386 | Calendar-absence feature: manager+worker marking, mandatory-for-VACATION reason, drag-to-move, bidirectional notifications, auto-cancel of a conflicting shift when absence is marked (a second critical bug found and fixed mid-PR) |
+| #387 | Sidebar collapse/expand transition smoothed |
+| #388 | All 11 npm audit vulnerabilities patched (lockfile-only, no breaking changes) (#7, #8) |
+| #389 | Failed-login monitoring + manager escalation (TREQ-AUTH-007) — replaces the originally-requested rate limiter; user explicitly chose this over `express-rate-limit` since app-layer rate limiting would contradict frozen spec TREQ-AUTH-008 (#6) |
+| #390 | Removed dead calendar daily-operations stub routes (ADR-051) (#2) |
+| #391 | httpOnly auth-cookie support, backend half of #4 |
+
+### Open
+- **#392** — same-origin Next.js rewrite proxy + drops localStorage-persisted tokens, frontend half
+  of #4. **Depends on #391 merging/deploying first** (relies entirely on the cookies it sets).
+  Manually verified end-to-end with a stub backend + real Chromium via Playwright: confirmed
+  `document.cookie` is empty after login (the httpOnly flag actually blocks JS read — the exact
+  vulnerability being closed) and the full login → cookie → authenticated-request round trip works
+  through the proxy. No live-DB test possible in this environment (see §6's still-valid limitation).
+
+### Original 12-item security batch — final disposition
+| # | Item | Status |
+|---|---|---|
+| 1 | `Hotel.manager_user_id` no `@unique` | Already mitigated pre-batch (PR #370/#376) |
+| 2 | Calendar `NotImplementedError` dead stubs | #390 |
+| 3 | Malformed JSON → wrong error code | #382 |
+| 4 | JWT in localStorage (XSS) | #391 (backend) + #392 (frontend, open) |
+| 5 | JWT algorithm-confusion | #380 |
+| 6 | No rate limiting | #389 (failed-login monitoring instead, by explicit user decision) |
+| 7/8 | npm audit vulns | #388 |
+| 9 | Stale schema comment | separate commit `c9c7c2e` |
+| 10 | Unvalidated phone field | #382 |
+| 11 | Critical IDOR — `AssignmentService` ownership | #379, hardened further in #382/#383 |
+| 12 | Attendance checkout missing geofence | #383 |
+
+### Second checklist verified this session (user-reported, cross-referenced against current `main`)
+Most items already shipped by earlier PRs in this same session, discovered when re-verifying
+against fresh `main` rather than stale assumptions:
+- **Assignment completed but work request still pending** — RESOLVED by #369 (`deriveFillStatus`,
+  predates this session but confirmed still correct).
+- **No ranking/leaderboard visible** — PARTIALLY DONE. Backend + frontend UI both exist
+  (`LeaderboardTable`, `/analytics` page), but the sidebar nav entry is role-gated to
+  manager/regional_manager/admin — invisible to a `worker`-role user. Likely explains "created it
+  but can't see it." Not yet fixed (queued).
+- **Rooms/occupancy stats (stay-over/checkout/total people) with notes, editable in calendar** —
+  PARTIALLY DONE. `RoomsCompletedEntry` (rooms_completed + notes, per-assignment not per-day-hotel-
+  aggregate) exists end-to-end on the backend (`POST /assignments/:id/rooms-completed`) but has
+  zero UI surface in the calendar page. The hotel-level daily aggregate (stay-over/checkout/total-
+  people) does not exist at all — that concept was the removed `DailyOperation` type (#390). Not
+  yet fixed (queued).
+- **Data protection consent missing** — RESOLVED as a mechanism (SPEC-CONSENT-001, daily gate,
+  decline→manager notify, audit trail all built and wired), but the actual legal notice text is a
+  literal placeholder ("legal content pending Zirove/DPO authorship") — a legal/DPO content gap,
+  not an engineering one.
+- **Broadcast-accepted assignment not showing in calendar** — RESOLVED by #371 (predates this
+  session).
+- **Check-in geofence not applied** — RESOLVED, already hard-enforced by design (soft-skip only
+  when a hotel has no geofence configured at all, which is intentional).
+- **Genuinely not started** (real feature work, need scoping before building): contract-type
+  detection + part/mid/full-time approval workflow ("middle time" is ambiguous, needs
+  clarification); Leave & Sickness (multi-day requests, clash detection beyond same-day,
+  certificate OCR, reminders — OCR especially is a substantial new capability, zero precedent in
+  this codebase); dark mode (no toggle exists, only Next.js's unused default CSS scaffold);
+  language switcher (zero i18n infrastructure); document templates (no template concept anywhere,
+  not even for HR's existing `Contract.template_id` field).
+
+### Two frozen-spec amendments flagged, not yet done
+Both FROZEN specs, so amending them follows their own protocol rather than a routine edit — flagged
+rather than silently changed:
+- `SPEC-CALENDAR-001` (RULE-CAL-04/REQ-CAL-T04) — needs updating for the day-grain absence-blocking
+  behavior from #385.
+- `SPEC-AUTH-001` (REQ-AUTH-003) — its "no failed-attempt counting or notification of any kind
+  exists" line is now stale after #389.
 
 ---
 

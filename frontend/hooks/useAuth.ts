@@ -14,22 +14,27 @@ import type { AuthUser } from "@/lib/types";
 export function useAuth() {
   const user = useAuthStore((s) => s.user);
   const status = useAuthStore((s) => s.status);
-  const setSession = useAuthStore((s) => s.setSession);
+  const setUser = useAuthStore((s) => s.setUser);
   const clear = useAuthStore((s) => s.clear);
 
   const login = useCallback(
     async (email: string, password: string) => {
+      // Security #4: the response still includes access_token/refresh_token
+      // (mobile needs them in the body), but the web client never reads or
+      // stores them -- the backend's Set-Cookie response is what actually
+      // establishes the session. Only `user` is cached client-side.
       const data = await authApi.login(email, password);
-      setSession(data);
+      setUser(data.user);
       return data.user;
     },
-    [setSession],
+    [setUser],
   );
 
   const logout = useCallback(async () => {
-    const { refreshToken } = useAuthStore.getState();
     try {
-      await authApi.logout(refreshToken);
+      // Security #4: no refresh token to read/send -- the cookie identifies
+      // the session; the backend clears both cookies in its response.
+      await authApi.logout();
     } catch {
       // Best-effort: clear locally even if the server call fails.
     } finally {
