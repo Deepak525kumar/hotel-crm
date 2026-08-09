@@ -17,10 +17,12 @@ let testAuth:
   | { userId: string; role: string; permissions: string[]; scope: unknown }
   | null = null;
 
-// assignment_id -> hotel it belongs to.
-const assignments: Record<string, { id: string; hotel_id: string; worker_id: string }> = {
-  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1' },
-  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1' },
+// assignment_id -> hotel it belongs to. status: COMPLETED (2026-08-09) --
+// logRoomsCompleted now requires a completed assignment before the scope
+// check even runs.
+const assignments: Record<string, { id: string; hotel_id: string; worker_id: string; status: string }> = {
+  asg_h1: { id: 'asg_h1', hotel_id: 'h1', worker_id: 'w1', status: 'COMPLETED' },
+  asg_h2: { id: 'asg_h2', hotel_id: 'h2', worker_id: 'w1', status: 'COMPLETED' },
 };
 
 jest.mock('../config/feature-flags.js', () => ({
@@ -52,6 +54,12 @@ jest.mock('../lib/db.js', () => ({
     },
     hotel: {
       findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
+    },
+    // review follow-up (PR #395 item A): logRoomsCompleted resolves the
+    // entering user's display name via one prisma.user.findUnique call
+    // after the create succeeds.
+    user: {
+      findUnique: async () => ({ first_name: 'Test', last_name: 'User' }),
     },
     auditLog: { create: async () => undefined },
   }),

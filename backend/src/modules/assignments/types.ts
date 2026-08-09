@@ -79,6 +79,14 @@ export interface RoomsCompletedEntryDto {
   hotel_id: string;
   worker_id: string;
   entered_by_id: string;
+  // 2026-08-10 (review follow-up, PR #395 item A): the display name of
+  // entered_by_id at read time, so the calendar UI can show "logged by
+  // Jane Doe" without a second round-trip. Optional/nullable rather than
+  // always-present: the entering user may since have been deleted (User FK
+  // has no cascade/restrict tying RoomsCompletedEntry's lifetime to the
+  // entering user's), in which case entered_by_id is still a valid
+  // historical reference but there is no name to resolve.
+  entered_by_name?: string | null;
   rooms_completed: number;
   notes: string | null;
   created_at: string;
@@ -102,6 +110,14 @@ export interface AssignmentDto {
   cancelled_at: string | null;
   cancellation_reason: string | null;
   updated_at: string;
+  // 2026-08-09: the RoomsCompletedEntry attached to this assignment, if one
+  // has been logged (ADR-028's manager-entered post-shift count). Null until
+  // POST /:id/rooms-completed is called — never fabricated as 0, since "not
+  // yet entered" and "zero rooms" are different facts. Visibility follows
+  // getById()/list()'s EXISTING ownership/scope gate (worker sees own,
+  // manager/RM sees in-scope, admin sees all) -- no separate check needed,
+  // since this is read-only exposure of data the caller could already see.
+  rooms_completed: RoomsCompletedEntryDto | null;
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03).
