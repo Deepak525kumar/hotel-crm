@@ -3,6 +3,8 @@ import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requirePermission, requireRole } from '../../middleware/permissions.js';
 import { hrController } from './controller.js';
+import { validateQuery } from '../../middleware/validation.js';
+import { ListContractsQuerySchema, ListPayslipRequestsQuerySchema } from './types.js';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from '../documents/upload-policy.js';
 import { ValidationError } from '../../lib/errors.js';
 
@@ -126,7 +128,7 @@ router.use(authMiddleware);
 // for users/service.ts's listUsers(), not a new authorization pattern.
 
 // Contracts
-router.get('/contracts', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('hr:read'), (req, res, next) =>
+router.get('/contracts', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('hr:read'), validateQuery(ListContractsQuerySchema), (req, res, next) =>
   hrController.listContracts(req, res, next)
 );
 router.post(
@@ -142,7 +144,7 @@ router.post(
 // via resolveNonAdminScopeFilter inside the service). Worker sees only their
 // own requests — self-scope enforced in hrService.listPayroll (FIND-SEC-HR-03
 // IDOR guard, actorId-override pattern mirroring getContractStatus).
-router.get('/payroll', requireRole(['admin', 'manager', 'regional_manager', 'worker']), requirePayslipReadAccess(), (req, res, next) =>
+router.get('/payroll', requireRole(['admin', 'manager', 'regional_manager', 'worker']), requirePayslipReadAccess(), validateQuery(ListPayslipRequestsQuerySchema), (req, res, next) =>
   hrController.listPayroll(req, res, next)
 );
 router.post(

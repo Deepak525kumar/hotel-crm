@@ -75,7 +75,7 @@ export class DocumentTemplatesService extends BaseService {
 
   async getTemplate(id: string, actor: Actor): Promise<DocumentTemplateDto> {
     const template = await this.loadTemplateWithSections(id);
-    
+
     if (actor.role === 'worker') {
       const activeInstance = await this.prisma.documentInstance.findFirst({
         where: { template_id: id, worker_id: actor.userId }
@@ -84,7 +84,7 @@ export class DocumentTemplatesService extends BaseService {
         throw new ForbiddenError('Workers may only read templates for which they have an active document instance');
       }
     }
-    
+
     return this.toTemplateDto(template);
   }
 
@@ -490,7 +490,7 @@ export class DocumentTemplatesService extends BaseService {
       if (!field) {
         throw new ValidationError(`field_id ${v.field_id} does not belong to this instance's template`);
       }
-      
+
       if ((field.signer_role ?? 'SUBJECT') === 'SUBJECT') {
         if (!isSelfScopedRole(actor.role) || instance.worker_id !== actor.userId) {
           throw new ForbiddenError(`Only the worker this document is about may fill SUBJECT-role fields (field: ${field.label})`);

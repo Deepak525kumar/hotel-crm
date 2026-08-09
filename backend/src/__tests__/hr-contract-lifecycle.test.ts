@@ -514,7 +514,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockPayslipRequestFindMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: {} })
       );
-      expect(result).toHaveLength(1);
+      expect(result.data).toHaveLength(1);
     });
 
     it('scopes results to the manager\'s own hotel_group_id (ADR-043)', async () => {
