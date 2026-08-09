@@ -70,7 +70,7 @@ export default function NewUserPage() {
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
-            <CardContent className="text-sm text-gray-500">
+            <CardContent className="text-sm text-gray-500 dark:text-gray-400">
               Only admins can create users.
             </CardContent>
           </Card>

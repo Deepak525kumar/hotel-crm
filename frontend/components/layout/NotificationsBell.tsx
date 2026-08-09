@@ -54,7 +54,7 @@ export function NotificationsBell() {
             : "Notifications"
         }
         aria-expanded={open}
-        className="relative rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
+        className="relative rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-400 dark:hover:bg-gray-800"
       >
         <Bell className="h-5 w-5" aria-hidden />
         {unreadCount > 0 && (
@@ -75,17 +75,17 @@ export function NotificationsBell() {
       {open && (
         <div
           aria-label="Notifications"
-          className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
-          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-            <span className="text-sm font-semibold text-gray-900">Notifications</span>
+          <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Notifications</span>
             {unreadCount > 0 && (
               <Badge tone="info">{unreadCount} unread</Badge>
             )}
           </div>
 
           {preview.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-gray-500">
+            <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
               You&apos;re all caught up.
             </p>
           ) : (
@@ -101,7 +101,7 @@ export function NotificationsBell() {
             </ul>
           )}
 
-          <div className="border-t border-gray-100 px-4 py-2 text-center">
+          <div className="border-t border-gray-100 px-4 py-2 text-center dark:border-gray-800">
             <TextLink href="/notifications" onClick={() => setOpen(false)} className="text-sm">
               View all notifications
             </TextLink>
@@ -139,26 +139,26 @@ function NotificationRow({
   return (
     <li
       className={cn(
-        "border-b border-gray-50 px-4 py-3 last:border-b-0",
-        !n.is_read && "bg-blue-50/50",
+        "border-b border-gray-50 px-4 py-3 last:border-b-0 dark:border-gray-800",
+        !n.is_read && "bg-blue-50/50 dark:bg-blue-950/40",
       )}
     >
       <Link
         href={`/notifications/${n.id}`}
         onClick={onClose}
-        className="block text-sm font-medium text-gray-900 hover:underline"
+        className="block text-sm font-medium text-gray-900 hover:underline dark:text-gray-100"
       >
         {n.title}
       </Link>
-      <p className="mt-0.5 line-clamp-2 text-sm text-gray-500">{n.message}</p>
+      <p className="mt-0.5 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">{n.message}</p>
       <div className="mt-1 flex items-center justify-between">
-        <span className="text-xs text-gray-400">{formatDateTime(n.created_at)}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">{formatDateTime(n.created_at)}</span>
         {!n.is_read && (
           <button
             type="button"
             onClick={onMarkRead}
             disabled={markRead.pending}
-            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50"
+            className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
           >
             Mark as read
           </button>

@@ -81,7 +81,7 @@ export default function HotelGroupDetailPage() {
 
       {error ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-red-600">
+          <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load this hotel group.
           </CardContent>
         </Card>
@@ -128,7 +128,7 @@ export default function HotelGroupDetailPage() {
                           : "View regional manager"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         Vacant
                         {group.regional_manager_vacated_at &&
                           ` since ${formatDateTime(group.regional_manager_vacated_at)}`}
@@ -143,7 +143,7 @@ export default function HotelGroupDetailPage() {
                   label="Billing info"
                   value={
                     group.billing_info || (
-                      <span className="text-gray-500">Not set</span>
+                      <span className="text-gray-500 dark:text-gray-400">Not set</span>
                     )
                   }
                 />

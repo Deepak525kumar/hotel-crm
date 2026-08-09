@@ -93,7 +93,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
           <CardTitle>Account settings</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             Update your name and contact details, or reset your password.
           </p>
           <div className="flex shrink-0 gap-2">
@@ -172,13 +172,13 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
         }
       >
         {resetSent ? (
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
             If an account exists for <span className="font-medium">{user.email}</span>, a
             password reset link is on its way. The link expires shortly, so use it soon.
           </p>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-700 dark:text-gray-300">
               We&apos;ll email a reset link to{" "}
               <span className="font-medium">{user.email}</span>. Your current password
               stays active until you complete the reset.

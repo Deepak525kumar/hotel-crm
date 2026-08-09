@@ -77,7 +77,7 @@ export default function ProfilePage() {
               {user.permissions.map((p) => (
                 <li
                   key={p}
-                  className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700"
+                  className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                 >
                   {p}
                 </li>
@@ -96,7 +96,7 @@ export default function ProfilePage() {
       <ExportMyDataCard />
 
       {isLoading && (
-        <p className="text-center text-xs text-gray-500">Refreshing…</p>
+        <p className="text-center text-xs text-gray-500 dark:text-gray-400">Refreshing…</p>
       )}
     </div>
   );

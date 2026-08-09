@@ -23,10 +23,10 @@ import type { EmployeeBlocklistEntry } from "@/lib/types";
 
 function BlocklistRow({ entry }: { entry: EmployeeBlocklistEntry }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
+    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-gray-900">{entry.reason}</p>
-        <p className="text-xs text-gray-500">Added {formatDate(entry.created_at)}</p>
+        <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">{entry.reason}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400">Added {formatDate(entry.created_at)}</p>
       </div>
     </li>
   );
@@ -61,7 +61,7 @@ export function BlocklistCard({ hotelId }: { hotelId: string }) {
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="py-6 text-center text-sm text-red-600">
+            <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load the blocklist.
             </p>
           ) : isLoading ? (

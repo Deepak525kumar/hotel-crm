@@ -26,7 +26,7 @@ export function THead({
 }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <thead
-      className={cn("border-b border-gray-200 bg-gray-50", className)}
+      className={cn("border-b border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800", className)}
       {...props}
     />
   );
@@ -38,7 +38,7 @@ export function TBody({
 }: HTMLAttributes<HTMLTableSectionElement>) {
   return (
     <tbody
-      className={cn("divide-y divide-gray-100", className)}
+      className={cn("divide-y divide-gray-100 dark:divide-gray-800", className)}
       {...props}
     />
   );
@@ -48,7 +48,7 @@ export function TR({
   className,
   ...props
 }: HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn("hover:bg-gray-50", className)} {...props} />;
+  return <tr className={cn("hover:bg-gray-50 dark:hover:bg-gray-800", className)} {...props} />;
 }
 
 export function TH({
@@ -58,7 +58,7 @@ export function TH({
   return (
     <th
       className={cn(
-        "px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500",
+        "px-4 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400",
         className,
       )}
       {...props}
@@ -71,6 +71,6 @@ export function TD({
   ...props
 }: TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn("px-4 py-3 text-gray-900", className)} {...props} />
+    <td className={cn("px-4 py-3 text-gray-900 dark:text-gray-100", className)} {...props} />
   );
 }

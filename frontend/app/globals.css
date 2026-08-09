@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/*
+ * Dark mode (2026-08-09): Tailwind v4 has no JS `darkMode: 'class'` config
+ * (no tailwind.config.js exists in this project at all -- CSS-first v4
+ * setup) -- `dark:` variants must be opted into explicitly via
+ * @custom-variant, or they'd only ever follow prefers-color-scheme with no
+ * way for next-themes' class-on-<html> toggle to override it. This makes
+ * every `dark:` utility below key off `.dark` on <html> (set by
+ * next-themes' ThemeProvider, components/theme/ThemeProvider.tsx), which
+ * next-themes manages for all three modes (light/dark/system).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -12,11 +24,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {

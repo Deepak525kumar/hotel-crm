@@ -121,7 +121,7 @@ function UsersDirectory() {
       <Card>
         <CardContent className="p-0">
           {error ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load users. Please try again.
             </div>
           ) : (
@@ -163,7 +163,7 @@ function UsersDirectory() {
                           {u.first_name} {u.last_name}
                         </TextLink>
                       </TD>
-                      <TD className="text-gray-500">{u.email}</TD>
+                      <TD className="text-gray-500 dark:text-gray-400">{u.email}</TD>
                       <TD>
                         <RoleBadge role={u.role} />
                       </TD>
@@ -195,7 +195,7 @@ export default function UsersPage() {
       allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
-          <CardContent className="text-sm text-gray-500">
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
             Only admins and managers can view users.
           </CardContent>
         </Card>

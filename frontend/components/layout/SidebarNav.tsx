@@ -135,8 +135,8 @@ export function SidebarNav({
           // justify-content switch to fight the width transition.
           "justify-start px-3 transition-[padding,background-color] duration-200 ease-out",
           active
-            ? "bg-blue-50 text-blue-700"
-            : "text-gray-700 hover:bg-gray-100",
+            ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+            : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
         )}
       >
         <span className="flex min-w-0 items-center gap-3">
@@ -171,7 +171,7 @@ export function SidebarNav({
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-3">
         {featureItems.map(renderLink)}
       </nav>
-      <footer className="space-y-1 border-t border-gray-200 p-3">
+      <footer className="space-y-1 border-t border-gray-200 p-3 dark:border-gray-800">
         {user && (
           <Link
             href="/profile"
@@ -185,12 +185,12 @@ export function SidebarNav({
               "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
               "justify-start px-3 transition-[padding,background-color] duration-200 ease-out",
               pathname === "/profile"
-                ? "bg-blue-50 text-blue-700"
-                : "text-gray-700 hover:bg-gray-100",
+                ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400"
+                : "text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800",
             )}
           >
             <span className="flex min-w-0 items-center gap-3">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-700">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-gray-200 text-[10px] font-semibold text-gray-700 dark:bg-gray-700 dark:text-gray-200">
                 {user.first_name?.[0]}
                 {user.last_name?.[0]}
               </span>
