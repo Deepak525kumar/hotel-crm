@@ -8,6 +8,17 @@ import pkg from "./package.json" with { type: "json" };
 // proxies server-side. This is what makes plain SameSite=Lax httpOnly
 // auth cookies work without a cross-origin SameSite=None+CSRF scheme --
 // see lib/cookies.ts on the backend.
+// A missing env var in production would silently proxy every /api request
+// to localhost:3001 on the Vercel server itself -- nothing is listening
+// there, so every request fails, but the failure looks like a generic
+// network error with no indication the real cause is a missing env var.
+// Failing at build time instead turns that into an immediate, legible error.
+if (process.env.NODE_ENV === "production" && !process.env.BACKEND_INTERNAL_URL) {
+  throw new Error(
+    "BACKEND_INTERNAL_URL must be set in production for the /api rewrite proxy",
+  );
+}
+
 const BACKEND_INTERNAL_URL =
   process.env.BACKEND_INTERNAL_URL ?? "http://localhost:3001";
 
