@@ -59,7 +59,7 @@ function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
           {workRequest?.position ?? "View request"}
         </TextLink>
         {workRequest && (
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-gray-500 dark:text-gray-400">
             {workRequest.shift_date} · {workRequest.shift_start_time}–{workRequest.shift_end_time}
           </div>
         )}
@@ -115,7 +115,7 @@ export default function AssignmentsPage() {
       <Card>
         <CardContent className="p-0">
           {error ? (
-            <div className="px-6 py-10 text-center text-sm text-red-600">
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load assignments. Please try again.
             </div>
           ) : (

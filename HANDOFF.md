@@ -1,124 +1,184 @@
 # Hotel CRM — Handoff
 
-Last updated: 2026-08-09 (Document Templates + Digital Signature: built complete on the
-unmerged branch `feat/document-templates` — see §0 immediately below, which is the active
-work; everything from §1 down is prior-session history).
+Last updated: 2026-08-09 (#394 and #395 both merged to `main`; feature-scoping decisions recorded
+for dark mode, document templates, language switcher, contract-type workflow, and Leave & Sickness
+OCR — see §0.3. #396, this doc-sync PR, still open).
 
-Previous update: 2026-08-07 (PR #358 open: hotel-group hotels filter + regional manager display +
-raw-id-across-the-app sweep — see §1.5).
+**Note on this file's history below (§1–§8):** sections §1–§8 date from 2026-08-07 and earlier and
+were NOT kept current through the 2026-08-08/09 security-hardening + calendar-feature session
+(PRs #379–#395). Treat everything below §0 as a historical snapshot of the employment-lifecycle
+rework and its immediate aftermath, not current status — §0 is the only section actively
+maintained now. Going forward this file is updated after every PR, not just at session boundaries.
 
-Previous update: 2026-08-06 (employment-lifecycle rework: FULLY SHIPPED, all 5 planned PRs merged).
+## 0. Current status (2026-08-09)
+
+**Security-hardening batch (original 12-item list): all 12 closed.** Also shipped this session: a
+full calendar-absence feature, a failed-login monitoring/escalation feature (replacing the
+originally-requested rate-limiter by explicit user decision), removal of dead calendar-operations
+stub routes, and — after a real merge-topology incident (see below) — the frontend half of the
+httpOnly-cookie migration finally reconciled onto `main`. Rooms-completed data (#395) now has a
+calendar UI surface. Currently working a second checklist of user-reported items (§0.3).
+
+### ⚠️ Known incident: PR #392 never reached `main`, fixed by PR #394 — read before trusting any
+### "merged" status on this repo without checking `git log origin/main`
+
+PR #392 (frontend half of the cookie migration) was based on `fix/auth-cookies-backend` (PR #391's
+branch), per plan — backend ships first, frontend second. What went wrong: **#391 merged into
+`main` directly**, and **#392 merged into `fix/auth-cookies-backend`** — but nobody then merged
+`fix/auth-cookies-backend` into `main` afterward. Result: `main` had the backend cookie support
+live, but the frontend was still reading/writing `localStorage` tokens, even though GitHub showed
+#392 as "Merged". The actual XSS-closing fix was never in production despite the green checkmark.
+Caught only by diffing `origin/main`'s `frontend/lib/config.ts` against what #392's diff should
+have produced. **Fixed by PR #394** (`fix/auth-cookies-frontend-remerge` → `main`, clean merge, all
+3 original commits verbatim) — **confirmed merged into `main` 2026-08-09T21:07:50Z**, the frontend
+cookie migration is live. **Lesson: `mergedAt`/"Merged" in `gh pr view` only tells you the PR's OWN
+base branch received the commits — it says nothing about whether that base branch ever reached
+`main`.** Always check the PR's `baseRefName`, and if it isn't `main`, verify the base branch itself
+later reached `main` before trusting the feature is live.
+
+### Merged, this session (chronological)
+| PR | What |
+|---|---|
+| #379 | Critical IDOR fix — `AssignmentService` ownership check (original batch #11) |
+| #380 | JWT algorithm-confusion fix — `algorithms: ['HS256']` pinned on `jwt.verify()` (#5) |
+| #381 | Sidebar fixed in place, profile moved to a pinned footer above Settings |
+| #382 | Malformed-JSON error code, phone validation, JobRequest/Attendance manager-scope IDORs, worker RoleGate gap (#3, #10, part of #11/#12) |
+| #383 | Checkout manipulation/geofence, hotel cascade, remaining manager-scope IDORs (#12) |
+| #384 | Gated `PayslipRequestsCard` actions to backend-allowed roles |
+| #385 | **Critical bug** (not from the audit report) — block placing a worker on a day they have a declared SICK/VACATION absence; explicit `BLOCKING_ABSENCE_KINDS` list + day-grain semantics documented per review |
+| #386 | Calendar-absence feature: manager+worker marking, mandatory-for-VACATION reason, drag-to-move, bidirectional notifications, auto-cancel of a conflicting shift when absence is marked (a second critical bug found and fixed mid-PR) |
+| #387 | Sidebar collapse/expand transition smoothed |
+| #388 | All 11 npm audit vulnerabilities patched (lockfile-only, no breaking changes) (#7, #8) |
+| #389 | Failed-login monitoring + manager escalation (TREQ-AUTH-007) — replaces the originally-requested rate limiter; user explicitly chose this over `express-rate-limit` since app-layer rate limiting would contradict frozen spec TREQ-AUTH-008 (#6) |
+| #390 | Removed dead calendar daily-operations stub routes (ADR-051) (#2) |
+| #391 | httpOnly auth-cookie support, backend half of #4 |
+| #393 | Worker self-stats enrichment (`total_assignments`/`attendance_rate`/`current_month`/`recent_ratings`) — see §0.2 for why this replaced an earlier leaderboard-access attempt |
+| #394 | `fix/auth-cookies-frontend-remerge` → `main`. Reconciles #392's frontend cookie migration onto `main` after the merge-topology incident above (#392 itself never reached `main` — see the incident note). httpOnly cookies are confirmed live now that this is merged. |
+| #395 | Rooms-completed data (ADR-028's manager-entered per-shift room count) surfaced in the calendar UI. Had zero read path and zero UI surface before this — fixed with a new `AssignmentDto.rooms_completed` field (visibility follows the *existing* ownership/scope gate on `getById`/`list`, no new authz surface) plus a `PATCH /:id/rooms-completed` correction endpoint (kept separate from `POST`, whose create-once/409-on-repeat contract is unchanged and tested). Both endpoints require `assignment.status === COMPLETED` (a real pre-existing gap, closed by explicit user decision — a manager could previously log a count for a shift that hadn't started). Follow-up review pass added `entered_by_name` to the DTO, a genuine optimistic UI update in the calendar modal, and a full-shape DTO regression test (mutation-verified). |
+
+### Open
+- **#396** — this PR: syncs `HANDOFF.md` to reflect #394/#395 actually merging and records the §0.3
+  feature-scoping decisions below.
+- **#398** — Document Templates + Digital Signature. See §0.3's Document templates entry below for
+  full status (built, not yet merged, not yet run end-to-end, needs Chromium in CI/EC2).
+- **#399** — Calendar Today button turned into a real toggle (highlighted+disabled when the visible
+  grid already contains today, outline+clickable otherwise) — small, unrelated to #398.
+
+### Original 12-item security batch — final disposition (all 12 closed)
+| # | Item | Status |
+|---|---|---|
+| 1 | `Hotel.manager_user_id` no `@unique` | Already mitigated pre-batch (PR #370/#376) |
+| 2 | Calendar `NotImplementedError` dead stubs | #390 |
+| 3 | Malformed JSON → wrong error code | #382 |
+| 4 | JWT in localStorage (XSS) | #391 (backend) + #392/#394 (frontend — see the incident note above; confirmed merged and live) |
+| 5 | JWT algorithm-confusion | #380 |
+| 6 | No rate limiting | #389 (failed-login monitoring instead, by explicit user decision) |
+| 7/8 | npm audit vulns | #388 |
+| 9 | Stale schema comment | separate commit `c9c7c2e` |
+| 10 | Unvalidated phone field | #382 |
+| 11 | Critical IDOR — `AssignmentService` ownership | #379, hardened further in #382/#383 |
+| 12 | Attendance checkout missing geofence | #383 |
+
+### §0.1 — Second checklist (user-reported items), verification + work status
+Cross-referenced against current `main`, most already resolved by earlier PRs in this same session
+before being re-checked:
+- **Assignment completed but work request still pending** — RESOLVED by #369 (`deriveFillStatus`,
+  predates this session but confirmed still correct).
+- **No ranking/leaderboard visible** — see §0.2 below; NOT fixed the way originally planned. Note
+  also: backend + frontend UI both already exist (`LeaderboardTable`, `/analytics` page), but the
+  sidebar nav entry is still role-gated to manager/regional_manager/admin (`SidebarNav.tsx`) —
+  invisible to a `worker`-role user regardless of §0.2's outcome. That nav gate is itself a
+  candidate GD-06-consistent behavior (workers aren't meant to see the leaderboard at all per that
+  ruling), not a bug to fix independently — don't "fix" the nav visibility without first resolving
+  whether GD-06 even wants a worker-visible leaderboard.
+- **Rooms/occupancy stats editable in calendar** — RESOLVED by #395 (this session, see above). Note:
+  the hotel-level DAILY AGGREGATE (stay-over/checkout/total-people-working) is a genuinely different,
+  still-nonexistent concept from `RoomsCompletedEntry` (per-assignment, not per-day-hotel) — that
+  was the removed `DailyOperation` type (#390) and has NOT been rebuilt. If the user still wants a
+  hotel-level daily rooms/occupancy dashboard, that's separate, unscoped work.
+- **Data protection consent missing** — RESOLVED as a mechanism (daily gate, decline→manager notify,
+  audit trail all built/wired), but the legal notice text is a literal placeholder ("legal content
+  pending Zirove/DPO authorship") — a legal/DPO content gap, not engineering.
+- **Broadcast-accepted assignment not showing in calendar** — RESOLVED by #371 (predates this session).
+- **Check-in geofence not applied** — RESOLVED, already hard-enforced by design (soft-skip only when
+  a hotel has no geofence configured at all, which is intentional).
+- **Genuinely not started** (real feature work, need scoping before building): contract-type
+  detection + part/mid/full-time approval workflow ("middle time" is ambiguous, needs
+  clarification); Leave & Sickness (multi-day requests, clash detection beyond same-day, certificate
+  OCR — zero precedent in this codebase, reminders); dark mode (no toggle exists); language switcher
+  (zero i18n infrastructure); document templates (no template concept anywhere, not even for HR's
+  existing `Contract.template_id` field). **Scoping for these is now recorded in §0.3.**
+
+### §0.2 — GD-06 governance conflict (worker analytics scope) — a real lesson, not just a footnote
+Attempted to open the manager-facing leaderboard (`GET /analytics/leaderboard`) to workers to
+resolve "no ranking system visible" — but this directly contradicts **GD-06** (2026-07-27), a
+ratified governance decision that explicitly weighed "worker sees own stats" vs. "worker sees
+broader analytics" and chose the former (encoded in ADR-030 §3's `C-31` capability matrix,
+worker=deny, enforced by `capability-policy.test.ts`). **Reverted that branch entirely** rather than
+override a deliberate product decision without a real business reason surfacing during the
+investigation. Built #393 instead: enriched the existing self-scoped `GET /analytics/my-stats`
+(which already existed, GD-06-compliant, but had a thin response and no dashboard placement) with
+`total_assignments`/`attendance_rate`/`current_month`/`recent_ratings`, still zero peer-identifying
+data, now also on the dashboard (previously `/profile`-only). **If a real leaderboard-for-workers
+requirement ever comes up again, it needs a GD-06 AMENDMENT (dated note + updated ADR-030 matrix
+row, same pattern as ADR-030's own C-16 supersession precedent) — not a direct code change.**
+
+### Two frozen-spec amendments flagged, not yet done
+Both FROZEN specs; amending them follows their own protocol, not a routine edit:
+- `SPEC-CALENDAR-001` (RULE-CAL-04/REQ-CAL-T04) — needs updating for the day-grain absence-blocking
+  behavior from #385.
+- `SPEC-AUTH-001` (REQ-AUTH-003) — its "no failed-attempt counting or notification of any kind
+  exists" line is now stale after #389.
+
+### §0.3 — Deferred feature scoping (explicit user decision, 2026-08-09)
+Of the 5 not-started items from §0.1, scoping was resolved for 2 (dark mode, document templates)
+and explicitly deferred for 3. **When asked "what's left," report these three as open/undecided —
+do not silently re-derive a scope for them.**
+
+**Deferred, no scope decided yet:**
+- **Contract-type detection + approval workflow.** "Middle time" was never defined — the user
+  said to leave it and note it as a later decision. Nothing to build until that's resolved.
+- **Leave & Sickness — OCR portion specifically.** The user deferred OCR (sick-note upload/
+  extraction, certificate reminders) without picking a scoping approach. Multi-day leave requests
+  + clash detection (the non-OCR half) are UNSTARTED too — the user's answer deferred the whole
+  item, not just OCR; don't assume the non-OCR half is authorized to build without checking back.
+
+**Scoped, ready to build (once picked up):**
+- **Dark mode**: manual toggle in Settings (Light/Dark/System), System defaults to
+  `prefers-color-scheme`, persisted (not an auth token, plain localStorage is fine here — do not
+  confuse with the httpOnly-cookie auth-token work, unrelated). Not yet started.
+- **Document templates**: **in-app fillable form templates** (not static file uploads) — a
+  template defines structured fields, filled through a form in the app, rendered to a document.
+  **Also requires digital signature capture** (explicit user requirement, not implied by "template"
+  alone). **Built and open as PR #398** (`feat/document-templates`) — full backend module (7 Prisma
+  models, fork-on-edit template versioning, Playwright PDF rendering, attestation-level signature
+  capture) plus frontend (template CRUD, fill/sign wizard, `signature_pad` canvas capture). NOT yet
+  merged; NOT yet run end-to-end against a real database/browser; needs the Chromium binary
+  installed in CI/EC2 before it can actually render a PDF in those environments. See PR #398's own
+  description for the full verification status and open decisions before assuming this is done.
+- **Language switcher**: **full coverage**, not UI-only — "everything the user will see, be it
+  notifications or whatever, should be translated." This is a much larger scope than the original
+  UI-only framing: every notification-producing code path (in-app `Notification` records, any
+  future email/push text) needs translation, not just frontend component strings. Target
+  languages still unspecified — needs that decision plus an i18n architecture pass (message
+  catalog format, where translated notification text is generated — at write time per-recipient
+  locale, or at read time) before implementation starts. Not yet started.
 
 ---
 
-## 0. ACTIVE: Document Templates + Digital Signature (branch `feat/document-templates`, NOT merged, NO PR opened yet)
+### Addendum, 2026-08-10 — PR #397 (dark mode) review follow-up, tracked not actioned
 
-**What it is.** An admin authors a reusable multi-section document template through the UI (no
-code change, no redeploy); a worker/manager creates a per-worker instance of it, fills the fields
-section by section, each required signer draws a signature, and once every signature block is
-signed it finalizes into a real PDF stored through the existing documents module. Requested
-directly by the project owner this session ("in app fillable form templates. we also need to get
-digital signature"), with a real German employment contract (`Arbeitsvertrag`) supplied as the
-reference for the *shape* the model must express.
+Review feedback on PR #397 (`feat/dark-mode-toggle`) suggested tokenizing the dark-mode approach:
+instead of a `dark:` Tailwind variant on every affected utility class (repeated across the ~66-file
+surface that PR touches), introduce semantic classes (`bg-surface`, `bg-surface-secondary`,
+`text-primary`, `text-secondary`, `border-default`, ...) mapped to CSS variables in `globals.css`.
+That would make future palette/contrast tweaks a one-file change instead of a repo-wide sweep.
 
-**Status: feature-complete and locally verified; never run against a real database or browser.**
-
-| Layer | State |
-|---|---|
-| Prisma schema + migration | 7 models, 4 enums, additive. Hand-authored SQL verified **byte-identical** to `prisma migrate diff` output; `down.sql` paired; `migrate-harness.sh check-pairs` passes |
-| Backend module | `backend/src/modules/document-templates/{routes,controller,service,types,pdf-renderer}.ts`, mounted in `routes/v1/index.ts` |
-| RBAC | 7 new tokens; 3 role-conditional wrappers each carrying the `@requiresPermission` annotation the static D-8 parser needs |
-| Backend tests | 41 new (29 service + 12 route-authz). **Full suite green: 107 suites / 2618 tests** |
-| Frontend | template CRUD (list/new/editor), instance flow (list/new/fill-sign wizard), `SignatureCaptureModal` (`signature_pad`), `MyDocumentInstancesCard` on `/users/[id]`, sidebar entry, `DocumentTemplatesWriteGate`. `tsc`/`eslint`/`build` all clean |
-| Docs | `docs/03-modules/document-templates/MODULE_SPEC.md` + `MODULE_REGISTRY.yaml` + `SPECIFICATION_INDEX.yaml` entries. `repository-integrity-check.js`: **0 real failures** |
-
-### 0.1 Three things that will bite whoever picks this up
-
-1. **DEPLOYMENT PREREQUISITE — `playwright` needs the Chromium binary (~300 MB) in every
-   environment that runs this code** (`npx playwright install --with-deps chromium`). An image
-   without it fails **at first PDF render, not at startup** — so the app looks perfectly healthy
-   until someone hits Preview or Finalize. The EC2 image and the CI runner both need this before
-   this branch ships. This is the single most likely way this module breaks in an environment
-   that otherwise looks fine.
-2. **No end-to-end run has ever happened.** The Playwright renderer is *mocked* in the test suite,
-   so the real PDF path — including the Chromium-missing failure mode — has zero automated
-   coverage, and no one has authored a full contract-shaped template through the UI and driven it
-   to a signed PDF. This is the top pre-merge task, and it needs a real environment (DB + auth +
-   browser), which this session never had.
-3. **The signature is attestation, not a legally-binding e-signature.** Drawn image + signer id
-   from `req.auth` + server timestamp + IP + SHA-256 `content_hash_at_signing`. Same trust level
-   `backend-hr`'s existing `confirmContractSigned()` already operates at. No cryptographic
-   signing, no eIDAS/PAdES. The owner was asked directly and confirmed this is what's wanted for
-   now. The UI carries the mandatory disclosure copy ("Recorded for audit purposes; not a
-   qualified electronic signature") — **do not let that string get dropped in a future refactor.**
-
-### 0.2 Design decisions the owner made explicitly (don't silently revisit these)
-
-- **Build the full shape in one larger PR**, not a walking skeleton — chosen over the plan
-  agent's own recommendation.
-- **Fork on edit**: editing a PUBLISHED template deep-copies it into a new DRAFT (`version + 1`,
-  `parent_template_id`) rather than mutating it, so a signed instance's text can never change
-  retroactively. The frontend editor handles the returned-id change and shows a one-time notice —
-  `documentTemplatesApi.updateTemplate`'s JSDoc warns every caller that `dto.id` may differ from
-  the id passed in.
-- **No proxy-fill in either direction.** A worker fills/signs only their own `SUBJECT` fields and
-  blocks; admin/manager only `COUNTERSIGNER` blocks. Enforced per-block in the service layer.
-- **SELECT added as a 6th field type**; **drawn-only** signature capture (no typed-name
-  fallback); **draft preview allowed** before all signatures collected; final PDF **reuses
-  `DocumentCategory.GENERAL`** (no new enum value).
-
-### 0.3 The spec is deliberately honest about provenance — read this before "fixing" it
-
-Every other `MODULE_SPEC.md` in this repo cites exact line numbers from CRR/PDD. **This feature
-appears in neither authoritative document**, and CRR §9 actually *excludes* signature capture for
-the contract case. So the spec carries an explicit Provenance note stating it's a first-party
-product decision from the 2026-08-09 owner session rather than fabricating citations it doesn't
-have, and it is `DRAFT` / **NOT FROZEN** — no G2 freeze was sought and no G4 review round was run
-(that's `OD-DOCTPL-08`). If a future pass "corrects" this by inventing CRR references, that is a
-regression, not a fix.
-
-### 0.4 Nine open decisions recorded in the spec (none silently resolved)
-
-`OD-DOCTPL-01` relationship to `backend-hr`'s contract flow and the unused `Contract.template_id`
-column — **deliberately undecided, needs an ADR**. `-02` no amend/re-sign/void path exists. `-03`
-`validation` is a `Json?` column with no evaluator behind it. `-04` **no retention tier assigned
-to any of the seven tables** — must be classified before this holds real data. `-05`
-`DocumentInstanceStatus.VOIDED` is defined but unreachable. `-06` PDF rendering launches Chromium
-synchronously per request, unqueued/unthrottled — a plausible DoS vector via repeated `/preview`
-calls. `-07` a template can be authored to collect CRR §27 special-category data with no
-restricted-visibility mechanism. `-08` no G4/G2. `-09` `body_template` renders as trusted admin
-markup (accepted by design, disclosed).
-
-### 0.5 Immediate next actions
-
-1. Open the PR. It has never been reviewed by anyone but the implementing session — get the
-   adversarial review this repo requires for changes of this size (§1's established bar).
-2. Get Chromium into the CI and EC2 images **before** merge (see 0.1.1).
-3. Do the end-to-end run in a real environment (see 0.1.2) — author the full contract-shaped
-   template, fill it, sign all blocks with a mix of worker and manager actors, finalize, open the
-   PDF, confirm every signature lands in the right section and `AuditLog` has one
-   `document_instance.sign` row per signature.
-4. Classify the retention tier (`OD-DOCTPL-04`) before this carries real employee data.
-
-### 0.6 Untracked file — do not commit
-
-`Arbeitsvertrag_Alona_Likhoto_final.pdf` in the repo root is a **real employee's contract**. It is
-untracked and must stay that way. No real personal data from it (name, address, DOB, RV-Nummer, or
-any filled value) appears anywhere in the code, tests, docs, or commit messages — only structural
-field *names* like `employee_name`. Keep it that way.
-
-Current status: **The employment-lifecycle rework is complete.** All prior-session work
-(#345–357) is merged to `main`, local `main` synced. PRs #354 (schema/migration + service-layer,
-combined per the user's "combine similar PRs" instruction), #355 (frontend lifecycle UI), #356
-(blocklist removal + real enforcement — an adversarial review caught and fixed a critical IDOR
-before merge), and #357 (`MODULE_SPEC.md` doc sync to the shipped model) are all merged — see §3.5
-below for the full story on each, including two genuine incident-response threads worth knowing
-about: (1) a real, pre-existing `import.meta`/CJS-ESM landmine in `config/env.ts` that #354 was the
-first change to trip (found and fixed, not a regression this rework caused); (2) a GitHub-wide
-Actions platform outage (confirmed via githubstatus.com, `Actions: major_outage`) that blocked CI
-on #356/#357 — both were merged after full local verification substituted for CI, per explicit user
-instruction, not by skipping verification. 13 unrelated deferred items (6 from the prior session +
-11 new) are batched and now the active work — see §4.
+**Explicitly NOT done now** — the reviewer's own call, agreed with: retrofitting tokens means
+re-touching every one of those ~66 files a second time for zero user-visible change, which is real
+scope and regression risk for a toggle that already works correctly. Left as `dark:`-variant-based
+for this PR. **Next person touching dark-mode styling broadly (not a one-off tweak) should consider
+this tokenization first**, rather than adding a 67th file's worth of `dark:` variants to the pile.
 
 ---
 

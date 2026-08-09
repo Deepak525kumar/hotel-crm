@@ -124,7 +124,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="py-6 text-center text-sm text-red-600">
+            <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load employment status.
             </p>
           ) : isLoading ? (
@@ -134,13 +134,13 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
             </div>
           ) : !record ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-500">Not yet onboarded.</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Not yet onboarded.</p>
               {canCreateEmployment ? (
                 <Button size="sm" onClick={() => setCreateOpen(true)}>
                   Start onboarding
                 </Button>
               ) : (
-                <p className="text-sm text-gray-400">Only an Admin can start onboarding.</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">Only an Admin can start onboarding.</p>
               )}
               <FormError>{action.error}</FormError>
             </div>
@@ -173,7 +173,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     <DataRow
                       label="Deleted"
                       value={
-                        <span className="text-red-700">
+                        <span className="text-red-700 dark:text-red-400">
                           {record.deleted_at ? formatDate(record.deleted_at) : "—"}
                         </span>
                       }
@@ -186,8 +186,8 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               </DataList>
 
               {record.status === "PENDING" && !record.submitted_for_review_at && (
-                <div className="border-t border-gray-100 pt-4">
-                  <p className="mb-2 text-sm text-gray-500">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
                     Paperwork/checks pending before this worker can be reviewed for approval.
                   </p>
                   <Button
@@ -201,7 +201,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               )}
 
               {record.status === "PENDING" && record.submitted_for_review_at && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
                   <Button size="sm" onClick={() => setApproveOpen(true)}>
                     Approve for work
                   </Button>
@@ -217,7 +217,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               )}
 
               {record.status === "ACTIVE" && (
-                <div className="border-t border-gray-100 pt-4">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                   <Button
                     size="sm"
                     variant="outline"
@@ -229,8 +229,8 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               )}
 
               {record.status === "DEACTIVATED" && (
-                <div className="border-t border-gray-100 pt-4">
-                  <p className="mb-2 text-sm text-gray-500">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
                     Temporarily paused — this worker is still employed and can return directly.
                   </p>
                   <Button size="sm" onClick={onReactivate} loading={action.isPending("reactivate")}>
@@ -240,7 +240,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               )}
 
               {record.status === "REJECTED" && (
-                <div className="border-t border-gray-100 pt-4">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                   {/* rehire() (service.ts) never resolves/connects
                       hotel_group_id, unlike approve() — a REJECTED record
                       commonly has none (it was never approved), so a rehire
@@ -249,7 +249,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       component; flag rather than silently promise a group
                       gets set. */}
                   {!record.hotel_group_id && (
-                    <p className="mb-2 text-sm text-amber-600">
+                    <p className="mb-2 text-sm text-amber-600 dark:text-amber-400">
                       This record has no hotel group. Rehiring won&apos;t set one — the worker
                       will become Active but unassignable until a group is set separately.
                     </p>
@@ -264,7 +264,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 record.status === "DEACTIVATED" ||
                 record.status === "REJECTED") &&
                 canDeleteEmployment && (
-                  <div className="border-t border-gray-100 pt-4">
+                  <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                     <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
                       Delete (left the company)
                     </Button>
@@ -272,8 +272,8 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 )}
 
               {record.status === "DELETED" && canRestoreEmployment && (
-                <div className="border-t border-gray-100 pt-4">
-                  <p className="mb-2 text-sm text-gray-500">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
                     A restored record must go through approval again before becoming active.
                   </p>
                   <RestoreButton employeeId={record.employee_id} onDone={refresh} />
@@ -432,7 +432,7 @@ function CreateEmploymentModal({
           onChange={(e) => setStartDate(e.target.value)}
         />
         <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700">Skills (optional)</p>
+          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Skills (optional)</p>
           {SKILL_OPTIONS.map((opt) => (
             <Checkbox
               key={opt.value}
@@ -504,7 +504,7 @@ function ApproveModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Hotel group is auto-detected when a Regional Manager or Hotel Manager approves — it
           isn&apos;t for an Admin account, so this must be set here or the worker becomes active
           but unassignable to any hotel.
@@ -582,7 +582,7 @@ function DeactivateModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           This worker stays employed and can be reactivated directly, with no re-approval. Future
           assignments are cancelled. If this person has left the company, use Delete instead.
         </p>
@@ -659,7 +659,7 @@ function DeleteModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           This also deactivates the worker&apos;s account and cancels their future assignments. It
           can be reversed with Restore, which requires re-approval before the worker becomes
           active again.

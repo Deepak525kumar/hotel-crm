@@ -18,8 +18,8 @@ export function DataRow({
         className,
       )}
     >
-      <span className="shrink-0 text-gray-500">{label}</span>
-      <span className="text-right font-medium text-gray-900">{value}</span>
+      <span className="shrink-0 text-gray-500 dark:text-gray-400">{label}</span>
+      <span className="text-right font-medium text-gray-900 dark:text-gray-100">{value}</span>
     </div>
   );
 }
@@ -33,6 +33,6 @@ export function DataList({
   className?: string;
 }) {
   return (
-    <div className={cn("divide-y divide-gray-100", className)}>{children}</div>
+    <div className={cn("divide-y divide-gray-100 dark:divide-gray-800", className)}>{children}</div>
   );
 }

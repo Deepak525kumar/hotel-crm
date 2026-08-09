@@ -113,7 +113,7 @@ export default function NotificationDetailPage() {
           ← Back to notifications
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             This notification was not found or could not be loaded.
           </CardContent>
         </Card>
@@ -156,7 +156,7 @@ export default function NotificationDetailPage() {
           <CardTitle>Message</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-line text-sm text-gray-900">
+          <p className="whitespace-pre-line text-sm text-gray-900 dark:text-gray-100">
             {notification.message}
           </p>
         </CardContent>
@@ -220,7 +220,7 @@ export default function NotificationDetailPage() {
       {!notification.is_read && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               Mark this notification as read once you&apos;ve seen it.
             </div>
             <Button onClick={markRead} loading={mark.pending} className="shrink-0">

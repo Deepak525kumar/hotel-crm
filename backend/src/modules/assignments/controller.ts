@@ -139,6 +139,31 @@ export async function logRoomsCompleted(
   }
 }
 
+// 2026-08-09: correction path for an already-logged entry. See
+// AssignmentService.updateRoomsCompleted's own comment for why this is a
+// separate endpoint rather than turning POST into an upsert.
+export async function updateRoomsCompleted(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const parsed = LogRoomsCompletedSchema.safeParse(req.body);
+    if (!parsed.success) {
+      next(new ValidationError('Invalid request body', zodDetails(parsed.error)));
+      return;
+    }
+    const result = await assignmentService.updateRoomsCompleted(req.params.id, parsed.data, {
+      userId: req.auth!.userId,
+      role: req.auth!.role,
+      scope: req.auth!.scope ?? null,
+    });
+    sendSuccess(res, result, { statusCode: 200, requestId: req.requestId });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): manager places a worker
 // directly on the calendar for a given day — no accept/decline step.
 export async function createCalendarEntry(

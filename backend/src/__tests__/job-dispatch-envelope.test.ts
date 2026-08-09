@@ -159,6 +159,12 @@ jest.mock('../lib/db.js', () => ({
     jobRequestSkillSlot: { update: async () => ({}) },
     notification: { create: async () => ({ id: 'notif_new' }) },
     outboxEvent: { create: async () => ({ id: 'outbox_new' }) },
+    // getById()/list() now attach a logged rooms-completed entry, if any
+    // (2026-08-09) -- no fixture assignment has one logged.
+    roomsCompletedEntry: {
+      findUnique: async () => null,
+      findMany: async () => [],
+    },
     auditLog: { create: async () => undefined },
     $transaction: async (fn: any) =>
       fn({

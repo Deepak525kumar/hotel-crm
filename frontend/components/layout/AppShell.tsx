@@ -20,7 +20,7 @@ const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
   <div
     // px-4 in both states (rather than px-0 <-> px-6) so the "H" sits at
     // the same x as the nav icons below it and nothing has to slide.
-    className="flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 px-4 font-semibold text-gray-900"
+    className="flex h-14 shrink-0 items-center overflow-hidden border-b border-gray-200 px-4 font-semibold text-gray-900 dark:border-gray-800 dark:text-gray-100"
   >
     {/* The wordmark previously swapped its text content outright ("H" <->
         "Hotel CRM") the instant `collapsed` flipped, so it popped a frame
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Desktop sidebar — an icon-only rail by default, expanding smoothly
           to show labels on hover OR keyboard focus (independently tracked,
           see the state comment above). `w-16`/`w-60` bracket the transition;
@@ -131,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           // the link padding, and the label grid in SidebarNav. Previously
           // these used different property sets and no explicit curve, so
           // they visibly finished at different moments.
-          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-out md:flex",
+          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-out dark:border-gray-800 dark:bg-gray-900 md:flex",
           sidebarExpanded ? "w-60" : "w-16",
         )}
       >
@@ -148,13 +148,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="Navigation"
         >
           <div
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/50 dark:bg-black/70"
             onClick={() => setMobileNavOpen(false)}
             aria-hidden
           />
           <aside
             ref={drawerRef}
-            className="relative z-10 flex h-full w-64 max-w-[80%] flex-col bg-white shadow-xl"
+            className="relative z-10 flex h-full w-64 max-w-[80%] flex-col bg-white shadow-xl dark:bg-gray-900"
           >
             <BrandMark />
             <SidebarNav onNavigate={() => setMobileNavOpen(false)} />
@@ -163,14 +163,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 sm:px-6">
+        <header className="flex h-14 items-center gap-3 border-b border-gray-200 bg-white px-4 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
           <button
             ref={menuButtonRef}
             type="button"
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation"
             aria-expanded={mobileNavOpen}
-            className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 md:hidden"
+            className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
           >
             <svg
               width="20"
@@ -185,7 +185,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <path d="M3 6h18M3 12h18M3 18h18" />
             </svg>
           </button>
-          <span className="text-sm font-semibold text-gray-900 md:hidden">
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 md:hidden">
             Hotel CRM
           </span>
 
@@ -194,7 +194,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-300 dark:hover:bg-gray-800"
             >
               Log out
             </button>
@@ -208,7 +208,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             and on long ones it simply follows the content -- no sticky
             positioning, and nothing overlapping the page itself. The year is
             computed per render rather than hardcoded so it never goes stale. */}
-        <footer className="px-4 pb-4 text-center text-xs text-gray-400 sm:px-6">
+        <footer className="px-4 pb-4 text-center text-xs text-gray-400 dark:text-gray-500 sm:px-6">
           &copy; {new Date().getFullYear()} {APP_OWNER}. All rights reserved.
           This application is owned and developed by {APP_OWNER}.
         </footer>

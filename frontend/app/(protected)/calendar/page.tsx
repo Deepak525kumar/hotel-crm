@@ -5,7 +5,7 @@ import { mutate } from "swr";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
 import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
+import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
@@ -22,7 +22,7 @@ import {
   Skeleton,
   Textarea,
 } from "@/components/ui";
-import type { AbsenceKind, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -209,18 +209,18 @@ export default function CalendarGridPage() {
         }
         actions={
           <div className="flex items-center gap-2">
-            <div className="flex overflow-hidden rounded-md border border-gray-300">
+            <div className="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
               <button
                 type="button"
                 onClick={() => setView("week")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "week" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                className={`px-3 py-1.5 text-sm font-medium ${view === "week" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
               >
                 Week
               </button>
               <button
                 type="button"
                 onClick={() => setView("month")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "month" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50"}`}
+                className={`px-3 py-1.5 text-sm font-medium ${view === "month" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
               >
                 Month
               </button>
@@ -242,7 +242,7 @@ export default function CalendarGridPage() {
 
       {entriesError ? (
         <Card>
-          <div className="p-6 text-center text-sm text-red-600">Failed to load the calendar. Please try again.</div>
+          <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load the calendar. Please try again.</div>
         </Card>
       ) : (
         <div
@@ -397,17 +397,17 @@ function DayCell({
       onDragLeave={() => setDragOver(false)}
       onDrop={canWrite ? onDrop : undefined}
       className={[
-        isToday ? "ring-2 ring-blue-500" : undefined,
+        isToday ? "ring-2 ring-blue-500 dark:ring-blue-500" : undefined,
         outsideCurrentMonth ? "opacity-50" : undefined,
-        dragOver ? "bg-blue-50" : undefined,
+        dragOver ? "bg-blue-50 dark:bg-blue-950" : undefined,
       ]
         .filter(Boolean)
         .join(" ") || undefined}
     >
-      <div className={`flex items-center justify-between border-b border-gray-100 ${isMonth ? "px-2 py-1" : "px-3 py-2"}`}>
+      <div className={`flex items-center justify-between border-b border-gray-100 dark:border-gray-800 ${isMonth ? "px-2 py-1" : "px-3 py-2"}`}>
         <div>
-          {!isMonth && <div className="text-xs font-medium text-gray-500">{WEEKDAY_LABEL.format(date)}</div>}
-          <div className={isMonth ? "text-xs font-semibold text-gray-900" : "text-sm font-semibold text-gray-900"}>
+          {!isMonth && <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{WEEKDAY_LABEL.format(date)}</div>}
+          <div className={isMonth ? "text-xs font-semibold text-gray-900 dark:text-gray-100" : "text-sm font-semibold text-gray-900 dark:text-gray-100"}>
             {isMonth ? MONTH_DAY_LABEL.format(date) : DAY_LABEL.format(date)}
           </div>
         </div>
@@ -417,7 +417,7 @@ function DayCell({
               type="button"
               onClick={onAdd}
               aria-label={`Add calendar entry for ${dayKey}`}
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-blue-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-blue-400"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
@@ -432,7 +432,7 @@ function DayCell({
               onClick={onMarkAbsence}
               title="Mark a worker absent on this day"
               aria-label={`Mark a worker absent on ${dayKey}`}
-              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
+              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-amber-400"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="h-3.5 w-3.5" aria-hidden>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -471,7 +471,7 @@ function DayCell({
                 />
               ),
             )}
-            {hiddenCount > 0 && <div className="text-[11px] text-gray-400">+{hiddenCount} more</div>}
+            {hiddenCount > 0 && <div className="text-[11px] text-gray-400 dark:text-gray-500">+{hiddenCount} more</div>}
           </>
         ) : (
           <>
@@ -497,7 +497,7 @@ function DayCell({
               />
             ))}
             {entries.length === 0 && absences.length === 0 && (
-              <div className="pt-2 text-center text-xs text-gray-400">No entries</div>
+              <div className="pt-2 text-center text-xs text-gray-400 dark:text-gray-500">No entries</div>
             )}
           </>
         )}
@@ -538,7 +538,7 @@ function PlacementTag({
         e.dataTransfer.effectAllowed = "move";
       }}
       className={[
-        "block w-full truncate rounded bg-blue-50 text-left font-medium text-blue-700 hover:bg-blue-100",
+        "block w-full truncate rounded bg-blue-50 text-left font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
         size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
         draggable ? "cursor-grab active:cursor-grabbing" : undefined,
         moving ? "opacity-50" : undefined,
@@ -595,8 +595,8 @@ function AbsenceTag({
       className={[
         "block w-full truncate rounded text-left font-medium",
         isSick
-          ? "bg-red-50 text-red-700 hover:bg-red-100"
-          : "bg-amber-50 text-amber-700 hover:bg-amber-100",
+          ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900/60"
+          : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900/60",
         size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
         draggable ? "cursor-grab active:cursor-grabbing" : undefined,
         moving ? "opacity-50" : undefined,
@@ -636,7 +636,7 @@ function WorkerPicker({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700">Worker</label>
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worker</label>
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -644,11 +644,11 @@ function WorkerPicker({
         disabled={!hotelId}
       />
       {hotelId && (
-        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800">
           {isLoading ? (
-            <div className="p-3 text-sm text-gray-400">Searching…</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
           ) : workers.length === 0 ? (
-            <div className="p-3 text-sm text-gray-400">No eligible workers found.</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No eligible workers found.</div>
           ) : (
             workers.map((w) => {
               const label = `${w.first_name} ${w.last_name}`;
@@ -658,12 +658,12 @@ function WorkerPicker({
                   key={w.id}
                   type="button"
                   onClick={() => onChange(w.id, label)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                    selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   <span className="truncate">{label}</span>
-                  <span className="truncate text-xs text-gray-400">{w.email}</span>
+                  <span className="truncate text-xs text-gray-400 dark:text-gray-500">{w.email}</span>
                 </button>
               );
             })
@@ -826,8 +826,8 @@ function AddEntryModal({
           }}
         />
         {workerId && (
-          <p className="text-xs text-gray-500">
-            Selected worker: <span className="font-medium text-gray-700">{workerLabel}</span>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Selected worker: <span className="font-medium text-gray-700 dark:text-gray-300">{workerLabel}</span>
           </p>
         )}
         <Input label="Day" type="date" value={day} readOnly disabled />
@@ -849,7 +849,7 @@ function AddEntryModal({
         )}
         <FormError>{error}</FormError>
         {partialFailures.length > 0 && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
             <p className="font-medium">
               {occurrences - partialFailures.length} of {occurrences} placements created. {partialFailures.length}{" "}
               failed:
@@ -958,17 +958,17 @@ function MarkAbsenceForWorkerModal({
     >
       <div className="space-y-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700">Worker</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worker</label>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name or email…"
           />
-          <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+          <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800">
             {workersLoading ? (
-              <div className="p-3 text-sm text-gray-400">Searching…</div>
+              <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
             ) : workers.length === 0 ? (
-              <div className="p-3 text-sm text-gray-400">No workers found.</div>
+              <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No workers found.</div>
             ) : (
               workers.map((w) => {
                 const label = `${w.first_name} ${w.last_name}`;
@@ -978,12 +978,12 @@ function MarkAbsenceForWorkerModal({
                     key={w.id}
                     type="button"
                     onClick={() => setWorkerId(w.id)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                      selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                      selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                     }`}
                   >
                     <span className="truncate">{label}</span>
-                    <span className="truncate text-xs text-gray-400">{w.email}</span>
+                    <span className="truncate text-xs text-gray-400 dark:text-gray-500">{w.email}</span>
                   </button>
                 );
               })
@@ -1012,6 +1012,173 @@ function MarkAbsenceForWorkerModal({
         <FormError>{error}</FormError>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Rooms-completed view/edit, shown inside EditEntryModal only once the
+ * assignment is COMPLETED (2026-08-09) -- logging/editing a count before
+ * the shift has finished doesn't describe anything real yet, and the
+ * backend enforces the same rule (409 otherwise). Everyone who can open
+ * the placement-details modal sees this if it applies to them (workers see
+ * their own); only canWrite roles get the edit control, matching the
+ * manager-only POST/PATCH /assignments/:id/rooms-completed routes.
+ */
+function RoomsCompletedSection({
+  assignmentId,
+  canWrite,
+}: {
+  assignmentId: string;
+  canWrite: boolean;
+}) {
+  const { data: assignment, isLoading } = useAssignment(assignmentId);
+  const { user } = useAuth();
+  const [editing, setEditing] = useState(false);
+  const [rooms, setRooms] = useState("");
+  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (isLoading || !assignment || assignment.status !== "COMPLETED") return null;
+
+  const existing = assignment.rooms_completed;
+
+  const startEditing = () => {
+    setRooms(existing ? String(existing.rooms_completed) : "");
+    setNotes(existing?.notes ?? "");
+    setError(null);
+    setEditing(true);
+  };
+
+  // Optimistic save (review follow-up, PR #395 item B): the "Count"/"Notes"
+  // display switches to the new values the instant Save is clicked, not
+  // after the round-trip resolves -- same optimisticData/rollbackOnError
+  // shape as onMoveEntry/onMoveAbsence above, applied to this key instead of
+  // the calendar-entries-range one. On failure SWR reverts this cache entry
+  // to its pre-save value automatically; `error` still surfaces why.
+  const onSave = async () => {
+    const parsed = Number(rooms);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      setError("Enter a whole number of rooms (0 or more).");
+      return;
+    }
+    setError(null);
+    setSaving(true);
+    const trimmedNotes = notes.trim();
+    const input = { rooms_completed: parsed, notes: trimmedNotes || undefined };
+
+    // Provisional row shown immediately. id/assignment_id/created_at are
+    // placeholders (the create case has no real id yet) -- fine, since
+    // nothing reads them before the real response replaces this optimistic
+    // entry (success) or SWR rolls the whole assignment back (failure).
+    const optimisticEntry: RoomsCompletedEntry = {
+      id: existing?.id ?? `optimistic-${assignmentId}`,
+      assignment_id: assignmentId,
+      hotel_id: assignment.hotel_id,
+      worker_id: assignment.worker_id,
+      entered_by_id: existing?.entered_by_id ?? user?.id ?? "",
+      entered_by_name:
+        existing?.entered_by_name ?? (user ? `${user.first_name} ${user.last_name}` : null),
+      rooms_completed: parsed,
+      notes: trimmedNotes || null,
+      created_at: existing?.created_at ?? new Date(0).toISOString(),
+      updated_at: new Date(0).toISOString(),
+    };
+    const optimisticAssignment: Assignment = { ...assignment, rooms_completed: optimisticEntry };
+
+    try {
+      await mutate(
+        ["assignment", assignmentId],
+        async (current: Assignment = assignment) => {
+          const updated = existing
+            ? await assignmentsApi.updateRoomsCompleted(assignmentId, input)
+            : await assignmentsApi.logRoomsCompleted(assignmentId, input);
+          return { ...current, rooms_completed: updated };
+        },
+        {
+          optimisticData: optimisticAssignment,
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-100 pt-3">
+      <p className="mb-2 text-sm font-medium text-gray-700">Rooms completed</p>
+      {editing ? (
+        <div className="space-y-2">
+          <Input
+            label="Rooms completed"
+            type="number"
+            min={0}
+            step={1}
+            value={rooms}
+            onChange={(e) => setRooms(e.target.value)}
+          />
+          <Textarea
+            label="Notes (optional)"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            maxLength={1000}
+          />
+          <FormError>{error}</FormError>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={onSave} loading={saving}>
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setEditing(false)}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      ) : existing ? (
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Count</span>
+            <span className="font-medium text-gray-900">{existing.rooms_completed}</span>
+          </div>
+          {existing.notes && (
+            <div className="flex justify-between gap-4">
+              <span className="shrink-0 text-gray-500">Notes</span>
+              <span className="text-right text-gray-700">{existing.notes}</span>
+            </div>
+          )}
+          {/* review follow-up (PR #395 item A): who logged this count, not
+              just when -- resolved server-side (entered_by_name), falls
+              back to the raw id on the rare chance the name failed to
+              resolve rather than hiding the field entirely. */}
+          <div className="flex justify-between gap-4">
+            <span className="shrink-0 text-gray-500">Logged by</span>
+            <span className="text-right text-gray-700">
+              {existing.entered_by_name ?? existing.entered_by_id}
+            </span>
+          </div>
+          {canWrite && (
+            <Button size="sm" variant="outline" className="mt-1" onClick={startEditing}>
+              Edit
+            </Button>
+          )}
+        </div>
+      ) : canWrite ? (
+        <Button size="sm" variant="outline" onClick={startEditing}>
+          Log rooms completed
+        </Button>
+      ) : (
+        <p className="text-sm text-gray-500">Not yet logged.</p>
+      )}
+    </div>
   );
 }
 
@@ -1078,26 +1245,27 @@ function EditEntryModal({
     >
       <div className="space-y-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-500">Worker</span>
-          <span className="font-medium text-gray-900">{workerName}</span>
+          <span className="text-gray-500 dark:text-gray-400">Worker</span>
+          <span className="font-medium text-gray-900 dark:text-gray-100">{workerName}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Hotel</span>
-          <span className="font-medium text-gray-900">{hotelName}</span>
+          <span className="text-gray-500 dark:text-gray-400">Hotel</span>
+          <span className="font-medium text-gray-900 dark:text-gray-100">{hotelName}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500">Day</span>
-          <span className="font-medium text-gray-900">{entry.day}</span>
+          <span className="text-gray-500 dark:text-gray-400">Day</span>
+          <span className="font-medium text-gray-900 dark:text-gray-100">{entry.day}</span>
         </div>
         {/* Gated on canWrite: dragging is only offered to the roles
             PlacementTag actually sets draggable for (same StaffingWriteGate
             set). A worker/checker sees this modal read-only, so the hint
             described a gesture they cannot perform. */}
         {canWrite && (
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             To move this placement to a different day, drag it to the destination day cell.
           </p>
         )}
+        <RoomsCompletedSection assignmentId={entry.assignment_id} canWrite={canWrite} />
         <FormError>{error}</FormError>
       </div>
     </Modal>

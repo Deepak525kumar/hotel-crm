@@ -46,7 +46,7 @@ function GeoCheckinDetail({ id }: { id: string }) {
           ← Back to geo check-ins
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
               ? "This geo check-in was not found."
               : "This geo check-in was not found or could not be loaded."}
@@ -137,7 +137,7 @@ export default function GeoCheckinDetailPage() {
     <GeoCheckinsGate
       fallback={
         <Card>
-          <CardContent className="text-sm text-gray-500">
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
             Geo check-ins are available to managers and admins.
           </CardContent>
         </Card>

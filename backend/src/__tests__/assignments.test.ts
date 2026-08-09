@@ -61,11 +61,20 @@ const mockCalendarAbsence = {
   findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
 };
 
+// getById()/list() now attach a logged rooms-completed entry, if any
+// (2026-08-09) -- default to "none logged yet" so existing fixtures don't
+// need to know about it unless a test specifically exercises the field.
+const mockRoomsCompletedEntry = {
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   calendarAbsence: mockCalendarAbsence,
+  roomsCompletedEntry: mockRoomsCompletedEntry,
   hotel: mockHotel,
   rating: mockRating,
   attendance: mockAttendance,

@@ -3,13 +3,13 @@ import Link from "next/link";
 /** Branded 404 for unmatched routes. */
 export default function NotFound() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <p className="text-sm font-semibold text-blue-700">404</p>
-        <h1 className="mt-1 text-lg font-semibold text-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 dark:bg-gray-800">
+      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">404</p>
+        <h1 className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
           Page not found
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           The page you’re looking for doesn’t exist or has moved.
         </p>
         <div className="mt-6">
