@@ -69,8 +69,8 @@ export function LifecycleCard({
       <Card>
         <CardContent className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-900">Deleted {label}</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Deleted {label}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               Removed from operations on {formatDateTime(deletedAt)}. History is
               preserved and it can be restored.
             </p>
@@ -90,13 +90,13 @@ export function LifecycleCard({
 
   return (
     <>
-      <Card className={isActive ? "border-red-100" : undefined}>
+      <Card className={isActive ? "border-red-100 dark:border-red-900/60" : undefined}>
         <CardContent className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
               {isActive ? `Deactivate ${label}` : `Reactivate ${label}`}
             </p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
               {isActive
                 ? `Temporarily pauses this ${label}. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.`
                 : `This ${label} is paused. Reactivating makes it available again immediately.`}
@@ -150,7 +150,7 @@ export function LifecycleCard({
           </>
         }
       >
-        <div className="space-y-3 text-sm text-gray-700">
+        <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
           <p>
             This removes the {label} from operations entirely: it will no longer
             appear in lists, pickers or assignment flows.

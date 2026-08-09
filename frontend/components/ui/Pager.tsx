@@ -25,7 +25,7 @@ export function Pager({ page, hasNext, onPageChange, disabled }: PagerProps) {
       >
         Previous
       </Button>
-      <span className="text-sm text-gray-500">Page {page}</span>
+      <span className="text-sm text-gray-500 dark:text-gray-400">Page {page}</span>
       <Button
         variant="outline"
         size="sm"

@@ -48,12 +48,12 @@ function formatBytes(bytes: number): string {
 
 function DocumentRow({ doc }: { doc: WorkerDocument }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
+    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-gray-900">
+        <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
           {doc.original_filename}
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           {formatBytes(doc.file_size_bytes)} · Uploaded {formatDate(doc.created_at)}
           {doc.expires_at && <> · Expires {formatDate(doc.expires_at)}</>}
         </p>
@@ -67,12 +67,12 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
             href={doc.presigned_url}
             target="_blank"
             rel="noreferrer"
-            className="text-sm font-medium text-blue-600 hover:text-blue-700"
+            className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
             View
           </a>
         ) : (
-          <span className="text-sm text-gray-400" title="Storage not configured in this environment">
+          <span className="text-sm text-gray-400 dark:text-gray-500" title="Storage not configured in this environment">
             Unavailable
           </span>
         )}
@@ -116,7 +116,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
           </Button>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 dark:border-gray-800">
             <Checkbox
               label="Evaluate with work permit required"
               checked={workPermitRequired}
@@ -132,7 +132,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
           </div>
 
           {error ? (
-            <p className="py-6 text-center text-sm text-red-600">
+            <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load documents.
             </p>
           ) : isLoading ? (
@@ -272,7 +272,7 @@ function UploadDocumentModal({
         />
 
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700" htmlFor="document-file">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="document-file">
             File
           </label>
           <input
@@ -280,9 +280,9 @@ function UploadDocumentModal({
             id="document-file"
             type="file"
             accept={ALLOWED_MIME_TYPES.join(",")}
-            className="text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200"
+            className="text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100 dark:hover:file:bg-gray-700"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             PDF, JPEG, PNG, or WEBP. Max {formatBytes(MAX_FILE_SIZE_BYTES)}.
           </p>
         </div>

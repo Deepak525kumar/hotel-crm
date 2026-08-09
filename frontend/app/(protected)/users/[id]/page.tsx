@@ -110,7 +110,7 @@ function UserDetail() {
 
       {error ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-red-600">
+          <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load this user. They may have been removed.
           </CardContent>
         </Card>
@@ -183,7 +183,7 @@ function UserDetail() {
                   {user.permissions.map((p) => (
                     <li
                       key={p}
-                      className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700"
+                      className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
                     >
                       {p}
                     </li>
@@ -226,10 +226,10 @@ function UserDetail() {
             <Card>
               <CardContent className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     Reset password
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {passwordResetSentAt
                       ? `Reset link sent at ${formatDateTime(passwordResetSentAt.toISOString())}.`
                       : `Emails a password reset link to ${user.email}. Their current password keeps working until they complete the reset.`}
@@ -252,10 +252,10 @@ function UserDetail() {
             <Card>
               <CardContent className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     Revoke all sessions
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     {sessionsRevokedAt
                       ? `All sessions revoked at ${formatDateTime(sessionsRevokedAt.toISOString())}.`
                       : isSelf
@@ -276,13 +276,13 @@ function UserDetail() {
 
           <UserDeactivateGate>
             {user.is_active && (
-              <Card className="border-red-100">
+              <Card className="border-red-100 dark:border-red-900/50">
                 <CardContent className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       Deactivate account
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {isSelf
                         ? "You cannot deactivate your own account."
                         : "Revokes sign-in access. The account can be reactivated later."}
@@ -321,7 +321,7 @@ function UserDetail() {
           </>
         }
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           This revokes access for{" "}
           <span className="font-medium">
             {user?.first_name} {user?.last_name}
@@ -354,7 +354,7 @@ function UserDetail() {
           </>
         }
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           {isSelf ? (
             "This will sign you out immediately, along with every other active session for your account."
           ) : (
@@ -379,7 +379,7 @@ export default function UserDetailPage() {
       allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
-          <CardContent className="text-sm text-gray-500">
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
             Only admins and managers can view user accounts.
           </CardContent>
         </Card>

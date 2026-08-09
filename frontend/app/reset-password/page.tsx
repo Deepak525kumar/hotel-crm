@@ -54,9 +54,9 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="text-center text-sm text-gray-600 py-4">
+      <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
         <p className="mb-4">Invalid password reset link. The token is missing.</p>
-        <Link href="/forgot-password" className="text-blue-600 hover:underline">
+        <Link href="/forgot-password" className="text-blue-600 hover:underline dark:text-blue-400">
           Request a new link
         </Link>
       </div>
@@ -65,9 +65,9 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="text-center text-sm text-gray-600 py-4">
-        <p className="mb-4 text-green-600 font-medium">Your password has been reset successfully!</p>
-        <Link href="/login" className="text-blue-600 hover:underline">
+      <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
+        <p className="mb-4 text-green-600 font-medium dark:text-green-400">Your password has been reset successfully!</p>
+        <Link href="/login" className="text-blue-600 hover:underline dark:text-blue-400">
           Return to login
         </Link>
       </div>
@@ -76,7 +76,7 @@ function ResetPasswordForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      <p className="text-sm text-gray-600">
+      <p className="text-sm text-gray-600 dark:text-gray-300">
         Enter a new password for your account.
       </p>
       <Input
@@ -97,13 +97,13 @@ function ResetPasswordForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-800">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>Set New Password</CardTitle>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<div className="text-center text-sm text-gray-500 py-4">Loading...</div>}>
+          <Suspense fallback={<div className="text-center text-sm text-gray-500 py-4 dark:text-gray-400">Loading...</div>}>
             <ResetPasswordForm />
           </Suspense>
         </CardContent>

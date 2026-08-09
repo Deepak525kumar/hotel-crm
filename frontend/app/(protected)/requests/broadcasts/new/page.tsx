@@ -235,7 +235,7 @@ function NewBroadcastForm() {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-900">
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   Skills needed
                 </span>
                 <Button type="button" variant="outline" size="sm" onClick={addSkillLine}>
@@ -299,7 +299,7 @@ export default function NewBroadcastPage() {
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
-            <CardContent className="text-sm text-gray-500">
+            <CardContent className="text-sm text-gray-500 dark:text-gray-400">
               Only managers and admins can raise a broadcast.
             </CardContent>
           </Card>

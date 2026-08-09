@@ -112,7 +112,7 @@ export default function AssignmentDetailPage() {
           ← Back to assignments
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
               ? "This assignment was not found."
               : "This assignment was not found or could not be loaded."}
@@ -231,7 +231,7 @@ export default function AssignmentDetailPage() {
       {(canStart || canComplete || canCancel) && (
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               Manage this assignment&apos;s status. Transitions follow the
               shift lifecycle.
             </div>
@@ -284,7 +284,7 @@ export default function AssignmentDetailPage() {
       <RoleGate allow={["admin", "manager", "regional_manager"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               {loggedRoomsCompleted
                 ? `Logged ${loggedRoomsCompleted.rooms_completed} rooms completed.`
                 : "Log the rooms completed count for this assignment."}
@@ -314,7 +314,7 @@ export default function AssignmentDetailPage() {
       <RoleGate allow={["admin", "checker"]}>
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               {loggedVerification
                 ? `Verified — score ${loggedVerification.score} (${loggedVerification.status}).`
                 : "Verify the completed work for this assignment."}
@@ -345,7 +345,7 @@ export default function AssignmentDetailPage() {
 
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 dark:text-gray-300">
               {loggedRating
                 ? `Rated — score ${loggedRating.score}/100.`
                 : "Rate the worker's performance for this assignment."}
@@ -500,7 +500,7 @@ function ReassignModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-600 dark:text-gray-300">
           The current assignment is marked reassigned; a new confirmed assignment is created for
           the selected worker at the same hotel and day.
         </p>
@@ -510,11 +510,11 @@ function ReassignModal({
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by name or email…"
         />
-        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200">
+        <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800">
           {workersLoading ? (
-            <div className="p-3 text-sm text-gray-400">Searching…</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
           ) : eligibleWorkers.length === 0 ? (
-            <div className="p-3 text-sm text-gray-400">No eligible workers found.</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No eligible workers found.</div>
           ) : (
             eligibleWorkers.map((w) => {
               const label = `${w.first_name} ${w.last_name}`;
@@ -524,12 +524,12 @@ function ReassignModal({
                   key={w.id}
                   type="button"
                   onClick={() => setSelectedWorkerId(w.id)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                    selected ? "bg-blue-50 text-blue-700" : "text-gray-900"
+                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
                   <span className="truncate">{label}</span>
-                  <span className="truncate text-xs text-gray-400">{w.email}</span>
+                  <span className="truncate text-xs text-gray-400 dark:text-gray-500">{w.email}</span>
                 </button>
               );
             })
@@ -710,7 +710,7 @@ function CreateVerificationModal({
           value={score}
           onChange={(e) => setScore(e.target.value)}
         />
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails.
         </p>
         <Textarea

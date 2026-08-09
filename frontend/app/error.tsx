@@ -21,12 +21,12 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
-        <h1 className="text-lg font-semibold text-gray-900">
+    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-6 dark:bg-gray-800">
+      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm dark:border-gray-800 dark:bg-gray-900">
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           Something went wrong
         </h1>
-        <p className="mt-2 text-sm text-gray-500">
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
           An unexpected error occurred. You can try again, or head back to the
           dashboard.
         </p>
@@ -40,7 +40,7 @@ export default function Error({
           </button>
           <a
             href="/dashboard"
-            className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400"
+            className="inline-flex h-10 items-center justify-center rounded-md border border-gray-300 px-4 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800"
           >
             Go to dashboard
           </a>

@@ -80,7 +80,7 @@ export default function WorkRequestDetailPage() {
           ← Back to work requests
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
               ? "This work request was not found."
               : "Failed to load this work request."}
@@ -170,16 +170,16 @@ export default function WorkRequestDetailPage() {
           <CardHeader>
             <CardTitle>Notes</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 text-sm text-gray-700">
+          <CardContent className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
             {request.description && (
               <div>
-                <p className="font-medium text-gray-900">Description</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">Description</p>
                 <p className="whitespace-pre-wrap">{request.description}</p>
               </div>
             )}
             {request.requirements && (
               <div>
-                <p className="font-medium text-gray-900">Requirements</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">Requirements</p>
                 <p className="whitespace-pre-wrap">{request.requirements}</p>
               </div>
             )}
@@ -200,7 +200,7 @@ export default function WorkRequestDetailPage() {
           return (
             <Card>
               <CardContent className="flex items-center justify-between gap-4">
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-600 dark:text-gray-400">
                   {canPublish
                     ? "This request is a draft. Publish it to open it for staffing."
                     : "Manage this work request's status."}

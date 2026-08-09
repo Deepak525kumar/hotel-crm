@@ -3,6 +3,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { APP_COMMIT_SHA, APP_NAME, APP_OWNER, APP_VERSION } from "@/lib/config";
 import { RoleBadge } from "@/components/users/RoleBadge";
+import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import {
   Card,
   CardContent,
@@ -18,12 +19,11 @@ import {
 /**
  * Items we deliberately show as unbuilt rather than rendering dead controls:
  * a disabled toggle reads as "broken", a listed intent reads as "not yet".
+ * Dark mode moved out of this list (2026-08-09, shipped as a real control
+ * below) -- Language stays, its scope (full app + notification-text
+ * translation) isn't built yet.
  */
 const COMING_SOON: { title: string; detail: string }[] = [
-  {
-    title: "Dark mode",
-    detail: "A light/dark theme preference that persists across devices.",
-  },
   {
     title: "Language",
     detail: "Choosing the display language for the app interface.",
@@ -65,10 +65,31 @@ export default function SettingsPage() {
           </DataList>
           {/* Editing lives on /profile (EditProfileCard) — pointed at rather
               than duplicated, so there is only one place these fields change. */}
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             To change your name, phone number or password, go to{" "}
             <TextLink href="/profile">your profile</TextLink>.
           </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+        </CardHeader>
+        <CardContent className="py-2">
+          <DataList>
+            <DataRow
+              label={
+                <span className="flex flex-col gap-0.5 text-left">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">Theme</span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    System follows your device&apos;s setting.
+                  </span>
+                </span>
+              }
+              value={<ThemeToggle />}
+            />
+          </DataList>
         </CardContent>
       </Card>
 
@@ -89,7 +110,7 @@ export default function SettingsPage() {
                 APP_COMMIT_SHA ? (
                   <span className="font-mono text-xs">{APP_COMMIT_SHA}</span>
                 ) : (
-                  <span className="text-gray-500">Local development build</span>
+                  <span className="text-gray-500 dark:text-gray-400">Local development build</span>
                 )
               }
             />
@@ -109,14 +130,14 @@ export default function SettingsPage() {
                 key={item.title}
                 label={
                   <span className="flex flex-col gap-0.5 text-left">
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-gray-900 dark:text-gray-100">
                       {item.title}
                     </span>
-                    <span className="text-gray-500">{item.detail}</span>
+                    <span className="text-gray-500 dark:text-gray-400">{item.detail}</span>
                   </span>
                 }
                 value={
-                  <span className="text-xs font-normal text-gray-500">
+                  <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
                     Not available yet
                   </span>
                 }

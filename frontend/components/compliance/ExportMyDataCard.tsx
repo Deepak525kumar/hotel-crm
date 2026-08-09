@@ -27,8 +27,8 @@ function SourceRow({
   count: number | null;
 }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
-      <p className="text-sm text-gray-700">{label}</p>
+    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
+      <p className="text-sm text-gray-700 dark:text-gray-300">{label}</p>
       {result.status === "unavailable" ? (
         <Badge tone="warning">Unavailable</Badge>
       ) : (
@@ -69,12 +69,12 @@ export function ExportMyDataCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         {!bundle ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Generates a copy of your documents, consent history, and account audit trail.
           </p>
         ) : (
           <>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               Generated {formatDateTime(bundle.generated_at)}
             </p>
             <ul>

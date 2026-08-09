@@ -97,7 +97,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="py-6 text-center text-sm text-red-600">
+            <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load contract status.
             </p>
           ) : isLoading ? (
@@ -127,7 +127,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
               </DataList>
 
               {isManagerOrAdmin && contract.status === "PENDING" && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -153,7 +153,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
               )}
 
               {isManagerOrAdmin && (contract.status === "ACTIVE" || contract.status === "EXTENDED") && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4">
+                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
                   <Button size="sm" onClick={onExtend} loading={action.isPending("extend")}>
                     Confirm continuation
                   </Button>
@@ -260,7 +260,7 @@ function CreateContractModal({
       }
     >
       <div className="space-y-4">
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Requires this worker&apos;s Personalfragebogen data to already be recorded — creation
           fails otherwise.
         </p>

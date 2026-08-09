@@ -103,7 +103,7 @@ export default function BroadcastDetailPage() {
           ← Back to broadcasts
         </TextLink>
         <Card>
-          <CardContent className="text-sm text-red-600">
+          <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
               ? "This broadcast was not found."
               : "Failed to load this broadcast."}
@@ -174,7 +174,7 @@ export default function BroadcastDetailPage() {
           <CardHeader>
             <CardTitle>Description</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-gray-700">
+          <CardContent className="text-sm text-gray-700 dark:text-gray-300">
             <p className="whitespace-pre-wrap">{request.description}</p>
           </CardContent>
         </Card>
@@ -186,7 +186,7 @@ export default function BroadcastDetailPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {eligibilityError ? (
-            <p className="text-sm text-red-600">
+            <p className="text-sm text-red-600 dark:text-red-400">
               Failed to load eligibility for this broadcast.
             </p>
           ) : (
@@ -203,13 +203,13 @@ export default function BroadcastDetailPage() {
               return (
                 <div
                   key={slot.id}
-                  className="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-md border border-gray-200 px-4 py-3 dark:border-gray-800"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                       {SKILL_LABELS[slot.skill] ?? slot.skill}
                     </p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
                       {slot.confirmed_count}/{slot.headcount} confirmed
                       {eligibleCount !== null && !filled
                         ? ` · ${eligibleCount} eligible worker${eligibleCount === 1 ? "" : "s"}`
@@ -217,7 +217,7 @@ export default function BroadcastDetailPage() {
                     </p>
                   </div>
                   {filled ? (
-                    <span className="shrink-0 text-sm font-medium text-green-700">Filled</span>
+                    <span className="shrink-0 text-sm font-medium text-green-700 dark:text-green-400">Filled</span>
                   ) : canAcceptThisSlot ? (
                     <Button
                       size="sm"
@@ -242,14 +242,14 @@ export default function BroadcastDetailPage() {
             {acceptResult.status === "accepted" ? (
               <>
                 <Badge tone="success">Confirmed</Badge>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
                   You&rsquo;re confirmed for this shift ({SKILL_LABELS[acceptResult.skill] ?? acceptResult.skill}).
                 </p>
               </>
             ) : (
               <>
                 <Badge tone="warning">Already filled</Badge>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-gray-700 dark:text-gray-300">
                   Someone else claimed this slot just before you — no shift was assigned.
                 </p>
               </>
@@ -264,7 +264,7 @@ export default function BroadcastDetailPage() {
         {request.status === "OPEN" && (
           <Card>
             <CardContent className="flex items-center justify-between gap-4">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Close this broadcast early if you no longer need it filled.
               </div>
               <Button variant="outline" onClick={onClose} loading={close.pending}>

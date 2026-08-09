@@ -44,12 +44,12 @@ function PayslipRequestRow({
   fulfilling: boolean;
 }) {
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0">
+    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-gray-900">
+        <p className="truncate text-sm font-medium text-gray-900 dark:text-gray-100">
           {formatDate(request.period_start)} – {formatDate(request.period_end)}
         </p>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           Requested {formatDateTime(request.created_at)}
           {request.fulfilled_at && <> · Fulfilled {formatDateTime(request.fulfilled_at)}</>}
         </p>
@@ -111,7 +111,7 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
         </CardHeader>
         <CardContent>
           {error ? (
-            <p className="py-6 text-center text-sm text-red-600">
+            <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
               Failed to load payslip requests.
             </p>
           ) : isLoading ? (

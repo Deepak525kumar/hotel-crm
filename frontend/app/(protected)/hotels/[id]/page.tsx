@@ -64,7 +64,7 @@ export default function HotelDetailPage() {
 
       {error ? (
         <Card>
-          <CardContent className="py-10 text-center text-sm text-red-600">
+          <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
             Failed to load this hotel. It may have been removed.
           </CardContent>
         </Card>
@@ -118,7 +118,7 @@ export default function HotelDetailPage() {
                         {group?.name ?? "View group"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-500">Unassigned</span>
+                      <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
                     )
                   }
                 />
@@ -130,7 +130,7 @@ export default function HotelDetailPage() {
                         {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         Vacant
                         {hotel.manager_vacated_at && ` since ${formatDateTime(hotel.manager_vacated_at)}`}
                         {hotel.manager_vacancy_reason &&
@@ -150,7 +150,7 @@ export default function HotelDetailPage() {
                           : "View regional manager"}
                       </TextLink>
                     ) : hotel.hotel_group_id ? (
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         Vacant
                         {group?.regional_manager_vacated_at &&
                           ` since ${formatDateTime(group.regional_manager_vacated_at)}`}
@@ -159,7 +159,7 @@ export default function HotelDetailPage() {
                           ` (${group.regional_manager_vacancy_reason.toLowerCase()})`}
                       </span>
                     ) : (
-                      <span className="text-gray-500">No hotel group assigned</span>
+                      <span className="text-gray-500 dark:text-gray-400">No hotel group assigned</span>
                     )
                   }
                 />
@@ -167,11 +167,11 @@ export default function HotelDetailPage() {
                   label="Geofence"
                   value={
                     hotel.latitude != null && hotel.longitude != null ? (
-                      <span className="text-green-700">
+                      <span className="text-green-700 dark:text-green-400">
                         Configured ({hotel.latitude.toFixed(4)}, {hotel.longitude.toFixed(4)})
                       </span>
                     ) : (
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         Not set — worker check-in unavailable
                       </span>
                     )
