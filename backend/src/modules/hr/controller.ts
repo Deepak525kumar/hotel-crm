@@ -28,8 +28,8 @@ export class HrController {
       });
       res.status(200).json({
         status: 'success',
-        data: result,
-        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        data: result.data,
+        meta: { total: result.total, timestamp: new Date().toISOString(), request_id: req.requestId },
       });
     } catch (error) {
       next(error);
@@ -215,8 +215,8 @@ export class HrController {
       });
       res.status(200).json({
         status: 'success',
-        data: result,
-        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        data: result.data,
+        meta: { total: result.total, timestamp: new Date().toISOString(), request_id: req.requestId },
       });
     } catch (error) {
       next(error);

@@ -128,6 +128,7 @@ const mockDb = {
   employeeBlocklistEntry: {
     create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
     findMany: async () => [],
+    count: async () => 0,
     findUnique: async ({ where }: any) => blocklistEntries[where.id] ?? null,
     delete: async ({ where }: any) => {
       const entry = blocklistEntries[where.id];

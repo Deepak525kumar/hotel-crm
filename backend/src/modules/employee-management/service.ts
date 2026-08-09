@@ -193,14 +193,26 @@ export class EmployeeManagementService extends BaseService {
 
   // IF-EMP-GetBlocklist / v0 (REQ-EMP-005). The hotel-scoped route already
   // enforces checkHotelAccess(); no additional scope check here.
-  async getBlocklist(_actor: AuthContext, filters: { hotelId?: string; employeeId?: string }) {
+  async getBlocklist(_actor: AuthContext, filters: { hotelId?: string; employeeId?: string; page?: number; limit?: number }) {
     const where: Prisma.EmployeeBlocklistEntryWhereInput = {};
     if (filters.hotelId) where.hotel_id = filters.hotelId;
     if (filters.employeeId) {
       const record = await this.findRecordOrThrow(filters.employeeId);
       where.employment_record_id = record.id;
     }
-    return this.prisma.employeeBlocklistEntry.findMany({ where, orderBy: { created_at: 'desc' } });
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+
+    const [entries, total] = await Promise.all([
+      this.prisma.employeeBlocklistEntry.findMany({
+        where,
+        orderBy: { created_at: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.employeeBlocklistEntry.count({ where }),
+    ]);
+    return { data: entries, total };
   }
 
   // IF-EMP-SetBlocklist / v0 (REQ-EMP-005 / RULE-EMP-07): reason is required.

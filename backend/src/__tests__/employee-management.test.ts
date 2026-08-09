@@ -38,6 +38,7 @@ const mockPrisma: any = {
   },
   employeeBlocklistEntry: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     delete: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,

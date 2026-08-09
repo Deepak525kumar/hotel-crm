@@ -35,6 +35,8 @@ export interface ContractDto {
 export interface ListContractsQuery {
   worker_id?: string;
   status?: ContractStatusType;
+  page?: number;
+  limit?: number;
 }
 
 export type PayslipRequestStatusType = 'REQUESTED' | 'FULFILLED';
@@ -62,4 +64,6 @@ export interface PayslipRequestDto {
 export interface ListPayslipRequestsQuery {
   worker_id?: string;
   status?: PayslipRequestStatusType;
+  page?: number;
+  limit?: number;
 }
