@@ -1434,6 +1434,24 @@ model DocumentTemplateSignatureBlock {
 
 // state-document-instance: one worker's filled copy of a specific
 // (immutable) template version.
+// Retention (OD-DOCTPL-04, closed 2026-08-10 via ADR-033's already-ratified
+// mapping — this module simply hadn't been retrofitted into it yet):
+// applying ADR-033's own split for uploaded/employment-adjacent documents
+// (Decision point 1, "Uploaded/work-permit documents (OD-DOC-001)"), a
+// DocumentInstance is a signed, employment-contract-shaped record about a
+// specific worker — the same character as backend-hr's Contract, which that
+// ADR assigns Tier 3 (6-year payroll/tax-adjacent, §257 HGB/§147 AO), not
+// Tier 2 (general personal data). This applies to DocumentInstance and its
+// two child tables (DocumentInstanceFieldValue, DocumentInstanceSignature)
+// — the actual per-worker personal data. DocumentTemplate itself (the
+// admin-authored blueprint, no personal data) carries no tier. Provisional
+// pending tax-advisor sign-off exactly as ADR-033 itself discloses for every
+// other module's mapping — not a new, module-specific caveat. No
+// RetentionTier enum/column exists on these tables yet, matching every
+// other module's identical comment-only convention today (backend-retention
+// is schema-only; no sweep engine exists platform-wide to consume a real
+// column yet) — see PayslipRequest's own escalated_at-adjacent comment
+// above for the precedent this follows.
 model DocumentInstance {
   id            String                 @id @default(cuid())
   template_id   String
