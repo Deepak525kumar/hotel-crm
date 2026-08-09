@@ -361,4 +361,100 @@ describe('AuthService — JWT scope claim (PR 5.4 / ADR-023 §6 / ADR-025 §4)',
       expect(payload.scope).toEqual({ type: 'hotel', hotel_id: 'hotel_55' });
     });
   });
+
+  // Calendar scoping (2026-08-10): the same resolved scope is mirrored onto
+  // the USER PAYLOAD (scope_hotel_id/scope_hotel_group_id), not just the JWT,
+  // so the frontend can render scope-appropriate calendar filters. These
+  // assert the payload specifically -- the JWT-claim tests above already
+  // cover resolveScope()'s own precedence logic, so these only pin the
+  // flattening and that payload and token cannot disagree.
+  describe('user payload scope fields (calendar filter scoping)', () => {
+    it('hotel manager → scope_hotel_id set, scope_hotel_group_id null', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({ id: 'hm_p1', email: 'hmp@test.com', role: 'MANAGER', password_hash: realPasswordHash })
+      );
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_9' }]);
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'hmp@test.com', password: 'password123' });
+
+      expect(result.user.scope_hotel_id).toBe('hotel_9');
+      expect(result.user.scope_hotel_group_id).toBeNull();
+      // The payload must agree with the token it was issued alongside.
+      expect(decodeAccessToken(result.access_token).scope).toEqual({
+        type: 'hotel',
+        hotel_id: 'hotel_9',
+      });
+    });
+
+    it('regional manager → scope_hotel_group_id set, scope_hotel_id null', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({
+          id: 'rm_p1',
+          email: 'rmp@test.com',
+          role: 'REGIONAL_MANAGER',
+          password_hash: realPasswordHash,
+        })
+      );
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'group_3' });
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'rmp@test.com', password: 'password123' });
+
+      expect(result.user.scope_hotel_group_id).toBe('group_3');
+      expect(result.user.scope_hotel_id).toBeNull();
+    });
+
+    it('admin (global scope) → both fields null, since an admin is bound to neither', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({ id: 'adm_p1', email: 'admp@test.com', role: 'ADMIN', password_hash: realPasswordHash })
+      );
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'admp@test.com', password: 'password123' });
+
+      expect(result.user.scope_hotel_id).toBeNull();
+      expect(result.user.scope_hotel_group_id).toBeNull();
+    });
+
+    it('worker (no association) → both fields null', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({ id: 'w_p1', email: 'wp@test.com', role: 'WORKER', password_hash: realPasswordHash })
+      );
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.session.create.mockResolvedValue({ id: 'sess_1' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.login({ email: 'wp@test.com', password: 'password123' });
+
+      expect(result.user.scope_hotel_id).toBeNull();
+      expect(result.user.scope_hotel_group_id).toBeNull();
+    });
+
+    // getCurrentUser() is what SessionBootstrap calls on every page load, so it must
+    // carry the scope too -- and must RE-RESOLVE it rather than trust a
+    // possibly-stale token, so a manager reassigned since their last login
+    // sees the current hotel in the UI.
+    it('getCurrentUser() re-resolves scope and returns it on the payload', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(
+        baseUser({ id: 'hm_me', email: 'hmme@test.com', role: 'MANAGER' })
+      );
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+      mockPrisma.hotel.findMany.mockResolvedValue([{ id: 'hotel_current' }]);
+
+      const me = await service.getCurrentUser('hm_me');
+
+      expect(me.scope_hotel_id).toBe('hotel_current');
+      expect(mockPrisma.hotel.findMany).toHaveBeenCalledWith({
+        where: { manager_user_id: 'hm_me' },
+        select: { id: true },
+        orderBy: { id: 'asc' },
+      });
+    });
+  });
 });

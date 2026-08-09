@@ -1066,7 +1066,7 @@ export class AssignmentService extends BaseService {
 
   async listCalendarEntries(
     query: ListCalendarEntriesQuery,
-    actor: { userId: string; role: string }
+    actor: { userId: string; role: string; scope?: UserScope | null }
   ): Promise<{ data: CalendarEntryDto[]; total: number }> {
     const where: Prisma.CalendarEntryWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
@@ -1081,6 +1081,37 @@ export class AssignmentService extends BaseService {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
+    }
+
+    // IDOR fix (2026-08-10): this method ran NO manager-scope check at all --
+    // it took `query.hotel_id` straight from the client and applied it as the
+    // only hotel constraint, so a manager/RM could read any hotel's entire
+    // placement roster just by passing someone else's hotel_id (or omit it
+    // and read every hotel platform-wide). This is the identical defect that
+    // list() in this same file had fixed on 2026-08-08 -- that fix was never
+    // applied here.
+    //
+    // Applied AFTER the client-supplied hotel_id above, and deliberately
+    // overwriting/intersecting it rather than being skipped when one is
+    // present: an out-of-scope hotel_id must narrow to nothing, never widen.
+    if (isScopedManagerRole(actor.role)) {
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        // Fail closed: a scoped manager role with no scope claim sees nothing,
+        // rather than everything.
+        where.hotel_id = { in: [] };
+      } else if (scope.type === 'hotel') {
+        // A hotel-scoped manager is pinned to their own hotel. If they asked
+        // for a different one, the intersection is empty by construction.
+        where.hotel_id =
+          query.hotel_id && query.hotel_id !== scope.hotel_id ? { in: [] } : scope.hotel_id;
+      } else if (scope.type === 'hotel_group') {
+        // Group-scoped (RM): constrain to hotels in their own group. A
+        // client-supplied hotel_id still applies on top (both conditions must
+        // hold), so requesting a hotel outside the group yields nothing.
+        where.hotel = { hotel_group_id: scope.hotel_group_id };
+      }
+      // scope.type === 'global' -> no additional restriction.
     }
 
     const [records, total] = await Promise.all([

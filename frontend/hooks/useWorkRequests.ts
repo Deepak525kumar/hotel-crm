@@ -45,6 +45,25 @@ export function useHotelOptions() {
 }
 
 /**
+ * Hotel options narrowed to one HotelGroup — the calendar's Regional-Manager
+ * hotel picker, and the admin's hotel picker once a group is selected.
+ * Server-side filtered (`hotel_group_id`), not a client-side filter over the
+ * full list: an admin's platform-wide hotel count is unbounded, and the
+ * 100-row cap on the unfiltered list above would silently drop hotels past
+ * the first page rather than fail visibly.
+ *
+ * Passing `null` disables the fetch entirely (SWR null-key), for the admin
+ * case where no group is selected yet.
+ */
+export function useHotelOptionsInGroup(hotelGroupId: string | null | undefined) {
+  const swr = useSWR(
+    hotelGroupId ? (["hotel-options-in-group", hotelGroupId] as const) : null,
+    ([, groupId]) => hotelsApi.list({ is_active: "true", limit: 100, hotel_group_id: groupId }),
+  );
+  return { ...swr, hotels: swr.data ?? [] };
+}
+
+/**
  * Job Dispatch Phase 2 (Epic 9 PRs 9.7-9.9, MIG-GAP-04/05/06): lists
  * broadcasts, i.e. work requests that carry skill_slots. Filters
  * server-side via `is_broadcast: true` (GET /work-requests?is_broadcast=

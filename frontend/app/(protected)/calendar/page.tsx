@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { mutate } from "swr";
-import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { useHotelOptions, useHotelOptionsInGroup } from "@/hooks/useWorkRequests";
+import { useHotelGroups } from "@/hooks/useHotels";
 import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
@@ -23,45 +24,21 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/** YYYY-MM-DD in the local timezone (matches the backend's date-only day field). */
-function toDateKey(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-/** Monday of the week containing `d`. */
-function startOfWeek(d: Date): Date {
-  const copy = new Date(d);
-  const dow = copy.getDay(); // 0 = Sunday
-  const diff = dow === 0 ? -6 : 1 - dow;
-  copy.setDate(copy.getDate() + diff);
-  copy.setHours(0, 0, 0, 0);
-  return copy;
-}
-
-/**
- * The Monday-to-Sunday grid start for the calendar month containing `d` --
- * i.e. the Monday of the week the 1st falls in, which may be in the
- * previous month. Always produces exactly 6 weeks (42 days), the standard
- * fixed-size month-grid layout (matches Google/Outlook-style calendars) so
- * the grid's row count never shifts between months.
- */
-function startOfMonthGrid(d: Date): Date {
-  const firstOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
-  return startOfWeek(firstOfMonth);
-}
-
-const WEEKDAY_LABEL = new Intl.DateTimeFormat("en", { weekday: "short" });
-const DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric", month: "short" });
-const MONTH_DAY_LABEL = new Intl.DateTimeFormat("en", { day: "numeric" });
-const MONTH_TITLE_LABEL = new Intl.DateTimeFormat("en", { month: "long", year: "numeric" });
-
-type CalendarView = "week" | "month";
+import {
+  DAY_LABEL,
+  DAY_MS,
+  FULL_DAY_LABEL,
+  MONTH_DAY_LABEL,
+  MONTH_TITLE_LABEL,
+  VIEW_OPTIONS,
+  WEEKDAY_LABEL,
+  startOfMonthGrid,
+  startOfWeek,
+  toDateKey,
+  type CalendarView,
+} from "@/lib/calendar";
+import { CalendarFilters } from "@/components/calendar/CalendarFilters";
+import { RangeBreakdown } from "@/components/calendar/RangeBreakdown";
 
 export default function CalendarGridPage() {
   const { user } = useAuth();
@@ -76,11 +53,15 @@ export default function CalendarGridPage() {
   // cells is not a real virtualization case) -- the actual cost that scales
   // with range is the underlying data fetch, which useCalendarEntriesInRange
   // already pages through rather than truncate (see its own comment).
-  const gridStart = useMemo(
-    () => (view === "week" ? startOfWeek(anchor) : startOfMonthGrid(anchor)),
-    [view, anchor],
-  );
-  const dayCount = view === "week" ? 7 : 42;
+  const gridStart = useMemo(() => {
+    if (view === "day") {
+      const d = new Date(anchor);
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+    return view === "week" ? startOfWeek(anchor) : startOfMonthGrid(anchor);
+  }, [view, anchor]);
+  const dayCount = view === "day" ? 1 : view === "week" ? 7 : 42;
   const days = useMemo(
     () => Array.from({ length: dayCount }, (_, i) => new Date(gridStart.getTime() + i * DAY_MS)),
     [gridStart, dayCount],
@@ -88,6 +69,12 @@ export default function CalendarGridPage() {
   const from = toDateKey(days[0]);
   const to = toDateKey(days[days.length - 1]);
   const currentMonth = anchor.getMonth();
+  // Whether today's date already falls inside the visible grid -- drives the
+  // Today control's toggle state (highlighted + inert when already there,
+  // rather than a plain nav button that looks the same regardless of where
+  // you're currently looking).
+  const todayKey = toDateKey(new Date());
+  const isOnToday = todayKey >= from && todayKey <= to;
 
   const { data: entries, isLoading: entriesLoading, error: entriesError } =
     useCalendarEntriesInRange({ from, to });
@@ -99,8 +86,8 @@ export default function CalendarGridPage() {
     canSeeAbsences ? { from, to } : null,
   );
 
-  const entriesByDay = useMemo(() => groupByDay(entries ?? [], (e) => e.day), [entries]);
-  const absencesByDay = useMemo(() => groupByDay(absences ?? [], (a) => a.day), [absences]);
+  // Unfiltered day-grouping; the hotel/group-filtered versions are derived
+  // further down, once the filter state they depend on is in scope.
 
   // Worker names for display -- the grid renders worker_id-keyed placements
   // and absences, but a Teams-style grid should show a name, not a raw id.
@@ -120,6 +107,103 @@ export default function CalendarGridPage() {
     for (const [id, u] of usersById) map.set(id, `${u.first_name} ${u.last_name}`);
     return map;
   }, [usersById]);
+
+  // Scope-driven filtering (2026-08-10). Three distinct shapes, driven by the
+  // scope the backend resolved for this user (AuthUser.scope_*), NOT by role
+  // alone -- a "manager" with no hotel assignment must not get a picker over
+  // hotels they don't manage:
+  //   admin            -> group picker + hotel picker (hotels narrowed to group)
+  //   regional_manager -> hotel picker over their own group's hotels
+  //   hotel manager    -> no picker; their one hotel, fixed
+  //   worker/checker   -> no picker; the backend already self-scopes their rows
+  // These filters are a VIEW convenience over data the server already scoped;
+  // they never widen what's visible.
+  const isAdmin = user?.role === "admin";
+  const scopeGroupId = user?.scope_hotel_group_id ?? null;
+  const scopeHotelId = user?.scope_hotel_id ?? null;
+
+  const [groupFilter, setGroupFilter] = useState<string>("");
+  const [hotelFilter, setHotelFilter] = useState<string>("");
+
+  // Admin picks a group first; an RM's group is fixed to their own.
+  const activeGroupId = isAdmin ? groupFilter || null : scopeGroupId;
+
+  const { groups } = useHotelGroups({ limit: 100 });
+  const { hotels: groupHotels } = useHotelOptionsInGroup(activeGroupId);
+  // Admin with no group selected still needs *some* hotel list to filter by;
+  // falls back to the platform-wide list rather than showing an empty picker.
+  const { hotels: allHotels } = useHotelOptions();
+  const hotelOptions = activeGroupId ? groupHotels : isAdmin ? allHotels : [];
+
+  // Resolve hotel_id -> name for the per-hotel breakdown headings. Uses
+  // whichever list is loaded plus the platform-wide list, so a heading never
+  // falls back to a raw id just because the narrower query hasn't resolved.
+  const hotelNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const h of [...allHotels, ...groupHotels]) map.set(h.id, h.name);
+    return map;
+  }, [allHotels, groupHotels]);
+
+  // A hotel manager is pinned to their own hotel with no picker; everyone
+  // else filters by whatever they selected (empty = no filter).
+  const effectiveHotelFilter = scopeHotelId ?? (hotelFilter || null);
+
+  const groupHotelIds = useMemo(
+    () => new Set(groupHotels.map((h) => h.id)),
+    [groupHotels],
+  );
+
+  /** Whether a hotel_id passes the currently-active hotel/group filter. */
+  const hotelPassesFilter = (hotelId: string): boolean => {
+    if (effectiveHotelFilter) return hotelId === effectiveHotelFilter;
+    if (activeGroupId && groupHotelIds.size > 0) return groupHotelIds.has(hotelId);
+    return true;
+  };
+
+  const filterEntries = (items: CalendarEntryDto[]): CalendarEntryDto[] =>
+    items.filter((e) => hotelPassesFilter(e.hotel_id));
+
+  // CalendarAbsence carries NO hotel_id -- an absence is a property of the
+  // worker's day, not of any hotel (schema.prisma: worker_id + day + kind,
+  // no hotel relation). So it cannot be hotel-filtered directly. Instead a
+  // worker is treated as belonging to the filtered hotel(s) if they have any
+  // placement there in the visible range; an absent worker with no placement
+  // anywhere in range has no derivable hotel and is shown under "Unassigned"
+  // rather than silently dropped -- dropping them would hide exactly the
+  // information (who is off) this view exists to surface.
+  const workerHotelIds = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const e of entries ?? []) {
+      const set = map.get(e.worker_id) ?? new Set<string>();
+      set.add(e.hotel_id);
+      map.set(e.worker_id, set);
+    }
+    return map;
+  }, [entries]);
+
+  const filterAbsences = (items: CalendarAbsence[]): CalendarAbsence[] =>
+    items.filter((a) => {
+      const hotels = workerHotelIds.get(a.worker_id);
+      if (!hotels || hotels.size === 0) return true; // no derivable hotel — keep
+      return Array.from(hotels).some(hotelPassesFilter);
+    });
+
+  const filteredEntries = useMemo(
+    () => filterEntries(entries ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [entries, effectiveHotelFilter, activeGroupId, groupHotelIds],
+  );
+  const filteredAbsences = useMemo(
+    () => filterAbsences(absences ?? []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [absences, effectiveHotelFilter, activeGroupId, groupHotelIds, workerHotelIds],
+  );
+
+  const entriesByDay = useMemo(() => groupByDay(filteredEntries, (e) => e.day), [filteredEntries]);
+  const absencesByDay = useMemo(
+    () => groupByDay(filteredAbsences, (a) => a.day),
+    [filteredAbsences],
+  );
 
   const isLoading = entriesLoading || (canSeeAbsences && absencesLoading);
 
@@ -188,13 +272,17 @@ export default function CalendarGridPage() {
     setAnchor((a) =>
       view === "week"
         ? new Date(a.getTime() - 7 * DAY_MS)
-        : new Date(a.getFullYear(), a.getMonth() - 1, 1),
+        : view === "day"
+          ? new Date(a.getTime() - DAY_MS)
+          : new Date(a.getFullYear(), a.getMonth() - 1, 1),
     );
   const goNext = () =>
     setAnchor((a) =>
       view === "week"
         ? new Date(a.getTime() + 7 * DAY_MS)
-        : new Date(a.getFullYear(), a.getMonth() + 1, 1),
+        : view === "day"
+          ? new Date(a.getTime() + DAY_MS)
+          : new Date(a.getFullYear(), a.getMonth() + 1, 1),
     );
   const goToday = () => setAnchor(new Date());
 
@@ -203,32 +291,42 @@ export default function CalendarGridPage() {
       <PageHeader
         title="Calendar"
         description={
-          view === "week"
-            ? "Worker placements and absences, one week at a time."
-            : MONTH_TITLE_LABEL.format(anchor)
+          view === "day"
+            ? FULL_DAY_LABEL.format(anchor)
+            : view === "week"
+              ? "Worker placements and absences, one week at a time."
+              : MONTH_TITLE_LABEL.format(anchor)
         }
         actions={
           <div className="flex items-center gap-2">
             <div className="flex overflow-hidden rounded-md border border-gray-300 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={() => setView("week")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "week" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
-              >
-                Week
-              </button>
-              <button
-                type="button"
-                onClick={() => setView("month")}
-                className={`px-3 py-1.5 text-sm font-medium ${view === "month" ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
-              >
-                Month
-              </button>
+              {VIEW_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setView(opt.value)}
+                  aria-pressed={view === opt.value}
+                  className={`px-3 py-1.5 text-sm font-medium ${view === opt.value ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
             </div>
             <Button variant="outline" size="sm" onClick={goPrev}>
               ← Prev
             </Button>
-            <Button variant="outline" size="sm" onClick={goToday}>
+            {/* Today toggle: solid/active whenever today's date is already
+                inside the visible grid (and inert, since jumping to the
+                current view is a no-op), outline and clickable otherwise --
+                so the control also doubles as an at-a-glance "am I looking
+                at today or not" indicator, not just a jump action. */}
+            <Button
+              variant={isOnToday ? "primary" : "outline"}
+              size="sm"
+              onClick={goToday}
+              disabled={isOnToday}
+              aria-pressed={isOnToday}
+            >
               Today
             </Button>
             <Button variant="outline" size="sm" onClick={goNext}>
@@ -236,6 +334,26 @@ export default function CalendarGridPage() {
             </Button>
           </div>
         }
+      />
+
+      <CalendarFilters
+        isAdmin={isAdmin}
+        scopeGroupId={scopeGroupId}
+        scopeHotelId={scopeHotelId}
+        groupFilter={groupFilter}
+        onGroupFilterChange={(groupId) => {
+          setGroupFilter(groupId);
+          // A hotel selected under the previous group is meaningless under a
+          // new one -- clear rather than silently keep an out-of-group hotel
+          // filter applied.
+          setHotelFilter("");
+        }}
+        hotelFilter={hotelFilter}
+        onHotelFilterChange={setHotelFilter}
+        activeGroupId={activeGroupId}
+        groups={groups}
+        hotelOptions={hotelOptions}
+        hotelNameById={hotelNameById}
       />
 
       <FormError>{moveError}</FormError>
@@ -247,9 +365,11 @@ export default function CalendarGridPage() {
       ) : (
         <div
           className={
-            view === "week"
-              ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
-              : "grid grid-cols-7 gap-1.5"
+            view === "day"
+              ? "grid grid-cols-1 gap-3"
+              : view === "week"
+                ? "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-7"
+                : "grid grid-cols-7 gap-1.5"
           }
         >
           {days.map((d) => {
@@ -277,6 +397,25 @@ export default function CalendarGridPage() {
             );
           })}
         </div>
+      )}
+
+      {/* Per-hotel breakdown for the visible range. Shown in all three views:
+          in day view it's the point of the screen, in week/month it's the
+          "who is where, who is off" summary the grid's compact tags can't
+          convey. Uses the SAME filtered data the grid does, so the two can
+          never disagree. */}
+      {!entriesError && (
+        <RangeBreakdown
+          days={days}
+          view={view}
+          entriesByDay={entriesByDay}
+          absencesByDay={absencesByDay}
+          workerNameById={workerNameById}
+          hotelNameById={hotelNameById}
+          loading={isLoading}
+          canSeeAbsences={canSeeAbsences}
+          onSelectEntry={setEditingEntry}
+        />
       )}
 
       {addDay && <AddEntryModal day={addDay} range={{ from, to }} onClose={() => setAddDay(null)} />}
@@ -311,6 +450,7 @@ function groupByDay<T>(items: T[], getDay: (item: T) => string): Map<string, T[]
   return map;
 }
 
+
 const MONTH_VIEW_VISIBLE_ITEMS = 3;
 /** dataTransfer MIME type for a dragged placement -- namespaced so a drop
  * handler never mistakes an unrelated browser drag (e.g. dragging text or a
@@ -341,7 +481,7 @@ function DayCell({
 }: {
   date: Date;
   dayKey: string;
-  view: "week" | "month";
+  view: CalendarView;
   outsideCurrentMonth: boolean;
   entries: CalendarEntryDto[];
   absences: CalendarAbsence[];

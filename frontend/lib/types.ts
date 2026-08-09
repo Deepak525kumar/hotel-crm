@@ -27,6 +27,19 @@ export interface AuthUser {
   is_active: boolean;
   created_at: string;
   updated_at?: string;
+  /**
+   * The hotel/group this user is scope-bound to, mirrored from the same
+   * `resolveScope()` the backend uses for the JWT (auth/service.ts). Drives
+   * scope-appropriate calendar filters: a Hotel Manager sees no hotel picker
+   * (exactly one hotel), a Regional Manager gets a picker over their group's
+   * hotels, an admin gets both a group and a hotel picker.
+   *
+   * DISPLAY ONLY — never an authorization boundary. Every read is scoped
+   * server-side regardless of what the client sends, so ignoring or forging
+   * these gains nothing.
+   */
+  scope_hotel_id?: string | null;
+  scope_hotel_group_id?: string | null;
 }
 
 export interface AuthTokens {

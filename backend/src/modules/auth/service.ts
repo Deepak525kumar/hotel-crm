@@ -181,6 +181,24 @@ export class AuthService extends BaseService {
     }
   }
 
+  // Flattens the UserScope union into the two nullable id fields the user
+  // payload carries (AuthUser.scope_hotel_id/scope_hotel_group_id). A
+  // 'global' (admin) scope intentionally yields both null -- an admin is not
+  // bound to any one hotel or group, which is exactly what "no id" means
+  // here; the frontend distinguishes admin by role, not by these fields.
+  private static flattenScope(scope: UserScope | null): {
+    scope_hotel_id: string | null;
+    scope_hotel_group_id: string | null;
+  } {
+    if (scope?.type === 'hotel') {
+      return { scope_hotel_id: scope.hotel_id, scope_hotel_group_id: null };
+    }
+    if (scope?.type === 'hotel_group') {
+      return { scope_hotel_id: null, scope_hotel_group_id: scope.hotel_group_id };
+    }
+    return { scope_hotel_id: null, scope_hotel_group_id: null };
+  }
+
   // PR 5.4 (ADR-023 §6 / ADR-025 §4): resolves the JWT scope claim from
   // read-only manager-association lookups. backend-auth never writes
   // Hotel/HotelGroup rows or manager assignments — this method only reads
@@ -310,6 +328,10 @@ export class AuthService extends BaseService {
         is_active: user.is_active,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
+        // Reuses the SAME `scope` already resolved above for the JWT -- no
+        // second DB lookup, and no chance of the payload and the token
+        // disagreeing about which hotel/group this user is bound to.
+        ...AuthService.flattenScope(scope),
       },
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
@@ -393,6 +415,10 @@ export class AuthService extends BaseService {
         is_active: user.is_active,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
+        // Reuses the SAME `scope` already resolved above for the JWT -- no
+        // second DB lookup, and no chance of the payload and the token
+        // disagreeing about which hotel/group this user is bound to.
+        ...AuthService.flattenScope(scope),
       },
       access_token: tokens.access_token,
       refresh_token: tokens.refresh_token,
@@ -479,7 +505,19 @@ export class AuthService extends BaseService {
     if (!user) throw new NotFoundError('User not found');
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
-    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
+    //
+    // resolveScope() is re-run here rather than read off the caller's JWT:
+    // this endpoint is what SessionBootstrap calls on every page load, and a
+    // manager whose hotel assignment changed since their token was issued
+    // must see the CURRENT assignment in the UI, not the stale one baked
+    // into a token issued up to an access-token lifetime ago.
+    const scope = await this.resolveScope(user.id, user.role);
+    return {
+      ...user,
+      role: user.role.toLowerCase(),
+      permissions: ROLE_PERMISSIONS[user.role] ?? [],
+      ...AuthService.flattenScope(scope),
+    };
   }
 
   // HOTFIX-AUTH-002 (SIR-AUTH-001): step 1 of 2. Never accepts a new password —

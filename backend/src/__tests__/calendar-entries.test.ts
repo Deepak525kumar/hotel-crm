@@ -599,4 +599,110 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       expect(result.success).toBe(false);
     });
   });
+
+  /**
+   * IDOR regression (2026-08-10). listCalendarEntries() previously ran NO
+   * manager-scope check whatsoever: it applied `query.hotel_id` verbatim as
+   * the only hotel constraint, so a manager/RM could read any hotel's entire
+   * placement roster by passing someone else's hotel_id -- or omit it and
+   * read every hotel platform-wide. The identical defect was fixed in
+   * list() (same file) on 2026-08-08 but never applied here.
+   *
+   * These assert the resulting Prisma `where`, which is where the constraint
+   * actually lives -- a test that only checked the returned rows would pass
+   * against a mock regardless of whether any scoping happened at all.
+   */
+  describe('listCalendarEntries — manager/RM scope authz (IDOR fix)', () => {
+    beforeEach(() => {
+      mockCalendarEntry.findMany.mockResolvedValue([]);
+      mockCalendarEntry.count.mockResolvedValue(0);
+    });
+
+    const whereFromLastCall = () => mockCalendarEntry.findMany.mock.calls[0][0].where;
+
+    it('admin: no hotel constraint added; a supplied hotel_id is honoured as-is', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_any', page: 1, per_page: 20 } as any,
+        { userId: 'adm1', role: 'admin', scope: { type: 'global' } }
+      );
+      expect(whereFromLastCall().hotel_id).toBe('h_any');
+    });
+
+    it('hotel manager requesting a DIFFERENT hotel resolves to an empty set, never that hotel', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_other', page: 1, per_page: 20 } as any,
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h_mine' } }
+      );
+      // The pre-fix behaviour was `hotel_id: 'h_other'` -- another hotel's
+      // full roster.
+      expect(whereFromLastCall().hotel_id).toEqual({ in: [] });
+    });
+
+    it('hotel manager supplying no hotel_id is pinned to their own hotel, not left unfiltered', async () => {
+      await service.listCalendarEntries(
+        { page: 1, per_page: 20 } as any,
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h_mine' } }
+      );
+      expect(whereFromLastCall().hotel_id).toBe('h_mine');
+    });
+
+    it('hotel manager asking for their OWN hotel still gets it', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_mine', page: 1, per_page: 20 } as any,
+        { userId: 'mgr1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h_mine' } }
+      );
+      expect(whereFromLastCall().hotel_id).toBe('h_mine');
+    });
+
+    it('regional manager is constrained to their own group (hotel relation filter)', async () => {
+      await service.listCalendarEntries(
+        { page: 1, per_page: 20 } as any,
+        { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      );
+      expect(whereFromLastCall().hotel).toEqual({ hotel_group_id: 'g1' });
+    });
+
+    it('regional manager selecting a hotel OUTSIDE their group: both constraints apply, so the intersection is empty', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_outside', page: 1, per_page: 20 } as any,
+        { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      );
+      const where = whereFromLastCall();
+      // The supplied hotel_id is NOT dropped, and the group filter is NOT
+      // dropped -- an out-of-group hotel therefore matches no row rather than
+      // returning that hotel's data.
+      expect(where.hotel_id).toBe('h_outside');
+      expect(where.hotel).toEqual({ hotel_group_id: 'g1' });
+    });
+
+    it('group + hotel together (RM picking one of their OWN hotels) keeps both constraints', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_in_group', page: 1, per_page: 20 } as any,
+        { userId: 'rm1', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+      );
+      const where = whereFromLastCall();
+      expect(where.hotel_id).toBe('h_in_group');
+      expect(where.hotel).toEqual({ hotel_group_id: 'g1' });
+    });
+
+    it('scoped manager role with NO scope claim fails closed (empty), not open', async () => {
+      await service.listCalendarEntries(
+        { page: 1, per_page: 20 } as any,
+        { userId: 'mgr1', role: 'manager', scope: null }
+      );
+      expect(whereFromLastCall().hotel_id).toEqual({ in: [] });
+    });
+
+    it('worker stays self-scoped and gains no hotel-wide visibility from the fix', async () => {
+      await service.listCalendarEntries(
+        { hotel_id: 'h_any', page: 1, per_page: 20 } as any,
+        { userId: 'w1', role: 'worker', scope: null }
+      );
+      const where = whereFromLastCall();
+      expect(where.worker_id).toBe('w1');
+      // Not a scoped-manager role, so no hotel_id override is applied --
+      // self-scoping by worker_id is what constrains them.
+      expect(where.hotel_id).toBe('h_any');
+    });
+  });
 });

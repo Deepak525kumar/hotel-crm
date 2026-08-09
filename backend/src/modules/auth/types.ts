@@ -55,6 +55,18 @@ export interface AuthUser {
   is_active: boolean;
   created_at: string;
   updated_at?: string;
+  // Calendar scoping (2026-08-10): the SAME scope already computed for the
+  // JWT (resolveScope()), mirrored onto the user payload so the frontend can
+  // render scope-appropriate UI -- a Hotel Manager sees no hotel picker at
+  // all, a Regional Manager gets a picker over their own group's hotels, an
+  // admin gets both a group and a hotel picker.
+  //
+  // This is a DISPLAY aid, never an authorization boundary: every read is
+  // still scoped server-side (isHotelInScope/isWorkerInGroupScope), so a
+  // client that ignores or forges these fields gains nothing. Exposing them
+  // leaks no privilege -- a manager already knows which hotel they manage.
+  scope_hotel_id?: string | null;
+  scope_hotel_group_id?: string | null;
 }
 
 export interface AuthTokens {
