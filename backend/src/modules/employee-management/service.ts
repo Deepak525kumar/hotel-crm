@@ -1,5 +1,6 @@
 import {
   AssignmentStatus,
+  ContractStatus,
   DeactivationReason,
   EmploymentStatus,
   EmploymentRecord,
@@ -19,6 +20,7 @@ import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
+import { documentService } from '../documents/service.js';
 import {
   assertTransition,
   ASSESSMENT_BASIS,
@@ -419,6 +421,22 @@ export class EmployeeManagementService extends BaseService {
       throw new ConflictError('Only a Pending employment record may be submitted for review');
     }
 
+    // GATE: All required documents must be uploaded before onboarding can be
+    // submitted for review. Work permit requirement is derived from the
+    // personal_data.nationality field — if nationality is missing/unknown,
+    // we conservatively treat it as NOT required so a partial profile doesn't
+    // permanently block submission. An admin reviewer can still catch it.
+    const personalData = record.personal_data as Record<string, unknown> | null;
+    const nationality = typeof personalData?.nationality === 'string' ? personalData.nationality : null;
+    const isWorkPermitRequired = nationality !== null && nationality.toLowerCase() !== 'german' && nationality.toLowerCase() !== 'de';
+
+    const completeness = await documentService.getDocumentCompleteness(record.user_id, isWorkPermitRequired);
+    if (!completeness.is_complete) {
+      throw new ConflictError(
+        `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+      );
+    }
+
     const updated = await this.prisma.employmentRecord.update({
       where: { id: record.id },
       data: { submitted_for_review_at: new Date() },
@@ -465,6 +483,23 @@ export class EmployeeManagementService extends BaseService {
     // field, so its absence means exactly "never submitted."
     if (!record.submitted_for_review_at) {
       throw new ConflictError('Cannot approve an application that has not been submitted for review');
+    }
+
+    // GATE: Worker must have an approved contract (ACTIVE, EXTENDED, or
+    // PERMANENT) before they can be activated. A PENDING contract means the
+    // manager has not yet confirmed it as signed — activating without one
+    // would let workers accept shifts with no valid employment contract.
+    const approvedContract = await this.prisma.contract.findFirst({
+      where: {
+        worker_id: record.user_id,
+        status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED, ContractStatus.PERMANENT] },
+      },
+      select: { id: true },
+    });
+    if (!approvedContract) {
+      throw new ConflictError(
+        'Cannot approve: the worker does not have an approved contract (Active, Extended, or Permanent). Please confirm their contract in HR first.',
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
