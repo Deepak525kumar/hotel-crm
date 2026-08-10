@@ -71,12 +71,21 @@ async function signatureImgTag(key: string): Promise<string> {
 
 async function renderSignatureBlockHtml(
   block: DocumentTemplateSignatureBlock,
-  instance: InstanceWithChildren
+  instance: InstanceWithChildren,
+  stableHashMode = false
 ): Promise<string> {
   const signature = instance.signatures.find((s) => s.signature_block_id === block.id);
-  const imgHtml = signature
-    ? await signatureImgTag(signature.signature_image_key)
-    : '<div class="signature-line">&nbsp;</div>';
+  
+  let imgHtml = '<div class="signature-line">&nbsp;</div>';
+  if (signature) {
+    if (stableHashMode) {
+      // For hashing: use the exact immutable S3 key rather than a volatile
+      // presigned URL (which changes every request due to X-Amz-Date/Signature).
+      imgHtml = `<img class="signature-image" data-signature-key="${escapeHtml(signature.signature_image_key)}" alt="Signature" />`;
+    } else {
+      imgHtml = await signatureImgTag(signature.signature_image_key);
+    }
+  }
   return `
     <div class="signature-block">
       <div class="signature-label">${escapeHtml(block.label)}</div>
@@ -95,14 +104,15 @@ async function renderSignatureBlockHtml(
  */
 export async function renderSectionHtml(
   section: SectionWithChildren,
-  instance: InstanceWithChildren
+  instance: InstanceWithChildren,
+  stableHashMode = false
 ): Promise<string> {
   const body = interpolateBody(section, instance);
   const blocksHtml = await Promise.all(
     section.signature_blocks
       .slice()
       .sort((a, b) => a.order_index - b.order_index)
-      .map((b) => renderSignatureBlockHtml(b, instance))
+      .map((b) => renderSignatureBlockHtml(b, instance, stableHashMode))
   );
   return `
     <section class="doc-section">
@@ -131,6 +141,42 @@ const PAGE_STYLE = `
   </style>
 `;
 
+class Semaphore {
+  private queue: Array<{ resolve: () => void; reject: (reason?: any) => void; timer: NodeJS.Timeout }> = [];
+  constructor(private permits: number) {}
+
+  async acquire(timeoutMs: number = 30000): Promise<void> {
+    if (this.permits > 0) {
+      this.permits--;
+      return Promise.resolve();
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const index = this.queue.findIndex((e) => e.timer === timer);
+        if (index !== -1) {
+          this.queue.splice(index, 1);
+          reject(new Error(`Timeout waiting for PDF render semaphore (${timeoutMs}ms)`));
+        }
+      }, timeoutMs);
+
+      this.queue.push({ resolve, reject, timer });
+    });
+  }
+
+  release(): void {
+    const next = this.queue.shift();
+    if (next) {
+      clearTimeout(next.timer);
+      next.resolve();
+    } else {
+      this.permits++;
+    }
+  }
+}
+
+// Limit concurrent PDF renders to 2 to prevent memory exhaustion from Chromium spawns.
+const renderSemaphore = new Semaphore(2);
+
 /**
  * Renders a full DocumentInstance (all sections, in order) to a PDF Buffer.
  * `draft: true` allows rendering before every signature block is signed
@@ -157,13 +203,18 @@ export async function renderInstanceToPdf(
     </html>
   `;
 
-  const browser = await chromium.launch();
+  await renderSemaphore.acquire();
   try {
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle' });
-    const pdf = await page.pdf({ format: 'A4', printBackground: true });
-    return pdf;
+    const browser = await chromium.launch();
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle' });
+      const pdf = await page.pdf({ format: 'A4', printBackground: true });
+      return pdf;
+    } finally {
+      await browser.close();
+    }
   } finally {
-    await browser.close();
+    renderSemaphore.release();
   }
 }

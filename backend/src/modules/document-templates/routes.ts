@@ -84,73 +84,76 @@ function requireInstanceSignAccess() {
   };
 }
 
-const router = Router();
-router.use(authMiddleware);
+const documentTemplateRoutes = Router();
+const documentInstanceRoutes = Router();
+
+documentTemplateRoutes.use(authMiddleware);
+documentInstanceRoutes.use(authMiddleware);
 
 // -- Templates (admin-authored; manager/RM read-only) -----------------------
 
-router.post(
-  '/document-templates',
+documentTemplateRoutes.post(
+  '/',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.createTemplate(req, res, next)
 );
-router.get(
-  '/document-templates',
+documentTemplateRoutes.get(
+  '/',
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('document_templates:read'),
   (req, res, next) => documentTemplatesController.listTemplates(req, res, next)
 );
-router.get(
-  '/document-templates/:id',
+documentTemplateRoutes.get(
+  '/:id',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireTemplateReadAccess(),
   (req, res, next) => documentTemplatesController.getTemplate(req, res, next)
 );
-router.patch(
-  '/document-templates/:id',
+documentTemplateRoutes.patch(
+  '/:id',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.updateTemplate(req, res, next)
 );
-router.post(
-  '/document-templates/:id/sections',
+documentTemplateRoutes.post(
+  '/:id/sections',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.addSection(req, res, next)
 );
-router.patch(
-  '/document-templates/:id/sections/:sid',
+documentTemplateRoutes.patch(
+  '/:id/sections/:sid',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.updateSection(req, res, next)
 );
-router.post(
-  '/document-templates/:id/sections/:sid/fields',
+documentTemplateRoutes.post(
+  '/:id/sections/:sid/fields',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.addField(req, res, next)
 );
-router.patch(
-  '/document-templates/:id/sections/:sid/fields/:fid',
+documentTemplateRoutes.patch(
+  '/:id/sections/:sid/fields/:fid',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.updateField(req, res, next)
 );
-router.post(
-  '/document-templates/:id/sections/:sid/signature-blocks',
+documentTemplateRoutes.post(
+  '/:id/sections/:sid/signature-blocks',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.addSignatureBlock(req, res, next)
 );
-router.post(
-  '/document-templates/:id/publish',
+documentTemplateRoutes.post(
+  '/:id/publish',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.publishTemplate(req, res, next)
 );
-router.post(
-  '/document-templates/:id/archive',
+documentTemplateRoutes.post(
+  '/:id/archive',
   requireRole('admin'),
   requirePermission('document_templates:write'),
   (req, res, next) => documentTemplatesController.archiveTemplate(req, res, next)
@@ -163,61 +166,61 @@ router.post(
 // checkWorkerScope() (which only reads a worker_id path/body param, which
 // none of these routes carry).
 
-router.post(
-  '/document-instances',
+documentInstanceRoutes.post(
+  '/',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceFillAccess(),
   (req, res, next) => documentTemplatesController.createInstance(req, res, next)
 );
-router.get(
-  '/document-instances',
+documentInstanceRoutes.get(
+  '',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceReadAccess(),
   (req, res, next) => documentTemplatesController.listInstances(req, res, next)
 );
-router.get(
-  '/document-instances/:id',
+documentInstanceRoutes.get(
+  '/:id',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceReadAccess(),
   (req, res, next) => documentTemplatesController.getInstance(req, res, next)
 );
-router.patch(
-  '/document-instances/:id/fields',
+documentInstanceRoutes.patch(
+  '/:id/fields',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceFillAccess(),
   (req, res, next) => documentTemplatesController.upsertFieldValues(req, res, next)
 );
-router.get(
-  '/document-instances/:id/preview',
+documentInstanceRoutes.get(
+  '/:id/preview',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceReadAccess(),
   (req, res, next) => documentTemplatesController.previewInstance(req, res, next)
 );
-router.post(
-  '/document-instances/:id/signature-blocks/:blockId/sign',
+documentInstanceRoutes.post(
+  '/:id/signature-blocks/:blockId/sign',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceSignAccess(),
   upload.single('file'),
   handleUploadErrors(),
   (req: Request, res: Response, next: NextFunction) => documentTemplatesController.signBlock(req, res, next)
 );
-router.get(
-  '/document-instances/:id/signatures',
+documentInstanceRoutes.get(
+  '/:id/signatures',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceReadAccess(),
   (req, res, next) => documentTemplatesController.listSignatures(req, res, next)
 );
-router.post(
-  '/document-instances/:id/finalize',
+documentInstanceRoutes.post(
+  '/:id/finalize',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceFillAccess(),
   (req, res, next) => documentTemplatesController.finalize(req, res, next)
 );
-router.get(
-  '/document-instances/:id/document',
+documentInstanceRoutes.get(
+  '/:id/document',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   requireInstanceReadAccess(),
   (req, res, next) => documentTemplatesController.getFinalDocument(req, res, next)
 );
 
-export default router;
+export { documentTemplateRoutes, documentInstanceRoutes };

@@ -13,6 +13,9 @@ let testAuth:
   | { userId: string; role: string; permissions: string[]; scope: unknown }
   | null = null;
 
+const mockInstanceSignatureCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+const mockInstanceSignatureUpdate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+
 jest.mock('../lib/logger.js', () => ({
   logger: {
     info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -55,11 +58,20 @@ jest.mock('../modules/document-templates/controller.js', () => ({
     finalize: ok,
     getFinalDocument: ok,
   },
+  documentInstanceSignature: {
+    create: mockInstanceSignatureCreate,
+    update: mockInstanceSignatureUpdate,
+  },
 }));
 
 import express from 'express';
 import request from 'supertest';
-import documentTemplatesRouter from '../modules/document-templates/routes.js';
+import { documentTemplateRoutes, documentInstanceRoutes } from '../modules/document-templates/routes.js';
+import { Router } from 'express';
+
+const documentTemplatesRouter = Router();
+documentTemplatesRouter.use('/document-templates', documentTemplateRoutes);
+documentTemplatesRouter.use('/document-instances', documentInstanceRoutes);
 import { AppError } from '../lib/errors.js';
 import { ROLE_PERMISSIONS } from '../config/constants.js';
 
