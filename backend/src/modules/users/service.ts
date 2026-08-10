@@ -155,12 +155,12 @@ export class UserService extends BaseService {
     if (existing) throw new ConflictError('Email already registered');
 
     // SECURITY (HOTFIX-AUTH-003): assigning a privileged role is a server-side
-    // authority decision, not a caller-supplied one. The authenticated admin-
-    // creation workflow is role-gated to {admin, manager} at the route, but a
-    // manager must not be able to mint an ADMIN account through this path.
-    // Mirror the elevation guard already enforced on updateUser: only an admin
-    // may assign the admin role. Preserves the legitimate admin-creates-admin
-    // and manager-creates-worker/checker/manager workflows.
+    // authority decision, not a caller-supplied one. Note: as of SEC-01 and
+    // ADR-030 D-4 (tracked in SIR-USERS-002), the route itself (POST /users) is
+    // strictly Admin-only. Managers cannot reach this method at all, so this
+    // guard (if data.role === 'admin' && actorRole !== 'admin') is currently
+    // defense-in-depth for a future state, not something exercised by a live
+    // manager-creates-worker path today. Do not remove it.
     if (data.role === 'admin' && actorRole !== 'admin') {
       throw new ForbiddenError('Only admins can assign admin role');
     }
