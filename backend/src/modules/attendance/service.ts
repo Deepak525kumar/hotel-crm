@@ -114,7 +114,8 @@ export class AttendanceService extends BaseService {
         actorId,
         { hotel_id: assignment.hotel_id, latitude: input.latitude, longitude: input.longitude },
         actorRole,
-        actorIp
+        actorIp,
+        existing.id
       );
 
       if (verification.status === 'verified' && !verification.insideRadius) {
@@ -374,7 +375,8 @@ export class AttendanceService extends BaseService {
             actorId,
             { hotel_id: record.hotel_id, latitude: input.latitude, longitude: input.longitude },
             actorRole,
-            actorIp
+            actorIp,
+            record.id
           );
           if (verification.status === 'verified' && !verification.insideRadius) {
             await this.logAudit(actorId, actorRole, 'CHECK_OUT_DENIED_GEOFENCE', 'ATTENDANCE', record.id, {

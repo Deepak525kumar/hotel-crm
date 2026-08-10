@@ -279,6 +279,50 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       }
       expect(mockWorkerGeoCheckinCreate).toHaveBeenCalled();
     });
+
+    it('OD-GEO-010: writes attendance_id when AttendanceService supplies one', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
+      mockWorkerGeoCheckinCreate.mockResolvedValue({
+        id: 'c3',
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        attendance_id: 'att1',
+        distance_meters: 5,
+        inside_radius: true,
+        checked_at: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      await service.verifyGeofence(
+        'w1',
+        { hotel_id: 'h1', latitude: 52.52001, longitude: 13.405 },
+        'worker',
+        undefined,
+        'att1'
+      );
+
+      expect(mockWorkerGeoCheckinCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attendance_id: 'att1' }) })
+      );
+    });
+
+    it('OD-GEO-010: writes attendance_id=null for the standalone worker-facing checkIn (no attendance context)', async () => {
+      mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
+      mockWorkerGeoCheckinCreate.mockResolvedValue({
+        id: 'c4',
+        worker_id: 'w1',
+        hotel_id: 'h1',
+        attendance_id: null,
+        distance_meters: 5,
+        inside_radius: true,
+        checked_at: new Date('2026-07-28T00:00:00.000Z'),
+      });
+
+      await service.checkIn('w1', { hotel_id: 'h1', latitude: 52.52001, longitude: 13.405 }, 'worker');
+
+      expect(mockWorkerGeoCheckinCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ attendance_id: null }) })
+      );
+    });
   });
 
   describe('checkIn — still delegates to verifyGeofence with unchanged fail-closed contract', () => {
@@ -305,6 +349,17 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
 
       expect(mockWorkerGeoCheckinFindMany).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.objectContaining({ worker_id: 'w1' }) })
+      );
+    });
+
+    it('OD-GEO-010: filters by attendance_id when supplied, still applying manager hotel scope', async () => {
+      await service.listCheckins(
+        { page: 1, per_page: 20, attendance_id: 'att1' },
+        { userId: 'm1', role: 'manager', scope: { type: 'global' } }
+      );
+
+      expect(mockWorkerGeoCheckinFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ attendance_id: 'att1' }) })
       );
     });
 

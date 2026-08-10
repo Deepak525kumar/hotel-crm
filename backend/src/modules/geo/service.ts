@@ -48,7 +48,13 @@ export class GeoService extends BaseService {
     workerId: string,
     input: CheckinInput,
     actorRole: string,
-    actorIp?: string
+    actorIp?: string,
+    // OD-GEO-010: only ever supplied by AttendanceService's own
+    // checkIn()/checkOut(), which already knows the Attendance row this
+    // check belongs to -- never derived from client input, so the public
+    // CheckinSchema deliberately has no attendance_id field a worker could
+    // spoof to attach a checkin to someone else's shift.
+    attendanceId?: string
   ): Promise<GeofenceVerification> {
     const hotel = await this.prisma.hotel.findUnique({
       where: { id: input.hotel_id },
@@ -76,6 +82,7 @@ export class GeoService extends BaseService {
       data: {
         worker_id: workerId,
         hotel_id: input.hotel_id,
+        attendance_id: attendanceId ?? null,
         latitude: input.latitude,
         longitude: input.longitude,
         distance_meters: distanceMeters,
@@ -146,8 +153,10 @@ export class GeoService extends BaseService {
       worker_id?: string;
       hotel_id?: string | { in: string[] };
       hotel?: { hotel_group_id: string };
+      attendance_id?: string;
     } = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
+      ...(query.attendance_id ? { attendance_id: query.attendance_id } : {}),
     };
 
     // isSelfScopedRole()/isScopedManagerRole() rather than literal role strings:
@@ -220,6 +229,7 @@ export class GeoService extends BaseService {
       id: c.id,
       worker_id: c.worker_id,
       hotel_id: c.hotel_id,
+      attendance_id: c.attendance_id,
       distance_meters: c.distance_meters,
       inside_radius: c.inside_radius,
       checked_at: c.checked_at.toISOString(),
