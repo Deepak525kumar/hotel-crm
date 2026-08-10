@@ -13,12 +13,14 @@ export class BaseService {
     details?: Record<string, unknown>,
     ip_address?: string,
     old_values?: Record<string, unknown>,
-    new_values?: Record<string, unknown>
+    new_values?: Record<string, unknown>,
+    tx?: Prisma.TransactionClient
   ) {
     const normalizedRole = actor_role
       ? (actor_role.toUpperCase() as UserRole)
       : null;
-    await this.prisma.auditLog.create({
+    const client = tx || this.prisma;
+    await client.auditLog.create({
       data: {
         actor_id,
         actor_role: normalizedRole,

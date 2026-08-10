@@ -399,14 +399,25 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockAuditLogCreate).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
-            actor_id: 'm1',
             action: 'hr_contract.confirm_signed',
+            actor_id: 'm1',
             resource_type: 'Contract',
             resource_id: 'c1',
           }),
-        })
+        }),
       );
       expect(result.status).toBe('ACTIVE');
+    });
+
+    it('rolls back the contract update if logAudit fails', async () => {
+      mockContractFindFirst.mockResolvedValue(
+        makeContractRow({ status: 'PENDING', scanned_document_id: 'doc1' })
+      );
+      mockAuditLogCreate.mockRejectedValueOnce(new Error('audit failed'));
+
+      await expect(service.confirmContractSigned('w1', 'm1', 'manager', '1.2.3.4')).rejects.toThrow('audit failed');
+
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -440,6 +451,17 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(result.id).toBe('p1');
     });
 
+    it('rolls back the payslip request creation if notifyResponsibleManager (notification enqueue) fails', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+      mockNotificationEnqueue.mockRejectedValueOnce(new Error('notification failed'));
+
+      await expect(service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' })).rejects.toThrow('notification failed');
+      
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+    });
+
     it('notifies the worker\'s Regional Manager on request (best-effort, OD-CAL-06 posture)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
       mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
@@ -448,7 +470,8 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' });
 
       expect(mockNotificationEnqueue).toHaveBeenCalledWith(
-        expect.objectContaining({ recipientId: 'rm1', type: 'HR_PAYSLIP_REQUESTED' })
+        expect.objectContaining({ recipientId: 'rm1', type: 'HR_PAYSLIP_REQUESTED' }),
+        expect.anything()
       );
     });
 
