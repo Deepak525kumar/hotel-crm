@@ -142,21 +142,32 @@ const PAGE_STYLE = `
 `;
 
 class Semaphore {
-  private queue: Array<() => void> = [];
+  private queue: Array<{ resolve: () => void; reject: (reason?: any) => void; timer: NodeJS.Timeout }> = [];
   constructor(private permits: number) {}
 
-  async acquire(): Promise<void> {
+  async acquire(timeoutMs: number = 30000): Promise<void> {
     if (this.permits > 0) {
       this.permits--;
       return Promise.resolve();
     }
-    return new Promise((resolve) => this.queue.push(resolve));
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        const index = this.queue.findIndex((e) => e.timer === timer);
+        if (index !== -1) {
+          this.queue.splice(index, 1);
+          reject(new Error(`Timeout waiting for PDF render semaphore (${timeoutMs}ms)`));
+        }
+      }, timeoutMs);
+
+      this.queue.push({ resolve, reject, timer });
+    });
   }
 
   release(): void {
     const next = this.queue.shift();
     if (next) {
-      next();
+      clearTimeout(next.timer);
+      next.resolve();
     } else {
       this.permits++;
     }
