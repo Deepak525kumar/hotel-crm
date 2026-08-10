@@ -293,28 +293,30 @@ export default function AssignmentDetailPage() {
 
       {/* rooms-completed route now includes regional_manager (ADR-030 §3
           C-24, staffing:write) alongside admin/manager. */}
-      <RoleGate allow={["admin", "manager", "regional_manager"]}>
-        <Card>
-          <CardContent className="flex items-center justify-between gap-4">
-            <div className="text-sm text-gray-600 dark:text-gray-300">
-              {loggedRoomsCompleted
-                ? `Logged ${loggedRoomsCompleted.rooms_completed} rooms completed.`
-                : "Log the rooms completed count for this assignment."}
-            </div>
-            {loggedRoomsCompleted ? (
-              <Badge tone="success">Logged</Badge>
-            ) : (
-              <Button
-                variant="outline"
-                onClick={() => setRoomsCompletedOpen(true)}
-                className="shrink-0"
-              >
-                Log rooms completed
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-      </RoleGate>
+      {assignment.status === "COMPLETED" && (
+        <RoleGate allow={["admin", "manager", "regional_manager"]}>
+          <Card>
+            <CardContent className="flex items-center justify-between gap-4">
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                {(loggedRoomsCompleted ?? assignment.rooms_completed)
+                  ? `Logged ${(loggedRoomsCompleted ?? assignment.rooms_completed)!.rooms_completed} rooms completed.`
+                  : "Log the rooms completed count for this assignment."}
+              </div>
+              {(loggedRoomsCompleted ?? assignment.rooms_completed) ? (
+                <Badge tone="success">Logged</Badge>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setRoomsCompletedOpen(true)}
+                  className="shrink-0"
+                >
+                  Log rooms completed
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </RoleGate>
+      )}
 
       {/*
         quality:write (backend/src/config/constants.ts ROLE_PERMISSIONS) is

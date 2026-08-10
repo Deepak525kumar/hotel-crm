@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
-import { useUserOptions } from "@/hooks/useHotels";
+import { useUserOptions, useHotel } from "@/hooks/useHotels";
+import { localToday } from "@/lib/format";
 import { assignmentsApi, ApiError } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
@@ -35,11 +36,20 @@ const INITIAL: FormState = {
 function NewCalendarEntryForm() {
   const router = useRouter();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
-  const { users: workers, isLoading: workersLoading } = useUserOptions({ role: "worker" });
-
+  
   const [form, setForm] = useState<FormState>(INITIAL);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const { data: selectedHotel } = useHotel(form.hotel_id);
+  const { users: workers, isLoading: workersLoading } = useUserOptions({
+    role: "worker",
+    hotel_id: form.hotel_id || undefined,
+  });
+
+  const today = selectedHotel
+    ? new Date().toLocaleDateString("en-CA", { timeZone: selectedHotel.timezone })
+    : localToday();
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -122,6 +132,7 @@ function NewCalendarEntryForm() {
               label="Day"
               type="date"
               required
+              min={today}
               value={form.day}
               onChange={(e) => set("day", e.target.value)}
             />
