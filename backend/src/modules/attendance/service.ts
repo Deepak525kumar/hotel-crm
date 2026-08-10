@@ -12,6 +12,7 @@ import type { UserScope } from '../../lib/jwt.js';
 import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
 import { assignmentService, resolveScheduledStart } from '../assignments/service.js';
 import { AssignmentStatus } from '@prisma/client';
+import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 export class AttendanceService extends BaseService {
   private toDto(a: Attendance): AttendanceDto {
@@ -140,35 +141,52 @@ export class AttendanceService extends BaseService {
     // window are rejected. Configurable (ATTENDANCE_EARLY_CHECK_IN_GRACE_
     // MINUTES, default 2h per user direction) rather than hardcoded, same
     // convention as every other business-rule threshold in config/env.ts.
-    // Bug 34: Enforce early-arrival check-in restrictions even if expected_start is null.
-    // If the shift lacks a scheduled time, it cannot be worked yet.
-    if (!existing.expected_start) {
-      throw new ForbiddenError('Check-in denied: shift lacks a scheduled start time. Contact your manager.');
-    }
+    let minutesLate: number | null = null;
+    let isLate = false;
 
-    const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
-    const minutesEarly = Math.floor(
-      (existing.expected_start.getTime() - now.getTime()) / 60000
-    );
-    
-    if (minutesEarly > graceMinutes) {
-      await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_TOO_EARLY', 'ATTENDANCE', existing.id, {
-        assignment_id: input.assignment_id,
-        minutes_early: minutesEarly,
-      });
-      throw new ForbiddenError(
-        `Check-in denied: too early. Check-in opens ${graceMinutes / 60} hours before the shift starts.`
+    if (existing.expected_start) {
+      const graceMinutes = getEnv().ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES;
+      const minutesEarly = Math.floor(
+        (existing.expected_start.getTime() - now.getTime()) / 60000
       );
-    }
+      
+      if (minutesEarly > graceMinutes) {
+        await this.logAudit(actorId, actorRole, 'CHECK_IN_DENIED_TOO_EARLY', 'ATTENDANCE', existing.id, {
+          assignment_id: input.assignment_id,
+          minutes_early: minutesEarly,
+        });
+        throw new ForbiddenError(
+          `Check-in denied: too early. Check-in opens ${graceMinutes / 60} hours before the shift starts.`
+        );
+      }
 
-    // Bug 14: Implement configurable tardiness grace period.
-    const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
-    const lateThreshold = new Date(existing.expected_start.getTime() + tardyGraceMinutes * 60000);
-    const isLate = now > lateThreshold;
-    const minutesLate: number | null = Math.max(
-      0,
-      Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000)
-    );
+      // Bug 14: Implement configurable tardiness grace period.
+      const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
+      const lateThreshold = new Date(existing.expected_start.getTime() + tardyGraceMinutes * 60000);
+      isLate = now > lateThreshold;
+      minutesLate = Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000));
+    } else {
+      // Bug 34 fix: Handle calendar-placed shifts (which have no expected_start)
+      const calendarEntry = await this.prisma.calendarEntry.findUnique({
+        where: { assignment_id: assignment.id },
+      });
+      
+      if (!calendarEntry) {
+        throw new ForbiddenError('Check-in denied: shift lacks a scheduled start time and is not a calendar placement. Contact your manager.');
+      }
+
+      const hotel = await this.prisma.hotel.findUnique({ where: { id: assignment.hotel_id } });
+      const todayStr = todayInCalendarTimezone(hotel?.timezone || 'Europe/Berlin').split('T')[0];
+      const shiftDayStr = calendarEntry.day.toISOString().split('T')[0];
+
+      if (shiftDayStr! > todayStr!) {
+        throw new ForbiddenError('Check-in denied: too early. This calendar shift is scheduled for a future day.');
+      } else if (shiftDayStr! < todayStr!) {
+        throw new ForbiddenError('Check-in denied: this calendar shift was scheduled for a past day.');
+      }
+      
+      // If it's today, check-in is allowed. No tardiness applies.
+    }
 
     // Review fix: compare-and-swap via updateMany's WHERE clause (same
     // pattern as hr/service.ts's fulfilPayslipRequest() review fix,
