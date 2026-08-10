@@ -27,6 +27,8 @@ const mockPrisma = {
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   jobRequest: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  calendarEntry: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  hotel: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -182,12 +184,22 @@ describe('AttendanceService', () => {
       expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
 
-    it('throws ForbiddenError when expected_start is null (Bug 34)', async () => {
-      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1' });
+    it('throws ForbiddenError when calendar shift lacks calendar entry or is too early', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue({ id: 'a1', worker_id: 'w1', hotel_id: 'h1' });
       mockAttendance.findUnique.mockResolvedValue(makeRecord({ expected_start: null }));
+      (mockPrisma.calendarEntry as any).findUnique.mockResolvedValue(null);
+      (mockPrisma.hotel as any).findUnique.mockResolvedValue({ timezone: 'Europe/Berlin' });
       await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
         name: 'ForbiddenError',
-        message: 'Check-in denied: shift lacks a scheduled start time. Contact your manager.',
+        message: 'Check-in denied: shift lacks a scheduled start time and is not a calendar placement. Contact your manager.',
+      });
+      
+      const futureDate = new Date();
+      futureDate.setUTCDate(futureDate.getUTCDate() + 10);
+      (mockPrisma.calendarEntry.findUnique as any).mockResolvedValue({ day: futureDate });
+      await expect(service.checkIn({ assignment_id: 'a1' }, 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+        message: 'Check-in denied: too early. This calendar shift is scheduled for a future day.',
       });
     });
 

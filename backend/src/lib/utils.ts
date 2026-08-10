@@ -61,6 +61,6 @@ export function parsePaginationParams(
 // own default, SPEC-CRM-001) pending a platform-wide timezone decision.
 export const CALENDAR_TIMEZONE = 'Europe/Berlin';
 
-export function todayInCalendarTimezone(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(new Date());
+export function todayInCalendarTimezone(timezone: string = CALENDAR_TIMEZONE): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date());
 }
