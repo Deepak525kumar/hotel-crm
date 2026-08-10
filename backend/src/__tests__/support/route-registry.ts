@@ -365,10 +365,15 @@ export function parseRouteFile(moduleName: string, source: string): ParsedRoute[
   let match: RegExpExecArray | null;
 
   while ((match = callRegex.exec(source)) !== null) {
+<<<<<<< HEAD
     const method = match[1];
     // Need to find the actual match text to know where the open paren starts
     const fullMatch = match[0];
     const openParenIdx = match.index + fullMatch.length - 1;
+=======
+    const method = match[1]!;
+    const openParenIdx = match.index + match[0].length - 1; // index of '('
+>>>>>>> origin/main
     const chunk = extractBalancedParens(source, openParenIdx);
     const inner = chunk.slice(1, -1);
 

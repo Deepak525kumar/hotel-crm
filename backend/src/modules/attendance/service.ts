@@ -162,8 +162,9 @@ export class AttendanceService extends BaseService {
 
       // Bug 14: Implement configurable tardiness grace period.
       const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
+      const lateThreshold = new Date(existing.expected_start.getTime() + tardyGraceMinutes * 60000);
+      isLate = now > lateThreshold;
       minutesLate = Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000));
-      isLate = minutesLate > tardyGraceMinutes;
     } else {
       // Bug 34 fix: Handle calendar-placed shifts (which have no expected_start)
       const calendarEntry = await this.prisma.calendarEntry.findUnique({
