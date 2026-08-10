@@ -24,6 +24,9 @@ export type CheckinInput = z.infer<typeof CheckinSchema>;
 export const ListCheckinsQuerySchema = z.object({
   worker_id: z.string().optional(),
   hotel_id: z.string().optional(),
+  // OD-GEO-010: exact match against the shift a checkin verified, replacing
+  // the frontend's prior worker_id+hotel_id+time-window heuristic.
+  attendance_id: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   per_page: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -37,6 +40,7 @@ export interface GeoCheckinDto {
   id: string;
   worker_id: string;
   hotel_id: string;
+  attendance_id: string | null;
   distance_meters: number;
   inside_radius: boolean;
   checked_at: string;

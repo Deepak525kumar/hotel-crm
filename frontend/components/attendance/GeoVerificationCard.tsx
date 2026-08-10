@@ -17,20 +17,15 @@ import type { Attendance } from "@/lib/types";
 
 /**
  * Embeds the geofence-verification events tied to one attendance record's
- * shift, replacing the standalone /geo-checkins tab (SPEC-GEO-001 data has
- * no attendance_id/assignment_id link, so events are matched client-side by
- * worker_id + hotel_id, narrowed to the shift's check-in/check-out window).
- *
- * This is an approximate association, not a real foreign-key relationship:
- * a worker with two overlapping shifts at the same hotel could see a geo
- * event attributed to the wrong attendance record. Accepted as MVP behavior
- * until SPEC-GEO-001 gains an attendance_id/assignment_id link.
+ * shift, replacing the standalone /geo-checkins tab. Exact match via
+ * WorkerGeoCheckin.attendance_id (OD-GEO-010, SPEC-GEO-001 amendment) — set
+ * by AttendanceService whenever it calls GeoService.verifyGeofence() during
+ * check-in/check-out, so no client-side heuristic is needed.
  */
 export function GeoVerificationCard({ record }: { record: Attendance }) {
   const { records, isLoading, error } = useGeoCheckins({
-    worker_id: record.worker_id,
-    hotel_id: record.hotel_id,
-    per_page: 100,
+    attendance_id: record.id,
+    per_page: 20,
   });
 
   if (isLoading) {
@@ -60,21 +55,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
     );
   }
 
-  const windowStart = record.check_in_at ?? record.expected_start;
-  const windowEnd = record.check_out_at ?? record.expected_end;
-  const inWindow = (checkedAt: string) => {
-    if (!windowStart) return true;
-    const t = new Date(checkedAt).getTime();
-    const start = new Date(windowStart).getTime() - 30 * 60 * 1000;
-    if (t < start) return false;
-    if (!windowEnd) return true;
-    const end = new Date(windowEnd).getTime() + 30 * 60 * 1000;
-    return t <= end;
-  };
-
-  const shiftCheckins = records.filter((r) => inWindow(r.checked_at));
-
-  if (shiftCheckins.length === 0) return null;
+  if (records.length === 0) return null;
 
   return (
     <GeoCheckinsGate>
@@ -84,7 +65,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            {shiftCheckins.map((c) => (
+            {records.map((c) => (
               <DataRow
                 key={c.id}
                 label={formatDateTime(c.checked_at)}

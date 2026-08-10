@@ -866,6 +866,10 @@ export interface GeoCheckin {
   id: string;
   worker_id: string;
   hotel_id: string;
+  /** The Attendance shift this check verified, when it originated from Attendance's own
+   *  check-in/check-out flow (OD-GEO-010). Null for the standalone worker-facing
+   *  "Verify Location" self-checkin, which has no attendance context. */
+  attendance_id: string | null;
   distance_meters: number;
   inside_radius: boolean;
   checked_at: string;
@@ -875,6 +879,7 @@ export interface GeoCheckin {
 export interface ListGeoCheckinsQuery {
   worker_id?: string;
   hotel_id?: string;
+  attendance_id?: string;
   page?: number;
   per_page?: number;
 }

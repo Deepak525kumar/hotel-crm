@@ -1003,6 +1003,10 @@ model Attendance {
   verified_at    DateTime?
   created_at     DateTime         @default(now())
   updated_at     DateTime         @updatedAt
+  // OD-GEO-010: geofence-verification events captured by GeoService.verifyGeofence
+  // during this shift's check-in/check-out (backend-geo-owned table; see
+  // WorkerGeoCheckin.attendance_id).
+  geo_checkins   WorkerGeoCheckin[]
 
   @@index([worker_id])
   @@index([hotel_id])
@@ -1595,11 +1599,22 @@ model CalendarAbsence {
 // and inside_radius are exposed cross-role. Enforced in service.ts's DTO
 // mapping, not by the schema itself.
 model WorkerGeoCheckin {
-  id              String   @id @default(cuid())
+  id              String      @id @default(cuid())
   worker_id       String
-  worker          User     @relation("geo_checkin_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  worker          User        @relation("geo_checkin_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id        String
-  hotel           Hotel    @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  hotel           Hotel       @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  // OD-GEO-010: the shift this check verified, when the check originated
+  // from Attendance's own checkIn()/checkOut() (GD-14 backend-attendance <->
+  // backend-geo wiring). Nullable because GeoController.checkIn's
+  // standalone worker-facing "Verify Location" endpoint has no attendance
+  // record to attach to -- an exact link where one exists is strictly
+  // better than the worker_id+hotel_id+time-window heuristic callers used
+  // before this field existed. onDelete: SetNull, not Cascade: the geo
+  // audit trail (GDPR Tier 1, 6-month retention) must survive the
+  // Attendance row's own lifecycle rather than being deleted alongside it.
+  attendance_id   String?
+  attendance      Attendance? @relation(fields: [attendance_id], references: [id], onDelete: SetNull)
   // Raw device coordinates (RULE-GEO-002: sampled only at this single check,
   // never continuous/background). Personal location data -- GDPR Tier 1.
   latitude        Float
@@ -1608,7 +1623,7 @@ model WorkerGeoCheckin {
   // admin/manager; latitude/longitude above are not (OD-GEO-005).
   distance_meters Float
   inside_radius   Boolean
-  checked_at      DateTime @default(now())
+  checked_at      DateTime    @default(now())
 
   // RULE-GEO-004/TREQ-GEO-005: 6-month hard-delete retention sweep scans on
   // checked_at, not created_at, to match "6 months after capture" precisely
@@ -1617,6 +1632,7 @@ model WorkerGeoCheckin {
   @@index([worker_id])
   @@index([hotel_id])
   @@index([checked_at])
+  @@index([attendance_id])
 }
 
 // =============================================================================

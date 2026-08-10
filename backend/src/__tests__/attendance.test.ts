@@ -276,7 +276,8 @@ describe('AttendanceService', () => {
         'w1',
         { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
         'worker',
-        undefined
+        undefined,
+        'att1'
       );
       expect(mockAttendance.updateMany).toHaveBeenCalledTimes(1);
     });
@@ -349,7 +350,8 @@ describe('AttendanceService', () => {
         'w1',
         { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
         'worker',
-        '203.0.113.7'
+        '203.0.113.7',
+        'att1'
       );
     });
   });
