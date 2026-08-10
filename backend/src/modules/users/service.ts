@@ -130,8 +130,11 @@ export class UserService extends BaseService {
 
     // Read-side counterpart of updateUser's scope check: a manager/RM could
     // otherwise read any user's full profile platform-wide (a read-only
-    // IDOR), holding `users:read` with no route-level scope gate. `checker`
-    // is deliberately left unscoped here, matching its documented
+    // IDOR), holding `users:read` with no route-level scope gate. This lack of
+    // a route-level scope gate is an accepted, intentional exception to the
+    // platform's defense-in-depth pattern because the generic route middleware
+    // cannot express the self-read exemption or target-role constraints below.
+    // `checker` is deliberately left unscoped here, matching its documented
     // cross-hotel bypass elsewhere in this module (isSelfScopedRole).
     // Self-read is exempt (a manager viewing their OWN profile, e.g. the
     // /users/:id detail page they now have a nav link to) — same exemption
