@@ -53,8 +53,9 @@ export const UpdateHotelSchema = z.object({
   // admin-only manual entry (this route is already admin-only per
   // requireRoleFlagged(['admin','manager'], 'admin') in routes.ts — no new
   // permission/role gate needed). No geocoding-from-address service.
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
+  // Bug 15: allow unsetting (deleting) a hotel geofence by making these nullable
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
 });
 
 export const ListHotelsQuerySchema = z.object({

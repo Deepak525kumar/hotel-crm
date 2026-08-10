@@ -269,8 +269,8 @@ export interface UpdateHotelInput {
   /** Group assignment is update-only (assigned after creation, ADR-023). `null` clears it. */
   hotel_group_id?: string | null;
   /** GD-14/OD-GEO-004: admin-only manual entry, no geocoding service. */
-  latitude?: number;
-  longitude?: number;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 /** Query params accepted by `GET /crm/hotels`. */

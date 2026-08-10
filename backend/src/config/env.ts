@@ -334,6 +334,9 @@ const envSchema = z.object({
   // hardcoded literal, matching this file's convention for every other
   // business-rule threshold.
   ATTENDANCE_EARLY_CHECK_IN_GRACE_MINUTES: z.coerce.number().int().positive().default(120),
+  
+  // Bug 14: Implement a configurable grace period for tardiness.
+  ATTENDANCE_TARDY_GRACE_MINUTES: z.coerce.number().int().nonnegative().default(15),
 
   // SPEC-AUTH-001 TREQ-AUTH-007 (2026-08-08): "N consecutive failed logins
   // for an account -> the responsible manager is notified". The spec leaves

@@ -159,7 +159,7 @@ export async function isWorkerAbsentOnDay(workerId: string, day: Date): Promise<
  * (OD-CAL-04, pending a platform-wide timezone decision). Deliberately reuses
  * that established fallback rather than inventing a second convention.
  */
-async function resolveScheduledStart(
+export async function resolveScheduledStart(
   tx: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
   assignment: { work_request_id: string | null; job_request_id: string | null; hotel_id: string }
 ): Promise<Date | null> {
@@ -356,7 +356,8 @@ export class AssignmentService extends BaseService {
     input: UpdateAssignmentInput,
     actorId: string,
     actorRole: string,
-    actorScope?: UserScope | null
+    actorScope?: UserScope | null,
+    internalBypass: boolean = false
   ): Promise<AssignmentDto> {
     const assignment = await this.prisma.workerAssignment.findUnique({ where: { id } });
     if (!assignment) throw new NotFoundError('Assignment not found');
@@ -396,6 +397,13 @@ export class AssignmentService extends BaseService {
         const stillEligible = await isWorkerEligibleForHotel(actorId, assignment.hotel_id);
         if (!stillEligible) {
           throw new ForbiddenError('You are no longer eligible to work at this hotel');
+        }
+        
+        // Bug 35 (Critical): Block workers from manually marking assignments IN_PROGRESS or COMPLETED
+        // via the assignment API. Only the Attendance module (via internal service calls) or
+        // administrative roles should be able to perform these transitions.
+        if (actorRole === 'worker' && !internalBypass) {
+          throw new ForbiddenError('Workers must use the Attendance module to start or complete shifts');
         }
       }
     }
