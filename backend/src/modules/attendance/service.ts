@@ -163,8 +163,9 @@ export class AttendanceService extends BaseService {
 
     // Bug 14: Implement configurable tardiness grace period.
     const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
+    const lateThreshold = new Date(existing.expected_start.getTime() + tardyGraceMinutes * 60000);
+    const isLate = now > lateThreshold;
     const minutesLate = Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000));
-    const isLate = minutesLate > tardyGraceMinutes;
 
     // Review fix: compare-and-swap via updateMany's WHERE clause (same
     // pattern as hr/service.ts's fulfilPayslipRequest() review fix,
