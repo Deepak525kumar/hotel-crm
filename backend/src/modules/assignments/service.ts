@@ -32,6 +32,7 @@ import {
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
 } from './types.js';
+import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 const ALLOWED_TRANSITIONS: Partial<Record<AssignmentStatus, AssignmentStatus[]>> = {
   [AssignmentStatus.CONFIRMED]: [AssignmentStatus.IN_PROGRESS, AssignmentStatus.CANCELLED],
@@ -920,6 +921,11 @@ export class AssignmentService extends BaseService {
       throw new ForbiddenError('This worker is not eligible at this hotel');
     }
 
+    const today = todayInCalendarTimezone();
+    if (input.day < today) {
+      throw new ConflictError('Cannot place an assignment in the past');
+    }
+
     const day = new Date(`${input.day}T00:00:00.000Z`);
 
     // Critical fix (2026-08-08): block placement on a day the worker has a
@@ -1012,6 +1018,11 @@ export class AssignmentService extends BaseService {
       if (!inScope) {
         throw new ForbiddenError('Cannot move a calendar placement for this hotel');
       }
+    }
+
+    const today = todayInCalendarTimezone();
+    if (input.day < today) {
+      throw new ConflictError('Cannot move an assignment to the past');
     }
 
     const day = new Date(`${input.day}T00:00:00.000Z`);

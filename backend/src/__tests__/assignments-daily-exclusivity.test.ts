@@ -1,5 +1,10 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+jest.mock('../lib/utils.js', () => ({
+  ...(jest.requireActual('../lib/utils.js') as object),
+  todayInCalendarTimezone: () => '2020-01-01',
+}));
+
 /**
  * Epic 9 PR 9.6 (TREQ-007/TRULE-006, MIG-GAP-08): daily-exclusivity partial
  * unique index (re-keyed WorkerAssignment_active_slot_unique on

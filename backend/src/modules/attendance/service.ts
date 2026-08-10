@@ -165,7 +165,10 @@ export class AttendanceService extends BaseService {
     const tardyGraceMinutes = getEnv().ATTENDANCE_TARDY_GRACE_MINUTES;
     const lateThreshold = new Date(existing.expected_start.getTime() + tardyGraceMinutes * 60000);
     const isLate = now > lateThreshold;
-    const minutesLate = Math.max(0, Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000));
+    const minutesLate: number | null = Math.max(
+      0,
+      Math.floor((now.getTime() - existing.expected_start.getTime()) / 60000)
+    );
 
     // Review fix: compare-and-swap via updateMany's WHERE clause (same
     // pattern as hr/service.ts's fulfilPayslipRequest() review fix,

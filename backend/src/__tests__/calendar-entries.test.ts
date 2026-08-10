@@ -1,5 +1,10 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+jest.mock('../lib/utils.js', () => ({
+  ...(jest.requireActual('../lib/utils.js') as object),
+  todayInCalendarTimezone: () => '2020-01-01',
+}));
+
 /**
  * Calendar direct-assignment regression for Epic 9 PR 9.5 (TREQ-001/TRULE-001,
  * MIG-GAP-03).
