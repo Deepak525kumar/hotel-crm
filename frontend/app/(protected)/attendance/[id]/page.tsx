@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AttendanceStatusBadge } from "@/components/attendance/AttendanceStatusBadge";
 import { VerificationBadge } from "@/components/attendance/VerificationBadge";
+import { GeoVerificationCard } from "@/components/attendance/GeoVerificationCard";
 import { formatDateTime } from "@/lib/format";
 import {
   Button,
@@ -210,6 +211,8 @@ export default function AttendanceDetailPage() {
           </DataList>
         </CardContent>
       </Card>
+
+      <GeoVerificationCard record={record} />
 
       {canCheckOut && (
         <Card>

@@ -9,7 +9,6 @@ import {
   CalendarDays,
   ClipboardCheck,
   Clock,
-  MapPin,
   BarChart3,
   Building2,
   Archive,
@@ -48,10 +47,9 @@ export const NAV: NavItem[] = [
   // this app already uses elsewhere).
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/attendance", label: "Attendance", icon: Clock },
-  // SPEC-GEO-001 (GD-14): regional_manager added per Regional Manager V1
-  // Decision 3 (grant at group scope) — see GeoCheckinsGate for the backend
-  // change this now matches.
-  { href: "/geo-checkins", label: "Geo check-ins", icon: MapPin, roles: ["manager", "regional_manager", "admin"] },
+  // Geo check-ins is no longer a standalone tab: geofence-verification
+  // events now render inline on the attendance detail page
+  // (GeoVerificationCard, gated by the same GeoCheckinsGate roles).
   // regional_manager added (ADR-030 D-5/PR-3): RM holds the same operational
   // capability set as manager at group scope, so sees the same nav surface.
   { href: "/analytics", label: "Analytics", icon: BarChart3, roles: ["manager", "regional_manager", "admin"] },
