@@ -40,7 +40,7 @@ const COLUMNS = 5;
 
 function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
   const { data: hotel } = useHotel(a.hotel_id);
-  const { data: workRequest } = useWorkRequest(a.work_request_id);
+  const { data: workRequest } = useWorkRequest(a.job_request_id ?? a.work_request_id);
   const peopleById = useUsersByIds([a.worker_id]);
   const worker = peopleById.get(a.worker_id);
 
@@ -55,9 +55,17 @@ function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
         <TextLink href={`/hotels/${a.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
       </TD>
       <TD>
-        <TextLink href={`/requests/${a.work_request_id}`}>
-          {workRequest?.position ?? "View request"}
-        </TextLink>
+        {a.job_request_id ? (
+          <TextLink href={`/requests/broadcasts/${a.job_request_id}`}>
+            {workRequest?.position ?? "Broadcast"}
+          </TextLink>
+        ) : a.work_request_id ? (
+          <TextLink href={`/requests/${a.work_request_id}`}>
+            {workRequest?.position ?? "View request"}
+          </TextLink>
+        ) : (
+          <span className="text-gray-500">Calendar Placement</span>
+        )}
         {workRequest && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {workRequest.shift_date} · {workRequest.shift_start_time}–{workRequest.shift_end_time}
