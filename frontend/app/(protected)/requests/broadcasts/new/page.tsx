@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
+import { useHotel } from "@/hooks/useHotels";
 import { localToday } from "@/lib/format";
 import { workRequestsApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
@@ -64,6 +65,11 @@ function NewBroadcastForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const { data: selectedHotel } = useHotel(form.hotel_id);
+  const today = selectedHotel
+    ? new Date().toLocaleDateString("en-CA", { timeZone: selectedHotel.timezone })
+    : localToday();
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -94,8 +100,9 @@ function NewBroadcastForm() {
   // real bug (it's the UTC date, not the local one -- it incorrectly
   // treats "today" as already past for several hours every evening in any
   // timezone west of UTC).
-  const today = localToday();
-  const isPastDate = form.shift_date && form.shift_date < today;
+  // is local today.
+  const todayVal = today;
+  const isPastDate = form.shift_date && form.shift_date < todayVal;
   const isEndBeforeStart =
     form.shift_start_time &&
     form.shift_end_time &&
