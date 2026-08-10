@@ -22,6 +22,7 @@ export const ReassignAssignmentSchema = z.object({
 export const ListAssignmentsQuerySchema = z.object({
   hotel_id: z.string().optional(),
   work_request_id: z.string().optional(),
+  job_request_id: z.string().optional(),
   worker_id: z.string().optional(),
   status: z.nativeEnum(AssignmentStatus).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -100,6 +101,7 @@ export interface AssignmentDto {
   // (placeOnCalendar()) and, later, broadcast-accept rows (PR 9.9) leave this
   // null (job_request_id is the FK populated for those creation paths).
   work_request_id: string | null;
+  job_request_id: string | null;
   worker_id: string;
   hotel_id: string;
   assigned_by_id: string;

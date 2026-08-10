@@ -631,7 +631,8 @@ export type AssignmentStatus =
  */
 export interface Assignment {
   id: string;
-  work_request_id: string;
+  work_request_id: string | null;
+  job_request_id: string | null;
   worker_id: string;
   hotel_id: string;
   assigned_by_id: string;
@@ -650,6 +651,7 @@ export interface Assignment {
 export interface ListAssignmentsQuery {
   hotel_id?: string;
   work_request_id?: string;
+  job_request_id?: string;
   worker_id?: string;
   status?: AssignmentStatus;
   page?: number;

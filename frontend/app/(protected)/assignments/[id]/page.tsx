@@ -37,7 +37,7 @@ export default function AssignmentDetailPage() {
 
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
   const { data: hotel } = useHotel(assignment?.hotel_id);
-  const { data: workRequest } = useWorkRequest(assignment?.work_request_id);
+  const { data: workRequest } = useWorkRequest(assignment?.job_request_id ?? assignment?.work_request_id);
 
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -173,15 +173,27 @@ export default function AssignmentDetailPage() {
               }
             />
             <DataRow
-              label="Work request"
+              label="Source"
               value={
-                <TextLink
-                  href={`/requests/${assignment.work_request_id}`}
-                >
-                  {workRequest?.position ?? "View request"}
-                </TextLink>
+                assignment.job_request_id ? (
+                  <TextLink href={`/requests/broadcasts/${assignment.job_request_id}`}>
+                    Broadcast (Epic 9)
+                  </TextLink>
+                ) : assignment.work_request_id ? (
+                  <TextLink href={`/requests/${assignment.work_request_id}`}>
+                    Direct Request (Legacy)
+                  </TextLink>
+                ) : (
+                  <span className="text-gray-500">Calendar Placement (Direct Schedule)</span>
+                )
               }
             />
+            {(assignment.job_request_id || assignment.work_request_id) && (
+              <DataRow
+                label="Requested position"
+                value={workRequest?.position ?? "—"}
+              />
+            )}
             <DataRow
               label="Shift"
               value={

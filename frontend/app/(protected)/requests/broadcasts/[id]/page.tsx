@@ -9,8 +9,12 @@ import { ApiError, workRequestsApi } from "@/lib/api";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { useAuthStore } from "@/stores/auth";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
+import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
+import { UserRef } from "@/components/users/UserRef";
+import { useAssignments } from "@/hooks/useAssignments";
 import { formatDateTime } from "@/lib/format";
 import type { AcceptBroadcastResultDto, SkillTag } from "@/lib/types";
+import { MapPin } from "lucide-react";
 import {
   Badge,
   Button,
@@ -51,6 +55,8 @@ export default function BroadcastDetailPage() {
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
   const { data: hotel } = useHotel(request?.hotel_id);
+  const { assignments, isLoading: assignmentsLoading } = useAssignments({ job_request_id: id });
+  
   const {
     data: eligibility,
     isLoading: eligibilityLoading,
@@ -143,9 +149,30 @@ export default function BroadcastDetailPage() {
             <DataRow
               label="Hotel"
               value={
-                <TextLink href={`/hotels/${request.hotel_id}`}>
-                  {hotel?.name ?? "View hotel"}
-                </TextLink>
+                <div className="flex flex-col gap-1">
+                  <TextLink href={`/hotels/${request.hotel_id}`}>
+                    {hotel?.name ?? "View hotel"}
+                  </TextLink>
+                  {hotel && (
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {hotel.address}, {hotel.city}, {hotel.country}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 gap-1"
+                        onClick={() => {
+                          const query = encodeURIComponent(`${hotel.name}, ${hotel.address}, ${hotel.city}, ${hotel.country}`);
+                          window.open(`https://maps.google.com/?q=${query}`, "_blank");
+                        }}
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Maps
+                      </Button>
+                    </div>
+                  )}
+                </div>
               }
             />
             <DataRow label="Shift date" value={request.shift_date} />
@@ -276,6 +303,35 @@ export default function BroadcastDetailPage() {
       </JobDispatchPhase2WriteGate>
 
       <FormError>{close.error}</FormError>
+
+      {canSeeAggregateEligibility && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Accepted workers</CardTitle>
+          </CardHeader>
+          <CardContent className="py-2">
+            {assignmentsLoading ? (
+              <div className="py-4 text-center text-sm text-gray-500">Loading assignments...</div>
+            ) : assignments.length === 0 ? (
+              <div className="py-4 text-center text-sm text-gray-500">No workers have accepted this broadcast yet.</div>
+            ) : (
+              <div className="divide-y divide-gray-100 dark:divide-gray-800">
+                {assignments.map((assignment) => (
+                  <div key={assignment.id} className="flex items-center justify-between py-3">
+                    <UserRef userId={assignment.worker_id} />
+                    <div className="flex items-center gap-4">
+                      <AssignmentStatusBadge status={assignment.status} />
+                      <TextLink href={`/assignments/${assignment.id}`} className="text-sm">
+                        View
+                      </TextLink>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
