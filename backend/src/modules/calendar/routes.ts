@@ -47,6 +47,12 @@ router.patch(
   (req, res, next) => calendarController.moveAbsence(req, res, next)
 );
 
+// Delete an absence (Bug 8). Self-service (owning worker) or manager/RM/admin.
+router.delete(
+  '/absences/:id',
+  (req, res, next) => calendarController.deleteAbsence(req, res, next)
+);
+
 // REQ-CAL-T06/RULE-CAL-08 (IF-CAL-GetAvailability/v0, ADR-021 "OD-CAL-01
 // RESOLVED"): no route-level role gate -- worker_id defaults to the caller
 // (self-scope is itself the authorization, same as /my-absences above), and

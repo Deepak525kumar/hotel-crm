@@ -56,3 +56,11 @@ export function parsePaginationParams(
 
   return { page: pageNum, limit: limitNum };
 }
+
+// OD-CAL-04: "today" is anchored to Europe/Berlin (matches Hotel.timezone's
+// own default, SPEC-CRM-001) pending a platform-wide timezone decision.
+export const CALENDAR_TIMEZONE = 'Europe/Berlin';
+
+export function todayInCalendarTimezone(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(new Date());
+}

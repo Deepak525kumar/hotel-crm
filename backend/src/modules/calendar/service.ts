@@ -22,13 +22,7 @@ import type {
 // second consumer or the event-bus decision actually lands.
 const assignmentService = new AssignmentService();
 
-// OD-CAL-04: "today" is anchored to Europe/Berlin (matches Hotel.timezone's
-// own default, SPEC-CRM-001) pending a platform-wide timezone decision.
-const CALENDAR_TIMEZONE = 'Europe/Berlin';
-
-function todayInCalendarTimezone(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: CALENDAR_TIMEZONE }).format(new Date());
-}
+import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 export class CalendarService extends BaseService {
   // REQ-CAL-T02: worker's own calendar view (this module's absence entries
@@ -197,6 +191,49 @@ export class CalendarService extends BaseService {
     }
 
     return this.toDto(updated);
+  }
+
+  // Delete an absence (Bug 8)
+  async deleteAbsence(
+    absenceId: string,
+    actor: { userId: string; role: string; scope?: UserScope | null }
+  ): Promise<void> {
+    const existing = await this.prisma.calendarAbsence.findUnique({
+      where: { id: absenceId },
+    });
+    if (!existing) {
+      throw new NotFoundError('Absence not found');
+    }
+
+    if (actor.role === 'worker') {
+      if (existing.worker_id !== actor.userId) {
+        throw new ForbiddenError('Cannot delete another worker\'s absence');
+      }
+    } else if (actor.role !== 'admin') {
+      const inScope = await isWorkerInGroupScope(actor.scope ?? null, existing.worker_id);
+      if (!inScope) throw new ForbiddenError('Cannot delete this absence');
+    }
+
+    const today = todayInCalendarTimezone();
+    const absenceDay = existing.day.toISOString().slice(0, 10);
+    if (absenceDay < today) {
+      throw new ConflictError('Cannot delete an absence in the past');
+    }
+
+    await this.prisma.calendarAbsence.delete({
+      where: { id: absenceId },
+    });
+
+    await this.logAudit(actor.userId, actor.role, 'DELETE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
+      worker_id: existing.worker_id,
+      day: absenceDay,
+    });
+
+    try {
+      await this.notifyAboutAbsence(existing.worker_id, actor.userId, absenceDay, existing.kind, 'cancelled');
+    } catch (error) {
+      logger.error('calendar_absence_notify_failed', { workerId: existing.worker_id, day: absenceDay, error });
+    }
   }
 
   // New (calendar grid view): manager/regional_manager read of absences
@@ -387,7 +424,7 @@ export class CalendarService extends BaseService {
     actorId: string,
     day: string,
     kind: string,
-    action: 'marked' | 'moved'
+    action: 'marked' | 'moved' | 'cancelled'
   ): Promise<void> {
     const [worker, record] = await Promise.all([
       this.prisma.user.findUnique({
@@ -401,7 +438,9 @@ export class CalendarService extends BaseService {
     ]);
 
     const actedOnBehalf = actorId !== workerId;
-    const verb = action === 'moved' ? 'moved' : 'marked';
+    let verb = 'marked';
+    if (action === 'moved') verb = 'moved';
+    if (action === 'cancelled') verb = 'cancelled';
 
     if (actedOnBehalf) {
       await notificationService.enqueue({

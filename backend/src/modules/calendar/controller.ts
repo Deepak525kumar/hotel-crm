@@ -97,6 +97,21 @@ export class CalendarController {
     }
   }
 
+  // Delete an absence
+  async deleteAbsence(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      await calendarService.deleteAbsence(req.params.id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope,
+      });
+      res.status(204).send();
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // New (calendar grid view): manager/regional_manager/admin view of
   // absences across their scoped team.
   async listAbsences(req: Request, res: Response, next: NextFunction) {
