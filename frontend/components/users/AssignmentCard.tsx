@@ -5,6 +5,7 @@ import { mutate as globalMutate } from "swr";
 import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
+import Link from "next/link";
 import { usersApi } from "@/lib/api";
 import {
   Button,
@@ -56,6 +57,11 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
   const action = useAsyncAction();
 
   if (!assignable) return null;
+
+  // For workers/checkers without an EmploymentRecord, show a clear
+  // "not yet onboarded" state instead of a misleading "Unassigned"
+  // with an Edit button that would fail at the API level.
+  const staffWithoutEmployment = isStaff && employment === null;
 
   // A manager's/RM's current posting is derived from the hotel/group that
   // points at them — the same columns `resolveScope()` reads to mint their
@@ -109,64 +115,81 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
           <CardTitle>Assignment</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
-          <DataList>
-            {isManager && (
-              <DataRow
-                label="Manages hotel"
-                value={
-                  managedHotel ? (
-                    <TextLink href={`/hotels/${managedHotel.id}`}>{managedHotel.name}</TextLink>
-                  ) : (
-                    unassigned
-                  )
-                }
-              />
-            )}
-            {isRegionalManager && (
-              <DataRow
-                label="Manages group"
-                value={
-                  managedGroup ? (
-                    <TextLink href={`/hotel-groups/${managedGroup.id}`}>{managedGroup.name}</TextLink>
-                  ) : (
-                    unassigned
-                  )
-                }
-              />
-            )}
-            {isStaff && (
-              <>
-                <DataRow
-                  label="Hotel group"
-                  value={
-                    employmentGroup ? (
-                      <TextLink href={`/hotel-groups/${employmentGroup.id}`}>
-                        {employmentGroup.name}
-                      </TextLink>
-                    ) : (
-                      unassigned
-                    )
-                  }
-                />
-                <DataRow
-                  label="Primary hotel"
-                  value={
-                    primaryHotel ? (
-                      <TextLink href={`/hotels/${primaryHotel.id}`}>{primaryHotel.name}</TextLink>
-                    ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Not set</span>
-                    )
-                  }
-                />
-              </>
-            )}
-          </DataList>
+          {staffWithoutEmployment ? (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                This worker has not been onboarded yet. Create an employment record in{" "}
+                <Link
+                  href="/employees"
+                  className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
+                >
+                  Employee Management
+                </Link>{" "}
+                before assigning a hotel group.
+              </p>
+            </div>
+          ) : (
+            <>
+              <DataList>
+                {isManager && (
+                  <DataRow
+                    label="Manages hotel"
+                    value={
+                      managedHotel ? (
+                        <TextLink href={`/hotels/${managedHotel.id}`}>{managedHotel.name}</TextLink>
+                      ) : (
+                        unassigned
+                      )
+                    }
+                  />
+                )}
+                {isRegionalManager && (
+                  <DataRow
+                    label="Manages group"
+                    value={
+                      managedGroup ? (
+                        <TextLink href={`/hotel-groups/${managedGroup.id}`}>{managedGroup.name}</TextLink>
+                      ) : (
+                        unassigned
+                      )
+                    }
+                  />
+                )}
+                {isStaff && (
+                  <>
+                    <DataRow
+                      label="Hotel group"
+                      value={
+                        employmentGroup ? (
+                          <TextLink href={`/hotel-groups/${employmentGroup.id}`}>
+                            {employmentGroup.name}
+                          </TextLink>
+                        ) : (
+                          unassigned
+                        )
+                      }
+                    />
+                    <DataRow
+                      label="Primary hotel"
+                      value={
+                        primaryHotel ? (
+                          <TextLink href={`/hotels/${primaryHotel.id}`}>{primaryHotel.name}</TextLink>
+                        ) : (
+                          <span className="text-gray-500 dark:text-gray-400">Not set</span>
+                        )
+                      }
+                    />
+                  </>
+                )}
+              </DataList>
 
-          <div className="flex justify-end pt-3">
-            <Button variant="outline" onClick={openModal}>
-              Edit assignment
-            </Button>
-          </div>
+              <div className="flex justify-end pt-3">
+                <Button variant="outline" onClick={openModal}>
+                  Edit assignment
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 

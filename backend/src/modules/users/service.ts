@@ -618,15 +618,18 @@ export class UserService extends BaseService {
       // display/default-selection only — never read by roster-scope.ts) ──
       if ((newRole === 'WORKER' || newRole === 'CHECKER') && (data.hotel_group_id !== undefined || data.primary_hotel_id !== undefined)) {
         const employmentRecord = await tx.employmentRecord.findUnique({ where: { user_id: userId }, select: { id: true } });
-        if (employmentRecord) {
-          await tx.employmentRecord.update({
-            where: { id: employmentRecord.id },
-            data: {
-              ...(data.hotel_group_id !== undefined ? { hotel_group_id: data.hotel_group_id } : {}),
-              ...(data.primary_hotel_id !== undefined ? { primary_hotel_id: data.primary_hotel_id } : {}),
-            },
-          });
+        if (!employmentRecord) {
+          throw new ValidationError('This worker has no employment record yet. Please onboard them via Employee Management before assigning a hotel group.', [
+            { field: 'hotel_group_id', message: 'Worker must have an employment record before a hotel group can be assigned' },
+          ]);
         }
+        await tx.employmentRecord.update({
+          where: { id: employmentRecord.id },
+          data: {
+            ...(data.hotel_group_id !== undefined ? { hotel_group_id: data.hotel_group_id } : {}),
+            ...(data.primary_hotel_id !== undefined ? { primary_hotel_id: data.primary_hotel_id } : {}),
+          },
+        });
       }
 
       // ── Invariant: one user holds at most ONE organizational posting ──
