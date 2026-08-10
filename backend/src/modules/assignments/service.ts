@@ -220,6 +220,7 @@ export class AssignmentService extends BaseService {
     return {
       id: a.id,
       work_request_id: a.work_request_id,
+      job_request_id: a.job_request_id,
       worker_id: a.worker_id,
       hotel_id: a.hotel_id,
       assigned_by_id: a.assigned_by_id,
@@ -243,6 +244,7 @@ export class AssignmentService extends BaseService {
     const where: Prisma.WorkerAssignmentWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
       ...(query.work_request_id ? { work_request_id: query.work_request_id } : {}),
+      ...(query.job_request_id ? { job_request_id: query.job_request_id } : {}),
       ...(query.status ? { status: query.status } : {}),
     };
 

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  ClipboardList,
   Megaphone,
   Users as UsersIcon,
   CalendarDays,
@@ -35,7 +34,6 @@ export interface NavItem {
 // Feature routes are added here as modules land under app/(protected)/.
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/requests", label: "Work requests", icon: ClipboardList },
   // Job Dispatch Phase 2 (Epic 9 PRs 9.7/9.9/9.10, FEATURE_JOBDISPATCH_PHASE2):
   // broadcasts are a distinct JobRequest shape (skill x headcount, no
   // apply/approve step) from the marketplace `/requests` flow above — kept
