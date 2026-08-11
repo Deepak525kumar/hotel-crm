@@ -21,6 +21,10 @@ import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { generateStorageKey, getStorageClient } from './storage.js';
+// ADR-066 (Option A): shared malware-scan seam. Owned by backend-hr today
+// (ADR-044 was its first consumer); imported cross-module here rather than
+// relocated -- see ADR-066 §5's implementation note.
+import { getMalwareScanner } from '../hr/malware-scan.js';
 import { isWorkerInGroupScope } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type {
@@ -68,6 +72,29 @@ export class DocumentService extends BaseService {
     }
 
     const category = input.category as DocumentCategory;
+
+    // OD-DOC-016/ADR-066 (Option A, ratified 2026-08-12): synchronous
+    // malware-scan hook, before the file is persisted anywhere (S3 or DB) --
+    // mirroring ADR-044's Decisions 1-2 for the mechanism-class-identical HR
+    // contract-scan path (hr/service.ts). Reject on detection.
+    //
+    // The seam is imported from backend-hr rather than relocated to lib/:
+    // hr/malware-scan.ts is a leaf module with no imports of its own, so this
+    // introduces no import cycle despite the pre-existing hr -> documents
+    // module direction, and backend-document-templates already consumes it the
+    // same way (document-templates/service.ts). See ADR-066 §5's implementation
+    // note for why relocation was considered and deliberately deferred.
+    //
+    // NOTE: the default scanner is a PASS-THROUGH NO-OP (hr/malware-scan.ts's
+    // noOpScanner) -- no vendor/library has been selected by ADR-044 or
+    // ADR-066. This is real control flow, not real detection. Do not read the
+    // presence of this call as evidence that uploads are scanned.
+    const scanResult = await getMalwareScanner().scan(fileBuffer);
+    if (!scanResult.clean) {
+      throw new ValidationError(
+        `Uploaded file failed the malware scan${scanResult.reason ? `: ${scanResult.reason}` : ''}`
+      );
+    }
 
     // RULE-DOC-09: server-generated key, never from client input.
     const s3Key = generateStorageKey(input.worker_id, category, input.original_filename);

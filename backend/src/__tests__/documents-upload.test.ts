@@ -69,6 +69,11 @@ import express from 'express';
 import request from 'supertest';
 import documentsRouter from '../modules/documents/routes.js';
 import { AppError } from '../lib/errors.js';
+// OD-DOC-016/ADR-066: the malware-scan seam is NOT jest.mock()'d here -- the
+// real module is imported and its swappable-singleton test seam
+// (setMalwareScanner, the same one hr-malware-scan.test.ts uses) drives the
+// clean/detected cases, so these tests exercise the genuine wiring.
+import { setMalwareScanner, noOpScanner } from '../modules/hr/malware-scan.js';
 
 function makeApp() {
   const app = express();
@@ -199,5 +204,85 @@ describe('Documents multipart upload (PR #247)', () => {
 
     expect(res.status).toBe(403);
     expect(mockWorkerDocumentCreate).not.toHaveBeenCalled();
+  });
+
+  // OD-DOC-016/ADR-066 (Option A, ratified 2026-08-12): the malware-scan hook
+  // is wired into this path, mirroring ADR-044's Decisions 1-2 for the
+  // mechanism-class-identical HR contract-scan upload. These tests assert the
+  // CONTROL FLOW (reject before any persistence), not real detection -- the
+  // default scanner is a pass-through no-op, per ADR-066 §1/§7.
+  describe('malware-scan hook (OD-DOC-016/ADR-066)', () => {
+    afterEach(() => {
+      // Restore the real default so a rejecting scanner cannot leak into any
+      // other test in this file or suite.
+      setMalwareScanner(noOpScanner);
+    });
+
+    it('rejects the upload and persists NOTHING when the scan reports a detection', async () => {
+      setMalwareScanner({
+        async scan() {
+          return { clean: false, reason: 'EICAR-TEST-SIGNATURE' };
+        },
+      });
+
+      const res = await request(makeApp())
+        .post('/documents/workers/w1/documents')
+        .field('category', 'ID_CARD')
+        .field('original_filename', 'id.pdf')
+        .field('mime_type', 'application/pdf')
+        .attach('file', Buffer.from('pretend-malicious'), { filename: 'id.pdf', contentType: 'application/pdf' });
+
+      expect(res.status).toBe(422);
+      expect(res.body.message).toMatch(/failed the malware scan/i);
+      expect(res.body.message).toMatch(/EICAR-TEST-SIGNATURE/);
+
+      // ADR-044 Decision 1 ("before the file is persisted") applied here means
+      // before BOTH stores: no S3 object and no metadata row may exist.
+      expect(mockUpload).not.toHaveBeenCalled();
+      expect(mockWorkerDocumentCreate).not.toHaveBeenCalled();
+      expect(mockAuditLogCreate).not.toHaveBeenCalled();
+    });
+
+    it('allows the upload through when the scan reports clean', async () => {
+      setMalwareScanner({
+        async scan() {
+          return { clean: true };
+        },
+      });
+
+      const res = await request(makeApp())
+        .post('/documents/workers/w1/documents')
+        .field('category', 'ID_CARD')
+        .field('original_filename', 'id.pdf')
+        .field('mime_type', 'application/pdf')
+        .attach('file', Buffer.from('benign'), { filename: 'id.pdf', contentType: 'application/pdf' });
+
+      expect(res.status).toBe(201);
+      expect(mockUpload).toHaveBeenCalledTimes(1);
+      expect(mockWorkerDocumentCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it('receives the ACTUAL parsed file bytes, not a placeholder buffer', async () => {
+      // Guards against ADR-044's own OD-HR-06 failure mode (a Buffer.alloc(0)
+      // placeholder reaching the scanner, making any real scanner useless).
+      const fileContents = Buffer.from('scan-me-for-real');
+      let scanned: Buffer | null = null;
+      setMalwareScanner({
+        async scan(buffer: Buffer) {
+          scanned = buffer;
+          return { clean: true };
+        },
+      });
+
+      await request(makeApp())
+        .post('/documents/workers/w1/documents')
+        .field('category', 'ID_CARD')
+        .field('original_filename', 'id.pdf')
+        .field('mime_type', 'application/pdf')
+        .attach('file', fileContents, { filename: 'id.pdf', contentType: 'application/pdf' });
+
+      expect(scanned).not.toBeNull();
+      expect(Buffer.compare(scanned as unknown as Buffer, fileContents)).toBe(0);
+    });
   });
 });
