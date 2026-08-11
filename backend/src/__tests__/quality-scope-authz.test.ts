@@ -66,6 +66,7 @@ jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     workerAssignment: {
       findUnique: async ({ where }: any) => assignments[where.id] ?? null,
+      findFirst: async () => null,
     },
     qualityVerification: {
       findUnique: async () => null,
@@ -144,10 +145,11 @@ describe('Quality scope authorization', () => {
       expect(res.body.error).toBe('ForbiddenError');
     });
 
-    it('allows a checker to verify cross-hotel (preserved, 201)', async () => {
+    it('denies a checker verifying cross-hotel (403)', async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
       const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h2', score: 80 });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
     });
   });
 
@@ -169,12 +171,13 @@ describe('Quality scope authorization', () => {
       expect(res.body.error).toBe('ForbiddenError');
     });
 
-    it('allows a checker to rate cross-hotel (preserved, 201)', async () => {
+    it('denies a checker rating cross-hotel (403)', async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: ['quality:write'], scope: null };
       const res = await request(makeApp())
         .post('/quality/ratings')
         .send({ assignment_id: 'asg_h2', worker_id: 'w1', score: 80 });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
     });
   });
 });

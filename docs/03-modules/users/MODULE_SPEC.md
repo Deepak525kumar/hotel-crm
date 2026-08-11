@@ -328,8 +328,7 @@ import graph is otherwise acyclic for this module.
 
 ### `User` record lifecycle (Current)
 
-- **States:** `active` (`is_active=true`, `deleted_at=null`) and `inactive/soft-deleted`
-  (`is_active=false`, `deleted_at` set).
+- **States:** `active` (`is_active=true`, `deleted_at=null`), `inactive/soft-deleted` (`is_active=false`, `deleted_at` set), and **target state** `pending/inactive` (ADR-065: all non-Admin users enter this state upon signup until they complete the onboarding gate and are approved).
 - **Transitions:**
   - `(none) → active` — `createUser` (Admin-only in practice as of the current revision —
     `RULE-USERS-05`; see the `SIR-USERS-002` framing note there — `service.ts:85-129`),
@@ -364,6 +363,7 @@ import graph is otherwise acyclic for this module.
 - **`scope` claim:** a hotel/hotel-group scope value carried on the access token and, presumably,
   persisted or derivable per user (PDD §5.3, §5.4). No schema field, no JWT claim exists
   (`OQ-USERS-05`).
+- **Strict Post-Activation Scope Assignment (ADR-065):** Organizational assignment (e.g. `hotel_group_id`) must *never* be written to the user or their employment record until they transition from Pending to Active. The scope claim must remain absent during the Pending state.
 - **Deny-by-default + audited special-category access:** a stricter default authorization posture
   than today's route-level allow-list gating (PDD §5.4, line 180). Not implemented.
 

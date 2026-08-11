@@ -95,7 +95,7 @@ describe('HR document upload delegates to backend-documents (MIG-GAP-DOC-001)', 
       id: 'd1',
       worker_id: 'w1',
       uploaded_by_id: 'm1',
-      category: 'GENERAL',
+      category: 'ID_CARD',
       s3_key: 'documents/w1/general/test-uuid/contract.pdf',
       original_filename: 'contract.pdf',
       mime_type: 'application/pdf',
@@ -120,7 +120,7 @@ describe('HR document upload delegates to backend-documents (MIG-GAP-DOC-001)', 
         data: expect.objectContaining({
           worker_id: 'w1',
           uploaded_by_id: 'm1', // RULE-DOC-08: actor derived from req.auth, not client input
-          category: 'GENERAL',
+          category: 'ID_CARD',
           file_size_bytes: fileContents.length,
         }),
       })

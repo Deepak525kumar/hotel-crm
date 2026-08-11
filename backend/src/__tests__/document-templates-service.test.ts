@@ -683,7 +683,7 @@ describe('DocumentTemplatesService', () => {
       const result = await service.finalize('i1', { userId: 'w1', role: 'worker' });
 
       expect(mockUploadDocument).toHaveBeenCalledWith(
-        expect.objectContaining({ worker_id: 'w1', category: 'GENERAL' }),
+        expect.objectContaining({ worker_id: 'w1', category: 'ID_CARD' }),
         expect.any(Buffer),
         'worker'
       );

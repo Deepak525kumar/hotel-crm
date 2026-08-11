@@ -124,6 +124,7 @@ const mockDb = {
   },
   user: {
     update: async ({ data }: any) => ({ id: 'user_1', ...data }),
+    findUnique: async () => ({ id: 'user_1', role: 'WORKER' }),
   },
   employeeBlocklistEntry: {
     create: async ({ data }: any) => ({ id: 'bl_1', created_at: new Date(), ...data }),
@@ -141,7 +142,15 @@ const mockDb = {
     findFirst: async () => null,
   },
   workerDocument: {
-    findMany: async () => [{ category: 'GENERAL' }, { category: 'IDENTITY' }, { category: 'WORK_PERMIT' }],
+    findMany: async () => [
+      { category: 'TAX_NUMBER' },
+      { category: 'SOCIAL_SECURITY_NUMBER' },
+      { category: 'HEALTH_INSURANCE' },
+      { category: 'ID_CARD' },
+      { category: 'PASSPORT' },
+      { category: 'ADDRESS' },
+      { category: 'WORK_PERMIT' }
+    ],
   },
   contract: {
     findFirst: async () => ({ id: 'mock_contract_1', status: 'ACTIVE' }),

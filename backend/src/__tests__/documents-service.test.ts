@@ -78,7 +78,7 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
           {
             worker_id: 'w2',
             actor_id: 'w1',
-            category: 'GENERAL',
+            category: 'ID_CARD',
             original_filename: 'id.pdf',
             mime_type: 'application/pdf',
             file_size_bytes: 100,
@@ -95,7 +95,7 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
         id: 'd1',
         worker_id: 'w1',
         uploaded_by_id: 'w1',
-        category: 'GENERAL',
+        category: 'ID_CARD',
         s3_key: 'documents/w1/general/uuid/id.pdf',
         original_filename: 'id.pdf',
         mime_type: 'application/pdf',
@@ -110,7 +110,7 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
         {
           worker_id: 'w1',
           actor_id: 'w1',
-          category: 'GENERAL',
+          category: 'ID_CARD',
           original_filename: 'id.pdf',
           mime_type: 'application/pdf',
           file_size_bytes: 1,
@@ -238,15 +238,29 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
   });
 
   describe('getDocumentCompleteness — REQ-DOC-002/005', () => {
-    it('is incomplete when no GENERAL document exists', async () => {
+    it('is incomplete when mandatory documents are missing', async () => {
       mockWorkerDocumentFindMany.mockResolvedValue([]);
       const result = await service.getDocumentCompleteness('w1', false);
       expect(result.is_complete).toBe(false);
-      expect(result.missing_categories).toEqual(['GENERAL']);
+      expect(result.missing_categories).toEqual([
+        'TAX_NUMBER',
+        'SOCIAL_SECURITY_NUMBER',
+        'HEALTH_INSURANCE',
+        'ID_CARD',
+        'PASSPORT',
+        'ADDRESS'
+      ]);
     });
 
     it('requires WORK_PERMIT only when work_permit_required is true', async () => {
-      mockWorkerDocumentFindMany.mockResolvedValue([{ category: 'GENERAL' }]);
+      mockWorkerDocumentFindMany.mockResolvedValue([
+        { category: 'TAX_NUMBER' },
+        { category: 'SOCIAL_SECURITY_NUMBER' },
+        { category: 'HEALTH_INSURANCE' },
+        { category: 'ID_CARD' },
+        { category: 'PASSPORT' },
+        { category: 'ADDRESS' },
+      ]);
       const notRequired = await service.getDocumentCompleteness('w1', false);
       expect(notRequired.is_complete).toBe(true);
 

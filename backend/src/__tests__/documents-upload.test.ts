@@ -96,7 +96,7 @@ describe('Documents multipart upload (PR #247)', () => {
       id: 'd1',
       worker_id: 'w1',
       uploaded_by_id: 'w1',
-      category: 'GENERAL',
+      category: 'ID_CARD',
       s3_key: 'documents/w1/general/test-uuid/id.pdf',
       original_filename: 'id.pdf',
       mime_type: 'application/pdf',
@@ -113,7 +113,7 @@ describe('Documents multipart upload (PR #247)', () => {
 
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'id.pdf')
       .field('mime_type', 'application/pdf')
       .attach('file', fileContents, { filename: 'id.pdf', contentType: 'application/pdf' });
@@ -136,7 +136,7 @@ describe('Documents multipart upload (PR #247)', () => {
   it('rejects the request with 422 when no file is attached', async () => {
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'id.pdf')
       .field('mime_type', 'application/pdf');
 
@@ -147,7 +147,7 @@ describe('Documents multipart upload (PR #247)', () => {
   it('rejects a disallowed MIME type with 422 before reaching the service', async () => {
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'malware.exe')
       .field('mime_type', 'application/x-msdownload')
       .attach('file', Buffer.from('bad'), {
@@ -164,7 +164,7 @@ describe('Documents multipart upload (PR #247)', () => {
 
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'big.pdf')
       .field('mime_type', 'application/pdf')
       .attach('file', oversized, { filename: 'big.pdf', contentType: 'application/pdf' });
@@ -177,7 +177,7 @@ describe('Documents multipart upload (PR #247)', () => {
     testAuth = null;
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'id.pdf')
       .field('mime_type', 'application/pdf')
       .attach('file', Buffer.from('x'), { filename: 'id.pdf', contentType: 'application/pdf' });
@@ -192,7 +192,7 @@ describe('Documents multipart upload (PR #247)', () => {
 
     const res = await request(makeApp())
       .post('/documents/workers/w1/documents')
-      .field('category', 'GENERAL')
+      .field('category', 'ID_CARD')
       .field('original_filename', 'id.pdf')
       .field('mime_type', 'application/pdf')
       .attach('file', Buffer.from('x'), { filename: 'id.pdf', contentType: 'application/pdf' });

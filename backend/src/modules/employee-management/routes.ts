@@ -12,6 +12,13 @@ router.use(authMiddleware);
 router.post('/', requireRole('admin'), requirePermission('employees:write'), ...controller.createEmployee);
 router.post('/bulk-import', requireRole('admin'), requirePermission('employees:write'), ...controller.bulkImport);
 
+// Review Queue (ADR-065 §6 item 7)
+router.get(
+  '/review-queue',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  (req, res, next) => controller.getReviewQueue(req, res, next)
+);
+
 // By-user lookup — resolves whether a `User` already has an EmploymentRecord
 // (and its current status/employee_id) without the caller needing to already
 // know the employee-management-owned `employee_id`. Read-only; returns `null`
@@ -78,6 +85,12 @@ router.post(
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('employees:write'),
   ...controller.approve
+);
+router.post(
+  '/:employee_id/assign',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.assign
 );
 router.post(
   '/:employee_id/reject',

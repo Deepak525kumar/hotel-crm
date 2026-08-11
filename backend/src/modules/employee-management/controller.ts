@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { z } from 'zod';
 import { employeeManagementService } from './service.js';
 import {
   ApproveEmployeeSchema,
@@ -127,6 +128,20 @@ export class EmployeeManagementController {
     },
   ];
 
+  async getReviewQueue(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      const result = await employeeManagementService.getReviewQueue(req.auth);
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async exportEmployeeData(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();
@@ -168,8 +183,31 @@ export class EmployeeManagementController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const result = await employeeManagementService.approve(req.auth, req.params['employee_id']!, {
+        const result = await employeeManagementService.approve(req.auth, req.params['employee_id']!);
+        res.status(200).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
+  assign = [
+    validateBody(
+      z.object({
+        hotel_group_id: z.string().optional(),
+        primary_hotel_id: z.string().optional(),
+      })
+    ),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const result = await employeeManagementService.assign(req.auth, req.params['employee_id']!, {
           hotel_group_id: req.body.hotel_group_id,
+          primary_hotel_id: req.body.primary_hotel_id,
         });
         res.status(200).json({
           status: 'success',

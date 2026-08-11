@@ -716,7 +716,7 @@ export class DocumentTemplatesService extends BaseService {
       {
         worker_id: instance.worker_id,
         actor_id: actor.userId,
-        category: 'GENERAL',
+        category: 'ID_CARD',
         original_filename: `${template.name}.pdf`,
         mime_type: 'application/pdf',
         file_size_bytes: pdfBuffer.length,

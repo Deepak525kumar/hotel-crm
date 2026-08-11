@@ -226,18 +226,33 @@ export class DocumentService extends BaseService {
       select: { category: true },
     });
 
-    const hasGeneral = docs.some((d) => d.category === DocumentCategory.GENERAL);
-    const hasWorkPermit = docs.some((d) => d.category === DocumentCategory.WORK_PERMIT);
+    const hasCat = (cat: DocumentCategory) => docs.some((d) => d.category === cat);
+
+    const categories: Record<DocumentCategoryType, boolean> = {
+      TAX_NUMBER: hasCat(DocumentCategory.TAX_NUMBER),
+      SOCIAL_SECURITY_NUMBER: hasCat(DocumentCategory.SOCIAL_SECURITY_NUMBER),
+      HEALTH_INSURANCE: hasCat(DocumentCategory.HEALTH_INSURANCE),
+      ID_CARD: hasCat(DocumentCategory.ID_CARD),
+      PASSPORT: hasCat(DocumentCategory.PASSPORT),
+      ADDRESS: hasCat(DocumentCategory.ADDRESS),
+      WORK_PERMIT: hasCat(DocumentCategory.WORK_PERMIT),
+    };
 
     const missing: DocumentCategoryType[] = [];
-    if (!hasGeneral) missing.push('GENERAL');
-    if (isWorkPermitRequired && !hasWorkPermit) missing.push('WORK_PERMIT');
+    if (!categories.TAX_NUMBER) missing.push('TAX_NUMBER');
+    if (!categories.SOCIAL_SECURITY_NUMBER) missing.push('SOCIAL_SECURITY_NUMBER');
+    if (!categories.HEALTH_INSURANCE) missing.push('HEALTH_INSURANCE');
+    if (!categories.ID_CARD) missing.push('ID_CARD');
+    if (!categories.PASSPORT) missing.push('PASSPORT');
+    if (!categories.ADDRESS) missing.push('ADDRESS');
+    if (isWorkPermitRequired && !categories.WORK_PERMIT) missing.push('WORK_PERMIT');
 
     return {
       worker_id: workerId,
       work_permit_required: isWorkPermitRequired,
       is_complete: missing.length === 0,
       missing_categories: missing,
+      categories,
       document_count: docs.length,
     };
   }

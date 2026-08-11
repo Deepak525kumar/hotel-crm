@@ -10,6 +10,8 @@ export const CreateEmployeeSchema = z.object({
   start_date: z.coerce.date(),
   skills: z.array(z.nativeEnum(SkillTag)).optional(),
   personal_data: z.record(z.unknown()).optional(),
+  work_permit_required: z.boolean().optional(),
+  target_hotel_group_id: z.string().optional(),
 });
 
 export type CreateEmployeeRequest = z.infer<typeof CreateEmployeeSchema>;
