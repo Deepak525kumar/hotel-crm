@@ -600,14 +600,94 @@ export class EmployeeManagementService extends BaseService {
       });
 
       if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
+        const targetHotel = await tx.hotel.findUnique({ where: { id: payload.primary_hotel_id } });
+        if (targetHotel && targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
+          throw new ConflictError('Hotel already has a different manager assigned');
+        }
+
+        const ownedHotels = await tx.hotel.findMany({
+          where: { manager_user_id: newRecord.user_id },
+          select: { id: true },
+        });
+        const now = new Date();
+        for (const hotel of ownedHotels) {
+          if (hotel.id !== payload.primary_hotel_id) {
+            await tx.hotel.update({
+              where: { id: hotel.id },
+              data: {
+                manager_user_id: null,
+                manager_assigned_at: null,
+                manager_vacated_at: now,
+                manager_vacancy_reason: 'TRANSFERRED',
+              },
+            });
+            await tx.hotelManagerAssignmentHistory.updateMany({
+              where: { hotel_id: hotel.id, manager_user_id: newRecord.user_id, unassigned_at: null },
+              data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TRANSFERRED' },
+            });
+          }
+        }
+
         await tx.hotel.update({
           where: { id: payload.primary_hotel_id },
-          data: { manager_user_id: newRecord.user_id },
+          data: { 
+            manager_user_id: newRecord.user_id,
+            manager_assigned_at: now,
+            manager_vacated_at: null,
+            manager_vacancy_reason: null,
+          },
+        });
+        await tx.hotelManagerAssignmentHistory.create({
+          data: {
+            hotel_id: payload.primary_hotel_id,
+            manager_user_id: newRecord.user_id,
+            assigned_at: now,
+            assigned_by_id: actor.userId,
+          },
         });
       } else if (newRecord.user.role === 'REGIONAL_MANAGER' && payload.hotel_group_id) {
+        const targetGroup = await tx.hotelGroup.findUnique({ where: { id: payload.hotel_group_id } });
+        if (targetGroup && targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
+          throw new ConflictError('Hotel group already has a different regional manager assigned');
+        }
+
+        const ownedGroup = await tx.hotelGroup.findUnique({
+          where: { regional_manager_user_id: newRecord.user_id },
+          select: { id: true },
+        });
+        const now = new Date();
+        if (ownedGroup && ownedGroup.id !== payload.hotel_group_id) {
+          await tx.hotelGroup.update({
+            where: { id: ownedGroup.id },
+            data: {
+              regional_manager_user_id: null,
+              regional_manager_assigned_at: null,
+              regional_manager_vacated_at: now,
+              regional_manager_vacancy_reason: 'TRANSFERRED',
+            },
+          });
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: newRecord.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TRANSFERRED' },
+          });
+        }
+
         await tx.hotelGroup.update({
           where: { id: payload.hotel_group_id },
-          data: { regional_manager_user_id: newRecord.user_id },
+          data: { 
+            regional_manager_user_id: newRecord.user_id,
+            regional_manager_assigned_at: now,
+            regional_manager_vacated_at: null,
+            regional_manager_vacancy_reason: null,
+          },
+        });
+        await tx.regionalManagerAssignmentHistory.create({
+          data: {
+            hotel_group_id: payload.hotel_group_id,
+            regional_manager_user_id: newRecord.user_id,
+            assigned_at: now,
+            assigned_by_id: actor.userId,
+          },
         });
       }
 
