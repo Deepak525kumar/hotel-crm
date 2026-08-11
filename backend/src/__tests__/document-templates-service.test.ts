@@ -157,7 +157,7 @@ describe('DocumentTemplatesService', () => {
     mockTransaction.mockImplementation(async (arg: any) => {
       if (typeof arg === 'function') {
         return arg({
-          documentTemplate: { create: mockTemplateCreate },
+          documentTemplate: { create: mockTemplateCreate, update: mockTemplateUpdate },
           documentTemplateSection: {
             create: (async (...args: any[]) => {
               const result = await mockSectionCreate(...args);
@@ -166,6 +166,8 @@ describe('DocumentTemplatesService', () => {
           },
           documentTemplateField: { create: mockFieldCreate },
           documentTemplateSignatureBlock: { create: mockSignatureBlockCreate },
+          documentInstance: { create: mockInstanceCreate },
+          auditLog: { create: mockAuditLogCreate },
         });
       }
       return Promise.all(arg);
@@ -683,7 +685,7 @@ describe('DocumentTemplatesService', () => {
       const result = await service.finalize('i1', { userId: 'w1', role: 'worker' });
 
       expect(mockUploadDocument).toHaveBeenCalledWith(
-        expect.objectContaining({ worker_id: 'w1', category: 'GENERAL' }),
+        expect.objectContaining({ worker_id: 'w1', category: 'ID_CARD' }),
         expect.any(Buffer),
         'worker'
       );

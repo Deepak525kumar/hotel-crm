@@ -16,8 +16,10 @@ export { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES };
 // parsed file (req.file.size), never trusted from a client-supplied field
 // (RULE-DOC-09 provenance discipline — the same reasoning already applied to
 // s3_key/actor_id).
+import { DocumentCategory } from '@prisma/client';
+
 export const uploadDocumentSchema = z.object({
-  category: z.enum(['GENERAL', 'WORK_PERMIT']),
+  category: z.nativeEnum(DocumentCategory),
   original_filename: z.string().min(1).max(255),
   mime_type: z.enum(ALLOWED_MIME_TYPES as unknown as [string, ...string[]]),
   is_work_permit: z

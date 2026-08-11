@@ -87,6 +87,7 @@ import type {
   OrgChart,
   CreateEmploymentInput,
   ApproveEmploymentInput,
+  AssignEmploymentInput,
   RejectEmploymentInput,
   DeactivateEmploymentInput,
   DeleteEmploymentInput,
@@ -941,6 +942,10 @@ export const employeesApi = {
   getByUserId: (userId: string) =>
     apiFetch<EmploymentRecord | null>(`/employees/by-user/${userId}`),
 
+  /** Fetches the review queue for the current manager/admin (ADR-065). */
+  getReviewQueue: () =>
+    apiFetch<EmploymentRecord[]>('/employees/review-queue'),
+
   /** Creates the EmploymentRecord for an existing worker `User` (Admin-only). Starts `PENDING`. */
   create: (input: CreateEmploymentInput) =>
     apiFetch<EmploymentRecord>(`/employees`, { method: "POST", body: input }),
@@ -963,6 +968,10 @@ export const employeesApi = {
   /** PENDING -> ACTIVE. Fails if the record was never submitted for review. */
   approve: (employeeId: string, input: ApproveEmploymentInput = {}) =>
     apiFetch<EmploymentRecord>(`/employees/${employeeId}/approve`, { method: "POST", body: input }),
+
+  /** Assigns an approved record (Manager/Regional Manager) to their target scope. */
+  assign: (employeeId: string, input: AssignEmploymentInput) =>
+    apiFetch<EmploymentRecord>(`/employees/${employeeId}/assign`, { method: "POST", body: input }),
 
   /** PENDING -> REJECTED. */
   reject: (employeeId: string, input: RejectEmploymentInput = {}) =>

@@ -35,6 +35,7 @@ const mockPrisma: any = {
   },
   user: {
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   employeeBlocklistEntry: {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -45,8 +46,12 @@ const mockPrisma: any = {
   },
   workerDocument: {
     findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([
-      { category: 'GENERAL' },
-      { category: 'IDENTITY' },
+      { category: 'TAX_NUMBER' },
+      { category: 'SOCIAL_SECURITY_NUMBER' },
+      { category: 'HEALTH_INSURANCE' },
+      { category: 'ID_CARD' },
+      { category: 'PASSPORT' },
+      { category: 'ADDRESS' },
       { category: 'WORK_PERMIT' }
     ]),
   },
@@ -124,6 +129,7 @@ describe('EmployeeManagementService', () => {
   describe('createEmployee', () => {
     it('creates a record starting Inactive (REQ-EMP-001)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       const created = fakeRecord({ status: EmploymentStatus.PENDING });
       mockPrisma.employmentRecord.create.mockResolvedValue(created);
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -143,6 +149,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects non-admin actors (OD-EMP-08 conservative restriction)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       await expect(
         service.createEmployee({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, {
           user_id: 'user_1',
@@ -155,6 +162,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects a duplicate user_id or employee_id with ConflictError', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValueOnce(fakeRecord()).mockResolvedValueOnce(null);
 
       await expect(
@@ -169,6 +177,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects a skill tag outside the fixed set (REQ-EMP-003 / RULE-EMP-04)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -184,8 +193,9 @@ describe('EmployeeManagementService', () => {
     });
 
     it('excludes konfession and disability_status from the general profile (REQ-EMP-007 / FIND-002)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
-      const created = fakeRecord({ konfession: 'catholic', disability_status: 'none' });
+      const created = fakeRecord({ status: EmploymentStatus.PENDING, konfession: 'catholic', disability_status: 'none' });
       mockPrisma.employmentRecord.create.mockResolvedValue(created);
       mockPrisma.auditLog.create.mockResolvedValue({});
 
@@ -208,6 +218,20 @@ describe('EmployeeManagementService', () => {
       expect(profile).not.toHaveProperty('konfession');
       expect(profile).not.toHaveProperty('disability_status');
       expect(profile.employee_id).toBe('E-001');
+    });
+
+    it('defensively deletes nested user.password_hash if accidentally included in the query', () => {
+      const record = fakeRecord({ konfession: 'catholic' }) as any;
+      record.user = {
+        id: 'user_1',
+        first_name: 'John',
+        password_hash: 'super-secret-hash-that-should-never-leak',
+      };
+      const profile = toGeneralProfile(record) as any;
+      expect(profile.user).toBeDefined();
+      expect(profile.user).not.toHaveProperty('password_hash');
+      // Other fields should remain
+      expect(profile.user?.first_name).toBe('John');
     });
   });
 
@@ -466,6 +490,7 @@ describe('EmployeeManagementService', () => {
 
   describe('bulkImport (REQ-EMP-006 / RULE-EMP-10)', () => {
     it('isolates a failing row from succeeding rows', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', role: 'WORKER' });
       mockPrisma.employmentRecord.findUnique
         .mockResolvedValueOnce(null) // row 0: user_id check
         .mockResolvedValueOnce(null) // row 0: employee_id check
@@ -515,29 +540,28 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
       );
-      mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.submitForReview(admin as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.PENDING);
       expect(result.submitted_for_review_at).not.toBeNull();
     });
 
-    it('approve moves PENDING -> ACTIVE and sets hotel_group_id from the approving manager group (ADR-023 §4)', async () => {
+    it('approve moves PENDING -> ACTIVE and does not set hotel_group_id (ADR-065 §6 item 6 status-only)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.PENDING, hotel_group_id: null, submitted_for_review_at: new Date() })
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
       );
-      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' }); // own group
       mockPrisma.employmentRecord.update.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.ACTIVE, hotel_group_id: 'g1' })
+        fakeRecord({ status: EmploymentStatus.ACTIVE })
       );
       mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      const result = await service.approve(admin as any, 'E-001');
+      const result = await service.approve({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, 'E-001');
 
       expect(result.status).toBe(EmploymentStatus.ACTIVE);
       const updateArg = mockPrisma.employmentRecord.update.mock.calls[0][0] as { data: { hotel_group?: { connect: { id: string } } } };
-      expect(updateArg.data.hotel_group?.connect.id).toBe('g1');
+      expect(updateArg.data.hotel_group).toBeUndefined();
     });
 
     it('approve rejects a PENDING record that was never submitted for review', async () => {

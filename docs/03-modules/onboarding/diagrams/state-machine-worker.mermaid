@@ -1,0 +1,24 @@
+stateDiagram-v2
+    [*] --> SignupInitiated: Worker signs up
+    
+    SignupInitiated --> PersonalfragebogenInProgress: Starts form
+    PersonalfragebogenInProgress --> PersonalfragebogenCompleted: Submits form
+    
+    PersonalfragebogenCompleted --> DocumentCollectionInProgress: Starts chatbot
+    DocumentCollectionInProgress --> DocumentsCollected: Uploads all docs
+    
+    DocumentsCollected --> FamiliarizationPeriod: Optional trial
+    DocumentsCollected --> ContractGenerated: Trial skipped
+    FamiliarizationPeriod --> ContractGenerated: Trial finished
+    
+    ContractGenerated --> ContractSigned: Manager confirms signature
+    
+    ContractSigned --> AwaitingManagerReview: Enters pool (target HotelGroup)
+    
+    AwaitingManagerReview --> UnderManagerReview: Claimed by Manager/RM
+    
+    UnderManagerReview --> Approved: Manager/RM approves
+    UnderManagerReview --> Rejected: Manager/RM rejects
+    
+    Approved --> [*]: Transition to Active (Scope Assigned)
+    Rejected --> [*]: Transition to Rejected

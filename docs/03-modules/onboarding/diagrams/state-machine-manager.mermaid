@@ -1,0 +1,19 @@
+stateDiagram-v2
+    [*] --> SignupInitiated: Manager signs up
+    
+    SignupInitiated --> PersonalfragebogenInProgress: Starts form
+    PersonalfragebogenInProgress --> PersonalfragebogenCompleted: Submits form
+    
+    PersonalfragebogenCompleted --> ContractGenerated: Proceeds directly (no chatbot/trial)
+    
+    ContractGenerated --> ContractSigned: RM/Admin confirms signature
+    
+    ContractSigned --> AwaitingRMAdminReview: Enters pool (target HotelGroup)
+    
+    AwaitingRMAdminReview --> UnderRMAdminReview: Claimed by RM or Admin
+    
+    UnderRMAdminReview --> Approved: RM/Admin approves
+    UnderRMAdminReview --> Rejected: RM/Admin rejects
+    
+    Approved --> [*]: Transition to Active (Scope Assigned)
+    Rejected --> [*]: Transition to Rejected

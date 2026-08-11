@@ -21,6 +21,10 @@ import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { generateStorageKey, getStorageClient } from './storage.js';
+// ADR-066 (Option A): shared malware-scan seam. Owned by backend-hr today
+// (ADR-044 was its first consumer); imported cross-module here rather than
+// relocated -- see ADR-066 §5's implementation note.
+import { getMalwareScanner } from '../hr/malware-scan.js';
 import { isWorkerInGroupScope } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type {
@@ -69,6 +73,29 @@ export class DocumentService extends BaseService {
 
     const category = input.category as DocumentCategory;
 
+    // OD-DOC-016/ADR-066 (Option A, ratified 2026-08-12): synchronous
+    // malware-scan hook, before the file is persisted anywhere (S3 or DB) --
+    // mirroring ADR-044's Decisions 1-2 for the mechanism-class-identical HR
+    // contract-scan path (hr/service.ts). Reject on detection.
+    //
+    // The seam is imported from backend-hr rather than relocated to lib/:
+    // hr/malware-scan.ts is a leaf module with no imports of its own, so this
+    // introduces no import cycle despite the pre-existing hr -> documents
+    // module direction, and backend-document-templates already consumes it the
+    // same way (document-templates/service.ts). See ADR-066 §5's implementation
+    // note for why relocation was considered and deliberately deferred.
+    //
+    // NOTE: the default scanner is a PASS-THROUGH NO-OP (hr/malware-scan.ts's
+    // noOpScanner) -- no vendor/library has been selected by ADR-044 or
+    // ADR-066. This is real control flow, not real detection. Do not read the
+    // presence of this call as evidence that uploads are scanned.
+    const scanResult = await getMalwareScanner().scan(fileBuffer);
+    if (!scanResult.clean) {
+      throw new ValidationError(
+        `Uploaded file failed the malware scan${scanResult.reason ? `: ${scanResult.reason}` : ''}`
+      );
+    }
+
     // RULE-DOC-09: server-generated key, never from client input.
     const s3Key = generateStorageKey(input.worker_id, category, input.original_filename);
 
@@ -84,41 +111,52 @@ export class DocumentService extends BaseService {
 
     const expiresAt = input.expires_at ? new Date(`${input.expires_at}T00:00:00.000Z`) : null;
 
-    const doc = await this.prisma.$transaction(async (tx) => {
-      const createdDoc = await tx.workerDocument.create({
-        data: {
-          worker_id: input.worker_id,
-          uploaded_by_id: input.actor_id,
-          category,
-          s3_key: s3Key,
-          original_filename: input.original_filename,
-          mime_type: input.mime_type,
-          file_size_bytes: fileBuffer.length,
-          expires_at: expiresAt,
-          is_work_permit: input.is_work_permit ?? false,
-        },
+    let doc;
+    try {
+      doc = await this.prisma.$transaction(async (tx) => {
+        const createdDoc = await tx.workerDocument.create({
+          data: {
+            worker_id: input.worker_id,
+            uploaded_by_id: input.actor_id,
+            category,
+            s3_key: s3Key,
+            original_filename: input.original_filename,
+            mime_type: input.mime_type,
+            file_size_bytes: fileBuffer.length,
+            expires_at: expiresAt,
+            is_work_permit: input.is_work_permit ?? false,
+          },
+        });
+
+        await this.logAudit(
+          input.actor_id,
+          actorRole,
+          'document.upload',
+          'WorkerDocument',
+          createdDoc.id,
+          {
+            worker_id: input.worker_id,
+            category,
+            original_filename: input.original_filename,
+            is_work_permit: createdDoc.is_work_permit,
+          },
+          actorIp,
+          undefined,
+          undefined,
+          tx
+        );
+
+        return createdDoc;
       });
-
-      await this.logAudit(
-        input.actor_id,
-        actorRole,
-        'document.upload',
-        'WorkerDocument',
-        createdDoc.id,
-        {
-          worker_id: input.worker_id,
-          category,
-          original_filename: input.original_filename,
-          is_work_permit: createdDoc.is_work_permit,
-        },
-        actorIp,
-        undefined,
-        undefined,
-        tx
-      );
-
-      return createdDoc;
-    });
+    } catch (err) {
+      // Compensating action: delete the orphaned S3 object if the DB transaction fails
+      try {
+        await storage.delete(s3Key);
+      } catch (deleteErr) {
+        logger.error('documents_s3_compensating_delete_failed', { s3Key, error: deleteErr });
+      }
+      throw err;
+    }
 
     const presignedUrl = await storage.getPresignedUrl(s3Key).catch(() => null);
     return this.toDto(doc, presignedUrl);
@@ -226,18 +264,33 @@ export class DocumentService extends BaseService {
       select: { category: true },
     });
 
-    const hasGeneral = docs.some((d) => d.category === DocumentCategory.GENERAL);
-    const hasWorkPermit = docs.some((d) => d.category === DocumentCategory.WORK_PERMIT);
+    const hasCat = (cat: DocumentCategory) => docs.some((d) => d.category === cat);
+
+    const categories: Record<DocumentCategoryType, boolean> = {
+      TAX_NUMBER: hasCat(DocumentCategory.TAX_NUMBER),
+      SOCIAL_SECURITY_NUMBER: hasCat(DocumentCategory.SOCIAL_SECURITY_NUMBER),
+      HEALTH_INSURANCE: hasCat(DocumentCategory.HEALTH_INSURANCE),
+      ID_CARD: hasCat(DocumentCategory.ID_CARD),
+      PASSPORT: hasCat(DocumentCategory.PASSPORT),
+      ADDRESS: hasCat(DocumentCategory.ADDRESS),
+      WORK_PERMIT: hasCat(DocumentCategory.WORK_PERMIT),
+    };
 
     const missing: DocumentCategoryType[] = [];
-    if (!hasGeneral) missing.push('GENERAL');
-    if (isWorkPermitRequired && !hasWorkPermit) missing.push('WORK_PERMIT');
+    if (!categories.TAX_NUMBER) missing.push('TAX_NUMBER');
+    if (!categories.SOCIAL_SECURITY_NUMBER) missing.push('SOCIAL_SECURITY_NUMBER');
+    if (!categories.HEALTH_INSURANCE) missing.push('HEALTH_INSURANCE');
+    if (!categories.ID_CARD) missing.push('ID_CARD');
+    if (!categories.PASSPORT) missing.push('PASSPORT');
+    if (!categories.ADDRESS) missing.push('ADDRESS');
+    if (isWorkPermitRequired && !categories.WORK_PERMIT) missing.push('WORK_PERMIT');
 
     return {
       worker_id: workerId,
       work_permit_required: isWorkPermitRequired,
       is_complete: missing.length === 0,
       missing_categories: missing,
+      categories,
       document_count: docs.length,
     };
   }

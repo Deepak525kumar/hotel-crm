@@ -29,6 +29,27 @@ No implementation may begin from an unfrozen specification. No phase may advance
 - Keep module ownership, contracts, and dependencies synchronized in `knowledge/`.
 - Prefer the revision-bound **Evidence Package** over re-inspecting the worktree; inspect directly only to verify a specific claim or when its `baseline_revision` key is stale ([Context Artifacts](constitution/CONTEXT_ARTIFACTS.md)).
 
+## End-to-End Testing (mandatory entry point)
+
+Whenever you are asked to **test, verify, validate, or QA the application** — including any
+variant of "test everything", "check the onboarding flow", "re-run the E2E tests", or a
+post-deployment verification — you MUST first read
+[`docs/10-testing/e2e/README.md`](../docs/10-testing/e2e/README.md) and then execute the
+numbered scenario files in `docs/10-testing/e2e/scenarios/` in order. Do not invent an ad-hoc
+test plan: those scenarios encode defects that were expensive to find, are easy to regress, and
+include explicit pass criteria plus a list of what is knowingly untested.
+
+Three non-negotiables from that suite:
+
+- **Verify at the data layer.** A `200 success` response has repeatedly meant nothing was
+  written, or the wrong thing was. Read the database.
+- **Never substitute a direct DB write for the path under test.** If the real path cannot run
+  (missing credentials, unavailable service), report it as a gap — never as a pass.
+- **Update the suite in the same pass.** Move fixed items into the history table, add new
+  defects with reproductions, and append a run log under `docs/10-testing/e2e/runs/`. A defect
+  found but not recorded there will be rediscovered from scratch — that has already happened
+  more than once in this project.
+
 ## Agent System
 
 Agent contracts live in `agents/`. Each agent owns one responsibility, receives a minimal context package, and returns a structured artifact. The main conversation adopts the Lead Architect contract and coordinates specialists; do not delegate orchestration to a child agent because subagents cannot spawn other subagents. The Lead Architect does not perform specialist reviews. Add specialists by adding a contract; do not change the operating model.

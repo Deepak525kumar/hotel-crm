@@ -340,7 +340,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
       expect(mockScan).toHaveBeenCalledWith(Buffer.from('x'));
       expect(mockDocumentServiceUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ worker_id: 'w1', actor_id: 'm1', category: 'GENERAL' }),
+        expect.objectContaining({ worker_id: 'w1', actor_id: 'm1', category: 'ID_CARD' }),
         Buffer.from('x'),
         'manager',
         '1.2.3.4'

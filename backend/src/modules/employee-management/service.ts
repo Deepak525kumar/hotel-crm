@@ -19,6 +19,7 @@ import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
+import { isRmRoleEnabled } from '../../config/feature-flags.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { documentService } from '../documents/service.js';
 import {
@@ -42,9 +43,12 @@ import type {
 // general profile serializer must be physically unreachable from the
 // special-category fields).
 export function toGeneralProfile(record: EmploymentRecord): Omit<EmploymentRecord, 'konfession' | 'disability_status'> {
-  const profile: Partial<EmploymentRecord> = { ...record };
+  const profile: any = { ...record };
   delete profile.konfession;
   delete profile.disability_status;
+  if (profile.user && typeof profile.user === 'object') {
+    delete profile.user.password_hash;
+  }
   return profile as Omit<EmploymentRecord, 'konfession' | 'disability_status'>;
 }
 
@@ -66,8 +70,55 @@ export class EmployeeManagementService extends BaseService {
   // `[OPEN]`). Conservatively restricted to Admin for both manual and bulk
   // creation until that decision resolves.
   async createEmployee(actor: AuthContext, data: CreateEmployeeRequest) {
-    if (actor.role !== 'admin') {
-      throw new ForbiddenError('Only Admin may create employment records');
+    // Determine the target user's role to apply creation logic
+    const targetUser = await this.prisma.user.findUnique({ where: { id: data.user_id } });
+    if (!targetUser) {
+      throw new ConflictError('User not found');
+    }
+
+    // Role-based creation guards
+    if (actor.role === 'admin') {
+      // Admin can create for anyone.
+      // If Admin creates a Manager application, target_hotel_group_id is required.
+      if (targetUser.role === 'MANAGER' && !data.target_hotel_group_id) {
+        throw new ConflictError('Admin must explicitly provide a target_hotel_group_id when creating a Manager application');
+      }
+    } else if (actor.role === 'regional_manager') {
+      // Regional Manager can only create Workers, Checkers, and Managers
+      if (!['WORKER', 'CHECKER', 'MANAGER'].includes(targetUser.role)) {
+        throw new ForbiddenError('Regional Manager may only create applications for Worker, Checker, and Manager roles');
+      }
+      if (targetUser.role === 'MANAGER') {
+        const rmGroup = actor.scope?.type === 'hotel_group' ? actor.scope.hotel_group_id : undefined;
+        if (!rmGroup) {
+          throw new ForbiddenError('Regional Manager must have a scoped hotel_group_id to create a Manager application');
+        }
+        if (data.target_hotel_group_id && data.target_hotel_group_id !== rmGroup) {
+          throw new ConflictError('Regional Manager cannot create a Manager application targeting a different group');
+        }
+        data.target_hotel_group_id = rmGroup;
+      }
+    } else if (actor.role === 'manager') {
+      // Manager can only create Workers and Checkers
+      if (!['WORKER', 'CHECKER'].includes(targetUser.role)) {
+        throw new ForbiddenError('Manager may only create applications for Worker and Checker roles');
+      }
+      const mgrHotel = actor.scope?.type === 'hotel' ? actor.scope.hotel_id : undefined;
+      if (!mgrHotel) {
+        throw new ForbiddenError('Manager must have a scoped hotel_id to create an application');
+      }
+      if (data.target_primary_hotel_id && data.target_primary_hotel_id !== mgrHotel) {
+        throw new ConflictError('Manager cannot create an application targeting a different hotel');
+      }
+      data.target_primary_hotel_id = mgrHotel;
+      
+      // Auto-populate target_hotel_group_id from the Manager's hotel if not already fetched
+      const mgrHotelRecord = await this.prisma.hotel.findUnique({ where: { id: mgrHotel } });
+      if (mgrHotelRecord && mgrHotelRecord.hotel_group_id) {
+        data.target_hotel_group_id = mgrHotelRecord.hotel_group_id;
+      }
+    } else {
+      throw new ForbiddenError('Only Admin, Regional Manager, and Manager may create employment records');
     }
 
     if (data.skills) {
@@ -95,6 +146,9 @@ export class EmployeeManagementService extends BaseService {
           // freshly-created record is PENDING with submitted_for_review_at null,
           // exactly what the old INACTIVE meant.
           status: EmploymentStatus.PENDING,
+          work_permit_required: data.work_permit_required ?? false,
+          target_hotel_group_id: data.target_hotel_group_id || null,
+          target_primary_hotel_id: data.target_primary_hotel_id || null,
           skills: data.skills ?? [],
           personal_data: data.personal_data
             ? (data.personal_data as Prisma.InputJsonValue)
@@ -379,27 +433,44 @@ export class EmployeeManagementService extends BaseService {
       record.status === EmploymentStatus.DELETED && toStatus === EmploymentStatus.PENDING;
     const nextCycle = isRehire ? record.employment_cycle + 1 : record.employment_cycle;
 
-    const updated = await tx.employmentRecord.update({
-      where: { id: record.id },
-      data: {
-        ...(opts.data ?? {}),
-        status: toStatus,
-        ...(isRehire ? { employment_cycle: nextCycle } : {}),
-      },
-    });
+    try {
+      const updated = await tx.employmentRecord.update({
+        where: { id: record.id, version: record.version },
+        data: {
+          ...(opts.data ?? {}),
+          status: toStatus,
+          ...(isRehire ? { employment_cycle: nextCycle } : {}),
+          version: { increment: 1 },
+        },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              role: true,
+            }
+          }
+        },
+      });
+      
+      await tx.employmentStatusHistory.create({
+        data: {
+          employment_record_id: record.id,
+          from_status: record.status,
+          to_status: toStatus,
+          reason: opts.reason ?? null,
+          actor_user_id: opts.actorUserId,
+          employment_cycle: nextCycle,
+        },
+      });
 
-    await tx.employmentStatusHistory.create({
-      data: {
-        employment_record_id: record.id,
-        from_status: record.status,
-        to_status: toStatus,
-        reason: opts.reason ?? null,
-        actor_user_id: opts.actorUserId,
-        employment_cycle: nextCycle,
-      },
-    });
+      return updated;
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
+      }
+      throw error;
+    }
 
-    return updated;
   }
 
   /**
@@ -429,13 +500,10 @@ export class EmployeeManagementService extends BaseService {
     }
 
     // GATE: All required documents must be uploaded before onboarding can be
-    // submitted for review. Work permit requirement is derived from the
-    // personal_data.nationality field — if nationality is missing/unknown,
-    // we conservatively treat it as NOT required so a partial profile doesn't
-    // permanently block submission. An admin reviewer can still catch it.
-    const personalData = record.personal_data as Record<string, unknown> | null;
-    const nationality = typeof personalData?.nationality === 'string' ? personalData.nationality : null;
-    const isWorkPermitRequired = nationality !== null && nationality.toLowerCase() !== 'german' && nationality.toLowerCase() !== 'de';
+    // submitted for review. ADR-065 §6 item 8: work permit requirement is
+    // explicitly driven by the record's work_permit_required flag, set at
+    // creation time, rather than inferred from nationality.
+    const isWorkPermitRequired = record.work_permit_required;
 
     const completeness = await documentService.getDocumentCompleteness(record.user_id, isWorkPermitRequired);
     if (!completeness.is_complete) {
@@ -445,10 +513,18 @@ export class EmployeeManagementService extends BaseService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const transitionedRecord = await tx.employmentRecord.update({
-        where: { id: record.id },
-        data: { submitted_for_review_at: new Date() },
-      });
+      let transitionedRecord;
+      try {
+        transitionedRecord = await tx.employmentRecord.update({
+          where: { id: record.id, version: record.version },
+          data: { submitted_for_review_at: new Date(), version: { increment: 1 } },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2025') {
+          throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
+        }
+        throw error;
+      }
 
       await this.logAudit(
         actor.userId,
@@ -481,7 +557,7 @@ export class EmployeeManagementService extends BaseService {
    * is left null — PROVISIONAL, unchanged from the pre-rework behavior: the
    * record becomes Active but unassignable until a group is set.
    */
-  async approve(actor: AuthContext, employeeId: string, payload?: { hotel_group_id?: string }) {
+  async approve(actor: AuthContext, employeeId: string) {
     const record = await this.findRecordOrThrow(employeeId);
     await this.assertLifecycleAuthority(actor, record, 'approve an employee', {
       allowUnassignedGroup: true,
@@ -500,22 +576,172 @@ export class EmployeeManagementService extends BaseService {
     await this.assertApprovedContract(record.user_id);
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
       const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
         actorUserId: actor.userId,
-        data: resolvedGroupId ? { hotel_group: { connect: { id: resolvedGroupId } } } : {},
+        data: {}, // ADR-065 §6 item 6: approve is status-only, does not write scope fields
       });
 
       await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.approved', 'EMPLOYMENT_RECORD', record.id, {
         from: record.status,
         to: EmploymentStatus.ACTIVE,
-        hotel_group_id: transitionedRecord.hotel_group_id,
       }, undefined, undefined, undefined, tx);
 
       return transitionedRecord;
     });
 
     this.logDomainEvent('EVT-EMP-approved', record.employee_id, EmploymentStatus.ACTIVE);
+
+    return toGeneralProfile(updated);
+  }
+
+  /** PENDING -> REJECTED (hire application declined). */
+  async assign(actor: AuthContext, employeeId: string, payload: { hotel_group_id?: string; primary_hotel_id?: string }) {
+    const record = await this.findRecordOrThrow(employeeId);
+    await this.assertLifecycleAuthority(actor, record, 'assign an employee', { allowUnassignedGroup: true });
+
+    if (actor.role === 'regional_manager' && payload.hotel_group_id) {
+      const ownGroupId = await this.resolveApprovalGroupId(actor);
+      if (payload.hotel_group_id !== ownGroupId) {
+        throw new ForbiddenError('Cannot assign employee to a different hotel group');
+      }
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const dataToUpdate: Prisma.EmploymentRecordUpdateInput = {};
+      if (payload.hotel_group_id !== undefined) {
+        dataToUpdate.hotel_group = payload.hotel_group_id ? { connect: { id: payload.hotel_group_id } } : { disconnect: true };
+      }
+      if (payload.primary_hotel_id !== undefined) {
+        dataToUpdate.primary_hotel = payload.primary_hotel_id ? { connect: { id: payload.primary_hotel_id } } : { disconnect: true };
+      }
+
+      let newRecord;
+      try {
+        newRecord = await tx.employmentRecord.update({
+          where: { id: record.id, version: record.version },
+          data: { ...dataToUpdate, version: { increment: 1 } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                role: true,
+              }
+            }
+          }
+        });
+      } catch (error: any) {
+        if (error.code === 'P2025') {
+          if (error.message && error.message.includes('connect')) {
+            throw new NotFoundError('Target hotel or hotel group not found');
+          }
+          throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
+        }
+        throw error;
+      }
+
+      if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
+        const targetHotel = await tx.hotel.findUnique({ where: { id: payload.primary_hotel_id } });
+        if (targetHotel && targetHotel.manager_user_id && targetHotel.manager_user_id !== newRecord.user_id) {
+          throw new ConflictError('Hotel already has a different manager assigned');
+        }
+
+        const ownedHotels = await tx.hotel.findMany({
+          where: { manager_user_id: newRecord.user_id },
+          select: { id: true },
+        });
+        const now = new Date();
+        for (const hotel of ownedHotels) {
+          if (hotel.id !== payload.primary_hotel_id) {
+            await tx.hotel.update({
+              where: { id: hotel.id },
+              data: {
+                manager_user_id: null,
+                manager_assigned_at: null,
+                manager_vacated_at: now,
+                manager_vacancy_reason: 'TRANSFERRED',
+              },
+            });
+            await tx.hotelManagerAssignmentHistory.updateMany({
+              where: { hotel_id: hotel.id, manager_user_id: newRecord.user_id, unassigned_at: null },
+              data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TRANSFERRED' },
+            });
+          }
+        }
+
+        await tx.hotel.update({
+          where: { id: payload.primary_hotel_id },
+          data: { 
+            manager_user_id: newRecord.user_id,
+            manager_assigned_at: now,
+            manager_vacated_at: null,
+            manager_vacancy_reason: null,
+          },
+        });
+        await tx.hotelManagerAssignmentHistory.create({
+          data: {
+            hotel_id: payload.primary_hotel_id,
+            manager_user_id: newRecord.user_id,
+            assigned_at: now,
+            assigned_by_id: actor.userId,
+          },
+        });
+      } else if (newRecord.user.role === 'REGIONAL_MANAGER' && payload.hotel_group_id) {
+        const targetGroup = await tx.hotelGroup.findUnique({ where: { id: payload.hotel_group_id } });
+        if (targetGroup && targetGroup.regional_manager_user_id && targetGroup.regional_manager_user_id !== newRecord.user_id) {
+          throw new ConflictError('Hotel group already has a different regional manager assigned');
+        }
+
+        const ownedGroup = await tx.hotelGroup.findUnique({
+          where: { regional_manager_user_id: newRecord.user_id },
+          select: { id: true },
+        });
+        const now = new Date();
+        if (ownedGroup && ownedGroup.id !== payload.hotel_group_id) {
+          await tx.hotelGroup.update({
+            where: { id: ownedGroup.id },
+            data: {
+              regional_manager_user_id: null,
+              regional_manager_assigned_at: null,
+              regional_manager_vacated_at: now,
+              regional_manager_vacancy_reason: 'TRANSFERRED',
+            },
+          });
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: newRecord.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TRANSFERRED' },
+          });
+        }
+
+        await tx.hotelGroup.update({
+          where: { id: payload.hotel_group_id },
+          data: { 
+            regional_manager_user_id: newRecord.user_id,
+            regional_manager_assigned_at: now,
+            regional_manager_vacated_at: null,
+            regional_manager_vacancy_reason: null,
+          },
+        });
+        await tx.regionalManagerAssignmentHistory.create({
+          data: {
+            hotel_group_id: payload.hotel_group_id,
+            regional_manager_user_id: newRecord.user_id,
+            assigned_at: now,
+            assigned_by_id: actor.userId,
+          },
+        });
+      }
+
+      await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.assigned', 'EMPLOYMENT_RECORD', record.id, {
+        from_hotel_group_id: record.hotel_group_id,
+        to_hotel_group_id: newRecord.hotel_group_id,
+        from_primary_hotel_id: record.primary_hotel_id,
+        to_primary_hotel_id: newRecord.primary_hotel_id,
+      }, undefined, undefined, undefined, tx);
+
+      return newRecord;
+    });
+
+    this.logDomainEvent('EVT-EMP-assigned', record.employee_id, updated.status);
 
     return toGeneralProfile(updated);
   }
@@ -584,6 +810,35 @@ export class EmployeeManagementService extends BaseService {
         reason,
         data: { deactivation_reason: reason },
       });
+
+      const targetUser = await tx.user.findUnique({ where: { id: record.user_id }, select: { role: true } });
+      const now = new Date();
+
+      if (targetUser?.role === 'MANAGER') {
+        const ownedHotels = await tx.hotel.findMany({ where: { manager_user_id: record.user_id }, select: { id: true } });
+        for (const hotel of ownedHotels) {
+          await tx.hotel.update({
+            where: { id: hotel.id },
+            data: { manager_user_id: null, manager_assigned_at: null, manager_vacated_at: now, manager_vacancy_reason: 'TEMPORARY' },
+          });
+          await tx.hotelManagerAssignmentHistory.updateMany({
+            where: { hotel_id: hotel.id, manager_user_id: record.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
+          });
+        }
+      } else if (targetUser?.role === 'REGIONAL_MANAGER') {
+        const ownedGroup = await tx.hotelGroup.findUnique({ where: { regional_manager_user_id: record.user_id }, select: { id: true } });
+        if (ownedGroup) {
+          await tx.hotelGroup.update({
+            where: { id: ownedGroup.id },
+            data: { regional_manager_user_id: null, regional_manager_assigned_at: null, regional_manager_vacated_at: now, regional_manager_vacancy_reason: 'TEMPORARY' },
+          });
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: record.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
+          });
+        }
+      }
 
       // Session invalidation (2026-08-07). DELETED (delete(),
       // deactivateForContractLapse()) and DELETED -> PENDING (restore())
@@ -1059,11 +1314,35 @@ export class EmployeeManagementService extends BaseService {
   ): Promise<void> {
     if (actor.role === 'admin') return;
 
+    if (action === 'submit an employee for review' && actor.userId === record.user_id) {
+      return;
+    }
+
     if (isScopedManagerRole(actor.role)) {
+      const targetUser = await this.prisma.user.findUnique({ where: { id: record.user_id } });
+      if (!targetUser) throw new NotFoundError('User not found');
+
+      if (targetUser.role === 'REGIONAL_MANAGER') {
+        throw new ForbiddenError(`Cannot ${action}: only Admin can manage Regional Manager applications`);
+      }
+      if (targetUser.role === 'MANAGER') {
+        if (actor.role === 'regional_manager' && !isRmRoleEnabled()) {
+          throw new ForbiddenError(`Cannot ${action}: only Admin can manage Manager applications while RM role is disabled`);
+        }
+        if (actor.role !== 'regional_manager') {
+          throw new ForbiddenError(`Cannot ${action}: only Admin or Regional Manager can manage Manager applications`);
+        }
+      }
+
       if (record.hotel_group_id === null && opts.allowUnassignedGroup) {
         const ownGroupId = await this.resolveApprovalGroupId(actor);
         if (!ownGroupId) {
           throw new ForbiddenError(`Cannot ${action}: you do not manage a hotel group`);
+        }
+        
+        // ADR-065 §6 item 5: Ensure RM is approving an application targeted at their group
+        if (record.target_hotel_group_id && record.target_hotel_group_id !== ownGroupId) {
+          throw new ForbiddenError(`Cannot ${action}: application is targeted at a different group`);
         }
         return;
       }
@@ -1206,9 +1485,55 @@ export class EmployeeManagementService extends BaseService {
     };
   }
 
+  // ── Review Queue (IF-EMP-ReviewQueue, ADR-065 §6 item 7) ────────────────
+
+  async getReviewQueue(actor: AuthContext) {
+    const query: Prisma.EmploymentRecordWhereInput = {
+      status: EmploymentStatus.PENDING,
+      submitted_for_review_at: { not: null },
+      deleted_at: null,
+    };
+
+    if (actor.role === 'manager') {
+      if (actor.scope?.type !== 'hotel') {
+        throw new ForbiddenError('Manager must be scoped to a hotel');
+      }
+      query.target_primary_hotel_id = actor.scope.hotel_id;
+    } else if (actor.role === 'regional_manager') {
+      if (actor.scope?.type !== 'hotel_group') {
+        throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
+      }
+      query.target_hotel_group_id = actor.scope.hotel_group_id;
+    } else if (actor.role !== 'admin') {
+      throw new ForbiddenError('Role not authorized for review queue');
+    }
+
+    const records = await this.prisma.employmentRecord.findMany({
+      where: query,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+            profile_photo_url: true,
+            role: true,
+            created_at: true,
+            updated_at: true,
+          }
+        }
+      },
+      orderBy: { submitted_for_review_at: 'asc' },
+    });
+
+    return records.map(toGeneralProfile);
+  }
+
   // ── By-user lookup (IF-EMP-GetByUserId) ─────────────────────────────────
 
-  // Resolves whether `userId` already has an EmploymentRecord, keyed by the
+  // resolves whether `userId` already has an EmploymentRecord, keyed by the
   // FK every other module already joins on (roster-scope.ts, scope.ts,
   // hr/service.ts, etc.) rather than this module's own `employee_id`. Returns
   // `null` (not a 404) when no record exists — "not yet onboarded" is the
@@ -1273,6 +1598,12 @@ export class EmployeeManagementService extends BaseService {
       return;
     }
     if (actor.role === 'admin') return;
+    // ADR-065 self-service: a Manager/RM applicant's own record has no
+    // hotel_group_id/scope claim yet (both are set only on activation), so
+    // the group-scope check below always denies self-reads pre-assignment.
+    // Own-record access must be checked before the scope branch, the same
+    // ordering assertLifecycleAuthority already uses for self-submission.
+    if (record.user_id === actor.userId) return;
     if (isScopedManagerRole(actor.role) || actor.role === 'checker') {
       const allowed = await this.isRecordInScope(actor, record);
       if (!allowed) throw new ForbiddenError('Record is outside your scope');

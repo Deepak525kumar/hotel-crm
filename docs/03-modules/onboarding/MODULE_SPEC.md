@@ -22,9 +22,9 @@ No behaviour in this document is derived from any other source.
 
 The Onboarding Module is the system responsible for **new-hire intake, document collection, legal contract execution, and hire approval decisioning**. It orchestrates the journey from first signup through manager approval to the point where the employee becomes active in Employee Management.
 
-The module is customer-facing for workers (self-service signup, Personalfragebogen form, document upload via the Chatbot module, contract download/print for hand signing) and manager-facing for hiring decisioning (contract-scan upload and confirmation, pool/claim review mechanism, approve/reject).
+The module is customer-facing for all non-Admin applicants (Workers, Checkers, Managers, Regional Managers) (self-service signup, Personalfragebogen form, document upload via the Chatbot module, contract download/print for hand signing) and manager/admin-facing for hiring decisioning (contract-scan upload and confirmation, pool/claim review mechanism, approve/reject).
 
-Onboarding produces two critical outputs: (1) a **completed onboarding** for the employee — the Employee-Management-owned employee record (created **Inactive** at signup) is progressed through the onboarding workflow and signalled complete, so Employee Management moves it to **Under Review**; and (2) a **manager decision** (approve/reject) that Employee Management uses to transition the employee to **Active** or **Rejected** (CRR §6–§10; EM §7–§8). Onboarding does **not** create the employee record — Employee Management owns employee creation and all lifecycle transitions (EM §7, §14).
+Onboarding produces two critical outputs: (1) a **completed onboarding** for the employee — the Employee-Management-owned employee record (created **Inactive** at signup) is progressed through the onboarding workflow and signalled complete, so Employee Management moves it to **Under Review**; and (2) a **manager/admin decision** (approve/reject) that Employee Management uses to transition the employee to **Active** or **Rejected** (CRR §6–§10; EM §7–§8). Onboarding does **not** create the employee record — Employee Management owns employee creation and all lifecycle transitions (EM §7, §14). Additionally, per ADR-065, organizational scope assignment strictly happens post-activation.
 
 ## 2. Purpose
 
@@ -44,8 +44,8 @@ In scope for this module:
 - **Document collection and orchestration:** capturing required documents from workers and orchestrating the collection workflow; geofencing work-permit requirements to non-EU/EEA/Swiss workers (document validation itself is owned by the Documents module) (CRR §7).
 - **Chatbot-guided document collection (consumed):** triggering the Chatbot module's (`backend-chatbot`, `SPEC-CHATBOT-001`) AI-agent conversation to query workers for missing documents, and reacting to its completion or fallback-triggered signal; the agent's execution, provider, cost controls, and fallback logic are owned and implemented by the Chatbot module, not by Onboarding (CRR §8; ADR-013).
 - **Contract delivery and hand-signing capture:** generating the pre-filled contract PDF for download/print, then capturing the manager-confirmed hand-signed contract (the signed paper scan is uploaded and the manager marks it signed & valid) (CRR §9; PDD §7.1).
-- **Pool/claim hiring review:** a shared inbox mechanism where managers claim applications, review materials, and approve/reject new hires (CRR §10).
-- **Hire approval decisioning:** manager judgment on probation suitability and contract approval — entirely manual, no rating thresholds or automation (CRR §10).
+- **Pool/claim hiring review:** a shared inbox mechanism where managers/admins claim applications, review materials, and approve/reject new hires (CRR §10).
+- **Hire approval decisioning:** manager/admin judgment on probation suitability and contract approval — entirely manual, no rating thresholds or automation (CRR §10).
 - **Onboarding progression & completion signal:** advancing the pre-existing (Inactive) employee record through the onboarding workflow and signalling completion so Employee Management transitions it to Under Review; relaying the approval/rejection decision (CRR §10; EM §7, §14).
 - **Rejection handling:** capturing and communicating rejection decisions; no re-application mechanics (CRR §10; [OPEN] rework flow — see §20 OPQ-4).
 
@@ -129,16 +129,49 @@ The module is responsible for:
 
 ### 6.2 Document Requirements
 
-**Definition:** Work authorisation documents required from non-EU/EEA/Swiss workers to comply with German employment law.
+**Definition:** The full set of documents required from every non-Admin applicant (Worker, Checker,
+Manager, Regional Manager) before onboarding can be submitted for review, per `ADR-065` §6 item 8
+(2026-08-11, superseding the prior work-permit-only framing of this section).
 
-**Rules** (CRR §7):
+**Required document checklist (applies identically to every non-Admin role — CRR §7, `ADR-065` §6
+item 8):**
+
+- `TAX_NUMBER` — tax identification number.
+- `SOCIAL_SECURITY_NUMBER` — Sozialversicherungsnummer.
+- `HEALTH_INSURANCE` — health insurance proof/membership document.
+- `ID_CARD` — national identity card.
+- `PASSPORT` — passport. **Both `ID_CARD` and `PASSPORT` are independently required** — this is not
+  an either/or; a complete application has both documents uploaded, not just one identity document.
+- `ADDRESS` — proof of address.
+- `WORK_PERMIT` — required conditionally, per the rule below.
+
+**Work-permit rule** (CRR §7):
 
 - EU/EEA/Swiss citizens do NOT require work-permit documents (explicitly confirmed).
 - Non-EU workers MUST upload work-permit / residence documents.
-- Work-permit requirements are a **mandatory legal obligation** separate from the (rejected) background-check process.
-- Document validation is owned by the Documents module; Onboarding orchestrates the collection workflow.
+- Work-permit requirements are a **mandatory legal obligation** separate from the (rejected)
+  background-check process.
+- **Mechanism correction (`ADR-065` §6 item 8):** whether `WORK_PERMIT` is required for a given
+  application is no longer auto-derived from the applicant's declared nationality. It is an
+  **explicit checkbox/flag set by the creating actor at application-creation time** (the Manager
+  creating a Worker/Checker application, or the Regional Manager/Admin creating a Manager/Regional
+  Manager application) — stored on the employment record and read directly by the completeness
+  check at submission time, not inferred.
+- Document validation is owned by the Documents module; Onboarding orchestrates the collection
+  workflow.
 
-**Chatbot coordination:** The document-collection chatbot (§6.3) queries workers for documents and resubmits missing ones until the requirement is met.
+**Completeness is a checklist, not a single flag:** the applicant's onboarding status surfaces
+which of the required categories above are present versus missing, individually — not merely an
+aggregate "complete"/"incomplete" boolean. There is no generic catch-all document category; each
+of the six always-required categories plus the conditional `WORK_PERMIT` is tracked and reported on
+independently.
+
+**Chatbot coordination:** The document-collection chatbot (§6.3) queries applicants for documents
+and resubmits missing ones until the requirement is met. **The chatbot is not built at this
+revision** (`backend/src/modules/chatbot/` contains only a placeholder) — until it exists, every
+non-Admin role submits the checklist above via the existing manual/direct-upload path. This applies
+identically to every role; it is not a permanent exemption for any role, and does not change once
+the chatbot ships (§6.9, `ADR-065` §6 item 2).
 
 ### 6.3 Document Collection Chatbot (Consumed Capability)
 
@@ -210,6 +243,37 @@ The module is responsible for:
 - **Scope of review:** Manager has full access to the Personalfragebogen, uploaded documents, and signed contract.
 - **No re-application:** [OPEN] how rejected applicants are handled; whether they can reapply (see §20 OPQ-4).
 
+### 6.8 Hierarchical Onboarding Gate (ADR-065)
+
+**Definition:** The structured onboarding process is applied universally to all non-Admin roles (Worker, Checker, Manager, Regional Manager).
+
+**Specifications:**
+- **Universal Gate:** No non-Admin user bypasses the onboarding gate.
+- **Strict Post-Activation Assignment:** Organizational assignment foreign keys (e.g., `hotel_group_id`) are never written before the user is activated.
+- **Application Routing:** Applications use a `target_scope_id` to route to the correct approver inbox, allowing unassigned users to be reviewed.
+- **Approval Hierarchy:**
+  - Worker/Checker: Approved by Manager/RM.
+  - Manager: Approved by RM/Admin.
+  - RM: Approved by Admin.
+
+### 6.9 Self-Service & Review Queue UI Surfaces
+
+**Definition:** The frontend interface model for how each role interacts with their own onboarding and reviews others.
+
+**Specifications:**
+- **Manager-Initiated Creation:** Worker and Checker onboarding records are created by their Manager, not via public self-signup.
+- **Self-Service:** After creation, each user (Worker, Checker, Manager, Regional Manager) uploads their **own** documents and contract themselves — this is never done on their behalf by an approver.
+- **UI Panels:** Every role (except Admin) sees both a "My Onboarding" panel for their own record AND a "Review Queue" panel listing the tier below them awaiting review.
+- **Admin Exception:** Admin has **no** "My Onboarding" panel at all, as they do not undergo onboarding. Admin only sees a Review Queue for Regional Managers.
+
+| Role | "My Onboarding" (self) | "Review Queue" (tier below) |
+|---|---|---|
+| Worker | Yes | None |
+| Checker | Yes | None |
+| Manager | Yes (approved by RM/Admin) | Yes — Workers + Checkers in their specific **Hotel** (Strict Isolation) |
+| Regional Manager | Yes (approved by Admin) | Yes — Managers in their **Hotel Group** (Strict Isolation) |
+| Admin | **None** | Yes — Regional Managers |
+
 ## 7. Onboarding Lifecycle
 
 The onboarding lifecycle progresses through the following states:
@@ -259,11 +323,11 @@ Under manager review → Rejected   (Employee Management: Under Review → Rejec
 
 **Personalfragebogen & document upload:** Only the applicant (the worker themselves) can fill out the form and upload documents (CRR §6).
 
-**Pool/claim review:** Only **Hotel Group managers** can access the pool and claim applications. Specifically:
+**Pool/claim review:** Only **Hotel Group managers and Admins** can access the pool and claim applications based on the routing `target_scope_id` and the approval hierarchy (ADR-065). Specifically:
 
-- Hotel Manager: Can claim and review applications for employees they will manage.
-- Regional Manager: Can claim and review applications for any hotel in their Hotel Group.
-- Admin: Can claim and review applications across the system.
+- Hotel Manager: Can claim and review Worker/Checker applications targeted at their hotel.
+- Regional Manager: Can claim and review Worker/Checker/Manager applications targeted at their Hotel Group.
+- Admin: Can claim and review Regional Manager (and optionally Manager) applications across the system.
 - Staff (Worker) and Checker: No access to the pool.
 
 **Approval decision:** Only the manager who claimed the application can approve or reject it (lock prevents others from interfering).
@@ -386,7 +450,7 @@ Every Onboarding action produces an audit log entry:
 
 - **Document type:** Chatbot specifies which document types it will accept (e.g., PDF, JPG); system rejects unsupported types.
 - **File size:** [OPEN] maximum file size per document.
-- **Non-EU work-permit requirement:** The **Documents module** owns the work-permit requirement rule and its validation — non-EU/EEA/Swiss nationals require a work-permit document; EU/EEA/Swiss nationals are exempt (CRR §7; EM §4). Onboarding supplies the worker's Nationality (from the Personalfragebogen) and orchestrates collection; it does not independently define the rule. The rule is deterministic (Nationality vs. EU/EEA/Swiss list); no manual override.
+- **Non-EU work-permit requirement:** The **Documents module** owns the work-permit requirement rule and its validation — non-EU/EEA/Swiss nationals require a work-permit document; EU/EEA/Swiss nationals are exempt (CRR §7; EM §4). **Mechanism correction (`ADR-065` §6 item 8, 2026-08-11):** whether `WORK_PERMIT` is required for a given application is no longer derived automatically from Nationality — it is an explicit checkbox/flag the creating actor sets at application-creation time (§6.2), stored on the employment record. Onboarding still collects the worker's Nationality via the Personalfragebogen for other purposes, but no longer uses it to auto-derive this flag.
 - **Missing documents:** If required documents are missing, chatbot re-prompts; account cannot activate (§7, gate).
 
 ### 15.3 Contract Signing Validation
@@ -457,7 +521,7 @@ Every Onboarding action produces an audit log entry:
 
 ### 17.1 EU/EEA/Swiss Citizen (No Work Permit Required)
 
-A worker with Nationality = Austria, Poland, etc., is exempt from the work-permit document requirement. Applying the Documents-module-owned requirement rule (EM §4), Onboarding does NOT request work-permit documents for this worker (CRR §7).
+A worker with Nationality = Austria, Poland, etc., is typically exempt from the work-permit document requirement. **Per `ADR-065` §6 item 8's mechanism correction:** this exemption is no longer automatic/deterministic from Nationality — the creating actor explicitly leaves the `work_permit_required` flag unset (`false`) at application-creation time for such a worker. Nationality remains the practical guidance for that decision, but the system does not enforce it as a hard rule; the creating actor's explicit checkbox choice is what the completeness check reads (CRR §7; §6.2).
 
 ### 17.2 Personalfragebogen Data Mismatch
 

@@ -15,6 +15,7 @@ import { isHotelInScope } from '../../middleware/permissions.js';
 import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
+import { ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
 
 interface Actor {
   userId: string;
@@ -101,6 +102,18 @@ export class QualityService extends BaseService {
       const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
       if (!inScope) {
         throw new ForbiddenError('Cannot verify attendance for this hotel');
+      }
+    } else if (actor.role === 'checker') {
+      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: actor.userId,
+          hotel_id: assignment.hotel_id,
+          day: assignment.day,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES }
+        }
+      });
+      if (!checkerAssignment) {
+        throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
       }
     }
 
@@ -196,7 +209,7 @@ export class QualityService extends BaseService {
     const rating = await this.prisma.$transaction(async (tx) => {
       const assignment = await tx.workerAssignment.findUnique({
         where: { id: assignment_id },
-        select: { id: true, hotel_id: true, worker_id: true },
+        select: { id: true, hotel_id: true, worker_id: true, day: true },
       });
       if (!assignment) {
         throw new NotFoundError('Assignment not found');
@@ -213,6 +226,18 @@ export class QualityService extends BaseService {
         const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
         if (!inScope) {
           throw new ForbiddenError('Cannot rate for this hotel');
+        }
+      } else if (actor.role === 'checker') {
+        const checkerAssignment = await tx.workerAssignment.findFirst({
+          where: {
+            worker_id: actor.userId,
+            hotel_id: assignment.hotel_id,
+            day: assignment.day,
+            status: { in: ACTIVE_ASSIGNMENT_STATUSES }
+          }
+        });
+        if (!checkerAssignment) {
+          throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
         }
       }
 

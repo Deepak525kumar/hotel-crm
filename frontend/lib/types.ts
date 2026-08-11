@@ -1023,7 +1023,7 @@ export interface UpdateAttendanceInput {
 /*  Documents — SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16)                       */
 /* -------------------------------------------------------------------------- */
 
-export type DocumentCategory = "GENERAL" | "WORK_PERMIT";
+export type DocumentCategory = "TAX_NUMBER" | "SOCIAL_SECURITY_NUMBER" | "HEALTH_INSURANCE" | "ID_CARD" | "PASSPORT" | "ADDRESS" | "WORK_PERMIT";
 
 /** Matches backend `WorkerDocumentDto` (documents/types.ts) exactly. */
 export interface WorkerDocument {
@@ -1049,6 +1049,16 @@ export interface DocumentCompleteness {
   is_complete: boolean;
   missing_categories: DocumentCategory[];
   document_count: number;
+  /**
+   * Per-category presence map (ADR-065 §6 item 8's "checklist, not a single
+   * flag" requirement). NOTE: this is `categories` on the wire — the backend's
+   * DocumentCompleteness DTO (documents/types.ts) names it exactly this. An
+   * earlier revision of this interface called it `by_category`, which
+   * typechecked on both sides while crashing at runtime
+   * (`Cannot read properties of undefined (reading 'TAX_NUMBER')`) because no
+   * such field is ever sent. Keep this name aligned with the backend DTO.
+   */
+  categories: Record<DocumentCategory, boolean>;
 }
 
 /**
@@ -1205,6 +1215,9 @@ export interface EmploymentRecord {
   employment_cycle: number;
   marked_suitable: boolean;
   hotel_group_id: string | null;
+  work_permit_required: boolean;
+  target_hotel_group_id: string | null;
+  target_primary_hotel_id: string | null;
   /**
    * Primary/home hotel — display and default-selection only (person-centric
    * assignment redesign, 2026-08-07). Explicitly NOT an eligibility
@@ -1275,6 +1288,12 @@ export interface CreateEmploymentInput {
 export interface ApproveEmploymentInput {
   /** Explicit fallback only — normally auto-resolved from the approving actor's own scope (ADR-023 §4). */
   hotel_group_id?: string;
+}
+
+/** Body of `POST /employees/:employee_id/assign`. */
+export interface AssignEmploymentInput {
+  hotel_group_id?: string;
+  primary_hotel_id?: string;
 }
 
 /** Body of `POST /employees/:employee_id/reject`. */

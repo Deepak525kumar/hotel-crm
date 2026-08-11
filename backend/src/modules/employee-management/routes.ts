@@ -7,10 +7,16 @@ const router = Router();
 
 router.use(authMiddleware);
 
-// Create / bulk import (Admin-only — OD-EMP-08 leaves other importer roles
-// OPEN; see EmployeeManagementService.createEmployee).
-router.post('/', requireRole('admin'), requirePermission('employees:write'), ...controller.createEmployee);
+// Create / bulk import. ADR-065 expands createEmployee to manager/regional_manager.
+router.post('/', requireRole(['admin', 'regional_manager', 'manager']), requirePermission('employees:write'), ...controller.createEmployee);
 router.post('/bulk-import', requireRole('admin'), requirePermission('employees:write'), ...controller.bulkImport);
+
+// Review Queue (ADR-065 §6 item 7)
+router.get(
+  '/review-queue',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  (req, res, next) => controller.getReviewQueue(req, res, next)
+);
 
 // By-user lookup — resolves whether a `User` already has an EmploymentRecord
 // (and its current status/employee_id) without the caller needing to already
@@ -69,8 +75,10 @@ router.get(
 //     no scope claim narrows. The service re-checks admin independently.
 router.post(
   '/:employee_id/submit-for-review',
-  requireRole(['admin', 'manager', 'regional_manager']),
-  requirePermission('employees:write'),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
+  // Note: We omit requirePermission('employees:write') here because workers/checkers
+  // only have 'employees:read'. Self-submission authorization is handled securely
+  // inside assertLifecycleAuthority in the service layer.
   (req, res, next) => controller.submitForReview(req, res, next)
 );
 router.post(
@@ -78,6 +86,12 @@ router.post(
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('employees:write'),
   ...controller.approve
+);
+router.post(
+  '/:employee_id/assign',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.assign
 );
 router.post(
   '/:employee_id/reject',

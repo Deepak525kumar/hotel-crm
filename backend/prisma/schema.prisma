@@ -285,14 +285,14 @@ enum SkillTag {
 // =============================================================================
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  password_hash     String
-  first_name        String
-  last_name         String
-  phone             String?   @unique
-  profile_photo_url String?
-  role              UserRole  @default(WORKER)
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  password_hash      String
+  first_name         String
+  last_name          String
+  phone              String?   @unique
+  profile_photo_url  String?
+  role               UserRole  @default(WORKER)
   // ADR-031 M-3 (PR-7): the stored permission snapshot is retired. Permissions
   // are derived request-time from ROLE_PERMISSIONS[role] (D-1); this column
   // ceased being read at PR-3, ceased being written at PR-4, and is dropped
@@ -300,29 +300,29 @@ model User {
   // see docs/implementation/ADR-031_PRODUCTION_ROLLOUT_CHECKLIST.md). A
   // pre-drop snapshot is retained for one release per the migration's own
   // down.sql / backup-table note.
-  is_active         Boolean   @default(true)
-  email_verified_at DateTime?
-  phone_verified_at DateTime?
-  last_login_at     DateTime?
+  is_active          Boolean   @default(true)
+  email_verified_at  DateTime?
+  phone_verified_at  DateTime?
+  last_login_at      DateTime?
   // TREQ-AUTH-007 (2026-08-08): consecutive failed-login counter driving the
   // notify-the-manager escalation. NOT a lockout counter -- TRULE-AUTH-002's
   // confirmed pattern is "notify and never block", so nothing anywhere reads
   // this to deny a login; it only decides when to raise the alert. Reset to 0
   // on every successful login.
-  failed_login_count Int      @default(0)
+  failed_login_count Int       @default(0)
   // When the most recent consecutive-failure streak began. Recorded so the
   // notification can say "N attempts since <time>" rather than just a bare
   // count, and so a future retention sweep can age out stale streaks.
   failed_login_since DateTime?
-  deleted_at        DateTime? // GDPR soft delete — keep row, null PII via separate job
+  deleted_at         DateTime? // GDPR soft delete — keep row, null PII via separate job
   // ADR-031 M-1/D-3/D-4 (PR-2, enforced unconditionally as of PR-7): monotonic
   // revocation counter, mirrored into the access token's `token_generation`
   // claim at issuance. Incremented (never reset) by backend-auth on role
   // change / deactivation / soft delete / password reset; a mismatch against
   // the row invalidates an already-issued access token.
-  token_generation  Int       @default(0)
-  created_at        DateTime  @default(now())
-  updated_at        DateTime  @updatedAt
+  token_generation   Int       @default(0)
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
 
   // Relations
   sessions                                       Session[]
@@ -485,6 +485,7 @@ model HotelGroup {
   hotels                              Hotel[]
   // Epic 5 PR 5.6 (ADR-023 §4): employment records associated with this group.
   employment_records                  EmploymentRecord[]                 @relation("employment_group")
+  employment_records_target           EmploymentRecord[]                 @relation("target_employment_group")
   regional_manager_assignment_history RegionalManagerAssignmentHistory[]
 
   @@index([regional_manager_user_id])
@@ -573,6 +574,7 @@ model Hotel {
   // Person-centric assignment redesign (2026-08-07): display/default-selection
   // only -- see EmploymentRecord.primary_hotel_id.
   employment_records_primary EmploymentRecord[]              @relation("employment_primary_hotel")
+  employment_records_target  EmploymentRecord[]              @relation("target_employment_primary_hotel")
 
   @@index([country])
   @@index([is_active])
@@ -646,6 +648,8 @@ model EmploymentRecord {
   job_title               String // free text, provisional (OD-EMP-13)
   start_date              DateTime
   status                  EmploymentStatus    @default(PENDING)
+  version                 Int                 @default(0) // ADR-036: optimistic concurrency
+
   // Sub-state of PENDING only (2026-08-06 rework): null = old INACTIVE
   // (onboarding not yet submitted), non-null = old UNDER_REVIEW (awaiting
   // approval). Status itself stays PENDING across both; only Approve/Reject
@@ -676,6 +680,17 @@ model EmploymentRecord {
   // has a sensible default hotel to preselect for a worker/checker.
   primary_hotel_id        String?
   primary_hotel           Hotel?              @relation("employment_primary_hotel", fields: [primary_hotel_id], references: [id], onDelete: SetNull)
+  // ADR-065 §6 item 8: Replaces the nationality-derived WORK_PERMIT requirement.
+  // Explicitly set by the creating actor at application-creation time (defaults false), 
+  // determining whether the WORK_PERMIT document category is strictly required.
+  work_permit_required    Boolean             @default(false)
+  // ADR-065 §6 item 3, 5: Pre-activation routing/default-target fields.
+  // Never read by eligibility or authorization logic, but remain live/editable
+  // post-activation too (Decision 5).
+  target_hotel_group_id   String?
+  target_hotel_group      HotelGroup?         @relation("target_employment_group", fields: [target_hotel_group_id], references: [id], onDelete: SetNull)
+  target_primary_hotel_id String?
+  target_primary_hotel    Hotel?              @relation("target_employment_primary_hotel", fields: [target_primary_hotel_id], references: [id], onDelete: SetNull)
   skills                  SkillTag[] // fixed set (REQ-EMP-003)
   personal_data           Json? // Personalfragebogen non-special data (REQ-EMP-011)
   konfession              String? // special-category (RULE-EMP-09) — never on general profile
@@ -688,6 +703,7 @@ model EmploymentRecord {
   status_history    EmploymentStatusHistory[] @relation("employment_status_history")
 
   @@index([hotel_group_id])
+  @@index([target_hotel_group_id])
   @@index([status])
   @@index([primary_hotel_id])
 }
@@ -981,14 +997,14 @@ model CalendarEntry {
 // SP-6: status defaults to EXPECTED (pre-shift state before worker arrives).
 // SP-7: is_verified flag added for efficient manager-dashboard queries.
 model Attendance {
-  id             String           @id @default(cuid())
-  assignment_id  String           @unique // 1-to-1 with WorkerAssignment
-  assignment     WorkerAssignment @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
+  id             String             @id @default(cuid())
+  assignment_id  String             @unique // 1-to-1 with WorkerAssignment
+  assignment     WorkerAssignment   @relation(fields: [assignment_id], references: [id], onDelete: Cascade)
   worker_id      String
-  worker         User             @relation("attendee", fields: [worker_id], references: [id], onDelete: Cascade)
+  worker         User               @relation("attendee", fields: [worker_id], references: [id], onDelete: Cascade)
   hotel_id       String
-  hotel          Hotel            @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
-  status         AttendanceStatus @default(EXPECTED) // SP-6
+  hotel          Hotel              @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
+  status         AttendanceStatus   @default(EXPECTED) // SP-6
   check_in_at    DateTime?
   check_out_at   DateTime?
   // Denormalised from WorkRequest so payroll/reporting queries need no extra join
@@ -997,12 +1013,12 @@ model Attendance {
   minutes_late   Int?
   minutes_worked Int?
   notes          String?
-  is_verified    Boolean          @default(false) // SP-7: set true when manager verifies
+  is_verified    Boolean            @default(false) // SP-7: set true when manager verifies
   verified_by_id String?
-  verified_by    User?            @relation("attendance_verifier", fields: [verified_by_id], references: [id], onDelete: SetNull)
+  verified_by    User?              @relation("attendance_verifier", fields: [verified_by_id], references: [id], onDelete: SetNull)
   verified_at    DateTime?
-  created_at     DateTime         @default(now())
-  updated_at     DateTime         @updatedAt
+  created_at     DateTime           @default(now())
+  updated_at     DateTime           @updatedAt
   // OD-GEO-010: geofence-verification events captured by GeoService.verifyGeofence
   // during this shift's check-in/check-out (backend-geo-owned table; see
   // WorkerGeoCheckin.attendance_id).
@@ -1239,11 +1255,16 @@ model AuditLog {
 // DOCUMENTS MODULE (SPEC-DOCUMENTS-001 @0.1.4 FROZEN, GD-16 Decided 2026-07-27)
 // =============================================================================
 
-// CRR §7 lines 97-98: the only two confirmed document sub-type distinctions.
-// No broader category taxonomy is specified by CRR/PDD (OD-DOC-005 category half).
+// CRR §7 lines 97-98, ADR-065 §6 item 8: Named-document checklist model
+// applying identically to every non-Admin role (Worker, Checker, Manager, Regional Manager).
 enum DocumentCategory {
-  GENERAL // General onboarding/identity document (all workers)
-  WORK_PERMIT // Residence/work-authorization document (non-EU/EEA/Swiss only, REQ-DOC-003)
+  TAX_NUMBER // Tax identification number
+  SOCIAL_SECURITY_NUMBER // Sozialversicherungsnummer
+  HEALTH_INSURANCE // Health insurance proof/membership document
+  ID_CARD // National identity card
+  PASSPORT // Passport (Required independently of ID_CARD)
+  ADDRESS // Proof of address
+  WORK_PERMIT // Residence/work-authorization document (Required conditionally per work_permit_required flag)
 }
 
 // state-worker-document (SPEC-DOCUMENTS-001, PDD §9.3 line 389).
@@ -1253,31 +1274,31 @@ enum DocumentCategory {
 // Retention tier: OD-DOC-001 (open; not yet mapped to CRR §25 tier).
 // Special-category applicability: OD-DOC-002 (no confirmed special-category doc type today).
 model WorkerDocument {
-  id                String           @id @default(cuid())
-  worker_id         String
-  worker            User             @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  id                     String            @id @default(cuid())
+  worker_id              String
+  worker                 User              @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Uploader identity — always derived from the authenticated session (RULE-DOC-08).
   // For worker self-uploads: uploaded_by_id == worker_id.
   // For manager-on-behalf uploads (contract-scan mechanism): uploaded_by_id == manager's user id.
-  uploaded_by_id    String
-  uploaded_by       User             @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
-  category          DocumentCategory
+  uploaded_by_id         String
+  uploaded_by            User              @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
+  category               DocumentCategory
   // Server-generated storage key (RULE-DOC-09): never built from client input;
   // includes a UUIDv4 segment for unpredictability (OD-DOC-017).
-  s3_key            String           @unique
-  original_filename String
-  mime_type         String
-  file_size_bytes   Int
+  s3_key                 String            @unique
+  original_filename      String
+  mime_type              String
+  file_size_bytes        Int
   // REQ-DOC-001: expiry tracking. Consequence/warning on crossing is OD-DOC-003 (open).
-  expires_at        DateTime?        @db.Date
+  expires_at             DateTime?         @db.Date
   // REQ-DOC-003: true only for non-EU/EEA/Swiss workers' work-permit documents.
-  is_work_permit    Boolean          @default(false)
-  created_at        DateTime         @default(now())
-  updated_at        DateTime         @updatedAt
+  is_work_permit         Boolean           @default(false)
+  created_at             DateTime          @default(now())
+  updated_at             DateTime          @updatedAt
   // SPEC-HR-001 (MIG-GAP-DOC-001): back-relation for a Contract's scanned
   // signed copy — HR delegates storage here, does not duplicate it
   // (RULE-DOC-04: this delegation grants HR no document-lifecycle authority).
-  hr_contract_scan  Contract?        @relation("hr_contract_scan")
+  hr_contract_scan       Contract?         @relation("hr_contract_scan")
   // Document Templates module (2026-08-09): same delegation pattern as
   // hr_contract_scan above — the final assembled/signed PDF of a
   // DocumentInstance is stored as an ordinary WorkerDocument row
@@ -1392,15 +1413,15 @@ model DocumentTemplateSection {
 
 // A single fillable (or informational) field within a section.
 model DocumentTemplateField {
-  id          String                    @id @default(cuid())
-  section_id  String
-  section     DocumentTemplateSection   @relation(fields: [section_id], references: [id], onDelete: Cascade)
-  field_key   String // stable key referenced by body_template's {{field_key}} and by DocumentInstanceFieldValue
-  label       String
-  field_type  DocumentTemplateFieldType
-  is_required Boolean                   @default(true)
-  order_index Int
-  signer_role SignerRole                @default(SUBJECT)
+  id             String                    @id @default(cuid())
+  section_id     String
+  section        DocumentTemplateSection   @relation(fields: [section_id], references: [id], onDelete: Cascade)
+  field_key      String // stable key referenced by body_template's {{field_key}} and by DocumentInstanceFieldValue
+  label          String
+  field_type     DocumentTemplateFieldType
+  is_required    Boolean                   @default(true)
+  order_index    Int
+  signer_role    SignerRole                @default(SUBJECT)
   // Cross-section reuse: fields sharing the same shared_key across sections
   // of the SAME template resolve to one value at fill time (e.g. an
   // employee's name entered once, reused across every section that
@@ -1457,24 +1478,24 @@ model DocumentTemplateSignatureBlock {
 // column yet) — see PayslipRequest's own escalated_at-adjacent comment
 // above for the precedent this follows.
 model DocumentInstance {
-  id            String                 @id @default(cuid())
-  template_id   String
-  template      DocumentTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
+  id                String                 @id @default(cuid())
+  template_id       String
+  template          DocumentTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
   // The worker this document is ABOUT (the "subject") — mirrors
   // WorkerDocument.worker_id / Contract.worker_id naming.
-  worker_id     String
-  worker        User                   @relation("doc_instance_worker", fields: [worker_id], references: [id], onDelete: Cascade)
-  created_by_id String // who initiated the fill — admin/manager, or the worker themself
-  created_by    User                   @relation("doc_instance_created_by", fields: [created_by_id], references: [id])
-  status        DocumentInstanceStatus @default(IN_PROGRESS)
-  created_at    DateTime               @default(now())
-  updated_at    DateTime               @updatedAt
-  completed_at  DateTime?
+  worker_id         String
+  worker            User                   @relation("doc_instance_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  created_by_id     String // who initiated the fill — admin/manager, or the worker themself
+  created_by        User                   @relation("doc_instance_created_by", fields: [created_by_id], references: [id])
+  status            DocumentInstanceStatus @default(IN_PROGRESS)
+  created_at        DateTime               @default(now())
+  updated_at        DateTime               @updatedAt
+  completed_at      DateTime?
   // Final assembled, fully-signed PDF — delegated to the documents module's
   // storage exactly like HR's Contract.scanned_document_id pattern. Null
   // until COMPLETED.
-  final_document_id String?          @unique
-  final_document     WorkerDocument? @relation("doc_instance_final_pdf", fields: [final_document_id], references: [id], onDelete: SetNull)
+  final_document_id String?                @unique
+  final_document    WorkerDocument?        @relation("doc_instance_final_pdf", fields: [final_document_id], references: [id], onDelete: SetNull)
 
   field_values DocumentInstanceFieldValue[]
   signatures   DocumentInstanceSignature[]
@@ -1497,9 +1518,9 @@ model DocumentInstanceFieldValue {
   // NUMBER(as string)/CHECKBOX("true"/"false")/SELECT(one of its options)
   // all fit one nullable String column.
   value         String?
-  updated_at    DateTime @updatedAt
+  updated_at    DateTime              @updatedAt
   updated_by_id String
-  updated_by    User     @relation("doc_field_value_updated_by", fields: [updated_by_id], references: [id])
+  updated_by    User                  @relation("doc_field_value_updated_by", fields: [updated_by_id], references: [id])
 
   @@unique([instance_id, field_id])
   @@index([instance_id])
@@ -1509,22 +1530,22 @@ model DocumentInstanceFieldValue {
 // bytes go through the SAME documents/storage.ts helper as every other
 // file in this system — no new blob-storage mechanism.
 model DocumentInstanceSignature {
-  id                  String                         @id @default(cuid())
-  instance_id         String
-  instance            DocumentInstance               @relation(fields: [instance_id], references: [id], onDelete: Cascade)
-  signature_block_id  String
-  signature_block     DocumentTemplateSignatureBlock @relation(fields: [signature_block_id], references: [id], onDelete: Restrict)
+  id                      String                         @id @default(cuid())
+  instance_id             String
+  instance                DocumentInstance               @relation(fields: [instance_id], references: [id], onDelete: Cascade)
+  signature_block_id      String
+  signature_block         DocumentTemplateSignatureBlock @relation(fields: [signature_block_id], references: [id], onDelete: Restrict)
   // Who actually signed (resolved User, not just an abstract SignerRole).
-  signed_by_id        String
-  signed_by           User                           @relation("doc_signature_signed_by", fields: [signed_by_id], references: [id])
+  signed_by_id            String
+  signed_by               User                           @relation("doc_signature_signed_by", fields: [signed_by_id], references: [id])
   // S3 key for the captured signature image (drawn PNG). Reuses
   // generateStorageKey(workerId, category, filename) with
   // category="signature" — the existing helper's contract, no new storage
   // code. Never returned raw in DTOs — only a presigned URL, mirroring
   // WorkerDocument.s3_key's convention.
-  signature_image_key String
-  signed_at           DateTime                       @default(now())
-  signer_ip           String?
+  signature_image_key     String
+  signed_at               DateTime                       @default(now())
+  signer_ip               String?
   // Non-repudiation evidence (attestation-level, see module header note):
   // sha256 of THIS SECTION's rendered/interpolated HTML at the moment this
   // signature block was signed, so a later "what did they actually see"
@@ -1547,12 +1568,12 @@ model DocumentInstanceSignature {
 // Stores only a plain sick/vacation flag -- no health data (CRR §27 §353),
 // no leave-balance accounting (non-goal, REQ-CAL-T07).
 model CalendarAbsence {
-  id         String              @id @default(cuid())
-  worker_id  String
-  worker     User                @relation("calendar_absence_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  id           String              @id @default(cuid())
+  worker_id    String
+  worker       User                @relation("calendar_absence_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Date-only (no time component); the specific day being marked, not a range.
-  day        DateTime            @db.Date
-  kind       CalendarAbsenceKind
+  day          DateTime            @db.Date
+  kind         CalendarAbsenceKind
   // Reason text (2026-08-08 feature): mandatory for VACATION ("family trip",
   // "personal day" -- low sensitivity), nullable for SICK. A SICK reason is
   // deliberately NOT made mandatory: forcing detail on a sick day is exactly
@@ -1561,7 +1582,7 @@ model CalendarAbsence {
   // needs protections this system doesn't have. Enforced in the Zod schema
   // (types.ts), not a DB-level CHECK, so the column itself stays plain
   // nullable text.
-  reason     String?
+  reason       String?
   // Who actually performed the mark/move (2026-08-08 feature: manager may now
   // act on a worker's behalf, not just self-service) -- distinct from
   // worker_id, whose absence this is. Nullable/SetNull rather than required:
@@ -1573,8 +1594,8 @@ model CalendarAbsence {
   // <manager>" without joining AuditLog.
   marked_by_id String?
   marked_by    User?               @relation("calendar_absence_marked_by", fields: [marked_by_id], references: [id], onDelete: SetNull)
-  created_at DateTime            @default(now())
-  updated_at DateTime            @updatedAt
+  created_at   DateTime            @default(now())
+  updated_at   DateTime            @updatedAt
 
   // RULE-CAL-03: one mark per worker per day.
   @@unique([worker_id, day])

@@ -54,6 +54,49 @@ const VIOLATIONS: readonly CapabilityViolation[] = Object.freeze([
   // C-22, C-23, C-24, C-25, C-29 and C-30 regional_manager route-gate
   // violations were all closed in the same pass that added
   // resolveWorkerScope's RM branch. Conform.
+  
+  {
+    key: 'C-15:manager@employee-management:POST /',
+    reason: 'ADR-065 expands createEmployee to manager',
+    authority: 'ADR-065',
+    owner: 'PR 9.x',
+  },
+  {
+    key: 'C-15:regional_manager@employee-management:POST /',
+    reason: 'ADR-065 expands createEmployee to regional_manager',
+    authority: 'ADR-065',
+    owner: 'PR 9.x',
+  },
+  // C-16 (submit-for-review): ADR-065 §6 item 5 / SPEC-ONBOARDING-001 §6.9
+  // establish self-service onboarding — the applicant uploads their own
+  // documents and submits their own application. The ratified ADR-030 §3
+  // matrix predates that decision and lists this capability as manager+ only,
+  // so admitting worker/checker to the route diverges from the matrix as
+  // transcribed.
+  //
+  // Authorization is NOT weakened: the route's role gate widens, but
+  // `requirePermission('employees:write')` is deliberately dropped from it
+  // (worker/checker hold only `employees:read`) and the real boundary moves
+  // into assertLifecycleAuthority, which returns early ONLY when
+  // `actor.userId === record.user_id`. Verified end-to-end: a worker may
+  // submit their OWN record; the same worker submitting ANOTHER worker's
+  // record gets 403, as does a checker acting on a worker's record.
+  //
+  // These pins should be REMOVED (not the code reverted) once ADR-030 §3's
+  // matrix is amended to reflect ADR-065's self-service decision — the
+  // forward-note ADR-065 §7 already flags as owed to ADR-030.
+  {
+    key: 'C-16:worker@employee-management:POST /:employee_id/submit-for-review',
+    reason: 'ADR-065 self-service: a worker submits their own application (own-record only, enforced in assertLifecycleAuthority)',
+    authority: 'ADR-065 §6 item 5 / SPEC-ONBOARDING-001 §6.9 vs ADR-030 §3 C-16',
+    owner: 'ADR-030 §3 matrix amendment',
+  },
+  {
+    key: 'C-16:checker@employee-management:POST /:employee_id/submit-for-review',
+    reason: 'ADR-065 self-service: a checker submits their own application (own-record only, enforced in assertLifecycleAuthority)',
+    authority: 'ADR-065 §6 item 5 / SPEC-ONBOARDING-001 §6.9 vs ADR-030 §3 C-16',
+    owner: 'ADR-030 §3 matrix amendment',
+  },
   // ---------------------------------------------------------------------
 ]);
 

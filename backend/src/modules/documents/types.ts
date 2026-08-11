@@ -1,7 +1,7 @@
 // SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16 Decided 2026-07-27).
 // DocumentCategory enum values match schema.prisma exactly.
 
-export type DocumentCategoryType = 'GENERAL' | 'WORK_PERMIT';
+export type DocumentCategoryType = 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'WORK_PERMIT';
 
 // REQ-DOC-011: canonical entity name is WorkerDocument (PDD §9.3 line 389).
 export interface WorkerDocumentDto {
@@ -32,10 +32,11 @@ export interface DocumentCompleteness {
   // Whether the non-EU work-permit branch applies for this worker.
   // Determined by is_work_permit_required (derived from worker's nationality).
   work_permit_required: boolean;
-  // True only when all required categories are present (at least one GENERAL
-  // doc, plus a WORK_PERMIT doc if work_permit_required is true).
+  // True only when all required categories are present (all mandatory + work permit if required)
   is_complete: boolean;
   missing_categories: DocumentCategoryType[];
+  // ADR-065 §6 item 8: Checklist shape
+  categories: Record<DocumentCategoryType, boolean>;
   document_count: number;
 }
 
