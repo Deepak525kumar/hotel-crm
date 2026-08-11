@@ -78,18 +78,34 @@ describe('Analytics bare-route scope (ADR-030 PR-4)', () => {
     getDashboardStats.mockClear();
   });
 
-  it('ignores a manager-supplied ?hotel_id and scopes to their own hotel_group claim', async () => {
+  it('honors a manager-supplied ?hotel_id if it belongs to their hotel_group claim', async () => {
     testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
-    const res = await request(makeApp()).get('/analytics/leaderboard?hotel_id=h_other');
+    // h1 belongs to g1 based on the DB mock
+    const res = await request(makeApp()).get('/analytics/leaderboard?hotel_id=h1');
     expect(res.status).toBe(200);
-    expect(getLeaderboard).toHaveBeenCalledWith(undefined, 'g1');
+    expect(getLeaderboard).toHaveBeenCalledWith('h1', undefined);
   });
 
-  it('resolves a hotel-claim manager to their hotel\'s group on /stats, ignoring any client hotel_id', async () => {
+  it('rejects with 403 if a manager supplies a ?hotel_id outside their hotel_group claim', async () => {
+    testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+    // h2 belongs to g2, which is outside g1
+    const res = await request(makeApp()).get('/analytics/leaderboard?hotel_id=h2');
+    expect(res.status).toBe(403);
+    expect(getLeaderboard).not.toHaveBeenCalled();
+  });
+
+  it('honors a hotel-claim manager\'s own hotel_id on /stats', async () => {
     testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel', hotel_id: 'h1' } };
-    const res = await request(makeApp()).get('/analytics/stats?hotel_id=h_other');
+    const res = await request(makeApp()).get('/analytics/stats?hotel_id=h1');
     expect(res.status).toBe(200);
-    expect(getDashboardStats).toHaveBeenCalledWith(undefined, 'g1');
+    expect(getDashboardStats).toHaveBeenCalledWith('h1', undefined);
+  });
+
+  it('rejects with 403 if a hotel-claim manager supplies a different hotel_id', async () => {
+    testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['analytics:read'], scope: { type: 'hotel', hotel_id: 'h1' } };
+    const res = await request(makeApp()).get('/analytics/stats?hotel_id=h2');
+    expect(res.status).toBe(403);
+    expect(getDashboardStats).not.toHaveBeenCalled();
   });
 
   it('denies (empty scope) a manager with no scope claim on /leaderboard', async () => {

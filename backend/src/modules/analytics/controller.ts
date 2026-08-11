@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { analyticsService } from './service.js';
-import { resolveNonAdminScopeFilter } from '../../lib/scope.js';
-import { UnauthorizedError } from '../../lib/errors.js';
+import { resolveNonAdminScopeFilter, isHotelInScope } from '../../lib/scope.js';
+import { UnauthorizedError, ForbiddenError } from '../../lib/errors.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 // ADR-030 PR-4 (D-7): the bare /leaderboard and /stats routes have no
@@ -35,6 +35,15 @@ async function resolveScopedFilter(
   // returning unfiltered on that "shouldn't occur" case.
   const scopeFilter = await resolveNonAdminScopeFilter(auth.role, auth.scope ?? null);
   if (scopeFilter.kind === 'deny') return { hotelGroupId: '__none__' };
+
+  if (clientHotelId) {
+    const inScope = await isHotelInScope(auth.scope ?? null, clientHotelId);
+    if (!inScope) {
+      throw new ForbiddenError('Requested hotel is not in your scope');
+    }
+    return { hotelId: clientHotelId };
+  }
+
   return { hotelGroupId: scopeFilter.hotelGroupId };
 }
 

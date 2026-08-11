@@ -351,30 +351,37 @@ export class HrService extends BaseService {
     const expiresAt = new Date(now);
     expiresAt.setUTCFullYear(expiresAt.getUTCFullYear() + 1);
 
-    const updated = await this.prisma.contract.update({
-      where: { id: contract.id },
-      data: {
-        status: ContractStatus.ACTIVE,
-        confirmed_by_id: actorId,
-        confirmed_at: now,
-        expires_at: expiresAt,
-      },
-    });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const contractUpdate = await tx.contract.update({
+        where: { id: contract.id },
+        data: {
+          status: ContractStatus.ACTIVE,
+          confirmed_by_id: actorId,
+          confirmed_at: now,
+          expires_at: expiresAt,
+        },
+      });
 
-    // REQ-HR-013/RULE-HR-15: the sole compensating control for the
-    // no-signature-verification trust boundary — all five mandated fields
-    // (confirming actor id, timestamp, worker id, contract id, evidence-file
-    // reference) via BaseService.logAudit's existing schema. Immutable by
-    // construction (AuditLog has no update/delete code path anywhere).
-    await this.logAudit(
-      actorId,
-      actorRole,
-      'hr_contract.confirm_signed',
-      'Contract',
-      contract.id,
-      { worker_id: workerId, scanned_document_id: contract.scanned_document_id },
-      actorIp
-    );
+      // REQ-HR-013/RULE-HR-15: the sole compensating control for the
+      // no-signature-verification trust boundary — all five mandated fields
+      // (confirming actor id, timestamp, worker id, contract id, evidence-file
+      // reference) via BaseService.logAudit's existing schema. Immutable by
+      // construction (AuditLog has no update/delete code path anywhere).
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'hr_contract.confirm_signed',
+        'Contract',
+        contract.id,
+        { worker_id: workerId, scanned_document_id: contract.scanned_document_id },
+        actorIp,
+        undefined,
+        undefined,
+        tx
+      );
+
+      return contractUpdate;
+    });
 
     logger.info('hr_contract_confirmed', { contractId: contract.id, workerId, confirmedBy: actorId });
 
@@ -416,16 +423,24 @@ export class HrService extends BaseService {
       data.expires_at = null;
     }
 
-    const updated = await this.prisma.contract.update({ where: { id: contract.id }, data });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const contractUpdate = await tx.contract.update({ where: { id: contract.id }, data });
 
-    await this.logAudit(
-      actorId,
-      actorRole,
-      nextStatus === ContractStatus.EXTENDED ? 'hr_contract.extend' : 'hr_contract.make_permanent',
-      'Contract',
-      contract.id,
-      { worker_id: workerId, from_status: contract.status, to_status: nextStatus }
-    );
+      await this.logAudit(
+        actorId,
+        actorRole,
+        nextStatus === ContractStatus.EXTENDED ? 'hr_contract.extend' : 'hr_contract.make_permanent',
+        'Contract',
+        contract.id,
+        { worker_id: workerId, from_status: contract.status, to_status: nextStatus },
+        undefined,
+        undefined,
+        undefined,
+        tx
+      );
+
+      return contractUpdate;
+    });
 
     logger.info('hr_contract_extended', { contractId: contract.id, workerId, nextStatus });
 
@@ -597,9 +612,11 @@ export class HrService extends BaseService {
   // req.auth for the worker-self route rather than accepting a client
   // worker_id, mirroring getContractStatus's identical self-scope shape.
   async requestPayslip(data: CreatePayslipRequestRequest): Promise<PayslipRequestDto> {
-    const request = await this.createPayslipRequestRecord(data);
-
-    await this.notifyResponsibleManager(data.worker_id, request.id);
+    const request = await this.prisma.$transaction(async (tx) => {
+      const created = await this.createPayslipRequestRecord(data, tx);
+      await this.notifyResponsibleManager(data.worker_id, created.id, tx);
+      return created;
+    });
 
     logger.info('hr_payslip_requested', { requestId: request.id, workerId: data.worker_id });
 
@@ -630,12 +647,13 @@ export class HrService extends BaseService {
     return this.toPayslipDto(request);
   }
 
-  private async createPayslipRequestRecord(data: CreatePayslipRequestRequest) {
+  private async createPayslipRequestRecord(data: CreatePayslipRequestRequest, tx?: Prisma.TransactionClient) {
     if (!data.worker_id || !data.period_start || !data.period_end) {
       throw new ValidationError('worker_id, period_start, and period_end are required');
     }
 
-    return this.prisma.payslipRequest.create({
+    const client = tx || this.prisma;
+    return client.payslipRequest.create({
       data: {
         worker_id: data.worker_id,
         period_start: new Date(`${data.period_start}T00:00:00.000Z`),
@@ -790,14 +808,15 @@ export class HrService extends BaseService {
   // item is EVT-HR-PayslipRequested's `[OPEN]` transport note, now wired to
   // the existing Outbox/notification-service, matching every other module's
   // transport convention, ADR-032).
-  private async notifyResponsibleManager(workerId: string, requestId: string): Promise<void> {
-    const record = await this.prisma.employmentRecord.findUnique({
+  private async notifyResponsibleManager(workerId: string, requestId: string, tx?: Prisma.TransactionClient): Promise<void> {
+    const client = tx || this.prisma;
+    const record = await client.employmentRecord.findUnique({
       where: { user_id: workerId },
       select: { status: true, hotel_group_id: true },
     });
     if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
 
-    const group = await this.prisma.hotelGroup.findUnique({
+    const group = await client.hotelGroup.findUnique({
       where: { id: record.hotel_group_id },
       select: { regional_manager_user_id: true },
     });
@@ -812,7 +831,7 @@ export class HrService extends BaseService {
       transports: [OutboxTransport.PUSH],
       sourceModule: OutboxSourceModule.HR,
       producerService: 'HrService',
-    });
+    }, tx);
   }
 
   // MIG-GAP-DOC-001 (RULE-DOC-04, OD-DOC-015): the contract-scan upload is

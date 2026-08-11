@@ -42,13 +42,19 @@ const mockWorkerDocumentCreate = jest.fn() as jest.MockedFunction<(...args: any[
 const mockAuditLogCreate = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockEmploymentRecordFindUnique = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 
-jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
+jest.mock('../lib/db.js', () => {
+  const mockDb = {
     workerDocument: { create: mockWorkerDocumentCreate },
     auditLog: { create: mockAuditLogCreate },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
-  }),
-}));
+  };
+  return {
+    getPrisma: () => ({
+      ...mockDb,
+      $transaction: async (cb: any) => cb(mockDb),
+    }),
+  };
+});
 
 const mockUpload = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 jest.mock('../modules/documents/storage.js', () => ({

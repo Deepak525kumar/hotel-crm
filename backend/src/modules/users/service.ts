@@ -130,8 +130,11 @@ export class UserService extends BaseService {
 
     // Read-side counterpart of updateUser's scope check: a manager/RM could
     // otherwise read any user's full profile platform-wide (a read-only
-    // IDOR), holding `users:read` with no route-level scope gate. `checker`
-    // is deliberately left unscoped here, matching its documented
+    // IDOR), holding `users:read` with no route-level scope gate. This lack of
+    // a route-level scope gate is an accepted, intentional exception to the
+    // platform's defense-in-depth pattern because the generic route middleware
+    // cannot express the self-read exemption or target-role constraints below.
+    // `checker` is deliberately left unscoped here, matching its documented
     // cross-hotel bypass elsewhere in this module (isSelfScopedRole).
     // Self-read is exempt (a manager viewing their OWN profile, e.g. the
     // /users/:id detail page they now have a nav link to) — same exemption
@@ -155,12 +158,12 @@ export class UserService extends BaseService {
     if (existing) throw new ConflictError('Email already registered');
 
     // SECURITY (HOTFIX-AUTH-003): assigning a privileged role is a server-side
-    // authority decision, not a caller-supplied one. The authenticated admin-
-    // creation workflow is role-gated to {admin, manager} at the route, but a
-    // manager must not be able to mint an ADMIN account through this path.
-    // Mirror the elevation guard already enforced on updateUser: only an admin
-    // may assign the admin role. Preserves the legitimate admin-creates-admin
-    // and manager-creates-worker/checker/manager workflows.
+    // authority decision, not a caller-supplied one. Note: as of SEC-01 and
+    // ADR-030 D-4 (tracked in SIR-USERS-002), the route itself (POST /users) is
+    // strictly Admin-only. Managers cannot reach this method at all, so this
+    // guard (if data.role === 'admin' && actorRole !== 'admin') is currently
+    // defense-in-depth for a future state, not something exercised by a live
+    // manager-creates-worker path today. Do not remove it.
     if (data.role === 'admin' && actorRole !== 'admin') {
       throw new ForbiddenError('Only admins can assign admin role');
     }

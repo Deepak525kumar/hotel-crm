@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { mutate } from "swr";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
+import { useDocumentCompleteness } from "@/hooks/useDocuments";
+import { useWorkerContract } from "@/hooks/useContract";
 import { useHotelGroups } from "@/hooks/useHotels";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useEmploymentPermissions } from "@/hooks/useEmploymentPermissions";
@@ -87,6 +89,23 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   // than showing a button that always 403s.
   const { canCreateEmployment, canDeleteEmployment, canRestoreEmployment } =
     useEmploymentPermissions();
+
+  // Document completeness — needed to gate "Confirm onboarding complete".
+  // Only fetched when the record is in PENDING state (before submission).
+  const isPendingBeforeSubmit = record?.status === "PENDING" && !record?.submitted_for_review_at;
+  const isPendingAfterSubmit  = record?.status === "PENDING" && !!record?.submitted_for_review_at;
+  const { data: docCompleteness } = useDocumentCompleteness(
+    isPendingBeforeSubmit ? userId : null,
+    false // conservative: backend enforces the real work-permit requirement
+  );
+  // Contract status — needed to gate "Approve for work".
+  // Only fetched when the record is submitted and awaiting approval.
+  const { data: contractStatus } = useWorkerContract(
+    isPendingAfterSubmit ? userId : null
+  );
+  const hasApprovedContract = contractStatus?.status === "ACTIVE"
+    || contractStatus?.status === "EXTENDED"
+    || contractStatus?.status === "PERMANENT";
 
   // Refreshes this card's own cache entry plus every other SWR cache whose
   // key could now be stale after a lifecycle transition: the org chart (any
@@ -186,14 +205,25 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               </DataList>
 
               {record.status === "PENDING" && !record.submitted_for_review_at && (
-                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
-                  <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800 space-y-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
                     Paperwork/checks pending before this worker can be reviewed for approval.
                   </p>
+                  {docCompleteness && !docCompleteness.is_complete && (
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+                      <p className="font-medium">Documents required before submission:</p>
+                      <ul className="mt-1 list-disc list-inside">
+                        {docCompleteness.missing_categories.map((cat) => (
+                          <li key={cat}>{cat === "GENERAL" ? "General documents" : "Work permit"}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <Button
                     size="sm"
                     onClick={onSubmitForReview}
                     loading={action.isPending("submit")}
+                    disabled={docCompleteness != null && !docCompleteness.is_complete}
                   >
                     Confirm onboarding complete
                   </Button>
@@ -201,18 +231,33 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               )}
 
               {record.status === "PENDING" && record.submitted_for_review_at && (
-                <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
-                  <Button size="sm" onClick={() => setApproveOpen(true)}>
-                    Approve for work
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={onReject}
-                    loading={action.isPending("reject")}
-                  >
-                    Reject
-                  </Button>
+                <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+                  {!hasApprovedContract && contractStatus !== undefined && (
+                    <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
+                      <p className="font-medium">Contract not yet approved</p>
+                      <p className="mt-0.5">
+                        The worker must have an Active, Extended, or Permanent contract in HR before
+                        they can be approved for work.
+                      </p>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setApproveOpen(true)}
+                      disabled={!hasApprovedContract}
+                    >
+                      Approve for work
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={onReject}
+                      loading={action.isPending("reject")}
+                    >
+                      Reject
+                    </Button>
+                  </div>
                 </div>
               )}
 

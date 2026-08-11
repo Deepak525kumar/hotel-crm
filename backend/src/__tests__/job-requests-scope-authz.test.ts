@@ -97,7 +97,8 @@ jest.mock('../modules/notifications/service.js', () => ({
 }));
 
 jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
+  getPrisma: () => {
+  const mockDb = {
     hotel: {
       findUnique: async ({ where }: any) => hotels[where.id] ?? null,
     },
@@ -161,7 +162,12 @@ jest.mock('../lib/db.js', () => ({
     // result correctly makes the cascade a no-op.
     workerAssignment: { findMany: async () => [] },
     auditLog: { create: async () => undefined },
-  }),
+  };
+  return {
+    ...mockDb,
+    $transaction: async (cb: any) => cb(mockDb),
+  };
+  },
 }));
 
 jest.mock('../middleware/auth.js', () => ({
