@@ -200,6 +200,8 @@ export class EmployeeManagementController {
       z.object({
         hotel_group_id: z.string().optional(),
         primary_hotel_id: z.string().optional(),
+      }).refine(data => data.hotel_group_id || data.primary_hotel_id, {
+        message: 'Either hotel_group_id or primary_hotel_id must be provided',
       })
     ),
     async (req: Request, res: Response, next: NextFunction) => {

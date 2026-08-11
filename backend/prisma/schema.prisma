@@ -648,6 +648,8 @@ model EmploymentRecord {
   job_title               String // free text, provisional (OD-EMP-13)
   start_date              DateTime
   status                  EmploymentStatus    @default(PENDING)
+  version                 Int                 @default(0) // ADR-036: optimistic concurrency
+
   // Sub-state of PENDING only (2026-08-06 rework): null = old INACTIVE
   // (onboarding not yet submitted), non-null = old UNDER_REVIEW (awaiting
   // approval). Status itself stays PENDING across both; only Approve/Reject

@@ -19,6 +19,7 @@ import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
+import { isRmRoleEnabled } from '../../config/feature-flags.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { documentService } from '../documents/service.js';
 import {
@@ -429,27 +430,37 @@ export class EmployeeManagementService extends BaseService {
       record.status === EmploymentStatus.DELETED && toStatus === EmploymentStatus.PENDING;
     const nextCycle = isRehire ? record.employment_cycle + 1 : record.employment_cycle;
 
-    const updated = await tx.employmentRecord.update({
-      where: { id: record.id },
-      data: {
-        ...(opts.data ?? {}),
-        status: toStatus,
-        ...(isRehire ? { employment_cycle: nextCycle } : {}),
-      },
-    });
+    try {
+      const updated = await tx.employmentRecord.update({
+        where: { id: record.id, version: record.version },
+        data: {
+          ...(opts.data ?? {}),
+          status: toStatus,
+          ...(isRehire ? { employment_cycle: nextCycle } : {}),
+          version: { increment: 1 },
+        },
+        include: { user: true },
+      });
+      
+      await tx.employmentStatusHistory.create({
+        data: {
+          employment_record_id: record.id,
+          from_status: record.status,
+          to_status: toStatus,
+          reason: opts.reason ?? null,
+          actor_user_id: opts.actorUserId,
+          employment_cycle: nextCycle,
+        },
+      });
 
-    await tx.employmentStatusHistory.create({
-      data: {
-        employment_record_id: record.id,
-        from_status: record.status,
-        to_status: toStatus,
-        reason: opts.reason ?? null,
-        actor_user_id: opts.actorUserId,
-        employment_cycle: nextCycle,
-      },
-    });
+      return updated;
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
+      }
+      throw error;
+    }
 
-    return updated;
   }
 
   /**
@@ -492,10 +503,18 @@ export class EmployeeManagementService extends BaseService {
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const transitionedRecord = await tx.employmentRecord.update({
-        where: { id: record.id },
-        data: { submitted_for_review_at: new Date() },
-      });
+      let transitionedRecord;
+      try {
+        transitionedRecord = await tx.employmentRecord.update({
+          where: { id: record.id, version: record.version },
+          data: { submitted_for_review_at: new Date(), version: { increment: 1 } },
+        });
+      } catch (error: any) {
+        if (error.code === 'P2025') {
+          throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
+        }
+        throw error;
+      }
 
       await this.logAudit(
         actor.userId,
@@ -586,18 +605,29 @@ export class EmployeeManagementService extends BaseService {
         dataToUpdate.primary_hotel = payload.primary_hotel_id ? { connect: { id: payload.primary_hotel_id } } : { disconnect: true };
       }
 
-      const newRecord = await tx.employmentRecord.update({
-        where: { id: record.id },
-        data: dataToUpdate,
-        include: {
-          user: {
-            select: {
-              id: true,
-              role: true,
+      let newRecord;
+      try {
+        newRecord = await tx.employmentRecord.update({
+          where: { id: record.id, version: record.version },
+          data: { ...dataToUpdate, version: { increment: 1 } },
+          include: {
+            user: {
+              select: {
+                id: true,
+                role: true,
+              }
             }
           }
+        });
+      } catch (error: any) {
+        if (error.code === 'P2025') {
+          if (error.message && error.message.includes('connect')) {
+            throw new NotFoundError('Target hotel or hotel group not found');
+          }
+          throw new ConflictError('Record has been modified by another process. Please refresh and try again.');
         }
-      });
+        throw error;
+      }
 
       if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
         const targetHotel = await tx.hotel.findUnique({ where: { id: payload.primary_hotel_id } });
@@ -770,6 +800,35 @@ export class EmployeeManagementService extends BaseService {
         reason,
         data: { deactivation_reason: reason },
       });
+
+      const targetUser = await tx.user.findUnique({ where: { id: record.user_id }, select: { role: true } });
+      const now = new Date();
+
+      if (targetUser?.role === 'MANAGER') {
+        const ownedHotels = await tx.hotel.findMany({ where: { manager_user_id: record.user_id }, select: { id: true } });
+        for (const hotel of ownedHotels) {
+          await tx.hotel.update({
+            where: { id: hotel.id },
+            data: { manager_user_id: null, manager_assigned_at: null, manager_vacated_at: now, manager_vacancy_reason: 'TEMPORARY' },
+          });
+          await tx.hotelManagerAssignmentHistory.updateMany({
+            where: { hotel_id: hotel.id, manager_user_id: record.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
+          });
+        }
+      } else if (targetUser?.role === 'REGIONAL_MANAGER') {
+        const ownedGroup = await tx.hotelGroup.findUnique({ where: { regional_manager_user_id: record.user_id }, select: { id: true } });
+        if (ownedGroup) {
+          await tx.hotelGroup.update({
+            where: { id: ownedGroup.id },
+            data: { regional_manager_user_id: null, regional_manager_assigned_at: null, regional_manager_vacated_at: now, regional_manager_vacancy_reason: 'TEMPORARY' },
+          });
+          await tx.regionalManagerAssignmentHistory.updateMany({
+            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: record.user_id, unassigned_at: null },
+            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
+          });
+        }
+      }
 
       // Session invalidation (2026-08-07). DELETED (delete(),
       // deactivateForContractLapse()) and DELETED -> PENDING (restore())
@@ -1252,8 +1311,13 @@ export class EmployeeManagementService extends BaseService {
       if (targetUser.role === 'REGIONAL_MANAGER') {
         throw new ForbiddenError(`Cannot ${action}: only Admin can manage Regional Manager applications`);
       }
-      if (targetUser.role === 'MANAGER' && actor.role !== 'regional_manager') {
-        throw new ForbiddenError(`Cannot ${action}: only Admin or Regional Manager can manage Manager applications`);
+      if (targetUser.role === 'MANAGER') {
+        if (actor.role === 'regional_manager' && !isRmRoleEnabled()) {
+          throw new ForbiddenError(`Cannot ${action}: only Admin can manage Manager applications while RM role is disabled`);
+        }
+        if (actor.role !== 'regional_manager') {
+          throw new ForbiddenError(`Cannot ${action}: only Admin or Regional Manager can manage Manager applications`);
+        }
       }
 
       if (record.hotel_group_id === null && opts.allowUnassignedGroup) {
