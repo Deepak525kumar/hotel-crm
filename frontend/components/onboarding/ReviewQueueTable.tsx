@@ -3,10 +3,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { employeesApi } from "@/lib/api";
-import { Table, Badge, Button, Modal, EmptyState } from "@/components/ui";
+import { Table, Badge, Button, Modal, EmptyState, Select } from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
 import { Eye, Check, X } from "lucide-react";
 import { DocumentUploadList } from "./DocumentUploadList";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import type { EmploymentRecord } from "@/lib/types";
 
 // Extended type because the backend includes user info
@@ -29,17 +30,47 @@ export function ReviewQueueTable() {
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
 
+  const [assignRecord, setAssignRecord] = useState<ReviewQueueItem | null>(null);
+  const [assigning, setAssigning] = useState(false);
+  const [assignTarget, setAssignTarget] = useState("");
+
+  const { data: hotelsData } = useHotels({ page: 1, limit: 100 });
+  const { data: groupsData } = useHotelGroups({ page: 1, limit: 100 });
+
   const handleApprove = async () => {
     if (!selectedRecord) return;
     try {
       setApproving(true);
       await employeesApi.approve(selectedRecord.employee_id);
+      const approved = selectedRecord;
       setSelectedRecord(null);
+      if (approved.user?.role === "MANAGER" || approved.user?.role === "REGIONAL_MANAGER") {
+        setAssignRecord(approved);
+      }
       mutate();
     } catch (e) {
       alert("Failed to approve: " + (e instanceof Error ? e.message : "Unknown error"));
     } finally {
       setApproving(false);
+    }
+  };
+
+  const handleAssign = async () => {
+    if (!assignRecord || !assignTarget) return;
+    try {
+      setAssigning(true);
+      const isManager = assignRecord.user?.role === "MANAGER";
+      await employeesApi.assign(assignRecord.employee_id, {
+        primary_hotel_id: isManager ? assignTarget : null,
+        hotel_group_id: !isManager ? assignTarget : null,
+      });
+      setAssignRecord(null);
+      setAssignTarget("");
+      mutate();
+    } catch (e) {
+      alert("Failed to assign: " + (e instanceof Error ? e.message : "Unknown error"));
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -176,6 +207,43 @@ export function ReviewQueueTable() {
               >
                 <Check className="w-4 h-4 mr-2 text-green-500" />
                 Approve & Activate
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!assignRecord}
+        onClose={() => setAssignRecord(null)}
+        title="Assign Approved Employee"
+      >
+        {assignRecord && (
+          <div className="space-y-6 mt-4">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {assignRecord.user?.first_name} {assignRecord.user?.last_name} has been approved. You must now assign them to their target location to complete the process.
+            </p>
+            {assignRecord.user?.role === "MANAGER" ? (
+              <Select
+                label="Primary Hotel"
+                value={assignTarget}
+                onChange={(e) => setAssignTarget(e.target.value)}
+                options={(hotelsData || []).map((h: { id: string; name: string }) => ({ value: h.id, label: h.name }))}
+                placeholder="Select a hotel..."
+              />
+            ) : (
+              <Select
+                label="Hotel Group"
+                value={assignTarget}
+                onChange={(e) => setAssignTarget(e.target.value)}
+                options={(groupsData || []).map((g: { id: string; name: string }) => ({ value: g.id, label: g.name }))}
+                placeholder="Select a group..."
+              />
+            )}
+
+            <div className="flex items-center justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button onClick={handleAssign} loading={assigning} disabled={!assignTarget}>
+                Complete Assignment
               </Button>
             </div>
           </div>

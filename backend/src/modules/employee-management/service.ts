@@ -1314,6 +1314,10 @@ export class EmployeeManagementService extends BaseService {
   ): Promise<void> {
     if (actor.role === 'admin') return;
 
+    if (action === 'submit an employee for review' && actor.userId === record.user_id) {
+      return;
+    }
+
     if (isScopedManagerRole(actor.role)) {
       const targetUser = await this.prisma.user.findUnique({ where: { id: record.user_id } });
       if (!targetUser) throw new NotFoundError('User not found');

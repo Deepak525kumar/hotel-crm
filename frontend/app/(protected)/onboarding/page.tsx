@@ -62,7 +62,12 @@ export default function MyOnboardingPage() {
             </Badge>
           </div>
         }
-        description="Complete your required documentation to activate your account."
+        description={
+          isActive ? "Your onboarding is complete. Welcome to the team!" :
+          isRejected ? "Your application was rejected. Please review your documents and contact your manager." :
+          isSubmitted ? "Your application is under review by your manager." :
+          "Complete your required documentation to activate your account."
+        }
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

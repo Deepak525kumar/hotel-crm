@@ -1,0 +1,136 @@
+# Scenario 02 — Manager and Regional Manager Onboarding
+
+Verifies the hierarchical approval chain and the **two-step approve-then-assign** rule that
+distinguishes Manager/RM from Worker/Checker (`ADR-065` §3 items 4 and 6).
+
+**Preconditions:** Scenario 00 complete. **Record the `FEATURE_RM_ROLE` state** — it changes
+expected results in step 4.
+
+---
+
+## The approval chain under test
+
+| Applicant role | May be approved by | May **not** be approved by |
+|---|---|---|
+| Worker / Checker | Manager, Regional Manager, Admin | worker, checker |
+| Manager | Regional Manager (flag on), Admin | a peer Manager; RM when `FEATURE_RM_ROLE` is off |
+| Regional Manager | **Admin only** | Manager, **another RM** |
+| Admin | n/a — Admin has no onboarding | — |
+
+## Step 1 — Create a Manager application
+
+As **Admin**, `target_hotel_group_id` is **required** (Admin has no own scope to default from):
+
+```bash
+curl -s -X POST http://localhost:3001/api/v1/employees -H "Authorization: Bearer $T" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"<MGR_USER>","employee_id":"E2E-M-01","job_title":"Hotel Manager",
+       "start_date":"2026-09-01","target_hotel_group_id":"<GROUP>"}'
+```
+
+**PASS:** created `PENDING`, scope null, `target_hotel_group_id` as supplied.
+Omitting it as Admin **must** fail: *"Admin must explicitly provide a target_hotel_group_id
+when creating a Manager application"*.
+
+As **Regional Manager** (flag on), `target_hotel_group_id` **auto-fills from the RM's own
+group**; supplying a *different* group must be rejected.
+
+## Step 2 — Same document gate as everyone else
+
+Manager/RM are **not** exempt (`ADR-065` §6 item 2, as corrected). Submit before uploading:
+
+**PASS:** `409` naming the same six categories. A Manager/RM-specific exemption is a **FAIL** —
+that was an early misreading; "bypass the chatbot" never meant "bypass documents".
+
+## Step 3 — Peer Manager cannot approve a Manager
+
+```bash
+curl -s -X POST http://localhost:3001/api/v1/employees/E2E-M-01/approve \
+  -H "Authorization: Bearer $MT" -H "Content-Type: application/json" -d '{}'
+```
+
+**PASS:** `403` — *"only Admin or Regional Manager can manage Manager applications"*.
+
+Also verify `rehire` enforces the same rule (it is a second path to `ACTIVE`):
+`POST /employees/E2E-M-01/rehire` as a peer Manager → `403` with the same class of message.
+
+## Step 4 — RM approving a Manager depends on the flag
+
+- **`FEATURE_RM_ROLE` off (default):** RM → `403`
+  *"only Admin can manage Manager applications while RM role is disabled"*; Admin → succeeds.
+- **Flag on:** an RM scoped to the target group → succeeds; an RM scoped elsewhere → `403`.
+
+**Regression note:** this check did not exist at first — `isRmRoleEnabled()` had exactly one
+consumer (an unrelated script) and RM approval was unconditional. Verify the flag is genuinely
+consulted; don't infer it from the env file.
+
+## Step 5 — Regional Manager application
+
+- Created by **Admin only**.
+- `target_hotel_group_id` is **not required** and may stay `null` — RM applications are always
+  reviewed by Admin, so there is no scoped reviewer to route to (`ADR-065` §6 item 9).
+- A **peer RM** attempting to approve → `403` *"only Admin can manage Regional Manager
+  applications"*. This is the important case: RM-approves-RM must not be possible.
+
+## Step 6 — Approve writes NO scope (the critical assertion)
+
+```bash
+curl -s -X POST http://localhost:3001/api/v1/employees/E2E-M-01/approve \
+  -H "Authorization: Bearer $T" -H "Content-Type: application/json" -d '{}' | python3 -m json.tool
+curl -s http://localhost:3001/api/v1/crm/hotels/<HOTEL> -H "Authorization: Bearer $T" \
+  | python3 -c "import sys,json; print('manager_user_id:', json.load(sys.stdin)['data']['manager_user_id'])"
+```
+
+**PASS:** record is `ACTIVE` with `hotel_group_id: null`, `primary_hotel_id: null`, **and**
+`Hotel.manager_user_id` still `null`. The state is *Active, Unassigned*.
+
+**Why:** approval carries no information about *which* hotel the approver intends — that is a
+separate input only they can supply (`ADR-065` §3 item 6). Worker/Checker's fused behaviour is
+deliberately different; do not "harmonise" them.
+
+## Step 7 — Assign (the second, separate action)
+
+```bash
+curl -s -X POST http://localhost:3001/api/v1/employees/E2E-M-01/assign -H "Authorization: Bearer $T" \
+  -H "Content-Type: application/json" \
+  -d '{"hotel_group_id":"<GROUP>","primary_hotel_id":"<HOTEL>"}' | python3 -m json.tool
+```
+
+**PASS:** `EmploymentRecord.hotel_group_id`/`primary_hotel_id` set **and**
+`Hotel.manager_user_id` now equals the user id — **verify by reading the Hotel**, not just the
+response. For an RM, check `HotelGroup.regional_manager_user_id` instead.
+
+**FAIL conditions (all real past defects):**
+- Response `200` but `Hotel.manager_user_id` still null → the cross-entity write is missing
+- Any `password_hash` in the response body
+- Empty body `{}` returning `200` instead of a validation error
+- A nonexistent hotel id yielding a generic *"Resource not found"* rather than
+  *"Target hotel or hotel group not found"*
+
+## Step 8 — Field names matter
+
+`assign` takes **`primary_hotel_id`**, not `hotel_id`. Sending `hotel_id` is silently ignored
+(no validation error) and looks like a successful no-op. If that is still true, note it.
+
+---
+
+## Pass criteria summary
+
+- [ ] Admin must supply `target_hotel_group_id` for a Manager app; RM auto-fills its own
+- [ ] Manager/RM subject to the identical six-document gate
+- [ ] Peer Manager blocked from approving a Manager (via both `approve` and `rehire`)
+- [ ] Peer RM blocked from approving an RM; Admin succeeds
+- [ ] `FEATURE_RM_ROLE` genuinely gates RM's Manager-approval authority
+- [ ] RM application accepted with `target_hotel_group_id` null
+- [ ] Approve leaves **all** scope pointers null, including `Hotel.manager_user_id`
+- [ ] Assign writes both the EmploymentRecord fields and the Hotel/HotelGroup FK
+- [ ] No `password_hash` in any lifecycle or assign response
+
+## Defects this scenario has caught
+
+| Symptom | Root cause |
+|---|---|
+| `assign` returned 200 but the hotel had no manager | Only wrote EmploymentRecord, never `Hotel.manager_user_id` |
+| RM approved a Manager with the flag off | `isRmRoleEnabled()` never consulted in the authority check |
+| `password_hash` in responses (three separate times) | `include: { user: true }` without a `select` |
+| `assign {}` returned a silent 200 no-op | No `.refine()` requiring at least one target |

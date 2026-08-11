@@ -1290,6 +1290,12 @@ export interface ApproveEmploymentInput {
   hotel_group_id?: string;
 }
 
+/** Body of `POST /employees/:employee_id/assign`. */
+export interface AssignEmploymentInput {
+  hotel_group_id?: string | null;
+  primary_hotel_id?: string | null;
+}
+
 /** Body of `POST /employees/:employee_id/reject`. */
 export interface RejectEmploymentInput {
   reason?: string;

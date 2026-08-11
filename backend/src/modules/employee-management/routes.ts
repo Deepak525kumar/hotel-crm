@@ -75,8 +75,10 @@ router.get(
 //     no scope claim narrows. The service re-checks admin independently.
 router.post(
   '/:employee_id/submit-for-review',
-  requireRole(['admin', 'manager', 'regional_manager']),
-  requirePermission('employees:write'),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
+  // Note: We omit requirePermission('employees:write') here because workers/checkers
+  // only have 'employees:read'. Self-submission authorization is handled securely
+  // inside assertLifecycleAuthority in the service layer.
   (req, res, next) => controller.submitForReview(req, res, next)
 );
 router.post(
