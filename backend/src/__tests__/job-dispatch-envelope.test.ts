@@ -168,7 +168,25 @@ jest.mock('../lib/db.js', () => ({
     auditLog: { create: async () => undefined },
     $transaction: async (fn: any) =>
       fn({
+        auditLog: { create: async () => undefined },
         jobRequest: {
+          create: async ({ data }: any) => ({
+            id: 'wr_new',
+            version: 0,
+            workers_confirmed: 0,
+            hourly_rate: null,
+            currency: 'EUR',
+            description: null,
+            requirements: null,
+            published_at: null,
+            expires_at: null,
+            filled_at: null,
+            cancelled_at: null,
+            cancellation_reason: null,
+            created_at: new Date(),
+            updated_at: new Date(),
+            ...data,
+          }),
           update: async ({ where, data }: any) => ({
             ...workRequests[where.id],
             ...data,
