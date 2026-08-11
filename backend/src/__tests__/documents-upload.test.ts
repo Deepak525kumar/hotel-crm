@@ -44,6 +44,10 @@ jest.mock('../lib/db.js', () => ({
     workerDocument: { create: mockWorkerDocumentCreate },
     auditLog: { create: mockAuditLogCreate },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
+    $transaction: jest.fn(async (cb: any) => cb({
+      workerDocument: { create: mockWorkerDocumentCreate },
+      auditLog: { create: mockAuditLogCreate }
+    })) as jest.MockedFunction<(...args: any[]) => any>,
   }),
 }));
 
