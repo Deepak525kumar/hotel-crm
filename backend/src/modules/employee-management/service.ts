@@ -589,7 +589,14 @@ export class EmployeeManagementService extends BaseService {
       const newRecord = await tx.employmentRecord.update({
         where: { id: record.id },
         data: dataToUpdate,
-        include: { user: true }
+        include: {
+          user: {
+            select: {
+              id: true,
+              role: true,
+            }
+          }
+        }
       });
 
       if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
