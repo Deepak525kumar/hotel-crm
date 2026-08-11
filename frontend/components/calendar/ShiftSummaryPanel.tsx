@@ -15,7 +15,7 @@ interface ShiftSummaryPanelProps {
 
 export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPanelProps) {
   const [summary, setSummary] = useState<DailyShiftSummary | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   
   const [form, setForm] = useState<DailyShiftSummaryPayload>({
@@ -28,10 +28,9 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
 
   useEffect(() => {
     if (!hotelId || !dateStr) return;
-    
+
     let active = true;
-    setLoading(true);
-    
+
     calendarApi.listShiftSummaries(hotelId, dateStr, dateStr)
       .then((res) => {
         if (!active) return;
@@ -47,12 +46,15 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
         } else {
           setSummary(null);
         }
+        setLoading(false);
       })
-      .catch((err) => console.error("Failed to load shift summary:", err))
-      .finally(() => {
-        if (active) setLoading(false);
+      .catch((err) => {
+        if (active) {
+          console.error("Failed to load shift summary:", err);
+          setLoading(false);
+        }
       });
-      
+
     return () => { active = false; };
   }, [hotelId, dateStr]);
 
