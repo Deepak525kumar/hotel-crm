@@ -57,7 +57,11 @@ export function DocumentUploadList({ workerId, workPermitRequired = false, disab
   return (
     <div className="divide-y divide-gray-100 dark:divide-gray-800">
       {categories.map((cat) => {
-        const isUploaded = completeness?.by_category[cat.id] === true;
+        // Optional-chain BOTH levels: `completeness` may be undefined while
+        // SWR is revalidating, and a defensive read of `categories` avoids the
+        // crash class this line previously caused (see DocumentCompleteness's
+        // note in lib/types.ts).
+        const isUploaded = completeness?.categories?.[cat.id] === true;
         return (
           <DocumentUploadItem
             key={cat.id}
