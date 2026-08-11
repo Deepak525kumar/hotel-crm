@@ -82,28 +82,33 @@ export class EmployeeManagementService extends BaseService {
       throw new ConflictError('An employment record already exists for this user or employee ID');
     }
 
-    const record = await this.prisma.employmentRecord.create({
-      data: {
-        user_id: data.user_id,
-        employee_id: data.employee_id,
-        job_title: data.job_title,
-        start_date: data.start_date,
-        // 2026-08-06 rework: INACTIVE/UNDER_REVIEW collapsed into PENDING;
-        // "submitted for review" is now the submitted_for_review_at sub-state
-        // (schema.prisma EmploymentStatus comment), not a separate status. A
-        // freshly-created record is PENDING with submitted_for_review_at null,
-        // exactly what the old INACTIVE meant.
-        status: EmploymentStatus.PENDING,
-        skills: data.skills ?? [],
-        personal_data: data.personal_data
-          ? (data.personal_data as Prisma.InputJsonValue)
-          : Prisma.JsonNull,
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const createdRecord = await tx.employmentRecord.create({
+        data: {
+          user_id: data.user_id,
+          employee_id: data.employee_id,
+          job_title: data.job_title,
+          start_date: data.start_date,
+          // 2026-08-06 rework: INACTIVE/UNDER_REVIEW collapsed into PENDING;
+          // "submitted for review" is now the submitted_for_review_at sub-state
+          // (schema.prisma EmploymentStatus comment), not a separate status. A
+          // freshly-created record is PENDING with submitted_for_review_at null,
+          // exactly what the old INACTIVE meant.
+          status: EmploymentStatus.PENDING,
+          skills: data.skills ?? [],
+          personal_data: data.personal_data
+            ? (data.personal_data as Prisma.InputJsonValue)
+            : Prisma.JsonNull,
+        },
+      });
+
+      await this.logAudit(actor.userId, actor.role, 'employee.create', 'EMPLOYMENT_RECORD', createdRecord.id, {
+        employee_id: createdRecord.employee_id,
+      }, undefined, undefined, undefined, tx);
+
+      return createdRecord;
     });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.create', 'EMPLOYMENT_RECORD', record.id, {
-      employee_id: record.employee_id,
-    });
     return toGeneralProfile(record);
   }
 
@@ -267,11 +272,13 @@ export class EmployeeManagementService extends BaseService {
       throw new NotFoundError('Blocklist entry not found');
     }
 
-    await this.prisma.employeeBlocklistEntry.delete({ where: { id: entryId } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.employeeBlocklistEntry.delete({ where: { id: entryId } });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.blocklist.remove', 'EMPLOYEE_BLOCKLIST_ENTRY', entryId, {
-      hotel_id: entry.hotel_id,
-      employment_record_id: entry.employment_record_id,
+      await this.logAudit(actor.userId, actor.role, 'employee.blocklist.remove', 'EMPLOYEE_BLOCKLIST_ENTRY', entryId, {
+        hotel_id: entry.hotel_id,
+        employment_record_id: entry.employment_record_id,
+      }, undefined, undefined, undefined, tx);
     });
   }
 
@@ -437,19 +444,24 @@ export class EmployeeManagementService extends BaseService {
       );
     }
 
-    const updated = await this.prisma.employmentRecord.update({
-      where: { id: record.id },
-      data: { submitted_for_review_at: new Date() },
-    });
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transitionedRecord = await tx.employmentRecord.update({
+        where: { id: record.id },
+        data: { submitted_for_review_at: new Date() },
+      });
 
-    await this.logAudit(
-      actor.userId,
-      actor.role,
-      'employee.lifecycle.submitted_for_review',
-      'EMPLOYMENT_RECORD',
-      record.id,
-      { submitted_for_review_at: updated.submitted_for_review_at }
-    );
+      await this.logAudit(
+        actor.userId,
+        actor.role,
+        'employee.lifecycle.submitted_for_review',
+        'EMPLOYMENT_RECORD',
+        record.id,
+        { submitted_for_review_at: transitionedRecord.submitted_for_review_at },
+        undefined, undefined, undefined, tx
+      );
+
+      return transitionedRecord;
+    });
 
     this.logDomainEvent('EVT-EMP-submitted_for_review', record.employee_id, EmploymentStatus.PENDING);
 
@@ -489,16 +501,18 @@ export class EmployeeManagementService extends BaseService {
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
-      return this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+      const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
         actorUserId: actor.userId,
         data: resolvedGroupId ? { hotel_group: { connect: { id: resolvedGroupId } } } : {},
       });
-    });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.approved', 'EMPLOYMENT_RECORD', record.id, {
-      from: record.status,
-      to: EmploymentStatus.ACTIVE,
-      hotel_group_id: updated.hotel_group_id,
+      await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.approved', 'EMPLOYMENT_RECORD', record.id, {
+        from: record.status,
+        to: EmploymentStatus.ACTIVE,
+        hotel_group_id: transitionedRecord.hotel_group_id,
+      }, undefined, undefined, undefined, tx);
+
+      return transitionedRecord;
     });
 
     this.logDomainEvent('EVT-EMP-approved', record.employee_id, EmploymentStatus.ACTIVE);
@@ -513,17 +527,19 @@ export class EmployeeManagementService extends BaseService {
       allowUnassignedGroup: true,
     });
 
-    const updated = await this.prisma.$transaction((tx) =>
-      this.applyTransition(tx, record, EmploymentStatus.REJECTED, {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.REJECTED, {
         actorUserId: actor.userId,
         reason: reason ?? null,
-      })
-    );
+      });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.rejected', 'EMPLOYMENT_RECORD', record.id, {
-      from: record.status,
-      to: EmploymentStatus.REJECTED,
-      reason: reason ?? null,
+      await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.rejected', 'EMPLOYMENT_RECORD', record.id, {
+        from: record.status,
+        to: EmploymentStatus.REJECTED,
+        reason: reason ?? null,
+      }, undefined, undefined, undefined, tx);
+
+      return transitionedRecord;
     });
 
     this.logDomainEvent('EVT-EMP-rejected', record.employee_id, EmploymentStatus.REJECTED);
@@ -624,19 +640,21 @@ export class EmployeeManagementService extends BaseService {
     const record = await this.findRecordOrThrow(employeeId);
     await this.assertLifecycleAuthority(actor, record, 'reactivate an employee');
 
-    const updated = await this.prisma.$transaction((tx) =>
-      this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
         actorUserId: actor.userId,
         // Clear the pause reason: it described a pause that has now ended,
         // and leaving it set would make an ACTIVE record read as if it were
         // still on leave. The history row retains it permanently.
         data: { deactivation_reason: null },
-      })
-    );
+      });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.reactivate', 'EMPLOYMENT_RECORD', record.id, {
-      from: record.status,
-      to: EmploymentStatus.ACTIVE,
+      await this.logAudit(actor.userId, actor.role, 'employee.reactivate', 'EMPLOYMENT_RECORD', record.id, {
+        from: record.status,
+        to: EmploymentStatus.ACTIVE,
+      }, undefined, undefined, undefined, tx);
+
+      return transitionedRecord;
     });
 
     this.logDomainEvent('EVT-EMP-reactivated', record.employee_id, EmploymentStatus.ACTIVE);
@@ -662,15 +680,17 @@ export class EmployeeManagementService extends BaseService {
 
     await this.assertApprovedContract(record.user_id);
 
-    const updated = await this.prisma.$transaction((tx) =>
-      this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
         actorUserId: actor.userId,
-      })
-    );
+      });
 
-    await this.logAudit(actor.userId, actor.role, 'employee.rehire', 'EMPLOYMENT_RECORD', record.id, {
-      from: record.status,
-      to: EmploymentStatus.ACTIVE,
+      await this.logAudit(actor.userId, actor.role, 'employee.rehire', 'EMPLOYMENT_RECORD', record.id, {
+        from: record.status,
+        to: EmploymentStatus.ACTIVE,
+      }, undefined, undefined, undefined, tx);
+
+      return transitionedRecord;
     });
 
     this.logDomainEvent('EVT-EMP-rehired', record.employee_id, EmploymentStatus.ACTIVE);
