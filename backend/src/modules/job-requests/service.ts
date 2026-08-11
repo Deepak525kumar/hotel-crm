@@ -178,29 +178,32 @@ export class JobRequestService extends BaseService {
     }
 
     const publishing = input.status === 'OPEN';
+    const wr = await this.prisma.$transaction(async (tx) => {
+      const createdWr = await tx.jobRequest.create({
+        data: {
+          hotel_id: input.hotel_id,
+          created_by_id: actor.userId,
+          position: input.position,
+          workers_needed: input.workers_needed,
+          shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
+          shift_start_time: input.shift_start_time,
+          shift_end_time: input.shift_end_time,
+          hourly_rate: input.hourly_rate ?? null,
+          currency: input.currency ?? 'EUR',
+          description: input.description ?? null,
+          requirements: input.requirements ?? null,
+          status: publishing ? WorkRequestStatus.OPEN : WorkRequestStatus.DRAFT,
+          published_at: publishing ? new Date() : null,
+          expires_at: input.expires_at ? new Date(input.expires_at) : null,
+        },
+      });
 
-    const wr = await this.prisma.jobRequest.create({
-      data: {
-        hotel_id: input.hotel_id,
-        created_by_id: actor.userId,
-        position: input.position,
-        workers_needed: input.workers_needed,
-        shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
-        shift_start_time: input.shift_start_time,
-        shift_end_time: input.shift_end_time,
-        hourly_rate: input.hourly_rate ?? null,
-        currency: input.currency ?? 'EUR',
-        description: input.description ?? null,
-        requirements: input.requirements ?? null,
-        status: publishing ? WorkRequestStatus.OPEN : WorkRequestStatus.DRAFT,
-        published_at: publishing ? new Date() : null,
-        expires_at: input.expires_at ? new Date(input.expires_at) : null,
-      },
-    });
+      await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', createdWr.id, {
+        hotel_id: createdWr.hotel_id,
+        status: createdWr.status,
+      }, undefined, undefined, undefined, tx);
 
-    await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', wr.id, {
-      hotel_id: wr.hotel_id,
-      status: wr.status,
+      return createdWr;
     });
 
     return this.toDto(wr);
@@ -381,22 +384,28 @@ export class JobRequestService extends BaseService {
       updated = await this.prisma.$transaction(async (tx) => {
         const wrUpdated = await tx.jobRequest.update({ where: { id }, data });
         await this.enqueueRosterPublished(tx, wrUpdated, workerIds);
+        await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
+          from_status: wr.status,
+          to_status: wrUpdated.status,
+          ...(wrUpdated.status === WorkRequestStatus.CANCELLED
+            ? { cancellation_reason: wrUpdated.cancellation_reason }
+            : {}),
+        }, undefined, undefined, undefined, tx);
         return wrUpdated;
       });
     } else {
-      updated = await this.prisma.jobRequest.update({ where: { id }, data });
+      updated = await this.prisma.$transaction(async (tx) => {
+        const wrUpdated = await tx.jobRequest.update({ where: { id }, data });
+        await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
+          from_status: wr.status,
+          to_status: wrUpdated.status,
+          ...(wrUpdated.status === WorkRequestStatus.CANCELLED
+            ? { cancellation_reason: wrUpdated.cancellation_reason }
+            : {}),
+        }, undefined, undefined, undefined, tx);
+        return wrUpdated;
+      });
     }
-
-    await this.logAudit(actor.userId, actor.role, 'UPDATE', 'WORK_REQUEST', id, {
-      from_status: wr.status,
-      to_status: updated.status,
-      // cancellation_reason was saved to the row (line 264) but never
-      // surfaced in the audit trail -- an admin reviewing the log couldn't
-      // see WHY a request was cancelled, only that it was.
-      ...(updated.status === WorkRequestStatus.CANCELLED
-        ? { cancellation_reason: updated.cancellation_reason }
-        : {}),
-    });
 
     // Job-dispatch lifecycle cascade fix (2026-08-05): cancelling a
     // JobRequest previously never touched its already-assigned
@@ -569,13 +578,14 @@ export class JobRequestService extends BaseService {
       // enqueue can never be created for a broadcast that didn't commit, or
       // be lost for one that did.
       await this.enqueueBroadcastNotifications(tx, created, created.skill_slots);
+      
+      await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', created.id, {
+        hotel_id: created.hotel_id,
+        status: created.status,
+        skills: input.skills,
+      }, undefined, undefined, undefined, tx);
+      
       return { wr: created, slots: created.skill_slots };
-    });
-
-    await this.logAudit(actor.userId, actor.role, 'CREATE', 'WORK_REQUEST', wr.id, {
-      hotel_id: wr.hotel_id,
-      status: wr.status,
-      skills: input.skills,
     });
 
     return this.toDto(wr, slots);
@@ -919,6 +929,11 @@ export class JobRequestService extends BaseService {
           },
         });
 
+        await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST', 'WORKER_ASSIGNMENT', assignment.id, {
+          job_request_id: wr.id,
+          skill,
+        }, undefined, undefined, undefined, tx);
+
         return assignment.id;
       });
     } catch (error) {
@@ -934,16 +949,12 @@ export class JobRequestService extends BaseService {
       // to, but the attempt itself is worth a record (an admin investigating
       // "why didn't this worker get the shift" should be able to see the
       // attempt, not just silence). Logged against the WORK_REQUEST instead.
+      // This is unwrapped because no primary mutation occurred.
       await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST_LOST_RACE', 'WORK_REQUEST', wr.id, {
         skill,
       });
       return { status: 'requirement_fulfilled', job_request_id: wr.id, skill };
     }
-
-    await this.logAudit(actor.userId, actor.role, 'ACCEPT_BROADCAST', 'WORKER_ASSIGNMENT', assignmentId, {
-      job_request_id: wr.id,
-      skill,
-    });
 
     return { status: 'accepted', assignment_id: assignmentId, job_request_id: wr.id, skill };
   }
@@ -989,12 +1000,13 @@ export class JobRequestService extends BaseService {
         data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
       });
       await this.enqueueJobRequestClosed(tx, closed, 'manual');
+      
+      await this.logAudit(actor.userId, actor.role, 'MANUAL_CLOSE', 'WORK_REQUEST', id, {
+        from_status: wr.status,
+        to_status: closed.status,
+      }, undefined, undefined, undefined, tx);
+      
       return closed;
-    });
-
-    await this.logAudit(actor.userId, actor.role, 'MANUAL_CLOSE', 'WORK_REQUEST', id, {
-      from_status: wr.status,
-      to_status: updated.status,
     });
 
     return this.toDto(updated, wr.skill_slots);
@@ -1067,15 +1079,16 @@ export class JobRequestService extends BaseService {
             data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
           });
           await this.enqueueJobRequestClosed(tx, closed, 'auto');
-        });
-        // Audit gap: manualClose() logs MANUAL_CLOSE, but this scheduled
-        // path previously logged nothing at all -- a broadcast could expire
-        // with zero audit trail. `logAudit(null, 'system', ...)` matches the
-        // existing convention for scheduled-job-initiated actions (see
-        // employee-management/service.ts's contract-lapse deactivation).
-        await this.logAudit(null, 'system', 'AUTO_CLOSE', 'WORK_REQUEST', wr.id, {
-          from_status: wr.status,
-          to_status: WorkRequestStatus.EXPIRED,
+          
+          // Audit gap: manualClose() logs MANUAL_CLOSE, but this scheduled
+          // path previously logged nothing at all -- a broadcast could expire
+          // with zero audit trail. `logAudit(null, 'system', ...)` matches the
+          // existing convention for scheduled-job-initiated actions (see
+          // employee-management/service.ts's contract-lapse deactivation).
+          await this.logAudit(null, 'system', 'AUTO_CLOSE', 'WORK_REQUEST', wr.id, {
+            from_status: wr.status,
+            to_status: closed.status,
+          }, undefined, undefined, undefined, tx);
         });
       }
       total += stale.length;
