@@ -69,6 +69,10 @@ const mockPrisma = {
   attendance: mockAttendance,
   workerOverallRating: mockWorkerOverallRating,
   jobRequestSkillSlot: mockJobRequestSkillSlot,
+  calendarAbsence: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
