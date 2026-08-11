@@ -390,6 +390,9 @@ model User {
   doc_field_values_updated                       DocumentInstanceFieldValue[]       @relation("doc_field_value_updated_by")
   doc_signatures_signed                          DocumentInstanceSignature[]        @relation("doc_signature_signed_by")
 
+  created_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryCreator")
+  updated_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryUpdater")
+
   @@index([role])
   @@index([is_active])
   @@index([deleted_at])
@@ -575,6 +578,7 @@ model Hotel {
   // only -- see EmploymentRecord.primary_hotel_id.
   employment_records_primary EmploymentRecord[]              @relation("employment_primary_hotel")
   employment_records_target  EmploymentRecord[]              @relation("target_employment_primary_hotel")
+  shift_summaries            DailyShiftSummary[]
 
   @@index([country])
   @@index([is_active])
@@ -1946,4 +1950,27 @@ model RetentionAuditEntry {
 
   @@index([module_id, category_id])
   @@index([deleted_at])
+}
+
+model DailyShiftSummary {
+  id                   String   @id @default(uuid())
+  hotel_id             String
+  date                 DateTime // Anchored to 00:00:00 UTC for the local day
+  total_rooms          Int
+  stay_over_rooms      Int
+  checkout_rooms       Int
+  total_people_working Int
+  notes                String?
+
+  created_by_id String
+  updated_by_id String?
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
+
+  hotel      Hotel @relation(fields: [hotel_id], references: [id], onDelete: Restrict)
+  created_by User  @relation("ShiftSummaryCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  updated_by User? @relation("ShiftSummaryUpdater", fields: [updated_by_id], references: [id], onDelete: Restrict)
+
+  @@unique([hotel_id, date])
+  @@index([hotel_id])
 }
