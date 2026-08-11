@@ -227,11 +227,14 @@ export class CrmService extends BaseService {
     if (hotel.deleted_at) throw new ConflictError('Restore this hotel before deactivating it');
     if (!hotel.is_active) throw new ConflictError('Hotel is already deactivated');
 
-    const result = await this.prisma.hotel.update({
-      where: { id: hotelId },
-      data: { is_active: false },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotel.update({
+        where: { id: hotelId },
+        data: { is_active: false },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'deactivate', name: hotel.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'deactivate', name: hotel.name }, ip);
     await this.cascadeCancelHotelWork(hotelId, actorId, actorRole);
     return result;
   }
@@ -243,11 +246,14 @@ export class CrmService extends BaseService {
     if (hotel.deleted_at) throw new ConflictError('Restore this hotel before reactivating it');
     if (hotel.is_active) throw new ConflictError('Hotel is already active');
 
-    const result = await this.prisma.hotel.update({
-      where: { id: hotelId },
-      data: { is_active: true },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotel.update({
+        where: { id: hotelId },
+        data: { is_active: true },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'reactivate', name: hotel.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'reactivate', name: hotel.name }, ip);
     return result;
   }
 
@@ -272,11 +278,14 @@ export class CrmService extends BaseService {
     if (!hotel) throw new NotFoundError('Hotel not found');
     if (hotel.deleted_at) throw new ConflictError('Hotel is already deleted');
 
-    const result = await this.prisma.hotel.update({
-      where: { id: hotelId },
-      data: { is_active: false, deleted_at: new Date() },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotel.update({
+        where: { id: hotelId },
+        data: { is_active: false, deleted_at: new Date() },
+      });
+      await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL', hotelId, { name: hotel.name }, ip);
     await this.cascadeCancelHotelWork(hotelId, actorId, actorRole);
     return result;
   }
@@ -346,11 +355,14 @@ export class CrmService extends BaseService {
     if (!hotel) throw new NotFoundError('Hotel not found');
     if (!hotel.deleted_at) throw new ConflictError('Hotel is not deleted');
 
-    const result = await this.prisma.hotel.update({
-      where: { id: hotelId },
-      data: { is_active: true, deleted_at: null },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotel.update({
+        where: { id: hotelId },
+        data: { is_active: true, deleted_at: null },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'restore', name: hotel.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'restore', name: hotel.name }, ip);
     return result;
   }
 
@@ -445,14 +457,18 @@ export class CrmService extends BaseService {
   // no-manager-yet vacancy model) and the RM is assigned afterward via
   // users/service.ts#updateUserRole.
   async createHotelGroup(data: CreateHotelGroupRequest, actorId: string, actorRole: string, ip?: string) {
-    const hotelGroup = await this.prisma.hotelGroup.create({
-      data: {
-        name: data.name,
-        billing_info: data.billing_info,
-      },
+    const hotelGroup = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.hotelGroup.create({
+        data: {
+          name: data.name,
+          billing_info: data.billing_info,
+        },
+      });
+
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', created.id, { action: 'create', name: created.name }, ip, undefined, undefined, tx);
+      return created;
     });
 
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroup.id, { action: 'create', name: hotelGroup.name }, ip);
     return hotelGroup;
   }
 
@@ -466,15 +482,19 @@ export class CrmService extends BaseService {
     const existing = await this.prisma.hotelGroup.findUnique({ where: { id: hotelGroupId } });
     if (!existing) throw new NotFoundError('Hotel group not found');
 
-    const result = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: {
-        name: data.name ?? existing.name,
-        billing_info: data.billing_info ?? existing.billing_info,
-      },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: {
+          name: data.name ?? existing.name,
+          billing_info: data.billing_info ?? existing.billing_info,
+        },
+      });
+
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip, undefined, undefined, tx);
+      return updated;
     });
 
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { fields: Object.keys(data) }, ip);
     return result;
   }
 
@@ -485,11 +505,14 @@ export class CrmService extends BaseService {
     if (group.deleted_at) throw new ConflictError('Restore this hotel group before deactivating it');
     if (!group.is_active) throw new ConflictError('Hotel group is already deactivated');
 
-    const result = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: { is_active: false },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: { is_active: false },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'deactivate', name: group.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'deactivate', name: group.name }, ip);
     return result;
   }
 
@@ -500,11 +523,14 @@ export class CrmService extends BaseService {
     if (group.deleted_at) throw new ConflictError('Restore this hotel group before reactivating it');
     if (group.is_active) throw new ConflictError('Hotel group is already active');
 
-    const result = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: { is_active: true },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: { is_active: true },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'reactivate', name: group.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'reactivate', name: group.name }, ip);
     return result;
   }
 
@@ -528,11 +554,14 @@ export class CrmService extends BaseService {
     if (!group) throw new NotFoundError('Hotel group not found');
     if (group.deleted_at) throw new ConflictError('Hotel group is already deleted');
 
-    const result = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: { is_active: false, deleted_at: new Date() },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: { is_active: false, deleted_at: new Date() },
+      });
+      await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL_GROUP', hotelGroupId, { name: group.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'DELETE', 'HOTEL_GROUP', hotelGroupId, { name: group.name }, ip);
     return result;
   }
 
@@ -542,11 +571,14 @@ export class CrmService extends BaseService {
     if (!group) throw new NotFoundError('Hotel group not found');
     if (!group.deleted_at) throw new ConflictError('Hotel group is not deleted');
 
-    const result = await this.prisma.hotelGroup.update({
-      where: { id: hotelGroupId },
-      data: { is_active: true, deleted_at: null },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.hotelGroup.update({
+        where: { id: hotelGroupId },
+        data: { is_active: true, deleted_at: null },
+      });
+      await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'restore', name: group.name }, ip, undefined, undefined, tx);
+      return updated;
     });
-    await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL_GROUP', hotelGroupId, { action: 'restore', name: group.name }, ip);
     return result;
   }
 
