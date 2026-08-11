@@ -591,12 +591,23 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 })
       );
+      mockPrisma.contract.findFirst.mockResolvedValueOnce({ id: 'mock_contract_1', status: 'ACTIVE' });
       mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.rehire(admin as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.ACTIVE);
       expect(result.employment_cycle).toBe(1);
+    });
+
+    it('rehire rejects without an approved contract', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.REJECTED, employment_cycle: 1 })
+      );
+      mockPrisma.contract.findFirst.mockResolvedValueOnce(null);
+
+      await expect(service.rehire(admin as any, 'E-001')).rejects.toMatchObject({ name: 'ConflictError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
     it('delete requires admin (a scoped manager is denied)', async () => {

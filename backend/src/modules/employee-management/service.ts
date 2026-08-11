@@ -485,22 +485,7 @@ export class EmployeeManagementService extends BaseService {
       throw new ConflictError('Cannot approve an application that has not been submitted for review');
     }
 
-    // GATE: Worker must have an approved contract (ACTIVE, EXTENDED, or
-    // PERMANENT) before they can be activated. A PENDING contract means the
-    // manager has not yet confirmed it as signed — activating without one
-    // would let workers accept shifts with no valid employment contract.
-    const approvedContract = await this.prisma.contract.findFirst({
-      where: {
-        worker_id: record.user_id,
-        status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED, ContractStatus.PERMANENT] },
-      },
-      select: { id: true },
-    });
-    if (!approvedContract) {
-      throw new ConflictError(
-        'Cannot approve: the worker does not have an approved contract (Active, Extended, or Permanent). Please confirm their contract in HR first.',
-      );
-    }
+    await this.assertApprovedContract(record.user_id);
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const resolvedGroupId = await this.resolveApprovalGroupId(actor, payload?.hotel_group_id);
@@ -674,6 +659,8 @@ export class EmployeeManagementService extends BaseService {
     await this.assertLifecycleAuthority(actor, record, 'rehire an employee', {
       allowUnassignedGroup: true,
     });
+
+    await this.assertApprovedContract(record.user_id);
 
     const updated = await this.prisma.$transaction((tx) =>
       this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
@@ -1289,6 +1276,21 @@ export class EmployeeManagementService extends BaseService {
       select: { hotel_group_id: true },
     });
     return !!hotel && !!record.hotel_group_id && hotel.hotel_group_id === record.hotel_group_id;
+  }
+
+  private async assertApprovedContract(userId: string): Promise<void> {
+    const approvedContract = await this.prisma.contract.findFirst({
+      where: {
+        worker_id: userId,
+        status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED, ContractStatus.PERMANENT] },
+      },
+      select: { id: true },
+    });
+    if (!approvedContract) {
+      throw new ConflictError(
+        'Cannot approve: the worker does not have an approved contract (Active, Extended, or Permanent). Please confirm their contract in HR first.',
+      );
+    }
   }
 }
 
