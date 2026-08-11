@@ -84,7 +84,6 @@ export class EmployeeManagementService extends BaseService {
       if (!['WORKER', 'CHECKER', 'MANAGER'].includes(targetUser.role)) {
         throw new ForbiddenError('Regional Manager may only create applications for Worker, Checker, and Manager roles');
       }
-      // If creating a Manager application, auto-fill the RM's group.
       if (targetUser.role === 'MANAGER') {
         const rmGroup = actor.scope?.type === 'hotel_group' ? actor.scope.hotel_group_id : undefined;
         if (!rmGroup) {
@@ -95,8 +94,27 @@ export class EmployeeManagementService extends BaseService {
         }
         data.target_hotel_group_id = rmGroup;
       }
+    } else if (actor.role === 'manager') {
+      // Manager can only create Workers and Checkers
+      if (!['WORKER', 'CHECKER'].includes(targetUser.role)) {
+        throw new ForbiddenError('Manager may only create applications for Worker and Checker roles');
+      }
+      const mgrHotel = actor.scope?.type === 'hotel' ? actor.scope.hotel_id : undefined;
+      if (!mgrHotel) {
+        throw new ForbiddenError('Manager must have a scoped hotel_id to create an application');
+      }
+      if (data.target_primary_hotel_id && data.target_primary_hotel_id !== mgrHotel) {
+        throw new ConflictError('Manager cannot create an application targeting a different hotel');
+      }
+      data.target_primary_hotel_id = mgrHotel;
+      
+      // Auto-populate target_hotel_group_id from the Manager's hotel if not already fetched
+      const mgrHotelRecord = await this.prisma.hotel.findUnique({ where: { id: mgrHotel } });
+      if (mgrHotelRecord && mgrHotelRecord.hotel_group_id) {
+        data.target_hotel_group_id = mgrHotelRecord.hotel_group_id;
+      }
     } else {
-      throw new ForbiddenError('Only Admin and Regional Manager may create employment records');
+      throw new ForbiddenError('Only Admin, Regional Manager, and Manager may create employment records');
     }
 
     if (data.skills) {
@@ -126,6 +144,7 @@ export class EmployeeManagementService extends BaseService {
           status: EmploymentStatus.PENDING,
           work_permit_required: data.work_permit_required ?? false,
           target_hotel_group_id: data.target_hotel_group_id || null,
+          target_primary_hotel_id: data.target_primary_hotel_id || null,
           skills: data.skills ?? [],
           personal_data: data.personal_data
             ? (data.personal_data as Prisma.InputJsonValue)
@@ -570,7 +589,20 @@ export class EmployeeManagementService extends BaseService {
       const newRecord = await tx.employmentRecord.update({
         where: { id: record.id },
         data: dataToUpdate,
+        include: { user: true }
       });
+
+      if (newRecord.user.role === 'MANAGER' && payload.primary_hotel_id) {
+        await tx.hotel.update({
+          where: { id: payload.primary_hotel_id },
+          data: { manager_user_id: newRecord.user_id },
+        });
+      } else if (newRecord.user.role === 'REGIONAL_MANAGER' && payload.hotel_group_id) {
+        await tx.hotelGroup.update({
+          where: { id: payload.hotel_group_id },
+          data: { regional_manager_user_id: newRecord.user_id },
+        });
+      }
 
       await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.assigned', 'EMPLOYMENT_RECORD', record.id, {
         from_hotel_group_id: record.hotel_group_id,
@@ -1313,7 +1345,21 @@ export class EmployeeManagementService extends BaseService {
 
     const records = await this.prisma.employmentRecord.findMany({
       where: query,
-      include: { user: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+            profile_photo_url: true,
+            role: true,
+            created_at: true,
+            updated_at: true,
+          }
+        }
+      },
       orderBy: { submitted_for_review_at: 'asc' },
     });
 

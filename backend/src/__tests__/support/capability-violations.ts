@@ -54,6 +54,19 @@ const VIOLATIONS: readonly CapabilityViolation[] = Object.freeze([
   // C-22, C-23, C-24, C-25, C-29 and C-30 regional_manager route-gate
   // violations were all closed in the same pass that added
   // resolveWorkerScope's RM branch. Conform.
+  
+  {
+    key: 'C-15:manager@employee-management:POST /',
+    reason: 'ADR-065 expands createEmployee to manager',
+    authority: 'ADR-065',
+    owner: 'PR 9.x',
+  },
+  {
+    key: 'C-15:regional_manager@employee-management:POST /',
+    reason: 'ADR-065 expands createEmployee to regional_manager',
+    authority: 'ADR-065',
+    owner: 'PR 9.x',
+  },
   // ---------------------------------------------------------------------
 ]);
 

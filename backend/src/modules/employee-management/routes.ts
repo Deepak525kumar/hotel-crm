@@ -7,9 +7,8 @@ const router = Router();
 
 router.use(authMiddleware);
 
-// Create / bulk import (Admin-only — OD-EMP-08 leaves other importer roles
-// OPEN; see EmployeeManagementService.createEmployee).
-router.post('/', requireRole('admin'), requirePermission('employees:write'), ...controller.createEmployee);
+// Create / bulk import. ADR-065 expands createEmployee to manager/regional_manager.
+router.post('/', requireRole(['admin', 'regional_manager', 'manager']), requirePermission('employees:write'), ...controller.createEmployee);
 router.post('/bulk-import', requireRole('admin'), requirePermission('employees:write'), ...controller.bulkImport);
 
 // Review Queue (ADR-065 §6 item 7)
