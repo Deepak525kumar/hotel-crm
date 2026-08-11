@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authMiddleware } from '../../middleware/auth.js';
 import { requireRole } from '../../middleware/permissions.js';
 import { calendarController } from './controller.js';
+import { router as shiftSummaryRoutes } from './shift-summary/routes.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -63,5 +64,8 @@ router.delete(
 // bypass checkHotelAccess() grants it elsewhere -- see the service method's
 // own comment for why that bypass doesn't transfer to this permission.
 router.get('/availability', (req, res, next) => calendarController.getAvailability(req, res, next));
+
+// Daily Shift Summary (ADR-051 revival / Intake Pass)
+router.use('/hotels/:hotel_id/shift-summaries', shiftSummaryRoutes);
 
 export default router;

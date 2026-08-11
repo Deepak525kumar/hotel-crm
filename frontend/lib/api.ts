@@ -636,6 +636,26 @@ export const geoCheckinsApi = {
  * regional_manager via the worker's Hotel Group; checker denied) is enforced
  * entirely backend-side.
  */
+
+export interface DailyShiftSummary {
+  id: string;
+  hotel_id: string;
+  date: string;
+  total_rooms: number;
+  stay_over_rooms: number;
+  checkout_rooms: number;
+  total_people_working: number;
+  notes: string | null;
+  created_by_id: string;
+  updated_by_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DailyShiftSummaryPayload = Omit<
+  DailyShiftSummary,
+  "id" | "hotel_id" | "date" | "created_by_id" | "updated_by_id" | "created_at" | "updated_at"
+>;
 export const calendarApi = {
   getAvailability: (workerId: string) =>
     apiFetch<Availability>(`/calendar/availability${toQuery({ worker_id: workerId })}`),
@@ -672,6 +692,19 @@ export const calendarApi = {
     apiFetch<CalendarAbsence>(`/calendar/absences/${id}/move`, {
       method: "PATCH",
       body: { day },
+    }),
+
+  /** Daily Shift Summary: list for a date range */
+  listShiftSummaries: (hotelId: string, startDate: string, endDate: string) =>
+    apiFetch<DailyShiftSummary[]>(
+      `/calendar/hotels/${hotelId}/shift-summaries${toQuery({ start_date: startDate, end_date: endDate })}`
+    ),
+
+  /** Daily Shift Summary: upsert for a specific date */
+  upsertShiftSummary: (hotelId: string, date: string, payload: DailyShiftSummaryPayload) =>
+    apiFetch<DailyShiftSummary>(`/calendar/hotels/${hotelId}/shift-summaries/${date}`, {
+      method: "PUT",
+      body: payload,
     }),
 };
 
