@@ -11,6 +11,7 @@ discovered through testing. This file is the owner's own punch list.
 
 ## Open
 
+- [ ] Add a follow-up issue / ADR amendment task for updating ADR-030 §3 capability matrix, and reconciling worker/checker self-service onboarding submission with the ratified permissions model.
 - [ ] Get Docker running so the concurrency script (`scripts/05-concurrency.mjs`) and any live-DB
       verification can actually execute — currently blocking items #5/#7 from
       `08-known-gaps-and-next.md` (race conditions, assign-vs-deactivate) and item #6 (UI coverage

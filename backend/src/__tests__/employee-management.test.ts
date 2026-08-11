@@ -219,6 +219,20 @@ describe('EmployeeManagementService', () => {
       expect(profile).not.toHaveProperty('disability_status');
       expect(profile.employee_id).toBe('E-001');
     });
+
+    it('defensively deletes nested user.password_hash if accidentally included in the query', () => {
+      const record = fakeRecord({ konfession: 'catholic' }) as any;
+      record.user = {
+        id: 'user_1',
+        first_name: 'John',
+        password_hash: 'super-secret-hash-that-should-never-leak',
+      };
+      const profile = toGeneralProfile(record) as any;
+      expect(profile.user).toBeDefined();
+      expect(profile.user).not.toHaveProperty('password_hash');
+      // Other fields should remain
+      expect(profile.user?.first_name).toBe('John');
+    });
   });
 
   describe('lifecycle transitions (REQ-EMP-002 rework, 2026-08-06: permanent, non-terminal lifecycle)', () => {

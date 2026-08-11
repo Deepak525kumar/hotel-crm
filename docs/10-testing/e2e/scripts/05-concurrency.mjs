@@ -62,10 +62,14 @@ export async function runConcurrencyTest() {
 
   console.log(`Results: ${successCount} succeeded, ${conflictCount} conflicts, ${results.length - successCount - conflictCount} other errors.`);
   
+  // EXPECTED SUCCESS ENVELOPE:
+  // Out of 50 parallel requests, exactly 1 should succeed (status 200/201).
+  // The remaining 49 MUST fail with a 409 Conflict due to optimistic concurrency control
+  // and the database's version column validation.
   if (successCount === 1 && conflictCount === 49) {
     console.log('✅ N-Way Approval Race PASSED: exactly 1 request succeeded.');
   } else {
-    console.log('❌ N-Way Approval Race FAILED.');
+    console.log(`❌ N-Way Approval Race FAILED. Expected 1 success and 49 conflicts, got ${successCount} successes and ${conflictCount} conflicts.`);
   }
 
   // TODO: Assign vs Deactivate Race on an Active Manager
