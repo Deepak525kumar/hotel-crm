@@ -645,14 +645,14 @@ model HotelWorker {
 // HotelGroup), nullable until hire-approval, set at Under Review -> Active.
 // ADR-025 Decision 3: deliberately hotel-tie-free — no per-hotel FK here.
 model EmploymentRecord {
-  id          String           @id @default(cuid())
-  user_id     String           @unique // account link (REQ-EMP-001: one record per account)
-  user        User             @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
-  employee_id String           @unique // human-facing Employee ID
-  job_title   String // free text, provisional (OD-EMP-13)
-  start_date  DateTime
-  status      EmploymentStatus @default(PENDING)
-  version     Int              @default(0) // ADR-036: optimistic concurrency
+  id                      String              @id @default(cuid())
+  user_id                 String              @unique // account link (REQ-EMP-001: one record per account)
+  user                    User                @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
+  employee_id             String              @unique // human-facing Employee ID
+  job_title               String // free text, provisional (OD-EMP-13)
+  start_date              DateTime
+  status                  EmploymentStatus    @default(PENDING)
+  version                 Int                 @default(0) // ADR-036: optimistic concurrency
 
   // Sub-state of PENDING only (2026-08-06 rework): null = old INACTIVE
   // (onboarding not yet submitted), non-null = old UNDER_REVIEW (awaiting
