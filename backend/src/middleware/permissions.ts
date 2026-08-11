@@ -293,9 +293,15 @@ export async function resolveWorkerScope(
   role: string,
   workerId: string | undefined,
   scope: UserScope | null,
+  actorId?: string,
 ): Promise<WorkerAccessDecision> {
   if (role === 'admin') return { allowed: true };
   if (!workerId) return { allowed: false, reason: 'missing_worker_id' };
+  // ADR-065 self-service: a Manager/RM applicant's own record has no
+  // hotel_group_id yet (set only on activation), so isWorkerInGroupScope()
+  // always denies self-reads pre-assignment. Check self-access before the
+  // group-scope branch, same ordering as employee-management's assertVisibility.
+  if (actorId && actorId === workerId) return { allowed: true };
 
   if (isScopedManagerRole(role)) {
     const inScope = await isWorkerInGroupScope(scope, workerId);
@@ -315,7 +321,7 @@ export function checkWorkerScope() {
     const workerId = (req.params.worker_id || req.body?.worker_id) as string | undefined;
 
     try {
-      const decision = await resolveWorkerScope(req.auth.role, workerId, req.auth.scope ?? null);
+      const decision = await resolveWorkerScope(req.auth.role, workerId, req.auth.scope ?? null, req.auth.userId);
 
       if (!decision.allowed) {
         if (decision.reason === 'missing_worker_id') {

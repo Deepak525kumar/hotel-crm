@@ -29,6 +29,8 @@ export function ReviewQueueTable() {
   const [selectedRecord, setSelectedRecord] = useState<ReviewQueueItem | null>(null);
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectReason, setRejectReason] = useState("");
 
   const [assignRecord, setAssignRecord] = useState<ReviewQueueItem | null>(null);
   const [assigning, setAssigning] = useState(false);
@@ -60,10 +62,10 @@ export function ReviewQueueTable() {
     try {
       setAssigning(true);
       const isManager = assignRecord.user?.role === "MANAGER";
-      await employeesApi.assign(assignRecord.employee_id, {
-        primary_hotel_id: isManager ? assignTarget : null,
-        hotel_group_id: !isManager ? assignTarget : null,
-      });
+      await employeesApi.assign(
+        assignRecord.employee_id,
+        isManager ? { primary_hotel_id: assignTarget } : { hotel_group_id: assignTarget }
+      );
       setAssignRecord(null);
       setAssignTarget("");
       mutate();
@@ -74,14 +76,18 @@ export function ReviewQueueTable() {
     }
   };
 
-  const handleReject = async () => {
-    if (!selectedRecord) return;
-    const reason = prompt("Enter a reason for rejection:");
-    if (reason === null) return;
+  const handleRejectClick = () => {
+    setRejectReason("");
+    setRejectModalOpen(true);
+  };
+
+  const submitReject = async () => {
+    if (!selectedRecord || !rejectReason.trim()) return;
     
     try {
       setRejecting(true);
-      await employeesApi.reject(selectedRecord.employee_id, { reason });
+      await employeesApi.reject(selectedRecord.employee_id, { reason: rejectReason });
+      setRejectModalOpen(false);
       setSelectedRecord(null);
       mutate();
     } catch (e) {
@@ -193,7 +199,7 @@ export function ReviewQueueTable() {
             <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
               <Button 
                 variant="outline" 
-                onClick={handleReject}
+                onClick={handleRejectClick}
                 loading={rejecting}
                 disabled={approving}
               >
@@ -248,6 +254,47 @@ export function ReviewQueueTable() {
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal
+        open={rejectModalOpen}
+        onClose={() => !rejecting && setRejectModalOpen(false)}
+        title="Reject Application"
+      >
+        <div className="space-y-4 mt-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Please provide a reason for rejecting this application. This reason will be sent to the applicant.
+          </p>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              Rejection Reason
+            </label>
+            <textarea
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 min-h-[100px]"
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="e.g. Invalid document uploaded"
+              disabled={rejecting}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Button
+              variant="outline"
+              onClick={() => setRejectModalOpen(false)}
+              disabled={rejecting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={submitReject}
+              loading={rejecting}
+              disabled={!rejectReason.trim()}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Confirm Rejection
+            </Button>
+          </div>
+        </div>
       </Modal>
     </>
   );

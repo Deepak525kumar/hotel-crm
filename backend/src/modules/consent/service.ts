@@ -1,4 +1,4 @@
-import { ConsentDecision, OutboxSourceModule, OutboxTransport } from '@prisma/client';
+import { ConsentDecision, OutboxSourceModule, OutboxTransport, Prisma } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
@@ -144,34 +144,40 @@ export class ConsentService extends BaseService {
       );
     }
 
-    const record = await this.prisma.consentRecord.create({
-      data: {
-        worker_id: workerId,
-        consent_instance: input.consent_instance,
-        notice_version: input.notice_version,
-        decision: input.decision as ConsentDecision,
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.consentRecord.create({
+        data: {
+          worker_id: workerId,
+          consent_instance: input.consent_instance,
+          notice_version: input.notice_version,
+          decision: input.decision as ConsentDecision,
+        },
+      });
+
+      // RULE-CONSENT-05: every decision produces exactly one immutable audit
+      // entry, mirroring RULE-HR-15's identical trust-boundary treatment.
+      await this.logAudit(
+        workerId,
+        actorRole,
+        input.decision === 'GRANTED' ? 'CONSENT_GRANTED' : 'CONSENT_DECLINED',
+        'ConsentRecord',
+        rec.id,
+        { consent_instance: input.consent_instance, notice_version: input.notice_version },
+        actorIp,
+        undefined,
+        undefined,
+        tx
+      );
+
+      // RULE-CONSENT-03: a decline on the daily gate produces both the
+      // access-block fact (returned to the caller, who enforces the block --
+      // see Out of Scope) AND a manager-notification fact/event, together --
+      // neither may fire without the other.
+      if (input.decision === 'DECLINED') {
+        await this.notifyResponsibleManager(workerId, rec.id, input.consent_instance, tx);
+      }
+      return rec;
     });
-
-    // RULE-CONSENT-05: every decision produces exactly one immutable audit
-    // entry, mirroring RULE-HR-15's identical trust-boundary treatment.
-    await this.logAudit(
-      workerId,
-      actorRole,
-      input.decision === 'GRANTED' ? 'CONSENT_GRANTED' : 'CONSENT_DECLINED',
-      'ConsentRecord',
-      record.id,
-      { consent_instance: input.consent_instance, notice_version: input.notice_version },
-      actorIp
-    );
-
-    // RULE-CONSENT-03: a decline on the daily gate produces both the
-    // access-block fact (returned to the caller, who enforces the block --
-    // see Out of Scope) AND a manager-notification fact/event, together --
-    // neither may fire without the other.
-    if (input.decision === 'DECLINED') {
-      await this.notifyResponsibleManager(workerId, record.id, input.consent_instance);
-    }
 
     logger.info('consent_decision_recorded', {
       recordId: record.id,
@@ -275,15 +281,16 @@ export class ConsentService extends BaseService {
   private async notifyResponsibleManager(
     workerId: string,
     recordId: string,
-    consentInstance: string
+    consentInstance: string,
+    tx: Prisma.TransactionClient
   ): Promise<void> {
-    const employment = await this.prisma.employmentRecord.findUnique({
+    const employment = await tx.employmentRecord.findUnique({
       where: { user_id: workerId },
       select: { status: true, hotel_group_id: true },
     });
     if (!employment || employment.status !== 'ACTIVE' || !employment.hotel_group_id) return;
 
-    const group = await this.prisma.hotelGroup.findUnique({
+    const group = await tx.hotelGroup.findUnique({
       where: { id: employment.hotel_group_id },
       select: { regional_manager_user_id: true },
     });
@@ -298,7 +305,7 @@ export class ConsentService extends BaseService {
       transports: [OutboxTransport.PUSH],
       sourceModule: OutboxSourceModule.CONSENT,
       producerService: 'ConsentService',
-    });
+    }, tx);
   }
 
   private toDto(record: {

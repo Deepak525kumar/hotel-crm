@@ -1598,6 +1598,12 @@ export class EmployeeManagementService extends BaseService {
       return;
     }
     if (actor.role === 'admin') return;
+    // ADR-065 self-service: a Manager/RM applicant's own record has no
+    // hotel_group_id/scope claim yet (both are set only on activation), so
+    // the group-scope check below always denies self-reads pre-assignment.
+    // Own-record access must be checked before the scope branch, the same
+    // ordering assertLifecycleAuthority already uses for self-submission.
+    if (record.user_id === actor.userId) return;
     if (isScopedManagerRole(actor.role) || actor.role === 'checker') {
       const allowed = await this.isRecordInScope(actor, record);
       if (!allowed) throw new ForbiddenError('Record is outside your scope');

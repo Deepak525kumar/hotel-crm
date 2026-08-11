@@ -24,8 +24,8 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
-jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
+jest.mock('../lib/db.js', () => {
+  const db = {
     workerGeoCheckin: {
       create: mockWorkerGeoCheckinCreate,
       findMany: mockWorkerGeoCheckinFindMany,
@@ -34,8 +34,14 @@ jest.mock('../lib/db.js', () => ({
     },
     hotel: { findUnique: mockHotelFindUnique, findMany: mockHotelFindMany },
     auditLog: { create: mockAuditLogCreate },
-  }),
-}));
+  };
+  return {
+    getPrisma: () => ({
+      ...db,
+      $transaction: async (cb: any) => cb(db),
+    }),
+  };
+});
 
 jest.mock('../middleware/permissions.js', () => ({
   isHotelInScope: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
