@@ -87,24 +87,28 @@ export class CalendarService extends BaseService {
     // than being blocked by a prior one.
     const day = new Date(`${input.day}T00:00:00.000Z`);
     const reason = input.reason ?? null;
-    const absence = await this.prisma.calendarAbsence.upsert({
-      where: { worker_id_day: { worker_id: workerId, day } },
-      create: {
-        worker_id: workerId,
-        day,
-        kind: input.kind as CalendarAbsenceKind,
-        reason,
-        marked_by_id: actor.userId,
-      },
-      update: { kind: input.kind as CalendarAbsenceKind, reason, marked_by_id: actor.userId },
-    });
+    const absence = await this.prisma.$transaction(async (tx) => {
+      const createdAbsence = await tx.calendarAbsence.upsert({
+        where: { worker_id_day: { worker_id: workerId, day } },
+        create: {
+          worker_id: workerId,
+          day,
+          kind: input.kind as CalendarAbsenceKind,
+          reason,
+          marked_by_id: actor.userId,
+        },
+        update: { kind: input.kind as CalendarAbsenceKind, reason, marked_by_id: actor.userId },
+      });
 
-    // Audit trail (2026-08-08 feature): every calendar-absence write is
-    // logged, regardless of actor -- self-service or manager-on-behalf-of.
-    await this.logAudit(actor.userId, actor.role, 'MARK_ABSENCE', 'CALENDAR_ABSENCE', absence.id, {
-      worker_id: workerId,
-      day: input.day,
-      kind: input.kind,
+      // Audit trail (2026-08-08 feature): every calendar-absence write is
+      // logged, regardless of actor -- self-service or manager-on-behalf-of.
+      await this.logAudit(actor.userId, actor.role, 'MARK_ABSENCE', 'CALENDAR_ABSENCE', createdAbsence.id, {
+        worker_id: workerId,
+        day: input.day,
+        kind: input.kind,
+      }, undefined, undefined, undefined, tx);
+
+      return createdAbsence;
     });
 
     try {
@@ -157,9 +161,19 @@ export class CalendarService extends BaseService {
 
     let updated: CalendarAbsence;
     try {
-      updated = await this.prisma.calendarAbsence.update({
-        where: { id: absenceId },
-        data: { day, marked_by_id: actor.userId },
+      updated = await this.prisma.$transaction(async (tx) => {
+        const movedAbsence = await tx.calendarAbsence.update({
+          where: { id: absenceId },
+          data: { day, marked_by_id: actor.userId },
+        });
+
+        await this.logAudit(actor.userId, actor.role, 'MOVE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
+          worker_id: existing.worker_id,
+          from_day: existing.day.toISOString().slice(0, 10),
+          to_day: input.day,
+        }, undefined, undefined, undefined, tx);
+
+        return movedAbsence;
       });
     } catch (error) {
       const isP2002 =
@@ -171,12 +185,6 @@ export class CalendarService extends BaseService {
       }
       throw error;
     }
-
-    await this.logAudit(actor.userId, actor.role, 'MOVE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
-      worker_id: existing.worker_id,
-      from_day: existing.day.toISOString().slice(0, 10),
-      to_day: input.day,
-    });
 
     try {
       await this.autoCancelSameDayAssignment(existing.worker_id, day, actor);
@@ -220,13 +228,15 @@ export class CalendarService extends BaseService {
       throw new ConflictError('Cannot delete an absence in the past');
     }
 
-    await this.prisma.calendarAbsence.delete({
-      where: { id: absenceId },
-    });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.calendarAbsence.delete({
+        where: { id: absenceId },
+      });
 
-    await this.logAudit(actor.userId, actor.role, 'DELETE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
-      worker_id: existing.worker_id,
-      day: absenceDay,
+      await this.logAudit(actor.userId, actor.role, 'DELETE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
+        worker_id: existing.worker_id,
+        day: absenceDay,
+      }, undefined, undefined, undefined, tx);
     });
 
     try {
