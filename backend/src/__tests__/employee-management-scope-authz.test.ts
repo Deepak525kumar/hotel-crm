@@ -140,6 +140,12 @@ const mockDb = {
     findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
     findFirst: async () => null,
   },
+  workerDocument: {
+    findMany: async () => [{ category: 'GENERAL' }, { category: 'IDENTITY' }, { category: 'WORK_PERMIT' }],
+  },
+  contract: {
+    findFirst: async () => ({ id: 'mock_contract_1', status: 'ACTIVE' }),
+  },
   hotelGroup: {
     findFirst: async () => null,
     findUnique: async ({ where }: any) => hotelGroups[where.id] ?? null,

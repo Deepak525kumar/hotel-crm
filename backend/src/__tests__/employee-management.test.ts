@@ -43,6 +43,19 @@ const mockPrisma: any = {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     delete: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  workerDocument: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([
+      { category: 'GENERAL' },
+      { category: 'IDENTITY' },
+      { category: 'WORK_PERMIT' }
+    ]),
+  },
+  contract: {
+    findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
+      id: 'mock_contract_1',
+      status: 'ACTIVE'
+    }),
+  },
   hotel: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
