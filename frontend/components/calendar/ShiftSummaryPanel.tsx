@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { calendarApi, DailyShiftSummary, DailyShiftSummaryPayload } from "@/lib/api";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/Card";
+import { Input } from "@/components/ui/Input";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/Textarea";
 
 interface ShiftSummaryPanelProps {
   hotelId: string;
@@ -155,7 +155,7 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
       <div className="mb-4">
         <label className="block text-xs font-medium mb-1">Notes (What work was done today?)</label>
         <Textarea 
-          rows={3} value={form.notes} 
+          rows={3} value={form.notes || ""} 
           onChange={e => setForm({...form, notes: e.target.value})}
         />
       </div>
