@@ -214,7 +214,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       <p className="font-medium">Documents required before submission:</p>
                       <ul className="mt-1 list-disc list-inside">
                         {docCompleteness.missing_categories.map((cat) => (
-                          <li key={cat}>{cat === "GENERAL" ? "General documents" : "Work permit"}</li>
+                          <li key={cat} className="capitalize">{cat.replace(/_/g, " ").toLowerCase()}</li>
                         ))}
                       </ul>
                     </div>

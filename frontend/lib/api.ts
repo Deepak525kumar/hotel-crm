@@ -941,6 +941,10 @@ export const employeesApi = {
   getByUserId: (userId: string) =>
     apiFetch<EmploymentRecord | null>(`/employees/by-user/${userId}`),
 
+  /** Fetches the review queue for the current manager/admin (ADR-065). */
+  getReviewQueue: () =>
+    apiFetch<EmploymentRecord[]>('/employees/review-queue'),
+
   /** Creates the EmploymentRecord for an existing worker `User` (Admin-only). Starts `PENDING`. */
   create: (input: CreateEmploymentInput) =>
     apiFetch<EmploymentRecord>(`/employees`, { method: "POST", body: input }),

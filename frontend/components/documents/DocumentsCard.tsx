@@ -24,7 +24,12 @@ import {
 import type { DocumentCategory, WorkerDocument } from "@/lib/types";
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
-  GENERAL: "General",
+  TAX_NUMBER: "Tax Number",
+  SOCIAL_SECURITY_NUMBER: "Social Security",
+  HEALTH_INSURANCE: "Health Insurance",
+  ID_CARD: "ID Card",
+  PASSPORT: "Passport",
+  ADDRESS: "Proof of Address",
   WORK_PERMIT: "Work permit",
 };
 
@@ -174,14 +179,14 @@ function UploadDocumentModal({
   onClose: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [category, setCategory] = useState<DocumentCategory>("GENERAL");
+  const [category, setCategory] = useState<DocumentCategory>("ID_CARD");
   const [isWorkPermit, setIsWorkPermit] = useState(false);
   const [expiresAt, setExpiresAt] = useState("");
   const [fileError, setFileError] = useState<string | null>(null);
   const upload = useAsyncAction();
 
   const reset = () => {
-    setCategory("GENERAL");
+    setCategory("ID_CARD");
     setIsWorkPermit(false);
     setExpiresAt("");
     setFileError(null);

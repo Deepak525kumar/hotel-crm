@@ -1023,7 +1023,7 @@ export interface UpdateAttendanceInput {
 /*  Documents — SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16)                       */
 /* -------------------------------------------------------------------------- */
 
-export type DocumentCategory = "GENERAL" | "WORK_PERMIT";
+export type DocumentCategory = "TAX_NUMBER" | "SOCIAL_SECURITY_NUMBER" | "HEALTH_INSURANCE" | "ID_CARD" | "PASSPORT" | "ADDRESS" | "WORK_PERMIT";
 
 /** Matches backend `WorkerDocumentDto` (documents/types.ts) exactly. */
 export interface WorkerDocument {
@@ -1049,6 +1049,7 @@ export interface DocumentCompleteness {
   is_complete: boolean;
   missing_categories: DocumentCategory[];
   document_count: number;
+  by_category: Record<DocumentCategory, boolean>;
 }
 
 /**
@@ -1205,6 +1206,9 @@ export interface EmploymentRecord {
   employment_cycle: number;
   marked_suitable: boolean;
   hotel_group_id: string | null;
+  work_permit_required: boolean;
+  target_hotel_group_id: string | null;
+  target_primary_hotel_id: string | null;
   /**
    * Primary/home hotel — display and default-selection only (person-centric
    * assignment redesign, 2026-08-07). Explicitly NOT an eligibility
