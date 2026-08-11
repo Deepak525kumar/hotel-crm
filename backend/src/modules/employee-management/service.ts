@@ -43,9 +43,12 @@ import type {
 // general profile serializer must be physically unreachable from the
 // special-category fields).
 export function toGeneralProfile(record: EmploymentRecord): Omit<EmploymentRecord, 'konfession' | 'disability_status'> {
-  const profile: Partial<EmploymentRecord> = { ...record };
+  const profile: any = { ...record };
   delete profile.konfession;
   delete profile.disability_status;
+  if (profile.user && typeof profile.user === 'object') {
+    delete profile.user.password_hash;
+  }
   return profile as Omit<EmploymentRecord, 'konfession' | 'disability_status'>;
 }
 
@@ -439,7 +442,14 @@ export class EmployeeManagementService extends BaseService {
           ...(isRehire ? { employment_cycle: nextCycle } : {}),
           version: { increment: 1 },
         },
-        include: { user: true },
+        include: { 
+          user: {
+            select: {
+              id: true,
+              role: true,
+            }
+          }
+        },
       });
       
       await tx.employmentStatusHistory.create({
