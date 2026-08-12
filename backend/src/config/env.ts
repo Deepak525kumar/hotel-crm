@@ -350,7 +350,44 @@ const envSchema = z.object({
   // (TRULE-AUTH-002: "notify and never block"). Crossing it must not affect
   // whether a subsequent login is accepted.
   AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: z.coerce.number().int().positive().default(5),
-});
+})
+  // ---------------------------------------------------------------------------
+  // Fail-closed guard: a deployed environment must have real object storage.
+  //
+  // `documents/storage.ts` falls back to `stubStorageClient` when S3_BUCKET is
+  // unset -- deliberately, so unit tests and local-only work never touch the
+  // SDK. The stub logs a warning and NO-OPS the upload, while the caller's
+  // surrounding transaction still writes the WorkerDocument row. The failure is
+  // therefore invisible from every layer a human normally checks: the API
+  // returns 200, the UI shows the document as uploaded, and the DB row exists
+  // -- with no object in the bucket.
+  //
+  // That is fine (and necessary) in development and test. In staging or
+  // production it would mean silently losing every employee's identity
+  // documents, which is exactly the class of data loss this codebase's testing
+  // rules exist to prevent ("a 200 has repeatedly meant nothing was written").
+  // Cheapest possible mitigation: refuse to boot, so a missing/typo'd bucket is
+  // a loud startup crash instead of a discovery made months later when someone
+  // needs a work permit that was never stored.
+  //
+  // Verified reachable, not hypothetical: this exact stub path was hit
+  // accidentally during S3 verification on 2026-08-12 (a probe that reported
+  // `UPLOAD_RETURNED_OK` while writing nothing), which is what prompted this
+  // guard.
+  .superRefine((env, ctx) => {
+    const requiresRealStorage = env.NODE_ENV === 'production' || env.NODE_ENV === 'staging';
+    if (requiresRealStorage && !env.S3_BUCKET?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['S3_BUCKET'],
+        message:
+          `S3_BUCKET must be set when NODE_ENV=${env.NODE_ENV}: without it, document ` +
+          'uploads silently no-op (stub storage) while still writing the DB row, so ' +
+          'documents would appear uploaded but never reach the bucket. Set S3_BUCKET, ' +
+          'or run with NODE_ENV=development if you intend to use stub storage.',
+      });
+    }
+  });
 
 type Env = z.infer<typeof envSchema>;
 
