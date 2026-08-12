@@ -7,7 +7,7 @@ import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requireRole } from '../../middleware/permissions.js';
 import { documentController } from './controller.js';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './upload-policy.js';
-import { ValidationError } from '../../lib/errors.js';
+import { ForbiddenError, ValidationError } from '../../lib/errors.js';
 
 // RULE-DOC-09/REQ-DOC-017: memory storage only — bytes are handed straight to
 // StorageService.upload() (S3 stub today, real S3 once wired), never written
@@ -56,6 +56,38 @@ function scopeWorkerRoute() {
   };
 }
 
+// RULE B (project-owner decision, 2026-08-12): upload is SELF-SERVICE ONLY.
+// Enforced at the ROUTE as well as in DocumentService.uploadDocument — a
+// hidden button in front of a live route is not a control, and this route
+// previously admitted admin/manager/regional_manager for ANY :worker_id.
+//
+// Deliberately NOT `scopeWorkerRoute()`: that middleware asks "is this worker
+// inside the actor's group", which is the wrong question now — an in-scope
+// worker who is not the actor must still be denied. This asks the only
+// question RULE B cares about, and asks it identically for every role
+// (including admin, which checkWorkerScope() bypasses outright).
+//
+// Comparing `req.auth.userId` to the path parameter means the actor's identity
+// comes from the verified JWT and the target from the URL; there is no body
+// field a caller could use to claim someone else's id (RULE-DOC-08).
+function requireSelfWorker() {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      next(new ForbiddenError('Authentication required'));
+      return;
+    }
+    if (req.auth.userId !== req.params.worker_id) {
+      next(
+        new ForbiddenError(
+          'Documents may only be uploaded by the worker they belong to; no role may upload on another user\'s behalf'
+        )
+      );
+      return;
+    }
+    next();
+  };
+}
+
 // Translates multer's own MulterError into the platform's ValidationError
 // shape (422, ERROR_CODES.VALIDATION_ERROR) so a rejected upload (oversize,
 // disallowed MIME type, wrong field name) reaches the client in the same
@@ -80,10 +112,14 @@ function handleUploadErrors() {
 const router = Router();
 router.use(authMiddleware);
 
+// RULE B: any authenticated role may upload, but ONLY to its own document set
+// — so the role gate widens to include `checker` (a checker onboards too) while
+// requireSelfWorker() supplies the real, tighter boundary. Widening the role
+// list without the self-check would be a regression; the two land together.
 router.post(
   '/workers/:worker_id/documents',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
-  scopeWorkerRoute(),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
+  requireSelfWorker(),
   upload.single('file'),
   handleUploadErrors(),
   (req: Request, res: Response, next: NextFunction) => documentController.uploadDocument(req, res, next)

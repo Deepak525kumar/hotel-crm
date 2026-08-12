@@ -126,10 +126,20 @@ describe('EmployeeManagementService', () => {
     service = new EmployeeManagementService();
   });
 
+  // RULE A (project-owner decision, 2026-08-12): create is 1-level-down ONLY,
+  // so the `admin` actor these cases use may now create a REGIONAL_MANAGER and
+  // nothing else — the target user's role was WORKER here purely as an
+  // arbitrary stand-in, not because worker was the subject under test. Changed
+  // to REGIONAL_MANAGER so each case still exercises what it was written to
+  // exercise (starting status, duplicate detection, skill validation,
+  // special-category exclusion) rather than tripping the new hierarchy check
+  // first. RULE A itself is covered exhaustively, for every
+  // (actor_role, target_role) pair, in `role-hierarchy.test.ts` and
+  // `create-hierarchy-authz.test.ts`.
   describe('createEmployee', () => {
     it('creates a record starting Inactive (REQ-EMP-001)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
       const created = fakeRecord({ status: EmploymentStatus.PENDING });
       mockPrisma.employmentRecord.create.mockResolvedValue(created);
       mockPrisma.auditLog.create.mockResolvedValue({});
@@ -149,7 +159,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects non-admin actors (OD-EMP-08 conservative restriction)', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
       await expect(
         service.createEmployee({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, {
           user_id: 'user_1',
@@ -162,7 +172,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects a duplicate user_id or employee_id with ConflictError', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValueOnce(fakeRecord()).mockResolvedValueOnce(null);
 
       await expect(
@@ -177,7 +187,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('rejects a skill tag outside the fixed set (REQ-EMP-003 / RULE-EMP-04)', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -193,7 +203,7 @@ describe('EmployeeManagementService', () => {
     });
 
     it('excludes konfession and disability_status from the general profile (REQ-EMP-007 / FIND-002)', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
       const created = fakeRecord({ status: EmploymentStatus.PENDING, konfession: 'catholic', disability_status: 'none' });
       mockPrisma.employmentRecord.create.mockResolvedValue(created);
@@ -489,8 +499,13 @@ describe('EmployeeManagementService', () => {
   });
 
   describe('bulkImport (REQ-EMP-006 / RULE-EMP-10)', () => {
+    // RULE A (2026-08-12): bulkImport is admin-only and routes every row
+    // through createEmployee, so an admin's importable target role is now
+    // REGIONAL_MANAGER only (see the createEmployee describe block's note, and
+    // the RULE A consequence recorded in role-hierarchy.ts). The target role
+    // is incidental to what this case tests (per-row failure isolation).
     it('isolates a failing row from succeeding rows', async () => {
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', role: 'WORKER' });
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', role: 'REGIONAL_MANAGER' });
       mockPrisma.employmentRecord.findUnique
         .mockResolvedValueOnce(null) // row 0: user_id check
         .mockResolvedValueOnce(null) // row 0: employee_id check
@@ -525,7 +540,14 @@ describe('EmployeeManagementService', () => {
   // now admit admin OR a scoped manager/regional_manager (assertLifecycleAuthority()) --
   // no longer the pre-rework admin-only "internal transport" gate.
   describe('lifecycle actions (submitForReview / approve / reject)', () => {
-    it('submitForReview denies a role that is neither admin nor a scoped manager/RM', async () => {
+    // RULE B (project-owner decision, 2026-08-12): submit-for-review is
+    // SELF-SERVICE ONLY. `w_1` is not `fakeRecord().user_id` ('user_1'), so
+    // this remains a denial — but now for the self-check reason, not the
+    // "neither admin nor scoped manager" reason the old title gave. Retitled
+    // rather than deleted; the record is fetched before the authority check,
+    // so the mock is needed for the assertion to reach it.
+    it('submitForReview denies an actor who is not the applicant (RULE B self-only)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
       await expect(
         service.submitForReview(
           { userId: 'w_1', role: 'worker', permissions: [], scope: null } as any,
@@ -535,13 +557,27 @@ describe('EmployeeManagementService', () => {
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
 
-    it('submitForReview sets submitted_for_review_at, stays PENDING', async () => {
+    // RULE B: an ADMIN may no longer submit on an applicant's behalf. This is
+    // the bypass the owner closed — previously assertLifecycleAuthority
+    // returned early for admin before the self-check was reached.
+    it('submitForReview denies an ADMIN acting on another user\'s record (RULE B)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
+      await expect(service.submitForReview(admin as any, 'E-001')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    // The actor IS the applicant (userId === fakeRecord().user_id), which is
+    // now the only way this transition can happen at all.
+    it('submitForReview sets submitted_for_review_at, stays PENDING (self-submission)', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(fakeRecord({ status: EmploymentStatus.PENDING }));
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
       );
 
-      const result = await service.submitForReview(admin as any, 'E-001');
+      const applicant = { userId: 'user_1', role: 'worker', permissions: ['employees:read'], scope: null };
+      const result = await service.submitForReview(applicant as any, 'E-001');
       expect(result.status).toBe(EmploymentStatus.PENDING);
       expect(result.submitted_for_review_at).not.toBeNull();
     });
@@ -550,6 +586,13 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
       );
+      // The approving actor is a MANAGER, so assertLifecycleAuthority resolves
+      // the TARGET user's role to decide whether this manager may act on it.
+      // Stated explicitly rather than inherited from whatever a previous test
+      // left on the shared `user.findUnique` mock: a WORKER target is the case
+      // this test means, and a stale REGIONAL_MANAGER target would deny it for
+      // an unrelated reason (only Admin manages RM applications).
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
       mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' }); // own group
       mockPrisma.employmentRecord.update.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.ACTIVE })

@@ -4,7 +4,9 @@
 tested, and what to add next time. Read it at the **end** of a run and **update it** — move
 fixed items to the history table, add anything new you found.
 
-Last updated: **2026-08-12** (browser-verified assign UI + two new self-service visibility defects found and fixed via real Playwright clicking; see the run log for the full session).
+Last updated: **2026-08-12** (calendar shift-summary Admin/RM viewing gap closed — two independent
+real bugs found and fixed via real Playwright + Postgres verification; local `main` was also found
+diverged from `origin/main` by 15 total commits and merged during this run — see the run log).
 
 ---
 
@@ -18,6 +20,8 @@ Last updated: **2026-08-12** (browser-verified assign UI + two new self-service 
 | ~~7~~ | ~~Manager/RM applicant cannot view their own onboarding record before assignment~~ | **FOUND AND FIXED 2026-08-12** — `/onboarding` showed "Failed to load onboarding record" and the document checklist showed "Failed to load document status" for a Manager or Regional Manager applicant, 100% of the time, before they had been assigned a scope. Root cause: two separate visibility guards (`employee-management/service.ts`'s `assertVisibility`, called by `GET /employees/by-user/:user_id`; and `middleware/permissions.ts`'s `resolveWorkerScope`, called by `checkWorkerScope()` on the documents routes) both checked group/scope membership for `manager`/`regional_manager` actors with **no self-record branch** — but a pre-assignment applicant has no `hotel_group_id`/scope yet, so the check always failed even for the applicant's own record. This completely blocked self-service onboarding for every Manager/RM applicant; only a real browser session surfaced it (unit tests mock the DB layer and never hit this comparison with a null scope). Fixed by adding an explicit `record.user_id === actor.userId` / `actorId === workerId` early-return before the scope branch in both guards, mirroring the pattern `assertLifecycleAuthority` already used for self-submission. Verified live: Manager and RM applicants can now load `/onboarding`, see all 6 document categories, upload real files through the browser, and submit. Backend suite re-run clean (108/108, 2687/2687) after the fix. | Blocked 100% of Manager/RM self-service onboarding | `backend/src/modules/employee-management/service.ts` `assertVisibility`; `backend/src/middleware/permissions.ts` `resolveWorkerScope` | — |
 | ~~8~~ | ~~Assign UI sent `null` for the unused target field, backend rejected it~~ | **FOUND AND FIXED 2026-08-12** — `ReviewQueueTable.handleAssign()` sent both `primary_hotel_id` and `hotel_group_id` in the request body, setting whichever one didn't apply to `null` rather than omitting it. The backend's Zod schema (`z.object({ hotel_group_id: z.string().optional(), primary_hotel_id: z.string().optional() })`) accepts `undefined` for "not provided" but **not** `null`, so every assign attempt from the UI failed with a 422, regardless of role. Caught only by driving the actual modal and reading the live network response — the API-level tests always called `assign()` with exactly one field, never reproducing this shape. Fixed by sending only the relevant field (omitting the other) and narrowing `AssignEmploymentInput`'s type from `string \| null \| undefined` to `string \| undefined` so this shape can't recur silently. Verified live for both Manager (hotel) and RM (group) targets, confirmed via a fresh Postgres read of `Hotel.manager_user_id` / `HotelGroup.regional_manager_user_id`. | Blocked 100% of assign attempts from the UI (both roles) | `frontend/components/onboarding/ReviewQueueTable.tsx` `handleAssign`; `frontend/lib/types.ts` `AssignEmploymentInput` | — |
 | ~~9~~ | ~~Reject flow untested — uses `window.prompt()`~~ | **BROWSER-VERIFIED 2026-08-12** (not a defect, a test-harness note) — `handleReject()` uses a native `window.prompt()` for the rejection reason rather than a modal input. This works correctly for a real user but Playwright auto-dismisses native dialogs unless a `page.on('dialog', ...)` handler is attached; without one, clicking Reject silently no-ops (no request is even sent) with no visible error, which looks exactly like a broken button. Verified working once a dialog handler was added: click → prompt → reason submitted → `POST /employees/:id/reject` → record's status becomes `REJECTED`, confirmed in Postgres. Flagged so nobody re-discovers this as a false "Reject is broken" defect. **Product question, not a bug**: is `window.prompt()` the intended UX long-term, or should this become an in-modal text field for consistency with the rest of the app? | — | Cosmetic/UX — native prompt vs. in-app field |
+| 10 | **Document upload cannot be exercised end-to-end locally — S3 misconfiguration produces a bare 500** | `.env` sets `S3_BUCKET=hotelcrm-uploads` but supplies no AWS credentials, so `getStorageClient()` picks the REAL S3 client (the stub is only used when `S3_BUCKET` is unset) and `storage.upload()` throws a `StorageError`, which surfaces as `500 INTERNAL_ERROR`. **Pre-existing — confirmed by `git stash`ing the 2026-08-12 documents changes and reproducing the identical 500.** Consequence for testing: the *positive* upload path (a worker uploading their own document) **cannot be verified end-to-end in this environment** — authorization is reached and passes, then storage fails. Report it as a gap, never as a pass. Note the denial path IS fully verifiable and was verified: a non-self actor gets `403` from the authorization layer and never reaches storage, which is a clean discriminator between the two. | Blocks all local/E2E verification of successful document upload; a real S3 failure in production is also indistinguishable from a client error (bare 500, no actionable message) | `backend/src/modules/documents/storage.ts` `getStorageClient`; `.env` `S3_BUCKET` | Either unset `S3_BUCKET` locally to use the stub, or provide dev credentials. Separately: should a `StorageError` map to `503`, not `500`? |
+| ~~11~~ | ~~**Second admin-side document-upload surface — live Upload button on another user's profile**~~ | **FOUND AND FIXED 2026-08-12** (found by browser-verifying RULE B, not by tests). `components/documents/DocumentsCard.tsx` — rendered on `app/(protected)/users/[id]/page.tsx` for ANY user — had an unconditional "Upload" button calling `documentsApi.upload(workerId, …)` with an arbitrary `workerId`. This is a SECOND upload surface distinct from `components/onboarding/DocumentUploadList`, and grepping the onboarding folder alone misses it. The backend (RULE B) correctly denied the call, so this was a live button in front of a denied route rather than an open hole — but that is exactly the UI/route split this project has repeatedly gotten wrong in the other direction. Fixed by gating the button (and the misleading "Upload … for this worker" empty-state copy) on `viewerId === workerId`, defaulting to hidden while the auth store hydrates. Verified in the browser: Upload-button count on another user's profile went from 1 to 0, while the applicant's own `/onboarding` controls still render. **Lesson: when auditing a capability, enumerate call sites of the API function (`documentsApi.upload`), not files in the feature folder.** | — | `frontend/components/documents/DocumentsCard.tsx` | — |
 | ~~4~~ | ~~**`consent.recordDecision()` atomicity gap** — `consentRecord.create` → `logAudit` → `notifyResponsibleManager`, all unwrapped~~ | **FIXED** — Wrapped in `$transaction`, threading `tx` through to notifications and audit logging. | — | — |
 | ~~5~~ | ~~**Audit-outside-transaction sites** (per `ADR-029`, not `ADR-036`)~~ | **FIXED** — `geo/service.ts`, `document-templates/service.ts`, and `attendance/service.ts` all updated to wrap audits in `$transaction`. | — | — |
 | ~~6~~ | ~~**Orphaned S3 objects possible** — `storage.upload()` runs *before* the DB transaction with no compensating `storage.delete()`~~ | **FIXED** — Wrapped the DB transaction in a `try/catch` and added a compensating `storage.delete()` on failure. | — | — |
@@ -70,10 +74,35 @@ explicit yes/no:
 ## 5. Environmental caveats that have produced false results
 
 - **Docker containers vanish after a Docker restart** → `docker compose up -d`, not `docker start`.
-- **Missing AWS credentials** silently turn document tests into no-ops (stub storage still writes
-  the DB row). Always confirm `aws sts get-caller-identity` first.
+- **Missing AWS credentials do NOT always silently no-op.** The earlier note here ("stub storage
+  still writes the DB row") only holds when `S3_BUCKET` is unset, which routes to
+  `stubStorageClient`. When `S3_BUCKET` IS set (as it is in this repo's `backend/.env`, pointing
+  at a real bucket) but the SDK's own default credential chain has no valid credentials/session
+  (`aws login` expired, 2026-08-12), every upload hits the **real** S3 client path and fails hard
+  with `CredentialsProviderError`, surfaced to the caller as a generic `500 INTERNAL_ERROR` — no
+  document row is written at all, blocking `submit-for-review` for every applicant with a
+  `409 "required documents are missing"`. Always confirm `aws sts get-caller-identity` first; if
+  it fails and you need to exercise the rest of the onboarding pipeline (not S3 upload itself),
+  temporarily commenting out `S3_BUCKET` in `.env` (never delete real credentials, never invent
+  fake ones) forces the stub and unblocks the submit/approve/reject/assign chain — but that
+  explicitly means document **storage** itself was not verified end-to-end, and must be reported
+  as a gap, not folded into a pass. Restart `tsx watch` after any `.env` edit — it does not
+  hot-reload environment variables, only source files.
 - **`FEATURE_EMPLOYMENT_RECORD=false`** makes every `/employees` route 404 — the suite passes
   vacuously. Verify with a live request.
+- **`FEATURE_JOBDISPATCH_PHASE2` (default off) breaks the ENTIRE calendar page, not just
+  calendar-entries.** `GET /assignments/calendar-entries` 404s with the flag off (`"Assignment not
+  found"`, a misleading message — it's a route-not-registered 404, not a real not-found). The
+  calendar page's `entriesError` gate (`app/(protected)/calendar/page.tsx`) then hides its whole
+  body behind `{entriesError ? <error card> : <everything, including ShiftSummaryPanel>}`, so with
+  the flag off the shift-summary panel — and the placements grid, absences, everything — is
+  unreachable for every role, which looks identical to "the feature doesn't exist" from the UI.
+  This flag was unset in `backend/.env` for this session (default off, matching production
+  posture) and had to be temporarily enabled to test the shift-summary panel at all; it was
+  reverted before finishing. This coupling (an unrelated Job Dispatch flag gating the whole
+  Calendar page, not just its own feature) is itself worth a follow-up ticket — out of scope to
+  fix in this pass, noted here so the next session doesn't waste time re-diagnosing "why is the
+  calendar broken."
 - **Stale scenario data**: a record consumed by an earlier step makes a later race/queue test
   silently vacuous ("queue empty" ≠ "isolation works"). Use fresh records per test.
 - **`tsc` + unit tests + lint all passing proves little about the browser** — the worst defect
@@ -93,6 +122,23 @@ explicit yes/no:
   check *before* the scope check, not instead of it. This exact gap existed in two independent
   guards (`assertVisibility` and `resolveWorkerScope`) simultaneously — grep for `isScopedManagerRole`
   and `isWorkerInGroupScope` call sites if adding a new one, since a third could exist unfound.
+- **A route that skips the `{status, data, meta}` response envelope breaks silently on the
+  frontend, not loudly.** `frontend/lib/api.ts`'s `apiFetch` treats whatever JSON it gets back AS
+  the envelope and returns `envelope.data`; a route that does `res.json(bareArrayOrObject)`
+  instead of `res.json({status:'success', data, meta})` makes every caller receive `undefined` —
+  no thrown error, no non-2xx status, just a value that blows up wherever the caller assumes a
+  shape (`res.length`, `res.map`, etc.), often several lines away from the actual defect. This hit
+  `calendar/shift-summary/routes.ts` (a plain `Router()` file, not the class-based controller
+  pattern every sibling module uses) on **both** its GET and PUT handlers, and its manual
+  `res.status(400/401).json({error:...})` error paths used a different, also-nonstandard shape.
+  When adding a new route as a raw `Router()` handler rather than through a class controller,
+  explicitly diff its response shape against a sibling controller method before considering it
+  done — `tsc`, lint, and even a `200`/`201` from `curl` all looked completely fine here; only
+  reading the actual JSON body (or a real browser console) caught it.
+- **A local dev backend's `tsx watch` does not reload `.env` changes** — only source-file changes.
+  Any environment-variable edit (feature flags, credentials, `S3_BUCKET`, etc.) needs a manual
+  process restart (`pkill -f "tsx watch src/server.ts"` then re-launch) to take effect; otherwise
+  you'll be debugging against the OLD env for several requests before noticing nothing changed.
 
 ## 7. Pinned capability-matrix divergences (read before "fixing" a failing capability test)
 
@@ -102,11 +148,58 @@ divergences. The suite requires the pinned set to match the actual set **exactly
 introducing a new divergence *and* closing an existing one fail the build until the pin file is
 deliberately edited. That is intentional — a silent pass/fail flip is worse than a loud list.
 
-Currently pinned (all `ADR-065`-driven, all awaiting an `ADR-030` §3 matrix amendment — the
-forward-note `ADR-065` §7 already records as owed):
+Currently pinned (six, all awaiting an `ADR-030` §3 matrix amendment):
 
-- `C-15:manager@…POST /` and `C-15:regional_manager@…POST /` — Manager/RM may create records
-- `C-16:worker@…submit-for-review` and `C-16:checker@…submit-for-review` — self-service submit
+- `C-10:manager@users:POST /` and `C-10:regional_manager@users:POST /` — **added 2026-08-12**
+  (RULE A). `POST /users` widened from Admin-only to admit manager/RM; the target role each may
+  mint is enforced in `users/service.ts` via `lib/role-hierarchy.ts#canCreateRole`, which this
+  suite's seam (`requireRole`/`requirePermission` only) cannot see. Conflicts with `ADR-030` D-4
+  ("account creation Admin-only, permanently", `SIR-USERS-002`).
+- `C-15:manager@…POST /` and `C-15:regional_manager@…POST /` — Manager/RM may create records.
+  Authority **restated 2026-08-12**: `ADR-065`'s broad `createEmployee` grant is now NARROWED by
+  RULE A to exactly one level down. Route gate unchanged; target-role check added in
+  `employee-management/service.ts`.
+- `C-16:worker@…submit-for-review` and `C-16:checker@…submit-for-review` — self-service submit,
+  **strengthened 2026-08-12** (RULE B) to self-ONLY for every role, admin included.
+
+### RULE A / RULE B — project-owner decision, 2026-08-12
+
+Two authorization rules were ratified by the owner and implemented in the same pass. Both
+conflict with existing ADRs, and **the ADR amendments are still owed** (tracked in
+`REMAINING_WORK.md`) — the code, the pins in `support/capability-violations.ts`, and
+`backend/src/lib/role-hierarchy.ts`'s header are the authority trail until then.
+
+**RULE A — "create is 1-level-down only."** `admin → regional_manager`,
+`regional_manager → manager`, `manager → worker|checker`, `worker`/`checker` → nobody. Enforced
+on BOTH creation surfaces (`users/service.ts#createUser`,
+`employee-management/service.ts#createEmployee`) against the shared table in
+`backend/src/lib/role-hierarchy.ts`. Previously the employment-record route admitted
+admin/manager/RM with **no check on the target role at all** — that was the hole.
+
+Consequences worth knowing before writing a test that assumes the old behaviour:
+- **Nobody can create an `admin` account any more**, admin included (admin is one level below
+  nothing). This subsumes the old `HOTFIX-AUTH-003` guard.
+- **No peer creation** — a manager cannot create a manager.
+- **Admin can no longer create a worker/checker employment record.** Admin → RM only. Since
+  `bulkImport` is Admin-only and routes every row through `createEmployee`, admin bulk-import is
+  likewise RM-only now.
+
+**RULE B — "nobody may perform another user's onboarding."** Document upload and
+submit-for-review are SELF-SERVICE ONLY, for every role including admin.
+- submit-for-review: the self-check in `assertLifecycleAuthority` now precedes the `admin`
+  early-return. **The ordering is the security property** — the old ordering let admin
+  short-circuit past the self-check, which was the bypass.
+- upload: enforced at BOTH the route (`documents/routes.ts#requireSelfWorker`) and the service.
+  This REVERSES `GD-16`'s "manager-upload (actor 2)" allowance and the 2026-08-04
+  Regional-Manager widening.
+- **NOT in scope:** approve/assign/reject/deactivate/reactivate/rehire remain hierarchy actions
+  (a Manager's application is still approved by an RM or Admin) and are NOT narrowed to
+  1-level-down. `onboarding-self-only.test.ts` asserts this explicitly so a future
+  over-application of RULE B to the whole lifecycle fails loudly.
+- One deliberate exemption: `DocumentService.uploadDocument`'s `systemGenerated` flag, for the
+  HR contract-scan and rendered-template-PDF paths (documents ABOUT a worker, not that worker's
+  onboarding). **Unreachable from HTTP** — no controller sets it. Never plumb it to a
+  request-controlled value.
 
 **If a capability test fails**, do not edit the matrix or delete the assertion. Either the change
 is legitimate (add a pin with its authority and remediation owner) or it is an accidental
@@ -116,6 +209,8 @@ authorization widening (revert the code).
 
 | Defect | Fixed in |
 |---|---|
+| Calendar shift-summary panel invisible to Admin/RM (gated on `scopeHotelId`, always null for those roles) | uncommitted, 2026-08-12 session — `frontend/app/(protected)/calendar/page.tsx` |
+| Calendar shift-summary GET/PUT responses skip the standard `{status,data,meta}` envelope, breaking the read for every role (not just Admin/RM) with a silent `undefined` and a console `TypeError` | uncommitted, 2026-08-12 session — `backend/src/modules/calendar/shift-summary/routes.ts` |
 | Manager blocked from creating Worker/Checker records | `981229b` |
 | Manager Review Queue permanently empty (`target_primary_hotel_id` never set) | `981229b` |
 | 4 of 7 document categories impossible to upload (stale enum in validator) | `981229b` |

@@ -5,6 +5,7 @@ import { mutate } from "swr";
 import { useDocumentCompleteness, useWorkerDocuments } from "@/hooks/useDocuments";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { documentsApi } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
 import { formatDate } from "@/lib/format";
 import {
   Badge,
@@ -89,14 +90,35 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
 /**
  * SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16): worker document list + upload.
  * Rendering this component behind an unauthorized role is safe — the
- * backend (`checkWorkerScope()`, RULE-DOC-08) is the authoritative
- * enforcement point regardless of this component's own caller — but callers
- * should still wrap it in `DocumentsGate` so an out-of-scope manager doesn't
- * see a UI that will only ever 403.
+ * backend (RULE-DOC-08, and since 2026-08-12 the RULE B self-check in
+ * `documents/routes.ts#requireSelfWorker`) is the authoritative enforcement
+ * point regardless of this component's own caller — but callers should still
+ * wrap it in `DocumentsGate` so an out-of-scope manager doesn't see a UI that
+ * will only ever 403.
+ *
+ * RULE B (project-owner decision, 2026-08-12): "nobody may perform another
+ * user's onboarding." The UPLOAD control is therefore rendered only when the
+ * viewer IS `workerId`. READS (the list, the completeness badge) are
+ * unchanged — a manager reviewing an applicant's paperwork is still allowed
+ * and is the whole point of this card on a profile page.
+ *
+ * This was a REAL gap found by browser-verifying the change, not a
+ * precaution: this card is the SECOND upload surface (the first being
+ * `components/onboarding/DocumentUploadList`), it is rendered on
+ * `app/(protected)/users/[id]/page.tsx` for any user, and its Upload button
+ * called `documentsApi.upload(workerId, …)` with an arbitrary `workerId`. The
+ * backend denied it, but a live button in front of a denied route is exactly
+ * the "hidden button / live route" split this project has repeatedly gotten
+ * wrong in the other direction.
  */
 export function DocumentsCard({ workerId }: { workerId: string }) {
   const { data: documents, isLoading, error } = useWorkerDocuments(workerId);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const viewerId = useAuthStore((s) => s.user?.id);
+  // Defaults to FALSE while the store is still hydrating (`viewerId`
+  // undefined): losing the button for a moment is recoverable, offering it to
+  // the wrong viewer is not.
+  const canUpload = !!viewerId && viewerId === workerId;
   // TODO(SPEC-DOCUMENTS-001): temporary workaround, not a real per-worker
   // setting. No backend field records whether a worker actually needs a
   // work permit — IF-DOC-GetDocumentCompleteness takes it as a caller-
@@ -116,9 +138,14 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
       <Card>
         <CardHeader className="flex items-center justify-between">
           <CardTitle>Documents</CardTitle>
-          <Button size="sm" onClick={() => setUploadOpen(true)}>
-            Upload
-          </Button>
+          {/* RULE B: self-only upload. Omitted rather than disabled on another
+              user's profile — a disabled button implies the action is possible
+              under some condition, and it is not. */}
+          {canUpload && (
+            <Button size="sm" onClick={() => setUploadOpen(true)}>
+              Upload
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 dark:border-gray-800">
@@ -148,7 +175,13 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
           ) : !documents || documents.length === 0 ? (
             <EmptyState
               title="No documents"
-              description="Upload an identity or work-permit document for this worker."
+              description={
+                canUpload
+                  ? "Upload your identity and work-permit documents."
+                  : // RULE B: this viewer cannot upload for this worker, so the
+                    // copy must not instruct them to.
+                    "This worker has not uploaded any documents yet. Only they can upload them."
+              }
             />
           ) : (
             <ul>

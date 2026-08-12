@@ -339,11 +339,17 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       );
 
       expect(mockScan).toHaveBeenCalledWith(Buffer.from('x'));
+      // RULE B (2026-08-12) made worker-document upload self-only. A contract
+      // SCAN is the counterparty's record of an already-signed contract, not
+      // the applicant's own onboarding upload, so this delegation declares
+      // `systemGenerated`. Asserted explicitly so dropping the flag (breaking
+      // contract scanning) or widening it fails here.
       expect(mockDocumentServiceUpload).toHaveBeenCalledWith(
         expect.objectContaining({ worker_id: 'w1', actor_id: 'm1', category: 'ID_CARD' }),
         Buffer.from('x'),
         'manager',
-        '1.2.3.4'
+        '1.2.3.4',
+        { systemGenerated: true }
       );
       expect(mockContractUpdate).toHaveBeenCalledWith({
         where: { id: 'c1' },

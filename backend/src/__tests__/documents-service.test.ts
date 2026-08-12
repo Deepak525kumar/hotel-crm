@@ -125,7 +125,54 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
       expect(mockAuditLogCreate).toHaveBeenCalled();
     });
 
-    it('does not self-scope a manager upload (GD-16 actor 2, group scope is enforced in routes.ts)', async () => {
+    // RULE B (project-owner decision, 2026-08-12): "nobody may perform another
+    // user's onboarding." Upload is now SELF-ONLY for EVERY role, so this case
+    // is inverted — GD-16's "manager-upload (actor 2)" allowance was
+    // deliberately withdrawn by the owner, not accidentally broken.
+    it('denies a manager uploading for another worker (RULE B: self-only, reverses GD-16 actor 2)', async () => {
+      await expect(
+        service.uploadDocument(
+          {
+            worker_id: 'w1',
+            actor_id: 'm1',
+            category: 'WORK_PERMIT',
+            original_filename: 'permit.pdf',
+            mime_type: 'application/pdf',
+            file_size_bytes: 1,
+            is_work_permit: true,
+          },
+          Buffer.from('x'),
+          'manager'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockWorkerDocumentCreate).not.toHaveBeenCalled();
+    });
+
+    it('denies an ADMIN uploading for another worker (RULE B applies to every role)', async () => {
+      await expect(
+        service.uploadDocument(
+          {
+            worker_id: 'w1',
+            actor_id: 'adm_1',
+            category: 'WORK_PERMIT',
+            original_filename: 'permit.pdf',
+            mime_type: 'application/pdf',
+            file_size_bytes: 1,
+            is_work_permit: true,
+          },
+          Buffer.from('x'),
+          'admin'
+        )
+      ).rejects.toBeInstanceOf(ForbiddenError);
+      expect(mockWorkerDocumentCreate).not.toHaveBeenCalled();
+    });
+
+    // The `systemGenerated` escape hatch, asserted so its existence is visible
+    // and its blast radius pinned: it is the ONLY way a non-self upload can
+    // succeed, it is unreachable from any HTTP route (no controller sets it),
+    // and it exists for the HR contract-scan and rendered-template-PDF paths.
+    // See documents/service.ts#uploadDocument's note.
+    it('allows a non-self upload ONLY when the caller declares systemGenerated (HR contract scan / rendered PDF)', async () => {
       mockWorkerDocumentCreate.mockResolvedValue({
         id: 'd2',
         worker_id: 'w1',
@@ -152,7 +199,9 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
           is_work_permit: true,
         },
         Buffer.from('x'),
-        'manager'
+        'manager',
+        undefined,
+        { systemGenerated: true }
       );
 
       expect(result.uploaded_by_id).toBe('m1');

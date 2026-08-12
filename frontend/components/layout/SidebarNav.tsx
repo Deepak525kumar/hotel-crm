@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/hooks/useAuth";
+import { useMyOnboarding } from "@/hooks/useMyOnboarding";
 import { Badge } from "@/components/ui";
 import type { Role } from "@/lib/types";
 
@@ -30,12 +31,37 @@ export interface NavItem {
   icon: LucideIcon;
   /** When set, the item only shows for these roles. */
   roles?: Role[];
+  /**
+   * When true, the item is additionally gated on the signed-in user actually
+   * HAVING an onboarding record (any status). Role alone is not enough: every
+   * applicant role also contains fully-onboarded staff, for whom a permanent
+   * "My Onboarding" entry is dead weight. See the `/onboarding` entry below.
+   */
+  requiresOwnOnboarding?: boolean;
 }
 
 // Feature routes are added here as modules land under app/(protected)/.
 export const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/onboarding", label: "My Onboarding", icon: ClipboardList, roles: ["worker", "checker", "manager", "regional_manager"] },
+  // Self-service onboarding entry point (owner decision, 2026-08-12). Shown to
+  // every role that can BE an applicant — worker, checker, manager AND
+  // regional_manager (a Manager/RM onboards through the same six-document gate;
+  // ADR-065 §6 item 2 grants them no exemption).
+  //
+  // `requiresOwnOnboarding` is what keeps this from becoming permanent clutter:
+  // the roles above also contain long-since-activated staff. The item stays
+  // visible once ACTIVE (a neutral "view my onboarding" link, per the owner's
+  // "don't nag an active employee" requirement) but disappears for anyone with
+  // no record at all. Status is resolved from `useMyOnboarding`, NOT from any
+  // scope claim — an unassigned Manager/RM applicant has no scope, which is the
+  // bug class two earlier visibility guards hit.
+  {
+    href: "/onboarding",
+    label: "My Onboarding",
+    icon: ClipboardList,
+    roles: ["worker", "checker", "manager", "regional_manager"],
+    requiresOwnOnboarding: true,
+  },
   { href: "/onboarding/review-queue", label: "Review Queue", icon: ListChecks, roles: ["manager", "regional_manager", "admin"] },
   // Job Dispatch Phase 2 (Epic 9 PRs 9.7/9.9/9.10, FEATURE_JOBDISPATCH_PHASE2):
   // broadcasts are a distinct JobRequest shape (skill x headcount, no
@@ -99,10 +125,19 @@ export function SidebarNav({
 }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const onboarding = useMyOnboarding();
 
-  const items = NAV.filter(
-    (item) => !item.roles || (user && item.roles.includes(user.role)),
-  );
+  const items = NAV.filter((item) => {
+    if (item.roles && !(user && item.roles.includes(user.role))) return false;
+    // Hide onboarding-gated items only once we KNOW there is no record.
+    // While `phase === "loading"` the item is withheld rather than shown-then-
+    // removed: a nav entry that appears and vanishes a moment later is worse
+    // than one that arrives a moment late.
+    if (item.requiresOwnOnboarding && onboarding.phase !== "active" && !onboarding.needsAttention) {
+      return false;
+    }
+    return true;
+  });
   // Settings is excluded from the scrolling feature list and rendered in its
   // own pinned footer below instead (see the `<footer>` below) — it's a
   // destination users go looking for, not one they navigate between like the
@@ -154,7 +189,17 @@ export function SidebarNav({
               collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
             )}
           >
-            <span className="overflow-hidden whitespace-nowrap">{item.label}</span>
+            <span className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
+              {item.label}
+              {/* Live onboarding status, only while it still needs action.
+                  Once ACTIVE this renders nothing, so the entry degrades to a
+                  plain "view my onboarding" link instead of a standing
+                  reminder. Suppressed when collapsed for the same reason the
+                  label is: the 64px rail has no room for it. */}
+              {item.requiresOwnOnboarding && onboarding.needsAttention && (
+                <Badge tone={onboarding.tone}>{onboarding.label}</Badge>
+              )}
+            </span>
           </span>
         </span>
       </Link>

@@ -10,15 +10,27 @@ import {
   Input,
   Select,
 } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth";
+import { creatableRolesFor } from "@/lib/roleHierarchy";
 import type { Role, UserDetail } from "@/lib/types";
 
-const ROLE_OPTIONS: { value: Role; label: string }[] = [
-  { value: "worker", label: "Worker" },
-  { value: "checker", label: "Checker" },
-  { value: "manager", label: "Manager" },
-  { value: "regional_manager", label: "Regional Manager" },
-  { value: "admin", label: "Admin" },
-];
+const ROLE_LABEL: Record<Role, string> = {
+  worker: "Worker",
+  checker: "Checker",
+  manager: "Manager",
+  regional_manager: "Regional Manager",
+  admin: "Admin",
+};
+
+/**
+ * Every role, for EDIT mode — which changes an existing user's role via the
+ * Admin-only `PUT /users/:id/role` endpoint and is governed by that route, not
+ * by RULE A (a role CHANGE is not a role CREATION). CREATE mode narrows this
+ * to `creatableRolesFor(viewer)` instead; see the `options` computation below.
+ */
+const ALL_ROLE_OPTIONS: { value: Role; label: string }[] = (
+  ["worker", "checker", "manager", "regional_manager", "admin"] as const
+).map((value) => ({ value, label: ROLE_LABEL[value] }));
 
 export interface UserFormValues {
   email: string;
@@ -35,14 +47,17 @@ export type UserFormSubmitValues = Omit<UserFormValues, "phone"> & {
   phone: string | null;
 };
 
-function toValues(user?: UserDetail | null): UserFormValues {
+function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserFormValues {
   return {
     email: user?.email ?? "",
     password: "",
     first_name: user?.first_name ?? "",
     last_name: user?.last_name ?? "",
     phone: user?.phone ?? "",
-    role: user?.role ?? "worker",
+    // RULE A: in create mode the default must be a role the viewer may
+    // actually create, not a hardcoded "worker" — an admin defaulting to
+    // "worker" would pre-fill a value the backend rejects.
+    role: user?.role ?? defaultRole,
     is_active: user?.is_active ?? true,
   };
 }
@@ -68,7 +83,25 @@ export function UserForm({
   onSubmit,
   onCancel,
 }: UserFormProps) {
-  const [form, setForm] = useState<UserFormValues>(() => toValues(user));
+  // RULE A (project-owner decision, 2026-08-12): a create form may only offer
+  // the roles the CURRENT viewer may create — one level below itself. See
+  // lib/roleHierarchy.ts. UI affordance only; the backend enforces the same
+  // table at the route and service layer.
+  const viewerRole = useAuthStore((s) => s.user?.role);
+  const allowedCreateRoles = creatableRolesFor(viewerRole);
+
+  const roleOptions =
+    mode === "create"
+      ? allowedCreateRoles.map((value) => ({ value, label: ROLE_LABEL[value] }))
+      : ALL_ROLE_OPTIONS;
+
+  // A viewer with exactly one creatable role (admin, regional_manager) gets a
+  // single fixed option; worker/checker get none, in which case the form is not
+  // reachable at all (the page's own gate) — but default defensively rather
+  // than fall back to a role they cannot create.
+  const defaultCreateRole: Role = allowedCreateRoles[0] ?? "worker";
+
+  const [form, setForm] = useState<UserFormValues>(() => toValues(user, defaultCreateRole));
 
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -90,7 +123,11 @@ export function UserForm({
     form.first_name.trim() &&
     form.last_name.trim() &&
     (mode === "edit" ||
-      (form.email.trim() && form.password.length >= 8));
+      (form.email.trim() &&
+        form.password.length >= 8 &&
+        // RULE A: never let a create submit carry a role the viewer may not
+        // create, even if form state somehow held a stale value.
+        allowedCreateRoles.includes(form.role)));
 
   return (
     <Card>
@@ -147,9 +184,18 @@ export function UserForm({
               label="Role"
               value={form.role}
               onChange={(e) => set("role", e.target.value as Role)}
-              options={ROLE_OPTIONS}
-              disabled={!canEditRole}
-              hint={!canEditRole ? "Only admins can change a user's role." : undefined}
+              options={roleOptions}
+              // In create mode a single-option selector is fixed, not editable:
+              // there is nothing to choose between, and leaving it enabled
+              // implies otherwise.
+              disabled={!canEditRole || (mode === "create" && roleOptions.length <= 1)}
+              hint={
+                !canEditRole
+                  ? "Only admins can change a user's role."
+                  : mode === "create" && roleOptions.length === 1
+                    ? `You may only create ${ROLE_LABEL[roleOptions[0]!.value]} accounts.`
+                    : undefined
+              }
             />
           </div>
 

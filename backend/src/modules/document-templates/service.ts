@@ -731,7 +731,15 @@ export class DocumentTemplatesService extends BaseService {
         file_size_bytes: pdfBuffer.length,
       },
       pdfBuffer,
-      actor.role
+      actor.role,
+      undefined,
+      // RULE B (2026-08-12) makes worker-document upload self-only. These bytes
+      // are SERVER-RENDERED (renderInstanceToPdf) from an instance whose
+      // signatures are already complete, not an actor-supplied onboarding
+      // upload, so RULE B does not apply. Authorization is
+      // assertInstanceFillAccess() above. See
+      // documents/service.ts#uploadDocument's note on `systemGenerated`.
+      { systemGenerated: true }
     );
 
     const updated = await this.prisma.documentInstance.update({
