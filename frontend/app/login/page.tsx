@@ -57,7 +57,7 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-800">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Sign in to Hotel CRM</CardTitle>
+          <CardTitle>Sign in to FHM Hotelservice</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
