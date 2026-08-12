@@ -45,7 +45,7 @@ export const isDirectDispatchMode = (): boolean => PIVOT_MODE === "direct_dispat
  * environment like every other value here.
  */
 export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "FHM Hotelservice";
-export const APP_OWNER = process.env.NEXT_PUBLIC_APP_OWNER ?? "FHM Hotelservice GmbH";
+export const APP_OWNER = process.env.NEXT_PUBLIC_APP_OWNER ?? "Zirove";
 
 /**
  * Release identity, surfaced on the Settings page.
