@@ -214,8 +214,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             <p>Berner Straße 38, 60437 Frankfurt am Main</p>
             <p>Tel.: 0160 97044182 | Email: info@fhm-hotelservice.de</p>
           </div>
-          &copy; {new Date().getFullYear()} {APP_OWNER}. All rights reserved.
-          This application is owned and developed by {APP_OWNER}.
+          &copy; {new Date().getFullYear()} FHM Hotelservice GmbH. All rights reserved.
+          <br />
+          This application is owned by FHM Hotelservice GmbH and developed by {APP_OWNER}.
         </footer>
       </div>
     </div>
