@@ -16,7 +16,6 @@ import notificationRoutes from '../../modules/notifications/routes.js';
 import analyticsRoutes from '../../modules/analytics/routes.js';
 import calendarRoutes from '../../modules/calendar/routes.js';
 import documentRoutes from '../../modules/documents/routes.js';
-import { documentTemplateRoutes, documentInstanceRoutes } from '../../modules/document-templates/routes.js';
 import geoRoutes from '../../modules/geo/routes.js';
 import consentRoutes from '../../modules/consent/routes.js';
 import retentionRoutes from '../../modules/retention/routes.js';
@@ -39,8 +38,6 @@ router.use('/notifications', notificationRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/calendar', calendarRoutes);
 router.use('/documents', documentRoutes);
-router.use('/document-templates', documentTemplateRoutes);
-router.use('/document-instances', documentInstanceRoutes);
 router.use('/geo', geoRoutes);
 router.use('/consent', consentRoutes);
 router.use('/retention', retentionRoutes);
@@ -85,6 +82,10 @@ router.get('/status', (req, res) => {
       message: 'Hotel CRM API v1 is running',
       version: '0.1.0',
       modules: ['auth', 'users', 'crm', 'work-requests', 'assignments', 'attendance', 'hr', 'calendar', 'documents', 'geo', 'consent', 'retention', 'compliance', 'notifications', 'analytics', 'quality', 'employee-management'],
+      // Document Templates / Document Instances module removed 2026-08-13:
+      // superseded by the HR Contract feature's mandatory
+      // full-time/part-time employment type and its own default-contract
+      // download flow (hr/service.ts createContract()).
       environment: process.env.NODE_ENV || 'development',
     },
     meta: {

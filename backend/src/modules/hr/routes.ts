@@ -196,6 +196,19 @@ router.get(
   (req, res, next) => hrController.getContractStatus(req, res, next)
 );
 
+// 2026-08-13 contract feature: serves the single static default contract
+// PDF. Same read gate as IF-HR-GetContractStatus immediately above --
+// worker self-download (scopeWorkerRoute lets a worker through to no
+// further check, matching getContractStatus's own worker-self-read shape),
+// manager/RM via checkWorkerScope() group-scope, admin unscoped.
+router.get(
+  '/workers/:worker_id/contract-download',
+  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireContractReadAccess(),
+  scopeWorkerRoute(),
+  (req, res, next) => hrController.downloadDefaultContract(req, res, next)
+);
+
 // IF-HR-UploadSignedContract (RULE-HR-13/OD-HR-13): Manager/Admin only, per
 // spec's own actor list; hotel-scope enforcement via checkWorkerScope(),
 // same as every other HR write route.

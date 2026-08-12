@@ -1129,6 +1129,7 @@ export interface Contract {
   start_date: string;
   end_date: string | null;
   status: ContractStatus;
+  employment_type: EmploymentType;
   scanned_document_id: string | null;
   confirmed_by_id: string | null;
   confirmed_at: string | null;
@@ -1216,6 +1217,10 @@ export interface EmploymentRecord {
   marked_suitable: boolean;
   hotel_group_id: string | null;
   work_permit_required: boolean;
+  /** Mandatory at creation (2026-08-13 contract feature) — full-time or part-time. */
+  employment_type: EmploymentType;
+  /** Who created this application — used to route the review queue to this user's own superior. Null on legacy rows predating this column. */
+  created_by_id: string | null;
   target_hotel_group_id: string | null;
   target_primary_hotel_id: string | null;
   /**
@@ -1267,12 +1272,18 @@ export interface OrgChart {
   }>;
 }
 
+/** Full-time / part-time marking (2026-08-13 contract feature). Mandatory at
+ * application creation — drives the marking expected on the downloaded
+ * default contract PDF (see ContractDto's own `employment_type`). */
+export type EmploymentType = "FULL_TIME" | "PART_TIME";
+
 /** Body of `POST /employees` (Admin-only, REQ-EMP-001). */
 export interface CreateEmploymentInput {
   user_id: string;
   employee_id: string;
   job_title: string;
   start_date: string;
+  employment_type: EmploymentType;
   skills?: SkillTag[];
 }
 
@@ -1404,190 +1415,4 @@ export interface SubjectRightsBundle {
   audit_trail: SubjectRightsSourceResult<{ data: AuditLogEntry[]; total: number }>;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Document Templates + Digital Signature                                     */
-/* -------------------------------------------------------------------------- */
 
-/**
- * Matches backend `FIELD_TYPES`/`SignerRoleType` (document-templates/types.ts)
- * exactly.
- */
-export type DocumentFieldType =
-  | "TEXT"
-  | "DATE"
-  | "NUMBER"
-  | "CHECKBOX"
-  | "SELECT"
-  | "INFO_BLOCK";
-
-export type DocumentSignerRole = "SUBJECT" | "COUNTERSIGNER";
-
-export type DocumentTemplateStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
-
-export type DocumentInstanceStatus =
-  | "IN_PROGRESS"
-  | "AWAITING_SIGNATURES"
-  | "COMPLETED"
-  | "VOIDED";
-
-export interface DocumentTemplateFieldDto {
-  id: string;
-  section_id: string;
-  field_key: string;
-  label: string;
-  field_type: DocumentFieldType;
-  is_required: boolean;
-  order_index: number;
-  shared_key: string | null;
-  select_options: string[] | null;
-  validation: Record<string, unknown> | null;
-  help_text: string | null;
-}
-
-export interface DocumentTemplateSignatureBlockDto {
-  id: string;
-  section_id: string;
-  label: string;
-  signer_role: DocumentSignerRole;
-  order_index: number;
-}
-
-export interface DocumentTemplateSectionDto {
-  id: string;
-  template_id: string;
-  title: string;
-  order_index: number;
-  body_template: string;
-  fields: DocumentTemplateFieldDto[];
-  signature_blocks: DocumentTemplateSignatureBlockDto[];
-}
-
-export interface DocumentTemplateDto {
-  id: string;
-  name: string;
-  description: string | null;
-  status: DocumentTemplateStatus;
-  version: number;
-  parent_template_id: string | null;
-  created_by_id: string;
-  created_at: string;
-  updated_at: string;
-  published_at: string | null;
-  archived_at: string | null;
-  /** Included in the detail read (`GET /:id`) only — omitted from the list read. */
-  sections?: DocumentTemplateSectionDto[];
-}
-
-/** `GET /document-templates` list-read shape — sections omitted for payload size. */
-export type DocumentTemplateListDto = Omit<DocumentTemplateDto, "sections">;
-
-/** Body of `POST /document-templates`. */
-export interface CreateTemplateInput {
-  name: string;
-  description?: string;
-}
-
-/** Body of `PATCH /document-templates/:id`. */
-export interface UpdateTemplateInput {
-  name?: string;
-  description?: string;
-}
-
-/** Body of `POST /document-templates/:id/sections`. */
-export interface CreateSectionInput {
-  title: string;
-  order_index: number;
-  body_template: string;
-}
-
-/** Body of `PATCH /document-templates/:id/sections/:sid`. */
-export interface UpdateSectionInput {
-  title?: string;
-  order_index?: number;
-  body_template?: string;
-}
-
-/**
- * Body of `POST /document-templates/:id/sections/:sid/fields`.
- * `select_options` is required (non-empty) when `field_type` is `"SELECT"` —
- * enforced backend-side (Zod `.refine()`), not re-validated here.
- */
-export interface CreateFieldInput {
-  field_key: string;
-  label: string;
-  field_type: DocumentFieldType;
-  is_required?: boolean;
-  order_index: number;
-  shared_key?: string;
-  select_options?: string[];
-  validation?: Record<string, unknown>;
-  help_text?: string;
-}
-
-/** Body of `PATCH /document-templates/:id/sections/:sid/fields/:fid`. */
-export interface UpdateFieldInput {
-  label?: string;
-  is_required?: boolean;
-  order_index?: number;
-  select_options?: string[];
-  validation?: Record<string, unknown>;
-  help_text?: string;
-}
-
-/** Body of `POST /document-templates/:id/sections/:sid/signature-blocks`. */
-export interface CreateSignatureBlockInput {
-  label: string;
-  signer_role: DocumentSignerRole;
-  order_index: number;
-}
-
-export interface DocumentInstanceFieldValueDto {
-  id: string;
-  field_id: string;
-  value: string | null;
-  updated_at: string;
-  updated_by_id: string;
-}
-
-export interface DocumentInstanceSignatureDto {
-  id: string;
-  signature_block_id: string;
-  signed_by_id: string;
-  /** Never the raw S3 key — a presigned URL, or `null` if unavailable. */
-  signature_image_url: string | null;
-  signed_at: string;
-  content_hash_at_signing: string;
-}
-
-export interface DocumentInstanceDto {
-  id: string;
-  template_id: string;
-  worker_id: string;
-  created_by_id: string;
-  status: DocumentInstanceStatus;
-  created_at: string;
-  updated_at: string;
-  completed_at: string | null;
-  final_document_id: string | null;
-  field_values: DocumentInstanceFieldValueDto[];
-  signatures: DocumentInstanceSignatureDto[];
-}
-
-/** Body of `POST /document-instances`. */
-export interface CreateInstanceInput {
-  template_id: string;
-  worker_id: string;
-}
-
-/** Body of `PATCH /document-instances/:id/fields`. */
-export interface UpsertFieldValuesInput {
-  values: { field_id: string; value: string | null }[];
-}
-
-/** Query params accepted by `GET /document-instances`. */
-export interface ListInstancesQuery {
-  worker_id?: string;
-  status?: DocumentInstanceStatus;
-  page?: number;
-  per_page?: number;
-}

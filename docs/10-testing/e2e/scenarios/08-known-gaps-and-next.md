@@ -4,9 +4,10 @@
 tested, and what to add next time. Read it at the **end** of a run and **update it** — move
 fixed items to the history table, add anything new you found.
 
-Last updated: **2026-08-12** (calendar shift-summary Admin/RM viewing gap closed — two independent
-real bugs found and fixed via real Playwright + Postgres verification; local `main` was also found
-diverged from `origin/main` by 15 total commits and merged during this run — see the run log).
+Last updated: **2026-08-13** (contract feature + review-routing + document-templates removal batch
+— see `runs/2026-08-13-contract-feature-and-review-routing.md`. Not a full suite run: scoped
+verification of the features changed this session, per explicit instruction not to re-run the
+whole E2E suite).
 
 ---
 
@@ -28,7 +29,7 @@ diverged from `origin/main` by 15 total commits and merged during this run — s
 
 ## 2. Judgment calls awaiting the project owner
 
-All three are **documented, deliberate** positions — not bugs — but were flagged as worth an
+The following are **documented, deliberate** positions — not bugs — but were flagged as worth an
 explicit yes/no:
 
 1. **`retention`'s deletion audit log is readable by any authenticated user** (including a plain
@@ -36,9 +37,10 @@ explicit yes/no:
    per `SIR-RETENTION-003` (OPEN), but the practical exposure (a worker enumerating the platform's
    whole deletion history) may exceed what "trusted backend context only" anticipated. **Widest
    exposure of the three.**
-2. **`document-templates` returns all templates platform-wide** to admin/manager/RM. Likely
-   correct — templates are modeled as global blueprints with no hotel FK to filter on
-   (`MODULE_SPEC.md:181`).
+2. ~~**`document-templates` returns all templates platform-wide**~~ — **MOOT, 2026-08-13**: the
+   Document Templates / Document Instances module was removed entirely (product decision — see
+   `runs/2026-08-13-contract-feature-and-review-routing.md`), superseded by the HR Contract
+   feature's mandatory full-time/part-time employment type and single default-contract PDF.
 3. **`consent` read asymmetry** — Admin reads any worker; Manager/RM read none, not even their
    own group. Explicitly ratified in `ADR-037`/`SIR-CONSENT-011`.
 
@@ -233,6 +235,10 @@ authorization widening (revert the code).
 | `consent.recordDecision()` atomicity gap | uncommitted — `backend/src/modules/consent/service.ts` |
 | Audit-outside-transaction sites (`geo`, `document-templates`, `attendance`) | uncommitted — `backend/src/modules/geo`, `backend/src/modules/document-templates`, `backend/src/modules/attendance` |
 | Orphaned S3 objects in `uploadDocument` | uncommitted — `backend/src/modules/documents/service.ts` |
+| Review queue routed to admin/scope-only instead of the creator's own superior — a manager's own worker-application could effectively self-review by scope, and the reviewer had no visibility into who actually created the application | uncommitted, 2026-08-13 session — `backend/src/modules/employee-management/service.ts` `getReviewQueue`; new `EmploymentRecord.created_by_id` column |
+| Reviewer (manager/RM) opening the rebuilt Review Queue modal for ANY not-yet-approved applicant got a 403 on document completeness, 100% of the time — `isWorkerInGroupScope()` denies by design whenever `EmploymentRecord.hotel_group_id` is null, which is true for every application still PENDING review (the group is only set on approval). Found while browser/API-verifying the rebuilt `ReviewQueueTable`, not by a unit test (those mock the DB layer). Fixed with a new read-only, reviewer-scoped primitive (`isWorkerInReviewerScope`, falls back to `target_hotel_group_id`/`target_primary_hotel_id` pre-approval) rather than widening the shared `checkWorkerScope()`/`resolveWorkerScope()` used by write routes elsewhere (HR contract-scan/confirm/extend/lapse) — verified live: RM can now view a pending applicant's document completeness; an out-of-scope manager is still denied. | uncommitted, 2026-08-13 session — `backend/src/lib/scope.ts` `isWorkerInReviewerScope`; `backend/src/modules/documents/routes.ts` `scopeWorkerReadRoute` |
+| `ReviewQueueTable.tsx` used raw `<table>`/`<thead>` instead of the shared `Table`/`THead`/`TBody`/`TR`/`TH`/`TD` components, `<Badge color="blue">` (not a real prop — `Badge` only accepts `tone`), a hand-rolled `<textarea>` instead of `Textarea`, and `useHotels`/`useHotelGroups` destructured as a bare array (`data:`) when the hooks return `{ hotels, groups, ... }` — the "Assign" modal's hotel/group `<Select>` was silently always empty. Also: the review-queue page bypassed `RoleGate` with a hand-rolled `useAuth()` check. | uncommitted, 2026-08-13 session — `frontend/components/onboarding/ReviewQueueTable.tsx`, `frontend/app/(protected)/onboarding/review-queue/page.tsx` |
+| Worker document uploads had no delete/replace path — re-uploading the same category created a second row rather than replacing the first (no unique constraint on `(worker_id, category)`), and reviewers had a write-shaped gap risk since the module previously granted no write route to any non-worker role at all but was worth closing explicitly | uncommitted, 2026-08-13 session — `backend/src/modules/documents/service.ts` `deleteDocument`; `backend/src/modules/documents/routes.ts`; `frontend/components/documents/DocumentsCard.tsx` |
 
 ---
 

@@ -93,20 +93,6 @@ import type {
   DeleteEmploymentInput,
   SetBlocklistInput,
   SubjectRightsBundle,
-  DocumentTemplateDto,
-  DocumentTemplateListDto,
-  DocumentInstanceDto,
-  DocumentInstanceSignatureDto,
-  CreateTemplateInput,
-  UpdateTemplateInput,
-  CreateSectionInput,
-  UpdateSectionInput,
-  CreateFieldInput,
-  UpdateFieldInput,
-  CreateSignatureBlockInput,
-  CreateInstanceInput,
-  UpsertFieldValuesInput,
-  ListInstancesQuery,
 } from "@/lib/types";
 
 /** Error thrown by {@link apiFetch} for any non-2xx response. */
@@ -891,6 +877,16 @@ export const documentsApi = {
       body: form,
     });
   },
+
+  /**
+   * 2026-08-13 (worker edit/replace fix): self-only on the backend
+   * (documentService.deleteDocument — a worker may delete only their own
+   * document; no other role is granted this route at all, so reviewers stay
+   * view-only by construction). Delete-then-reupload is how "editing" works
+   * for this immutable-file-object storage model.
+   */
+  delete: (documentId: string) =>
+    apiFetch<{ deleted: boolean }>(`/documents/documents/${documentId}`, { method: "DELETE" }),
 };
 
 /**
@@ -932,6 +928,19 @@ export const hrApi = {
   /** Manager/Admin creates a contract (REQ-HR-001); requires a recorded Personalfragebogen. */
   createContract: (input: CreateContractInput) =>
     apiFetch<Contract>("/hr/contracts", { method: "POST", body: input }),
+
+  /**
+   * 2026-08-13 contract feature: URL for the single default contract PDF
+   * (GET /hr/workers/:worker_id/contract-download). Not fetched as JSON —
+   * `API_BASE_URL` is same-origin (lib/config.ts), so a direct navigation
+   * (`window.open`/`<a href>`) carries the session cookie automatically and
+   * the backend's `Content-Disposition: attachment` header triggers a
+   * native browser download with no blob/fetch handling needed client-side.
+   * Same worker-self / manager-RM-group-scope / admin-unscoped read gate as
+   * getContractStatus (hr/routes.ts's requireContractReadAccess()).
+   */
+  defaultContractDownloadUrl: (workerId: string) =>
+    `${API_BASE_URL}/hr/workers/${workerId}/contract-download`,
 
   /** IF-HR-UploadSignedContract: attaches the scanned signed contract file. */
   uploadSignedContract: (workerId: string, file: File) => {
@@ -1085,194 +1094,3 @@ export const complianceApi = {
     }),
 };
 
-/**
- * Fetches a raw binary (non-envelope) response, cookie-authenticated like
- * `apiFetch` (Security #4, 2026-08-09 -- no bearer token exists to read or
- * attach anymore; the httpOnly auth cookies travel automatically via
- * `credentials: 'include'`). Used only for `GET /document-instances/:id/preview`
- * (`previewInstance`, controller.ts), which streams `application/pdf` bytes
- * directly rather than the `{status, data, meta}` JSON envelope every other
- * endpoint returns — `apiFetch`'s `parseEnvelope` would `JSON.parse` the PDF
- * bytes and throw.
- *
- * Mirrors `apiFetch`'s single transparent refresh-and-retry on 401: without
- * it, a user whose session cookie expired gets a hard error on "Preview PDF"
- * while every other action in the app silently recovers — an inconsistency
- * the user experiences as this one button being broken. The 401 body here is
- * NOT peeked for TOKEN_REVOKED (unlike `apiFetch`): this endpoint's error
- * responses are the standard JSON envelope, but reading the body to
- * distinguish revocation would consume a stream we may still need, and a
- * revoked session simply fails the retry and surfaces as a 401 — the next
- * envelope-returning call clears credentials properly.
- */
-async function fetchBlob(path: string, _retried = false): Promise<Blob> {
-  const res = await fetch(buildUrl(path), { credentials: "include" });
-
-  if (res.status === 401 && !_retried) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) return fetchBlob(path, true);
-  }
-
-  if (!res.ok) {
-    throw new ApiError(res.status, "HTTP_ERROR", res.statusText);
-  }
-  return res.blob();
-}
-
-/**
- * Document Templates + Digital Signature API matching the backend
- * `/document-templates/*` and `/document-instances/*` routes
- * (document-templates/routes.ts, 2026-08-09). Two distinct actor surfaces
- * behind one client module, mirroring the backend's own file split:
- * template authoring (admin-only writes, admin/manager/regional_manager
- * reads) and instance fill/sign (scoped to the instance's own worker plus
- * admin/manager/regional_manager, enforced service-side per
- * `requireInstanceReadAccess`/`requireInstanceFillAccess`/
- * `requireInstanceSignAccess` — this client never re-derives that scope, it
- * only calls the route and surfaces whatever 403 comes back).
- */
-export const documentTemplatesApi = {
-  // -- Templates (admin-authored; manager/RM read-only) ---------------------
-
-  listTemplates: () => apiFetch<DocumentTemplateListDto[]>("/document-templates"),
-
-  getTemplate: (id: string) =>
-    apiFetch<DocumentTemplateDto>(`/document-templates/${id}`),
-
-  createTemplate: (input: CreateTemplateInput) =>
-    apiFetch<DocumentTemplateDto>("/document-templates", {
-      method: "POST",
-      body: input,
-    }),
-
-  /**
-   * Editing a PUBLISHED template forks it server-side (a new DRAFT row with
-   * a fresh `id`, `parent_template_id` pointing at the source) — the
-   * returned dto's `id` may differ from the `id` this was called with.
-   * Callers MUST re-point at `dto.id` for any further edit, never assume
-   * the id they passed in is still the live one.
-   */
-  updateTemplate: (id: string, input: UpdateTemplateInput) =>
-    apiFetch<DocumentTemplateDto>(`/document-templates/${id}`, {
-      method: "PATCH",
-      body: input,
-    }),
-
-  /**
-   * Returns the whole (possibly-forked) template, not just the new section —
-   * matches the backend's own response shape (`addSection`, service.ts,
-   * returns `this.getTemplate(editable.id)`). Forks on a PUBLISHED template;
-   * see {@link updateTemplate}'s note.
-   */
-  addSection: (templateId: string, input: CreateSectionInput) =>
-    apiFetch<DocumentTemplateDto>(`/document-templates/${templateId}/sections`, {
-      method: "POST",
-      body: input,
-    }),
-
-  /** Returns the whole template — see {@link addSection}'s note. Forks on a PUBLISHED template. */
-  updateSection: (templateId: string, sectionId: string, input: UpdateSectionInput) =>
-    apiFetch<DocumentTemplateDto>(
-      `/document-templates/${templateId}/sections/${sectionId}`,
-      { method: "PATCH", body: input },
-    ),
-
-  /** Returns the whole template — see {@link addSection}'s note. Forks on a PUBLISHED template. */
-  addField: (templateId: string, sectionId: string, input: CreateFieldInput) =>
-    apiFetch<DocumentTemplateDto>(
-      `/document-templates/${templateId}/sections/${sectionId}/fields`,
-      { method: "POST", body: input },
-    ),
-
-  /** Returns the whole template — see {@link addSection}'s note. Forks on a PUBLISHED template. */
-  updateField: (
-    templateId: string,
-    sectionId: string,
-    fieldId: string,
-    input: UpdateFieldInput,
-  ) =>
-    apiFetch<DocumentTemplateDto>(
-      `/document-templates/${templateId}/sections/${sectionId}/fields/${fieldId}`,
-      { method: "PATCH", body: input },
-    ),
-
-  /** Returns the whole template — see {@link addSection}'s note. Forks on a PUBLISHED template. */
-  addSignatureBlock: (
-    templateId: string,
-    sectionId: string,
-    input: CreateSignatureBlockInput,
-  ) =>
-    apiFetch<DocumentTemplateDto>(
-      `/document-templates/${templateId}/sections/${sectionId}/signature-blocks`,
-      { method: "POST", body: input },
-    ),
-
-  /** DRAFT -> PUBLISHED. 422s if the template has no sections or no signature blocks yet. */
-  publishTemplate: (id: string) =>
-    apiFetch<DocumentTemplateDto>(`/document-templates/${id}/publish`, {
-      method: "POST",
-    }),
-
-  /** PUBLISHED -> ARCHIVED. */
-  archiveTemplate: (id: string) =>
-    apiFetch<DocumentTemplateDto>(`/document-templates/${id}/archive`, {
-      method: "POST",
-    }),
-
-  // -- Instances (fill / sign) -----------------------------------------------
-
-  listInstances: (query: ListInstancesQuery = {}) =>
-    apiFetch<DocumentInstanceDto[]>(`/document-instances${toQuery({ ...query })}`),
-
-  getInstance: (id: string) => apiFetch<DocumentInstanceDto>(`/document-instances/${id}`),
-
-  /** No proxy-fill: a worker may only create an instance for themself. */
-  createInstance: (input: CreateInstanceInput) =>
-    apiFetch<DocumentInstanceDto>("/document-instances", {
-      method: "POST",
-      body: input,
-    }),
-
-  /** Upserts one section's worth (or fewer) of field values in a single call. */
-  upsertFieldValues: (id: string, input: UpsertFieldValuesInput) =>
-    apiFetch<DocumentInstanceDto>(`/document-instances/${id}/fields`, {
-      method: "PATCH",
-      body: input,
-    }),
-
-  /**
-   * Draft render of the in-progress instance (works pre-completion, before
-   * every signature block is signed) — raw `application/pdf` bytes, not the
-   * JSON envelope. See {@link fetchBlob}.
-   */
-  previewInstance: (id: string) => fetchBlob(`/document-instances/${id}/preview`),
-
-  /**
-   * Uploads a drawn signature PNG for one signature block. `file` is
-   * attached as the multipart `file` field the backend's `upload.single('file')`
-   * middleware expects (routes.ts) — image/png only, max 10MB, enforced
-   * both by the browser-side SignatureCaptureModal (canvas always emits PNG)
-   * and, authoritatively, by the backend's own multer fileFilter/limits.
-   */
-  signBlock: (id: string, blockId: string, file: Blob) => {
-    const form = new FormData();
-    form.set("file", file, "signature.png");
-    return apiFetch<DocumentInstanceSignatureDto>(
-      `/document-instances/${id}/signature-blocks/${blockId}/sign`,
-      { method: "POST", body: form },
-    );
-  },
-
-  listSignatures: (id: string) =>
-    apiFetch<DocumentInstanceSignatureDto[]>(`/document-instances/${id}/signatures`),
-
-  /** Assembles the final signed PDF. 422s if any signature block is still unsigned. */
-  finalize: (id: string) =>
-    apiFetch<DocumentInstanceDto>(`/document-instances/${id}/finalize`, {
-      method: "POST",
-    }),
-
-  /** Presigned URL to the final signed PDF, or `null` if storage is unavailable. */
-  getFinalDocument: (id: string) =>
-    apiFetch<{ url: string | null }>(`/document-instances/${id}/document`),
-};

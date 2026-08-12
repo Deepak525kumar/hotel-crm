@@ -351,6 +351,7 @@ model User {
   // Epic 5 PR 5.6 (SPEC-EMP-001): the employment record's account link
   // (REQ-EMP-001, one record per account) and blocklist-entry authorship.
   employment_record                              EmploymentRecord?                  @relation("employment_record")
+  employment_records_created                     EmploymentRecord[]                 @relation("employment_record_created_by")
   blocklist_entries_authored                     EmployeeBlocklistEntry[]           @relation("blocklist_author")
   // 2026-08-06 lifecycle rework: who performed each transition (null = system-driven, e.g. contract-lapse).
   employment_status_transitions                  EmploymentStatusHistory[]          @relation("employment_status_history_actor")
@@ -384,11 +385,6 @@ model User {
   hotel_manager_assignment_history_unassigned    HotelManagerAssignmentHistory[]    @relation("hotel_manager_assignment_history_unassigned_by")
   // Document Templates module (2026-08-09): admin-authored reusable
   // templates, and a worker's filled/signed instances of them.
-  doc_templates_created                          DocumentTemplate[]                 @relation("doc_template_created_by")
-  doc_instances_as_worker                        DocumentInstance[]                 @relation("doc_instance_worker")
-  doc_instances_created                          DocumentInstance[]                 @relation("doc_instance_created_by")
-  doc_field_values_updated                       DocumentInstanceFieldValue[]       @relation("doc_field_value_updated_by")
-  doc_signatures_signed                          DocumentInstanceSignature[]        @relation("doc_signature_signed_by")
 
   created_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryCreator")
   updated_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryUpdater")
@@ -645,14 +641,14 @@ model HotelWorker {
 // HotelGroup), nullable until hire-approval, set at Under Review -> Active.
 // ADR-025 Decision 3: deliberately hotel-tie-free — no per-hotel FK here.
 model EmploymentRecord {
-  id                      String              @id @default(cuid())
-  user_id                 String              @unique // account link (REQ-EMP-001: one record per account)
-  user                    User                @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
-  employee_id             String              @unique // human-facing Employee ID
-  job_title               String // free text, provisional (OD-EMP-13)
-  start_date              DateTime
-  status                  EmploymentStatus    @default(PENDING)
-  version                 Int                 @default(0) // ADR-036: optimistic concurrency
+  id          String           @id @default(cuid())
+  user_id     String           @unique // account link (REQ-EMP-001: one record per account)
+  user        User             @relation("employment_record", fields: [user_id], references: [id], onDelete: Cascade)
+  employee_id String           @unique // human-facing Employee ID
+  job_title   String // free text, provisional (OD-EMP-13)
+  start_date  DateTime
+  status      EmploymentStatus @default(PENDING)
+  version     Int              @default(0) // ADR-036: optimistic concurrency
 
   // Sub-state of PENDING only (2026-08-06 rework): null = old INACTIVE
   // (onboarding not yet submitted), non-null = old UNDER_REVIEW (awaiting
@@ -699,6 +695,22 @@ model EmploymentRecord {
   personal_data           Json? // Personalfragebogen non-special data (REQ-EMP-011)
   konfession              String? // special-category (RULE-EMP-09) — never on general profile
   disability_status       String? // special-category (RULE-EMP-09)
+  // Mandatory at application-creation time (2026-08-13 contract feature):
+  // the creating actor (the applicant's direct superior in the hierarchy,
+  // lib/role-hierarchy.ts) declares whether the applicant is being onboarded
+  // full-time or part-time. Drives which default contract PDF marking is
+  // expected — Contract itself carries its own copy (employment_type on
+  // Contract below) rather than joining back here, so a later change to
+  // this field cannot silently retroact an already-generated contract.
+  employment_type         EmploymentType
+  // Creator of this application (2026-08-13 review-routing fix): the review
+  // queue routes to this user's own manager/RM/admin, i.e. one level above
+  // the actor who created the application -- NOT to the applicant's target
+  // hotel/group scope as before. Nullable only for rows that predate this
+  // column (backfilled null by migration); getReviewQueue() falls back to
+  // admin-wide visibility for those legacy rows.
+  created_by_id           String?
+  created_by              User?               @relation("employment_record_created_by", fields: [created_by_id], references: [id], onDelete: SetNull)
   deleted_at              DateTime? // soft delete (REQ-EMP-010) -- mirrors User.deleted_at (Decision 1: DELETED == deleteUser())
   created_at              DateTime            @default(now())
   updated_at              DateTime            @updatedAt
@@ -710,6 +722,16 @@ model EmploymentRecord {
   @@index([target_hotel_group_id])
   @@index([status])
   @@index([primary_hotel_id])
+  @@index([created_by_id])
+}
+
+// 2026-08-13: full-time / part-time marking, mandatory at application
+// creation. Determines which pre-printed marking the applicant is expected
+// to select on the downloaded default contract PDF (manual review by the
+// approving manager, not machine-checked -- see hr/service.ts createContract()).
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
 }
 
 // Append-only lifecycle transition log (2026-08-06 rework). Every
@@ -1278,289 +1300,35 @@ enum DocumentCategory {
 // Retention tier: OD-DOC-001 (open; not yet mapped to CRR §25 tier).
 // Special-category applicability: OD-DOC-002 (no confirmed special-category doc type today).
 model WorkerDocument {
-  id                     String            @id @default(cuid())
-  worker_id              String
-  worker                 User              @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  id                String           @id @default(cuid())
+  worker_id         String
+  worker            User             @relation("documents_worker", fields: [worker_id], references: [id], onDelete: Cascade)
   // Uploader identity — always derived from the authenticated session (RULE-DOC-08).
   // For worker self-uploads: uploaded_by_id == worker_id.
   // For manager-on-behalf uploads (contract-scan mechanism): uploaded_by_id == manager's user id.
-  uploaded_by_id         String
-  uploaded_by            User              @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
-  category               DocumentCategory
+  uploaded_by_id    String
+  uploaded_by       User             @relation("documents_uploader", fields: [uploaded_by_id], references: [id])
+  category          DocumentCategory
   // Server-generated storage key (RULE-DOC-09): never built from client input;
   // includes a UUIDv4 segment for unpredictability (OD-DOC-017).
-  s3_key                 String            @unique
-  original_filename      String
-  mime_type              String
-  file_size_bytes        Int
+  s3_key            String           @unique
+  original_filename String
+  mime_type         String
+  file_size_bytes   Int
   // REQ-DOC-001: expiry tracking. Consequence/warning on crossing is OD-DOC-003 (open).
-  expires_at             DateTime?         @db.Date
+  expires_at        DateTime?        @db.Date
   // REQ-DOC-003: true only for non-EU/EEA/Swiss workers' work-permit documents.
-  is_work_permit         Boolean           @default(false)
-  created_at             DateTime          @default(now())
-  updated_at             DateTime          @updatedAt
+  is_work_permit    Boolean          @default(false)
+  created_at        DateTime         @default(now())
+  updated_at        DateTime         @updatedAt
   // SPEC-HR-001 (MIG-GAP-DOC-001): back-relation for a Contract's scanned
   // signed copy — HR delegates storage here, does not duplicate it
   // (RULE-DOC-04: this delegation grants HR no document-lifecycle authority).
-  hr_contract_scan       Contract?         @relation("hr_contract_scan")
-  // Document Templates module (2026-08-09): same delegation pattern as
-  // hr_contract_scan above — the final assembled/signed PDF of a
-  // DocumentInstance is stored as an ordinary WorkerDocument row
-  // (category GENERAL), not duplicated storage.
-  doc_instance_final_pdf DocumentInstance? @relation("doc_instance_final_pdf")
+  hr_contract_scan  Contract?        @relation("hr_contract_scan")
 
   // OD-DOC-019 (FIND-PERF-001): compound index required at schema-creation time.
   @@index([worker_id, category])
   @@index([worker_id])
-}
-
-// =============================================================================
-// DOCUMENT TEMPLATES MODULE (2026-08-09, greenfield)
-// =============================================================================
-// Admin-authored, reusable, multi-section, multi-signature-point document
-// templates (e.g. a multi-page employment contract with several appendices,
-// each with its own signature line) — worker/manager fill in a structured
-// form, capture attestation signatures, and get a final rendered PDF. This
-// is a distinct bounded module, not an extension of `documents` (owns byte
-// storage/metadata only) or `hr` (owns Contract lifecycle specifically) —
-// it reuses both: documents/storage.ts for S3 (generateStorageKey,
-// getStorageClient) and hr/malware-scan.ts's scanner hook, but owns none of
-// their lifecycle semantics.
-//
-// SIGNATURE TRUST BOUNDARY (explicit, confirmed with the product owner
-// 2026-08-09): "digital signature" here means attestation capture — a
-// drawn signature image plus an audit trail (signer id, timestamp, IP, a
-// content hash of what was shown at signing time) — NOT a legally-binding
-// cryptographic e-signature (no eIDAS/PAdES qualified signature, no key
-// pair, no timestamp authority). Same trust level hr/service.ts's
-// confirmContractSigned() already documents as "the accepted
-// no-signature-verification trust boundary." UI must disclose this to
-// users at the point of signing.
-
-enum DocumentTemplateFieldType {
-  TEXT
-  DATE
-  NUMBER
-  CHECKBOX // boolean yes/no
-  SELECT // admin-defined option list (DocumentTemplateField.select_options)
-  INFO_BLOCK // static informational text, no value captured
-}
-
-enum DocumentTemplateStatus {
-  DRAFT // admin still editing; not fillable; freely editable in place
-  PUBLISHED // fillable; sections/fields frozen — editing forks a new version (parent_template_id)
-  ARCHIVED // no longer offered for new instances; existing instances unaffected
-}
-
-enum DocumentInstanceStatus {
-  IN_PROGRESS // fields being filled, not all signatures captured
-  AWAITING_SIGNATURES
-  COMPLETED // all required signature blocks signed; final PDF assembled
-  VOIDED // administratively cancelled before completion
-}
-
-enum SignerRole {
-  // Who is expected to sign a given signature block — not a User FK, since
-  // the *template* defines an abstract role (e.g. "employer", "employee")
-  // resolved to an actual User at fill-time per instance.
-  SUBJECT // the worker the document is about
-  COUNTERSIGNER // an admin/manager acting as the other party
-}
-
-// state-document-template: admin-authored, reusable. A PUBLISHED template
-// is treated as immutable for section/field editing (RULE, confirmed with
-// product owner 2026-08-09) — editing one creates a new template row via
-// parent_template_id + version+1, so a DocumentInstance filled against v1
-// never has its underlying field/section shape change out from under it.
-// DRAFT templates may be freely edited in place.
-model DocumentTemplate {
-  id                 String                 @id @default(cuid())
-  name               String
-  description        String?
-  status             DocumentTemplateStatus @default(DRAFT)
-  version            Int                    @default(1)
-  parent_template_id String?
-  parent_template    DocumentTemplate?      @relation("template_version_chain", fields: [parent_template_id], references: [id], onDelete: SetNull)
-  child_versions     DocumentTemplate[]     @relation("template_version_chain")
-  created_by_id      String
-  created_by         User                   @relation("doc_template_created_by", fields: [created_by_id], references: [id])
-  created_at         DateTime               @default(now())
-  updated_at         DateTime               @updatedAt
-  published_at       DateTime?
-  archived_at        DateTime?
-
-  sections  DocumentTemplateSection[]
-  instances DocumentInstance[]
-
-  @@index([status])
-  @@index([parent_template_id])
-}
-
-// One ordered section of a template (e.g. a contract's main body, or one
-// appendix). `body_template` is static legal/informational text authored
-// via the admin UI, with `{{field_key}}` placeholders interpolated at
-// render time.
-model DocumentTemplateSection {
-  id            String           @id @default(cuid())
-  template_id   String
-  template      DocumentTemplate @relation(fields: [template_id], references: [id], onDelete: Cascade)
-  title         String
-  order_index   Int
-  body_template String           @db.Text
-
-  fields           DocumentTemplateField[]
-  signature_blocks DocumentTemplateSignatureBlock[]
-
-  @@unique([template_id, order_index])
-  @@index([template_id])
-}
-
-// A single fillable (or informational) field within a section.
-model DocumentTemplateField {
-  id             String                    @id @default(cuid())
-  section_id     String
-  section        DocumentTemplateSection   @relation(fields: [section_id], references: [id], onDelete: Cascade)
-  field_key      String // stable key referenced by body_template's {{field_key}} and by DocumentInstanceFieldValue
-  label          String
-  field_type     DocumentTemplateFieldType
-  is_required    Boolean                   @default(true)
-  order_index    Int
-  signer_role    SignerRole                @default(SUBJECT)
-  // Cross-section reuse: fields sharing the same shared_key across sections
-  // of the SAME template resolve to one value at fill time (e.g. an
-  // employee's name entered once, reused across every section that
-  // references that key). Null = section-local-only field.
-  shared_key     String?
-  // SELECT-type only: string[] of admin-defined options.
-  select_options Json?
-  // Optional loose validation hint (e.g. {min, max, pattern}) — no rigid
-  // validation DSL for MVP, just a place to put simple rules later.
-  validation     Json?
-  help_text      String?
-
-  field_values DocumentInstanceFieldValue[]
-
-  @@unique([section_id, field_key])
-  @@index([section_id])
-  @@index([shared_key])
-}
-
-// A required signature point within a section. Total signature blocks
-// across a template fall out of section x block cardinality — never
-// hardcoded to any specific count.
-model DocumentTemplateSignatureBlock {
-  id          String                  @id @default(cuid())
-  section_id  String
-  section     DocumentTemplateSection @relation(fields: [section_id], references: [id], onDelete: Cascade)
-  label       String // "Employer signature", "Employee signature"
-  signer_role SignerRole
-  order_index Int
-
-  instance_signatures DocumentInstanceSignature[]
-
-  @@index([section_id])
-}
-
-// state-document-instance: one worker's filled copy of a specific
-// (immutable) template version.
-// Retention (OD-DOCTPL-04, closed 2026-08-10 via ADR-033's already-ratified
-// mapping — this module simply hadn't been retrofitted into it yet):
-// applying ADR-033's own split for uploaded/employment-adjacent documents
-// (Decision point 1, "Uploaded/work-permit documents (OD-DOC-001)"), a
-// DocumentInstance is a signed, employment-contract-shaped record about a
-// specific worker — the same character as backend-hr's Contract, which that
-// ADR assigns Tier 3 (6-year payroll/tax-adjacent, §257 HGB/§147 AO), not
-// Tier 2 (general personal data). This applies to DocumentInstance and its
-// two child tables (DocumentInstanceFieldValue, DocumentInstanceSignature)
-// — the actual per-worker personal data. DocumentTemplate itself (the
-// admin-authored blueprint, no personal data) carries no tier. Provisional
-// pending tax-advisor sign-off exactly as ADR-033 itself discloses for every
-// other module's mapping — not a new, module-specific caveat. No
-// RetentionTier enum/column exists on these tables yet, matching every
-// other module's identical comment-only convention today (backend-retention
-// is schema-only; no sweep engine exists platform-wide to consume a real
-// column yet) — see PayslipRequest's own escalated_at-adjacent comment
-// above for the precedent this follows.
-model DocumentInstance {
-  id                String                 @id @default(cuid())
-  template_id       String
-  template          DocumentTemplate       @relation(fields: [template_id], references: [id], onDelete: Restrict)
-  // The worker this document is ABOUT (the "subject") — mirrors
-  // WorkerDocument.worker_id / Contract.worker_id naming.
-  worker_id         String
-  worker            User                   @relation("doc_instance_worker", fields: [worker_id], references: [id], onDelete: Cascade)
-  created_by_id     String // who initiated the fill — admin/manager, or the worker themself
-  created_by        User                   @relation("doc_instance_created_by", fields: [created_by_id], references: [id])
-  status            DocumentInstanceStatus @default(IN_PROGRESS)
-  created_at        DateTime               @default(now())
-  updated_at        DateTime               @updatedAt
-  completed_at      DateTime?
-  // Final assembled, fully-signed PDF — delegated to the documents module's
-  // storage exactly like HR's Contract.scanned_document_id pattern. Null
-  // until COMPLETED.
-  final_document_id String?                @unique
-  final_document    WorkerDocument?        @relation("doc_instance_final_pdf", fields: [final_document_id], references: [id], onDelete: SetNull)
-
-  field_values DocumentInstanceFieldValue[]
-  signatures   DocumentInstanceSignature[]
-
-  @@index([worker_id])
-  @@index([template_id])
-  @@index([status])
-}
-
-// One captured value per template field for a given instance.
-model DocumentInstanceFieldValue {
-  id            String                @id @default(cuid())
-  instance_id   String
-  instance      DocumentInstance      @relation(fields: [instance_id], references: [id], onDelete: Cascade)
-  field_id      String
-  field         DocumentTemplateField @relation(fields: [field_id], references: [id], onDelete: Restrict)
-  // Single loosely-typed value column keeps this table simple; the field's
-  // own field_type on DocumentTemplateField governs interpretation/
-  // validation at write time (service layer, not the DB). TEXT/DATE(ISO)/
-  // NUMBER(as string)/CHECKBOX("true"/"false")/SELECT(one of its options)
-  // all fit one nullable String column.
-  value         String?
-  updated_at    DateTime              @updatedAt
-  updated_by_id String
-  updated_by    User                  @relation("doc_field_value_updated_by", fields: [updated_by_id], references: [id])
-
-  @@unique([instance_id, field_id])
-  @@index([instance_id])
-}
-
-// One captured signature for one signature block on one instance. Image
-// bytes go through the SAME documents/storage.ts helper as every other
-// file in this system — no new blob-storage mechanism.
-model DocumentInstanceSignature {
-  id                      String                         @id @default(cuid())
-  instance_id             String
-  instance                DocumentInstance               @relation(fields: [instance_id], references: [id], onDelete: Cascade)
-  signature_block_id      String
-  signature_block         DocumentTemplateSignatureBlock @relation(fields: [signature_block_id], references: [id], onDelete: Restrict)
-  // Who actually signed (resolved User, not just an abstract SignerRole).
-  signed_by_id            String
-  signed_by               User                           @relation("doc_signature_signed_by", fields: [signed_by_id], references: [id])
-  // S3 key for the captured signature image (drawn PNG). Reuses
-  // generateStorageKey(workerId, category, filename) with
-  // category="signature" — the existing helper's contract, no new storage
-  // code. Never returned raw in DTOs — only a presigned URL, mirroring
-  // WorkerDocument.s3_key's convention.
-  signature_image_key     String
-  signed_at               DateTime                       @default(now())
-  signer_ip               String?
-  // Non-repudiation evidence (attestation-level, see module header note):
-  // sha256 of THIS SECTION's rendered/interpolated HTML at the moment this
-  // signature block was signed, so a later "what did they actually see"
-  // question is answerable per-signature (sections can be signed at
-  // different times). Explicitly not a cryptographic signature over that
-  // hash — just a stored digest for comparison.
-  content_hash_at_signing String
-
-  @@unique([instance_id, signature_block_id])
-  @@index([instance_id])
-  @@index([signed_by_id])
 }
 
 // =============================================================================
@@ -1694,7 +1462,19 @@ model Contract {
   template_id          String // ADR-039: no salary/compensation field — document production only
   position             String
   start_date           DateTime        @db.Date
+  // Defaults to start_date + 6 months at creation (hr/service.ts
+  // createContract(), 2026-08-13) — end date is provisional and remains
+  // editable later (e.g. on extend/confirm); NOT enforced against
+  // employment_type below (a part-time contract is not required to be
+  // shorter than a full-time one).
   end_date             DateTime?       @db.Date
+  // Mandatory marking carried over from EmploymentRecord.employment_type at
+  // the moment this contract is generated (2026-08-13 contract feature) —
+  // determines which pre-printed FULL_TIME/PART_TIME marking the applicant
+  // is expected to select on the downloaded default contract PDF. The
+  // manager reviews the returned scan manually (RULE-HR-03); this field is
+  // never machine-checked against the scan content.
+  employment_type      EmploymentType
   status               ContractStatus  @default(PENDING)
   // Generated PDF reference (RULE-HR-01) and the manager-uploaded scanned
   // signed copy (RULE-HR-03) — both S3 EU object keys (REQ-HR-008), never

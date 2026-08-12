@@ -273,6 +273,74 @@ export class DocumentService extends BaseService {
   }
 
   // ---------------------------------------------------------------------------
+  // IF-DOC-DeleteDocument (2026-08-13: worker edit/replace fix)
+  // ---------------------------------------------------------------------------
+  // The reviewer's "view documents" checklist issue surfaced a real gap on
+  // the other side of the same feature: there was no way for a worker to
+  // correct a wrong upload (wrong file, wrong category) short of it staying
+  // in their document set forever, since re-uploading the same category
+  // creates a SECOND row rather than replacing the first (no unique
+  // constraint on (worker_id, category) -- schema.prisma's own comment on
+  // WorkerDocument). "Edit" for an immutable-file-object model means
+  // delete-then-reupload, not in-place mutation of the stored bytes.
+  //
+  // Self-only, mirroring uploadDocument's RULE B posture exactly: a worker
+  // may delete only their OWN document, and no other role may delete a
+  // worker's document on their behalf (reviewers are explicitly view-only --
+  // this module's role gates already enforce that by simply not granting
+  // manager/RM/admin any write route here at all).
+  async deleteDocument(documentId: string, actorId: string, actorRole: string): Promise<void> {
+    const doc = await this.prisma.workerDocument.findUnique({
+      where: { id: documentId },
+      include: { hr_contract_scan: { select: { id: true } } },
+    });
+    if (!doc) throw new NotFoundError('Document not found');
+
+    if (actorRole !== 'worker' || doc.worker_id !== actorId) {
+      throw new ForbiddenError('Documents may only be deleted by the worker they belong to');
+    }
+
+    // A document already attached to a contract as its signed scan is no
+    // longer "just an onboarding upload" -- it is HR's compensating-control
+    // evidence trail (RULE-HR-15). Deleting it here would silently orphan
+    // Contract.scanned_document_id and destroy that evidence; the worker
+    // must go through HR's own contract flow (a fresh scan upload) instead.
+    if (doc.hr_contract_scan) {
+      throw new ForbiddenError('Cannot delete a document that has been submitted as a signed contract scan');
+    }
+
+    const storage = await getStorageClient();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.workerDocument.delete({ where: { id: documentId } });
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'document.delete',
+        'WorkerDocument',
+        documentId,
+        { worker_id: doc.worker_id, category: doc.category, original_filename: doc.original_filename },
+        undefined,
+        undefined,
+        undefined,
+        tx
+      );
+    });
+
+    try {
+      await storage.delete(doc.s3_key);
+    } catch (err) {
+      // Best-effort: the DB row is already gone (the delete is the
+      // authoritative, user-visible action) -- an S3 cleanup failure here
+      // leaves an orphaned object, not an orphaned/inconsistent document
+      // list. Logged, not thrown, mirroring uploadDocument's own
+      // compensating-delete error handling above (that path logs+rethrows
+      // because ITS failure leaves the DB row missing something real; this
+      // one doesn't).
+      logger.error('documents_s3_delete_failed', { s3Key: doc.s3_key, error: err });
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // IF-DOC-GetDocumentCompleteness (REQ-DOC-002/REQ-DOC-005)
   // ---------------------------------------------------------------------------
   // Onboarding and Employee Management call this to determine whether a worker

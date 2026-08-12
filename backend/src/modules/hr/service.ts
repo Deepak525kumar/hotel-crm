@@ -97,10 +97,14 @@ import {
   ContractStatus,
   PayslipRequestStatus,
   EmploymentStatus,
+  EmploymentType,
   OutboxTransport,
   OutboxSourceModule,
   Prisma,
 } from '@prisma/client';
+import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { BaseService } from '../../lib/base-service.js';
 import type { DatabaseTransaction } from '../../lib/db.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
@@ -123,6 +127,40 @@ import type {
   PayslipRequestStatusType,
   ListPayslipRequestsQuery,
 } from './types.js';
+
+// 2026-08-13 contract feature: the single default contract PDF (replaces the
+// removed Document Templates module -- see ADR/decision note in
+// employee-management/service.ts's createEmployee()). Every worker downloads
+// the same static file, marks it FULL_TIME or PART_TIME by hand, signs it,
+// and returns it via the pre-existing uploadSignedContract()/
+// confirmContractSigned() flow below -- no per-worker rendering.
+declare const __dirname: string | undefined;
+
+// Mirrors config/env.ts's backendRoot() dual CJS/ESM resolution exactly (see
+// that function's own comment): under ts-jest/CommonJS, `__dirname` is
+// provided by the module wrapper (this file lives at
+// `backend/src/modules/hr/` -> walk up 3 to `backend/`); under native ESM
+// (`node dist/server.js`), `__dirname` does not exist and `import.meta.url`
+// is unavailable at this module's target/module tsconfig settings, so the
+// entrypoint-relative walk-up-to-package.json fallback is used instead.
+function resolveDefaultContractPdfPath(): string {
+  if (typeof __dirname !== 'undefined') {
+    return resolve(__dirname, '..', '..', '..', 'assets', 'contracts', 'default-contract-template.pdf');
+  }
+  const entry = process.argv[1];
+  let dir = entry ? dirname(resolve(entry)) : process.cwd();
+  for (let i = 0; i < 10; i += 1) {
+    if (existsSync(resolve(dir, 'package.json'))) {
+      return resolve(dir, 'assets', 'contracts', 'default-contract-template.pdf');
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return resolve(process.cwd(), 'assets', 'contracts', 'default-contract-template.pdf');
+}
+
+const DEFAULT_CONTRACT_PDF_PATH = resolveDefaultContractPdfPath();
 
 // Architectural assumption (review note, not a defect): this service's
 // worker-scoped Contract lookups (getContractStatus, and PR 3/4/5's
@@ -161,7 +199,7 @@ export class HrService extends BaseService {
     // failure mode ("Missing Personalfragebogen data").
     const employmentRecord = await this.prisma.employmentRecord.findUnique({
       where: { user_id: data.worker_id },
-      select: { personal_data: true },
+      select: { personal_data: true, employment_type: true },
     });
     if (!employmentRecord) {
       throw new NotFoundError('No employment record found for this worker — Personalfragebogen data unavailable');
@@ -185,12 +223,85 @@ export class HrService extends BaseService {
         end_date: data.end_date ? new Date(`${data.end_date}T00:00:00.000Z`) : null,
         status: ContractStatus.PENDING,
         generated_pdf_key: generatedPdfKey,
+        employment_type: employmentRecord.employment_type,
       },
     });
 
     logger.info('hr_contract_created', { contractId: contract.id, workerId: data.worker_id });
 
     return this.toDto(contract);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Default Contract (2026-08-13 feature, replaces Document Templates)
+  // ---------------------------------------------------------------------------
+  // Auto-invoked by employee-management's createEmployee() the moment an
+  // application record is created (see that method's own comment) — there is
+  // exactly one contract PDF in this system (assets/contracts/
+  // default-contract-template.pdf), so no template_id selection or
+  // Personalfragebogen prerequisite applies the way createContract()'s manual
+  // HR path requires: the file is static, not rendered per-worker. The
+  // applicant downloads it (getDefaultContractPdf below), marks FULL_TIME or
+  // PART_TIME by hand exactly as the record's own employment_type says,
+  // signs it, and returns it via the existing uploadSignedContract() /
+  // confirmContractSigned() flow — manual review, never machine-checked
+  // against employment_type.
+  //
+  // Idempotent by construction: employee-management guards this with a
+  // findFirst(worker_id) check of its own before calling, but this method
+  // additionally short-circuits if a contract already exists for the worker,
+  // so a retried call (e.g. a failed transaction retry) never creates a
+  // second row for the same applicant.
+  async generateDefaultContract(
+    workerId: string,
+    jobTitle: string,
+    startDate: Date,
+    employmentType: EmploymentType
+  ): Promise<ContractDto> {
+    const existing = await this.prisma.contract.findFirst({ where: { worker_id: workerId } });
+    if (existing) {
+      return this.toDto(existing);
+    }
+
+    // 6-month default end date (owner decision, 2026-08-13): editable later
+    // via any future contract-update path; not enforced against
+    // employment_type (part-time contracts are not required to be shorter).
+    const endDate = new Date(startDate);
+    endDate.setUTCMonth(endDate.getUTCMonth() + 6);
+
+    const contract = await this.prisma.contract.create({
+      data: {
+        worker_id: workerId,
+        template_id: 'default',
+        position: jobTitle,
+        start_date: startDate,
+        end_date: endDate,
+        status: ContractStatus.PENDING,
+        employment_type: employmentType,
+      },
+    });
+
+    logger.info('hr_default_contract_generated', { contractId: contract.id, workerId, employmentType });
+
+    return this.toDto(contract);
+  }
+
+  // Serves the single default contract PDF asset. Every worker/manager/RM/
+  // admin with read access to the worker's contract may download the same
+  // bytes — see hr/routes.ts's requireContractReadAccess() for the identical
+  // role/scope gate getContractStatus already uses. Never machine-validated
+  // against the worker's employment_type; the applicant marks it by hand and
+  // the approving manager reviews the returned scan (RULE-HR-03).
+  async getDefaultContractPdf(): Promise<Buffer> {
+    try {
+      return await readFile(DEFAULT_CONTRACT_PDF_PATH);
+    } catch (error) {
+      logger.error('hr_default_contract_pdf_missing', {
+        path: DEFAULT_CONTRACT_PDF_PATH,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new NotFoundError('The default contract template is not available. Contact an administrator.');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -896,6 +1007,7 @@ export class HrService extends BaseService {
     start_date: Date;
     end_date: Date | null;
     status: ContractStatus;
+    employment_type: EmploymentType;
     scanned_document_id: string | null;
     confirmed_by_id: string | null;
     confirmed_at: Date | null;
@@ -911,6 +1023,7 @@ export class HrService extends BaseService {
       start_date: contract.start_date.toISOString().slice(0, 10),
       end_date: contract.end_date ? contract.end_date.toISOString().slice(0, 10) : null,
       status: contract.status as ContractStatusType,
+      employment_type: contract.employment_type,
       scanned_document_id: contract.scanned_document_id,
       confirmed_by_id: contract.confirmed_by_id,
       confirmed_at: contract.confirmed_at ? contract.confirmed_at.toISOString() : null,

@@ -6,6 +6,7 @@ import {
   EmploymentRecord,
   Prisma,
   SkillTag,
+  UserRole,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import type { DatabaseTransaction } from '../../lib/db.js';
@@ -23,6 +24,14 @@ import { bumpTokenGeneration } from '../auth/service.js';
 import { isRmRoleEnabled } from '../../config/feature-flags.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { documentService } from '../documents/service.js';
+// 2026-08-13 contract feature: createEmployee() below auto-generates the
+// single default contract the moment an application record is created (see
+// that method's own comment). HR already depends on employee-management
+// (hr/service.ts imports employeeManagementService) -- this is the one
+// call site going the other direction; both modules' usage is inside
+// function bodies, not at module-eval time, so the resulting import cycle
+// resolves safely under Node ESM.
+import { hrService } from '../hr/service.js';
 import {
   assertTransition,
   ASSESSMENT_BASIS,
@@ -170,6 +179,15 @@ export class EmployeeManagementService extends BaseService {
           personal_data: data.personal_data
             ? (data.personal_data as Prisma.InputJsonValue)
             : Prisma.JsonNull,
+          // 2026-08-13 contract feature: mandatory at creation time
+          // (CreateEmployeeSchema), carried by the creating actor's choice of
+          // full-time vs part-time for the person they are onboarding.
+          employment_type: data.employment_type,
+          // 2026-08-13 review-routing fix: records who created this
+          // application, so the review queue can route to the creator's own
+          // superior (getReviewQueue below) instead of the applicant's
+          // target scope.
+          created_by_id: actor.userId,
         },
       });
 
@@ -179,6 +197,29 @@ export class EmployeeManagementService extends BaseService {
 
       return createdRecord;
     });
+
+    // 2026-08-13 contract feature: auto-generate the single default contract
+    // for this applicant. Deliberately outside the record-creation
+    // transaction above -- hrService.generateDefaultContract() is a
+    // best-effort side effect (mirrors HR's own notifyResponsibleManager()
+    // posture elsewhere in this codebase), not a condition of the
+    // application existing; a failure here must not roll back the
+    // just-committed EmploymentRecord. submitForReview() below re-checks a
+    // contract exists before allowing submission, so a failure surfaces
+    // there rather than being silently lost.
+    try {
+      await hrService.generateDefaultContract(
+        data.user_id,
+        data.job_title,
+        record.start_date,
+        record.employment_type
+      );
+    } catch (error) {
+      logger.error('employee_create_default_contract_failed', {
+        userId: data.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     return toGeneralProfile(record);
   }
@@ -526,6 +567,23 @@ export class EmployeeManagementService extends BaseService {
     if (!completeness.is_complete) {
       throw new ConflictError(
         `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+      );
+    }
+
+    // GATE (2026-08-13 contract feature): a Contract row must exist before
+    // an application can be submitted for review -- createEmployee()
+    // auto-generates one, but that call is a best-effort side effect (its
+    // own comment) and could have failed, so this is re-checked here rather
+    // than assumed. Existence only, not signed/ACTIVE: the applicant is
+    // still expected to download, mark FULL_TIME/PART_TIME, sign, and
+    // return it (hr/service.ts's uploadSignedContract/
+    // confirmContractSigned flow) -- approve() already independently
+    // requires an ACTIVE/EXTENDED/PERMANENT contract (assertApprovedContract
+    // below), which stays the stricter, later gate.
+    const contract = await this.prisma.contract.findFirst({ where: { worker_id: record.user_id } });
+    if (!contract) {
+      throw new ConflictError(
+        'Cannot submit for review: no contract has been generated for this application yet. Contact an administrator.',
       );
     }
 
@@ -1547,25 +1605,80 @@ export class EmployeeManagementService extends BaseService {
   }
 
   // ── Review Queue (IF-EMP-ReviewQueue, ADR-065 §6 item 7) ────────────────
-
+  //
+  // 2026-08-13 routing fix: previously scoped by the APPLICANT's own target
+  // hotel/group (a manager saw applications targeting their hotel, an RM
+  // saw applications targeting their group). That is a peer/self review --
+  // the same manager who created a worker's application could also be the
+  // one reviewing it. The corrected rule routes to the CREATOR's own
+  // superior instead, one level up the creation hierarchy
+  // (lib/role-hierarchy.ts: manager creates worker/checker, regional_manager
+  // creates manager, admin creates regional_manager):
+  //   - a manager-created application (worker/checker) routes to that
+  //     manager's own Regional Manager (Hotel.manager_user_id ->
+  //     hotel_group_id -> HotelGroup.regional_manager_user_id) -- NOT back
+  //     to the creating manager itself, and not to admin unless no RM is
+  //     assigned yet.
+  //   - a regional_manager-created application (manager) routes to admin
+  //     (no stored level exists above RM other than admin).
+  //   - an admin-created application (regional_manager) -- and any record
+  //     with no created_by_id at all (legacy rows predating this column,
+  //     or a manager whose hotel has no RM assigned yet) -- routes to admin
+  //     as the fallback superior/reviewer of last resort.
+  // A `manager` actor therefore never has anything in their own queue under
+  // this rule (they are never anyone's "creator's superior") -- the route
+  // stays reachable for that role (no 403) but always resolves empty,
+  // rather than silently 403ing a nav entry that used to show results.
   async getReviewQueue(actor: AuthContext) {
-    const query: Prisma.EmploymentRecordWhereInput = {
+    const baseQuery: Prisma.EmploymentRecordWhereInput = {
       status: EmploymentStatus.PENDING,
       submitted_for_review_at: { not: null },
       deleted_at: null,
     };
 
-    if (actor.role === 'manager') {
-      if (actor.scope?.type !== 'hotel') {
-        throw new ForbiddenError('Manager must be scoped to a hotel');
-      }
-      query.target_primary_hotel_id = actor.scope.hotel_id;
+    let query: Prisma.EmploymentRecordWhereInput;
+
+    if (actor.role === 'admin') {
+      // Admin reviews regional_manager-created applications, plus every
+      // fallback case (no creator recorded, or a manager creator with no
+      // resolvable RM) -- computed as "not claimed by any RM's queue" so
+      // the two queries can never silently disagree about a record.
+      const managerIdsWithResolvableRm = await this.managerIdsWithResolvableRegionalManager();
+      query = {
+        ...baseQuery,
+        OR: [
+          { created_by_id: null },
+          { created_by: { role: UserRole.REGIONAL_MANAGER } },
+          {
+            created_by: { role: UserRole.MANAGER },
+            NOT: { created_by_id: { in: managerIdsWithResolvableRm } },
+          },
+        ],
+      };
     } else if (actor.role === 'regional_manager') {
       if (actor.scope?.type !== 'hotel_group') {
         throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
       }
-      query.target_hotel_group_id = actor.scope.hotel_group_id;
-    } else if (actor.role !== 'admin') {
+      // Managers whose hotel belongs to THIS RM's own group -- these
+      // managers' worker/checker applications are this RM's to review.
+      const managersInGroup = await this.prisma.hotel.findMany({
+        where: { hotel_group_id: actor.scope.hotel_group_id, manager_user_id: { not: null } },
+        select: { manager_user_id: true },
+      });
+      const managerIds = managersInGroup
+        .map((h) => h.manager_user_id)
+        .filter((id): id is string => id !== null);
+      if (managerIds.length === 0) {
+        query = { ...baseQuery, id: '__none__' };
+      } else {
+        query = { ...baseQuery, created_by_id: { in: managerIds } };
+      }
+    } else if (actor.role === 'manager') {
+      // See header comment: a manager is never a creator's superior under
+      // this rule, so their queue is always empty. Distinct from a 403 --
+      // the role remains allowed to load the (empty) page.
+      query = { ...baseQuery, id: '__none__' };
+    } else {
       throw new ForbiddenError('Role not authorized for review queue');
     }
 
@@ -1584,12 +1697,39 @@ export class EmployeeManagementService extends BaseService {
             created_at: true,
             updated_at: true,
           }
+        },
+        created_by: {
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true,
+            role: true,
+          }
         }
       },
       orderBy: { submitted_for_review_at: 'asc' },
     });
 
     return records.map(toGeneralProfile);
+  }
+
+  // Manager user ids whose hotel resolves to a hotel_group with a
+  // regional_manager assigned -- i.e. managers whose worker/checker
+  // applications DO have a real RM to route to. Used by getReviewQueue's
+  // admin branch to compute the complement (managers with NO resolvable
+  // RM), so admin picks up exactly the applications no RM queue will ever
+  // claim, rather than the two queries drifting out of sync if computed
+  // independently.
+  private async managerIdsWithResolvableRegionalManager(): Promise<string[]> {
+    const hotels = await this.prisma.hotel.findMany({
+      where: {
+        manager_user_id: { not: null },
+        hotel_group: { regional_manager_user_id: { not: null } },
+      },
+      select: { manager_user_id: true },
+    });
+    return hotels.map((h) => h.manager_user_id).filter((id): id is string => id !== null);
   }
 
   // ── By-user lookup (IF-EMP-GetByUserId) ─────────────────────────────────

@@ -52,7 +52,30 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function DocumentRow({ doc }: { doc: WorkerDocument }) {
+function DocumentRow({
+  doc,
+  canEdit,
+  onDeleted,
+}: {
+  doc: WorkerDocument;
+  canEdit: boolean;
+  onDeleted: () => void;
+}) {
+  const action = useAsyncAction();
+
+  // 2026-08-13 (worker edit/replace fix): delete-then-reupload is how
+  // "editing" works for this immutable-file-object storage model — see
+  // documentsApi.delete's own comment. Self-only, same `canEdit` gate as the
+  // card's own Upload button (viewerId === workerId); reviewers never see
+  // this control at all, matching the backend granting them no write route
+  // here (view-only by construction, not by a narrower permission check).
+  const onDelete = () => {
+    if (!window.confirm(`Delete "${doc.original_filename}"? You can upload a replacement afterward.`)) {
+      return;
+    }
+    action.run(() => documentsApi.delete(doc.id), { key: doc.id, onSuccess: onDeleted });
+  };
+
   return (
     <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <div className="min-w-0">
@@ -63,6 +86,7 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
           {formatBytes(doc.file_size_bytes)} · Uploaded {formatDate(doc.created_at)}
           {doc.expires_at && <> · Expires {formatDate(doc.expires_at)}</>}
         </p>
+        {action.error && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{action.error}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Badge tone={doc.is_work_permit ? "warning" : "neutral"}>
@@ -81,6 +105,16 @@ function DocumentRow({ doc }: { doc: WorkerDocument }) {
           <span className="text-sm text-gray-400 dark:text-gray-500" title="Storage not configured in this environment">
             Unavailable
           </span>
+        )}
+        {canEdit && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onDelete}
+            loading={action.isPending(doc.id)}
+          >
+            Delete
+          </Button>
         )}
       </div>
     </li>
@@ -186,7 +220,12 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
           ) : (
             <ul>
               {documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} />
+                <DocumentRow
+                  key={doc.id}
+                  doc={doc}
+                  canEdit={canUpload}
+                  onDeleted={() => mutate(["documents", workerId])}
+                />
               ))}
             </ul>
           )}

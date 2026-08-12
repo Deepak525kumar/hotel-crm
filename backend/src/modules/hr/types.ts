@@ -14,6 +14,10 @@ export const HR_MAX_PAGE_SIZE = 100;
 
 export type ContractStatusType = 'PENDING' | 'ACTIVE' | 'EXTENDED' | 'PERMANENT';
 
+// 2026-08-13 contract feature: mandatory full-time/part-time marking,
+// mirrors EmploymentRecord.employment_type (schema.prisma).
+export type EmploymentTypeValue = 'FULL_TIME' | 'PART_TIME';
+
 export interface CreateContractRequest {
   worker_id: string;
   template_id: string;
@@ -30,6 +34,7 @@ export interface ContractDto {
   start_date: string;
   end_date: string | null;
   status: ContractStatusType;
+  employment_type: EmploymentTypeValue;
   // generated_pdf_key is intentionally NOT exposed (matches WorkerDocumentDto's
   // s3_key omission convention, OD-DOC-017) — internal storage reference only.
   scanned_document_id: string | null;

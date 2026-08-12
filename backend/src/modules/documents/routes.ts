@@ -4,10 +4,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
-import { checkWorkerScope, requireRole } from '../../middleware/permissions.js';
+import { requireRole } from '../../middleware/permissions.js';
 import { documentController } from './controller.js';
 import { ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from './upload-policy.js';
-import { ForbiddenError, ValidationError } from '../../lib/errors.js';
+import { ForbiddenError, UnauthorizedError, ValidationError } from '../../lib/errors.js';
+import { isWorkerInReviewerScope } from '../../lib/scope.js';
 
 // RULE-DOC-09/REQ-DOC-017: memory storage only — bytes are handed straight to
 // StorageService.upload() (S3 stub today, real S3 once wired), never written
@@ -36,23 +37,47 @@ const upload = multer({
 // PR6's documentation-synchronization step; until that record exists this
 // comment is the authority trail for the change, not a substitute for it.
 //
-// checkWorkerScope() (permissions.ts resolveWorkerScope) allows admin (bypass)
-// and the scope-bound manager roles (group-scope check via
-// isScopedManagerRole) — every other role, including worker, is
-// unconditionally denied. It was built for backend-hr's contract-scan routes
-// and cannot express GD-16's worker-self-service requirement. Applying it in front of a
-// worker's own request would deny GD-16's mandated actor, so it is only
-// applied for the admin/manager path; worker self-access is instead
-// self-scoped in the service layer (DocumentService checks actor_id ===
-// worker_id for the 'worker' role), the same split already used by
-// calendar's /my-absences and employee-management's own-profile read.
-function scopeWorkerRoute() {
-  return (req: Request, res: Response, next: NextFunction) => {
+// Worker self-access for these read routes is self-scoped in the service
+// layer instead (DocumentService checks actor_id === worker_id for the
+// 'worker' role) — the same split already used by calendar's /my-absences
+// and employee-management's own-profile read.
+//
+// 2026-08-13 (review-queue reviewing gap, found while rebuilding the review
+// queue UI): these three READ routes (list/completeness/export) used to go
+// through checkWorkerScope() -> isWorkerInGroupScope(), which denies by
+// design whenever EmploymentRecord.hotel_group_id is null -- true for every
+// application still PENDING review, i.e. exactly the applicants a
+// manager/RM's review queue exists to show. A reviewer opening the review
+// modal for ANY not-yet-approved applicant got a 403 on document
+// completeness, 100% of the time. Fixed with this NEW middleware rather than
+// widening checkWorkerScope()/resolveWorkerScope() itself: that shared
+// function also gates WRITE routes elsewhere (HR's contract-scan/confirm/
+// extend/lapse), and this fix is read-only, reviewer-only, pre-approval-only
+// by construction (isWorkerInReviewerScope falls through to the real
+// post-approval group once hotel_group_id is set) -- widening the shared
+// primitive would have risked loosening write authorization far outside
+// this ticket's scope.
+function scopeWorkerReadRoute() {
+  return async (req: Request, _res: Response, next: NextFunction) => {
     if (req.auth?.role === 'worker') {
       next();
       return;
     }
-    checkWorkerScope()(req, res, next);
+    if (!req.auth) {
+      next(new UnauthorizedError('Authentication required'));
+      return;
+    }
+    if (req.auth.role === 'admin') {
+      next();
+      return;
+    }
+    const workerId = req.params.worker_id;
+    const inScope = await isWorkerInReviewerScope(req.auth.scope ?? null, workerId).catch(() => false);
+    if (!inScope) {
+      next(new ForbiddenError(`Cannot access worker ${workerId}`));
+      return;
+    }
+    next();
   };
 }
 
@@ -61,11 +86,11 @@ function scopeWorkerRoute() {
 // hidden button in front of a live route is not a control, and this route
 // previously admitted admin/manager/regional_manager for ANY :worker_id.
 //
-// Deliberately NOT `scopeWorkerRoute()`: that middleware asks "is this worker
-// inside the actor's group", which is the wrong question now — an in-scope
-// worker who is not the actor must still be denied. This asks the only
-// question RULE B cares about, and asks it identically for every role
-// (including admin, which checkWorkerScope() bypasses outright).
+// Deliberately NOT a group-scope check: "is this worker inside the actor's
+// group" is the wrong question for an upload — an in-scope worker who is not
+// the actor must still be denied. This asks the only question RULE B cares
+// about, and asks it identically for every role (including admin, which a
+// group-scope check would otherwise bypass outright).
 //
 // Comparing `req.auth.userId` to the path parameter means the actor's identity
 // comes from the verified JWT and the target from the URL; there is no body
@@ -128,21 +153,21 @@ router.post(
 router.get(
   '/workers/:worker_id/documents',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
-  scopeWorkerRoute(),
+  scopeWorkerReadRoute(),
   (req, res, next) => documentController.listWorkerDocuments(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/completeness',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
-  scopeWorkerRoute(),
+  scopeWorkerReadRoute(),
   (req, res, next) => documentController.getDocumentCompleteness(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/export',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
-  scopeWorkerRoute(),
+  scopeWorkerReadRoute(),
   (req, res, next) => documentController.exportWorkerDocuments(req, res, next)
 );
 
@@ -152,6 +177,20 @@ router.get(
   '/documents/:document_id',
   requireRole(['admin', 'manager', 'regional_manager', 'worker']),
   (req, res, next) => documentController.getDocument(req, res, next)
+);
+
+// 2026-08-13 (worker edit/replace fix): self-only, same shape as
+// requireSelfWorker() above but keyed on the bare document id -- ownership
+// is bound inside documentService.deleteDocument (actorId === doc.worker_id
+// AND actorRole === 'worker'), not by a route-level worker_id param, since
+// this route carries none (mirrors GET /documents/:document_id immediately
+// above). No role other than worker is granted this route at all --
+// reviewers (manager/RM/admin) remain view-only by construction, not by a
+// narrower permission check that could later be widened by mistake.
+router.delete(
+  '/documents/:document_id',
+  requireRole('worker'),
+  (req, res, next) => documentController.deleteDocument(req, res, next)
 );
 
 export default router;
