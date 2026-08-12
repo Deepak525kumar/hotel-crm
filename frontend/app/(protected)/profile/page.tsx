@@ -67,25 +67,8 @@ export default function ProfilePage() {
 
       <EditProfileCard user={user} />
 
-      {user.permissions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Permissions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-wrap gap-2">
-              {user.permissions.map((p) => (
-                <li
-                  key={p}
-                  className="rounded-md bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700 dark:bg-gray-800 dark:text-gray-300"
-                >
-                  {p}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+
+
 
       {user.role === "worker" && <MyStatsCard />}
 
