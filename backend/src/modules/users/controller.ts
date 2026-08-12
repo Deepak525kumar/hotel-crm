@@ -59,7 +59,7 @@ export class UserController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const user = await userService.createUser(req.body, req.auth, req.ip);
+        const user = await userService.createUser(req.body, req.auth.userId, req.auth.role, req.ip);
         res.status(201).json({
           status: 'success',
           data: user,

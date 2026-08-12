@@ -427,7 +427,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, { userId: 'actor', email: 'actor@test.com', role: 'admin', permissions: [] })
+        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, 'actor', 'admin')
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
 
@@ -440,7 +440,8 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Mal', last_name: 'Ory', role: 'admin', phone: '+1234567890' },
-          { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+          'manager_actor',
+          'manager'
         )
       // Message changed with RULE A (2026-08-12): the old HOTFIX-AUTH-003
       // guard ("Only admins can assign admin role") was superseded by the
@@ -464,7 +465,8 @@ describe('UserService', () => {
       await expect(
         service.createUser(
           { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin', phone: '+1234567890' },
-          { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+          'admin_actor',
+          'admin'
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
@@ -481,7 +483,8 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager', phone: '+1234567890' },
-        { userId: 'admin_actor', email: 'admin@test.com', role: 'admin', permissions: [] }
+        'admin_actor',
+        'admin'
       );
 
       expect(result.role).toBe('regional_manager');
@@ -499,7 +502,8 @@ describe('UserService', () => {
 
       const result = await service.createUser(
         { email: 'worker@test.com', password: 'pw12345678', first_name: 'Work', last_name: 'Er', role: 'worker', phone: '+1234567890' },
-        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+        'manager_actor',
+        'manager'
       );
 
       expect(result.role).toBe('worker');

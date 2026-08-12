@@ -4,11 +4,9 @@ import { useAuthStore } from "@/stores/auth";
  * Named employment-lifecycle capabilities for the current viewer, so UI
  * code never hardcodes a role string (`role === "admin"`) inline.
  *
- * Mirrors employee-management's actual enforcement:
- *  - EmploymentRecord CREATION is no longer a user-facing action at all
- *    (ADR-065, Universal Onboarding Gate) — the record is auto-created the
- *    moment an account exists (users/service.ts#createUser), so there is no
- *    `canCreateEmployment` flag here; delete/restore remain Admin only.
+ * Mirrors employee-management's actual enforcement (ADR-030 §3 C-16 amendment
+ * 2026-08-06, as amended by the project owner's 2026-08-12 decision):
+ *  - create/delete/restore: Admin only.
  *  - submit-for-review: SELF-SERVICE ONLY (RULE B) — the applicant and nobody
  *    else, admin included. Requires `subjectUserId`.
  *  - approve/reject/deactivate/reactivate/rehire: Admin, or a scoped
@@ -46,6 +44,7 @@ export function useEmploymentPermissions(opts: { subjectUserId?: string } = {}) 
     !!viewerId && !!opts.subjectUserId && viewerId === opts.subjectUserId;
 
   return {
+    canCreateEmployment: isAdmin,
     canDeleteEmployment: isAdmin,
     canRestoreEmployment: isAdmin,
     canSubmitForReview,

@@ -2,7 +2,6 @@ import bcrypt from 'bcryptjs';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
-import { logger } from '../../lib/logger.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import {
   CreateUserRequest,
@@ -14,12 +13,6 @@ import {
 import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
 import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { UserScope } from '../../lib/jwt.js';
-import type { AuthContext } from '../../lib/types.js';
-// ADR-065 (Universal Onboarding Gate): createUser() below auto-creates the
-// linked EmploymentRecord for every non-admin account. No existing import
-// cycle risk -- employee-management/service.ts imports hr/service.ts, but
-// neither imports users/service.ts.
-import { employeeManagementService } from '../employee-management/service.js';
 
 export class UserService extends BaseService {
   // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
@@ -182,9 +175,7 @@ export class UserService extends BaseService {
     };
   }
 
-  async createUser(data: CreateUserRequest, actor: AuthContext, ip?: string) {
-    const actorId = actor.userId;
-    const actorRole = actor.role;
+  async createUser(data: CreateUserRequest, actorId: string, actorRole: string, ip?: string) {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new ConflictError('Email already registered');
 
@@ -240,44 +231,6 @@ export class UserService extends BaseService {
     });
 
     await this.logAudit(actorId, actorRole, 'MODIFY', 'USER', user.id, { action: 'create', email: user.email }, ip);
-
-    // ADR-065 (Universal Onboarding Gate, ratified 2026-08-11): every
-    // non-Admin account -- Worker, Checker, Manager, AND Regional Manager --
-    // gets an EmploymentRecord (Pending) the moment the account exists, so
-    // the new user can self-service their own onboarding immediately on
-    // first login, with no separate "Start onboarding" step for anyone.
-    // Delegates to employeeManagementService.createEmployee() rather than
-    // duplicating its RULE A / per-role target-scope logic: `actor` here has
-    // ALREADY passed canCreateRole() above for this exact (actorRole,
-    // data.role) pair, so createEmployee()'s own identical check is
-    // redundant defense-in-depth, not a second gate that could disagree.
-    // employee_id is server-generated (never user-supplied -- there is no
-    // manual creation form anymore) from the new user's own id, which is
-    // already globally unique, so no separate uniqueness check is needed.
-    //
-    // Best-effort, like generateDefaultContract() below it in the call
-    // chain: a failure here must not roll back the just-created User account
-    // (the account is real and useful on its own -- login, profile -- even
-    // if onboarding setup hiccups). Logged loudly rather than silently
-    // swallowed; an admin can always create the missing record by hand via
-    // the pre-existing POST /employees route if this ever happens.
-    if (role !== 'ADMIN') {
-      try {
-        await employeeManagementService.createEmployee(actor, {
-          user_id: user.id,
-          employee_id: `EMP-${user.id.slice(-10).toUpperCase()}`,
-          job_title: data.job_title!,
-          start_date: data.start_date!,
-          employment_type: data.employment_type!,
-        });
-      } catch (error) {
-        logger.error('user_create_employment_record_failed', {
-          userId: user.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
     return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };

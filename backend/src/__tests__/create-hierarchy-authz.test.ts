@@ -147,7 +147,8 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
               last_name: 'User',
               role: target,
             } as any,
-            { userId: `actor_${actor}`, email: 'actor@test.com', role: actor, permissions: [] }
+            `actor_${actor}`,
+            actor
           );
 
           if (allowed) {
@@ -168,7 +169,8 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
       await expect(
         service.createUser(
           { email: 'x@test.com', password: 'pw12345678', first_name: 'X', last_name: 'Y', role: 'worker' } as any,
-          { userId: 'actor_x', email: 'actor@test.com', role: 'superadmin', permissions: [] }
+          'actor_x',
+          'superadmin'
         )
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockUserCreate).not.toHaveBeenCalled();

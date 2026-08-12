@@ -119,13 +119,6 @@ export interface UserDetail extends UserSummary {
 }
 
 /** Body of `POST /users` (admin/manager). */
-/**
- * ADR-065 (Universal Onboarding Gate): every non-admin account gets an
- * EmploymentRecord auto-created the moment it's created (backend derives
- * `employee_id`) — job_title/start_date/employment_type are required for
- * every role except admin (backend's CreateUserSchema enforces this via
- * `.superRefine`, not by TypeScript's optional-field typing alone).
- */
 export interface CreateUserInput {
   email: string;
   password: string;
@@ -134,9 +127,6 @@ export interface CreateUserInput {
   phone?: string;
   /** Defaults to "worker" backend-side. */
   role?: Role;
-  job_title?: string;
-  start_date?: string;
-  employment_type?: EmploymentType;
 }
 
 /**
