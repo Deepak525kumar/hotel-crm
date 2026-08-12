@@ -21,7 +21,26 @@ router.get('/', requirePermission('users:read'), ...userController.listUsers);
 // privilege-escalation-on-rollback path this hard-coded `requireRole('admin')`
 // closes. `requirePermission('users:write')` below is defense-in-depth only,
 // not the actual boundary.
-router.post('/', requireRole('admin'), requirePermission('users:write'), ...userController.createUser);
+// RULE A (project-owner decision, 2026-08-12): account creation is now
+// 1-level-down for three roles rather than Admin-only, so the gate admits
+// admin/manager/regional_manager and `userService.createUser` decides WHICH
+// role each may mint (lib/role-hierarchy.ts, canCreateRole).
+//
+// This narrows more than it widens. Previously admin could create ANY role
+// including another admin; now `admin` is creatable by nobody. What it does
+// widen is who may reach the route at all — and the SEC-01 concern the
+// previous comment recorded (a manager holding `users:write` regaining account
+// creation if FEATURE_GD02_MATRIX were rolled back) is now handled by
+// canCreateRole rather than by the role literal: that check is NOT
+// flag-gated, so a manager reaching this route can only ever mint
+// worker/checker regardless of flag state, and can never reach admin or
+// regional_manager. Rolling the flag back can no longer produce escalation
+// here, which is what made the hard-coded `requireRole('admin')` necessary.
+//
+// Conflicts with ADR-030 D-4's "account creation is Admin-only, permanently"
+// (tracked in SIR-USERS-002). The owner ratified RULE A knowing an amendment
+// is owed; see lib/role-hierarchy.ts's governance note.
+router.post('/', requireRole(['admin', 'manager', 'regional_manager']), requirePermission('users:write'), ...userController.createUser);
 router.get('/:user_id', requirePermission('users:read'), (req, res, next) => userController.getUser(req, res, next));
 // ADR-030 D-4/D-4a: the profile-only route. 'regional_manager' added per D-5
 // parity with manager — unreachable today (FEATURE_RM_ROLE is off, no live

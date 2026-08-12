@@ -65,13 +65,18 @@ function NewUser() {
 
 export default function NewUserPage() {
   return (
+    // RULE A (project-owner decision, 2026-08-12): create is 1-level-down, so
+    // manager and regional_manager may now create users too — each restricted
+    // to its own one-level-down target role, which UserForm's selector enforces
+    // (and users/service.ts enforces authoritatively). worker/checker may
+    // create nobody and still get the fallback.
     <RoleGate
-      allow={["admin"]}
+      allow={["admin", "regional_manager", "manager"]}
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only admins can create users.
+              You do not have permission to create users.
             </CardContent>
           </Card>
         </div>

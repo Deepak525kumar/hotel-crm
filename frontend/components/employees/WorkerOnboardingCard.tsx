@@ -87,8 +87,18 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   // not a substitute for the backend's group-scope check on a specific
   // record). Hides the Admin-only actions for a non-admin viewer rather
   // than showing a button that always 403s.
-  const { canCreateEmployment, canDeleteEmployment, canRestoreEmployment } =
-    useEmploymentPermissions();
+  // `subjectUserId` is what makes RULE B (2026-08-12, "nobody may perform
+  // another user's onboarding") expressible here: `canSubmitForReview` is an
+  // identity comparison against this card's subject, not a role check. On an
+  // admin viewing ANOTHER user's profile it is false, so the
+  // "Confirm onboarding complete" button is not rendered — matching the
+  // backend, which now 403s that call.
+  const {
+    canCreateEmployment,
+    canDeleteEmployment,
+    canRestoreEmployment,
+    canSubmitForReview,
+  } = useEmploymentPermissions({ subjectUserId: userId });
 
   // Document completeness — needed to gate "Confirm onboarding complete".
   // Only fetched when the record is in PENDING state (before submission).
@@ -219,14 +229,26 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       </ul>
                     </div>
                   )}
-                  <Button
-                    size="sm"
-                    onClick={onSubmitForReview}
-                    loading={action.isPending("submit")}
-                    disabled={docCompleteness != null && !docCompleteness.is_complete}
-                  >
-                    Confirm onboarding complete
-                  </Button>
+                  {/* RULE B: submit-for-review is self-service only. On
+                      another user's profile this renders an explanation
+                      instead of a button that would 403 — the button is
+                      REMOVED, not merely disabled, because a disabled control
+                      still implies "you could, if conditions changed." */}
+                  {canSubmitForReview ? (
+                    <Button
+                      size="sm"
+                      onClick={onSubmitForReview}
+                      loading={action.isPending("submit")}
+                      disabled={docCompleteness != null && !docCompleteness.is_complete}
+                    >
+                      Confirm onboarding complete
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-gray-400 dark:text-gray-500">
+                      Only this employee can upload their documents and submit their own
+                      application for review.
+                    </p>
+                  )}
                 </div>
               )}
 

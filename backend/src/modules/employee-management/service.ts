@@ -17,6 +17,7 @@ import {
 } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
+import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
 import { isRmRoleEnabled } from '../../config/feature-flags.js';
@@ -74,6 +75,22 @@ export class EmployeeManagementService extends BaseService {
     const targetUser = await this.prisma.user.findUnique({ where: { id: data.user_id } });
     if (!targetUser) {
       throw new ConflictError('User not found');
+    }
+
+    // RULE A (project-owner decision, 2026-08-12): create is 1-level-down
+    // ONLY. This is the primary authorization boundary for creation and is
+    // checked FIRST, before any per-role scoping below — the route's
+    // requireRole() list cannot express it (it says nothing about the role
+    // being created) and previously nothing did, which is the hole this
+    // closes. See lib/role-hierarchy.ts for the mapping and the governance
+    // conflict it records (ADR-065 / ADR-030 §3 C-15 amendment owed).
+    //
+    // The per-role blocks that follow are RETAINED: they enforce a different
+    // question (which GROUP/HOTEL the created record is targeted at), which
+    // RULE A does not answer. Their own role-set checks are now redundant
+    // with this one but are deliberately left in place as defense-in-depth.
+    if (!canCreateRole(actor.role, targetUser.role)) {
+      throw new ForbiddenError(createRoleDenialMessage(actor.role, targetUser.role));
     }
 
     // Role-based creation guards
@@ -594,10 +611,35 @@ export class EmployeeManagementService extends BaseService {
     return toGeneralProfile(updated);
   }
 
-  /** PENDING -> REJECTED (hire application declined). */
+  /**
+   * Writes the scope fields (hotel_group_id / primary_hotel_id) for an
+   * already-approved employment record.
+   *
+   * PRIVILEGE-ESCALATION GUARD (found 2026-08-12 by real E2E probing, not by
+   * the suite -- scenario 02 asserted step *ordering* but never that assign
+   * REQUIRES approval): `approve` is deliberately status-only ("does not write
+   * scope fields", see above), which makes THIS method the only writer of the
+   * scope claims that end up in a user's JWT. It previously checked lifecycle
+   * *authority* (who the actor is) but never the record's *status*, so a
+   * PENDING -- including an explicitly just-refused -- application could be
+   * handed a real, usable `regional_manager_user_id` / `manager_user_id`
+   * binding: `approve` correctly returned 409, then `assign` returned 200 and
+   * granted the scope anyway.
+   *
+   * Assign is therefore gated on ACTIVE, mirroring `approve`'s
+   * `submitted_for_review_at` gate. Every other transition guards itself; this
+   * one must too. Do not relax this to "any status" to make a test pass --
+   * `onboarding-assign-requires-approval.test.ts` pins the behaviour.
+   */
   async assign(actor: AuthContext, employeeId: string, payload: { hotel_group_id?: string; primary_hotel_id?: string }) {
     const record = await this.findRecordOrThrow(employeeId);
     await this.assertLifecycleAuthority(actor, record, 'assign an employee', { allowUnassignedGroup: true });
+
+    if (record.status !== EmploymentStatus.ACTIVE) {
+      throw new ConflictError(
+        'Cannot assign an employee whose application has not been approved'
+      );
+    }
 
     if (actor.role === 'regional_manager' && payload.hotel_group_id) {
       const ownGroupId = await this.resolveApprovalGroupId(actor);
@@ -1312,11 +1354,30 @@ export class EmployeeManagementService extends BaseService {
     action: string,
     opts: { allowUnassignedGroup?: boolean } = {}
   ): Promise<void> {
-    if (actor.role === 'admin') return;
-
-    if (action === 'submit an employee for review' && actor.userId === record.user_id) {
-      return;
+    // RULE B (project-owner decision, 2026-08-12): NOBODY may perform another
+    // user's onboarding. submit-for-review is SELF-SERVICE ONLY — the
+    // applicant submits their own application, and no role (admin included)
+    // may submit on their behalf.
+    //
+    // This check is deliberately placed ABOVE the `admin` early-return: the
+    // previous ordering let admin short-circuit out before the self-check was
+    // ever reached, which is precisely the bypass RULE B closes. Ordering is
+    // the security property here, not an incidental style choice — do not
+    // hoist the admin return back above it.
+    //
+    // SCOPE — approve/assign/reject/deactivate/reactivate/rehire are NOT
+    // self-service and deliberately keep the hierarchy checks below: a
+    // Manager's application is still approved by an RM or Admin. Only
+    // submit-for-review (and document upload, in documents/service.ts) became
+    // self-only.
+    if (action === 'submit an employee for review') {
+      if (actor.userId === record.user_id) return;
+      throw new ForbiddenError(
+        'Only the applicant may submit their own application for review; no role may submit on another user\'s behalf'
+      );
     }
+
+    if (actor.role === 'admin') return;
 
     if (isScopedManagerRole(actor.role)) {
       const targetUser = await this.prisma.user.findUnique({ where: { id: record.user_id } });

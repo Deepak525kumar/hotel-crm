@@ -359,19 +359,57 @@ export default function CalendarGridPage() {
 
       <FormError>{moveError}</FormError>
 
+      {/* The daily shift summary is an INDEPENDENT data source from the
+          placement grid: it comes from
+          GET /calendar/hotels/:hotel_id/shift-summaries, not from
+          GET /assignments/calendar-entries. It therefore renders OUTSIDE the
+          `entriesError` branch below.
+
+          This was a real, browser-reproduced defect (2026-08-12, RM
+          verification pass): the panel used to live inside the `: (` else-arm
+          of `entriesError`, so ANY placement-grid failure hid the shift
+          summary entirely. That is not hypothetical -- the entries route
+          (`/assignments/calendar-entries`) is gated by
+          FEATURE_JOBDISPATCH_PHASE2, which is OFF by default, so it 404s
+          ("Assignment not found", the collection path falling through to the
+          by-id handler). With the flag off, `entriesError` is ALWAYS set and
+          the shift summary was unreachable for EVERY role -- admin, manager
+          and regional_manager alike -- with the page showing only "Failed to
+          load the calendar."
+
+          Coupling two independent reads through one error flag is the bug
+          class here; keep them separate. */}
+      {view === "day" && canWrite && (
+        effectiveHotelFilter ? (
+          <ShiftSummaryPanel
+            hotelId={effectiveHotelFilter}
+            dateStr={toDateKey(anchor)}
+            canWrite={canWrite}
+          />
+        ) : (
+          // Admin/RM land here with only a group selected (or nothing
+          // selected at all): scopeHotelId is null for both roles (a
+          // Hotel Manager is the only role with a fixed single hotel), so
+          // the shift summary -- which is inherently single-hotel data --
+          // has no hotel to query yet. Surface an explicit hint via the
+          // SAME hotel picker CalendarFilters already renders above,
+          // rather than silently omitting the panel (the pre-fix
+          // behaviour, which looked identical to "no gap exists" from the
+          // UI and was the reported defect).
+          <Card className="p-4 border border-dashed border-gray-300 dark:border-gray-700 mb-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Select a hotel above to view or edit its daily shift summary.
+            </p>
+          </Card>
+        )
+      )}
+
       {entriesError ? (
         <Card>
           <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load the calendar. Please try again.</div>
         </Card>
       ) : (
         <>
-        {view === "day" && (hotelFilter || scopeHotelId) && (
-          <ShiftSummaryPanel 
-            hotelId={(hotelFilter || scopeHotelId) as string} 
-            dateStr={toDateKey(anchor)} 
-            canWrite={canWrite} 
-          />
-        )}
         <div
           className={
             view === "day"

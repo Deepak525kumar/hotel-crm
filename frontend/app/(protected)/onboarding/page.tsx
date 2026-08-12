@@ -3,22 +3,27 @@
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader, Card, Badge, Button, EmptyState } from "@/components/ui";
 import { employeesApi } from "@/lib/api";
-import useSWR from "swr";
+import { useEmploymentRecord } from "@/hooks/useEmployment";
+import { useMyOnboarding } from "@/hooks/useMyOnboarding";
 import { DocumentUploadList } from "@/components/onboarding/DocumentUploadList";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
-import { mutate } from "swr";
 
 export default function MyOnboardingPage() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
 
-  // Fetch employment record
-  const { data: record, isLoading, error } = useSWR(
-    user?.id ? `/employees/by-user/${user.id}` : null,
-    () => employeesApi.getByUserId(user!.id)
-  );
+  // Shares BOTH the SWR cache key and the status vocabulary with the sidebar
+  // entry and the dashboard callout (useMyOnboarding wraps this same
+  // useEmploymentRecord hook). Previously this page called useSWR directly with
+  // a string key `/employees/by-user/:id` while `useEmploymentRecord` keyed on
+  // the tuple ["employment-record", id] — two caches for one resource, so a
+  // submit here left the other surfaces showing stale status.
+  const { data: record, isLoading, error, mutate: refreshRecord } =
+    useEmploymentRecord(user?.id);
+  const { label: statusLabel, description: statusDescription, tone: statusTone } =
+    useMyOnboarding();
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading your onboarding record...</div>;
   if (error) return <div className="p-8 text-center text-red-500">Failed to load onboarding record.</div>;
@@ -43,7 +48,9 @@ export default function MyOnboardingPage() {
     try {
       setSubmitting(true);
       await employeesApi.submitForReview(record.employee_id);
-      await mutate(`/employees/by-user/${user!.id}`);
+      // Revalidates the shared ["employment-record", userId] key, so the
+      // sidebar badge and dashboard callout update with this page.
+      await refreshRecord();
     } catch {
       alert("Failed to submit for review. Ensure all required documents are uploaded.");
     } finally {
@@ -53,21 +60,18 @@ export default function MyOnboardingPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader 
+      {/* Status label/tone/copy come from useMyOnboarding so this page, the
+          sidebar entry and the dashboard callout can never disagree.
+          `tone` (not `color`) is Badge's actual prop — `color` was silently
+          ignored and leaked to the DOM, so every status rendered grey. */}
+      <PageHeader
         title={
           <div className="flex items-center gap-4">
             My Onboarding
-            <Badge color={isActive ? "green" : isRejected ? "red" : isSubmitted ? "blue" : "gray"}>
-              {isActive ? "Active" : isRejected ? "Rejected" : isSubmitted ? "Under Review" : "Pending Documents"}
-            </Badge>
+            <Badge tone={statusTone}>{statusLabel}</Badge>
           </div>
         }
-        description={
-          isActive ? "Your onboarding is complete. Welcome to the team!" :
-          isRejected ? "Your application was rejected. Please review your documents and contact your manager." :
-          isSubmitted ? "Your application is under review by your manager." :
-          "Complete your required documentation to activate your account."
-        }
+        description={statusDescription}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -306,7 +306,14 @@ export class HrService extends BaseService {
       },
       file,
       actorRole,
-      actorIp
+      actorIp,
+      // RULE B (2026-08-12) makes worker-document upload self-only. A contract
+      // SCAN is not the applicant's own onboarding upload — it is the
+      // counterparty's record of an already-signed contract — so it is exempt.
+      // Authorization for it is this method's own contract-ownership check
+      // above, not the self-check RULE B installs. See
+      // documents/service.ts#uploadDocument's note on `systemGenerated`.
+      { systemGenerated: true }
     );
 
     const updated = await this.prisma.contract.update({
@@ -871,7 +878,10 @@ export class HrService extends BaseService {
       },
       file,
       actorRole,
-      actorIp
+      actorIp,
+      // Same contract-scan mechanism as uploadContractScan above, same RULE B
+      // exemption and same reasoning (documents/service.ts#uploadDocument).
+      { systemGenerated: true }
     );
   }
 

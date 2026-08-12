@@ -6,6 +6,7 @@ import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
 import { RoleGate, StaffingWriteGate } from "@/components/auth/RoleGate";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
 import { MyStatsCard } from "@/components/analytics/MyStatsCard";
+import { OnboardingCallout } from "@/components/onboarding/OnboardingCallout";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { formatPercent, formatScore } from "@/lib/format";
 import {
@@ -106,6 +107,15 @@ export default function DashboardPage() {
         title="Dashboard"
         description={`Welcome back${user ? `, ${user.first_name}` : ""}.`}
       />
+
+      {/* Owner decision 2026-08-12: a brand-new user had NO way to discover
+          /onboarding in the UI — the route worked only if you typed it. This
+          sits directly under the page header (above "Your account") because
+          for an applicant it is the single most important action on the page.
+          It self-hides once the record is ACTIVE, and renders nothing at all
+          for a user with no onboarding record, so it costs an established
+          employee or an Admin no vertical space. */}
+      <OnboardingCallout />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

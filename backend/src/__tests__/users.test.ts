@@ -443,29 +443,53 @@ describe('UserService', () => {
           'manager_actor',
           'manager'
         )
-      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can assign admin role' });
+      // Message changed with RULE A (2026-08-12): the old HOTFIX-AUTH-003
+      // guard ("Only admins can assign admin role") was superseded by the
+      // 1-level-down check, which denies this for a strictly broader reason.
+      // The security property under test is unchanged and still asserted.
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
 
       // The escalated account must never be created.
       expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
 
-    it('allows an admin to create an ADMIN account (workflow preserved)', async () => {
+    // RULE A (project-owner decision, 2026-08-12): create is 1-level-down
+    // ONLY, and `admin` is one level below nothing — so NO role, admin
+    // included, may create an admin account. This REPLACES the previous
+    // "allows an admin to create an ADMIN account (workflow preserved)" case:
+    // that workflow was deliberately removed, not accidentally broken, so the
+    // assertion is inverted rather than deleted.
+    it('forbids even an admin from creating an ADMIN account (RULE A: admin is not 1-level-down from anything)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.createUser(
+          { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin' },
+          'admin_actor',
+          'admin'
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('allows an admin to create a REGIONAL_MANAGER account (RULE A: admin -> regional_manager)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue(null);
       mockPrisma.user.create.mockResolvedValue({
-        id: 'u_admin', email: 'newadmin@test.com', first_name: 'Real', last_name: 'Admin',
-        phone: null, role: 'ADMIN', permissions: ['admin:*'], is_active: true, created_at: new Date(),
+        id: 'u_rm', email: 'rm@test.com', first_name: 'Reg', last_name: 'Man',
+        phone: null, role: 'REGIONAL_MANAGER', is_active: true, created_at: new Date(),
       });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.createUser(
-        { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin' },
+        { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager' },
         'admin_actor',
         'admin'
       );
 
-      expect(result.role).toBe('admin');
+      expect(result.role).toBe('regional_manager');
       const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string } }>;
-      expect(createCall[0]?.data.role).toBe('ADMIN');
+      expect(createCall[0]?.data.role).toBe('REGIONAL_MANAGER');
     });
 
     it('allows a manager to create a non-privileged WORKER account (workflow preserved)', async () => {

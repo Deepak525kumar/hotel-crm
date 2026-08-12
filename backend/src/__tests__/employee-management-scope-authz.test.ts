@@ -457,7 +457,10 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
   // admin-only. E-001's fixture record has hotel_group_id: 'g1' (see
   // employmentRecords above).
   describe('POST /employees/:employee_id/submit-for-review — scoped manager/RM, not admin-only (C-16)', () => {
-    it('denies a worker outright (not admin, not a scoped manager role)', async () => {
+    // Still a denial after RULE B, for a different reason: `w_1` is not
+    // E-001's `user_id` ('user_1'), so this is now "a worker submitting
+    // SOMEONE ELSE'S record", which is precisely what RULE B forbids.
+    it('denies a worker acting on a record that is not their own', async () => {
       testAuth = { userId: 'w_1', role: 'worker', permissions: ['employees:write'], scope: null };
       const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
       expect(res.status).toBe(403);
@@ -482,7 +485,17 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
       expect(res.status).toBe(403);
     });
 
-    it('allows a manager scoped to the record\'s own hotel group', async () => {
+    // RULE B (project-owner decision, 2026-08-12): "nobody may perform another
+    // user's onboarding." submit-for-review became SELF-SERVICE ONLY, so the
+    // two cases below — a manager scoped to the record's own group, and an
+    // admin — now DENY where they previously returned 200. Inverted rather
+    // than deleted: the previous 200 was the bypass the owner closed, and an
+    // inverted assertion is what makes a silent regression fail loudly.
+    //
+    // Scope is now irrelevant to this action: `mgr_1` is denied even with the
+    // matching 'g1' claim, because scope answers "may you act on this group's
+    // records", which is no longer the question for submit-for-review.
+    it('denies a manager scoped to the record\'s own hotel group (RULE B: not the applicant)', async () => {
       employmentRecords['E-001'].status = 'PENDING';
       testAuth = {
         userId: 'mgr_1',
@@ -491,12 +504,25 @@ describe('Employee-management scope authorization (REQ-EMP-013 / RULE-EMP-08 / F
         scope: { type: 'hotel_group', hotel_group_id: 'g1' },
       };
       const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
     });
 
-    it('allows an admin regardless of scope', async () => {
+    it('denies an admin acting on another user\'s record (RULE B: no role may submit on another\'s behalf)', async () => {
       employmentRecords['E-001'].status = 'PENDING';
       testAuth = { userId: 'adm_1', role: 'admin', permissions: ['employees:write'], scope: null };
+      const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    // The self-service path RULE B leaves as the ONLY way this transition can
+    // occur: the actor's JWT `userId` equals the record's `user_id`. Asserted
+    // here (not only as a denial suite) so the rule cannot be "satisfied" by
+    // accidentally denying everyone.
+    it('allows the applicant submitting their OWN record (RULE B self-service)', async () => {
+      employmentRecords['E-001'].status = 'PENDING';
+      testAuth = { userId: 'user_1', role: 'worker', permissions: ['employees:read'], scope: null };
       const res = await request(makeApp()).post('/employees/E-001/submit-for-review');
       expect(res.status).toBe(200);
     });

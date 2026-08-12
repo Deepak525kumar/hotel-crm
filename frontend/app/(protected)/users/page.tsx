@@ -80,9 +80,12 @@ function UsersDirectory() {
         title="Users"
         description="People with access to the platform."
         actions={
-          // POST /users is admin-only backend-side; a manager/RM can browse
-          // this directory (scope-filtered to their own group) but not create.
-          <RoleGate allow={["admin"]}>
+          // RULE A (project-owner decision, 2026-08-12): create is
+          // 1-level-down, so manager/RM may create too — each limited to its
+          // own one-level-down role (UserForm's selector; enforced
+          // authoritatively in users/service.ts). worker/checker may create
+          // nobody and so get no button.
+          <RoleGate allow={["admin", "regional_manager", "manager"]}>
             <Link href="/users/new">
               <Button>New user</Button>
             </Link>

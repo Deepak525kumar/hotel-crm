@@ -11,6 +11,7 @@ import {
   ListUsersQuery,
 } from './types.js';
 import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
+import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class UserService extends BaseService {
@@ -157,15 +158,22 @@ export class UserService extends BaseService {
     const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new ConflictError('Email already registered');
 
-    // SECURITY (HOTFIX-AUTH-003): assigning a privileged role is a server-side
-    // authority decision, not a caller-supplied one. Note: as of SEC-01 and
-    // ADR-030 D-4 (tracked in SIR-USERS-002), the route itself (POST /users) is
-    // strictly Admin-only. Managers cannot reach this method at all, so this
-    // guard (if data.role === 'admin' && actorRole !== 'admin') is currently
-    // defense-in-depth for a future state, not something exercised by a live
-    // manager-creates-worker path today. Do not remove it.
-    if (data.role === 'admin' && actorRole !== 'admin') {
-      throw new ForbiddenError('Only admins can assign admin role');
+    // RULE A (project-owner decision, 2026-08-12): create is 1-level-down
+    // ONLY — admin->regional_manager, regional_manager->manager,
+    // manager->worker|checker, worker/checker->nobody. See
+    // lib/role-hierarchy.ts.
+    //
+    // This SUPERSEDES the HOTFIX-AUTH-003 guard that stood here, which only
+    // blocked a non-admin from minting an `admin` and said nothing about any
+    // other target role. It is strictly stronger: `admin` is now creatable by
+    // NOBODY (it is not one-level-down from anything), so the old guard's
+    // property is subsumed rather than dropped.
+    //
+    // The route gate (routes.ts) admits the three creator roles; THIS is the
+    // check that decides which role each of them may mint, and it is the only
+    // place that decision is made for account creation.
+    if (!canCreateRole(actorRole, data.role)) {
+      throw new ForbiddenError(createRoleDenialMessage(actorRole, data.role));
     }
 
     const password_hash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);

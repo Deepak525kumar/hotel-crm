@@ -51,7 +51,8 @@ export class DocumentService extends BaseService {
     input: UploadDocumentInput,
     fileBuffer: Buffer,
     actorRole: string,
-    actorIp?: string
+    actorIp?: string,
+    opts: { systemGenerated?: boolean } = {}
   ): Promise<WorkerDocumentDto> {
     // RULE-DOC-09 defence-in-depth: the controller validates via Zod, but the
     // service also enforces the size bound in case it's called directly.
@@ -59,17 +60,49 @@ export class DocumentService extends BaseService {
       throw new ValidationError(`File size exceeds the maximum of ${MAX_FILE_SIZE_BYTES} bytes`);
     }
 
-    // GD-16: worker may only upload to their own document set (self-scoped).
-    // Managers may upload on behalf of any worker in their hotel (the hotel
-    // scope check is enforced by checkHotelAccess() in routes.ts before this
-    // is reached). Here we enforce that a WORKER role cannot upload for another
-    // worker.
-    if (
-      actorRole === 'worker' &&
-      input.actor_id !== input.worker_id
-    ) {
-      throw new ForbiddenError('Workers may only upload documents to their own document set');
+    // RULE B (project-owner decision, 2026-08-12): NOBODY may perform another
+    // user's onboarding. Document upload on the ONBOARDING path is
+    // SELF-SERVICE ONLY, for EVERY role including admin.
+    //
+    // This REPLACES the previous guard, which was scoped to `actorRole ===
+    // 'worker'` and therefore let admin/manager/regional_manager upload into
+    // any worker's document set. That was the bypass the owner closed: it
+    // REVERSES GD-16's "manager-upload" allowance and the 2026-08-04
+    // Regional-Manager widening recorded in routes.ts's governance note.
+    //
+    // The check is role-independent by construction — there is no role branch
+    // to forget to extend when a role is added, and no early-return above it
+    // for a privileged role (the ordering mistake that made the same bypass
+    // possible in employee-management's assertLifecycleAuthority).
+    //
+    // `systemGenerated` is the ONLY exemption, and it is not reachable from
+    // any HTTP request: `documentController.uploadDocument` never sets it, and
+    // the sole route that reaches this method (POST
+    // /documents/workers/:worker_id/documents) additionally enforces the same
+    // self-check in its own middleware (requireSelfWorker, routes.ts). It
+    // exists for three IN-PROCESS callers that generate a document ABOUT a
+    // worker rather than performing that worker's onboarding, and which
+    // therefore fall outside RULE B's subject matter entirely:
+    //
+    //   - hr/service.ts uploadContractScan  — the scanned SIGNED CONTRACT,
+    //     produced by the counterparty after the applicant already onboarded.
+    //   - hr/service.ts uploadDocument      — same contract-scan mechanism
+    //     (ADR-044 / MIG-GAP-DOC-001 delegation).
+    //   - document-templates/service.ts     — a server-RENDERED PDF of a
+    //     finalized, fully-signed template instance; the bytes are generated
+    //     by renderInstanceToPdf, never supplied by the actor.
+    //
+    // Each of those callers performs its OWN authorization before delegating
+    // (contract ownership / assertInstanceFillAccess). Do not add a fourth
+    // caller without an equivalent check, and never plumb this flag to a
+    // request-controlled value — it would reopen the exact bypass above.
+    if (!opts.systemGenerated && input.actor_id !== input.worker_id) {
+      throw new ForbiddenError(
+        'Documents may only be uploaded by the worker they belong to; no role may upload on another user\'s behalf'
+      );
     }
+    // `actorRole` is still recorded in the audit entry below, but no longer
+    // participates in the upload authorization decision.
 
     const category = input.category as DocumentCategory;
 

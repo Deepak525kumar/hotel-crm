@@ -684,10 +684,17 @@ describe('DocumentTemplatesService', () => {
 
       const result = await service.finalize('i1', { userId: 'w1', role: 'worker' });
 
+      // RULE B (2026-08-12) made worker-document upload self-only, so this
+      // delegation must declare itself `systemGenerated` — the bytes are
+      // SERVER-RENDERED from a fully-signed instance, not an actor's onboarding
+      // upload. Asserted explicitly (not loosened to `expect.anything()`) so
+      // dropping the flag, or plumbing it from request input, fails here.
       expect(mockUploadDocument).toHaveBeenCalledWith(
         expect.objectContaining({ worker_id: 'w1', category: 'ID_CARD' }),
         expect.any(Buffer),
-        'worker'
+        'worker',
+        undefined,
+        { systemGenerated: true }
       );
       expect(result.status).toBe('COMPLETED');
       expect(result.final_document_id).toBe('doc1');
