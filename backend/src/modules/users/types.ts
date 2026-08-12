@@ -5,7 +5,7 @@ export const CreateUserSchema = z.object({
   password: z.string().min(8),
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
+  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
   // `regional_manager` added (Regional Manager V1 lifecycle PR): POST /users
   // is requireRole('admin')-only, so no elevation-guard exercise like
   // updateUser's role !== 'admin' check applies — every caller who reaches

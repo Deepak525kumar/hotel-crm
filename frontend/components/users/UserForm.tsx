@@ -125,6 +125,7 @@ export function UserForm({
     (mode === "edit" ||
       (form.email.trim() &&
         form.password.length >= 8 &&
+        form.phone.trim() &&
         // RULE A: never let a create submit carry a role the viewer may not
         // create, even if form state somehow held a stale value.
         allowedCreateRoles.includes(form.role)));
@@ -175,8 +176,9 @@ export function UserForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="Phone (optional)"
+              label={mode === "create" ? "Phone" : "Phone (optional)"}
               type="tel"
+              required={mode === "create"}
               value={form.phone}
               onChange={(e) => set("phone", e.target.value)}
             />

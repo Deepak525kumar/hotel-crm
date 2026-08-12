@@ -427,7 +427,7 @@ describe('UserService', () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'existing' });
 
       await expect(
-        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker' }, 'actor', 'admin')
+        service.createUser({ email: 'exists@test.com', password: 'pw12345678', first_name: 'A', last_name: 'B', role: 'worker', phone: '+1234567890' }, 'actor', 'admin')
       ).rejects.toMatchObject({ name: 'ConflictError' });
     });
 
@@ -439,7 +439,7 @@ describe('UserService', () => {
 
       await expect(
         service.createUser(
-          { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Mal', last_name: 'Ory', role: 'admin' },
+          { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Mal', last_name: 'Ory', role: 'admin', phone: '+1234567890' },
           'manager_actor',
           'manager'
         )
@@ -464,7 +464,7 @@ describe('UserService', () => {
 
       await expect(
         service.createUser(
-          { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin' },
+          { email: 'newadmin@test.com', password: 'pw12345678', first_name: 'Real', last_name: 'Admin', role: 'admin', phone: '+1234567890' },
           'admin_actor',
           'admin'
         )
@@ -482,7 +482,7 @@ describe('UserService', () => {
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.createUser(
-        { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager' },
+        { email: 'rm@test.com', password: 'pw12345678', first_name: 'Reg', last_name: 'Man', role: 'regional_manager', phone: '+1234567890' },
         'admin_actor',
         'admin'
       );
@@ -501,7 +501,7 @@ describe('UserService', () => {
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.createUser(
-        { email: 'worker@test.com', password: 'pw12345678', first_name: 'Work', last_name: 'Er', role: 'worker' },
+        { email: 'worker@test.com', password: 'pw12345678', first_name: 'Work', last_name: 'Er', role: 'worker', phone: '+1234567890' },
         'manager_actor',
         'manager'
       );
