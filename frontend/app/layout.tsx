@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Hotel CRM",
+  title: "FHM Hotelservice",
   description: "Hotel Management CRM",
 };
 

@@ -28,16 +28,16 @@ const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
         animating only the remainder ("otel CRM") means the glyph never
         moves or re-renders -- the tail just grows out of it, on the same
         0fr/1fr grid + 200ms ease-out every other label in the rail uses. */}
-    <span aria-hidden>H</span>
+    <span aria-hidden>F</span>
     <span
       className={cn(
         "grid transition-[grid-template-columns,opacity] duration-200 ease-out",
         collapsed ? "grid-cols-[0fr] opacity-0" : "grid-cols-[1fr] opacity-100",
       )}
     >
-      <span className="overflow-hidden whitespace-nowrap">otel CRM</span>
+      <span className="overflow-hidden whitespace-nowrap">HM Hotelservice</span>
     </span>
-    <span className="sr-only">Hotel CRM</span>
+    <span className="sr-only">FHM Hotelservice</span>
   </div>
 );
 
@@ -186,7 +186,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 md:hidden">
-            Hotel CRM
+            FHM Hotelservice
           </span>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
@@ -209,8 +209,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             positioning, and nothing overlapping the page itself. The year is
             computed per render rather than hardcoded so it never goes stale. */}
         <footer className="px-4 pb-4 text-center text-xs text-gray-400 dark:text-gray-500 sm:px-6">
+          <div className="mb-2 space-y-1">
+            <p className="font-semibold text-gray-900 dark:text-gray-100">{APP_OWNER}</p>
+            <p>Berner Straße 38, 60437 Frankfurt am Main</p>
+            <p>Tel.: 0160 97044182 | Email: info@fhm-hotelservice.de</p>
+          </div>
           &copy; {new Date().getFullYear()} {APP_OWNER}. All rights reserved.
-          This application is owned and developed by {APP_OWNER}.
         </footer>
       </div>
     </div>

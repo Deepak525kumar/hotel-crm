@@ -44,8 +44,8 @@ export const isDirectDispatchMode = (): boolean => PIVOT_MODE === "direct_dispat
  * if this product is ever white-labelled or reused. Overridable per
  * environment like every other value here.
  */
-export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "Hotel CRM";
-export const APP_OWNER = process.env.NEXT_PUBLIC_APP_OWNER ?? "Zirove";
+export const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "FHM Hotelservice";
+export const APP_OWNER = process.env.NEXT_PUBLIC_APP_OWNER ?? "FHM Hotelservice GmbH";
 
 /**
  * Release identity, surfaced on the Settings page.
