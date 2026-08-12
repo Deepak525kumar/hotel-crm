@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
 import { useAuth } from "@/hooks/useAuth";
@@ -43,7 +43,6 @@ import {
 function UserDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const router = useRouter();
   const { user: currentUser } = useAuth();
 
   const { data: user, isLoading, error } = useUser(id);
@@ -88,7 +87,7 @@ function UserDetail() {
   const onDeactivate = () =>
     deactivate.run(
       async () => {
-        await usersApi.remove(id);
+        await usersApi.update(id, { is_active: false });
         await Promise.all([
           globalMutate(["user", id]),
           globalMutate((key) => Array.isArray(key) && key[0] === "users"),
@@ -97,7 +96,6 @@ function UserDetail() {
       {
         onSuccess: () => {
           setConfirmOpen(false);
-          router.push("/users");
         },
       },
     );
