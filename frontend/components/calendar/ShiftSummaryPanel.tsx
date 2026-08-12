@@ -129,28 +129,28 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
           <label className="block text-xs font-medium mb-1">Total Rooms</label>
           <Input 
             type="number" min={0} value={form.total_rooms} 
-            onChange={e => setForm({...form, total_rooms: parseInt(e.target.value) || 0})}
+            onChange={e => setForm({...form, total_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1">Stay-over</label>
           <Input 
             type="number" min={0} value={form.stay_over_rooms} 
-            onChange={e => setForm({...form, stay_over_rooms: parseInt(e.target.value) || 0})}
+            onChange={e => setForm({...form, stay_over_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1">Checkout</label>
           <Input 
             type="number" min={0} value={form.checkout_rooms} 
-            onChange={e => setForm({...form, checkout_rooms: parseInt(e.target.value) || 0})}
+            onChange={e => setForm({...form, checkout_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
           <label className="block text-xs font-medium mb-1">Workers</label>
           <Input 
             type="number" min={0} value={form.total_people_working} 
-            onChange={e => setForm({...form, total_people_working: parseInt(e.target.value) || 0})}
+            onChange={e => setForm({...form, total_people_working: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
       </div>
