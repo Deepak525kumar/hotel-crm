@@ -210,11 +210,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             computed per render rather than hardcoded so it never goes stale. */}
         <footer className="px-4 pb-4 text-center text-xs text-gray-400 dark:text-gray-500 sm:px-6">
           <div className="mb-2 space-y-1">
-            <p className="font-semibold text-gray-900 dark:text-gray-100">{APP_OWNER}</p>
+            <p className="font-semibold text-gray-900 dark:text-gray-100">FHM Hotelservice GmbH</p>
             <p>Berner Straße 38, 60437 Frankfurt am Main</p>
             <p>Tel.: 0160 97044182 | Email: info@fhm-hotelservice.de</p>
           </div>
           &copy; {new Date().getFullYear()} {APP_OWNER}. All rights reserved.
+          This application is owned and developed by {APP_OWNER}.
         </footer>
       </div>
     </div>
