@@ -39,14 +39,14 @@ describe('users/types.ts — phone E.164 validation', () => {
       expect(result.success).toBe(false);
     });
 
-    it('allows phone to be omitted (optional)', () => {
+    it('rejects when phone is omitted (required)', () => {
       const result = CreateUserSchema.safeParse({
         email: 'a@b.com',
         password: 'password123',
         first_name: 'A',
         last_name: 'B',
       });
-      expect(result.success).toBe(true);
+      expect(result.success).toBe(false);
     });
   });
 
