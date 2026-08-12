@@ -25,6 +25,13 @@ function NewUser() {
       last_name: values.last_name,
       role: values.role,
       ...(values.phone ? { phone: values.phone } : {}),
+      // ADR-065 (Universal Onboarding Gate): required for every non-admin
+      // role — UserForm's own validation (`valid`) already blocks submit
+      // without these, so `values.role === "admin"` is the only case they're
+      // legitimately blank.
+      ...(values.job_title ? { job_title: values.job_title } : {}),
+      ...(values.start_date ? { start_date: values.start_date } : {}),
+      ...(values.employment_type ? { employment_type: values.employment_type } : {}),
     };
     try {
       const created = await usersApi.create(payload);
@@ -49,7 +56,7 @@ function NewUser() {
         <PageHeader
           className="mt-2"
           title="New user"
-          description="Create an account and set an initial role."
+          description="Create an account and set an initial role. Their onboarding starts automatically."
         />
       </div>
       <UserForm

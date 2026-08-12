@@ -17,36 +17,16 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Checkbox,
   DataList,
   DataRow,
   FormError,
-  Input,
   Modal,
   Select,
   Skeleton,
   Textarea,
 } from "@/components/ui";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import type { DeactivationReason, EmploymentType, SkillTag } from "@/lib/types";
-
-// 2026-08-13 contract feature: mandatory at creation — see CreateEmploymentModal below.
-const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
-  { value: "FULL_TIME", label: "Full-time" },
-  { value: "PART_TIME", label: "Part-time" },
-];
-
-// Mirrors the backend `SkillTag` Prisma enum (schema.prisma) — a fixed,
-// schema-level enum (REQ-EMP-003), not an admin-managed lookup table, so it
-// can only change via a migration that would also require updating this
-// list. No API currently exposes the skill catalog for the frontend to
-// source this from instead; follow up if that changes.
-const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
-  { value: "CLEANER", label: "Cleaner" },
-  { value: "PUBLIC_SERVICE", label: "Public service" },
-  { value: "KITCHEN_DISHWASHER", label: "Kitchen / dishwasher" },
-  { value: "WAITER", label: "Waiter" },
-];
+import type { DeactivationReason } from "@/lib/types";
 
 // Mirrors the backend DeactivationReason Prisma enum (schema.prisma) — a
 // fixed set, same reasoning as SKILL_OPTIONS above.
@@ -82,7 +62,6 @@ const DEACTIVATION_REASON_OPTIONS: { value: DeactivationReason; label: string }[
  */
 export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const { data: record, isLoading, error } = useEmploymentRecord(userId);
-  const [createOpen, setCreateOpen] = useState(false);
   const [approveOpen, setApproveOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -100,7 +79,6 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   // "Confirm onboarding complete" button is not rendered — matching the
   // backend, which now 403s that call.
   const {
-    canCreateEmployment,
     canDeleteEmployment,
     canRestoreEmployment,
     canSubmitForReview,
@@ -168,15 +146,16 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               <Skeleton className="h-5 w-full" />
             </div>
           ) : !record ? (
+            // ADR-065 (Universal Onboarding Gate): an EmploymentRecord is now
+            // created automatically the moment the account exists (see
+            // users/service.ts#createUser) — there is no manual "Start
+            // onboarding" step for anyone. Reaching this branch means the
+            // account predates that change, or the best-effort auto-create
+            // failed (logged server-side as user_create_employment_record_failed).
             <div className="space-y-4">
-              <p className="text-sm text-gray-500 dark:text-gray-400">Not yet onboarded.</p>
-              {canCreateEmployment ? (
-                <Button size="sm" onClick={() => setCreateOpen(true)}>
-                  Start onboarding
-                </Button>
-              ) : (
-                <p className="text-sm text-gray-400 dark:text-gray-500">Only an Admin can start onboarding.</p>
-              )}
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                No employment record found. Contact an administrator.
+              </p>
               <FormError>{action.error}</FormError>
             </div>
           ) : (
@@ -359,11 +338,6 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
         </CardContent>
       </Card>
 
-      <CreateEmploymentModal
-        userId={userId}
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-      />
       {record && (
         <>
           <ApproveModal
@@ -408,133 +382,6 @@ function RestoreButton({ employeeId, onDone }: { employeeId: string; onDone: () 
       </Button>
       <FormError>{action.error}</FormError>
     </div>
-  );
-}
-
-function CreateEmploymentModal({
-  userId,
-  open,
-  onClose,
-}: {
-  userId: string;
-  open: boolean;
-  onClose: () => void;
-}) {
-  const [employeeId, setEmployeeId] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [employmentType, setEmploymentType] = useState<EmploymentType | "">("");
-  const [skills, setSkills] = useState<SkillTag[]>([]);
-  const [fieldError, setFieldError] = useState<string | null>(null);
-  const create = useAsyncAction();
-
-  const reset = () => {
-    setEmployeeId("");
-    setJobTitle("");
-    setStartDate("");
-    setEmploymentType("");
-    setSkills([]);
-    setFieldError(null);
-  };
-
-  const handleClose = () => {
-    if (create.pending) return;
-    reset();
-    onClose();
-  };
-
-  const toggleSkill = (skill: SkillTag, checked: boolean) =>
-    setSkills((prev) => (checked ? [...prev, skill] : prev.filter((s) => s !== skill)));
-
-  const onSubmit = () => {
-    setFieldError(null);
-    if (!employeeId.trim() || !jobTitle.trim() || !startDate) {
-      setFieldError("Employee ID, job title, and start date are required.");
-      return;
-    }
-    if (!employmentType) {
-      setFieldError("Full-time or part-time is required.");
-      return;
-    }
-
-    create.run(
-      () =>
-        employeesApi.create({
-          user_id: userId,
-          employee_id: employeeId.trim(),
-          job_title: jobTitle.trim(),
-          start_date: startDate,
-          employment_type: employmentType,
-          ...(skills.length ? { skills } : {}),
-        }),
-      {
-        onSuccess: async () => {
-          await mutate(["employment-record", userId]);
-          reset();
-          onClose();
-        },
-      },
-    );
-  };
-
-  return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      title="Start onboarding"
-      footer={
-        <>
-          <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
-          </Button>
-          <Button onClick={onSubmit} loading={create.pending}>
-            Start onboarding
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label="Employee ID"
-          hint="This organization's own HR/badge identifier, not the account ID."
-          value={employeeId}
-          onChange={(e) => setEmployeeId(e.target.value)}
-        />
-        <Input
-          label="Job title"
-          value={jobTitle}
-          onChange={(e) => setJobTitle(e.target.value)}
-        />
-        <Input
-          label="Start date"
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
-        />
-        <Select
-          label="Employment type"
-          hint="Drives the marking expected on the downloaded contract PDF."
-          value={employmentType}
-          onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
-          options={[
-            { value: "", label: "Select…" },
-            ...EMPLOYMENT_TYPE_OPTIONS,
-          ]}
-        />
-        <div className="space-y-2">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Skills (optional)</p>
-          {SKILL_OPTIONS.map((opt) => (
-            <Checkbox
-              key={opt.value}
-              label={opt.label}
-              checked={skills.includes(opt.value)}
-              onChange={(e) => toggleSkill(opt.value, e.target.checked)}
-            />
-          ))}
-        </div>
-        <FormError>{fieldError ?? create.error}</FormError>
-      </div>
-    </Modal>
   );
 }
 

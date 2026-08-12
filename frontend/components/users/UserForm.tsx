@@ -12,7 +12,14 @@ import {
 } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import { creatableRolesFor } from "@/lib/roleHierarchy";
-import type { Role, UserDetail } from "@/lib/types";
+import type { EmploymentType, Role, UserDetail } from "@/lib/types";
+
+// ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
+// creation — mirrors the backend CreateUserSchema.superRefine requirement.
+const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
+  { value: "FULL_TIME", label: "Full-time" },
+  { value: "PART_TIME", label: "Part-time" },
+];
 
 const ROLE_LABEL: Record<Role, string> = {
   worker: "Worker",
@@ -40,6 +47,12 @@ export interface UserFormValues {
   phone: string;
   role: Role;
   is_active: boolean;
+  // ADR-065 (Universal Onboarding Gate): required for every non-admin role
+  // at creation — the backend auto-creates the linked EmploymentRecord from
+  // these, so there is no separate "Start onboarding" step for anyone.
+  job_title: string;
+  start_date: string;
+  employment_type: EmploymentType | "";
 }
 
 /** Submitted shape: unlike form state, blank phone becomes `null`, not `""`. */
@@ -59,6 +72,9 @@ function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserF
     // "worker" would pre-fill a value the backend rejects.
     role: user?.role ?? defaultRole,
     is_active: user?.is_active ?? true,
+    job_title: "",
+    start_date: "",
+    employment_type: "",
   };
 }
 
@@ -106,6 +122,12 @@ export function UserForm({
   const set = <K extends keyof UserFormValues>(key: K, value: UserFormValues[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
+  // ADR-065: admin accounts have no onboarding/EmploymentRecord concept.
+  // RULE A means `admin` is never actually in `allowedCreateRoles`, but this
+  // stays role-derived (not hardcoded to "always show") so it degrades
+  // correctly if that ever changes.
+  const requiresOnboardingFields = mode === "create" && form.role !== "admin";
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit({
@@ -116,6 +138,7 @@ export function UserForm({
       // Blank phone must not be sent as "" — phone is unique-but-nullable,
       // and "" collides with every other user who also left it blank.
       phone: form.phone.trim() || null,
+      job_title: form.job_title.trim(),
     });
   };
 
@@ -128,7 +151,10 @@ export function UserForm({
         form.phone.trim() &&
         // RULE A: never let a create submit carry a role the viewer may not
         // create, even if form state somehow held a stale value.
-        allowedCreateRoles.includes(form.role)));
+        allowedCreateRoles.includes(form.role) &&
+        // ADR-065: required for every non-admin role at creation.
+        (!requiresOnboardingFields ||
+          (form.job_title.trim() && form.start_date && form.employment_type))));
 
   return (
     <Card>
@@ -200,6 +226,42 @@ export function UserForm({
               }
             />
           </div>
+
+          {requiresOnboardingFields && (
+            <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-800">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Onboarding
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                An employment record is created automatically — {form.first_name.trim() || "this person"} will
+                see &ldquo;My Onboarding&rdquo; and manage their own documents and contract from their first login.
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="Job title"
+                  required
+                  value={form.job_title}
+                  onChange={(e) => set("job_title", e.target.value)}
+                />
+                <Input
+                  label="Start date"
+                  type="date"
+                  required
+                  value={form.start_date}
+                  onChange={(e) => set("start_date", e.target.value)}
+                />
+              </div>
+              <Select
+                label="Employment type"
+                value={form.employment_type}
+                onChange={(e) => set("employment_type", e.target.value as EmploymentType)}
+                options={[
+                  { value: "", label: "Select…" },
+                  ...EMPLOYMENT_TYPE_OPTIONS,
+                ]}
+              />
+            </div>
+          )}
 
           {mode === "edit" && (
             <Checkbox
