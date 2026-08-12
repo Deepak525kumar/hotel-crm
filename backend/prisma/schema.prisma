@@ -321,6 +321,21 @@ model User {
   // change / deactivation / soft delete / password reset; a mismatch against
   // the row invalidates an already-issued access token.
   token_generation   Int       @default(0)
+  // 2026-08-13 fix: who created this account (POST /users). Nullable —
+  // self-registered accounts (if any ever exist) and every pre-existing row
+  // have no creator on record. Its sole purpose today is closing a real gap
+  // in getUser()'s scope check (users/service.ts): a manager/RM who just
+  // created a worker/checker account has no way to view that profile
+  // afterward, because EmploymentRecord (the thing isWorkerInGroupScope
+  // checks) doesn't exist yet -- it's created separately, later, via
+  // POST /employees. Falling back to "the creator may always view their own
+  // creation" closes that gap without reopening an IDOR: only the actual
+  // creator gets the exception, not every manager who happens to share a
+  // scope, and it stops mattering the moment a real EmploymentRecord (with
+  // its own group-grain scope) exists.
+  created_by_id      String?
+  created_by         User?     @relation("user_created_by", fields: [created_by_id], references: [id], onDelete: SetNull)
+  users_created      User[]    @relation("user_created_by")
   created_at         DateTime  @default(now())
   updated_at         DateTime  @updatedAt
 
@@ -392,6 +407,7 @@ model User {
   @@index([role])
   @@index([is_active])
   @@index([deleted_at])
+  @@index([created_by_id])
 }
 
 model Session {

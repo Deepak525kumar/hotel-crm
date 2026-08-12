@@ -125,6 +125,7 @@ export class UserService extends BaseService {
         created_at: true,
         updated_at: true,
         deleted_at: true,
+        created_by_id: true,
       },
     });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
@@ -144,14 +145,34 @@ export class UserService extends BaseService {
       if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
         throw new ForbiddenError('User not in your scope');
       }
-      const inScope = await isWorkerInGroupScope(actorScope, userId);
-      if (!inScope) throw new ForbiddenError('User not in your scope');
+      // 2026-08-13 fix: a freshly-created worker/checker has no
+      // EmploymentRecord yet (created separately, later, via POST
+      // /employees) -- isWorkerInGroupScope has nothing to check against and
+      // always denies, so the manager/RM who JUST created this account could
+      // never view the profile they were redirected to. The creator is
+      // exempted from the scope check for their own creation, closing the
+      // gap without reopening an IDOR: only the actual creator gets this,
+      // not every manager who happens to share a scope, and it stops
+      // mattering the moment a real EmploymentRecord exists (the branch
+      // below still runs for everyone else, and for the creator too once
+      // isWorkerInGroupScope would itself resolve true).
+      if (user.created_by_id !== actorId) {
+        const inScope = await isWorkerInGroupScope(actorScope, userId);
+        if (!inScope) throw new ForbiddenError('User not in your scope');
+      }
     }
 
     await this.logAudit(actorId, actorRole, 'VIEW', 'USER', userId, {}, ip);
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
-    // stored column (dropped).
-    return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [], deleted_at: undefined };
+    // stored column (dropped). created_by_id is authorization-internal
+    // (used only in the scope check above) and never sent to the client.
+    return {
+      ...user,
+      role: user.role.toLowerCase(),
+      permissions: ROLE_PERMISSIONS[user.role] ?? [],
+      deleted_at: undefined,
+      created_by_id: undefined,
+    };
   }
 
   async createUser(data: CreateUserRequest, actorId: string, actorRole: string, ip?: string) {
@@ -190,6 +211,12 @@ export class UserService extends BaseService {
         last_name: data.last_name,
         phone: data.phone,
         role,
+        // 2026-08-13 fix: closes the gap where a manager/RM who just
+        // created a worker/checker account could not view that profile
+        // afterward (getUser()'s scope check has nothing to check against
+        // until an EmploymentRecord exists, which happens later) — see
+        // getUser()'s own comment.
+        created_by_id: actorId,
       },
       select: {
         id: true,
