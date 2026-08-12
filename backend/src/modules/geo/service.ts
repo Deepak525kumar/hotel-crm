@@ -78,34 +78,41 @@ export class GeoService extends BaseService {
 
     // TREQ-GEO-004: actual device coordinates are captured and stored at
     // every check, regardless of pass/fail.
-    const checkin = await this.prisma.workerGeoCheckin.create({
-      data: {
-        worker_id: workerId,
-        hotel_id: input.hotel_id,
-        attendance_id: attendanceId ?? null,
-        latitude: input.latitude,
-        longitude: input.longitude,
-        distance_meters: distanceMeters,
-        inside_radius: insideRadius,
-      },
-    });
+    const checkin = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.workerGeoCheckin.create({
+        data: {
+          worker_id: workerId,
+          hotel_id: input.hotel_id,
+          attendance_id: attendanceId ?? null,
+          latitude: input.latitude,
+          longitude: input.longitude,
+          distance_meters: distanceMeters,
+          inside_radius: insideRadius,
+        },
+      });
 
-    // OD-GEO-007: every distance-check result (pass or fail) is audit-logged,
-    // distinct from Attendance's own CHECK_IN/UPDATE_ATTENDANCE audit rows.
-    // Never includes latitude/longitude in the audit details (OD-GEO-005).
-    await this.logAudit(
-      workerId,
-      actorRole,
-      'GEOFENCE_CHECK',
-      'WORKER_GEO_CHECKIN',
-      checkin.id,
-      {
-        hotel_id: input.hotel_id,
-        distance_meters: distanceMeters,
-        inside_radius: insideRadius,
-      },
-      actorIp
-    );
+      // OD-GEO-007: every distance-check result (pass or fail) is audit-logged,
+      // distinct from Attendance's own CHECK_IN/UPDATE_ATTENDANCE audit rows.
+      // Never includes latitude/longitude in the audit details (OD-GEO-005).
+      await this.logAudit(
+        workerId,
+        actorRole,
+        'GEOFENCE_CHECK',
+        'WORKER_GEO_CHECKIN',
+        rec.id,
+        {
+          hotel_id: input.hotel_id,
+          distance_meters: distanceMeters,
+          inside_radius: insideRadius,
+        },
+        actorIp,
+        undefined,
+        undefined,
+        tx
+      );
+
+      return rec;
+    });
 
     return { status: 'verified', insideRadius, distanceMeters, checkin };
   }

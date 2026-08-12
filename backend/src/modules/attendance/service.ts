@@ -198,32 +198,37 @@ export class AttendanceService extends BaseService {
     // assignment from both passing the geofence gate and then both
     // unconditionally overwriting the same Attendance row (last-write-wins,
     // duplicate CHECK_IN audit entries).
-    const claimed = await this.prisma.attendance.updateMany({
-      where: { id: existing.id, status: AttendanceStatus.EXPECTED },
-      data: {
-        check_in_at: now,
-        status: isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
-        minutes_late: minutesLate,
-        notes: input.notes ?? existing.notes,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const claimed = await tx.attendance.updateMany({
+        where: { id: existing.id, status: AttendanceStatus.EXPECTED },
+        data: {
+          check_in_at: now,
+          status: isLate ? AttendanceStatus.LATE : AttendanceStatus.PRESENT,
+          minutes_late: minutesLate,
+          notes: input.notes ?? existing.notes,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError('Already checked in');
+      }
+
+      const u = await tx.attendance.findUniqueOrThrow({ where: { id: existing.id } });
+
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'CHECK_IN',
+        'ATTENDANCE',
+        u.id,
+        { assignment_id: input.assignment_id },
+        undefined,
+        { status: existing.status, check_in_at: existing.check_in_at, minutes_late: existing.minutes_late },
+        { status: u.status, check_in_at: u.check_in_at, minutes_late: u.minutes_late },
+        tx
+      );
+      
+      return u;
     });
-    if (claimed.count === 0) {
-      throw new ConflictError('Already checked in');
-    }
-
-    const updated = await this.prisma.attendance.findUniqueOrThrow({ where: { id: existing.id } });
-
-    await this.logAudit(
-      actorId,
-      actorRole,
-      'CHECK_IN',
-      'ATTENDANCE',
-      updated.id,
-      { assignment_id: input.assignment_id },
-      undefined,
-      { status: existing.status, check_in_at: existing.check_in_at, minutes_late: existing.minutes_late },
-      { status: updated.status, check_in_at: updated.check_in_at, minutes_late: updated.minutes_late }
-    );
 
     // Bug 35 (Critical): Sync the assignment state so workers don't bypass attendance
     await assignmentService.update(
@@ -474,30 +479,31 @@ export class AttendanceService extends BaseService {
         }
       }
 
+      await this.logAudit(
+        actorId,
+        actorRole,
+        'UPDATE_ATTENDANCE',
+        'ATTENDANCE',
+        id,
+        { worker_id: record.worker_id },
+        undefined,
+        {
+          status: record.status,
+          check_out_at: record.check_out_at,
+          minutes_worked: record.minutes_worked,
+          is_verified: record.is_verified,
+        },
+        {
+          status: u.status,
+          check_out_at: u.check_out_at,
+          minutes_worked: u.minutes_worked,
+          is_verified: u.is_verified,
+        },
+        tx
+      );
+
       return u;
     });
-
-    await this.logAudit(
-      actorId,
-      actorRole,
-      'UPDATE_ATTENDANCE',
-      'ATTENDANCE',
-      id,
-      { worker_id: record.worker_id },
-      undefined,
-      {
-        status: record.status,
-        check_out_at: record.check_out_at,
-        minutes_worked: record.minutes_worked,
-        is_verified: record.is_verified,
-      },
-      {
-        status: updated.status,
-        check_out_at: updated.check_out_at,
-        minutes_worked: updated.minutes_worked,
-        is_verified: updated.is_verified,
-      }
-    );
     // Bug 35 (Critical): Sync the assignment state so workers don't bypass attendance
     if (input.check_out_at !== undefined && record.check_out_at === null) {
       try {

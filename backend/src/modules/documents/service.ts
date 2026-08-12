@@ -111,41 +111,52 @@ export class DocumentService extends BaseService {
 
     const expiresAt = input.expires_at ? new Date(`${input.expires_at}T00:00:00.000Z`) : null;
 
-    const doc = await this.prisma.$transaction(async (tx) => {
-      const createdDoc = await tx.workerDocument.create({
-        data: {
-          worker_id: input.worker_id,
-          uploaded_by_id: input.actor_id,
-          category,
-          s3_key: s3Key,
-          original_filename: input.original_filename,
-          mime_type: input.mime_type,
-          file_size_bytes: fileBuffer.length,
-          expires_at: expiresAt,
-          is_work_permit: input.is_work_permit ?? false,
-        },
+    let doc;
+    try {
+      doc = await this.prisma.$transaction(async (tx) => {
+        const createdDoc = await tx.workerDocument.create({
+          data: {
+            worker_id: input.worker_id,
+            uploaded_by_id: input.actor_id,
+            category,
+            s3_key: s3Key,
+            original_filename: input.original_filename,
+            mime_type: input.mime_type,
+            file_size_bytes: fileBuffer.length,
+            expires_at: expiresAt,
+            is_work_permit: input.is_work_permit ?? false,
+          },
+        });
+
+        await this.logAudit(
+          input.actor_id,
+          actorRole,
+          'document.upload',
+          'WorkerDocument',
+          createdDoc.id,
+          {
+            worker_id: input.worker_id,
+            category,
+            original_filename: input.original_filename,
+            is_work_permit: createdDoc.is_work_permit,
+          },
+          actorIp,
+          undefined,
+          undefined,
+          tx
+        );
+
+        return createdDoc;
       });
-
-      await this.logAudit(
-        input.actor_id,
-        actorRole,
-        'document.upload',
-        'WorkerDocument',
-        createdDoc.id,
-        {
-          worker_id: input.worker_id,
-          category,
-          original_filename: input.original_filename,
-          is_work_permit: createdDoc.is_work_permit,
-        },
-        actorIp,
-        undefined,
-        undefined,
-        tx
-      );
-
-      return createdDoc;
-    });
+    } catch (err) {
+      // Compensating action: delete the orphaned S3 object if the DB transaction fails
+      try {
+        await storage.delete(s3Key);
+      } catch (deleteErr) {
+        logger.error('documents_s3_compensating_delete_failed', { s3Key, error: deleteErr });
+      }
+      throw err;
+    }
 
     const presignedUrl = await storage.getPresignedUrl(s3Key).catch(() => null);
     return this.toDto(doc, presignedUrl);

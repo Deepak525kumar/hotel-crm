@@ -10,6 +10,7 @@ import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments
 import { useAbsencesInRange } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
+import { ShiftSummaryPanel } from "@/components/calendar/ShiftSummaryPanel";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import {
   Button,
@@ -363,6 +364,14 @@ export default function CalendarGridPage() {
           <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load the calendar. Please try again.</div>
         </Card>
       ) : (
+        <>
+        {view === "day" && (hotelFilter || scopeHotelId) && (
+          <ShiftSummaryPanel 
+            hotelId={(hotelFilter || scopeHotelId) as string} 
+            dateStr={toDateKey(anchor)} 
+            canWrite={canWrite} 
+          />
+        )}
         <div
           className={
             view === "day"
@@ -397,6 +406,7 @@ export default function CalendarGridPage() {
             );
           })}
         </div>
+        </>
       )}
 
       {/* Per-hotel breakdown for the visible range. Shown in all three views:

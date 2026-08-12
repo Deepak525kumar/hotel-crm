@@ -1292,8 +1292,8 @@ export interface ApproveEmploymentInput {
 
 /** Body of `POST /employees/:employee_id/assign`. */
 export interface AssignEmploymentInput {
-  hotel_group_id?: string | null;
-  primary_hotel_id?: string | null;
+  hotel_group_id?: string;
+  primary_hotel_id?: string;
 }
 
 /** Body of `POST /employees/:employee_id/reject`. */

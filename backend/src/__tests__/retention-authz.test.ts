@@ -67,9 +67,9 @@ describe('Retention route authorization (SPEC-RETENTION-001)', () => {
     jest.clearAllMocks();
   });
 
-  describe('GET /retention/audit-log — any authenticated role, no Admin gate (OD-RETENTION-05 open)', () => {
-    it('allows any authenticated role', async () => {
-      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+  describe('GET /retention/audit-log — Admin gate (OD-RETENTION-05 resolved)', () => {
+    it('allows admin role', async () => {
+      testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
       const res = await request(makeApp()).get('/retention/audit-log');
       expect(res.status).toBe(200);
       expect(getDeletionAuditLog).toHaveBeenCalled();
@@ -83,14 +83,14 @@ describe('Retention route authorization (SPEC-RETENTION-001)', () => {
     });
 
     it('rejects per_page above 100 with 422', async () => {
-      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
       const res = await request(makeApp()).get('/retention/audit-log?per_page=101');
       expect(res.status).toBe(422);
       expect(getDeletionAuditLog).not.toHaveBeenCalled();
     });
 
     it('passes parsed query filters through to the service', async () => {
-      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
       await request(makeApp()).get('/retention/audit-log?module_id=attendance&category_id=shift_coordinate');
       expect(getDeletionAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ module_id: 'attendance', category_id: 'shift_coordinate' })
@@ -98,7 +98,7 @@ describe('Retention route authorization (SPEC-RETENTION-001)', () => {
     });
 
     it('returns pagination metadata in the response envelope', async () => {
-      testAuth = { userId: 'w1', role: 'worker', permissions: [], scope: null };
+      testAuth = { userId: 'a1', role: 'admin', permissions: [], scope: null };
       getDeletionAuditLog.mockResolvedValueOnce({ data: [], total: 25 });
       const res = await request(makeApp()).get('/retention/audit-log?page=2&per_page=10');
       expect(res.body.pagination).toEqual({

@@ -23,8 +23,8 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
-jest.mock('../lib/db.js', () => ({
-  getPrisma: () => ({
+jest.mock('../lib/db.js', () => {
+  const db = {
     consentRecord: {
       create: mockConsentRecordCreate,
       findFirst: mockConsentRecordFindFirst,
@@ -34,8 +34,11 @@ jest.mock('../lib/db.js', () => ({
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotelGroup: { findUnique: mockHotelGroupFindUnique },
     auditLog: { create: mockAuditLogCreate },
-  }),
-}));
+  };
+  return {
+    getPrisma: () => ({ ...db, $transaction: async (cb: any) => cb(db) }),
+  };
+});
 
 jest.mock('../modules/notifications/service.js', () => ({
   notificationService: { enqueue: mockNotificationEnqueue },
@@ -225,7 +228,8 @@ describe('ConsentService (SPEC-CONSENT-001)', () => {
         expect.objectContaining({ data: expect.objectContaining({ action: 'CONSENT_DECLINED' }) })
       );
       expect(mockNotificationEnqueue).toHaveBeenCalledWith(
-        expect.objectContaining({ recipientId: 'rm1', type: 'CONSENT_DECLINED' })
+        expect.objectContaining({ recipientId: 'rm1', type: 'CONSENT_DECLINED' }),
+        expect.anything()
       );
       expect(result.decision).toBe('DECLINED');
     });

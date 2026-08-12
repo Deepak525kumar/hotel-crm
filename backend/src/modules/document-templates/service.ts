@@ -338,11 +338,14 @@ export class DocumentTemplatesService extends BaseService {
       throw new ValidationError('A template must define at least one signature block before publishing');
     }
 
-    const updated = await this.prisma.documentTemplate.update({
-      where: { id },
-      data: { status: DocumentTemplateStatus.PUBLISHED, published_at: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.documentTemplate.update({
+        where: { id },
+        data: { status: DocumentTemplateStatus.PUBLISHED, published_at: new Date() },
+      });
+      await this.logAudit(actor.userId, actor.role, 'PUBLISH_DOCUMENT_TEMPLATE', 'DocumentTemplate', rec.id, undefined, undefined, undefined, undefined, tx);
+      return rec;
     });
-    await this.logAudit(actor.userId, actor.role, 'PUBLISH_DOCUMENT_TEMPLATE', 'DocumentTemplate', updated.id);
     return this.getTemplate(updated.id, actor);
   }
 
@@ -352,11 +355,14 @@ export class DocumentTemplatesService extends BaseService {
     if (template.status !== 'PUBLISHED') {
       throw new ConflictError('Only a PUBLISHED template can be archived');
     }
-    const updated = await this.prisma.documentTemplate.update({
-      where: { id },
-      data: { status: DocumentTemplateStatus.ARCHIVED, archived_at: new Date() },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.documentTemplate.update({
+        where: { id },
+        data: { status: DocumentTemplateStatus.ARCHIVED, archived_at: new Date() },
+      });
+      await this.logAudit(actor.userId, actor.role, 'ARCHIVE_DOCUMENT_TEMPLATE', 'DocumentTemplate', rec.id, undefined, undefined, undefined, undefined, tx);
+      return rec;
     });
-    await this.logAudit(actor.userId, actor.role, 'ARCHIVE_DOCUMENT_TEMPLATE', 'DocumentTemplate', updated.id);
     return this.getTemplate(updated.id, actor);
   }
 
@@ -381,12 +387,15 @@ export class DocumentTemplatesService extends BaseService {
       throw new ConflictError('Only a PUBLISHED template can be used to create an instance');
     }
 
-    const instance = await this.prisma.documentInstance.create({
-      data: { template_id: template.id, worker_id: input.worker_id, created_by_id: actor.userId },
-    });
-    await this.logAudit(actor.userId, actor.role, 'CREATE_DOCUMENT_INSTANCE', 'DocumentInstance', instance.id, {
-      template_id: template.id,
-      worker_id: input.worker_id,
+    const instance = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.documentInstance.create({
+        data: { template_id: template.id, worker_id: input.worker_id, created_by_id: actor.userId },
+      });
+      await this.logAudit(actor.userId, actor.role, 'CREATE_DOCUMENT_INSTANCE', 'DocumentInstance', rec.id, {
+        template_id: template.id,
+        worker_id: input.worker_id,
+      }, undefined, undefined, undefined, tx);
+      return rec;
     });
     return this.getInstance(instance.id, actor);
   }
