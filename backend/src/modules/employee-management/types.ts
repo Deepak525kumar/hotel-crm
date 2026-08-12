@@ -1,13 +1,22 @@
 import { z } from 'zod';
-import { DeactivationReason, SkillTag } from '@prisma/client';
+import { DeactivationReason, EmploymentType, SkillTag } from '@prisma/client';
 import { MAX_PAGE_SIZE, DEFAULT_PAGE_SIZE } from './constants.js';
 
 // IF-EMP-CreateEmployee / v0 (REQ-EMP-001, REQ-EMP-003, REQ-EMP-011).
+// employment_type is REQUIRED (2026-08-13 contract feature): the creating
+// actor (the applicant's direct superior in the hierarchy) must declare
+// full-time or part-time for the person they are onboarding -- it drives
+// the marking expected on the downloaded default contract PDF and is
+// copied onto the auto-generated Contract row (hr/service.ts
+// generateDefaultContract()).
 export const CreateEmployeeSchema = z.object({
   user_id: z.string().min(1),
   employee_id: z.string().min(1).max(100),
   job_title: z.string().min(1).max(200),
   start_date: z.coerce.date(),
+  employment_type: z.nativeEnum(EmploymentType, {
+    required_error: 'employment_type is required (FULL_TIME or PART_TIME)',
+  }),
   skills: z.array(z.nativeEnum(SkillTag)).optional(),
   personal_data: z.record(z.unknown()).optional(),
   work_permit_required: z.boolean().optional(),

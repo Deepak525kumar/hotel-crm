@@ -100,6 +100,22 @@ export class DocumentController {
     }
   }
 
+  // IF-DOC-DeleteDocument (2026-08-13: worker edit/replace fix). Self-only,
+  // enforced in documentService.deleteDocument -- see that method's comment.
+  async deleteDocument(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+      await documentService.deleteDocument(req.params.document_id, req.auth.userId, req.auth.role);
+      res.status(200).json({
+        status: 'success',
+        data: { deleted: true },
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // IF-DOC-GetDocumentCompleteness
   async getDocumentCompleteness(req: Request, res: Response, next: NextFunction) {
     try {

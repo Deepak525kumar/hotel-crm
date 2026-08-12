@@ -22,7 +22,7 @@ import {
   Modal,
   Skeleton,
 } from "@/components/ui";
-import type { ContractStatus } from "@/lib/types";
+import type { ContractStatus, EmploymentType } from "@/lib/types";
 
 const STATUS_TONE: Record<ContractStatus, "warning" | "success" | "neutral"> = {
   PENDING: "warning",
@@ -36,6 +36,12 @@ const STATUS_LABEL: Record<ContractStatus, string> = {
   ACTIVE: "Active",
   EXTENDED: "Extended",
   PERMANENT: "Permanent",
+};
+
+// 2026-08-13 contract feature.
+const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  FULL_TIME: "Full-time",
+  PART_TIME: "Part-time",
 };
 
 /**
@@ -118,6 +124,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
             <div className="space-y-4">
               <DataList>
                 <DataRow label="Status" value={<Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>} />
+                <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
                 <DataRow label="Position" value={contract.position} />
                 <DataRow label="Start date" value={formatDate(contract.start_date)} />
                 {contract.end_date && <DataRow label="End date" value={formatDate(contract.end_date)} />}
@@ -125,6 +132,26 @@ export function ContractCard({ workerId }: { workerId: string }) {
                   <DataRow label="Signature confirmed" value={formatDate(contract.confirmed_at)} />
                 )}
               </DataList>
+
+              {contract.status === "PENDING" && !contract.scanned_document_id && (
+                <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
+                  {/* 2026-08-13 contract feature: the single default contract
+                      PDF -- the applicant downloads it, marks the printed
+                      Employment type row above (Full-time/Part-time) by
+                      hand, signs it, and returns it via the upload button
+                      below (manager/admin only). Same-origin navigation, no
+                      fetch/blob handling — see hrApi.defaultContractDownloadUrl. */}
+                  <a
+                    href={hrApi.defaultContractDownloadUrl(workerId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Button size="sm" variant="outline">
+                      Download contract PDF
+                    </Button>
+                  </a>
+                </div>
+              )}
 
               {isManagerOrAdmin && contract.status === "PENDING" && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">

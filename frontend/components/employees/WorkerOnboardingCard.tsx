@@ -28,7 +28,13 @@ import {
   Textarea,
 } from "@/components/ui";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import type { DeactivationReason, SkillTag } from "@/lib/types";
+import type { DeactivationReason, EmploymentType, SkillTag } from "@/lib/types";
+
+// 2026-08-13 contract feature: mandatory at creation — see CreateEmploymentModal below.
+const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
+  { value: "FULL_TIME", label: "Full-time" },
+  { value: "PART_TIME", label: "Part-time" },
+];
 
 // Mirrors the backend `SkillTag` Prisma enum (schema.prisma) — a fixed,
 // schema-level enum (REQ-EMP-003), not an admin-managed lookup table, so it
@@ -417,6 +423,7 @@ function CreateEmploymentModal({
   const [employeeId, setEmployeeId] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [startDate, setStartDate] = useState("");
+  const [employmentType, setEmploymentType] = useState<EmploymentType | "">("");
   const [skills, setSkills] = useState<SkillTag[]>([]);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
@@ -425,6 +432,7 @@ function CreateEmploymentModal({
     setEmployeeId("");
     setJobTitle("");
     setStartDate("");
+    setEmploymentType("");
     setSkills([]);
     setFieldError(null);
   };
@@ -444,6 +452,10 @@ function CreateEmploymentModal({
       setFieldError("Employee ID, job title, and start date are required.");
       return;
     }
+    if (!employmentType) {
+      setFieldError("Full-time or part-time is required.");
+      return;
+    }
 
     create.run(
       () =>
@@ -452,6 +464,7 @@ function CreateEmploymentModal({
           employee_id: employeeId.trim(),
           job_title: jobTitle.trim(),
           start_date: startDate,
+          employment_type: employmentType,
           ...(skills.length ? { skills } : {}),
         }),
       {
@@ -497,6 +510,16 @@ function CreateEmploymentModal({
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
+        />
+        <Select
+          label="Employment type"
+          hint="Drives the marking expected on the downloaded contract PDF."
+          value={employmentType}
+          onChange={(e) => setEmploymentType(e.target.value as EmploymentType)}
+          options={[
+            { value: "", label: "Select…" },
+            ...EMPLOYMENT_TYPE_OPTIONS,
+          ]}
         />
         <div className="space-y-2">
           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Skills (optional)</p>

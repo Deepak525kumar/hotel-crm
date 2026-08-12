@@ -134,6 +134,53 @@ export async function isWorkerInGroupScope(scope: UserScope | null, workerId: st
   return !!hotel && hotel.hotel_group_id === record.hotel_group_id;
 }
 
+// 2026-08-13 (review-queue reviewing gap, found while rebuilding the review
+// queue UI): isWorkerInGroupScope() above denies by design when
+// hotel_group_id is null -- correct for the general case, but an
+// EmploymentRecord in that exact state (PENDING, not yet approved) is
+// precisely what a manager/RM's review queue exists to show. Its own
+// target_hotel_group_id/target_primary_hotel_id (schema.prisma, ADR-065 §6
+// item 3/5 -- set at creation from the CREATING actor's own scope, "display/
+// default-selection only, never read by eligibility checks") is the
+// pre-approval equivalent of hotel_group_id for this one purpose: deciding
+// whether a REVIEWER may view (never write) a not-yet-approved applicant's
+// document completeness. Falls through to isWorkerInGroupScope's real,
+// post-approval group once hotel_group_id is set, so this never widens
+// access for an already-active worker.
+export async function isWorkerInReviewerScope(scope: UserScope | null, workerId: string): Promise<boolean> {
+  if (!scope) return false;
+  const prisma = getPrisma();
+  const record = await prisma.employmentRecord.findUnique({
+    where: { user_id: workerId },
+    select: { hotel_group_id: true, target_hotel_group_id: true, target_primary_hotel_id: true },
+  });
+  if (!record) return false;
+
+  if (record.hotel_group_id) {
+    return isWorkerInGroupScope(scope, workerId);
+  }
+
+  if (scope.type === 'global') return true;
+  if (record.target_hotel_group_id && scope.type === 'hotel_group') {
+    return scope.hotel_group_id === record.target_hotel_group_id;
+  }
+  if (record.target_primary_hotel_id && scope.type === 'hotel') {
+    return scope.hotel_id === record.target_primary_hotel_id;
+  }
+  // Cross-check the other direction too (e.g. an RM's group scope against a
+  // manager-created applicant whose target is hotel-grain only, or vice
+  // versa) by resolving through the hotel<->group relationship, mirroring
+  // isWorkerInGroupScope's own hotel-scope branch.
+  if (record.target_primary_hotel_id && scope.type === 'hotel_group') {
+    const hotel = await prisma.hotel.findUnique({
+      where: { id: record.target_primary_hotel_id },
+      select: { hotel_group_id: true },
+    });
+    return !!hotel && hotel.hotel_group_id === scope.hotel_group_id;
+  }
+  return false;
+}
+
 // ADR-030 PR-4 (D-7 "filter, don't deny"): resolves a manager/regional_manager
 // scope claim down to a single hotel_group_id list-filter. Three consumers
 // need the identical resolution (users/hotel-groups/analytics list reads),

@@ -149,6 +149,7 @@ describe('EmployeeManagementService', () => {
         employee_id: 'E-001',
         job_title: 'Cleaner',
         start_date: new Date('2026-01-01'),
+        employment_type: 'FULL_TIME',
       });
 
       expect(result.status).toBe(EmploymentStatus.PENDING);
@@ -166,6 +167,7 @@ describe('EmployeeManagementService', () => {
           employee_id: 'E-001',
           job_title: 'Cleaner',
           start_date: new Date('2026-01-01'),
+          employment_type: 'FULL_TIME',
         })
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockPrisma.employmentRecord.create).not.toHaveBeenCalled();
@@ -181,6 +183,7 @@ describe('EmployeeManagementService', () => {
           employee_id: 'E-002',
           job_title: 'Cleaner',
           start_date: new Date('2026-01-01'),
+          employment_type: 'FULL_TIME',
         })
       ).rejects.toMatchObject({ name: 'ConflictError' });
       expect(mockPrisma.employmentRecord.create).not.toHaveBeenCalled();
@@ -196,6 +199,7 @@ describe('EmployeeManagementService', () => {
           employee_id: 'E-001',
           job_title: 'Cleaner',
           start_date: new Date('2026-01-01'),
+          employment_type: 'FULL_TIME',
           skills: ['SUPERVISOR'] as unknown as SkillTag[],
         })
       ).rejects.toMatchObject({ name: 'ValidationError' });
@@ -214,6 +218,7 @@ describe('EmployeeManagementService', () => {
         employee_id: 'E-001',
         job_title: 'Cleaner',
         start_date: new Date('2026-01-01'),
+        employment_type: 'FULL_TIME',
       });
 
       expect(result).not.toHaveProperty('konfession');
@@ -515,8 +520,8 @@ describe('EmployeeManagementService', () => {
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       const result = await service.bulkImport(admin as any, [
-        { user_id: 'user_1', employee_id: 'E-001', job_title: 'Cleaner', start_date: new Date('2026-01-01') },
-        { user_id: 'user_2', employee_id: 'E-002', job_title: 'Waiter', start_date: new Date('2026-01-01') },
+        { user_id: 'user_1', employee_id: 'E-001', job_title: 'Cleaner', start_date: new Date('2026-01-01'), employment_type: 'FULL_TIME' },
+        { user_id: 'user_2', employee_id: 'E-002', job_title: 'Waiter', start_date: new Date('2026-01-01'), employment_type: 'FULL_TIME' },
       ]);
 
       expect(result.created).toHaveLength(1);
@@ -527,7 +532,7 @@ describe('EmployeeManagementService', () => {
     it('rejects a non-admin actor (OD-EMP-08 conservative restriction)', async () => {
       await expect(
         service.bulkImport({ userId: 'mgr_1', role: 'manager', permissions: [], scope: null } as any, [
-          { user_id: 'user_1', employee_id: 'E-001', job_title: 'Cleaner', start_date: new Date('2026-01-01') },
+          { user_id: 'user_1', employee_id: 'E-001', job_title: 'Cleaner', start_date: new Date('2026-01-01'), employment_type: 'FULL_TIME' },
         ])
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
       expect(mockPrisma.employmentRecord.create).not.toHaveBeenCalled();

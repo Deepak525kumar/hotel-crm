@@ -57,6 +57,23 @@ export class HrController {
     }
   }
 
+  // 2026-08-13 contract feature: serves the single default contract PDF
+  // asset (assets/contracts/default-contract-template.pdf via
+  // hrService.getDefaultContractPdf()). requireContractReadAccess()/
+  // scopeWorkerRoute() at the route layer are the same gate
+  // getContractStatus already uses -- worker downloads their own, manager/
+  // RM/admin download within scope.
+  async downloadDefaultContract(_req: Request, res: Response, next: NextFunction) {
+    try {
+      const pdf = await hrService.getDefaultContractPdf();
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="contract-template.pdf"');
+      res.status(200).send(pdf);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // IF-HR-UploadSignedContract. RULE-HR-14: manager identity is req.auth
   // only, never client-supplied — mirrors uploadDocument() below exactly.
   async uploadSignedContract(req: Request, res: Response, next: NextFunction) {

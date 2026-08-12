@@ -1,25 +1,28 @@
 "use client";
 
-import { PageHeader, Card } from "@/components/ui";
+import { PageHeader, Card, CardContent } from "@/components/ui";
+import { RoleGate } from "@/components/auth/RoleGate";
 import { ReviewQueueTable } from "@/components/onboarding/ReviewQueueTable";
-import { useAuth } from "@/hooks/useAuth";
 
 export default function ReviewQueuePage() {
-  const { user } = useAuth();
-  
-  if (!user || user.role === "worker" || user.role === "checker") {
-    return <div className="p-8 text-center text-red-500">You do not have permission to view the review queue.</div>;
-  }
-
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Review Queue" 
-        description="Pending onboarding applications requiring your review."
-      />
-      <Card>
+    <RoleGate
+      allow={["manager", "regional_manager", "admin"]}
+      fallback={
+        <Card>
+          <CardContent className="text-sm text-gray-500 dark:text-gray-400">
+            You do not have permission to view the review queue.
+          </CardContent>
+        </Card>
+      }
+    >
+      <div className="space-y-6">
+        <PageHeader
+          title="Review queue"
+          description="Applications submitted by your team, awaiting your review."
+        />
         <ReviewQueueTable />
-      </Card>
-    </div>
+      </div>
+    </RoleGate>
   );
 }

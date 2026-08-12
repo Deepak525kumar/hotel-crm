@@ -127,6 +127,7 @@ function makeContractRow(overrides: Record<string, unknown> = {}) {
     start_date: new Date('2026-08-01T00:00:00.000Z'),
     end_date: null,
     status: 'PENDING',
+    employment_type: 'FULL_TIME',
     scanned_document_id: null,
     confirmed_by_id: null,
     confirmed_at: null,
@@ -213,6 +214,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
     it('creates a contract reading persisted Personalfragebogen data (not a transient source)', async () => {
       mockEmploymentRecordFindUnique.mockResolvedValue({
         personal_data: { first_name: 'Ada', last_name: 'Lovelace' },
+        employment_type: 'FULL_TIME',
       });
       mockContractCreate.mockResolvedValue(makeContractRow());
 
@@ -225,7 +227,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
       expect(mockEmploymentRecordFindUnique).toHaveBeenCalledWith({
         where: { user_id: 'w1' },
-        select: { personal_data: true },
+        select: { personal_data: true, employment_type: true },
       });
       expect(mockContractCreate).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -3,14 +3,37 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { employeesApi } from "@/lib/api";
-import { Table, Badge, Button, Modal, EmptyState, Select } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  DataList,
+  DataRow,
+  EmptyState,
+  FormError,
+  Modal,
+  Select,
+  Table,
+  TBody,
+  TableSkeleton,
+  TD,
+  TH,
+  THead,
+  TR,
+  Textarea,
+} from "@/components/ui";
 import { formatDateTime } from "@/lib/format";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
+import { useWorkerContract } from "@/hooks/useContract";
 import { Eye, Check, X } from "lucide-react";
 import { DocumentUploadList } from "./DocumentUploadList";
-import { useHotels, useHotelGroups } from "@/hooks/useHotels";
-import type { EmploymentRecord } from "@/lib/types";
+import type { EmploymentRecord, EmploymentType } from "@/lib/types";
 
-// Extended type because the backend includes user info
+// Extended type because the backend includes user info (and, since the
+// 2026-08-13 review-routing fix, the creator's own summary — see
+// employee-management/service.ts's getReviewQueue()).
 type ReviewQueueItem = EmploymentRecord & {
   user?: {
     first_name: string;
@@ -18,7 +41,30 @@ type ReviewQueueItem = EmploymentRecord & {
     email: string;
     role: string;
   };
+  created_by?: {
+    first_name: string;
+    last_name: string;
+    role: string;
+  } | null;
 };
+
+const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
+  FULL_TIME: "Full-time",
+  PART_TIME: "Part-time",
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  WORKER: "Worker",
+  CHECKER: "Checker",
+  MANAGER: "Manager",
+  REGIONAL_MANAGER: "Regional Manager",
+  ADMIN: "Admin",
+};
+
+function roleLabel(role: string | undefined): string {
+  if (!role) return "—";
+  return ROLE_LABEL[role] ?? role;
+}
 
 export function ReviewQueueTable() {
   const { data: queue, isLoading, error, mutate } = useSWR<ReviewQueueItem[]>(
@@ -27,192 +73,205 @@ export function ReviewQueueTable() {
   );
 
   const [selectedRecord, setSelectedRecord] = useState<ReviewQueueItem | null>(null);
-  const [approving, setApproving] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
+  const approveAction = useAsyncAction();
+  const rejectAction = useAsyncAction();
+  const assignAction = useAsyncAction();
+
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
 
   const [assignRecord, setAssignRecord] = useState<ReviewQueueItem | null>(null);
-  const [assigning, setAssigning] = useState(false);
   const [assignTarget, setAssignTarget] = useState("");
 
-  const { data: hotelsData } = useHotels({ page: 1, limit: 100 });
-  const { data: groupsData } = useHotelGroups({ page: 1, limit: 100 });
+  // Contract status for the currently-open review — approve() requires an
+  // Active/Extended/Permanent contract server-side (assertApprovedContract,
+  // employee-management/service.ts), so the reviewer sees that state
+  // up front rather than discovering it only from a failed Approve call.
+  const { data: contractStatus } = useWorkerContract(selectedRecord?.user_id ?? null);
+  const hasApprovedContract =
+    contractStatus?.status === "ACTIVE" ||
+    contractStatus?.status === "EXTENDED" ||
+    contractStatus?.status === "PERMANENT";
 
-  const handleApprove = async () => {
+  const { hotels, isLoading: hotelsLoading } = useHotels({ page: 1, limit: 100 });
+  const { groups, isLoading: groupsLoading } = useHotelGroups({ page: 1, limit: 100 });
+
+  const handleApprove = () => {
     if (!selectedRecord) return;
-    try {
-      setApproving(true);
-      await employeesApi.approve(selectedRecord.employee_id);
-      const approved = selectedRecord;
-      setSelectedRecord(null);
-      if (approved.user?.role === "MANAGER" || approved.user?.role === "REGIONAL_MANAGER") {
-        setAssignRecord(approved);
-      }
-      mutate();
-    } catch (e) {
-      alert("Failed to approve: " + (e instanceof Error ? e.message : "Unknown error"));
-    } finally {
-      setApproving(false);
-    }
+    approveAction.run(() => employeesApi.approve(selectedRecord.employee_id), {
+      onSuccess: () => {
+        const approved = selectedRecord;
+        setSelectedRecord(null);
+        if (approved.user?.role === "MANAGER" || approved.user?.role === "REGIONAL_MANAGER") {
+          setAssignRecord(approved);
+        }
+        mutate();
+      },
+    });
   };
 
-  const handleAssign = async () => {
+  const handleAssign = () => {
     if (!assignRecord || !assignTarget) return;
-    try {
-      setAssigning(true);
-      const isManager = assignRecord.user?.role === "MANAGER";
-      await employeesApi.assign(
-        assignRecord.employee_id,
-        isManager ? { primary_hotel_id: assignTarget } : { hotel_group_id: assignTarget }
-      );
-      setAssignRecord(null);
-      setAssignTarget("");
-      mutate();
-    } catch (e) {
-      alert("Failed to assign: " + (e instanceof Error ? e.message : "Unknown error"));
-    } finally {
-      setAssigning(false);
-    }
+    const isManager = assignRecord.user?.role === "MANAGER";
+    assignAction.run(
+      () =>
+        employeesApi.assign(
+          assignRecord.employee_id,
+          isManager ? { primary_hotel_id: assignTarget } : { hotel_group_id: assignTarget }
+        ),
+      {
+        onSuccess: () => {
+          setAssignRecord(null);
+          setAssignTarget("");
+          mutate();
+        },
+      }
+    );
   };
 
   const handleRejectClick = () => {
     setRejectReason("");
+    rejectAction.setError(null);
     setRejectModalOpen(true);
   };
 
-  const submitReject = async () => {
+  const submitReject = () => {
     if (!selectedRecord || !rejectReason.trim()) return;
-    
-    try {
-      setRejecting(true);
-      await employeesApi.reject(selectedRecord.employee_id, { reason: rejectReason });
-      setRejectModalOpen(false);
-      setSelectedRecord(null);
-      mutate();
-    } catch (e) {
-      alert("Failed to reject: " + (e instanceof Error ? e.message : "Unknown error"));
-    } finally {
-      setRejecting(false);
-    }
+    rejectAction.run(
+      () => employeesApi.reject(selectedRecord.employee_id, { reason: rejectReason }),
+      {
+        onSuccess: () => {
+          setRejectModalOpen(false);
+          setSelectedRecord(null);
+          mutate();
+        },
+      }
+    );
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading queue...</div>;
-  if (error) return <div className="p-8 text-center text-red-500">Failed to load review queue.</div>;
-
-  if (!queue || queue.length === 0) {
-    return (
-      <EmptyState
-        title="Review queue empty"
-        description="There are no applications waiting for your review."
-      />
-    );
-  }
+  const columns = 5;
 
   return (
     <>
-      <div className="overflow-x-auto">
-        <Table>
-          <thead>
-            <tr>
-              <th>Applicant</th>
-              <th>Role</th>
-              <th>Target Location</th>
-              <th>Submitted</th>
-              <th>Status</th>
-              <th className="text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {queue.map((record) => (
-              <tr key={record.id}>
-                <td>
-                  <div className="font-medium text-gray-900 dark:text-gray-100">
-                    {record.user?.first_name} {record.user?.last_name}
-                  </div>
-                  <div className="text-sm text-gray-500">{record.user?.email}</div>
-                </td>
-                <td className="capitalize">{record.user?.role?.replace("_", " ")}</td>
-                <td>
-                  <span className="text-sm">
-                    {record.target_hotel_group_id || record.target_primary_hotel_id || "Unassigned"}
-                  </span>
-                </td>
-                <td>
-                  {record.submitted_for_review_at ? formatDateTime(record.submitted_for_review_at) : "N/A"}
-                </td>
-                <td>
-                  <Badge color="blue">Under Review</Badge>
-                </td>
-                <td className="text-right">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setSelectedRecord(record)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Review
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      </div>
+      <Card>
+        <CardContent className="p-0">
+          {error ? (
+            <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
+              Failed to load the review queue. Please try again.
+            </div>
+          ) : (
+            <Table aria-label="Review queue">
+              <THead>
+                <tr>
+                  <TH>Applicant</TH>
+                  <TH>Role</TH>
+                  <TH>Employment type</TH>
+                  <TH>Submitted</TH>
+                  <TH className="text-right">Actions</TH>
+                </tr>
+              </THead>
+              {isLoading ? (
+                <TableSkeleton columns={columns} />
+              ) : !queue || queue.length === 0 ? (
+                <TBody>
+                  <tr>
+                    <TD colSpan={columns} className="p-0">
+                      <EmptyState
+                        title="Review queue empty"
+                        description="There are no applications waiting for your review."
+                      />
+                    </TD>
+                  </tr>
+                </TBody>
+              ) : (
+                <TBody>
+                  {queue.map((record) => (
+                    <TR key={record.id}>
+                      <TD className="font-medium">
+                        <div>{record.user?.first_name} {record.user?.last_name}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{record.user?.email}</div>
+                      </TD>
+                      <TD>{roleLabel(record.user?.role)}</TD>
+                      <TD>{EMPLOYMENT_TYPE_LABEL[record.employment_type]}</TD>
+                      <TD className="text-gray-500 dark:text-gray-400">
+                        {record.submitted_for_review_at ? formatDateTime(record.submitted_for_review_at) : "—"}
+                      </TD>
+                      <TD className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => setSelectedRecord(record)}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Review
+                        </Button>
+                      </TD>
+                    </TR>
+                  ))}
+                </TBody>
+              )}
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
-      <Modal 
-        open={!!selectedRecord} 
+      <Modal
+        open={!!selectedRecord}
         onClose={() => setSelectedRecord(null)}
-        title="Review Application"
+        title="Review application"
       >
         {selectedRecord && (
-          <div className="space-y-6 mt-4">
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-md">
-              <h3 className="font-medium text-gray-900 dark:text-gray-100">Applicant Details</h3>
-              <dl className="mt-2 text-sm text-gray-600 dark:text-gray-400 grid grid-cols-2 gap-4">
-                <div>
-                  <dt className="font-medium">Name</dt>
-                  <dd>{selectedRecord.user?.first_name} {selectedRecord.user?.last_name}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Email</dt>
-                  <dd>{selectedRecord.user?.email}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium">Role</dt>
-                  <dd className="capitalize">{selectedRecord.user?.role?.replace("_", " ")}</dd>
-                </div>
-              </dl>
+          <div className="mt-4 space-y-6">
+            <DataList>
+              <DataRow label="Name" value={`${selectedRecord.user?.first_name ?? ""} ${selectedRecord.user?.last_name ?? ""}`} />
+              <DataRow label="Email" value={selectedRecord.user?.email ?? "—"} />
+              <DataRow label="Role" value={roleLabel(selectedRecord.user?.role)} />
+              <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[selectedRecord.employment_type]} />
+              {selectedRecord.created_by && (
+                <DataRow
+                  label="Created by"
+                  value={`${selectedRecord.created_by.first_name} ${selectedRecord.created_by.last_name} (${roleLabel(selectedRecord.created_by.role)})`}
+                />
+              )}
+            </DataList>
+
+            <div>
+              {contractStatus === undefined ? null : !hasApprovedContract ? (
+                <Badge tone="warning">
+                  {contractStatus ? "Contract not yet signed/confirmed" : "No contract on file"}
+                </Badge>
+              ) : (
+                <Badge tone="success">Contract approved</Badge>
+              )}
             </div>
 
             <div>
-              <h3 className="font-medium text-gray-900 dark:text-gray-100 mb-2">Submitted Documents</h3>
-              <div className="border border-gray-200 dark:border-gray-700 rounded-md">
-                <DocumentUploadList 
-                  workerId={selectedRecord.user_id} 
-                  workPermitRequired={selectedRecord.work_permit_required} 
-                  disabled={true} 
+              <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Submitted documents</h3>
+              <div className="rounded-md border border-gray-200 dark:border-gray-700">
+                <DocumentUploadList
+                  workerId={selectedRecord.user_id}
+                  workPermitRequired={selectedRecord.work_permit_required}
+                  disabled
                 />
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button 
-                variant="outline" 
+            <FormError>{approveAction.error}</FormError>
+
+            <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
+              <Button
+                variant="outline"
                 onClick={handleRejectClick}
-                loading={rejecting}
-                disabled={approving}
+                loading={rejectAction.pending}
+                disabled={approveAction.pending}
               >
-                <X className="w-4 h-4 mr-2 text-red-500" />
+                <X className="mr-2 h-4 w-4 text-red-500" />
                 Reject
               </Button>
-              <Button 
+              <Button
                 onClick={handleApprove}
-                loading={approving}
-                disabled={rejecting}
+                loading={approveAction.pending}
+                disabled={rejectAction.pending || !hasApprovedContract}
+                title={!hasApprovedContract ? "Requires an Active, Extended, or Permanent contract" : undefined}
               >
-                <Check className="w-4 h-4 mr-2 text-green-500" />
-                Approve & Activate
+                <Check className="mr-2 h-4 w-4" />
+                Approve & activate
               </Button>
             </div>
           </div>
@@ -222,34 +281,43 @@ export function ReviewQueueTable() {
       <Modal
         open={!!assignRecord}
         onClose={() => setAssignRecord(null)}
-        title="Assign Approved Employee"
+        title="Assign approved employee"
       >
         {assignRecord && (
-          <div className="space-y-6 mt-4">
+          <div className="mt-4 space-y-6">
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {assignRecord.user?.first_name} {assignRecord.user?.last_name} has been approved. You must now assign them to their target location to complete the process.
+              {assignRecord.user?.first_name} {assignRecord.user?.last_name} has been approved.
+              Assign them to their target location to complete the process.
             </p>
             {assignRecord.user?.role === "MANAGER" ? (
               <Select
-                label="Primary Hotel"
+                label="Primary hotel"
                 value={assignTarget}
                 onChange={(e) => setAssignTarget(e.target.value)}
-                options={(hotelsData || []).map((h: { id: string; name: string }) => ({ value: h.id, label: h.name }))}
-                placeholder="Select a hotel..."
+                disabled={hotelsLoading}
+                options={[
+                  { value: "", label: "Select a hotel…" },
+                  ...hotels.map((h) => ({ value: h.id, label: h.name })),
+                ]}
               />
             ) : (
               <Select
-                label="Hotel Group"
+                label="Hotel group"
                 value={assignTarget}
                 onChange={(e) => setAssignTarget(e.target.value)}
-                options={(groupsData || []).map((g: { id: string; name: string }) => ({ value: g.id, label: g.name }))}
-                placeholder="Select a group..."
+                disabled={groupsLoading}
+                options={[
+                  { value: "", label: "Select a group…" },
+                  ...groups.map((g) => ({ value: g.id, label: g.name })),
+                ]}
               />
             )}
 
-            <div className="flex items-center justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Button onClick={handleAssign} loading={assigning} disabled={!assignTarget}>
-                Complete Assignment
+            <FormError>{assignAction.error}</FormError>
+
+            <div className="flex items-center justify-end border-t border-gray-200 pt-4 dark:border-gray-700">
+              <Button onClick={handleAssign} loading={assignAction.pending} disabled={!assignTarget}>
+                Complete assignment
               </Button>
             </div>
           </div>
@@ -258,40 +326,36 @@ export function ReviewQueueTable() {
 
       <Modal
         open={rejectModalOpen}
-        onClose={() => !rejecting && setRejectModalOpen(false)}
-        title="Reject Application"
+        onClose={() => !rejectAction.pending && setRejectModalOpen(false)}
+        title="Reject application"
       >
-        <div className="space-y-4 mt-4">
+        <div className="mt-4 space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Please provide a reason for rejecting this application. This reason will be sent to the applicant.
+            This reason is sent to the applicant.
           </p>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              Rejection Reason
-            </label>
-            <textarea
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-100 min-h-[100px]"
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="e.g. Invalid document uploaded"
-              disabled={rejecting}
-            />
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <Textarea
+            label="Rejection reason"
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="e.g. Invalid document uploaded"
+            disabled={rejectAction.pending}
+          />
+          <FormError>{rejectAction.error}</FormError>
+          <div className="flex items-center justify-end gap-3 border-t border-gray-200 pt-4 dark:border-gray-700">
             <Button
               variant="outline"
               onClick={() => setRejectModalOpen(false)}
-              disabled={rejecting}
+              disabled={rejectAction.pending}
             >
               Cancel
             </Button>
             <Button
+              variant="danger"
               onClick={submitReject}
-              loading={rejecting}
+              loading={rejectAction.pending}
               disabled={!rejectReason.trim()}
-              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              Confirm Rejection
+              Confirm rejection
             </Button>
           </div>
         </div>
