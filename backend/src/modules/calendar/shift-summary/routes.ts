@@ -55,8 +55,12 @@ router.put(
       }
 
       const payload = dailyShiftSummarySchema.parse(req.body);
-      const user = (req as any).user;
-      const summary = await service.upsertSummary(hotel_id, parsedDate, payload, user.id || user.userId);
+      const actorId = req.auth?.userId;
+      if (!actorId) {
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+      const summary = await service.upsertSummary(hotel_id, parsedDate, payload, actorId);
       
       res.json(summary);
     } catch (err) {
