@@ -72,7 +72,7 @@ curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/submit-for-revie
 **PASS:** `status` stays `PENDING`; `submitted_for_review_at` becomes non-null (it is a
 *sub-state* of PENDING, not a separate status). Scope fields still `null`.
 
-## Step 5 — Approve without a contract (must be blocked)
+## Step 5 — Approve without a signed contract (must be blocked)
 
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/approve \
@@ -81,17 +81,37 @@ curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/approve \
 
 **PASS:** `409 CONFLICT` — "does not have an approved contract (Active, Extended, or Permanent)".
 
-## Step 6 — Create an approved contract, then approve
+Note this only fires when **no signed scan has been uploaded**. Since 2026-08-13, approving a
+worker who HAS returned a signed contract confirms that contract as part of the approval (see
+Step 6) — the previous behaviour, where approval required a manager to first confirm the
+signature on a separate HR screen, made the Approve button dead for every application.
 
-Seed a `Contract` with `status: 'ACTIVE'` for the worker (the real HR path needs a scan upload;
-that is HR's own scenario, not this one). Then:
+## Step 6 — Upload the signed contract as the applicant, then approve
+
+Do **not** seed a Contract row directly for this step: seeding an `ACTIVE` contract skips
+exactly the path that was broken. Upload the signed copy the way an applicant does — as a
+`CONTRACT_SCAN` document on their own record (self-upload, RULE B):
+
+```bash
+curl -s -X POST http://localhost:3001/api/v1/documents/workers/<WORKER_USER_ID>/documents \
+  -H "Authorization: Bearer $WT" -F "category=CONTRACT_SCAN" -F "file=@signed.pdf"
+```
+
+**PASS at the data layer:** a `WorkerDocument` row with `category = CONTRACT_SCAN` and
+`created_at >= Contract.created_at`. `Contract.scanned_document_id` is **still null** at this
+point — that column is only written by the manager-upload path, and by confirmation. Reading
+it as "has the applicant signed?" is the defect fixed on 2026-08-13.
+
+`GET /hr/workers/<id>/contract` must now report `signed_scan_uploaded: true`. Then approve:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/approve \
   -H "Authorization: Bearer $MT" -H "Content-Type: application/json" -d '{}' | python3 -m json.tool
 ```
 
-**PASS:** `status: "ACTIVE"`. `hotel_group_id` is resolved from the approving actor's own
+**PASS:** `status: "ACTIVE"`, **and** the contract is now `ACTIVE` with `confirmed_by_id` set
+to the approving actor and `scanned_document_id` pointing at the applicant's uploaded document
+— verify all three in the database, not from the approve response. `hotel_group_id` is resolved from the approving actor's own
 scope for Worker/Checker (this is the **fused** path, deliberately unchanged by `ADR-065` —
 see §3 item 6's final sentence). If the approver is an **Admin** with no scope and no explicit
 `hotel_group_id` in the body, `null` here is **correct**, not a bug.
@@ -126,7 +146,10 @@ a finding.
 - [ ] `target_*` fields auto-fill from the creating manager's scope; operational scope stays null
 - [ ] Submit blocked until all six documents exist; error names the correct categories
 - [ ] Completeness response uses `categories`
-- [ ] Approve blocked without an ACTIVE/EXTENDED/PERMANENT contract
+- [ ] Approve blocked when no signed contract has been uploaded
+- [ ] `signed_scan_uploaded` is true after the applicant's own CONTRACT_SCAN upload
+- [ ] Approve confirms the pending contract (status ACTIVE, `confirmed_by_id` = approver,
+      `scanned_document_id` = the applicant's document)
 - [ ] Approve succeeds with one clean history row and an incremented `version`
 - [ ] Checker behaves identically to Worker
 
@@ -139,3 +162,5 @@ a finding.
 | Frontend `/onboarding` crashed | Frontend read `by_category`; backend sends `categories` |
 | Worker activated with no documents/contract | Both gates were deleted in an earlier edit (caught by diff review) |
 | `rehire()` bypassed the contract gate | Gate existed in `approve()` only |
+| Approve button dead for every application | Approval required a contract confirmation that only existed on a separate HR screen the reviewer never visited |
+| "Contract is uploaded" but UI said it was not | Every surface keyed on `Contract.scanned_document_id`, which the applicant's own upload path never writes |

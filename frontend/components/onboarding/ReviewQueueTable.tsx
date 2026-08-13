@@ -56,6 +56,8 @@ type ReviewQueueItem = EmploymentRecord & {
   is_reonboarding?: boolean;
   contract_status?: string | null;
   contract_valid?: boolean;
+  /** A signed copy is on file (either upload path) and approving will confirm it. */
+  contract_signed_uploaded?: boolean;
   contract_end_date?: string | null;
 };
 
@@ -105,6 +107,19 @@ export function ReviewQueueTable() {
   // years ago and that the backend will reject.
   const { data: contractStatus } = useWorkerContract(selectedRecord?.user_id ?? null);
   const hasApprovedContract = contractStatus?.is_valid === true;
+  // A signed copy on file is enough to approve: approving CONFIRMS that
+  // signature server-side (employee-management approve() ->
+  // hrService.confirmSignedContractIfPending), which is the same managerial
+  // act RULE-HR-03 describes. Requiring the reviewer to first confirm it on a
+  // separate HR screen is what made this button permanently disabled.
+  // Falls back to the queue row's own flag while the per-worker contract
+  // request is still in flight, so the button is not briefly disabled for a
+  // record the list already knows is signed.
+  const hasSignedContract =
+    contractStatus === undefined
+      ? selectedRecord?.contract_signed_uploaded === true
+      : contractStatus?.signed_scan_uploaded === true;
+  const canApprove = hasApprovedContract || hasSignedContract;
   const isReonboarding = selectedRecord?.is_reonboarding === true;
 
   const { hotels, isLoading: hotelsLoading } = useHotels({ page: 1, limit: 100 });
@@ -254,6 +269,11 @@ export function ReviewQueueTable() {
                   Contract valid
                   {contractStatus?.end_date ? ` until ${formatDate(contractStatus.end_date)}` : ""}
                 </Badge>
+              ) : hasSignedContract ? (
+                // The applicant has returned a signed copy of the CURRENT
+                // contract; approving confirms it. Deliberately not shown as
+                // a warning — there is nothing outstanding for anyone else.
+                <Badge tone="info">Signed contract received — approving will confirm it</Badge>
               ) : contractStatus?.is_expired ? (
                 <Badge tone="danger">
                   Contract expired
@@ -261,7 +281,7 @@ export function ReviewQueueTable() {
                 </Badge>
               ) : (
                 <Badge tone="warning">
-                  {contractStatus ? "Contract not yet signed/confirmed" : "No contract on file"}
+                  {contractStatus ? "Awaiting the applicant's signed contract" : "No contract on file"}
                 </Badge>
               )}
             </div>
@@ -276,10 +296,13 @@ export function ReviewQueueTable() {
               <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
                 <p className="font-medium">Returning employee (cycle {selectedRecord.employment_cycle})</p>
                 <p className="mt-0.5">
-                  Previously-submitted documents are still on file and are not re-collected.
+                  Their profile and documents are preserved from the previous engagement and are
+                  not re-collected — the contract is the only thing being re-checked.
                   {hasApprovedContract
                     ? " Their contract is still valid, so they can be reactivated directly."
-                    : " Their contract is no longer valid — a new one has been issued for them to sign, and must be confirmed in HR before reactivation."}
+                    : hasSignedContract
+                      ? " Their previous contract had lapsed; a new one was issued and they have returned it signed. Reactivating confirms it."
+                      : " Their contract has lapsed. A new one has been issued and is waiting for them to sign and return it."}
                 </p>
               </div>
               {/* Still shown for a returning employee: "not re-collected"
@@ -324,17 +347,21 @@ export function ReviewQueueTable() {
               <Button
                 onClick={handleApprove}
                 loading={approveAction.pending}
-                disabled={rejectAction.pending || !hasApprovedContract}
+                disabled={rejectAction.pending || !canApprove}
                 title={
-                  hasApprovedContract
+                  canApprove
                     ? undefined
-                    : isReonboarding
-                      ? "A new contract has been issued — confirm it in HR before reactivating"
-                      : "Requires a valid (signed and unexpired) contract"
+                    : "Waiting for the applicant to upload their signed contract"
                 }
               >
                 <Check className="mr-2 h-4 w-4" />
-                {isReonboarding ? "Reactivate" : "Approve & activate"}
+                {isReonboarding
+                  ? hasApprovedContract
+                    ? "Reactivate"
+                    : "Reactivate & confirm new contract"
+                  : hasApprovedContract
+                    ? "Approve & activate"
+                    : "Confirm contract & approve"}
               </Button>
             </div>
           </div>

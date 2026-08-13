@@ -563,36 +563,36 @@ export class EmployeeManagementService extends BaseService {
       throw new ConflictError('Only a Pending employment record may be submitted for review');
     }
 
-    // RE-ONBOARDING (2026-08-13, owner decision): a returning employee
-    // (employment_cycle > 1, i.e. this record went DELETED -> PENDING via
-    // restore()) does not RE-UPLOAD documents -- WorkerDocument rows survive
-    // delete()/restore(), so the previous cycle's files are still on file and
-    // re-demanding them would ask for something the system already has.
+    // RE-ONBOARDING (owner decision, 2026-08-13, REVISED after end-to-end
+    // review): a returning employee (employment_cycle > 1, i.e. this record
+    // went DELETED -> PENDING via restore()) re-onboards on the CONTRACT
+    // ALONE. Their profile and documents are deliberately preserved across
+    // cycles (WorkerDocument rows survive delete()/restore()), so the only
+    // question a re-engagement raises is "is this person's contract still
+    // valid, and if not, have they signed the new one".
     //
-    // But it must still CHECK they are there (audit finding #2). The old code
-    // skipped the completeness check entirely for a returning employee, which
-    // assumed documents could never disappear. They can: a departed worker
-    // could delete their own documents (e.g. for privacy) between cycles, and
-    // that assumption then let them be approved with nothing on file. The
-    // check runs for everyone; only the "please upload" framing differs, so a
-    // returning employee is told what to restore rather than being silently
-    // waved through.
+    // This supersedes the earlier decision to re-run the document-completeness
+    // gate for returning employees "in case a document was deleted between
+    // cycles". That gate blocked re-onboarding on paperwork the system was
+    // explicitly designed not to ask for twice; the owner ruled the preserved
+    // record is the point. Documents remain visible to the reviewer, who can
+    // still reject if something is genuinely missing.
     const isReonboarding = record.employment_cycle > 1;
 
-    // GATE: All required documents must be present before onboarding can be
-    // submitted for review. ADR-065 §6 item 8: work permit requirement is
-    // explicitly driven by the record's work_permit_required flag, set at
-    // creation time, rather than inferred from nationality.
-    const completeness = await documentService.getDocumentCompleteness(
-      record.user_id,
-      record.work_permit_required,
-    );
-    if (!completeness.is_complete) {
-      throw new ConflictError(
-        isReonboarding
-          ? `Cannot submit for review: documents from your previous engagement are no longer on file (${completeness.missing_categories.join(', ')}). Please re-upload them.`
-          : `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+    // GATE: All required documents must be present before a FIRST-TIME
+    // onboarding can be submitted for review. ADR-065 §6 item 8: work permit
+    // requirement is explicitly driven by the record's work_permit_required
+    // flag, set at creation time, rather than inferred from nationality.
+    if (!isReonboarding) {
+      const completeness = await documentService.getDocumentCompleteness(
+        record.user_id,
+        record.work_permit_required,
       );
+      if (!completeness.is_complete) {
+        throw new ConflictError(
+          `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+        );
+      }
     }
 
     // GATE (owner decision, 2026-08-13): the SIGNED contract is mandatory to
@@ -724,6 +724,20 @@ export class EmployeeManagementService extends BaseService {
     if (!record.submitted_for_review_at) {
       throw new ConflictError('Cannot approve an application that has not been submitted for review');
     }
+
+    // 2026-08-13 fix ("the Approve button does not work"). approve() requires
+    // a CONFIRMED contract, but nothing in the reviewer's own surface ever
+    // confirmed one: the applicant uploads their signed copy as a CONTRACT_SCAN
+    // document, and confirmation lived on a separate HR screen the reviewer
+    // had no reason to visit. Every approval therefore 409'd, and the UI's
+    // own pre-check disabled the button outright.
+    //
+    // Approving IS the manager's review of the returned signed contract
+    // (RULE-HR-03) -- the same human act -- so it confirms the pending
+    // contract, attributed to the approving actor and audited by HR's own
+    // confirmation record. With no scan on file this is a no-op and
+    // assertApprovedContract below produces the real message.
+    await hrService.confirmSignedContractIfPending(record.user_id, actor.userId, actor.role);
 
     await this.assertApprovedContract(record.user_id);
 
@@ -1111,6 +1125,11 @@ export class EmployeeManagementService extends BaseService {
     await this.assertLifecycleAuthority(actor, record, 'rehire an employee', {
       allowUnassignedGroup: true,
     });
+
+    // Same reasoning as approve() above: rehire is the identical review act
+    // on a previously-rejected application, and gating it on a confirmation
+    // that happens on another screen makes it unreachable in practice.
+    await hrService.confirmSignedContractIfPending(record.user_id, actor.userId, actor.role);
 
     await this.assertApprovedContract(record.user_id);
 
@@ -1732,104 +1751,19 @@ export class EmployeeManagementService extends BaseService {
   // stays reachable for that role (no 403) but always resolves empty,
   // rather than silently 403ing a nav entry that used to show results.
   async getReviewQueue(actor: AuthContext) {
-    const baseQuery: Prisma.EmploymentRecordWhereInput = {
-      status: EmploymentStatus.PENDING,
-      submitted_for_review_at: { not: null },
-      deleted_at: null,
-    };
-
-    let query: Prisma.EmploymentRecordWhereInput;
-
-    if (actor.role === 'admin') {
-      // Admin reviews:
-      //   - ADMIN-created applications. Admin is the top of the hierarchy, so
-      //     there is no "creator's superior" above it -- admin reviews its own
-      //     creations. Under ADR-065 (an EmploymentRecord is auto-created with
-      //     every account) this is the NORMAL case for Regional Managers, not
-      //     an edge case: admin creates the RM account, so admin owns the
-      //     review. Omitting this clause made every admin-created application
-      //     invisible to every queue, including admin's own (found by
-      //     end-to-end verification, 2026-08-13).
-      //   - regional_manager-created applications (admin is the RM's superior).
-      //   - every fallback case (no creator recorded, or a manager creator
-      //     with no resolvable RM) -- computed as "not claimed by any RM's
-      //     queue" so the two queries can never silently disagree.
-      // Managers who still head a hotel -- i.e. can still act on their own
-      // queue. Everything they created is theirs; anything created by a
-      // manager NOT in this set is orphaned and falls to admin.
-      const activeManagerIds = await this.activeManagerIds();
-      query = {
-        ...baseQuery,
-        OR: [
-          { created_by_id: null },
-          { created_by: { role: UserRole.ADMIN } },
-          { created_by: { role: UserRole.REGIONAL_MANAGER } },
-          // Manager-created records now belong to that manager's own queue
-          // (owner decision, 2026-08-13), so admin no longer claims them --
-          // EXCEPT where the creating manager can no longer act: they no
-          // longer head a hotel, so neither their queue nor any RM's would
-          // ever surface it. Without this clause such a record would be
-          // invisible to everyone.
-          {
-            created_by: { role: UserRole.MANAGER },
-            NOT: { created_by_id: { in: activeManagerIds.length ? activeManagerIds : ['__none__'] } },
-          },
-        ],
-      };
-    } else if (actor.role === 'regional_manager') {
-      if (actor.scope?.type !== 'hotel_group') {
-        throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
-      }
-      // An RM reviews the MANAGER applications they created. Worker/checker
-      // applications created by a manager now belong to that manager's own
-      // queue (owner decision, 2026-08-13) and are deliberately NOT duplicated
-      // here -- exactly one queue owns each record, or two reviewers could act
-      // on the same application and the second would hit a stale-state error.
-      //
-      // The manager-created set is still surfaced to the RM when the creating
-      // manager cannot act on it themselves, which today means only the
-      // no-longer-a-manager case: their hotel assignment is gone, so the
-      // record would otherwise be orphaned.
-      const managersInGroup = await this.prisma.hotel.findMany({
-        where: { hotel_group_id: actor.scope.hotel_group_id, manager_user_id: { not: null } },
-        select: { manager_user_id: true },
-      });
-      const managerIds = managersInGroup
-        .map((h) => h.manager_user_id)
-        .filter((id): id is string => id !== null);
-      // Records created by a manager who is STILL a manager in this group are
-      // that manager's own to review. What reaches the RM is: their own
-      // creations, plus any manager-created record whose creator no longer
-      // heads a hotel here (nobody else would ever see it).
-      const orphanedCreatorFilter: Prisma.EmploymentRecordWhereInput = {
-        created_by: { role: UserRole.MANAGER },
-        NOT: { created_by_id: { in: managerIds.length ? managerIds : ['__none__'] } },
-      };
-      query = {
-        ...baseQuery,
-        OR: [{ created_by_id: actor.userId }, orphanedCreatorFilter],
-      };
-    } else if (actor.role === 'manager') {
-      // Owner decision (2026-08-13, revising the creator's-superior rule for
-      // this case only): a Hotel Manager reviews the worker/checker
-      // applications THEY created. The strict rule left their queue
-      // permanently empty and pushed every housekeeper and receptionist up to
-      // the Regional Manager, which does not scale -- an RM would approve
-      // every front-line hire across all their hotels.
-      //
-      // Deliberately scoped to their OWN creations, not "every application in
-      // my hotel": created_by_id is the same key getReviewQueue's other
-      // branches route on, so a manager cannot pick up an application that an
-      // RM's or admin's queue is also claiming. Manager-created applications
-      // therefore stop appearing in the RM queue (see the RM branch below,
-      // which now excludes them) -- exactly one queue owns each record.
-      query = { ...baseQuery, created_by_id: actor.userId };
-    } else {
+    if (!['admin', 'manager', 'regional_manager'].includes(actor.role)) {
       throw new ForbiddenError('Role not authorized for review queue');
+    }
+    if (actor.role === 'regional_manager' && actor.scope?.type !== 'hotel_group') {
+      throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
     }
 
     const records = await this.prisma.employmentRecord.findMany({
-      where: query,
+      where: {
+        status: EmploymentStatus.PENDING,
+        submitted_for_review_at: { not: null },
+        deleted_at: null,
+      },
       include: {
         user: {
           select: {
@@ -1842,83 +1776,145 @@ export class EmployeeManagementService extends BaseService {
             role: true,
             created_at: true,
             updated_at: true,
-          }
+          },
         },
         created_by: {
-          select: {
-            id: true,
-            email: true,
-            first_name: true,
-            last_name: true,
-            role: true,
-          }
-        }
+          select: { id: true, email: true, first_name: true, last_name: true, role: true },
+        },
       },
       orderBy: { submitted_for_review_at: 'asc' },
     });
 
-    // 2026-08-13 re-onboarding: the reviewer decides differently for a
-    // returning employee (employment_cycle > 1) than a first-time applicant --
-    // they are reactivating a known person with documents already on file,
-    // not vetting a new one -- and the action they get offered depends on
-    // whether that person's contract is still valid. Both facts are attached
-    // here, in ONE query, rather than left to the UI to fetch per row: a
-    // review queue of N rows would otherwise fire N contract requests, and
-    // the reviewer's button label would flicker as they resolved.
+    // 2026-08-13 routing rewrite (reported: "why is admin seeing all the
+    // review requests"). The queue is now filtered by the SAME resolver that
+    // decides who gets notified (resolveReviewerRecipients), applied per
+    // record, instead of a second set of hand-written Prisma predicates.
+    //
+    // The two had already drifted: the queue gave a manager-created worker
+    // application to the creating manager, while the notification for that
+    // exact record went to that manager's Regional Manager -- so the person
+    // who could act never heard about it, and the person told about it saw an
+    // empty queue. Admin, meanwhile, claimed every record with an ADMIN
+    // creator, which under ADR-065 (an account's EmploymentRecord is created
+    // by whoever creates the account, and admin creates most accounts) is
+    // nearly all of them.
+    //
+    // Routing is now by WHO THE APPLICANT IS and WHERE THEY ARE HEADED, not
+    // by who typed the account in:
+    //   Regional Manager applicant -> Admin
+    //   Manager applicant          -> the RM of their target group (Admin if
+    //                                 none, or while the RM role is disabled)
+    //   Worker/Checker applicant   -> the manager of their target hotel, else
+    //                                 that group's RM, else Admin
+    // Exactly one queue owns each record, and an applicant is never their own
+    // reviewer. Admin remains the reviewer of last resort, which is the only
+    // reason an admin should see a front-line application at all.
+    const owned = await Promise.all(
+      records.map(async (record) => ({
+        record,
+        reviewerIds: await this.resolveReviewerRecipients(record, record.user.role),
+      })),
+    );
+    const visible = owned
+      .filter(({ reviewerIds }) => reviewerIds.includes(actor.userId))
+      .map(({ record }) => record);
+
+    return this.decorateReviewQueue(visible);
+  }
+
+  /**
+   * Attaches the facts the reviewer's decision depends on, in ONE query for
+   * the whole page: whether this is a returning employee (employment_cycle
+   * > 1) and whether their contract still stands. Fetching these per row in
+   * the UI would fire N contract requests and make the reviewer's button
+   * label flicker as they resolved.
+   *
+   * `contract_signed_uploaded` covers BOTH upload paths (the applicant's own
+   * CONTRACT_SCAN document and a manager-posted scan) -- see
+   * hr/service.ts#findSignedScanDocumentId. Approving confirms that scan, so
+   * the reviewer's Approve button must be enabled on it, not only on an
+   * already-confirmed contract.
+   */
+  private async decorateReviewQueue<T extends EmploymentRecord>(records: T[]) {
     const userIds = records.map((r) => r.user_id);
-    const contracts = userIds.length
-      ? await this.prisma.contract.findMany({
-          where: { worker_id: { in: userIds } },
-          orderBy: { created_at: 'desc' },
-          select: { worker_id: true, status: true, expires_at: true, end_date: true },
-        })
-      : [];
+    const [contracts, signedScans] = await Promise.all([
+      userIds.length
+        ? this.prisma.contract.findMany({
+            where: { worker_id: { in: userIds } },
+            orderBy: { created_at: 'desc' },
+            select: { worker_id: true, status: true, expires_at: true, end_date: true, created_at: true, scanned_document_id: true },
+          })
+        : Promise.resolve([]),
+      userIds.length
+        ? this.prisma.workerDocument.findMany({
+            where: { worker_id: { in: userIds }, category: 'CONTRACT_SCAN' },
+            orderBy: { created_at: 'desc' },
+            select: { worker_id: true, created_at: true },
+          })
+        : Promise.resolve([]),
+    ]);
+
     // findMany returns newest-first, so the FIRST hit per worker is the
-    // newest — which is the one that governs (matches
+    // newest -- which is the one that governs (matches
     // assertApprovedContract/ensureValidContract's own ordering).
     const newestByWorker = new Map<string, (typeof contracts)[number]>();
     for (const c of contracts) {
       if (!newestByWorker.has(c.worker_id)) newestByWorker.set(c.worker_id, c);
     }
+    const newestScanByWorker = new Map<string, Date>();
+    for (const d of signedScans) {
+      if (!newestScanByWorker.has(d.worker_id)) newestScanByWorker.set(d.worker_id, d.created_at);
+    }
 
     return records.map((record) => {
       const contract = newestByWorker.get(record.user_id) ?? null;
+      const scanAt = newestScanByWorker.get(record.user_id) ?? null;
+      const signedUploaded =
+        !!contract && (contract.scanned_document_id != null || (scanAt != null && scanAt >= contract.created_at));
       return {
         ...toGeneralProfile(record),
         is_reonboarding: record.employment_cycle > 1,
         contract_status: contract?.status ?? null,
         contract_valid: isContractValid(contract),
+        contract_signed_uploaded: signedUploaded,
         contract_end_date: contract?.end_date ? contract.end_date.toISOString().slice(0, 10) : null,
       };
     });
   }
 
-  // Manager user ids whose hotel resolves to a hotel_group with a
-  // regional_manager assigned -- i.e. managers whose worker/checker
-  // applications DO have a real RM to route to. Used by getReviewQueue's
-  // admin branch to compute the complement (managers with NO resolvable
-  // RM), so admin picks up exactly the applications no RM queue will ever
-  // claim, rather than the two queries drifting out of sync if computed
-  // independently.
   /**
-   * Resolves WHO should be notified that an application awaits review —
-   * deliberately mirroring getReviewQueue's routing rule exactly, so the
-   * person who gets the notification is the person whose queue the record
-   * actually lands in. Computing "the reviewer" a second, independent way is
-   * how you end up notifying someone who cannot see the record, and leaving
-   * the person who can see it unaware.
+   * THE routing authority for onboarding review: who reviews this
+   * application. getReviewQueue() filters its rows with this, and
+   * submitForReview() notifies exactly this set -- one function, so the queue
+   * a record lands in and the person told about it cannot disagree. (They
+   * previously did: a manager-created worker application sat in the creating
+   * manager's queue while the notification went to that manager's Regional
+   * Manager.)
    *
-   *   manager-created  -> that manager's own RM (their hotel's group's RM)
-   *   RM-created       -> admin(s)
-   *   admin-created    -> admin(s) (admin is the top of the hierarchy)
-   *   no creator / manager with no resolvable RM -> admin(s) (the fallback
-   *                       branch of getReviewQueue's admin query)
+   * Routing is by WHO THE APPLICANT IS and WHERE THEY ARE HEADED, not by who
+   * created the account -- under ADR-065 the creator is simply whoever typed
+   * the account in, which is usually an admin and is not a statement about
+   * who should vet the person:
    *
-   * Returns every recipient id; callers notify all of them. Best-effort by
-   * design — an empty result means nobody is notified, never an error, since
-   * a missing notification must not block a submission.
+   *   Regional Manager applicant -> Admin(s)
+   *   Manager applicant          -> the RM of their target group; Admin when
+   *                                 no RM is assigned or the RM role is off
+   *   Worker/Checker applicant   -> the manager of their target hotel, else
+   *                                 that group's RM, else Admin(s)
+   *
+   * An applicant is never their own reviewer (a self-created or
+   * self-targeting record falls through to the next level up), and Admin is
+   * the reviewer of last resort so no submitted application can become
+   * invisible to everyone.
+   *
+   * Best-effort for the notification caller: an empty result means nobody is
+   * notified, never an error -- a missing notification must not block a
+   * submission.
    */
-  private async resolveReviewerRecipients(record: EmploymentRecord): Promise<string[]> {
+  private async resolveReviewerRecipients(
+    record: EmploymentRecord,
+    applicantRole?: UserRole
+  ): Promise<string[]> {
     const admins = async () =>
       (
         await this.prisma.user.findMany({
@@ -1927,29 +1923,50 @@ export class EmployeeManagementService extends BaseService {
         })
       ).map((u) => u.id);
 
-    if (!record.created_by_id) return admins();
+    const role =
+      applicantRole ??
+      (
+        await this.prisma.user.findUnique({
+          where: { id: record.user_id },
+          select: { role: true },
+        })
+      )?.role;
 
-    const creator = await this.prisma.user.findUnique({
-      where: { id: record.created_by_id },
-      select: { role: true },
-    });
-    if (!creator) return admins();
+    if (!role || role === UserRole.ADMIN || role === UserRole.REGIONAL_MANAGER) {
+      return admins();
+    }
 
-    if (creator.role === UserRole.MANAGER) {
-      // The creating manager's own RM, resolved through the hotel they
-      // manage — the same hotel -> group -> regional_manager_user_id chain
-      // getReviewQueue's RM branch matches on.
-      const hotel = await this.prisma.hotel.findFirst({
-        where: { manager_user_id: record.created_by_id },
-        select: { hotel_group: { select: { regional_manager_user_id: true } } },
+    const groupId = record.target_hotel_group_id ?? record.hotel_group_id ?? null;
+
+    const regionalManagerId = async (): Promise<string | null> => {
+      if (!groupId || !isRmRoleEnabled()) return null;
+      const group = await this.prisma.hotelGroup.findUnique({
+        where: { id: groupId },
+        select: { regional_manager_user_id: true },
       });
-      const rmId = hotel?.hotel_group?.regional_manager_user_id;
-      // No RM assigned -> admin, matching getReviewQueue's own fallback.
+      const rmId = group?.regional_manager_user_id ?? null;
+      // Never route someone their own application.
+      return rmId && rmId !== record.user_id ? rmId : null;
+    };
+
+    if (role === UserRole.MANAGER) {
+      const rmId = await regionalManagerId();
       return rmId ? [rmId] : admins();
     }
 
-    // RM-created and admin-created both route to admin.
-    return admins();
+    // WORKER / CHECKER: their hotel's manager owns the review.
+    const hotelId = record.target_primary_hotel_id ?? record.primary_hotel_id ?? null;
+    if (hotelId) {
+      const hotel = await this.prisma.hotel.findUnique({
+        where: { id: hotelId },
+        select: { manager_user_id: true },
+      });
+      const managerId = hotel?.manager_user_id ?? null;
+      if (managerId && managerId !== record.user_id) return [managerId];
+    }
+
+    const rmId = await regionalManagerId();
+    return rmId ? [rmId] : admins();
   }
 
   /**
@@ -2038,21 +2055,6 @@ export class EmployeeManagementService extends BaseService {
         });
       }
     }
-  }
-
-  // Manager user ids who still head a hotel, i.e. who can still act on their
-  // own review queue. Anything created by a manager outside this set is
-  // orphaned -- neither that manager's queue nor an RM's would surface it --
-  // so admin picks it up. Replaces the previous
-  // managerIdsWithResolvableRegionalManager(), whose question ("does this
-  // manager have an RM above them?") stopped being the routing question once
-  // managers began reviewing their own creations.
-  private async activeManagerIds(): Promise<string[]> {
-    const hotels = await this.prisma.hotel.findMany({
-      where: { manager_user_id: { not: null } },
-      select: { manager_user_id: true },
-    });
-    return hotels.map((h) => h.manager_user_id).filter((id): id is string => id !== null);
   }
 
 

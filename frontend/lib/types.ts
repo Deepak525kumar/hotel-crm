@@ -1166,6 +1166,16 @@ export interface Contract {
   status: ContractStatus;
   employment_type: EmploymentType;
   scanned_document_id: string | null;
+  /**
+   * True when a signed copy of THIS contract is on file, by EITHER path: a
+   * manager-posted contract scan (`scanned_document_id`) or the applicant's
+   * own CONTRACT_SCAN document upload, which writes no Contract column.
+   * Render "signed copy received" from this, never from
+   * `scanned_document_id` — that field is blank for every applicant upload,
+   * which is what made the UI say "not uploaded" for a file the reviewer
+   * could see in the checklist.
+   */
+  signed_scan_uploaded: boolean;
   confirmed_by_id: string | null;
   confirmed_at: string | null;
   expires_at: string | null;

@@ -1,5 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { DeactivationReason, EmploymentStatus, SkillTag } from '@prisma/client';
+import { DeactivationReason, EmploymentStatus, SkillTag, UserRole } from '@prisma/client';
 
 /**
  * Service-level regression suite for Epic 5 PR 5.6 (SPEC-EMP-001 v0.2.0).
@@ -54,6 +54,12 @@ const mockPrisma: any = {
       { category: 'ADDRESS' },
       { category: 'WORK_PERMIT' }
     ]),
+    // approve()/rehire() now confirm an already-signed contract (the
+    // applicant's own CONTRACT_SCAN upload) as part of the review act.
+    // Defaults to "no scan on file", so the pre-existing approve/rehire
+    // expectations here still exercise the contract gate they were written
+    // for -- the auto-confirm is a no-op under this mock.
+    findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
   },
   contract: {
     findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
@@ -83,6 +89,14 @@ const mockPrisma: any = {
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+// Review routing consults the RM cutover flag (a manager application only
+// routes to a Regional Manager while the role is live). Stubbed rather than
+// loading the whole env: the flag's default is the platform default (off).
+jest.mock('../config/feature-flags.js', () => ({
+  isRmRoleEnabled: () => false,
+  isEmploymentRecordEnabled: () => true,
+  isGd02MatrixEnabled: () => false,
+}));
 jest.mock('../lib/logger.js', () => ({
   logger: {
     info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -676,7 +690,9 @@ describe('EmployeeManagementService', () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.REJECTED, employment_cycle: 1 })
       );
-      mockPrisma.contract.findFirst.mockResolvedValueOnce(null);
+      // Two lookups now: the auto-confirm step (nothing pending to confirm)
+      // and assertApprovedContract's own gate. Both must see "no contract".
+      mockPrisma.contract.findFirst.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
       await expect(service.rehire(admin as any, 'E-001')).rejects.toMatchObject({ name: 'ConflictError' });
       expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
@@ -891,6 +907,82 @@ describe('EmployeeManagementService', () => {
       );
 
       await expect(service.getByUserId(manager, 'user_1')).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+  });
+  // ── 2026-08-13 onboarding defect fixes ──────────────────────────────────
+  //
+  // Each case here pins one reported end-to-end defect. They are behavioural,
+  // not structural: if a future refactor reintroduces the old routing or the
+  // old contract gate, these fail.
+  describe('review-queue routing (reported: "why is admin seeing all the review requests")', () => {
+    const workerRecord = {
+      ...fakeRecord({
+        user_id: 'user_1',
+        submitted_for_review_at: new Date(),
+        target_primary_hotel_id: 'hotel_1',
+        target_hotel_group_id: 'group_1',
+        created_by_id: 'admin_1',
+        employment_cycle: 1,
+      }),
+      user: { id: 'user_1', role: UserRole.WORKER },
+      created_by: { id: 'admin_1', role: UserRole.ADMIN },
+    };
+
+    beforeEach(() => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([workerRecord]);
+      mockPrisma.contract.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]);
+      mockPrisma.workerDocument.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: 'mgr_1' });
+      mockPrisma.user.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([{ id: 'admin_1' }]);
+    });
+
+    it('routes a worker application to the manager of its target hotel, not to admin', async () => {
+      const manager = { userId: 'mgr_1', role: 'manager', scope: { type: 'hotel', hotel_id: 'hotel_1' } };
+
+      const managerQueue = await service.getReviewQueue(manager as any);
+      expect(managerQueue.map((r: any) => r.employee_id)).toEqual(['E-001']);
+
+      // Same record, admin actor: admin is the reviewer of LAST RESORT, and a
+      // hotel manager exists, so admin must not also see it. Admin claiming
+      // every admin-CREATED record is the reported defect -- under ADR-065
+      // admin creates almost every account.
+      const adminQueue = await service.getReviewQueue(admin as any);
+      expect(adminQueue).toEqual([]);
+    });
+
+    it('falls back to admin when the target hotel has no manager', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: null });
+
+      const adminQueue = await service.getReviewQueue(admin as any);
+      expect(adminQueue.map((r: any) => r.employee_id)).toEqual(['E-001']);
+    });
+  });
+
+  describe('re-onboarding (owner decision: contract only, documents preserved)', () => {
+    const returning = fakeRecord({
+      status: EmploymentStatus.PENDING,
+      employment_cycle: 2,
+      work_permit_required: false,
+      employment_type: 'FULL_TIME',
+    });
+
+    it('submits for review with no documents on file — only the contract is re-checked', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(returning);
+      // Nothing on file at all: the first-time gate would reject this outright.
+      mockPrisma.workerDocument.findMany.mockResolvedValue([]);
+      // A still-valid contract needs no fresh signature.
+      mockPrisma.contract.findFirst.mockResolvedValue({
+        id: 'c1',
+        status: 'ACTIVE',
+        expires_at: new Date(Date.now() + 86_400_000),
+        created_at: new Date(),
+      });
+      mockPrisma.employmentRecord.update.mockResolvedValue({ ...returning, submitted_for_review_at: new Date() });
+      mockPrisma.user.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]);
+
+      const self = { userId: 'user_1', role: 'worker', scope: null };
+      await expect(service.submitForReview(self as any, 'E-001')).resolves.toBeDefined();
+      expect(mockPrisma.employmentRecord.update).toHaveBeenCalled();
     });
   });
 });

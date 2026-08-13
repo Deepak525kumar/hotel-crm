@@ -146,7 +146,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
                 )}
               </DataList>
 
-              {contract.status === "PENDING" && !contract.scanned_document_id && (
+              {contract.status === "PENDING" && !contract.signed_scan_uploaded && (
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                   {/* 2026-08-13 contract feature: the single default contract
                       PDF -- the applicant downloads it, marks the printed
@@ -175,7 +175,12 @@ export function ContractCard({ workerId }: { workerId: string }) {
                     className="hidden"
                     onChange={onFileSelected}
                   />
-                  {!contract.scanned_document_id ? (
+                  {/* signed_scan_uploaded, not scanned_document_id: the
+                      applicant's own upload on My Onboarding sets no Contract
+                      column, so keying on the column left the manager stuck on
+                      "Upload signed contract" for a contract that had already
+                      been signed and returned. */}
+                  {!contract.signed_scan_uploaded ? (
                     <Button
                       size="sm"
                       variant="outline"

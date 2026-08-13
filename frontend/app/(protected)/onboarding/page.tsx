@@ -14,6 +14,7 @@ import { useState } from "react";
 export default function MyOnboardingPage() {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Shares BOTH the SWR cache key and the status vocabulary with the sidebar
   // entry and the dashboard callout (useMyOnboarding wraps this same
@@ -44,16 +45,30 @@ export default function MyOnboardingPage() {
   const isSubmitted = !!record.submitted_for_review_at;
   const isRejected = record.status === "REJECTED";
   const isActive = record.status === "ACTIVE";
+  // A returning employee (their previous engagement ended and was restored).
+  // Their documents are deliberately preserved and are NOT re-collected —
+  // re-onboarding checks the contract only (employee-management
+  // submitForReview).
+  const isReonboarding = (record.employment_cycle ?? 1) > 1;
 
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
+      setSubmitError(null);
       await employeesApi.submitForReview(record.employee_id);
       // Revalidates the shared ["employment-record", userId] key, so the
       // sidebar badge and dashboard callout update with this page.
       await refreshRecord();
-    } catch {
-      alert("Failed to submit for review. Ensure all required documents are uploaded.");
+    } catch (err) {
+      // The backend's message says exactly what is missing (which document,
+      // or that the signed contract has not been uploaded yet). The previous
+      // fixed alert() replaced all of that with a guess that was wrong for
+      // every contract-related failure.
+      setSubmitError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to submit for review. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -77,10 +92,12 @@ export default function MyOnboardingPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-          <Card title="Required Documents">
+          <Card title={isReonboarding ? "Your Documents" : "Required Documents"}>
             <div className="p-4 border-b border-gray-100 dark:border-gray-800">
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Please upload all required documents listed below. Once all documents are uploaded, you can submit your application for review.
+                {isReonboarding
+                  ? "Welcome back — the documents from your previous engagement are still on file and do not need to be uploaded again. Only your contract is re-checked."
+                  : "Please upload all required documents listed below. Once all documents are uploaded, you can submit your application for review."}
               </p>
             </div>
             <DocumentUploadList 
@@ -142,8 +159,13 @@ export default function MyOnboardingPage() {
                   >
                     Submit for Review
                   </Button>
+                  {submitError && (
+                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">{submitError}</p>
+                  )}
                   <p className="text-xs text-center text-gray-500 mt-2">
-                    Ensure all documents are marked as complete before submitting.
+                    {isReonboarding
+                      ? "Sign and upload your contract, then submit to your reviewer."
+                      : "Ensure all documents are marked as complete before submitting."}
                   </p>
                 </div>
               )}

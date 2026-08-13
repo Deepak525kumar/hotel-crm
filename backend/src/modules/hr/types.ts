@@ -38,6 +38,14 @@ export interface ContractDto {
   // generated_pdf_key is intentionally NOT exposed (matches WorkerDocumentDto's
   // s3_key omission convention, OD-DOC-017) — internal storage reference only.
   scanned_document_id: string | null;
+  /**
+   * True when a signed copy of THIS contract is on file — by either upload
+   * path: the manager-posted contract-scan (scanned_document_id) or the
+   * applicant's own CONTRACT_SCAN document upload, which writes no Contract
+   * column. Consumers must render "signed copy received" from this, never
+   * from scanned_document_id alone.
+   */
+  signed_scan_uploaded: boolean;
   confirmed_by_id: string | null;
   confirmed_at: string | null;
   expires_at: string | null;

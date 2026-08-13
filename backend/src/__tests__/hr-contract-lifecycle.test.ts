@@ -38,6 +38,12 @@ const mockNotificationEnqueue = jest.fn() as jest.MockedFunction<(...args: any[]
 const mockResolveNonAdminScopeFilter = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockIsWorkerInGroupScope = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
 const mockDeactivateForContractLapse = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+// 2026-08-13: confirmContractSigned/getContractStatus now also resolve the
+// APPLICANT-uploaded signed scan (a CONTRACT_SCAN WorkerDocument), because the
+// manager-upload path is not the one applicants actually use. Defaults to "no
+// such document", so every pre-existing expectation in this file keeps its
+// original meaning (scanned_document_id remains the only signal).
+const mockWorkerDocumentFindFirst = jest.fn(() => Promise.resolve(null)) as jest.MockedFunction<(...args: any[]) => any>;
 
 jest.mock('../lib/logger.js', () => ({
   logger: {
@@ -73,6 +79,7 @@ const txClient = {
   employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
   hotelGroup: { findUnique: mockHotelGroupFindUnique },
   auditLog: { create: mockAuditLogCreate },
+  workerDocument: { findFirst: mockWorkerDocumentFindFirst },
 };
 const mockTransaction = jest.fn((callback: (tx: typeof txClient) => Promise<unknown>) =>
   callback(txClient)
