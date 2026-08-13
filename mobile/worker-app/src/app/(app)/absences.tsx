@@ -1,4 +1,4 @@
-import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl } from 'react-native';
+import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useCallback } from 'react';
 import { ThemedText } from '@/components/themed-text';
@@ -19,8 +19,20 @@ const KIND_COLOR: Record<CalendarAbsenceKind, string> = {
   VACATION: '#3182CE',
 };
 
-function AbsenceCard({ item }: { item: CalendarAbsence }) {
+function AbsenceCard({
+  item,
+  onWithdraw,
+  withdrawing,
+}: {
+  item: CalendarAbsence;
+  onWithdraw: (item: CalendarAbsence) => void;
+  withdrawing: boolean;
+}) {
   const color = KIND_COLOR[item.kind];
+  // The backend refuses to delete a past absence, so offering the action on
+  // one would only ever produce an error. Same rule the web app applies.
+  const isPast = item.day < isoDateInCalendarTimezone(0);
+
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.cardRow} type="backgroundElement">
@@ -31,6 +43,23 @@ function AbsenceCard({ item }: { item: CalendarAbsence }) {
           </ThemedText>
         </ThemedView>
       </ThemedView>
+      {!isPast && (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Withdraw ${KIND_LABEL[item.kind].toLowerCase()} on ${formatDay(item.day)}`}
+          onPress={() => onWithdraw(item)}
+          disabled={withdrawing}
+          style={({ pressed }) => [styles.withdrawButton, { opacity: pressed || withdrawing ? 0.6 : 1 }]}
+        >
+          {withdrawing ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <ThemedText type="small" style={styles.withdrawText}>
+              Withdraw
+            </ThemedText>
+          )}
+        </Pressable>
+      )}
     </ThemedView>
   );
 }
@@ -42,6 +71,7 @@ export default function AbsencesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState<{ day: string; kind: CalendarAbsenceKind } | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -80,6 +110,40 @@ export default function AbsencesScreen() {
       } finally {
         setMarking(null);
       }
+    },
+    [load]
+  );
+
+  // Confirmed before firing: withdrawing does NOT restore a shift that was
+  // auto-cancelled when the absence was marked (the slot may already have been
+  // backfilled), so this is not a plain undo and should not feel like one.
+  const handleWithdraw = useCallback(
+    (item: CalendarAbsence) => {
+      Alert.alert(
+        `Withdraw ${KIND_LABEL[item.kind].toLowerCase()}?`,
+        `${formatDay(item.day)} will no longer be marked ${KIND_LABEL[item.kind].toLowerCase()}. A shift cancelled for this day is not automatically restored.`,
+        [
+          { text: 'Keep', style: 'cancel' },
+          {
+            text: 'Withdraw',
+            style: 'destructive',
+            onPress: async () => {
+              setErrorMessage(null);
+              setWithdrawingId(item.id);
+              try {
+                await api.calendar.deleteAbsence(item.id);
+                await load();
+              } catch (error) {
+                setErrorMessage(
+                  error instanceof ApiError ? error.message : 'Could not withdraw absence.'
+                );
+              } finally {
+                setWithdrawingId(null);
+              }
+            },
+          },
+        ]
+      );
     },
     [load]
   );
@@ -139,7 +203,13 @@ export default function AbsencesScreen() {
           <FlatList
             data={items}
             keyExtractor={(i) => i.id}
-            renderItem={({ item }) => <AbsenceCard item={item} />}
+            renderItem={({ item }) => (
+              <AbsenceCard
+                item={item}
+                onWithdraw={handleWithdraw}
+                withdrawing={withdrawingId === item.id}
+              />
+            )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
                 <ThemedText type="small" themeColor="textSecondary">
@@ -180,6 +250,15 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.two, padding: Spacing.three },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   badge: { borderRadius: Spacing.one, paddingHorizontal: Spacing.two, paddingVertical: 2 },
+  withdrawButton: {
+    alignSelf: 'flex-start',
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+  },
+  withdrawText: {
+    textDecorationLine: 'underline',
+  },
   badgeText: { color: '#fff', fontSize: 11 },
   empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center' },
 });
