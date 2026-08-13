@@ -355,6 +355,36 @@ describe('AuthService', () => {
         );
       });
 
+      // 2026-08-13 fix (reported live: My Profile showed a green "Active"
+      // badge for a still-Pending Manager). login()'s response seeds the
+      // same client store the Profile page reads, so it must carry
+      // employment_status too, not just getCurrentUser().
+      it('includes employment_status from the EmploymentRecord in the login response', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 0 })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue({ status: 'PENDING' });
+
+        const result = await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(result.user.employment_status).toBe('PENDING');
+      });
+
+      it('reports employment_status null when no EmploymentRecord exists', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          failingUser({ password_hash: hash, failed_login_count: 0 })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
+
+        const result = await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(result.user.employment_status).toBeNull();
+      });
+
       it('issues no counter write on a successful login when the streak is already zero', async () => {
         const hash = await bcrypt.hash('correctpassword', 4);
         mockPrisma.user.findUnique.mockResolvedValue(
@@ -562,6 +592,56 @@ describe('AuthService', () => {
 
       expect(result.id).toBe('user_1');
       expect(result.role).toBe('worker');
+      // Not selected by this mock -> employment_record is undefined ->
+      // must fall back to null, never crash on the optional chain.
+      expect(result.employment_status).toBeNull();
+    });
+
+    // 2026-08-13 fix (reported live): this endpoint is /auth/me, which My
+    // Profile and SessionBootstrap read the signed-in user from. It never
+    // selected the EmploymentRecord, so a still-onboarding user's own
+    // profile fell back to the account `is_active` flag (true from
+    // creation) and showed a green "Active" badge for someone who had not
+    // been approved at all.
+    it('reports the EmploymentRecord status, not the account is_active flag', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'user_2',
+        email: 'pending@test.com',
+        first_name: 'Pend',
+        last_name: 'Ing',
+        phone: null,
+        profile_photo_url: null,
+        role: 'MANAGER',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+        employment_record: { status: 'PENDING' },
+      });
+
+      const result = await service.getCurrentUser('user_2');
+
+      expect(result.employment_status).toBe('PENDING');
+      expect(result.is_active).toBe(true);
+    });
+
+    it('reports employment_status null for an account with no EmploymentRecord (e.g. admin)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin_1',
+        email: 'admin@test.com',
+        first_name: 'Ad',
+        last_name: 'Min',
+        phone: null,
+        profile_photo_url: null,
+        role: 'ADMIN',
+        is_active: true,
+        created_at: new Date(),
+        updated_at: new Date(),
+        employment_record: null,
+      });
+
+      const result = await service.getCurrentUser('admin_1');
+
+      expect(result.employment_status).toBeNull();
     });
 
     it('throws NotFoundError when user not found', async () => {

@@ -26,6 +26,12 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // login() reads this (read-only) to populate the response's
+  // employment_status field (2026-08-13 fix). Defaults to null, which
+  // leaves this suite's refresh-token-hash assertions unaffected.
+  employmentRecord: {
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  },
   // PR 5.4: AuthService.resolveScope reads these (read-only) during
   // login/signup/refreshToken to compute the JWT scope claim. Default
   // (unmocked) resolution returns undefined→null scope, which leaves this

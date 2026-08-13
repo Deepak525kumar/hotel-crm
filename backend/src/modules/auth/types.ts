@@ -53,6 +53,14 @@ export interface AuthUser {
   role: string;
   permissions: string[];
   is_active: boolean;
+  /**
+   * Employment lifecycle status, or null when no EmploymentRecord exists (an
+   * admin, or an account predating ADR-065's auto-creation). Distinct from
+   * `is_active` (the account/sign-in flag, true from creation) -- consumers
+   * must prefer this for "is this person actually onboarded/active," per
+   * users/service.ts's identical convention.
+   */
+  employment_status: string | null;
   created_at: string;
   updated_at?: string;
   // Calendar scoping (2026-08-10): the SAME scope already computed for the

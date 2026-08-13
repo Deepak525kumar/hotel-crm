@@ -24,7 +24,21 @@ export interface AuthUser {
   profile_photo_url?: string;
   role: Role;
   permissions: string[];
+  /**
+   * ACCOUNT flag only — "can this person sign in". True from the moment the
+   * account is created, so it does NOT mean the person has completed
+   * onboarding. Use `employment_status` for that; rendering `is_active`
+   * alone shows a green Active badge for someone who has not onboarded at
+   * all (mirrors `UserSummary.is_active`'s identical note).
+   */
   is_active: boolean;
+  /**
+   * Employment lifecycle status, or null when no EmploymentRecord exists (an
+   * admin, or an account predating ADR-065's auto-creation). Prefer this
+   * over `is_active` for "is this person actually active," same convention
+   * as `UserSummary`/`UserDetail`.
+   */
+  employment_status: EmploymentStatus | null;
   created_at: string;
   updated_at?: string;
   /**
