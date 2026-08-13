@@ -1982,6 +1982,27 @@ export class EmployeeManagementService extends BaseService {
    * notified, never an error -- a missing notification must not block a
    * submission.
    */
+  /**
+   * Would this creator actually be ALLOWED to act on this applicant?
+   *
+   * Routing must not hand someone a queue item they would be refused on
+   * click. assertLifecycleAuthority() blocks a Regional Manager from managing
+   * a Manager application while FEATURE_RM_ROLE is off, so during that window
+   * an RM-created manager application has to keep escalating to Admin --
+   * otherwise the RM sees work they cannot do, which is the mirror image of
+   * the silent-empty-queue problem.
+   *
+   * Mirrors assertLifecycleAuthority's rule deliberately. If that gate gains a
+   * condition, this must gain it too, or routing and authority drift apart
+   * again.
+   */
+  private creatorCanReview(creatorRole: string, applicantRole: UserRole): boolean {
+    if (creatorRole.toLowerCase() === 'regional_manager' && applicantRole === UserRole.MANAGER) {
+      return isRmRoleEnabled();
+    }
+    return true;
+  }
+
   private async resolveReviewerRecipients(
     record: EmploymentRecord,
     applicantRole?: UserRole
@@ -2002,6 +2023,40 @@ export class EmployeeManagementService extends BaseService {
           select: { role: true },
         })
       )?.role;
+
+    // The creator reviews what they created (owner decision, 2026-08-14).
+    //
+    // This routes BY HIERARCHY rather than around it. RULE A
+    // (lib/role-hierarchy.ts) already enforces "create is 1-level-down only"
+    // at creation time -- admin -> regional_manager -> manager ->
+    // worker/checker -- so the creator always outranks the applicant by
+    // exactly one level. Routing to them therefore cannot produce a peer
+    // approval (a manager can never have created another manager) and cannot
+    // route someone their own application (nobody creates their own account).
+    // canCreateRole() is re-checked here rather than assumed, so a record
+    // predating RULE A, or one whose creator has since changed role, falls
+    // through instead of handing review to someone who no longer outranks the
+    // applicant.
+    //
+    // Falls through to the target-group routing below when the creator is
+    // unknown (created_by_id is SetNull on user deletion), deactivated, or
+    // cannot act on this applicant -- see creatorCanReview().
+    const creatorId = record.created_by_id;
+    if (creatorId && creatorId !== record.user_id && role) {
+      const creator = await this.prisma.user.findUnique({
+        where: { id: creatorId },
+        select: { id: true, role: true, is_active: true, deleted_at: true },
+      });
+      if (
+        creator &&
+        creator.is_active &&
+        !creator.deleted_at &&
+        canCreateRole(creator.role, role) &&
+        this.creatorCanReview(creator.role, role)
+      ) {
+        return [creator.id];
+      }
+    }
 
     if (!role || role === UserRole.ADMIN || role === UserRole.REGIONAL_MANAGER) {
       return admins();

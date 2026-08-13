@@ -1113,6 +1113,171 @@ describe('EmployeeManagementService', () => {
     });
   });
 
+  /**
+   * Creator-reviews-their-own-hire (owner decision, 2026-08-14).
+   *
+   * Reported: "I created a manager from the regional manager's id and when I
+   * submitted the application it didn't show up in the regional manager's
+   * profile." Routing went by the applicant's TARGET GROUP, so the person who
+   * actually created the account was not the one asked to approve it.
+   *
+   * This routes BY hierarchy, not around it: RULE A (lib/role-hierarchy.ts)
+   * enforces create-is-1-level-down at creation time, so the creator always
+   * outranks the applicant by exactly one level. A peer approval is therefore
+   * unreachable, and so is routing someone their own application.
+   */
+  describe('review routing to the creator', () => {
+    const recordCreatedBy = (creatorId: string, applicantRole: UserRole) => ({
+      ...fakeRecord({
+        user_id: 'user_1',
+        submitted_for_review_at: new Date(),
+        target_hotel_group_id: 'group_1',
+        target_primary_hotel_id: 'hotel_1',
+        created_by_id: creatorId,
+        employment_cycle: 1,
+      }),
+      user: { id: 'user_1', role: applicantRole },
+    });
+
+    beforeEach(() => {
+      mockPrisma.contract.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]);
+      mockPrisma.workerDocument.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: 'other_mgr' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: 'other_rm' });
+      mockPrisma.user.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([{ id: 'admin_1' }]);
+    });
+
+    afterEach(() => {
+      rmRoleEnabled = false;
+    });
+
+    /** Runs the queue as `actor` and reports whether the record reached them. */
+    async function queueReaches(actor: Record<string, unknown>) {
+      const queue = await service.getReviewQueue(actor as never);
+      return queue.length > 0;
+    }
+
+    // The exact reported scenario.
+    it('routes an RM-created manager application to that RM, not to admin', async () => {
+      rmRoleEnabled = true;
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('rm_creator', UserRole.MANAGER),
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'rm_creator',
+        role: UserRole.REGIONAL_MANAGER,
+        is_active: true,
+        deleted_at: null,
+      });
+
+      await expect(
+        queueReaches({ userId: 'rm_creator', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'group_1' } })
+      ).resolves.toBe(true);
+      // Admin is the reviewer of LAST resort -- it must not also claim it.
+      await expect(
+        queueReaches({ userId: 'admin_1', role: 'admin', scope: { type: 'global' } })
+      ).resolves.toBe(false);
+    });
+
+    it('routes a manager-created worker application to that manager, not the target hotel\'s manager', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('mgr_creator', UserRole.WORKER),
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'mgr_creator',
+        role: UserRole.MANAGER,
+        is_active: true,
+        deleted_at: null,
+      });
+
+      await expect(
+        queueReaches({ userId: 'mgr_creator', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } })
+      ).resolves.toBe(true);
+      await expect(
+        queueReaches({ userId: 'other_mgr', role: 'manager', scope: { type: 'hotel', hotel_id: 'hotel_1' } })
+      ).resolves.toBe(false);
+    });
+
+    // Routing must not hand someone a queue item they would be refused on
+    // click: assertLifecycleAuthority blocks an RM from managing a Manager
+    // application while the RM role is off.
+    it('escalates to admin when the RM creator could not act on it anyway', async () => {
+      rmRoleEnabled = false;
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('rm_creator', UserRole.MANAGER),
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'rm_creator',
+        role: UserRole.REGIONAL_MANAGER,
+        is_active: true,
+        deleted_at: null,
+      });
+
+      await expect(
+        queueReaches({ userId: 'admin_1', role: 'admin', scope: { type: 'global' } })
+      ).resolves.toBe(true);
+    });
+
+    it('falls through when the creator is deactivated', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('mgr_creator', UserRole.WORKER),
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'mgr_creator',
+        role: UserRole.MANAGER,
+        is_active: false,
+        deleted_at: null,
+      });
+
+      await expect(
+        queueReaches({ userId: 'mgr_creator', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } })
+      ).resolves.toBe(false);
+      await expect(
+        queueReaches({ userId: 'other_mgr', role: 'manager', scope: { type: 'hotel', hotel_id: 'hotel_1' } })
+      ).resolves.toBe(true);
+    });
+
+    // created_by_id is SetNull when the creator's account is deleted.
+    it('falls through when the creator is unknown', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy(null as never, UserRole.WORKER),
+      ]);
+
+      await expect(
+        queueReaches({ userId: 'other_mgr', role: 'manager', scope: { type: 'hotel', hotel_id: 'hotel_1' } })
+      ).resolves.toBe(true);
+    });
+
+    // RULE A is re-checked rather than assumed: a record predating it, or one
+    // whose creator has since changed role, must not hand review to someone
+    // who no longer outranks the applicant.
+    it('falls through when the creator no longer outranks the applicant', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('mgr_creator', UserRole.MANAGER),
+      ]);
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'mgr_creator',
+        role: UserRole.MANAGER, // manager cannot create a manager under RULE A
+        is_active: true,
+        deleted_at: null,
+      });
+
+      await expect(
+        queueReaches({ userId: 'mgr_creator', role: 'manager', scope: { type: 'hotel', hotel_id: 'h9' } })
+      ).resolves.toBe(false);
+    });
+
+    it('never routes an applicant their own application', async () => {
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([
+        recordCreatedBy('user_1', UserRole.WORKER),
+      ]);
+
+      await expect(
+        queueReaches({ userId: 'user_1', role: 'worker', scope: { type: 'hotel', hotel_id: 'h9' } })
+      ).rejects.toThrow(/not authorized/);
+    });
+  });
+
   describe('review-queue routing (reported: "why is admin seeing all the review requests")', () => {
     const workerRecord = {
       ...fakeRecord({
@@ -1133,6 +1298,18 @@ describe('EmployeeManagementService', () => {
       mockPrisma.workerDocument.findMany.mockResolvedValue([]);
       mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: 'mgr_1' });
       mockPrisma.user.findMany = (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([{ id: 'admin_1' }]);
+      // Pinned, not inherited: jest.clearAllMocks() clears calls but NOT
+      // implementations, so a mockResolvedValue left on this shared mock by
+      // another describe survives into this one -- and creator-based routing
+      // reads it. This fixture's creator is the admin, who under RULE A cannot
+      // create a WORKER, so the record correctly falls through to the hotel's
+      // manager. Leaving it inherited made that outcome depend on test order.
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'admin_1',
+        role: UserRole.ADMIN,
+        is_active: true,
+        deleted_at: null,
+      });
     });
 
     it('routes a worker application to the manager of its target hotel, not to admin', async () => {
