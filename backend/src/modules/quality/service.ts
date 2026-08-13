@@ -16,6 +16,7 @@ import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
 import { ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
+import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 interface Actor {
   userId: string;
@@ -32,6 +33,45 @@ type RatingAggregateTx = Prisma.TransactionClient;
 // inside the same transaction, or the aggregate silently goes stale — see
 // assignments/service.ts's call from AssignmentService.update().
 export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_id: string) {
+  // 2026-08-13 fix (E2E integration audit -- "leaderboard sabotage"): this
+  // denominator used to be a raw count of EVERY WorkerAssignment row
+  // regardless of status, with zero filtering. completion_rate/on_time_rate
+  // are ratios against it, so that had two concrete failure modes, both
+  // reproducible in normal operation, neither the worker's doing:
+  //
+  //  1. A manager-cancelled shift (overstaffing, hotel closure, anything)
+  //     stayed in the denominator forever -- the numerator (completed) never
+  //     moves for a row that never happened, so every cancellation is a pure
+  //     drop in the worker's own rate, permanently, for an outcome they had
+  //     no part in.
+  //  2. A brand-new worker who accepted several of NEXT WEEK's shifts had
+  //     their completion rate crash toward 0% immediately, before any of
+  //     those shifts' scheduled day had even arrived -- picking up future
+  //     work penalized them exactly as if they'd failed to show up for it.
+  //
+  // Fixed by counting only assignments that have actually come DUE: a
+  // terminal outcome (COMPLETED/NO_SHOW, regardless of day -- these already
+  // happened) or an active assignment (CONFIRMED/IN_PROGRESS) whose `day`
+  // has arrived. CANCELLED and REASSIGNED are excluded outright, at any day
+  // -- neither describes a shift the worker was actually responsible for
+  // completing. A future CONFIRMED/IN_PROGRESS assignment is excluded until
+  // its day arrives, at which point it counts (and, from that day forward,
+  // resolves to COMPLETED/NO_SHOW/CANCELLED like any other -- this query is
+  // re-run by refreshWorkerOverallRating's every caller on the next status
+  // change, so it is never permanently stuck counting a now-past CONFIRMED
+  // row that should have transitioned).
+  const today = new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`);
+  const dueAssignmentWhere: Prisma.WorkerAssignmentWhereInput = {
+    worker_id,
+    OR: [
+      { status: { in: [AssignmentStatus.COMPLETED, AssignmentStatus.NO_SHOW] } },
+      {
+        status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
+        day: { lte: today },
+      },
+    ],
+  };
+
   const [agg, totalAssignments, completedAssignments, onTimeAttendance, lastWorked] =
     await Promise.all([
       tx.rating.aggregate({
@@ -39,7 +79,7 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         _avg: { score: true },
         _count: true,
       }),
-      tx.workerAssignment.count({ where: { worker_id } }),
+      tx.workerAssignment.count({ where: dueAssignmentWhere }),
       tx.workerAssignment.count({
         where: { worker_id, status: AssignmentStatus.COMPLETED },
       }),
