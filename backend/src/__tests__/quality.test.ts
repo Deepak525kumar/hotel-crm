@@ -2,6 +2,14 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { requirePermission } from '../middleware/permissions.js';
 
+// refreshWorkerOverallRating()'s 2026-08-13 due-date fix reads "today" via
+// this helper -- pinned for deterministic assertions, same pattern
+// calendar-entries.test.ts already establishes for the identical helper.
+jest.mock('../lib/utils.js', () => ({
+  ...(jest.requireActual('../lib/utils.js') as object),
+  todayInCalendarTimezone: () => '2026-08-13',
+}));
+
 jest.mock('../lib/logger.js', () => ({
   logger: {
     info: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -74,7 +82,7 @@ jest.mock('../config/env.js', () => ({
 }));
 
 import { QualityController } from '../modules/quality/controller.js';
-import { QualityService } from '../modules/quality/service.js';
+import { QualityService, refreshWorkerOverallRating } from '../modules/quality/service.js';
 import { CreateRatingSchema } from '../modules/quality/types.js';
 import { Prisma } from '@prisma/client';
 
@@ -655,5 +663,80 @@ describe('Quality getLeaderboard — pagination (ADR-035)', () => {
       has_next: true,
       has_prev: true,
     });
+  });
+});
+
+// 2026-08-13 fix (E2E integration audit -- "leaderboard sabotage"):
+// totalAssignments used to be a raw, unfiltered count of every
+// WorkerAssignment row, so a manager-cancelled shift or a future-dated
+// CONFIRMED shift both dragged a worker's completion/on-time rate down for
+// outcomes that were not (yet, or ever) their doing. This exercises
+// refreshWorkerOverallRating() directly against a minimal fake `tx`,
+// independent of QualityService's own request-handling tests above.
+describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-13 fix)', () => {
+  const makeTx = () => ({
+    rating: { aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    workerAssignment: {
+      count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
+        async (args: any) => {
+          // The completedAssignments count (status: COMPLETED only) is a
+          // second, distinct call -- only the FIRST call (the denominator)
+          // is asserted against assignmentCountWhere by the caller.
+          return args.where && 'OR' in args.where ? 3 : 1;
+        }
+      ),
+      findFirst: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
+    },
+    attendance: { count: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+  });
+
+  it('excludes CANCELLED and REASSIGNED from the denominator, at any day', async () => {
+    const tx = makeTx();
+    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.attendance.count.mockResolvedValue(1);
+    tx.workerAssignment.findFirst.mockResolvedValue(null);
+
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
+      (c) => c[0]?.where && 'OR' in c[0].where
+    );
+    expect(denominatorCall[0].where).toEqual({
+      worker_id: 'w1',
+      OR: [
+        { status: { in: ['COMPLETED', 'NO_SHOW'] } },
+        { status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, day: { lte: new Date('2026-08-13T00:00:00.000Z') } },
+      ],
+    });
+  });
+
+  it('includes a future-dated CONFIRMED/IN_PROGRESS shift once its day is <= today, excludes it before', async () => {
+    const tx = makeTx();
+    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.attendance.count.mockResolvedValue(0);
+    tx.workerAssignment.findFirst.mockResolvedValue(null);
+
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
+      (c) => c[0]?.where && 'OR' in c[0].where
+    );
+    const dayFilter = denominatorCall[0].where.OR[1].day;
+    expect(dayFilter).toEqual({ lte: new Date('2026-08-13T00:00:00.000Z') });
+  });
+
+  it('always includes COMPLETED/NO_SHOW regardless of day (a terminal outcome already happened)', async () => {
+    const tx = makeTx();
+    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.attendance.count.mockResolvedValue(0);
+    tx.workerAssignment.findFirst.mockResolvedValue(null);
+
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
+      (c) => c[0]?.where && 'OR' in c[0].where
+    );
+    expect(denominatorCall[0].where.OR[0]).toEqual({ status: { in: ['COMPLETED', 'NO_SHOW'] } });
   });
 });
