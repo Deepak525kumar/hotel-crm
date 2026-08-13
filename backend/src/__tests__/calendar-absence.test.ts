@@ -15,6 +15,7 @@ const mockCalendarAbsence = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  delete: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 const mockWorkerAssignment = {
   findFirst: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -827,5 +828,98 @@ describe('CalendarService.moveAbsence (drag-to-move, 2026-08-08 feature)', () =>
       (c: any) => c[0].data.user_id === 'w1'
     );
     expect(workerNotif).toBeUndefined();
+  });
+});
+
+/**
+ * Withdrawal gap (2026-08-13).
+ *
+ * Marking an absence auto-cancels that day's shift and releases the broadcast
+ * slot. Withdrawing the absence frees the worker again but deliberately does
+ * NOT un-cancel the shift -- the slot may already have been backfilled, so
+ * restoring it could exceed headcount or double-book the day.
+ *
+ * The gap was that nobody was told. The RM's existing "cancelled" notification
+ * said only that the absence went away; it never mentioned the shift cancelled
+ * as a consequence, so an unstaffed shift sat on the calendar with the worker
+ * showing as available and no prompt to re-staff it.
+ */
+describe('CalendarService.deleteAbsence — releasing an auto-cancelled shift', () => {
+  let service: CalendarService;
+  let restoreClock: () => void;
+
+  const rmNotif = () =>
+    mockNotification.create.mock.calls
+      .map((c: any) => c[0].data)
+      .find((d: any) => d.user_id === 'rm1');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new CalendarService();
+    restoreClock = fixedToday('2026-07-27');
+    mockCalendarAbsence.findUnique.mockResolvedValue({
+      id: 'abs1',
+      worker_id: 'w1',
+      day: new Date('2026-07-28T00:00:00.000Z'),
+      kind: 'SICK',
+    });
+    mockCalendarAbsence.delete.mockResolvedValue({ id: 'abs1' });
+    mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+    mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'rm1' });
+    mockUser.findUnique.mockResolvedValue({ first_name: 'Ada', last_name: 'Lovelace' });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+  });
+
+  afterEach(() => restoreClock());
+
+  it('only counts a shift cancelled BY the absence, not one cancelled deliberately', async () => {
+    await service.deleteAbsence('abs1', { userId: 'w1', role: 'worker' });
+
+    const where = mockWorkerAssignment.findFirst.mock.calls[0][0].where;
+    expect(where.status).toBe('CANCELLED');
+    expect(where.cancellation_reason.in).toEqual([
+      'Worker marked sick/vacation',
+      'Marked sick/vacation by a manager',
+    ]);
+  });
+
+  it('tells the manager the shift is still unstaffed when one was released', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1', hotel_id: 'h1' });
+
+    await service.deleteAbsence('abs1', { userId: 'w1', role: 'worker' });
+
+    const notif = rmNotif();
+    expect(notif.title).toBe('Shift needs re-staffing');
+    expect(notif.message).toContain('still unstaffed');
+    expect(notif.data).toMatchObject({ cancelled_assignment_id: 'a1', hotel_id: 'h1' });
+  });
+
+  it('keeps the plain wording when no shift was cancelled for that day', async () => {
+    await service.deleteAbsence('abs1', { userId: 'w1', role: 'worker' });
+
+    const notif = rmNotif();
+    expect(notif.title).not.toBe('Shift needs re-staffing');
+    expect(notif.data.cancelled_assignment_id).toBeUndefined();
+  });
+
+  // Restoring is a scheduling decision, not something to infer -- the slot may
+  // already have been backfilled by someone else.
+  it('never un-cancels the assignment', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1', hotel_id: 'h1' });
+
+    await service.deleteAbsence('abs1', { userId: 'w1', role: 'worker' });
+
+    expect(mockWorkerAssignment.update).not.toHaveBeenCalled();
+  });
+
+  it('records the left-cancelled shift on the audit entry', async () => {
+    mockWorkerAssignment.findFirst.mockResolvedValue({ id: 'a1', hotel_id: 'h1' });
+
+    await service.deleteAbsence('abs1', { userId: 'w1', role: 'worker' });
+
+    const audit = mockAuditLog.create.mock.calls
+      .map((c: any) => c[0].data)
+      .find((d: any) => d.action === 'DELETE_ABSENCE');
+    expect(audit.details).toMatchObject({ left_cancelled_assignment_id: 'a1' });
   });
 });
