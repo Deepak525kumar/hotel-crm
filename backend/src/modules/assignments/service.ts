@@ -1007,6 +1007,35 @@ export class AssignmentService extends BaseService {
   // hotel-scope check mirror placeOnCalendar() exactly, since a manager/RM
   // moving a placement is authorizing the same "can this actor schedule this
   // worker at this hotel" question create does, just for a different day.
+  //
+  // 2026-08-13 integration-audit fixes (E2E review of calendar/assignments/
+  // job-requests found this method was the one creation/mutation path that
+  // never went through either of the two checks every OTHER path enforces):
+  //
+  //  1. isWorkerAbsentOnDay() was never consulted. placeOnCalendar(),
+  //     reassign(), and acceptBroadcast() all block scheduling a worker onto
+  //     a day they've declared SICK/VACATION; a drag-and-drop move onto such
+  //     a day sailed through with no check at all.
+  //
+  //  2. A broadcast-accepted assignment (skill_slot_id set) kept counting
+  //     against its ORIGINAL day's broadcast slot after being dragged to a
+  //     different day -- moveCalendarEntry only ever touched
+  //     CalendarEntry.day/WorkerAssignment.day, never skill_slot_id or the
+  //     slot's confirmed_count. Two compounding failures followed: the
+  //     original day's broadcast reads permanently "filled" for a worker who
+  //     is no longer coming, and if that worker later cancels (including via
+  //     calendar/service.ts's own auto-cancel-on-sick-mark), the cancellation
+  //     path decrements confirmed_count on the ORIGINAL slot -- restocking a
+  //     broadcast for a day that was never actually vacated by this move.
+  //     Fixed by detaching the assignment from the broadcast the moment its
+  //     day changes: decrement the original slot's confirmed_count and clear
+  //     skill_slot_id/job_request_id, converting it into a plain calendar
+  //     placement (the identical null/null shape placeOnCalendar() already
+  //     produces) that stands on its own from here on -- exactly the
+  //     "cleanly detach" option, not blocking the move outright, since a
+  //     manager rescheduling a shift by a day is a legitimate action and the
+  //     broadcast that originally sourced the worker has no further claim on
+  //     where they end up.
   async moveCalendarEntry(
     calendarEntryId: string,
     input: MoveCalendarEntryInput,
@@ -1014,6 +1043,11 @@ export class AssignmentService extends BaseService {
   ): Promise<{ assignment: AssignmentDto; calendar_entry: CalendarEntryDto }> {
     const existing = await this.prisma.calendarEntry.findUnique({ where: { id: calendarEntryId } });
     if (!existing) throw new NotFoundError('Calendar entry not found');
+
+    const currentAssignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: existing.assignment_id },
+    });
+    if (!currentAssignment) throw new NotFoundError('Assignment not found');
 
     if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, existing.hotel_id);
@@ -1028,6 +1062,19 @@ export class AssignmentService extends BaseService {
     }
 
     const day = new Date(`${input.day}T00:00:00.000Z`);
+    const dayIsChanging = existing.day.getTime() !== day.getTime();
+
+    // Fix 1: same absence check every other creation/move path enforces.
+    if (dayIsChanging && (await isWorkerAbsentOnDay(existing.worker_id, day))) {
+      throw new ConflictError('Worker has a sick/vacation absence marked for this day');
+    }
+
+    // Fix 2: detach from the original broadcast slot when the day actually
+    // moves. Read outside the transaction (used to decide what to write
+    // inside it); re-read is unnecessary since skill_slot_id is immutable
+    // once set (only this code path or acceptBroadcast() ever touch it, and
+    // this is the only writer of a null-ing transition).
+    const detachingFromBroadcast = dayIsChanging && currentAssignment.skill_slot_id !== null;
 
     let updated;
     try {
@@ -1036,10 +1083,23 @@ export class AssignmentService extends BaseService {
           where: { id: calendarEntryId },
           data: { day },
         });
+
+        const assignmentData: Prisma.WorkerAssignmentUpdateInput = { day };
+        if (detachingFromBroadcast) {
+          assignmentData.skill_slot = { disconnect: true };
+          assignmentData.job_request = { disconnect: true };
+        }
         const assignment = await tx.workerAssignment.update({
           where: { id: existing.assignment_id },
-          data: { day },
+          data: assignmentData,
         });
+
+        if (detachingFromBroadcast && currentAssignment.skill_slot_id) {
+          await tx.jobRequestSkillSlot.update({
+            where: { id: currentAssignment.skill_slot_id },
+            data: { confirmed_count: { decrement: 1 } },
+          });
+        }
 
         // Job-dispatch lifecycle notification fix (2026-08-05): moving a
         // placement to a different day previously notified nobody -- the
@@ -1077,6 +1137,7 @@ export class AssignmentService extends BaseService {
       assignment_id: updated.assignment.id,
       from_day: existing.day.toISOString().slice(0, 10),
       to_day: input.day,
+      ...(detachingFromBroadcast ? { detached_from_skill_slot_id: currentAssignment.skill_slot_id } : {}),
     });
 
     return {
@@ -1094,6 +1155,20 @@ export class AssignmentService extends BaseService {
       ...(query.from && query.to
         ? { day: { gte: new Date(`${query.from}T00:00:00.000Z`), lte: new Date(`${query.to}T00:00:00.000Z`) } }
         : {}),
+      // 2026-08-13 fix ("ghost shifts", found in E2E audit and confirmed
+      // live on the production calendar grid): this query read CalendarEntry
+      // in complete isolation from its 1:1 WorkerAssignment, so a shift
+      // cancelled through ANY path -- a manager cancelling it directly, a
+      // worker cancelling their own, or calendar/service.ts's own
+      // auto-cancel-on-sick-mark -- left its CalendarEntry row exactly as-is.
+      // The grid kept showing a fully-staffed placement for a shift nobody
+      // was coming to. CANCELLED and REASSIGNED are both "this worker is not
+      // the one working this day anymore" outcomes (REASSIGNED's replacement
+      // is a brand-new WorkerAssignment with no CalendarEntry link of its
+      // own today -- a pre-existing, separate gap, not one this fix expands
+      // or narrows); COMPLETED/IN_PROGRESS/CONFIRMED/NO_SHOW all still mean
+      // "this placement is real," so only these two are excluded.
+      assignment: { status: { notIn: [AssignmentStatus.CANCELLED, AssignmentStatus.REASSIGNED] } },
     };
 
     // Workers see only their own calendar entries; admin/manager may filter

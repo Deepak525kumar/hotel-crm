@@ -25,8 +25,22 @@ jest.mock('../lib/utils.js', () => ({
 
 const mockWorkerAssignment = {
   findFirst: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  // 2026-08-13 fix: moveCalendarEntry() now reads the current assignment
+  // first (to know its skill_slot_id before deciding whether the move
+  // detaches it from a broadcast) -- default to a plain, non-broadcast
+  // CONFIRMED row so every existing move test that doesn't care about
+  // broadcast detachment keeps working unchanged.
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({
+    id: 'a1', worker_id: 'w1', hotel_id: 'h1', skill_slot_id: null, job_request_id: null,
+  }),
   count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
+// 2026-08-13 fix: moveCalendarEntry() decrements the original broadcast
+// slot's confirmed_count when detaching a moved assignment from it.
+const mockJobRequestSkillSlot = {
   update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
@@ -82,6 +96,7 @@ const mockPrisma = {
   attendance: { count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(0) },
   workerAssignment: mockWorkerAssignment,
   calendarEntry: mockCalendarEntry,
+  jobRequestSkillSlot: mockJobRequestSkillSlot,
   hotel: mockHotel,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
@@ -377,8 +392,107 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     beforeEach(() => {
       mockCalendarEntry.findUnique.mockReset();
       mockCalendarEntry.update.mockReset();
+      mockWorkerAssignment.findUnique.mockReset();
+      mockWorkerAssignment.findUnique.mockResolvedValue({
+        id: 'a1', worker_id: 'w1', hotel_id: 'h1', skill_slot_id: null, job_request_id: null,
+      });
       mockWorkerAssignment.update.mockReset();
       mockHotel.findUnique.mockReset();
+      mockCalendarAbsence.findFirst.mockReset();
+      mockCalendarAbsence.findFirst.mockResolvedValue(null);
+      mockJobRequestSkillSlot.update.mockReset();
+    });
+
+    // 2026-08-13 fix (E2E integration audit): every OTHER creation/move path
+    // (placeOnCalendar, reassign, acceptBroadcast) blocks scheduling a worker
+    // onto a day they've declared SICK/VACATION -- this was the one path that
+    // never checked, so a drag-and-drop move could land a shift directly on
+    // top of a declared absence.
+    it('blocks moving a placement onto a day the worker has a sick/vacation absence marked', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ worker_id: 'w1' }));
+      mockCalendarAbsence.findFirst.mockResolvedValue({ id: 'abs1' });
+
+      await expect(
+        service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' })
+      ).rejects.toThrow('Worker has a sick/vacation absence marked for this day');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('does not consult absences when the day is not actually changing', async () => {
+      mockCalendarEntry.findUnique.mockResolvedValue(
+        makeCalendarEntryRow({ worker_id: 'w1', day: new Date('2026-08-05T00:00:00.000Z') })
+      );
+      mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+
+      await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+      expect(mockCalendarAbsence.findFirst).not.toHaveBeenCalled();
+    });
+
+    // 2026-08-13 fix: a broadcast-accepted assignment (skill_slot_id set)
+    // must detach from its original slot when dragged to a new day, or the
+    // original day's broadcast reads permanently "filled" for a worker who
+    // is no longer coming.
+    describe('detaching from a broadcast slot on move', () => {
+      it('decrements the original skill slot and clears skill_slot_id/job_request_id when the day changes', async () => {
+        mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ worker_id: 'w1' }));
+        mockWorkerAssignment.findUnique.mockResolvedValue({
+          id: 'a1', worker_id: 'w1', hotel_id: 'h1', skill_slot_id: 'slot1', job_request_id: 'jr1',
+        });
+        mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+        mockWorkerAssignment.update.mockResolvedValue(
+          makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z'), skill_slot_id: null, job_request_id: null })
+        );
+
+        await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+        expect(mockWorkerAssignment.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'a1' },
+            data: expect.objectContaining({
+              day: new Date('2026-08-05T00:00:00.000Z'),
+              skill_slot: { disconnect: true },
+              job_request: { disconnect: true },
+            }),
+          })
+        );
+        expect(mockJobRequestSkillSlot.update).toHaveBeenCalledWith({
+          where: { id: 'slot1' },
+          data: { confirmed_count: { decrement: 1 } },
+        });
+      });
+
+      it('does NOT detach or decrement when the day is unchanged (same-day no-op move)', async () => {
+        mockCalendarEntry.findUnique.mockResolvedValue(
+          makeCalendarEntryRow({ worker_id: 'w1', day: new Date('2026-08-05T00:00:00.000Z') })
+        );
+        mockWorkerAssignment.findUnique.mockResolvedValue({
+          id: 'a1', worker_id: 'w1', hotel_id: 'h1', skill_slot_id: 'slot1', job_request_id: 'jr1',
+        });
+        mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+
+        await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+        expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+        const assignmentUpdateCall = mockWorkerAssignment.update.mock.calls[0]?.[0] as any;
+        expect(assignmentUpdateCall.data).toEqual({ day: new Date('2026-08-05T00:00:00.000Z') });
+      });
+
+      it('does NOT touch skill_slot for a plain (non-broadcast) placement moved to a new day', async () => {
+        mockCalendarEntry.findUnique.mockResolvedValue(makeCalendarEntryRow({ worker_id: 'w1' }));
+        // Default mockWorkerAssignment.findUnique already returns skill_slot_id: null.
+        mockCalendarEntry.update.mockResolvedValue(makeCalendarEntryRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+        mockWorkerAssignment.update.mockResolvedValue(makeAssignmentRow({ day: new Date('2026-08-05T00:00:00.000Z') }));
+
+        await service.moveCalendarEntry('ce1', { day: '2026-08-05' }, { userId: 'admin1', role: 'admin' });
+
+        expect(mockJobRequestSkillSlot.update).not.toHaveBeenCalled();
+        const assignmentUpdateCall = mockWorkerAssignment.update.mock.calls[0]?.[0] as any;
+        expect(assignmentUpdateCall.data).toEqual({ day: new Date('2026-08-05T00:00:00.000Z') });
+      });
     });
 
     it('admin moves a placement to a new day', async () => {
@@ -514,6 +628,35 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
   });
 
   describe('listCalendarEntries', () => {
+    // 2026-08-13 fix ("ghost shifts", confirmed live on the production
+    // calendar grid during E2E audit): a cancelled/reassigned assignment's
+    // CalendarEntry row was never touched by cancellation, so the grid kept
+    // showing a fully-staffed placement for a shift nobody was coming to.
+    it('excludes calendar entries whose underlying assignment is CANCELLED or REASSIGNED', async () => {
+      mockCalendarEntry.findMany.mockResolvedValue([]);
+      mockCalendarEntry.count.mockResolvedValue(0);
+
+      await service.listCalendarEntries({ page: 1, per_page: 20 } as any, {
+        userId: 'admin1',
+        role: 'admin',
+      });
+
+      expect(mockCalendarEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            assignment: { status: { notIn: ['CANCELLED', 'REASSIGNED'] } },
+          }),
+        })
+      );
+      expect(mockCalendarEntry.count).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            assignment: { status: { notIn: ['CANCELLED', 'REASSIGNED'] } },
+          }),
+        })
+      );
+    });
+
     it('worker sees only their own calendar entries', async () => {
       mockCalendarEntry.findMany.mockResolvedValue([makeCalendarEntryRow()]);
       mockCalendarEntry.count.mockResolvedValue(1);
