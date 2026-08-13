@@ -776,21 +776,47 @@ export interface CalendarEntryDto {
 }
 
 /**
- * Does this calendar entry still represent real staffing?
+ * Statuses where nobody is working the shift.
  *
- * `listCalendarEntries` deliberately RETURNS cancelled placements (so the grid
- * can render them struck-through rather than having a shift silently vanish),
- * which means every consumer that counts, sums, or reports on entries has to
- * exclude them itself. Shared rather than inlined: the first pass added the
- * cancelled state to the grid only, and three other surfaces — the range
- * breakdown's "Placements" and "Workers placed" tiles, and the calendar-entry
- * list — kept counting cancelled rows as staffed.
+ * CANCELLED — the placement was called off in advance.
+ * NO_SHOW    — the worker was expected and did not arrive.
+ *
+ * Different causes, same staffing consequence: the hotel has nobody there.
+ * A no-show counted as staffing is the more dangerous of the two, because it
+ * reads as covered on the day it most needs attention.
+ */
+const UNSTAFFED_STATUSES: ReadonlySet<AssignmentStatus> = new Set([
+  "CANCELLED",
+  "NO_SHOW",
+]);
+
+/**
+ * Does this calendar entry represent someone actually working?
+ *
+ * `listCalendarEntries` deliberately RETURNS these placements (so the grid can
+ * render them marked rather than having a shift silently vanish), which means
+ * every consumer that counts, sums, or reports on entries has to exclude them
+ * itself. Shared rather than inlined: the first pass added the cancelled state
+ * to the grid only, and three other surfaces — the range breakdown's
+ * "Placements" and "Workers placed" tiles, and the calendar-entry list — kept
+ * counting cancelled rows as staffed.
  *
  * Entries from older responses have no `assignment_status` at all; those are
  * treated as active, matching the pre-2026-08-13 behaviour.
  */
 export function isActivePlacement(entry: CalendarEntryDto): boolean {
-  return entry.assignment_status !== "CANCELLED";
+  return !entry.assignment_status || !UNSTAFFED_STATUSES.has(entry.assignment_status);
+}
+
+/**
+ * How an unstaffed placement should be labelled, or null when it is staffed.
+ * Returned rather than inferred per-surface so the grid, the breakdown and the
+ * list cannot drift into describing the same state differently.
+ */
+export function placementAbsenceLabel(entry: CalendarEntryDto): string | null {
+  if (entry.assignment_status === "CANCELLED") return "Cancelled";
+  if (entry.assignment_status === "NO_SHOW") return "No show";
+  return null;
 }
 
 /* -------------------------------------------------------------------------- */

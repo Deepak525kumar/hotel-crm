@@ -1,4 +1,4 @@
-import { isActivePlacement } from "@/lib/types";
+import { isActivePlacement, placementAbsenceLabel } from "@/lib/types";
 import type { CalendarEntryDto } from "@/lib/types";
 
 /**
@@ -30,7 +30,7 @@ describe("isActivePlacement", () => {
     expect(isActivePlacement(entry({ assignment_status: "CANCELLED" }))).toBe(false);
   });
 
-  it.each(["CONFIRMED", "IN_PROGRESS", "COMPLETED", "NO_SHOW"] as const)(
+  it.each(["CONFIRMED", "IN_PROGRESS", "COMPLETED"] as const)(
     "counts a %s placement as active",
     (status) => {
       expect(isActivePlacement(entry({ assignment_status: status }))).toBe(true);
@@ -43,10 +43,38 @@ describe("isActivePlacement", () => {
     expect(isActivePlacement(entry())).toBe(true);
   });
 
-  // NO_SHOW is deliberately active: the shift was staffed and the worker
-  // failed to appear, which is a different fact from the shift not existing.
-  // Counting it as unstaffed would hide the no-show from the manager.
-  it("does not treat NO_SHOW as unstaffed", () => {
-    expect(isActivePlacement(entry({ assignment_status: "NO_SHOW" }))).toBe(true);
+  // A no-show means nobody worked the shift, so it must not read as staffed --
+  // it is the case that most needs the manager's attention, and counting it as
+  // covered hides exactly that.
+  it("excludes a no-show", () => {
+    expect(isActivePlacement(entry({ assignment_status: "NO_SHOW" }))).toBe(false);
+  });
+});
+
+describe("placementAbsenceLabel", () => {
+  it.each([
+    ["CANCELLED", "Cancelled"],
+    ["NO_SHOW", "No show"],
+  ] as const)("labels %s as %s", (status, expected) => {
+    expect(placementAbsenceLabel(entry({ assignment_status: status }))).toBe(expected);
+  });
+
+  // The two unstaffed states have different causes and must stay
+  // distinguishable -- a cancellation was known in advance, a no-show was not.
+  it("distinguishes a cancellation from a no-show", () => {
+    expect(placementAbsenceLabel(entry({ assignment_status: "CANCELLED" }))).not.toBe(
+      placementAbsenceLabel(entry({ assignment_status: "NO_SHOW" })),
+    );
+  });
+
+  it.each(["CONFIRMED", "IN_PROGRESS", "COMPLETED"] as const)(
+    "returns no label for a staffed %s placement",
+    (status) => {
+      expect(placementAbsenceLabel(entry({ assignment_status: status }))).toBeNull();
+    },
+  );
+
+  it("returns no label when the status is absent entirely", () => {
+    expect(placementAbsenceLabel(entry())).toBeNull();
   });
 });

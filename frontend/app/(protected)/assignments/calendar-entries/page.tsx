@@ -24,7 +24,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
-import { isActivePlacement } from "@/lib/types";
+import { placementAbsenceLabel } from "@/lib/types";
 import type { CalendarEntryDto } from "@/lib/types";
 
 const PER_PAGE = 20;
@@ -35,7 +35,8 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
   // The API returns cancelled placements on purpose so they can be shown as
   // cancelled rather than vanishing. Without this the row was indistinguishable
   // from a live shift.
-  const cancelled = !isActivePlacement(entry);
+  const absenceLabel = placementAbsenceLabel(entry);
+  const cancelled = absenceLabel !== null;
 
   return (
     <TR className={cancelled ? "opacity-60" : undefined}>
@@ -45,7 +46,7 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
         </span>
         {cancelled && (
           <Badge tone="neutral" className="ml-2">
-            Cancelled
+            {absenceLabel}
           </Badge>
         )}
       </TD>

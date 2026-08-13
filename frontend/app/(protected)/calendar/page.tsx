@@ -24,6 +24,7 @@ import {
   Skeleton,
   Textarea,
 } from "@/components/ui";
+import { placementAbsenceLabel } from "@/lib/types";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
 import {
   DAY_LABEL,
@@ -716,12 +717,18 @@ function PlacementTag({
   size: "sm" | "md";
   onSelect: (entry: CalendarEntryDto) => void;
 }) {
-  // A placement cancelled through any path (manager cancel, worker cancel, or
-  // the auto-cancel that fires when a sick day is marked) stays on the grid so
-  // the day visibly shows it has lost its cover -- rendered struck-through in
-  // a muted tone, and not draggable, since rescheduling a cancelled shift is
-  // not a move the backend accepts.
-  const cancelled = entry.assignment_status === "CANCELLED";
+  // A placement nobody is working -- cancelled through any path (manager
+  // cancel, worker cancel, or the auto-cancel that fires when a sick day is
+  // marked), or a NO_SHOW where the worker simply never arrived -- stays on
+  // the grid so the day visibly shows it has lost its cover. Rendered
+  // struck-through in a muted tone and not draggable, since rescheduling one
+  // is not a move the backend accepts.
+  //
+  // The tag also carries an explicit label. Strikethrough alone put the whole
+  // meaning in the styling: a manager had to infer WHY a shift was struck out,
+  // and could not tell a cancellation apart from a no-show at a glance.
+  const absenceLabel = placementAbsenceLabel(entry);
+  const cancelled = absenceLabel !== null;
   return (
     <button
       type="button"
@@ -742,9 +749,12 @@ function PlacementTag({
       ]
         .filter(Boolean)
         .join(" ")}
-      title={cancelled ? `${label} — cancelled` : label}
+      title={absenceLabel ? `${label} — ${absenceLabel.toLowerCase()}` : label}
     >
       {label}
+      {absenceLabel && (
+        <span className="ml-1 whitespace-nowrap font-normal no-underline">· {absenceLabel}</span>
+      )}
     </button>
   );
 }
