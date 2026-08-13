@@ -174,21 +174,34 @@ export class UserService extends BaseService {
     // /users/:id detail page they now have a nav link to) — same exemption
     // as updateUser's target-role/scope check.
     if (isScopedManagerRole(actorRole) && userId !== actorId) {
-      if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
-        throw new ForbiddenError('User not in your scope');
-      }
-      // 2026-08-13 fix: a freshly-created worker/checker has no
-      // EmploymentRecord yet (created separately, later, via POST
-      // /employees) -- isWorkerInGroupScope has nothing to check against and
-      // always denies, so the manager/RM who JUST created this account could
-      // never view the profile they were redirected to. The creator is
-      // exempted from the scope check for their own creation, closing the
-      // gap without reopening an IDOR: only the actual creator gets this,
-      // not every manager who happens to share a scope, and it stops
-      // mattering the moment a real EmploymentRecord exists (the branch
-      // below still runs for everyone else, and for the creator too once
-      // isWorkerInGroupScope would itself resolve true).
+      // 2026-08-13 fix (reported: RM creates a Manager, is redirected to
+      // their profile, and gets "Failed to load this user. They may have
+      // been removed."). The creator-exemption below this block was added
+      // for exactly this redirect-after-create case, but it only ran AFTER
+      // the role check two lines down — which throws immediately for any
+      // role other than WORKER/CHECKER, before the exemption is ever
+      // reached. A Regional Manager legitimately creates Manager accounts
+      // too (RULE A, lib/role-hierarchy.ts), so that role check rejected the
+      // RM's own creation before checking who created it.
+      //
+      // Checking self-creation FIRST, and unconditionally, closes this
+      // without reopening an IDOR: canCreateRole() already gated which
+      // target roles this actor was allowed to create (lib/role-hierarchy.ts,
+      // enforced in createUser()), so "I created this account" is proof the
+      // account's role was one this actor was authorized to onboard in the
+      // first place — no separate role allowlist is needed for a
+      // self-created target. A manager/RM viewing an account they did NOT
+      // create still falls through to the original WORKER/CHECKER + group-
+      // scope check below.
       if (user.created_by_id !== actorId) {
+        if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
+          throw new ForbiddenError('User not in your scope');
+        }
+        // A freshly-created worker/checker has no EmploymentRecord yet
+        // (created separately, later, via POST /employees) --
+        // isWorkerInGroupScope has nothing to check against and always
+        // denies. Only reached here for a NON-creator now; the creator's own
+        // read of their own creation is already allowed above.
         const inScope = await isWorkerInGroupScope(actorScope, userId);
         if (!inScope) throw new ForbiddenError('User not in your scope');
       }
