@@ -102,6 +102,14 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   // expiry passes, so a status-only check would show "contract approved" for
   // a contract the backend's approve gate will reject as expired.
   const hasApprovedContract = contractStatus?.is_valid === true;
+  // 2026-08-13 fix: approve() now confirms a signed-but-unconfirmed contract
+  // as part of approving (the same fix applied to ReviewQueueTable) — this
+  // card is a second, separate surface that calls the same endpoint and had
+  // the same bug: gating solely on `is_valid` (already-confirmed) disabled
+  // Approve for every application whose applicant had returned their signed
+  // contract but nobody had visited HR's separate confirm screen yet.
+  const hasSignedContract = contractStatus?.signed_scan_uploaded === true;
+  const canApproveForWork = hasApprovedContract || hasSignedContract;
 
   // Refreshes this card's own cache entry plus every other SWR cache whose
   // key could now be stale after a lifecycle transition: the org chart (any
@@ -241,20 +249,25 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
 
               {record.status === "PENDING" && record.submitted_for_review_at && (
                 <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
-                  {!hasApprovedContract && contractStatus !== undefined && (
+                  {!canApproveForWork && contractStatus !== undefined && (
                     <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                      <p className="font-medium">Contract not yet approved</p>
+                      <p className="font-medium">Signed contract not yet on file</p>
                       <p className="mt-0.5">
-                        The worker must have an Active, Extended, or Permanent contract in HR before
-                        they can be approved for work.
+                        The worker must upload their signed contract before they can be approved
+                        for work.
                       </p>
+                    </div>
+                  )}
+                  {!hasApprovedContract && hasSignedContract && (
+                    <div className="rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-800 dark:text-blue-300">
+                      Signed contract received — approving will confirm it.
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
                     <Button
                       size="sm"
                       onClick={() => setApproveOpen(true)}
-                      disabled={!hasApprovedContract}
+                      disabled={!canApproveForWork}
                     >
                       Approve for work
                     </Button>

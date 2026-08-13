@@ -325,6 +325,21 @@ export class UserService extends BaseService {
             error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
           });
         }
+        // 2026-08-13 fix (reported: "error message when a user is created
+        // from a manager id"). This used to be a fixed, opaque sentence, so
+        // the ACTUAL cause -- almost always an authorization/scope condition
+        // the creator can fix, e.g. "Manager must have a scoped hotel_id to
+        // create an application" for a manager who heads no hotel yet -- was
+        // replaced by "please try again", which is exactly the wrong advice:
+        // retrying an unscoped manager fails identically every time.
+        //
+        // Rethrow the underlying error when it is one of our own typed
+        // errors (they carry deliberately user-facing messages and the right
+        // status code); fall back to the generic sentence only for genuinely
+        // unexpected failures, where the message may not be safe to surface.
+        if (error instanceof ForbiddenError || error instanceof ConflictError || error instanceof ValidationError) {
+          throw error;
+        }
         throw new ConflictError(
           'Account could not be created: setting up the onboarding record failed. Please try again.',
         );

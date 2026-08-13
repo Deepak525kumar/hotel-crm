@@ -114,6 +114,33 @@ response. For an RM, check `HotelGroup.regional_manager_user_id` instead.
 
 ---
 
+## Step 9 — Review-queue routing (each application in exactly ONE queue)
+
+Rewritten 2026-08-13. The queue is filtered by the **same** function that picks the
+"awaiting review" notification recipient (`resolveReviewerRecipients`), so the queue a record
+lands in and the person notified about it cannot disagree — they previously did. Routing is by
+**who the applicant is and where they are headed**, never by who created the account (under
+ADR-065 that is whoever created the *user*, usually an admin):
+
+| Applicant | Reviewer |
+|---|---|
+| Regional Manager | Admin |
+| Manager | RM of the target group; Admin if none, or while `FEATURE_RM_ROLE` is off |
+| Worker / Checker | manager of the target hotel → else that group's RM → else Admin |
+
+Submit one application of each tier, then `GET /employees/review-queue` as **each** of admin,
+the target hotel's manager, and the group's RM.
+
+**PASS:**
+- every submitted application appears in exactly **one** actor's queue (compare the three
+  responses — an id in two of them is a finding, and means two reviewers can act and the
+  second gets a stale-state error)
+- a Worker application with a managed target hotel does **not** appear in admin's queue
+- admin's queue contains an application only when no manager/RM can review it
+- the recipient of the `ONBOARDING_SUBMITTED` notification (check the `Notification` table)
+  is an actor whose queue actually contains that record
+- an applicant never reviews their own application
+
 ## Pass criteria summary
 
 - [ ] Admin must supply `target_hotel_group_id` for a Manager app; RM auto-fills its own
@@ -134,3 +161,6 @@ response. For an RM, check `HotelGroup.regional_manager_user_id` instead.
 | RM approved a Manager with the flag off | `isRmRoleEnabled()` never consulted in the authority check |
 | `password_hash` in responses (three separate times) | `include: { user: true }` without a `select` |
 | `assign {}` returned a silent 200 no-op | No `.refine()` requiring at least one target |
+| Admin saw every review request | Admin's branch claimed all admin-created records; under ADR-065 that is nearly all of them |
+| Reviewer notified could not see the record; reviewer who could was never told | Queue routing and notification routing were two independent implementations that drifted |
+| RM shown a Manager application they were forbidden to reject | Queue matched on `created_by_id` while the authority check refuses an RM while `FEATURE_RM_ROLE` is off |

@@ -485,7 +485,17 @@ export class HrService extends BaseService {
       where: { worker_id: workerId },
       orderBy: { created_at: 'desc' },
     });
-    return contract ? this.toDto(contract) : null;
+    if (!contract) return null;
+
+    // signed_scan_uploaded is what both the applicant's own card and the
+    // reviewer's modal render "signed copy received" from -- and it must
+    // account for the applicant's self-upload path, not only
+    // Contract.scanned_document_id, or the UI reports "not uploaded" for a
+    // file the reviewer can see in the document checklist directly above it.
+    const scannedDocumentId =
+      contract.scanned_document_id ?? (await this.findSignedScanDocumentId(workerId, contract.created_at));
+
+    return this.toDto(contract, scannedDocumentId != null);
   }
 
   // ---------------------------------------------------------------------------
@@ -576,8 +586,24 @@ export class HrService extends BaseService {
     if (!contract) {
       throw new NotFoundError('No pending contract found for this worker to confirm');
     }
+
+    // 2026-08-13 fix (reported: "contract is uploaded, still says not
+    // uploaded"). There are TWO ways a signed scan reaches the system:
+    //   (a) a manager/admin posts it to /hr/workers/:id/contract-scan, which
+    //       sets Contract.scanned_document_id, and
+    //   (b) the APPLICANT uploads it themselves as a CONTRACT_SCAN
+    //       WorkerDocument on My Onboarding (the signed-contract upload
+    //       field shipped in #431), which writes no Contract column at all.
+    // Path (b) is the one every applicant actually uses, and confirmation
+    // read only path (a)'s column -- so the manager saw an uploaded file in
+    // the checklist and a "no uploaded signed scan" error on confirm.
+    // Resolve the applicant-uploaded scan here and adopt it, rather than
+    // teaching the documents module about contracts (HR owns this link).
+    const scannedDocumentId =
+      contract.scanned_document_id ?? (await this.findSignedScanDocumentId(workerId, contract.created_at));
+
     // CRR §9 safeguard: confirmation without an uploaded file is rejected.
-    if (!contract.scanned_document_id) {
+    if (!scannedDocumentId) {
       throw new ValidationError('Cannot confirm a contract with no uploaded signed scan');
     }
 
@@ -594,6 +620,10 @@ export class HrService extends BaseService {
           confirmed_by_id: actorId,
           confirmed_at: now,
           expires_at: expiresAt,
+          // Persist the adopted applicant-uploaded scan so the evidence
+          // reference below (RULE-HR-15) points at a real, stored document
+          // for both upload paths, not just the manager-upload one.
+          scanned_document_id: scannedDocumentId,
         },
       });
 
@@ -608,7 +638,7 @@ export class HrService extends BaseService {
         'hr_contract.confirm_signed',
         'Contract',
         contract.id,
-        { worker_id: workerId, scanned_document_id: contract.scanned_document_id },
+        { worker_id: workerId, scanned_document_id: scannedDocumentId },
         actorIp,
         undefined,
         undefined,
@@ -621,6 +651,63 @@ export class HrService extends BaseService {
     logger.info('hr_contract_confirmed', { contractId: contract.id, workerId, confirmedBy: actorId });
 
     return this.toDto(updated);
+  }
+
+  /**
+   * The applicant-uploaded signed scan for a contract, if one exists.
+   *
+   * "For a contract" is a date comparison, not just a category match: a scan
+   * uploaded against a PREVIOUS contract says nothing about the current one,
+   * which is exactly the re-onboarding case where a fresh contract was just
+   * issued. Same predicate employee-management's submit-for-review gate uses,
+   * so the two cannot disagree about whether a contract has been signed.
+   */
+  async findSignedScanDocumentId(workerId: string, contractCreatedAt: Date): Promise<string | null> {
+    const doc = await this.prisma.workerDocument.findFirst({
+      where: {
+        worker_id: workerId,
+        category: 'CONTRACT_SCAN',
+        created_at: { gte: contractCreatedAt },
+      },
+      orderBy: { created_at: 'desc' },
+      select: { id: true },
+    });
+    return doc?.id ?? null;
+  }
+
+  /**
+   * Confirms the worker's PENDING contract when the signed scan is already on
+   * file, attributing the confirmation to `actorId`.
+   *
+   * Called by employee-management's approve(): a reviewer approving an
+   * application IS the manager reviewing the returned signed contract
+   * (RULE-HR-03) -- it is the same human act, and requiring them to walk to a
+   * separate HR screen and press a second button is what made the Approve
+   * button appear broken (it 409'd on assertApprovedContract every time,
+   * because nothing had flipped the contract to ACTIVE).
+   *
+   * Returns false, without throwing, when there is nothing to confirm (no
+   * PENDING contract, or no signed scan yet) -- the caller's own gate then
+   * produces the user-facing message, so this method never invents one.
+   */
+  async confirmSignedContractIfPending(
+    workerId: string,
+    actorId: string,
+    actorRole: string,
+    actorIp?: string
+  ): Promise<boolean> {
+    const contract = await this.prisma.contract.findFirst({
+      where: { worker_id: workerId, status: ContractStatus.PENDING },
+      orderBy: { created_at: 'desc' },
+    });
+    if (!contract) return false;
+
+    const scannedDocumentId =
+      contract.scanned_document_id ?? (await this.findSignedScanDocumentId(workerId, contract.created_at));
+    if (!scannedDocumentId) return false;
+
+    await this.confirmContractSigned(workerId, actorId, actorRole, actorIp);
+    return true;
   }
 
   // ---------------------------------------------------------------------------
@@ -1131,7 +1218,11 @@ export class HrService extends BaseService {
     expires_at: Date | null;
     created_at: Date;
     updated_at: Date;
-  }): ContractDto {
+  },
+  // Defaults to the stored column so every existing call site keeps its
+  // previous meaning; getContractStatus passes the resolved value, which
+  // additionally covers the applicant's own upload path.
+  signedScanUploaded?: boolean): ContractDto {
     return {
       id: contract.id,
       worker_id: contract.worker_id,
@@ -1142,6 +1233,7 @@ export class HrService extends BaseService {
       status: contract.status as ContractStatusType,
       employment_type: contract.employment_type,
       scanned_document_id: contract.scanned_document_id,
+      signed_scan_uploaded: signedScanUploaded ?? contract.scanned_document_id != null,
       confirmed_by_id: contract.confirmed_by_id,
       confirmed_at: contract.confirmed_at ? contract.confirmed_at.toISOString() : null,
       expires_at: contract.expires_at ? contract.expires_at.toISOString() : null,

@@ -57,6 +57,11 @@ export function MyContractCard({ workerId }: { workerId: string }) {
                 value={
                   contract.is_valid ? (
                     <Badge tone="success">Active</Badge>
+                  ) : contract.signed_scan_uploaded ? (
+                    // Their signed copy is on file — the outstanding action is
+                    // the reviewer's, not theirs. Showing "Awaiting signature"
+                    // here told them to do something they had already done.
+                    <Badge tone="info">Signed copy received — awaiting confirmation</Badge>
                   ) : contract.is_expired ? (
                     <Badge tone="danger">Expired</Badge>
                   ) : (
@@ -73,10 +78,21 @@ export function MyContractCard({ workerId }: { workerId: string }) {
             {!contract.is_valid && (
               <div className="space-y-3 border-t border-gray-100 pt-4 dark:border-gray-800">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Download your contract, mark it as{" "}
-                  <span className="font-medium">{EMPLOYMENT_TYPE_LABEL[contract.employment_type]}</span>, sign it,
-                  and return the signed copy to your manager. They will confirm it, which is
-                  required before your onboarding can be approved.
+                  {contract.signed_scan_uploaded ? (
+                    <>
+                      Your signed contract has been received and is with your reviewer. You can
+                      download the contract again below if you need to replace the copy you
+                      uploaded.
+                    </>
+                  ) : (
+                    <>
+                      Download your contract, mark it as{" "}
+                      <span className="font-medium">{EMPLOYMENT_TYPE_LABEL[contract.employment_type]}</span>, sign
+                      it, and upload the signed copy under <span className="font-medium">Signed Contract</span> in
+                      your document list. Your reviewer confirms it when they approve your
+                      onboarding.
+                    </>
+                  )}
                 </p>
                 {/* Same-origin navigation; the backend sets
                     Content-Disposition: attachment, so this downloads rather
