@@ -1,5 +1,9 @@
 // jest.mock calls are hoisted before imports — mocks are in place before
 // auth-store.ts runs its module-level setOnTokenRefreshed/setOnAuthFailure calls.
+import * as SecureStore from 'expo-secure-store';
+import { useAuthStore } from '@/stores/auth-store';
+import { api, setAccessToken, setRefreshToken, getAccessToken, getRefreshToken } from '@/lib/api';
+
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
 jest.mock('@/lib/api', () => ({
   api: {
@@ -16,10 +20,6 @@ jest.mock('@/lib/api', () => ({
   getAccessToken: jest.fn(),
   getRefreshToken: jest.fn(),
 }));
-
-import * as SecureStore from 'expo-secure-store';
-import { useAuthStore } from '@/stores/auth-store';
-import { api, setAccessToken, setRefreshToken, getAccessToken, getRefreshToken } from '@/lib/api';
 
 const mockSecureStore = SecureStore as unknown as {
   getItemAsync: jest.Mock;

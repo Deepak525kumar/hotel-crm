@@ -14,10 +14,10 @@ import type { ContractDto, PayslipRequestDto } from '@/types/api';
 export default function HRScreen() {
   const router = useRouter();
   const { user } = useAuthStore();
-
+  
   const [contract, setContract] = useState<ContractDto | null>(null);
   const [requests, setRequests] = useState<PayslipRequestDto[]>([]);
-
+  
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -41,6 +41,7 @@ export default function HRScreen() {
   }, [user]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -51,12 +52,12 @@ export default function HRScreen() {
 
   const handleRequestPayslip = () => {
     if (!user) return;
-
+    
     // Default to last month
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-
+    
     const start = firstDay.toISOString().split('T')[0];
     const end = lastDay.toISOString().split('T')[0];
 
@@ -65,8 +66,8 @@ export default function HRScreen() {
       `Would you like to request your payslip for ${firstDay.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Request',
+        { 
+          text: 'Request', 
           onPress: async () => {
             try {
               await api.hr.requestPayslip({
@@ -93,7 +94,7 @@ export default function HRScreen() {
             ← Back
           </ThemedText>
         </Pressable>
-
+        
         <ThemedText type="subtitle" style={styles.header}>
           HR & Payroll
         </ThemedText>
