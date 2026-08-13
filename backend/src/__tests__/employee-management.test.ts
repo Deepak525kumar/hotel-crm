@@ -92,8 +92,12 @@ jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
 // Review routing consults the RM cutover flag (a manager application only
 // routes to a Regional Manager while the role is live). Stubbed rather than
 // loading the whole env: the flag's default is the platform default (off).
+// Toggleable so the RM-enabled path can be exercised too; defaults to the
+// platform default (off), so every test that does not opt in behaves exactly
+// as before.
+let rmRoleEnabled = false;
 jest.mock('../config/feature-flags.js', () => ({
-  isRmRoleEnabled: () => false,
+  isRmRoleEnabled: () => rmRoleEnabled,
   isEmploymentRecordEnabled: () => true,
   isGd02MatrixEnabled: () => false,
 }));
@@ -1033,6 +1037,82 @@ describe('EmployeeManagementService', () => {
   // Each case here pins one reported end-to-end defect. They are behavioural,
   // not structural: if a future refactor reintroduces the old routing or the
   // old contract gate, these fail.
+  /**
+   * Read/write consistency while the RM role is disabled.
+   *
+   * resolveScope() grants an RM their hotel_group scope without consulting
+   * FEATURE_RM_ROLE, so they sign in and reach the queue normally -- but
+   * resolveReviewerRecipients() DOES consult it and returns no RM, so every
+   * record routes to Admin and the queue filters down to nothing. An empty
+   * queue reads as "no applications waiting", indistinguishable from genuinely
+   * having none, while the write path refuses the same actor with an explicit
+   * reason. Reported live: a manager application created under an RM never
+   * appeared for any RM.
+   */
+  describe('review queue while the RM role is disabled', () => {
+    const rmActor = {
+      userId: 'rm_1',
+      role: 'regional_manager',
+      permissions: [],
+      scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+    } as never;
+
+    afterEach(() => {
+      rmRoleEnabled = false;
+    });
+
+    it('tells the RM why, instead of returning an empty queue', async () => {
+      rmRoleEnabled = false;
+      await expect(service.getReviewQueue(rmActor)).rejects.toThrow(
+        /Regional Manager role is disabled/
+      );
+    });
+
+    // The same actor is already refused on the write path; the read path must
+    // not disagree by silently showing nothing.
+    it('matches the refusal the write path already gives', async () => {
+      rmRoleEnabled = false;
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
+
+      await expect(service.approve(rmActor, 'E-001')).rejects.toThrow(/RM role is disabled/);
+      await expect(service.getReviewQueue(rmActor)).rejects.toThrow(/role is disabled/);
+    });
+
+    it('serves the queue normally once the role is enabled', async () => {
+      rmRoleEnabled = true;
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([]);
+
+      await expect(service.getReviewQueue(rmActor)).resolves.toEqual([]);
+    });
+
+    // Admin is the reviewer of last resort and must never be blocked by this.
+    it('does not affect admin', async () => {
+      rmRoleEnabled = false;
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.getReviewQueue({ userId: 'a1', role: 'admin', permissions: [], scope: { type: 'global' } } as never)
+      ).resolves.toEqual([]);
+    });
+
+    it('does not affect a hotel manager', async () => {
+      rmRoleEnabled = false;
+      mockPrisma.employmentRecord.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.getReviewQueue({
+          userId: 'm1',
+          role: 'manager',
+          permissions: [],
+          scope: { type: 'hotel', hotel_id: 'h1' },
+        } as never)
+      ).resolves.toEqual([]);
+    });
+  });
+
   describe('review-queue routing (reported: "why is admin seeing all the review requests")', () => {
     const workerRecord = {
       ...fakeRecord({
