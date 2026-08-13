@@ -866,8 +866,9 @@ export class AssignmentService extends BaseService {
     return this.toRoomsCompletedDto(updated, enteredByName);
   }
 
-  private toCalendarEntryDto(c: CalendarEntry): CalendarEntryDto {
+  private toCalendarEntryDto(c: CalendarEntry, assignmentStatus?: AssignmentStatus): CalendarEntryDto {
     return {
+      ...(assignmentStatus ? { assignment_status: assignmentStatus } : {}),
       id: c.id,
       assignment_id: c.assignment_id,
       worker_id: c.worker_id,
@@ -1168,7 +1169,15 @@ export class AssignmentService extends BaseService {
       // own today -- a pre-existing, separate gap, not one this fix expands
       // or narrows); COMPLETED/IN_PROGRESS/CONFIRMED/NO_SHOW all still mean
       // "this placement is real," so only these two are excluded.
-      assignment: { status: { notIn: [AssignmentStatus.CANCELLED, AssignmentStatus.REASSIGNED] } },
+      //
+      // 2026-08-13 follow-up: the original fix excluded CANCELLED too, which
+      // over-corrected -- a shift cancelled by a sick-leave mark then vanished
+      // from the grid with no trace, so a manager could not see that the day
+      // had lost its cover. CANCELLED is now returned and carries its status
+      // through to the DTO so the grid can render it as a cancelled card.
+      // REASSIGNED stays excluded: its replacement assignment is a different
+      // row, so showing it would double-count the day.
+      assignment: { status: { not: AssignmentStatus.REASSIGNED } },
     };
 
     // Workers see only their own calendar entries; admin/manager may filter
@@ -1213,6 +1222,7 @@ export class AssignmentService extends BaseService {
     const [records, total] = await Promise.all([
       this.prisma.calendarEntry.findMany({
         where,
+        include: { assignment: { select: { status: true } } },
         skip: (query.page - 1) * query.per_page,
         take: query.per_page,
         orderBy: { day: 'desc' },
@@ -1220,7 +1230,10 @@ export class AssignmentService extends BaseService {
       this.prisma.calendarEntry.count({ where }),
     ]);
 
-    return { data: records.map((r) => this.toCalendarEntryDto(r)), total };
+    return {
+      data: records.map((r) => this.toCalendarEntryDto(r, r.assignment?.status)),
+      total,
+    };
   }
 }
 
