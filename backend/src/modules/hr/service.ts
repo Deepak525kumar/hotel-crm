@@ -330,6 +330,49 @@ export class HrService extends BaseService {
     );
   }
 
+  /**
+   * Stands an active contract down when the employment it belongs to ends or
+   * is refused (2026-08-13 audit finding: contract/onboarding desync).
+   *
+   * HR can confirm a signature independently of the manager's approval
+   * decision, so a worker could end up REJECTED or DELETED while still
+   * holding a contract the system reported as ACTIVE, with its expiry clock
+   * running.
+   *
+   * Expires the contract rather than introducing a new status: RULE-HR-06 /
+   * REQ-HR-006 state that only PENDING/ACTIVE/EXTENDED/PERMANENT are
+   * reachable, and adding a fifth ("VOIDED") is a schema and product decision
+   * that needs its own ratification -- not something to slip in as part of a
+   * bug fix. Setting expires_at to now makes isContractValid() report false
+   * immediately through the mechanism that already exists, which is what
+   * every gate actually reads. The row itself is preserved as history.
+   *
+   * Best-effort by design: it must never block the lifecycle transition that
+   * triggered it (the rejection/termination is the real outcome).
+   */
+  async standDownContractsFor(workerId: string, reason: string): Promise<void> {
+    try {
+      const now = new Date();
+      const { count } = await this.prisma.contract.updateMany({
+        where: {
+          worker_id: workerId,
+          status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED, ContractStatus.PERMANENT] },
+          OR: [{ expires_at: null }, { expires_at: { gt: now } }],
+        },
+        data: { expires_at: now },
+      });
+      if (count > 0) {
+        logger.info('hr_contracts_stood_down', { workerId, count, reason });
+      }
+    } catch (error) {
+      logger.error('hr_contract_stand_down_failed', {
+        workerId,
+        reason,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   private async createDefaultContract(
     workerId: string,
     jobTitle: string,

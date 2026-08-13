@@ -27,18 +27,21 @@ jest.mock('../lib/logger.js', () => ({
   },
 }));
 
+const mockWorkerDocumentDelete = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+
 jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     workerDocument: {
       create: mockWorkerDocumentCreate,
       findMany: mockWorkerDocumentFindMany,
       findUnique: mockWorkerDocumentFindUnique,
+      delete: mockWorkerDocumentDelete,
     },
     employmentRecord: { findUnique: mockEmploymentRecordFindUnique },
     hotel: { findUnique: mockHotelFindUnique },
     auditLog: { create: mockAuditLogCreate },
     $transaction: jest.fn(async (cb: any) => cb({
-      workerDocument: { create: mockWorkerDocumentCreate },
+      workerDocument: { create: mockWorkerDocumentCreate, delete: mockWorkerDocumentDelete },
       auditLog: { create: mockAuditLogCreate }
     })) as jest.MockedFunction<(...args: any[]) => any>,
   }),
@@ -316,6 +319,98 @@ describe('DocumentService (SPEC-DOCUMENTS-001, GD-16)', () => {
       const required = await service.getDocumentCompleteness('w1', true);
       expect(required.is_complete).toBe(false);
       expect(required.missing_categories).toEqual(['WORK_PERMIT']);
+    });
+  });
+
+  // 2026-08-13 onboarding audit, finding #1 (critical). A worker could submit
+  // a COMPLETE application and then delete mandatory documents while it sat in
+  // the reviewer's queue, leaving the reviewer approving an application that
+  // was silently missing legally required files. Reproduced end-to-end before
+  // the fix; pinned here so it cannot regress silently.
+  describe('deleteDocument — review lock', () => {
+    const doc = {
+      id: 'd1',
+      worker_id: 'w1',
+      category: 'PASSPORT',
+      s3_key: 'k',
+      original_filename: 'p.pdf',
+      hr_contract_scan: null,
+    };
+
+    beforeEach(() => {
+      mockWorkerDocumentFindUnique.mockReset();
+      mockWorkerDocumentDelete.mockReset();
+      mockEmploymentRecordFindUnique.mockReset();
+      mockAuditLogCreate.mockReset();
+      mockAuditLogCreate.mockResolvedValue({});
+      mockWorkerDocumentDelete.mockResolvedValue({});
+    });
+
+    it('refuses deletion while the application is awaiting review', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(doc);
+      mockEmploymentRecordFindUnique.mockResolvedValue({
+        status: 'PENDING',
+        submitted_for_review_at: new Date(),
+      });
+
+      await expect(service.deleteDocument('d1', 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+      // The denial must be a NON-WRITE: a 403 that still deleted the row
+      // would be worse than no check at all.
+      expect(mockWorkerDocumentDelete).not.toHaveBeenCalled();
+    });
+
+    it('allows deletion before submission (the applicant is still editing)', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(doc);
+      mockEmploymentRecordFindUnique.mockResolvedValue({
+        status: 'PENDING',
+        submitted_for_review_at: null,
+      });
+
+      await service.deleteDocument('d1', 'w1', 'worker');
+      expect(mockWorkerDocumentDelete).toHaveBeenCalledTimes(1);
+    });
+
+    // Compliance: an employed worker must not be able to destroy records the
+    // company is legally required to retain. The first version of this lock
+    // only covered PENDING applications and disengaged the moment someone was
+    // hired, which is the wider hole.
+    it('refuses deletion once the worker is ACTIVE (compliance records)', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(doc);
+      mockEmploymentRecordFindUnique.mockResolvedValue({
+        status: 'ACTIVE',
+        submitted_for_review_at: new Date(),
+      });
+
+      await expect(service.deleteDocument('d1', 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+      expect(mockWorkerDocumentDelete).not.toHaveBeenCalled();
+    });
+
+    it('refuses deletion for a DEACTIVATED worker (still employed, just paused)', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(doc);
+      mockEmploymentRecordFindUnique.mockResolvedValue({
+        status: 'DEACTIVATED',
+        submitted_for_review_at: new Date(),
+      });
+
+      await expect(service.deleteDocument('d1', 'w1', 'worker')).rejects.toMatchObject({
+        name: 'ForbiddenError',
+      });
+      expect(mockWorkerDocumentDelete).not.toHaveBeenCalled();
+    });
+
+    it('allows deletion after a rejection, so the wrong document can be replaced', async () => {
+      mockWorkerDocumentFindUnique.mockResolvedValue(doc);
+      mockEmploymentRecordFindUnique.mockResolvedValue({
+        status: 'REJECTED',
+        submitted_for_review_at: new Date(),
+      });
+
+      await service.deleteDocument('d1', 'w1', 'worker');
+      expect(mockWorkerDocumentDelete).toHaveBeenCalledTimes(1);
     });
   });
 });

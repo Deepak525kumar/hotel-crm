@@ -53,6 +53,7 @@ export interface UserFormValues {
   job_title: string;
   start_date: string;
   employment_type: EmploymentType | "";
+  work_permit_required: boolean;
 }
 
 /** Submitted shape: unlike form state, blank phone becomes `null`, not `""`. */
@@ -75,6 +76,7 @@ function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserF
     job_title: "",
     start_date: "",
     employment_type: "",
+    work_permit_required: false,
   };
 }
 
@@ -251,6 +253,11 @@ export function UserForm({
                   onChange={(e) => set("start_date", e.target.value)}
                 />
               </div>
+              <Checkbox
+                label="Requires a work permit (non-EU/EEA/Swiss)"
+                checked={form.work_permit_required}
+                onChange={(e) => set("work_permit_required", e.target.checked)}
+              />
               <Select
                 label="Employment type"
                 value={form.employment_type}

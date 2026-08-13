@@ -66,6 +66,23 @@ const mockPrisma = {
 };
 
 jest.mock('../lib/db.js', () => ({ getPrisma: () => mockPrisma }));
+
+// ADR-065: createUser auto-creates the EmploymentRecord, and since the
+// 2026-08-13 audit fix a failure there FAILS the whole account creation
+// (previously swallowed, which stranded the worker). This suite tests
+// UserService, not employment-record creation, so the collaborator is mocked
+// to succeed -- otherwise every successful-creation case would fail on an
+// unmocked dependency rather than on the behaviour under test.
+jest.mock('../modules/employee-management/service.js', () => ({
+  employeeManagementService: {
+    createEmployee: jest.fn(() => Promise.resolve({})),
+    // deleteUser delegates here when an EmploymentRecord exists, so the full
+    // teardown (vacate managed hotels, clear scope, stand down contracts)
+    // happens on ONE path instead of two divergent ones -- that divergence
+    // was the "ghost employee" bug (2026-08-13 audit).
+    delete: jest.fn(() => Promise.resolve({})),
+  },
+}));
 jest.mock('../config/env.js', () => ({
   getEnv: () => ({
     JWT_SECRET: 'test-secret-key-minimum-32-characters-long',
@@ -76,6 +93,7 @@ jest.mock('../config/env.js', () => ({
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
 
+import { employeeManagementService } from '../modules/employee-management/service.js';
 import { UserService } from '../modules/users/service.js';
 
 let hotelRows: Map<string, string>;
@@ -1060,10 +1078,13 @@ describe('UserService', () => {
       });
     });
 
-    it('soft-deletes user and bumps token_generation', async () => {
+    it('soft-deletes user and bumps token_generation (no employment record)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', deleted_at: null, email: 'u@t.com' });
       mockPrisma.user.update.mockResolvedValue({ id: 'u1' });
       mockPrisma.auditLog.create.mockResolvedValue({});
+      // An admin has no EmploymentRecord, so this takes the plain
+      // account-soft-delete path rather than delegating.
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(null);
 
       await service.deleteUser('u1', 'actor', 'admin');
 
@@ -1074,6 +1095,32 @@ describe('UserService', () => {
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ data: expect.objectContaining({ token_generation: { increment: 1 } }) })
       );
+    });
+
+    // GHOST EMPLOYEE regression (2026-08-13 audit). This endpoint used to
+    // soft-delete the User and stop, leaving the EmploymentRecord live, the
+    // person still occupying their hotel's manager slot (so no replacement
+    // could be assigned), and their contract still valid. It now delegates
+    // the full teardown to employee-management's delete(), which already
+    // handles all three -- one path, so the two cannot diverge again.
+    it('delegates to employee-management delete() when an employment record exists', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'u1', deleted_at: null, email: 'u@t.com' });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue({
+        employee_id: 'EMP-1',
+        deleted_at: null,
+      });
+
+      await service.deleteUser('u1', 'actor', 'admin');
+
+      expect(employeeManagementService.delete).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 'actor', role: 'admin' }),
+        'EMP-1',
+        expect.any(String),
+      );
+      // Must NOT also run the plain soft-delete -- that would double-delete
+      // and bump token_generation twice.
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 
