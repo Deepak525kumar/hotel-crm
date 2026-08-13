@@ -1022,8 +1022,20 @@ export class JobRequestService extends BaseService {
   private async enqueueJobRequestClosed(
     tx: DatabaseTransaction,
     wr: JobRequest,
-    reason: 'auto' | 'manual'
+    reason: 'auto' | 'manual',
+    // 2026-08-13 fix (E2E integration audit): closeExpiredBroadcasts() below
+    // now only ever reaches this call for a broadcast that is NOT fully
+    // staffed (a fully-filled one is skipped, never closed-as-unfilled), but
+    // it CAN be partially filled -- 2 of 3 slots claimed when the 6-hour
+    // window ran out. The old message unconditionally said "unfilled,"
+    // which actively hid that a manager already had workers coming and
+    // could prompt them to duplicate the broadcast (real overstaffing risk
+    // the original report flagged). Optional and 'auto'-only: manualClose()
+    // is an explicit, informed decision by the manager who is looking at
+    // the broadcast right now, not an automated claim about its state.
+    fillSummary?: { confirmed: number; needed: number }
   ): Promise<void> {
+    const isPartiallyFilled = reason === 'auto' && fillSummary && fillSummary.confirmed > 0;
     await notificationService.enqueue(
       {
         recipientId: wr.created_by_id,
@@ -1031,7 +1043,9 @@ export class JobRequestService extends BaseService {
         title: 'Job Request Closed',
         message:
           reason === 'auto'
-            ? `Your ${wr.position} broadcast closed unfilled after 6 hours.`
+            ? isPartiallyFilled
+              ? `Your ${wr.position} broadcast closed after 6 hours with only ${fillSummary!.confirmed}/${fillSummary!.needed} positions filled.`
+              : `Your ${wr.position} broadcast closed unfilled after 6 hours.`
             : `Your ${wr.position} broadcast was closed manually.`,
         data: { work_request_id: wr.id, hotel_id: wr.hotel_id, reason },
         hotelId: wr.hotel_id,
@@ -1058,6 +1072,24 @@ export class JobRequestService extends BaseService {
    * rather than one batch update — closing must join a notification enqueue
    * per row (each broadcast has a distinct created_by_id to notify), so a
    * single bulk updateMany cannot serve both purposes.
+   *
+   * 2026-08-13 fix (E2E integration audit, confirmed by reading the code —
+   * fill status is derived at READ time from skill_slots and never written
+   * back to the stored `status` column by design, per deriveFillStatus()'s
+   * own doc comment). This sweep queried that raw stored column with no
+   * check against skill_slots at all, so a FULLY-staffed broadcast still
+   * read OPEN in the DB and got swept into EXPIRED here, generating a false
+   * "closed unfilled after 6 hours" notification for a manager whose
+   * broadcast had, in fact, succeeded. Now fetches skill_slots and skips
+   * (never closes) any broadcast that is already fully filled — it needs no
+   * closing at all; deriveFillStatus() already reads it as FILLED everywhere
+   * it's displayed, regardless of the stored column staying OPEN.
+   *
+   * Loop termination is now based on how many rows were actually CLOSED in a
+   * batch, not how many were fetched: a skipped (fully-filled) row remains
+   * OPEN and stale, so an unconditional stale.length check would refetch it
+   * every iteration. Breaking when a batch closes nothing guarantees
+   * termination regardless of how many filled-but-still-OPEN rows exist.
    */
   async closeExpiredBroadcasts(cutoff: Date, batchSize: number): Promise<number> {
     let total = 0;
@@ -1068,18 +1100,26 @@ export class JobRequestService extends BaseService {
           created_at: { lt: cutoff },
           skill_slots: { some: {} },
         },
+        include: { skill_slots: true },
         take: batchSize,
       });
       if (stale.length === 0) break;
 
+      let closedThisBatch = 0;
       for (const wr of stale) {
+        const needed = wr.skill_slots.reduce((sum, s) => sum + s.headcount, 0);
+        const confirmed = wr.skill_slots.reduce((sum, s) => sum + s.confirmed_count, 0);
+        // Fully staffed -- not actually stale in any sense that matters.
+        // Leave it OPEN; deriveFillStatus() already reads FILLED for it.
+        if (needed > 0 && confirmed >= needed) continue;
+
         await this.prisma.$transaction(async (tx) => {
           const closed = await tx.jobRequest.update({
             where: { id: wr.id },
             data: { status: WorkRequestStatus.EXPIRED, version: { increment: 1 } },
           });
-          await this.enqueueJobRequestClosed(tx, closed, 'auto');
-          
+          await this.enqueueJobRequestClosed(tx, closed, 'auto', { confirmed, needed });
+
           // Audit gap: manualClose() logs MANUAL_CLOSE, but this scheduled
           // path previously logged nothing at all -- a broadcast could expire
           // with zero audit trail. `logAudit(null, 'system', ...)` matches the
@@ -1088,12 +1128,15 @@ export class JobRequestService extends BaseService {
           await this.logAudit(null, 'system', 'AUTO_CLOSE', 'WORK_REQUEST', wr.id, {
             from_status: wr.status,
             to_status: closed.status,
+            confirmed,
+            needed,
           }, undefined, undefined, undefined, tx);
         });
+        closedThisBatch++;
       }
-      total += stale.length;
+      total += closedThisBatch;
 
-      if (stale.length < batchSize) break;
+      if (stale.length < batchSize || closedThisBatch === 0) break;
     }
     return total;
   }
