@@ -59,12 +59,25 @@ const upload = multer({
 // this ticket's scope.
 function scopeWorkerReadRoute() {
   return async (req: Request, _res: Response, next: NextFunction) => {
-    if (req.auth?.role === 'worker') {
-      next();
-      return;
-    }
     if (!req.auth) {
       next(new UnauthorizedError('Authentication required'));
+      return;
+    }
+    // SELF-ACCESS, role-independent (2026-08-13). This was previously
+    // `role === 'worker'`, written when a worker was the only kind of
+    // applicant. Under ADR-065 every non-admin role onboards -- so a Manager
+    // or Regional Manager viewing their OWN onboarding fell through to the
+    // scope check below, which cannot succeed for them: an applicant has no
+    // hotel_group_id until approval, and an RM has no assigned group yet
+    // either. The result was "Failed to load document status" on their own
+    // My Onboarding page, 100% of the time.
+    //
+    // Keyed on identity, not role, precisely so the next role added does not
+    // reintroduce this. useMyOnboarding's own header documents this same bug
+    // class ("two separate visibility guards have broken by assuming a scope
+    // exists for a manager-grade role") -- this was the third.
+    if (req.auth.userId === req.params.worker_id) {
+      next();
       return;
     }
     if (req.auth.role === 'admin') {
