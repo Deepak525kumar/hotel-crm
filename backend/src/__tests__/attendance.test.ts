@@ -424,6 +424,53 @@ describe('AttendanceService', () => {
       });
     });
 
+    // check_in_at manager correction (2026-08-13, E2E integration audit): a
+    // worker whose phone died had no check-in at all and no field a manager
+    // could set to fix it. check_in_at is now manager-only, like the other
+    // verification fields.
+    describe('check_in_at manager correction (2026-08-13)', () => {
+      it('rejects a worker attempting to set check_in_at', async () => {
+        mockAttendance.findUnique.mockResolvedValue(makeRecord({ worker_id: 'w1' }));
+        await expect(
+          service.update(
+            'att1',
+            { check_in_at: new Date('2026-07-01T08:05:00Z').toISOString() },
+            'w1',
+            'worker'
+          )
+        ).rejects.toMatchObject({ name: 'ForbiddenError' });
+        expect(mockAttendance.update).not.toHaveBeenCalled();
+      });
+
+      it('lets a manager set check_in_at on a record with no prior check-in', async () => {
+        mockAttendance.findUnique.mockResolvedValue(makeRecord({ worker_id: 'w1', check_in_at: null }));
+        mockAttendance.update.mockResolvedValue(makeRecord({ worker_id: 'w1' }));
+        const corrected = new Date('2026-07-01T08:05:00Z').toISOString();
+        await service.update('att1', { check_in_at: corrected }, 'mgr1', 'admin');
+        const data = mockAttendance.update.mock.calls[0][0].data;
+        expect(data.check_in_at.toISOString()).toBe(new Date(corrected).toISOString());
+      });
+
+      it('computes minutes_worked from a manager-corrected check_in_at when check_out_at is set in the same request', async () => {
+        mockAttendance.findUnique.mockResolvedValue(
+          makeRecord({ worker_id: 'w1', check_in_at: new Date('2026-07-01T09:00:00Z') })
+        );
+        mockAttendance.update.mockResolvedValue(makeRecord({ worker_id: 'w1' }));
+        const correctedCheckIn = new Date('2026-07-01T08:00:00Z').toISOString();
+        const checkOut = new Date('2026-07-01T16:00:00Z').toISOString();
+        await service.update(
+          'att1',
+          { check_in_at: correctedCheckIn, check_out_at: checkOut },
+          'mgr1',
+          'admin'
+        );
+        const data = mockAttendance.update.mock.calls[0][0].data;
+        expect(data.check_in_at.toISOString()).toBe(new Date(correctedCheckIn).toISOString());
+        // 8 hours from the corrected check-in, not the stale stored one (which would give 7h)
+        expect(data.minutes_worked).toBe(480);
+      });
+    });
+
     // Checkout geofence fix (2026-08-08): checkIn() has always enforced a
     // geofence when one is configured; checkout previously enforced nothing
     // at all, letting a worker check in on-site, leave, and check out from

@@ -27,6 +27,14 @@ export const UpdateAttendanceSchema = z
     status: z
       .enum(['PRESENT', 'ABSENT', 'LATE', 'PARTIAL', 'EXCUSED'])
       .optional(),
+    // 2026-08-13 fix (E2E integration audit): every other timesheet-error
+    // field a manager might need to correct was here (check_out_at,
+    // minutes_late, minutes_worked, status) except check_in_at itself -- a
+    // worker whose phone died or who forgot to check in had no field a
+    // manager could set to fix it; the record permanently showed no check-in
+    // at all. Manager-only (see service.ts's isWorker guard), same tier as
+    // is_verified/minutes_worked below.
+    check_in_at: z.string().datetime().optional(),
     minutes_late: z.number().int().min(0).optional(),
     minutes_worked: z.number().int().min(0).optional(),
     is_verified: z.boolean().optional(),
