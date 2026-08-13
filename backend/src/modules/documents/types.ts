@@ -1,7 +1,7 @@
 // SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16 Decided 2026-07-27).
 // DocumentCategory enum values match schema.prisma exactly.
 
-export type DocumentCategoryType = 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'WORK_PERMIT';
+export type DocumentCategoryType = 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'WORK_PERMIT' | 'CONTRACT_SCAN';
 
 // REQ-DOC-011: canonical entity name is WorkerDocument (PDD §9.3 line 389).
 export interface WorkerDocumentDto {

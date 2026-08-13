@@ -484,7 +484,7 @@ export class HrService extends BaseService {
       {
         worker_id: workerId,
         actor_id: actorId,
-        category: 'ID_CARD',
+        category: 'CONTRACT_SCAN',
         original_filename: originalFilename,
         mime_type: mimeType,
         file_size_bytes: file.length,
@@ -1056,7 +1056,7 @@ export class HrService extends BaseService {
       {
         worker_id: workerId,
         actor_id: actorId,
-        category: 'ID_CARD',
+        category: 'CONTRACT_SCAN',
         original_filename: originalFilename,
         mime_type: mimeType,
         file_size_bytes: file.length,

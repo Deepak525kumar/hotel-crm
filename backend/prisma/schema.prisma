@@ -1319,6 +1319,15 @@ enum DocumentCategory {
   PASSPORT // Passport (Required independently of ID_CARD)
   ADDRESS // Proof of address
   WORK_PERMIT // Residence/work-authorization document (Required conditionally per work_permit_required flag)
+  // 2026-08-13: the applicant's SIGNED contract, returned for manager
+  // confirmation. Before this existed, hr/service.ts filed contract scans
+  // under ID_CARD -- its own comment acknowledged the gap ("no CONTRACT_SCAN
+  // category exists") -- so a signed contract showed up as the worker's ID
+  // card in any category-keyed view. Deliberately NOT part of the required-
+  // document completeness set: the contract has its own gate
+  // (assertApprovedContract, which requires a manager-CONFIRMED contract,
+  // a stricter condition than "a file was uploaded").
+  CONTRACT_SCAN
 }
 
 // state-worker-document (SPEC-DOCUMENTS-001, PDD §9.3 line 389).

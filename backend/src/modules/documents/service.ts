@@ -375,6 +375,12 @@ export class DocumentService extends BaseService {
       PASSPORT: hasCat(DocumentCategory.PASSPORT),
       ADDRESS: hasCat(DocumentCategory.ADDRESS),
       WORK_PERMIT: hasCat(DocumentCategory.WORK_PERMIT),
+      // Reported for visibility, but deliberately absent from `missing`
+      // below: the contract has its own, stricter gate
+      // (assertApprovedContract requires a manager-CONFIRMED contract, not
+      // merely an uploaded file), so counting it here would double-gate it
+      // and let an unconfirmed upload satisfy the document checklist.
+      CONTRACT_SCAN: hasCat(DocumentCategory.CONTRACT_SCAN),
     };
 
     const missing: DocumentCategoryType[] = [];

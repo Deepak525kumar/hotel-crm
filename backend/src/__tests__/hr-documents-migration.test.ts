@@ -95,7 +95,7 @@ describe('HR document upload delegates to backend-documents (MIG-GAP-DOC-001)', 
       id: 'd1',
       worker_id: 'w1',
       uploaded_by_id: 'm1',
-      category: 'ID_CARD',
+      category: 'CONTRACT_SCAN',
       s3_key: 'documents/w1/general/test-uuid/contract.pdf',
       original_filename: 'contract.pdf',
       mime_type: 'application/pdf',
@@ -107,7 +107,7 @@ describe('HR document upload delegates to backend-documents (MIG-GAP-DOC-001)', 
     });
   });
 
-  it('persists the scanned contract as a GENERAL WorkerDocument, not a NotImplementedError', async () => {
+  it('persists the scanned contract as a CONTRACT_SCAN WorkerDocument, not a NotImplementedError', async () => {
     const fileContents = Buffer.from('%PDF-');
 
     const res = await request(makeApp())
@@ -120,7 +120,7 @@ describe('HR document upload delegates to backend-documents (MIG-GAP-DOC-001)', 
         data: expect.objectContaining({
           worker_id: 'w1',
           uploaded_by_id: 'm1', // RULE-DOC-08: actor derived from req.auth, not client input
-          category: 'ID_CARD',
+          category: 'CONTRACT_SCAN',
           file_size_bytes: fileContents.length,
         }),
       })
