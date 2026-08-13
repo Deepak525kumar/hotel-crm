@@ -271,8 +271,21 @@ export function UserForm({
           )}
 
           {mode === "edit" && (
+            // 2026-08-13 fix (reported live: a brand-new, still-Pending
+            // account's Edit screen showed this checked with a label
+            // claiming it means "can be... assigned work"). This checkbox
+            // controls ONLY `User.is_active` (account sign-in access), which
+            // the backend sets true from the moment the account is created —
+            // it does not touch, and was never wired to, EmploymentStatus.
+            // Work-assignment eligibility is decided entirely by the
+            // onboarding lifecycle (PENDING -> ACTIVE via approval), shown
+            // immediately above this in the page's own Employment section —
+            // a second, unrelated meaning bolted onto this label just
+            // asserted that state without reflecting it, which read as "the
+            // system thinks this unapproved worker can already be assigned
+            // work."
             <Checkbox
-              label="Active (can sign in and be assigned work)"
+              label="Active (can sign in to the platform)"
               checked={form.is_active}
               onChange={(e) => set("is_active", e.target.checked)}
             />
