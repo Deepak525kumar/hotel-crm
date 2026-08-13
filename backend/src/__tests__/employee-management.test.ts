@@ -1049,7 +1049,16 @@ describe('EmployeeManagementService', () => {
    * reason. Reported live: a manager application created under an RM never
    * appeared for any RM.
    */
-  describe('review queue while the RM role is disabled', () => {
+  /**
+   * RM review is no longer gated on FEATURE_RM_ROLE (owner decision,
+   * 2026-08-14). The flag left the platform half-recognizing Regional
+   * Managers: resolveScope() granted them hotel_group scope without consulting
+   * it, so they signed in and held scope, but were refused the one workflow
+   * the role exists for. These tests pin that the flag no longer affects this
+   * path at all -- asserted in BOTH flag states, since a reintroduced gate
+   * would otherwise only show up once the flag flipped.
+   */
+  describe('RM review is not flag-gated', () => {
     const rmActor = {
       userId: 'rm_1',
       role: 'regional_manager',
@@ -1061,31 +1070,71 @@ describe('EmployeeManagementService', () => {
       rmRoleEnabled = false;
     });
 
-    it('tells the RM why, instead of returning an empty queue', async () => {
-      rmRoleEnabled = false;
-      await expect(service.getReviewQueue(rmActor)).rejects.toThrow(
-        /Regional Manager role is disabled/
-      );
-    });
-
-    // The same actor is already refused on the write path; the read path must
-    // not disagree by silently showing nothing.
-    it('matches the refusal the write path already gives', async () => {
-      rmRoleEnabled = false;
-      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
-        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
-      );
-      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
-
-      await expect(service.approve(rmActor, 'E-001')).rejects.toThrow(/RM role is disabled/);
-      await expect(service.getReviewQueue(rmActor)).rejects.toThrow(/role is disabled/);
-    });
-
-    it('serves the queue normally once the role is enabled', async () => {
-      rmRoleEnabled = true;
+    // Previously threw "Regional Manager role is disabled". An RM now owns
+    // records, so locking them out of the queue would hide their own work.
+    it.each([false, true])('serves the queue with the flag %s', async (enabled) => {
+      rmRoleEnabled = enabled;
       mockPrisma.employmentRecord.findMany.mockResolvedValue([]);
 
       await expect(service.getReviewQueue(rmActor)).resolves.toEqual([]);
+    });
+
+    // Previously threw "only Admin can manage Manager applications while RM
+    // role is disabled" -- the refusal that broke the hierarchy at review
+    // time, since an RM is exactly who creates a Manager under RULE A.
+    it.each([false, true])(
+      'lets an RM approve a manager application in their own group with the flag %s',
+      async (enabled) => {
+        rmRoleEnabled = enabled;
+        mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+          fakeRecord({
+            status: EmploymentStatus.PENDING,
+            submitted_for_review_at: new Date(),
+            target_hotel_group_id: 'g1',
+          })
+        );
+        mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
+        mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
+        mockPrisma.employmentRecord.update.mockResolvedValue(
+          fakeRecord({ status: EmploymentStatus.ACTIVE })
+        );
+        mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+        mockPrisma.auditLog.create.mockResolvedValue({});
+        mockPrisma.hotel.findUnique.mockResolvedValue(null);
+
+        await expect(service.approve(rmActor, 'E-001')).resolves.toBeDefined();
+      }
+    );
+
+    // Widening WHICH role may review must not widen WHICH records they reach:
+    // ADR-065 §6 item 5 still binds an RM to applications targeting their own
+    // group.
+    it('still refuses an RM a manager application targeting another group', async () => {
+      rmRoleEnabled = true;
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.PENDING,
+          submitted_for_review_at: new Date(),
+          target_hotel_group_id: 'some_other_group',
+        })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'MANAGER' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
+
+      await expect(service.approve(rmActor, 'E-001')).rejects.toThrow(/different group/);
+    });
+
+    // Unchanged by this widening: only Admin manages an RM application.
+    it('still refuses an RM a Regional Manager application', async () => {
+      rmRoleEnabled = true;
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'REGIONAL_MANAGER' });
+
+      await expect(service.approve(rmActor, 'E-001')).rejects.toThrow(
+        /only Admin can manage Regional Manager applications/
+      );
     });
 
     // Admin is the reviewer of last resort and must never be blocked by this.
@@ -1198,25 +1247,31 @@ describe('EmployeeManagementService', () => {
       ).resolves.toBe(false);
     });
 
-    // Routing must not hand someone a queue item they would be refused on
-    // click: assertLifecycleAuthority blocks an RM from managing a Manager
-    // application while the RM role is off.
-    it('escalates to admin when the RM creator could not act on it anyway', async () => {
-      rmRoleEnabled = false;
-      mockPrisma.employmentRecord.findMany.mockResolvedValue([
-        recordCreatedBy('rm_creator', UserRole.MANAGER),
-      ]);
-      mockPrisma.user.findUnique.mockResolvedValue({
-        id: 'rm_creator',
-        role: UserRole.REGIONAL_MANAGER,
-        is_active: true,
-        deleted_at: null,
-      });
+    // RM review is no longer flag-gated, so the RM creator keeps the record in
+    // both flag states. This previously escalated to admin while the flag was
+    // off, which is exactly the hierarchy break the owner asked to remove.
+    it.each([false, true])(
+      'keeps an RM-created manager application with that RM, flag %s',
+      async (enabled) => {
+        rmRoleEnabled = enabled;
+        mockPrisma.employmentRecord.findMany.mockResolvedValue([
+          recordCreatedBy('rm_creator', UserRole.MANAGER),
+        ]);
+        mockPrisma.user.findUnique.mockResolvedValue({
+          id: 'rm_creator',
+          role: UserRole.REGIONAL_MANAGER,
+          is_active: true,
+          deleted_at: null,
+        });
 
-      await expect(
-        queueReaches({ userId: 'admin_1', role: 'admin', scope: { type: 'global' } })
-      ).resolves.toBe(true);
-    });
+        await expect(
+          queueReaches({ userId: 'rm_creator', role: 'regional_manager', scope: { type: 'hotel_group', hotel_group_id: 'group_1' } })
+        ).resolves.toBe(true);
+        await expect(
+          queueReaches({ userId: 'admin_1', role: 'admin', scope: { type: 'global' } })
+        ).resolves.toBe(false);
+      }
+    );
 
     it('falls through when the creator is deactivated', async () => {
       mockPrisma.employmentRecord.findMany.mockResolvedValue([
@@ -1326,8 +1381,28 @@ describe('EmployeeManagementService', () => {
       expect(adminQueue).toEqual([]);
     });
 
-    it('falls back to admin when the target hotel has no manager', async () => {
+    // The fallback chain is hotel manager -> that group's RM -> admin. The RM
+    // tier used to be inert (FEATURE_RM_ROLE gated it out), so this reached
+    // admin with only the hotel manager missing. It is live now, so admin is
+    // the last resort only when BOTH are absent.
+    it('falls back to the group RM when the target hotel has no manager', async () => {
       mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: null });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: 'rm_of_group' });
+
+      const rmQueue = await service.getReviewQueue({
+        userId: 'rm_of_group',
+        role: 'regional_manager',
+        scope: { type: 'hotel_group', hotel_group_id: 'group_1' },
+      } as any);
+      expect(rmQueue.map((r: any) => r.employee_id)).toEqual(['E-001']);
+
+      const adminQueue = await service.getReviewQueue(admin as any);
+      expect(adminQueue).toEqual([]);
+    });
+
+    it('falls back to admin when neither a hotel manager nor a group RM exists', async () => {
+      mockPrisma.hotel.findUnique.mockResolvedValue({ manager_user_id: null });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: null });
 
       const adminQueue = await service.getReviewQueue(admin as any);
       expect(adminQueue.map((r: any) => r.employee_id)).toEqual(['E-001']);
