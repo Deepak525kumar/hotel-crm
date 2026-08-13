@@ -17,6 +17,10 @@ describe('users/types.ts — phone E.164 validation', () => {
   const INVALID = ['not-a-phone', '0123456789', '+', 'abc123', '++14155552671'];
 
   describe('CreateUserSchema', () => {
+    // ADR-065 (Universal Onboarding Gate): role defaults to 'worker', which
+    // requires job_title/start_date/employment_type (every non-admin role
+    // does) -- supplied here so these cases test phone validation in
+    // isolation, not tripping the unrelated onboarding-field requirement.
     it.each(VALID)('accepts a valid E.164 phone: %s', (phone) => {
       const result = CreateUserSchema.safeParse({
         email: 'a@b.com',
@@ -24,6 +28,9 @@ describe('users/types.ts — phone E.164 validation', () => {
         first_name: 'A',
         last_name: 'B',
         phone,
+        job_title: 'Cleaner',
+        start_date: '2026-09-01',
+        employment_type: 'FULL_TIME',
       });
       expect(result.success).toBe(true);
     });

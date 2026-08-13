@@ -1,17 +1,47 @@
 import { z } from 'zod';
 
-export const CreateUserSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(8),
-  first_name: z.string().min(1).max(100),
-  last_name: z.string().min(1).max(100),
-  phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
-  // `regional_manager` added (Regional Manager V1 lifecycle PR): POST /users
-  // is requireRole('admin')-only, so no elevation-guard exercise like
-  // updateUser's role !== 'admin' check applies — every caller who reaches
-  // this schema is already an admin.
-  role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']).default('worker'),
-});
+// ADR-065 (Universal Onboarding Gate, ratified 2026-08-11): every non-Admin
+// account -- Worker, Checker, Manager, AND Regional Manager -- must get an
+// EmploymentRecord (Pending) the moment the account is created, so the new
+// user can self-service their own onboarding (documents, contract,
+// submit-for-review) immediately on first login. RULE A (2026-08-12) is a
+// separate, narrower decision governing WHO may create WHICH role (route
+// gate: admin/regional_manager/manager, per lib/role-hierarchy.ts) -- POST
+// /users is no longer admin-only, so job_title/start_date/employment_type
+// are collected here and threaded into employeeManagementService.createEmployee()
+// (users/service.ts#createUser) rather than left to a separate manual
+// "Start onboarding" step, which no longer exists.
+export const CreateUserSchema = z
+  .object({
+    email: z.string().email(),
+    password: z.string().min(8),
+    first_name: z.string().min(1).max(100),
+    last_name: z.string().min(1).max(100),
+    phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number'),
+    role: z.enum(['worker', 'checker', 'manager', 'admin', 'regional_manager']).default('worker'),
+    // Required for every non-admin role (enforced below, not by .optional()
+    // alone, since Zod has no native "required unless X" for a sibling
+    // field) -- admin accounts have no onboarding/EmploymentRecord concept.
+    job_title: z.string().min(1).max(200).optional(),
+    start_date: z.coerce.date().optional(),
+    employment_type: z.enum(['FULL_TIME', 'PART_TIME']).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.role === 'admin') return;
+    if (!data.job_title) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['job_title'], message: 'job_title is required' });
+    }
+    if (!data.start_date) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['start_date'], message: 'start_date is required' });
+    }
+    if (!data.employment_type) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['employment_type'],
+        message: 'employment_type is required (FULL_TIME or PART_TIME)',
+      });
+    }
+  });
 
 // LEGACY — used only while FEATURE_GD02_MATRIX is off (rollback path). This
 // is the exact schema the C-15 defect lived in (ADR-030 D-4a): whether a
