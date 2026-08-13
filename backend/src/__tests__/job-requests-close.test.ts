@@ -259,4 +259,116 @@ describe('JobRequestService.closeExpiredBroadcasts', () => {
     const where = mockJobRequest.findMany.mock.calls[0][0].where;
     expect(where.skill_slots).toEqual({ some: {} });
   });
+
+  it('now includes skill_slots on the fetch (needed to compute fill state)', async () => {
+    mockJobRequest.findMany.mockResolvedValueOnce([]);
+
+    await service.closeExpiredBroadcasts(new Date(), 100);
+
+    expect(mockJobRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ include: { skill_slots: true } })
+    );
+  });
+
+  // 2026-08-13 fix (reported and confirmed by reading the code: fill status
+  // is derived at read time and never written back to the stored `status`
+  // column, so a fully-staffed broadcast still read OPEN and was swept into
+  // EXPIRED here with a false "closed unfilled" notification).
+  describe('fully-staffed broadcasts are skipped, not closed as unfilled', () => {
+    it('does not close or notify for a broadcast where confirmed_count already meets headcount', async () => {
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ headcount: 2, confirmed_count: 2 })] }),
+      ]);
+
+      const closed = await service.closeExpiredBroadcasts(new Date(), 100);
+
+      expect(closed).toBe(0);
+      expect(mockJobRequest.update).not.toHaveBeenCalled();
+      expect(mockNotification.create).not.toHaveBeenCalled();
+      expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('sums across multiple skill slots before deciding fill state', async () => {
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({
+          skill_slots: [
+            makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 1, confirmed_count: 1 }),
+            makeSkillSlotRow({ id: 'slot2', skill: 'WAITER', headcount: 1, confirmed_count: 1 }),
+          ],
+        }),
+      ]);
+
+      const closed = await service.closeExpiredBroadcasts(new Date(), 100);
+
+      expect(closed).toBe(0);
+      expect(mockJobRequest.update).not.toHaveBeenCalled();
+    });
+
+    it('still closes a broadcast that is only PARTIALLY filled, with an accurate message', async () => {
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ headcount: 3, confirmed_count: 2 })] }),
+      ]);
+      mockJobRequest.update.mockResolvedValue(makeJobRequestRow({ status: 'EXPIRED' }));
+
+      const closed = await service.closeExpiredBroadcasts(new Date(), 100);
+
+      expect(closed).toBe(1);
+      expect(mockJobRequest.update).toHaveBeenCalledTimes(1);
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            message: expect.stringContaining('2/3 positions filled'),
+          }),
+        })
+      );
+    });
+
+    it('keeps the plain "unfilled" message when nobody accepted at all', async () => {
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ headcount: 2, confirmed_count: 0 })] }),
+      ]);
+      mockJobRequest.update.mockResolvedValue(makeJobRequestRow({ status: 'EXPIRED' }));
+
+      await service.closeExpiredBroadcasts(new Date(), 100);
+
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            message: expect.stringContaining('closed unfilled after 6 hours'),
+          }),
+        })
+      );
+    });
+
+    it('a batch that closes nothing (all rows fully staffed) still terminates the loop', async () => {
+      // A full page (== batchSize) where every row is skipped must not be
+      // re-fetched forever -- termination is keyed on closedThisBatch, not
+      // stale.length.
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({ id: 'jr1', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
+        makeJobRequestRow({ id: 'jr2', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
+      ]);
+
+      const closed = await service.closeExpiredBroadcasts(new Date(), 2);
+
+      expect(closed).toBe(0);
+      expect(mockJobRequest.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('a mixed batch closes only the non-fully-staffed rows and returns the correct count', async () => {
+      mockJobRequest.findMany.mockResolvedValueOnce([
+        makeJobRequestRow({ id: 'jr1', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }), // filled -> skip
+        makeJobRequestRow({ id: 'jr2', skill_slots: [makeSkillSlotRow({ headcount: 2, confirmed_count: 0 })] }), // unfilled -> close
+      ]);
+      mockJobRequest.update.mockResolvedValue(makeJobRequestRow({ status: 'EXPIRED' }));
+
+      const closed = await service.closeExpiredBroadcasts(new Date(), 100);
+
+      expect(closed).toBe(1);
+      expect(mockJobRequest.update).toHaveBeenCalledTimes(1);
+      expect(mockJobRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'jr2' } })
+      );
+    });
+  });
 });
