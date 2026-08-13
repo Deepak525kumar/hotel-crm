@@ -41,6 +41,17 @@ export interface ContractDto {
   confirmed_by_id: string | null;
   confirmed_at: string | null;
   expires_at: string | null;
+  // 2026-08-13 re-onboarding: DERIVED, not stored. Nothing in this codebase
+  // ever transitions a Contract out of ACTIVE when its expiry passes --
+  // sendExpiryReminders() only reads expires_at to notify, and RULE-HR-06's
+  // extend/permanent path is a manual manager action. So "is this contract
+  // still valid" cannot be answered by `status` alone: a contract can be
+  // ACTIVE and long past expires_at. Both re-onboarding (does this person
+  // need a new contract?) and the approve gate depend on the same question,
+  // so it is computed once here (isContractValid, hr/service.ts) rather
+  // than re-derived per caller.
+  is_valid: boolean;
+  is_expired: boolean;
   created_at: string;
   updated_at: string;
 }

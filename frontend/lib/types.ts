@@ -119,6 +119,13 @@ export interface UserDetail extends UserSummary {
 }
 
 /** Body of `POST /users` (admin/manager). */
+/**
+ * ADR-065 (Universal Onboarding Gate): every non-admin account gets an
+ * EmploymentRecord auto-created the moment it's created (backend derives
+ * `employee_id`) — job_title/start_date/employment_type are required for
+ * every role except admin (backend's CreateUserSchema enforces this via
+ * `.superRefine`, not by TypeScript's optional-field typing alone).
+ */
 export interface CreateUserInput {
   email: string;
   password: string;
@@ -127,6 +134,9 @@ export interface CreateUserInput {
   phone?: string;
   /** Defaults to "worker" backend-side. */
   role?: Role;
+  job_title?: string;
+  start_date?: string;
+  employment_type?: EmploymentType;
 }
 
 /**
@@ -1134,6 +1144,14 @@ export interface Contract {
   confirmed_by_id: string | null;
   confirmed_at: string | null;
   expires_at: string | null;
+  /**
+   * DERIVED server-side, not stored (hr/service.ts `isContractValid`).
+   * `status` alone is NOT sufficient: nothing ever transitions a contract out
+   * of ACTIVE when its expiry passes, so an ACTIVE contract can be long past
+   * `expires_at`. Always prefer this over checking `status` in UI code.
+   */
+  is_valid: boolean;
+  is_expired: boolean;
   created_at: string;
   updated_at: string;
 }

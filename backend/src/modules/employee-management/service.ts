@@ -31,7 +31,7 @@ import { documentService } from '../documents/service.js';
 // call site going the other direction; both modules' usage is inside
 // function bodies, not at module-eval time, so the resulting import cycle
 // resolves safely under Node ESM.
-import { hrService } from '../hr/service.js';
+import { hrService, isContractValid } from '../hr/service.js';
 import {
   assertTransition,
   ASSESSMENT_BASIS,
@@ -557,17 +557,30 @@ export class EmployeeManagementService extends BaseService {
       throw new ConflictError('Only a Pending employment record may be submitted for review');
     }
 
-    // GATE: All required documents must be uploaded before onboarding can be
-    // submitted for review. ADR-065 §6 item 8: work permit requirement is
-    // explicitly driven by the record's work_permit_required flag, set at
-    // creation time, rather than inferred from nationality.
-    const isWorkPermitRequired = record.work_permit_required;
+    // RE-ONBOARDING (2026-08-13, owner decision): a returning employee
+    // (employment_cycle > 1, i.e. this record went DELETED -> PENDING via
+    // restore()) does NOT re-upload documents. WorkerDocument rows are never
+    // deleted by delete()/restore() -- the previous cycle's documents are
+    // still on file and are deliberately preserved so they can be re-checked
+    // later -- so re-demanding them would be asking for something the system
+    // already has. The ONLY thing re-onboarding gates on is the contract
+    // (below): if the old one is still valid the person is simply reactivated;
+    // if it expired they sign a freshly-issued one.
+    const isReonboarding = record.employment_cycle > 1;
 
-    const completeness = await documentService.getDocumentCompleteness(record.user_id, isWorkPermitRequired);
-    if (!completeness.is_complete) {
-      throw new ConflictError(
-        `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
-      );
+    if (!isReonboarding) {
+      // GATE: All required documents must be uploaded before onboarding can be
+      // submitted for review. ADR-065 §6 item 8: work permit requirement is
+      // explicitly driven by the record's work_permit_required flag, set at
+      // creation time, rather than inferred from nationality.
+      const isWorkPermitRequired = record.work_permit_required;
+
+      const completeness = await documentService.getDocumentCompleteness(record.user_id, isWorkPermitRequired);
+      if (!completeness.is_complete) {
+        throw new ConflictError(
+          `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+        );
+      }
     }
 
     // GATE (2026-08-13 contract feature): a Contract row must exist before
@@ -578,9 +591,16 @@ export class EmployeeManagementService extends BaseService {
     // still expected to download, mark FULL_TIME/PART_TIME, sign, and
     // return it (hr/service.ts's uploadSignedContract/
     // confirmContractSigned flow) -- approve() already independently
-    // requires an ACTIVE/EXTENDED/PERMANENT contract (assertApprovedContract
-    // below), which stays the stricter, later gate.
-    const contract = await this.prisma.contract.findFirst({ where: { worker_id: record.user_id } });
+    // requires a VALID (status ok AND unexpired) contract
+    // (assertApprovedContract below), which stays the stricter, later gate.
+    //
+    // Re-onboarding with an EXPIRED contract lands here with no valid
+    // contract to sign, so ensureValidContract() issues a fresh PENDING one
+    // (same default template/6-month terms as a first-time hire) rather than
+    // dead-ending the submission -- the returning employee downloads, signs
+    // and returns THAT, and the reviewer sees the request in their pending
+    // queue exactly like any other.
+    const contract = await this.ensureValidContract(record);
     if (!contract) {
       throw new ConflictError(
         'Cannot submit for review: no contract has been generated for this application yet. Contact an administrator.',
@@ -1639,15 +1659,25 @@ export class EmployeeManagementService extends BaseService {
     let query: Prisma.EmploymentRecordWhereInput;
 
     if (actor.role === 'admin') {
-      // Admin reviews regional_manager-created applications, plus every
-      // fallback case (no creator recorded, or a manager creator with no
-      // resolvable RM) -- computed as "not claimed by any RM's queue" so
-      // the two queries can never silently disagree about a record.
+      // Admin reviews:
+      //   - ADMIN-created applications. Admin is the top of the hierarchy, so
+      //     there is no "creator's superior" above it -- admin reviews its own
+      //     creations. Under ADR-065 (an EmploymentRecord is auto-created with
+      //     every account) this is the NORMAL case for Regional Managers, not
+      //     an edge case: admin creates the RM account, so admin owns the
+      //     review. Omitting this clause made every admin-created application
+      //     invisible to every queue, including admin's own (found by
+      //     end-to-end verification, 2026-08-13).
+      //   - regional_manager-created applications (admin is the RM's superior).
+      //   - every fallback case (no creator recorded, or a manager creator
+      //     with no resolvable RM) -- computed as "not claimed by any RM's
+      //     queue" so the two queries can never silently disagree.
       const managerIdsWithResolvableRm = await this.managerIdsWithResolvableRegionalManager();
       query = {
         ...baseQuery,
         OR: [
           { created_by_id: null },
+          { created_by: { role: UserRole.ADMIN } },
           { created_by: { role: UserRole.REGIONAL_MANAGER } },
           {
             created_by: { role: UserRole.MANAGER },
@@ -1711,7 +1741,40 @@ export class EmployeeManagementService extends BaseService {
       orderBy: { submitted_for_review_at: 'asc' },
     });
 
-    return records.map(toGeneralProfile);
+    // 2026-08-13 re-onboarding: the reviewer decides differently for a
+    // returning employee (employment_cycle > 1) than a first-time applicant --
+    // they are reactivating a known person with documents already on file,
+    // not vetting a new one -- and the action they get offered depends on
+    // whether that person's contract is still valid. Both facts are attached
+    // here, in ONE query, rather than left to the UI to fetch per row: a
+    // review queue of N rows would otherwise fire N contract requests, and
+    // the reviewer's button label would flicker as they resolved.
+    const userIds = records.map((r) => r.user_id);
+    const contracts = userIds.length
+      ? await this.prisma.contract.findMany({
+          where: { worker_id: { in: userIds } },
+          orderBy: { created_at: 'desc' },
+          select: { worker_id: true, status: true, expires_at: true, end_date: true },
+        })
+      : [];
+    // findMany returns newest-first, so the FIRST hit per worker is the
+    // newest — which is the one that governs (matches
+    // assertApprovedContract/ensureValidContract's own ordering).
+    const newestByWorker = new Map<string, (typeof contracts)[number]>();
+    for (const c of contracts) {
+      if (!newestByWorker.has(c.worker_id)) newestByWorker.set(c.worker_id, c);
+    }
+
+    return records.map((record) => {
+      const contract = newestByWorker.get(record.user_id) ?? null;
+      return {
+        ...toGeneralProfile(record),
+        is_reonboarding: record.employment_cycle > 1,
+        contract_status: contract?.status ?? null,
+        contract_valid: isContractValid(contract),
+        contract_end_date: contract?.end_date ? contract.end_date.toISOString().slice(0, 10) : null,
+      };
+    });
   }
 
   // Manager user ids whose hotel resolves to a hotel_group with a
@@ -1830,17 +1893,86 @@ export class EmployeeManagementService extends BaseService {
     return !!hotel && !!record.hotel_group_id && hotel.hotel_group_id === record.hotel_group_id;
   }
 
+  /**
+   * Resolves the contract this record should be reviewed against, issuing a
+   * fresh one when re-onboarding finds the previous one expired.
+   *
+   * Returns the newest contract if one exists and is either still valid or
+   * still PENDING (i.e. already awaiting signature — issuing a second one
+   * would just create two unsigned contracts for the same person). Otherwise,
+   * when every contract on file has EXPIRED, generates a new PENDING one on
+   * the same default terms a first-time hire gets, so the returning employee
+   * has something current to sign.
+   *
+   * Returns null only when contract generation itself is unavailable, which
+   * submitForReview() surfaces as a "contact an administrator" conflict
+   * rather than silently proceeding without a contract.
+   */
+  private async ensureValidContract(record: EmploymentRecord) {
+    const latest = await this.prisma.contract.findFirst({
+      where: { worker_id: record.user_id },
+      orderBy: { created_at: 'desc' },
+    });
+
+    if (latest && (latest.status === ContractStatus.PENDING || isContractValid(latest))) {
+      return latest;
+    }
+
+    // No contract at all, or the newest one has expired -> issue a fresh
+    // PENDING contract. generateDefaultContract() is idempotent per worker
+    // ONLY while a contract exists, so the expired-contract path needs the
+    // explicit re-issue below rather than that method's short-circuit.
+    try {
+      if (!latest) {
+        await hrService.generateDefaultContract(
+          record.user_id,
+          record.job_title,
+          record.start_date,
+          record.employment_type
+        );
+      } else {
+        await hrService.reissueDefaultContract(
+          record.user_id,
+          record.job_title,
+          record.start_date,
+          record.employment_type
+        );
+      }
+    } catch (error) {
+      logger.error('employee_reonboarding_contract_issue_failed', {
+        userId: record.user_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+
+    return this.prisma.contract.findFirst({
+      where: { worker_id: record.user_id },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  // 2026-08-13 re-onboarding: now checks EXPIRY too, not just status.
+  // Previously this matched on status alone, so a contract that was ACTIVE
+  // but years past its expires_at still satisfied the approve/rehire gate --
+  // nothing in this codebase ever transitions a contract out of ACTIVE when
+  // it lapses (hr/service.ts sendExpiryReminders only notifies), so that was
+  // reachable in normal operation, not a corner case. Uses the shared
+  // isContractValid() predicate rather than a second copy of the rule.
   private async assertApprovedContract(userId: string): Promise<void> {
-    const approvedContract = await this.prisma.contract.findFirst({
+    const contract = await this.prisma.contract.findFirst({
       where: {
         worker_id: userId,
         status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED, ContractStatus.PERMANENT] },
       },
-      select: { id: true },
+      orderBy: { created_at: 'desc' },
+      select: { id: true, status: true, expires_at: true },
     });
-    if (!approvedContract) {
+    if (!isContractValid(contract)) {
       throw new ConflictError(
-        'Cannot approve: the worker does not have an approved contract (Active, Extended, or Permanent). Please confirm their contract in HR first.',
+        contract
+          ? 'Cannot approve: the worker\'s contract has expired. Issue and confirm a new contract in HR first.'
+          : 'Cannot approve: the worker does not have an approved contract (Active, Extended, or Permanent). Please confirm their contract in HR first.',
       );
     }
   }
