@@ -164,3 +164,4 @@ the target hotel's manager, and the group's RM.
 | Admin saw every review request | Admin's branch claimed all admin-created records; under ADR-065 that is nearly all of them |
 | Reviewer notified could not see the record; reviewer who could was never told | Queue routing and notification routing were two independent implementations that drifted |
 | RM shown a Manager application they were forbidden to reject | Queue matched on `created_by_id` while the authority check refuses an RM while `FEATURE_RM_ROLE` is off |
+| Manager/Checker/RM's own profile page showed no Employment status, no Confirm/Approve/Reject, no Contract/Payslip cards at all | `users/[id]/page.tsx` gated all of it on `user.role === "worker"`; every lifecycle endpoint is actually role-agnostic on the subject (2026-08-13, found in live QA) |
