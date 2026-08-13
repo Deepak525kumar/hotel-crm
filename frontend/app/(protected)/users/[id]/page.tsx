@@ -211,7 +211,22 @@ function UserDetail() {
             <AssignmentCard user={user} />
           </RoleGate>
 
-          {user.role === "worker" && (
+          {/* 2026-08-13 fix (found during live QA of the onboarding flow):
+              this was `user.role === "worker"`, so the entire employment
+              lifecycle -- Employment status, Confirm/Approve/Reject,
+              Deactivate/Reactivate, Delete/Restore (re-onboarding), Contract,
+              Payslip requests -- was invisible on this page for every
+              Checker, Manager, and Regional Manager account. ADR-065 gives
+              every non-admin role an EmploymentRecord and the identical
+              onboarding lifecycle; none of these cards are worker-specific
+              (WorkerOnboardingCard/ContractCard/PayslipRequestsCard all take
+              a plain userId/workerId and the backend's lifecycle endpoints
+              are role-agnostic, gated only by the ACTOR's role via
+              assertLifecycleAuthority -- see employee-management/service.ts).
+              Admin has no EmploymentRecord and is excluded, matching the
+              WorkerOnboardingCard's own "No employment record found" empty
+              state for that case. */}
+          {user.role !== "admin" && (
             <WorkerOnboardingGate>
               <WorkerOnboardingCard userId={id} />
             </WorkerOnboardingGate>
@@ -221,7 +236,7 @@ function UserDetail() {
             <DocumentsCard workerId={id} />
           </DocumentsGate>
 
-          {user.role === "worker" && (
+          {user.role !== "admin" && (
             <HrPayrollGate>
               <ContractCard workerId={id} />
               <PayslipRequestsCard workerId={id} />
