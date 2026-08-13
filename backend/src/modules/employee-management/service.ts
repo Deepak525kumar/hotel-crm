@@ -1757,6 +1757,27 @@ export class EmployeeManagementService extends BaseService {
     if (actor.role === 'regional_manager' && actor.scope?.type !== 'hotel_group') {
       throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
     }
+    // Read/write consistency for a disabled RM role.
+    //
+    // resolveScope() (auth/service.ts) grants an RM their hotel_group scope
+    // from HotelGroup.regional_manager_user_id without consulting
+    // FEATURE_RM_ROLE, so a Regional Manager signs in and reaches this queue
+    // normally. But resolveReviewerRecipients() DOES consult the flag and
+    // returns no RM while it is off, so every record routes to Admin and the
+    // ownership filter below matches nothing.
+    //
+    // The result was an empty queue that reads as "no applications waiting" --
+    // indistinguishable from genuinely having none, and flatly contradicting
+    // the write path, which already refuses the same actor with an explicit
+    // "only Admin can manage Manager applications while RM role is disabled"
+    // (assertLifecycleAuthority). Same actor, same feature, one path silent
+    // and one explicit. Say the same thing here rather than showing an empty
+    // list that hides the reason.
+    if (actor.role === 'regional_manager' && !isRmRoleEnabled()) {
+      throw new ForbiddenError(
+        'Applications are routed to Admin while the Regional Manager role is disabled'
+      );
+    }
 
     const records = await this.prisma.employmentRecord.findMany({
       where: {
