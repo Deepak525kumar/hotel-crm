@@ -65,6 +65,37 @@ export class GeoService extends BaseService {
     // set up yet for this hotel. Not a failure; callers treat the geofence
     // check as not-yet-applicable rather than fail-closed on it.
     if (!hotel || hotel.latitude === null || hotel.longitude === null) {
+      // 2026-08-13 fix (E2E integration audit): this returned with no record
+      // of any kind. OD-GEO-007 requires every distance-check result to be
+      // audit-logged, but the one outcome that produced NO WorkerGeoCheckin
+      // row -- and so had no row to hang an audit entry off -- also produced
+      // no audit entry, leaving the skip completely untraceable. After the
+      // fact there was no way to distinguish "this hotel had no geofence, so
+      // the check was skipped" from "the check never ran", which is exactly
+      // the question an audit of a disputed check-in has to answer.
+      //
+      // Deliberately does NOT persist the submitted coordinates. There is no
+      // geofence to evaluate them against, so storing device location here
+      // would be collecting personal location data with no processing purpose
+      // (the module already bars latitude/longitude from audit details
+      // entirely, OD-GEO-005). Recording that a check was requested and
+      // skipped is the audit requirement; the coordinates are not.
+      //
+      // Anchored to the HOTEL rather than WORKER_GEO_CHECKIN: no checkin row
+      // exists, and inventing an id for one would imply a stored coordinate
+      // record that is intentionally absent.
+      await this.logAudit(
+        workerId,
+        actorRole,
+        'GEOFENCE_CHECK_SKIPPED',
+        'HOTEL',
+        input.hotel_id,
+        {
+          reason: 'not_configured',
+          ...(attendanceId ? { attendance_id: attendanceId } : {}),
+        },
+        actorIp
+      );
       return { status: 'not_configured' };
     }
 
