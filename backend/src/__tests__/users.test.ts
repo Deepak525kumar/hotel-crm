@@ -406,6 +406,46 @@ describe('UserService', () => {
       expect(result.id).toBe('u_worker');
     });
 
+    // 2026-08-13 fix (reported live: RM creates a Manager, is redirected to
+    // /users/:id, and gets "Failed to load this user. They may have been
+    // removed."). The pre-existing creator-exemption test above only covers
+    // a WORKER target; RULE A lets a Regional Manager create MANAGER
+    // accounts too (lib/role-hierarchy.ts), and the role check used to throw
+    // before that exemption was ever reached for a non-worker/checker role.
+    it('allows a regional_manager to view a MANAGER account they just created (redirect-after-create)', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_new_mgr', role: 'MANAGER', first_name: 'New', last_name: 'Mgr',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+        created_by_id: 'rm_actor',
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.getUser(
+        'u_new_mgr', 'rm_actor', 'regional_manager', { type: 'hotel_group', hotel_group_id: 'my_group' }
+      );
+      expect(result.id).toBe('u_new_mgr');
+      // Newly-created account has no EmploymentRecord yet — the creator
+      // exemption must short-circuit before any group-scope lookup runs.
+      expect(mockPrisma.employmentRecord.findUnique).not.toHaveBeenCalled();
+    });
+
+    // The role-restriction gate still applies to anyone who is NOT the
+    // creator — this must keep denying a manager/RM viewing an unrelated
+    // manager's account, or the fix above becomes an IDOR.
+    it('still forbids a regional_manager from viewing a MANAGER account they did NOT create', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue({
+        id: 'u_other_mgr', role: 'MANAGER', first_name: 'Other', last_name: 'Mgr',
+        phone: null, profile_photo_url: null, is_active: true,
+        created_at: new Date(), updated_at: new Date(), deleted_at: null,
+        created_by_id: 'someone_else',
+      });
+
+      await expect(
+        service.getUser('u_other_mgr', 'rm_actor', 'regional_manager', { type: 'hotel_group', hotel_group_id: 'my_group' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
     it('forbids a regional_manager from viewing a worker outside their hotel group scope', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u_worker', role: 'WORKER', first_name: 'Work', last_name: 'Er',
