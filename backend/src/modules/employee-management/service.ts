@@ -699,15 +699,18 @@ export class EmployeeManagementService extends BaseService {
   /**
    * PENDING -> ACTIVE (hire approval).
    *
-   * ADR-023 §4's group resolution is unchanged in substance, only in
-   * placement: it now runs inside the transition's transaction so the
+   * Group resolution runs inside the transition's transaction, so the
    * resolved hotel_group_id and the ACTIVE status commit together — an
-   * approval can no longer half-apply (status ACTIVE, group unset) if the
-   * connect fails. Resolution order: (1) the actor's own HotelGroup as its
-   * Regional Manager, (2) the group of a Hotel the actor manages, (3) an
-   * explicit hotel_group_id in the payload. If none resolve, hotel_group_id
-   * is left null — PROVISIONAL, unchanged from the pre-rework behavior: the
-   * record becomes Active but unassignable until a group is set.
+   * approval cannot half-apply (status ACTIVE, group unset). Resolution
+   * order: (1) target_hotel_group_id, the scope chosen when the application
+   * was created, (2) an already-set hotel_group_id, (3) the approving
+   * actor's own group when they are scoped to one. If none resolve,
+   * hotel_group_id is left null — PROVISIONAL: the record becomes Active but
+   * unassignable until a group is set.
+   *
+   * This docstring previously described resolution that the body did not do
+   * (it passed `data: {}`), which is how the half-applied state it warns
+   * about became the normal outcome.
    */
   async approve(actor: AuthContext, employeeId: string) {
     const record = await this.findRecordOrThrow(employeeId);
@@ -741,10 +744,57 @@ export class EmployeeManagementService extends BaseService {
 
     await this.assertApprovedContract(record.user_id);
 
+    // Approval promotes the scope the application was created with.
+    //
+    // Approve used to be status-only ("ADR-065 §6 item 6: does not write scope
+    // fields"), which contradicted this method's own docstring above -- the one
+    // promising an approval "can no longer half-apply (status ACTIVE, group
+    // unset)". Half-applying is exactly what happened, and it was not a
+    // harmless inconsistency: listUsers() scopes every non-admin to
+    // `employment_record: { hotel_group_id, status: ACTIVE }`, so an approved
+    // employee with a null hotel_group_id is invisible in the Users tab to
+    // every manager and RM -- including the person who created and approved
+    // them. Only an admin could see them. Confirmed on production, where both
+    // employees onboarded through the UI were ACTIVE with hotel_group_id null
+    // and only target_hotel_group_id set.
+    //
+    // target_* is the scope the creating actor chose at creation time, so
+    // promoting it here writes no new decision -- it commits the one already
+    // made, atomically with the status. Resolution stays conservative: an
+    // explicit target wins, and the actor's own group is used only as the
+    // fallback the docstring already described. If neither resolves,
+    // hotel_group_id is left null (PROVISIONAL) rather than guessed.
+    const resolvedGroupId =
+      record.target_hotel_group_id ??
+      record.hotel_group_id ??
+      (actor.scope?.type === 'hotel_group' ? actor.scope.hotel_group_id : null);
+
     const updated = await this.prisma.$transaction(async (tx) => {
+      // A Hotel belongs to exactly one HotelGroup (schema.prisma: Hotel
+      // .hotel_group_id is non-null), so promoting the target hotel blindly
+      // could pin someone to a hotel OUTSIDE the group just resolved above --
+      // an internally inconsistent record that every group-scoped query would
+      // then disagree about. Verified against the resolved group, in the same
+      // transaction, so the check cannot race a hotel being moved between
+      // groups: a mismatch simply leaves primary_hotel unset for assign() to
+      // resolve deliberately, rather than guessing.
+      let primaryHotelId: string | null = null;
+      if (resolvedGroupId && record.target_primary_hotel_id && !record.primary_hotel_id) {
+        const targetHotel = await tx.hotel.findUnique({
+          where: { id: record.target_primary_hotel_id },
+          select: { hotel_group_id: true },
+        });
+        if (targetHotel?.hotel_group_id === resolvedGroupId) {
+          primaryHotelId = record.target_primary_hotel_id;
+        }
+      }
+
       const transitionedRecord = await this.applyTransition(tx, record, EmploymentStatus.ACTIVE, {
         actorUserId: actor.userId,
-        data: {}, // ADR-065 §6 item 6: approve is status-only, does not write scope fields
+        data: {
+          ...(resolvedGroupId ? { hotel_group: { connect: { id: resolvedGroupId } } } : {}),
+          ...(primaryHotelId ? { primary_hotel: { connect: { id: primaryHotelId } } } : {}),
+        },
       });
 
       await this.logAudit(actor.userId, actor.role, 'employee.lifecycle.approved', 'EMPLOYMENT_RECORD', record.id, {
