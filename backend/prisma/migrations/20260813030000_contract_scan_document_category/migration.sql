@@ -1,0 +1,16 @@
+-- 2026-08-13: dedicated category for the applicant's SIGNED contract.
+--
+-- Before this, hr/service.ts filed contract scans under 'ID_CARD' (its own
+-- comment acknowledged the gap: "no CONTRACT_SCAN category exists"), so a
+-- signed contract was indistinguishable from the worker's actual ID card in
+-- any category-keyed view. That misfiling becomes user-visible now that the
+-- onboarding checklist renders per-category documents, so the category is
+-- introduced alongside it.
+--
+-- Existing mis-filed rows are deliberately NOT migrated: an ID_CARD row
+-- cannot be distinguished from a genuine ID card by data alone (same
+-- category, same mime types), so a blanket rewrite would corrupt real ID
+-- cards. Historical rows keep their existing category; only new uploads use
+-- the new one. Contract.scanned_document_id remains the authoritative link
+-- from a contract to its scan regardless of category.
+ALTER TYPE "DocumentCategory" ADD VALUE IF NOT EXISTS 'CONTRACT_SCAN';

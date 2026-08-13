@@ -4,13 +4,19 @@ import { useMemo } from "react";
 import useSWR from "swr";
 import { documentsApi } from "@/lib/api";
 import { DocumentUploadItem } from "./DocumentUploadItem";
-import type { DocumentCategory } from "@/lib/types";
+import type { DocumentCategory, WorkerDocument } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
 
 export interface DocumentUploadListProps {
   workerId: string;
   workPermitRequired?: boolean;
   disabled?: boolean;
+  /**
+   * Include the signed-contract row. On by default for the applicant's own
+   * checklist and the reviewer's view — the contract is part of what a
+   * reviewer needs to see, not a separate surface they have to go find.
+   */
+  includeContract?: boolean;
 }
 
 const REQUIRED_CATEGORIES: { id: DocumentCategory; label: string; description: string }[] = [
@@ -22,24 +28,61 @@ const REQUIRED_CATEGORIES: { id: DocumentCategory; label: string; description: s
   { id: "ADDRESS", label: "Proof of Address", description: "Registration certificate (Meldebescheinigung) or recent utility bill" },
 ];
 
-export function DocumentUploadList({ workerId, workPermitRequired = false, disabled = false }: DocumentUploadListProps) {
-  // We use SWR to fetch document completeness
+const CONTRACT_CATEGORY: { id: DocumentCategory; label: string; description: string } = {
+  id: "CONTRACT_SCAN",
+  label: "Signed Contract",
+  description: "Download your contract, sign it, then upload the signed copy here",
+};
+
+export function DocumentUploadList({
+  workerId,
+  workPermitRequired = false,
+  disabled = false,
+  includeContract = true,
+}: DocumentUploadListProps) {
   const { data: completeness, isLoading, error, mutate } = useSWR(
     `/documents/workers/${workerId}/documents/completeness?work_permit_required=${workPermitRequired}`,
     () => documentsApi.completeness(workerId, workPermitRequired)
   );
 
+  // The actual uploaded files, so each row can link to the real document.
+  // Previously this component fetched ONLY the completeness booleans, which
+  // is why a reviewer saw green ticks but could not open a single file —
+  // there was no document id or URL anywhere in the data it had.
+  //
+  // Failure here is deliberately non-fatal and does not gate rendering: the
+  // checklist still works from `completeness` alone, just without view
+  // links. A reviewer seeing an un-clickable checklist beats one seeing a
+  // hard error because presigned-URL generation happened to be unavailable.
+  const { data: documents, mutate: mutateDocs } = useSWR<WorkerDocument[]>(
+    ["worker-documents", workerId],
+    () => documentsApi.list(workerId),
+  );
+
+  const latestByCategory = useMemo(() => {
+    const map = new Map<string, WorkerDocument>();
+    // The API returns newest-first (created_at desc), so the first hit per
+    // category is the current one — the same "newest wins" rule the
+    // completeness check and the reviewer both mean by "the document for
+    // this category".
+    for (const doc of documents ?? []) {
+      if (!map.has(doc.category)) map.set(doc.category, doc);
+    }
+    return map;
+  }, [documents]);
+
   const categories = useMemo(() => {
     const list = [...REQUIRED_CATEGORIES];
     if (workPermitRequired) {
-      list.push({ 
-        id: "WORK_PERMIT", 
-        label: "Work Permit", 
-        description: "Valid residence and work permit for non-EU citizens" 
+      list.push({
+        id: "WORK_PERMIT",
+        label: "Work Permit",
+        description: "Valid residence and work permit for non-EU citizens",
       });
     }
+    if (includeContract) list.push(CONTRACT_CATEGORY);
     return list;
-  }, [workPermitRequired]);
+  }, [workPermitRequired, includeContract]);
 
   if (error) {
     return (
@@ -70,8 +113,12 @@ export function DocumentUploadList({ workerId, workPermitRequired = false, disab
             description={cat.description}
             workerId={workerId}
             isUploaded={isUploaded}
+            document={latestByCategory.get(cat.id) ?? null}
             disabled={disabled}
-            onUploadSuccess={() => mutate()}
+            onUploadSuccess={() => {
+              mutate();
+              mutateDocs();
+            }}
           />
         );
       })}

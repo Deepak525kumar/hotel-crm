@@ -1047,7 +1047,10 @@ export interface UpdateAttendanceInput {
 /*  Documents — SPEC-DOCUMENTS-001 @0.1.4 FROZEN (GD-16)                       */
 /* -------------------------------------------------------------------------- */
 
-export type DocumentCategory = "TAX_NUMBER" | "SOCIAL_SECURITY_NUMBER" | "HEALTH_INSURANCE" | "ID_CARD" | "PASSPORT" | "ADDRESS" | "WORK_PERMIT";
+/** Mirrors the backend DocumentCategory enum (schema.prisma). CONTRACT_SCAN
+ * is the applicant's SIGNED contract — before it existed, contract scans were
+ * filed as ID_CARD and were indistinguishable from a real ID card. */
+export type DocumentCategory = "TAX_NUMBER" | "SOCIAL_SECURITY_NUMBER" | "HEALTH_INSURANCE" | "ID_CARD" | "PASSPORT" | "ADDRESS" | "WORK_PERMIT" | "CONTRACT_SCAN";
 
 /** Matches backend `WorkerDocumentDto` (documents/types.ts) exactly. */
 export interface WorkerDocument {

@@ -2,9 +2,9 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
-import { CheckCircle2, UploadCloud, FileType2 } from "lucide-react";
+import { CheckCircle2, UploadCloud, FileType2, Eye } from "lucide-react";
 import { documentsApi } from "@/lib/api";
-import type { DocumentCategory } from "@/lib/types";
+import type { DocumentCategory, WorkerDocument } from "@/lib/types";
 
 export interface DocumentUploadItemProps {
   category: DocumentCategory;
@@ -12,6 +12,13 @@ export interface DocumentUploadItemProps {
   description: string;
   workerId: string;
   isUploaded: boolean;
+  /**
+   * The actual uploaded file for this category, when one exists. Carries the
+   * presigned URL that makes the row viewable — without it a reviewer sees
+   * only a green "Uploaded" tick and has no way to open what was uploaded.
+   * Null while loading, or when nothing has been uploaded for this category.
+   */
+  document?: WorkerDocument | null;
   disabled?: boolean;
   onUploadSuccess: () => void;
 }
@@ -22,6 +29,7 @@ export function DocumentUploadItem({
   description,
   workerId,
   isUploaded,
+  document = null,
   disabled,
   onUploadSuccess
 }: DocumentUploadItemProps) {
@@ -78,6 +86,22 @@ export function DocumentUploadItem({
       </div>
       
       <div className="shrink-0 flex items-center gap-3">
+        {/* A presigned URL is short-lived and may legitimately be absent
+            (generation deferred, or storage unavailable) — in that case the
+            row still reports Uploaded, it just cannot be opened, rather than
+            rendering a link that would 404. */}
+        {document?.presigned_url && (
+          <a
+            href={document.presigned_url}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            title={document.original_filename}
+          >
+            <Eye className="h-4 w-4" />
+            View
+          </a>
+        )}
         {isUploaded ? (
           <span className="text-sm font-medium text-green-700">Uploaded</span>
         ) : (

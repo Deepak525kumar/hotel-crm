@@ -1,0 +1,4 @@
+-- Postgres cannot DROP a value from an enum type. Reverting would require
+-- recreating "DocumentCategory" and rewriting every column using it, which
+-- would destroy any WorkerDocument rows already filed as CONTRACT_SCAN.
+-- Deliberately a no-op: the value is inert unless a row uses it.

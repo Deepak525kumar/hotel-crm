@@ -347,7 +347,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       // `systemGenerated`. Asserted explicitly so dropping the flag (breaking
       // contract scanning) or widening it fails here.
       expect(mockDocumentServiceUpload).toHaveBeenCalledWith(
-        expect.objectContaining({ worker_id: 'w1', actor_id: 'm1', category: 'ID_CARD' }),
+        expect.objectContaining({ worker_id: 'w1', actor_id: 'm1', category: 'CONTRACT_SCAN' }),
         Buffer.from('x'),
         'manager',
         '1.2.3.4',

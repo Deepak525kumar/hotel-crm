@@ -272,6 +272,7 @@ export function ReviewQueueTable() {
                 them from scratch, so the document checklist is replaced by
                 an explicit note. The only real question is the contract. */}
             {isReonboarding ? (
+              <div className="space-y-4">
               <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
                 <p className="font-medium">Returning employee (cycle {selectedRecord.employment_cycle})</p>
                 <p className="mt-0.5">
@@ -280,6 +281,20 @@ export function ReviewQueueTable() {
                     ? " Their contract is still valid, so they can be reactivated directly."
                     : " Their contract is no longer valid — a new one has been issued for them to sign, and must be confirmed in HR before reactivation."}
                 </p>
+              </div>
+              {/* Still shown for a returning employee: "not re-collected"
+                  means they need not re-upload, NOT that the reviewer should
+                  be unable to inspect what is already on file. */}
+              <div>
+                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Documents on file</h3>
+                <div className="rounded-md border border-gray-200 dark:border-gray-700">
+                  <DocumentUploadList
+                    workerId={selectedRecord.user_id}
+                    workPermitRequired={selectedRecord.work_permit_required}
+                    disabled
+                  />
+                </div>
+              </div>
               </div>
             ) : (
               <div>

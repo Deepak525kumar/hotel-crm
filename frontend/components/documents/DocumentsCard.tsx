@@ -32,6 +32,7 @@ const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   PASSPORT: "Passport",
   ADDRESS: "Proof of Address",
   WORK_PERMIT: "Work permit",
+  CONTRACT_SCAN: "Signed contract",
 };
 
 // Matches backend/src/modules/documents/upload-policy.ts exactly (the same
