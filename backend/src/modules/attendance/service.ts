@@ -355,7 +355,8 @@ export class AttendanceService extends BaseService {
         input.status !== undefined ||
         input.minutes_late !== undefined ||
         input.minutes_worked !== undefined ||
-        input.is_verified !== undefined
+        input.is_verified !== undefined ||
+        input.check_in_at !== undefined
       ) {
         throw new ForbiddenError('Workers may only set check_out_at and notes');
       }
@@ -400,6 +401,14 @@ export class AttendanceService extends BaseService {
 
     const data: Prisma.AttendanceUpdateInput = {};
 
+    // 2026-08-13 fix: resolved BEFORE the check_out_at block below so that
+    // if a manager corrects both in the same request, the auto-computed
+    // minutes_worked uses the CORRECTED check-in time, not the stale stored
+    // one. Manager-only -- the isWorker guard above already rejects
+    // check_in_at from a worker-submitted request.
+    const effectiveCheckInAt =
+      !isWorker && input.check_in_at !== undefined ? new Date(input.check_in_at) : record.check_in_at;
+
     if (input.check_out_at !== undefined) {
       // Time-manipulation fix (2026-08-08): a worker's own check-out time was
       // taken verbatim from the request body and used unchanged to compute
@@ -411,10 +420,10 @@ export class AttendanceService extends BaseService {
       // below) and keeps using the value they supplied.
       const checkOutTime = isWorker ? new Date() : new Date(input.check_out_at);
       data.check_out_at = checkOutTime;
-      if (record.check_in_at) {
+      if (effectiveCheckInAt) {
         data.minutes_worked = Math.max(
           0,
-          Math.floor((checkOutTime.getTime() - record.check_in_at.getTime()) / 60000)
+          Math.floor((checkOutTime.getTime() - effectiveCheckInAt.getTime()) / 60000)
         );
       }
     }
@@ -424,6 +433,7 @@ export class AttendanceService extends BaseService {
     // Manager-only fields
     if (!isWorker) {
       if (input.status !== undefined) data.status = input.status as AttendanceStatus;
+      if (input.check_in_at !== undefined) data.check_in_at = effectiveCheckInAt;
       if (input.minutes_late !== undefined) data.minutes_late = input.minutes_late;
       if (input.minutes_worked !== undefined) data.minutes_worked = input.minutes_worked;
       if (input.is_verified === true) {
