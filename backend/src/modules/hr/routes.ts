@@ -48,6 +48,18 @@ const upload = multer({
 // scopeWorkerRoute() shape documents/routes.ts's four routes already establish.
 function scopeWorkerRoute() {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Self-access is role-independent (2026-08-13). Previously this was
+    // `role === 'worker'` only, from when a worker was the only applicant;
+    // under ADR-065 a Manager/RM onboards too and has no scope of their own
+    // until approval, so a role-keyed check would deny them their own
+    // contract status. This currently also passes via checkWorkerScope()'s
+    // own self-record branch, but relying on that leaves the correctness of
+    // this route dependent on an unrelated guard's internals -- state the
+    // self-exemption here, where the route's own intent lives.
+    if (req.auth && req.auth.userId === req.params.worker_id) {
+      next();
+      return;
+    }
     if (req.auth?.role === 'worker') {
       next();
       return;
