@@ -775,6 +775,24 @@ export interface CalendarEntryDto {
   updated_at: string;
 }
 
+/**
+ * Does this calendar entry still represent real staffing?
+ *
+ * `listCalendarEntries` deliberately RETURNS cancelled placements (so the grid
+ * can render them struck-through rather than having a shift silently vanish),
+ * which means every consumer that counts, sums, or reports on entries has to
+ * exclude them itself. Shared rather than inlined: the first pass added the
+ * cancelled state to the grid only, and three other surfaces — the range
+ * breakdown's "Placements" and "Workers placed" tiles, and the calendar-entry
+ * list — kept counting cancelled rows as staffed.
+ *
+ * Entries from older responses have no `assignment_status` at all; those are
+ * treated as active, matching the pre-2026-08-13 behaviour.
+ */
+export function isActivePlacement(entry: CalendarEntryDto): boolean {
+  return entry.assignment_status !== "CANCELLED";
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Quality — Verifications & Ratings                                         */
 /* -------------------------------------------------------------------------- */
