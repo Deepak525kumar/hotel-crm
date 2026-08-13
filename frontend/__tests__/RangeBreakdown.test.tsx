@@ -64,6 +64,13 @@ function tile(label: string): string {
 }
 
 describe("RangeBreakdown staffing counts", () => {
+  // A no-show means nobody worked the shift; it must not read as covered.
+  it("does not count a no-show as staffing", () => {
+    renderBreakdown([entry({ assignment_status: "NO_SHOW" })]);
+    expect(tile("Placements")).toBe("0");
+    expect(tile("Workers placed")).toBe("0");
+  });
+
   it("counts an active placement", () => {
     renderBreakdown([entry({ assignment_status: "CONFIRMED" })]);
     expect(tile("Placements")).toBe("1");
