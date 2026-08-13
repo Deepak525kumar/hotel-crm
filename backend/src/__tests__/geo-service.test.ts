@@ -237,6 +237,82 @@ describe('GeoService (SPEC-GEO-001, GD-14)', () => {
       expect(mockWorkerGeoCheckinCreate).not.toHaveBeenCalled();
     });
 
+    // 2026-08-13 (E2E integration audit): the not_configured branch returned
+    // with no record of any kind. OD-GEO-007 requires every distance-check
+    // result to be audit-logged, but the one outcome with no WorkerGeoCheckin
+    // row to hang an entry off produced no entry either -- so after the fact
+    // "the hotel had no geofence" was indistinguishable from "the check never
+    // ran", which is the question an audit of a disputed check-in must answer.
+    describe('not_configured audit trail', () => {
+      beforeEach(() => {
+        mockHotelFindUnique.mockResolvedValue({ latitude: null, longitude: null });
+      });
+
+      it('audits the skip, anchored to the hotel', async () => {
+        await service.verifyGeofence(
+          'w1',
+          { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+          'worker'
+        );
+
+        expect(mockAuditLogCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              action: 'GEOFENCE_CHECK_SKIPPED',
+              resource_type: 'HOTEL',
+              resource_id: 'h1',
+              actor_id: 'w1',
+            }),
+          })
+        );
+      });
+
+      it('records why it was skipped, and the attendance it belonged to', async () => {
+        await service.verifyGeofence(
+          'w1',
+          { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+          'worker',
+          undefined,
+          'att1'
+        );
+
+        expect(mockAuditLogCreate.mock.calls[0][0].data.details).toEqual({
+          reason: 'not_configured',
+          attendance_id: 'att1',
+        });
+      });
+
+      // OD-GEO-005 -- and there is no geofence to evaluate them against, so
+      // persisting device location here would be collecting personal data
+      // with no processing purpose.
+      it('never records the submitted coordinates', async () => {
+        await service.verifyGeofence(
+          'w1',
+          { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+          'worker',
+          undefined,
+          'att1'
+        );
+
+        const written = JSON.stringify(mockAuditLogCreate.mock.calls[0][0].data);
+        expect(written).not.toContain('52.52');
+        expect(written).not.toContain('13.405');
+        expect(mockWorkerGeoCheckinCreate).not.toHaveBeenCalled();
+      });
+
+      it('omits attendance_id when the check was not tied to an attendance row', async () => {
+        await service.verifyGeofence(
+          'w1',
+          { hotel_id: 'h1', latitude: 52.52, longitude: 13.405 },
+          'worker'
+        );
+
+        expect(mockAuditLogCreate.mock.calls[0][0].data.details).toEqual({
+          reason: 'not_configured',
+        });
+      });
+    });
+
     it('returns verified with insideRadius=true and persists/audits the same as checkIn()', async () => {
       mockHotelFindUnique.mockResolvedValue({ latitude: 52.52, longitude: 13.405 });
       mockWorkerGeoCheckinCreate.mockResolvedValue({
