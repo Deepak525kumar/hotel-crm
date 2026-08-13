@@ -601,7 +601,7 @@ describe('EmployeeManagementService', () => {
       expect(result.submitted_for_review_at).not.toBeNull();
     });
 
-    it('approve moves PENDING -> ACTIVE and does not set hotel_group_id (ADR-065 §6 item 6 status-only)', async () => {
+    it('approve leaves hotel_group_id null (PROVISIONAL) when no scope resolves', async () => {
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(
         fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date() })
       );
@@ -624,6 +624,125 @@ describe('EmployeeManagementService', () => {
       expect(result.status).toBe(EmploymentStatus.ACTIVE);
       const updateArg = mockPrisma.employmentRecord.update.mock.calls[0][0] as { data: { hotel_group?: { connect: { id: string } } } };
       expect(updateArg.data.hotel_group).toBeUndefined();
+    });
+
+    /**
+     * Approve used to be status-only, which left an approved employee ACTIVE
+     * with hotel_group_id null. listUsers() scopes every non-admin to
+     * `employment_record: { hotel_group_id, status: ACTIVE }`, so that person
+     * was invisible in the Users tab to every manager and RM -- including the
+     * one who created and approved them. Observed on production: both
+     * UI-onboarded employees were ACTIVE with a null group and only
+     * target_hotel_group_id set.
+     */
+    async function approveWith(record: Partial<Record<string, unknown>>, actorScope: unknown = null) {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, submitted_for_review_at: new Date(), ...record } as never)
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue({ id: 'g1' });
+      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.ACTIVE }));
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      // Admin actor: assertLifecycleAuthority returns early for admin, which
+      // isolates these tests to the GROUP RESOLUTION under test. The
+      // non-admin authority path (an approver may only approve into their own
+      // group) is covered by its own tests above and is unchanged here.
+      mockPrisma.hotel.findUnique.mockResolvedValue(null);
+      await service.approve(
+        { userId: 'admin_1', role: 'admin', permissions: [], scope: actorScope } as never,
+        'E-001'
+      );
+      return mockPrisma.employmentRecord.update.mock.calls[0][0] as {
+        data: { hotel_group?: { connect: { id: string } }; status: string };
+      };
+    }
+
+    it('promotes target_hotel_group_id to hotel_group_id on approval', async () => {
+      const arg = await approveWith({ target_hotel_group_id: 'grp_target' });
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_target' } });
+    });
+
+    it('commits the group in the SAME update as the status, so it cannot half-apply', async () => {
+      const arg = await approveWith({ target_hotel_group_id: 'grp_target' });
+      expect(arg.data.status).toBe(EmploymentStatus.ACTIVE);
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_target' } });
+      expect(mockPrisma.employmentRecord.update).toHaveBeenCalledTimes(1);
+    });
+
+    // The creator's explicit choice outranks the approver's own scope -- an
+    // approver from a different group must not silently redirect the hire.
+    it("prefers the application target over the approving actor's own group", async () => {
+      const arg = await approveWith(
+        { target_hotel_group_id: 'grp_target' },
+        { type: 'hotel_group', hotel_group_id: 'grp_actor' }
+      );
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_target' } });
+    });
+
+    it("falls back to the approving actor's group when the application has no target", async () => {
+      const arg = await approveWith({}, { type: 'hotel_group', hotel_group_id: 'grp_actor' });
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_actor' } });
+    });
+
+    it('does not overwrite a group the record already has', async () => {
+      const arg = await approveWith({ hotel_group_id: 'grp_existing', target_hotel_group_id: null });
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_existing' } });
+    });
+
+    /**
+     * A Hotel belongs to exactly one HotelGroup, so promoting the target hotel
+     * without checking would pin someone to a hotel outside the group just
+     * resolved -- an inconsistent record every group-scoped query would then
+     * disagree about.
+     */
+    it('promotes the target primary hotel when it belongs to the resolved group', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.PENDING,
+          submitted_for_review_at: new Date(),
+          target_hotel_group_id: 'grp_target',
+          target_primary_hotel_id: 'hotel_in_group',
+        } as never)
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotel.findUnique.mockResolvedValue({ hotel_group_id: 'grp_target' });
+      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.ACTIVE }));
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.approve({ userId: 'admin_1', role: 'admin', permissions: [], scope: null } as never, 'E-001');
+
+      const arg = mockPrisma.employmentRecord.update.mock.calls[0][0] as {
+        data: { primary_hotel?: { connect: { id: string } } };
+      };
+      expect(arg.data.primary_hotel).toEqual({ connect: { id: 'hotel_in_group' } });
+    });
+
+    it('leaves primary_hotel unset when the target hotel is in a DIFFERENT group', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({
+          status: EmploymentStatus.PENDING,
+          submitted_for_review_at: new Date(),
+          target_hotel_group_id: 'grp_target',
+          target_primary_hotel_id: 'hotel_elsewhere',
+        } as never)
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotel.findUnique.mockResolvedValue({ hotel_group_id: 'some_other_group' });
+      mockPrisma.employmentRecord.update.mockResolvedValue(fakeRecord({ status: EmploymentStatus.ACTIVE }));
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.approve({ userId: 'admin_1', role: 'admin', permissions: [], scope: null } as never, 'E-001');
+
+      const arg = mockPrisma.employmentRecord.update.mock.calls[0][0] as {
+        data: { primary_hotel?: { connect: { id: string } }; hotel_group?: { connect: { id: string } } };
+      };
+      expect(arg.data.primary_hotel).toBeUndefined();
+      // The group still resolves -- only the inconsistent hotel is skipped.
+      expect(arg.data.hotel_group).toEqual({ connect: { id: 'grp_target' } });
     });
 
     it('approve rejects a PENDING record that was never submitted for review', async () => {
