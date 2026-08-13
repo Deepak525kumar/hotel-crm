@@ -1,0 +1,5 @@
+-- Postgres cannot DROP a value from an enum type. Reverting requires
+-- recreating "NotificationType" without these three values and rewriting
+-- every column that uses it, which would destroy any notification rows
+-- already carrying them. Deliberately a no-op: the added values are inert
+-- unless a row uses them.

@@ -6,6 +6,7 @@ import { employeesApi } from "@/lib/api";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useMyOnboarding } from "@/hooks/useMyOnboarding";
 import { DocumentUploadList } from "@/components/onboarding/DocumentUploadList";
+import { MyContractCard } from "@/components/onboarding/MyContractCard";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
@@ -88,6 +89,11 @@ export default function MyOnboardingPage() {
               disabled={isSubmitted || isActive} 
             />
           </Card>
+
+          {/* The contract was previously absent from this page entirely, so an
+              applicant never learned they had one to sign — even though
+              approval independently requires it. */}
+          <MyContractCard workerId={user!.id} />
         </div>
 
         <div className="space-y-6">

@@ -96,6 +96,14 @@ export class UserService extends BaseService {
           is_active: true,
           created_at: true,
           updated_at: true,
+          // 2026-08-13: `is_active` is the ACCOUNT flag (can this person sign
+          // in) and is true from the moment the account is created. It says
+          // nothing about onboarding. Surfacing it alone made a brand-new,
+          // un-onboarded user read as a green "Active" in the users list --
+          // actively misleading to a reviewer, who means employment status by
+          // "active". The employment status is returned alongside it so the
+          // UI can show the one that actually answers that question.
+          employment_record: { select: { status: true } },
         },
         orderBy: { created_at: 'desc' },
       }),
@@ -105,7 +113,20 @@ export class UserService extends BaseService {
     return {
       // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
       // stored column (dropped).
-      users: users.map((u: { id: string; email: string; first_name: string; last_name: string; phone: string | null; profile_photo_url: string | null; role: string; is_active: boolean; created_at: Date; updated_at: Date }) => ({ ...u, role: u.role.toLowerCase(), permissions: ROLE_PERMISSIONS[u.role] ?? [] })),
+      users: users.map(
+        ({ employment_record, ...u }) => ({
+          ...u,
+          role: u.role.toLowerCase(),
+          permissions: ROLE_PERMISSIONS[u.role] ?? [],
+          // Flattened to a scalar rather than passed through as a nested
+          // relation: consumers need "what is this person's employment
+          // status", not a join shape they have to unwrap. Null means no
+          // EmploymentRecord exists (an admin, or a pre-ADR-065 account) --
+          // deliberately distinct from any status value, so the UI can tell
+          // "not applicable" apart from "pending".
+          employment_status: employment_record?.status ?? null,
+        })
+      ),
       pagination: {
         page,
         per_page: limit,
@@ -133,6 +154,10 @@ export class UserService extends BaseService {
         updated_at: true,
         deleted_at: true,
         created_by_id: true,
+        // See listUsers' note: `is_active` is the account flag and is true
+        // from creation, so it cannot answer "has this person completed
+        // onboarding". Returned alongside it, flattened below.
+        employment_record: { select: { status: true } },
       },
     });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
@@ -173,10 +198,14 @@ export class UserService extends BaseService {
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped). created_by_id is authorization-internal
     // (used only in the scope check above) and never sent to the client.
+    const { employment_record, ...rest } = user;
     return {
-      ...user,
+      ...rest,
       role: user.role.toLowerCase(),
       permissions: ROLE_PERMISSIONS[user.role] ?? [],
+      // Null = no EmploymentRecord (admin, or a pre-ADR-065 account), which
+      // is distinct from any status value — see listUsers' note.
+      employment_status: employment_record?.status ?? null,
       deleted_at: undefined,
       created_by_id: undefined,
     };

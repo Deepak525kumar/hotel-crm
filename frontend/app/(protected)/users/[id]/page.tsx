@@ -24,8 +24,10 @@ import { WorkerOnboardingCard } from "@/components/employees/WorkerOnboardingCar
 import { AssignmentCard } from "@/components/users/AssignmentCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
+import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import {
   ActiveBadge,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -126,7 +128,18 @@ function UserDetail() {
             title={
               <span className="flex items-center gap-3">
                 {user.first_name} {user.last_name}
-                <ActiveBadge active={user.is_active} />
+                {/* Employment status is what a reviewer reads this badge as.
+                    `is_active` is the account/sign-in flag and is true from
+                    creation, so on its own it showed "Active" for someone who
+                    has not onboarded. Only falls back to the account flag for
+                    accounts with no employment record (admins, pre-ADR-065). */}
+                {user.employment_status ? (
+                  <Badge tone={EMPLOYMENT_STATUS_TONE[user.employment_status]}>
+                    {EMPLOYMENT_STATUS_LABEL[user.employment_status]}
+                  </Badge>
+                ) : (
+                  <ActiveBadge active={user.is_active} />
+                )}
               </span>
             }
             description={user.email}

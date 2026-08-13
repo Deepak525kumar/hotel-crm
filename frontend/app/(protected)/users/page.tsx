@@ -8,6 +8,7 @@ import { RoleGate } from "@/components/auth/RoleGate";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import {
   ActiveBadge,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -25,6 +26,7 @@ import {
   TR,
   TextLink,
 } from "@/components/ui";
+import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import type { Role } from "@/lib/types";
 
 const ROLE_FILTERS = [
@@ -171,7 +173,20 @@ function UsersDirectory() {
                         <RoleBadge role={u.role} />
                       </TD>
                       <TD>
-                        <ActiveBadge active={u.is_active} />
+                        {/* Employment status when the person has one — that
+                            is what "active" means to a reviewer. `is_active`
+                            is the account/sign-in flag and is true from
+                            creation, so showing it alone made a brand-new,
+                            un-onboarded user read as Active. Falls back to
+                            the account flag only for accounts with no
+                            employment record (admins, pre-ADR-065 users). */}
+                        {u.employment_status ? (
+                          <Badge tone={EMPLOYMENT_STATUS_TONE[u.employment_status]}>
+                            {EMPLOYMENT_STATUS_LABEL[u.employment_status]}
+                          </Badge>
+                        ) : (
+                          <ActiveBadge active={u.is_active} />
+                        )}
                       </TD>
                     </TR>
                   ))}
