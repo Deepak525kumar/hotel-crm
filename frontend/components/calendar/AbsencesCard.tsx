@@ -34,15 +34,40 @@ const KIND_TONE: Record<AbsenceKind, "warning" | "neutral"> = {
 };
 
 function AbsenceRow({ absence }: { absence: CalendarAbsence }) {
+  // Withdrawing a declared absence (2026-08-13): the backend endpoint has
+  // existed since the feature shipped, but no UI ever called it, so a worker
+  // who marked a sick day by mistake or recovered early was stuck with it.
+  // Only offered for today or later -- the backend rejects withdrawing a past
+  // absence, and offering a button that always errors is worse than none.
+  const withdraw = useAsyncAction();
+  const isPast = absence.day < localToday();
+
+  const onWithdraw = () =>
+    withdraw.run(() => calendarApi.deleteAbsence(absence.id), {
+      onSuccess: async () => {
+        await mutate(["my-absences"]);
+      },
+    });
+
   return (
-    <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(absence.day)}</p>
-        {absence.reason && (
-          <p className="truncate text-xs text-gray-500 dark:text-gray-400">{absence.reason}</p>
-        )}
+    <li className="border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{formatDate(absence.day)}</p>
+          {absence.reason && (
+            <p className="truncate text-xs text-gray-500 dark:text-gray-400">{absence.reason}</p>
+          )}
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge tone={KIND_TONE[absence.kind]}>{KIND_LABEL[absence.kind]}</Badge>
+          {!isPast && (
+            <Button size="sm" variant="outline" onClick={onWithdraw} loading={withdraw.pending}>
+              Withdraw
+            </Button>
+          )}
+        </div>
       </div>
-      <Badge tone={KIND_TONE[absence.kind]}>{KIND_LABEL[absence.kind]}</Badge>
+      <FormError>{withdraw.error}</FormError>
     </li>
   );
 }

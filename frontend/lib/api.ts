@@ -680,6 +680,17 @@ export const calendarApi = {
       body: { day },
     }),
 
+  /**
+   * Withdraw a declared absence. The backend endpoint has existed since the
+   * absences feature shipped, but nothing ever called it -- a worker who
+   * marked a sick day by mistake, or recovered early, had no way to undo it
+   * (2026-08-13 audit). Self-service (the owning worker) or a manager/RM/
+   * admin acting on their behalf; the backend's ownership/group-scope check
+   * is the real gate, same as moveAbsence.
+   */
+  deleteAbsence: (id: string) =>
+    apiFetch<void>(`/calendar/absences/${id}`, { method: "DELETE" }),
+
   /** Daily Shift Summary: list for a date range */
   listShiftSummaries: (hotelId: string, startDate: string, endDate: string) =>
     apiFetch<DailyShiftSummary[]>(
