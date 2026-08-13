@@ -24,6 +24,16 @@ const assignmentService = new AssignmentService();
 
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 
+/**
+ * Cancellation reasons written by autoCancelSameDayAssignment(). Constants
+ * rather than inline literals because deleteAbsence() reads them back to tell
+ * an absence-driven cancellation apart from one a manager made deliberately --
+ * two copies of the same string in different methods is exactly the drift this
+ * codebase has been bitten by before.
+ */
+export const ABSENCE_CANCEL_REASON_SELF = 'Worker marked sick/vacation';
+export const ABSENCE_CANCEL_REASON_MANAGER = 'Marked sick/vacation by a manager';
+
 export class CalendarService extends BaseService {
   // REQ-CAL-T02: worker's own calendar view (this module's absence entries
   // only; assignment facts are read from Job Dispatch/assignments elsewhere).
@@ -228,6 +238,30 @@ export class CalendarService extends BaseService {
       throw new ConflictError('Cannot delete an absence in the past');
     }
 
+    // Withdrawal gap (2026-08-13): marking an absence auto-cancels that day's
+    // shift (autoCancelSameDayAssignment) and decrements the broadcast slot.
+    // Withdrawing the absence frees the worker again but deliberately does NOT
+    // un-cancel the shift: the slot was released back to the broadcast and may
+    // already have been backfilled by someone else, so restoring it could
+    // exceed headcount or double-book the day. Re-staffing is a scheduling
+    // decision, not something to infer.
+    //
+    // What WAS missing is that nobody was told. The RM's existing "cancelled"
+    // notification says only that the absence went away -- it never mentioned
+    // the shift cancelled as a consequence, so an unstaffed shift sat on the
+    // calendar with the worker showing as available and no prompt to act.
+    const releasedAssignment = await this.prisma.workerAssignment.findFirst({
+      where: {
+        worker_id: existing.worker_id,
+        day: existing.day,
+        status: AssignmentStatus.CANCELLED,
+        cancellation_reason: {
+          in: [ABSENCE_CANCEL_REASON_SELF, ABSENCE_CANCEL_REASON_MANAGER],
+        },
+      },
+      select: { id: true, hotel_id: true },
+    });
+
     await this.prisma.$transaction(async (tx) => {
       await tx.calendarAbsence.delete({
         where: { id: absenceId },
@@ -236,11 +270,23 @@ export class CalendarService extends BaseService {
       await this.logAudit(actor.userId, actor.role, 'DELETE_ABSENCE', 'CALENDAR_ABSENCE', absenceId, {
         worker_id: existing.worker_id,
         day: absenceDay,
+        // Recorded so an audit of the day can see the shift was left cancelled
+        // on purpose, rather than the restore having silently failed.
+        ...(releasedAssignment
+          ? { left_cancelled_assignment_id: releasedAssignment.id }
+          : {}),
       }, undefined, undefined, undefined, tx);
     });
 
     try {
-      await this.notifyAboutAbsence(existing.worker_id, actor.userId, absenceDay, existing.kind, 'cancelled');
+      await this.notifyAboutAbsence(
+        existing.worker_id,
+        actor.userId,
+        absenceDay,
+        existing.kind,
+        'cancelled',
+        releasedAssignment ?? undefined
+      );
     } catch (error) {
       logger.error('calendar_absence_notify_failed', { workerId: existing.worker_id, day: absenceDay, error });
     }
@@ -397,8 +443,8 @@ export class CalendarService extends BaseService {
         status: 'CANCELLED',
         cancellation_reason:
           actor.userId === workerId
-            ? 'Worker marked sick/vacation'
-            : 'Marked sick/vacation by a manager',
+            ? ABSENCE_CANCEL_REASON_SELF
+            : ABSENCE_CANCEL_REASON_MANAGER,
       },
       actor.userId,
       actor.role,
@@ -434,7 +480,10 @@ export class CalendarService extends BaseService {
     actorId: string,
     day: string,
     kind: string,
-    action: 'marked' | 'moved' | 'cancelled'
+    action: 'marked' | 'moved' | 'cancelled',
+    // Set only by deleteAbsence(), when withdrawing the absence leaves behind
+    // a shift that was auto-cancelled because of it and is now unstaffed.
+    releasedAssignment?: { id: string; hotel_id: string }
   ): Promise<void> {
     const [worker, record] = await Promise.all([
       this.prisma.user.findUnique({
@@ -485,11 +534,28 @@ export class CalendarService extends BaseService {
     await notificationService.enqueue({
       recipientId: group.regional_manager_user_id,
       type: 'CALENDAR_ABSENCE_MARKED',
-      title: actedOnBehalf ? 'Worker calendar updated' : 'Worker marked sick/vacation',
-      message: actedOnBehalf
-        ? `${worker?.first_name} ${worker?.last_name}'s ${day} was ${verb} as ${kind.toLowerCase()}.`
-        : `${worker?.first_name} ${worker?.last_name} marked ${day} as ${kind.toLowerCase()}.`,
-      data: { worker_id: workerId, day, kind, marked_by_id: actorId },
+      title: releasedAssignment
+        ? 'Shift needs re-staffing'
+        : actedOnBehalf
+          ? 'Worker calendar updated'
+          : 'Worker marked sick/vacation',
+      message: releasedAssignment
+        ? `${worker?.first_name} ${worker?.last_name} is available again on ${day}, but the shift cancelled for that ${kind.toLowerCase()} day was not restored and is still unstaffed.`
+        : actedOnBehalf
+          ? `${worker?.first_name} ${worker?.last_name}'s ${day} was ${verb} as ${kind.toLowerCase()}.`
+          : `${worker?.first_name} ${worker?.last_name} marked ${day} as ${kind.toLowerCase()}.`,
+      data: {
+        worker_id: workerId,
+        day,
+        kind,
+        marked_by_id: actorId,
+        ...(releasedAssignment
+          ? {
+              cancelled_assignment_id: releasedAssignment.id,
+              hotel_id: releasedAssignment.hotel_id,
+            }
+          : {}),
+      },
       transports: [OutboxTransport.PUSH],
       sourceModule: OutboxSourceModule.CALENDAR,
       producerService: 'CalendarService',
