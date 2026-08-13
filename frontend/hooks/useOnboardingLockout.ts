@@ -45,6 +45,14 @@ export function useOnboardingLockout(): {
 
   const isPathAllowed = (pathname: string) => {
     if (!isLocked) return true;
+    // Denials are checked FIRST: /onboarding/review-queue sits under
+    // /onboarding and would otherwise be swept in by the prefix rule below.
+    // A mid-onboarding manager/RM still holds their role, so the nav's role
+    // gate alone does not hide it — they would see a Review Queue tab while
+    // their own application is still awaiting review.
+    if (DENIED_WHILE_ONBOARDING.some((denied) => pathname === denied || pathname.startsWith(`${denied}/`))) {
+      return false;
+    }
     return ALLOWED_WHILE_ONBOARDING.some(
       (allowed) => pathname === allowed || pathname.startsWith(`${allowed}/`),
     );
@@ -58,12 +66,17 @@ export function useOnboardingLockout(): {
  *
  * `/onboarding` is their actual task; `/settings` and `/profile` are the
  * account surfaces every user keeps (a person mid-onboarding still needs to
- * change their password or fix their phone number). `/onboarding/review-queue`
- * lives under `/onboarding` and would be matched by the prefix rule, but it is
- * unreachable for a locked user anyway: it is role-gated to
- * manager/regional_manager/admin AND, for a mid-onboarding manager/RM, would
- * simply render an empty queue. Left as-is rather than special-cased, since
- * excluding it would mean a manager who finishes onboarding mid-session sees
- * the entry appear only after a reload.
+ * change their password or fix their phone number).
  */
 const ALLOWED_WHILE_ONBOARDING = ["/onboarding", "/settings", "/profile"] as const;
+
+/**
+ * Carved back OUT of the `/onboarding` prefix above.
+ *
+ * Reviewing other people's applications is not part of onboarding yourself.
+ * A manager or RM who is still mid-onboarding holds the role the nav's role
+ * gate checks, so without this they would see (and could open) the Review
+ * Queue while their own application is still pending — which is exactly the
+ * "newly created candidate sees the Review Queue tab" report this fixes.
+ */
+const DENIED_WHILE_ONBOARDING = ["/onboarding/review-queue"] as const;

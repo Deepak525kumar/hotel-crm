@@ -65,7 +65,12 @@ export function DocumentUploadItem({
         <div className={`mt-0.5 p-2 rounded-full shrink-0 ${isUploaded ? 'bg-green-100 text-green-700' : 'bg-blue-50 text-blue-600'}`}>
           {isUploaded ? <CheckCircle2 className="w-5 h-5" /> : <FileType2 className="w-5 h-5" />}
         </div>
-        <div>
+        {/* min-w-0 is required, not cosmetic: a flex child defaults to
+            min-width:auto, which refuses to shrink below its content's
+            intrinsic width. Without it the `truncate` below never engages —
+            the description pushes the row wider than its container and
+            overlaps the Uploaded/Upload control on the right. */}
+        <div className="min-w-0">
           <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</h4>
           <p className="text-sm text-gray-500 truncate">{description}</p>
           {error && <p className="text-xs text-red-600 mt-1">{error}</p>}

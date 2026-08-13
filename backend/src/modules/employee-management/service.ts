@@ -4,6 +4,8 @@ import {
   DeactivationReason,
   EmploymentStatus,
   EmploymentRecord,
+  OutboxSourceModule,
+  OutboxTransport,
   Prisma,
   SkillTag,
   UserRole,
@@ -32,6 +34,10 @@ import { documentService } from '../documents/service.js';
 // function bodies, not at module-eval time, so the resulting import cycle
 // resolves safely under Node ESM.
 import { hrService, isContractValid } from '../hr/service.js';
+// ADR-065 onboarding notifications (2026-08-13): submitted -> reviewer,
+// approved/rejected -> applicant. enqueue() writes the in-app notification
+// AND the outbox event, so PUSH delivery follows once credentials exist.
+import { notificationService } from '../notifications/service.js';
 import {
   assertTransition,
   ASSESSMENT_BASIS,
@@ -636,6 +642,31 @@ export class EmployeeManagementService extends BaseService {
 
     this.logDomainEvent('EVT-EMP-submitted_for_review', record.employee_id, EmploymentStatus.PENDING);
 
+    // Notify whoever this record actually routes to (resolveReviewerRecipients
+    // mirrors getReviewQueue's rule), so the reviewer learns there is
+    // something waiting instead of having to poll the queue.
+    //
+    // Wrapped: RESOLVING the recipient must not be able to fail the
+    // submission. notifyOnboarding() already swallows per-recipient send
+    // failures, but the lookup that feeds it sits outside that guard, so an
+    // error there would propagate and reject a submission that has ALREADY
+    // committed -- the user would see a failure for work that succeeded.
+    try {
+      const reviewers = await this.resolveReviewerRecipients(record);
+      await this.notifyOnboarding(
+        reviewers,
+        'ONBOARDING_SUBMITTED',
+        'Application awaiting review',
+        `${record.job_title} application submitted for review.`,
+        { employee_id: record.employee_id, user_id: record.user_id, is_reonboarding: record.employment_cycle > 1 },
+      );
+    } catch (error) {
+      logger.error('employee_onboarding_reviewer_resolution_failed', {
+        employeeId: record.employee_id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
     return toGeneralProfile(updated);
   }
 
@@ -685,6 +716,15 @@ export class EmployeeManagementService extends BaseService {
     });
 
     this.logDomainEvent('EVT-EMP-approved', record.employee_id, EmploymentStatus.ACTIVE);
+
+    // The applicant is the one waiting on this outcome.
+    await this.notifyOnboarding(
+      [record.user_id],
+      'ONBOARDING_APPROVED',
+      'Onboarding approved',
+      'Your onboarding has been approved. Welcome aboard!',
+      { employee_id: record.employee_id },
+    );
 
     return toGeneralProfile(updated);
   }
@@ -889,6 +929,16 @@ export class EmployeeManagementService extends BaseService {
     });
 
     this.logDomainEvent('EVT-EMP-rejected', record.employee_id, EmploymentStatus.REJECTED);
+
+    await this.notifyOnboarding(
+      [record.user_id],
+      'ONBOARDING_REJECTED',
+      'Onboarding not approved',
+      reason
+        ? `Your onboarding was not approved: ${reason}`
+        : 'Your onboarding was not approved. Contact your manager for details.',
+      { employee_id: record.employee_id },
+    );
 
     return toGeneralProfile(updated);
   }
@@ -1784,6 +1834,95 @@ export class EmployeeManagementService extends BaseService {
   // RM), so admin picks up exactly the applications no RM queue will ever
   // claim, rather than the two queries drifting out of sync if computed
   // independently.
+  /**
+   * Resolves WHO should be notified that an application awaits review —
+   * deliberately mirroring getReviewQueue's routing rule exactly, so the
+   * person who gets the notification is the person whose queue the record
+   * actually lands in. Computing "the reviewer" a second, independent way is
+   * how you end up notifying someone who cannot see the record, and leaving
+   * the person who can see it unaware.
+   *
+   *   manager-created  -> that manager's own RM (their hotel's group's RM)
+   *   RM-created       -> admin(s)
+   *   admin-created    -> admin(s) (admin is the top of the hierarchy)
+   *   no creator / manager with no resolvable RM -> admin(s) (the fallback
+   *                       branch of getReviewQueue's admin query)
+   *
+   * Returns every recipient id; callers notify all of them. Best-effort by
+   * design — an empty result means nobody is notified, never an error, since
+   * a missing notification must not block a submission.
+   */
+  private async resolveReviewerRecipients(record: EmploymentRecord): Promise<string[]> {
+    const admins = async () =>
+      (
+        await this.prisma.user.findMany({
+          where: { role: UserRole.ADMIN, is_active: true, deleted_at: null },
+          select: { id: true },
+        })
+      ).map((u) => u.id);
+
+    if (!record.created_by_id) return admins();
+
+    const creator = await this.prisma.user.findUnique({
+      where: { id: record.created_by_id },
+      select: { role: true },
+    });
+    if (!creator) return admins();
+
+    if (creator.role === UserRole.MANAGER) {
+      // The creating manager's own RM, resolved through the hotel they
+      // manage — the same hotel -> group -> regional_manager_user_id chain
+      // getReviewQueue's RM branch matches on.
+      const hotel = await this.prisma.hotel.findFirst({
+        where: { manager_user_id: record.created_by_id },
+        select: { hotel_group: { select: { regional_manager_user_id: true } } },
+      });
+      const rmId = hotel?.hotel_group?.regional_manager_user_id;
+      // No RM assigned -> admin, matching getReviewQueue's own fallback.
+      return rmId ? [rmId] : admins();
+    }
+
+    // RM-created and admin-created both route to admin.
+    return admins();
+  }
+
+  /**
+   * Fire-and-forget notification helper for the onboarding lifecycle.
+   *
+   * Always best-effort: a notification failure must never roll back or block
+   * the lifecycle transition that triggered it (the transition is the real
+   * outcome; the notification is how someone finds out about it). Errors are
+   * logged, never rethrown — the same posture HR's own notify helpers take.
+   */
+  private async notifyOnboarding(
+    recipientIds: string[],
+    type: 'ONBOARDING_SUBMITTED' | 'ONBOARDING_APPROVED' | 'ONBOARDING_REJECTED',
+    title: string,
+    message: string,
+    data: Record<string, unknown>
+  ): Promise<void> {
+    for (const recipientId of recipientIds) {
+      try {
+        await notificationService.enqueue({
+          recipientId,
+          type,
+          title,
+          message,
+          data,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.EMPLOYEE_MANAGEMENT,
+          producerService: 'EmployeeManagementService',
+        });
+      } catch (error) {
+        logger.error('employee_onboarding_notification_failed', {
+          recipientId,
+          type,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
   private async managerIdsWithResolvableRegionalManager(): Promise<string[]> {
     const hotels = await this.prisma.hotel.findMany({
       where: {

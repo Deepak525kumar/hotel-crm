@@ -142,6 +142,14 @@ enum NotificationType {
   // logins escalate by NOTIFYING, never by locking the account or throttling
   // further attempts (rate limiting is an edge concern, TREQ-AUTH-008).
   REPEATED_FAILED_LOGINS // to the account holder's responsible manager (admin fallback): N consecutive failed logins
+  // Onboarding lifecycle (ADR-065, 2026-08-13). Until now employee-management
+  // sent no notifications at all, so neither side of a review ever learned
+  // anything happened: a reviewer had to poll the Review Queue, and an
+  // applicant had to keep reopening My Onboarding to find out whether they
+  // had been approved.
+  ONBOARDING_SUBMITTED // to the reviewer (the creator's own superior): an application awaits review
+  ONBOARDING_APPROVED // to the applicant: their application was approved
+  ONBOARDING_REJECTED // to the applicant: their application was rejected
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -183,6 +191,10 @@ enum OutboxSourceModule {
   // JOB_REQUEST_CLOSED file under, since those are JobRequest-lifecycle
   // events, not WorkerAssignment-lifecycle ones).
   ASSIGNMENTS
+  // Onboarding lifecycle notifications (ADR-065, 2026-08-13): submitted /
+  // approved / rejected. Distinct from WORK_APPLICATIONS, which tags
+  // job-application events, not employment-onboarding ones.
+  EMPLOYEE_MANAGEMENT
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim
