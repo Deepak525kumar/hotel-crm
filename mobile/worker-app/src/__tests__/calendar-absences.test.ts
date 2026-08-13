@@ -62,3 +62,42 @@ describe('api.calendar.markAbsence', () => {
     expect(result).toEqual(mockAbsence);
   });
 });
+
+/**
+ * Withdraw parity (2026-08-13): a worker could mark themselves sick from the
+ * phone but had no way to undo it here -- the action existed only on the web
+ * app, which is not where workers actually are. Pins the request shape against
+ * the backend's existing DELETE /calendar/absences/:id route.
+ */
+describe('api.calendar.deleteAbsence', () => {
+  it('DELETEs /calendar/absences/:id', async () => {
+    mockFetch.mockResolvedValueOnce(res(204, {}));
+
+    await api.calendar.deleteAbsence('a1');
+
+    const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/calendar/absences/a1');
+    expect(init?.method).toBe('DELETE');
+  });
+
+  it('sends no body -- the absence is identified by the path alone', async () => {
+    mockFetch.mockResolvedValueOnce(res(204, {}));
+
+    await api.calendar.deleteAbsence('a1');
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(init?.body).toBeUndefined();
+  });
+
+  // The backend self-scopes deletion and refuses a past day; the client must
+  // surface that rejection rather than optimistically assuming success.
+  it('rejects when the backend refuses the withdrawal', async () => {
+    mockFetch.mockResolvedValueOnce(
+      res(409, { error: { code: 'CONFLICT', message: 'Cannot delete an absence in the past' } })
+    );
+
+    await expect(api.calendar.deleteAbsence('a1')).rejects.toMatchObject({
+      message: 'Cannot delete an absence in the past',
+    });
+  });
+});

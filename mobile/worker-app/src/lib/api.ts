@@ -390,6 +390,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+    // 2026-08-13 parity gap: a worker could mark themselves sick from the
+    // phone but had no way to undo it here -- the withdraw action existed only
+    // on the web app, which is not where workers actually are. The backend
+    // self-scopes this (a worker may only delete their own absence) and
+    // refuses a past day.
+    deleteAbsence: (absenceId: string) =>
+      request<void>(`/calendar/absences/${absenceId}`, { method: 'DELETE' }),
   },
   geo: {
     // GD-14: self-checkin, self-scoped to the authenticated worker
