@@ -23,7 +23,6 @@ import { isScopedManagerRole, isWorkerInGroupScope } from '../../lib/scope.js';
 import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { AuthContext } from '../../lib/types.js';
 import { bumpTokenGeneration } from '../auth/service.js';
-import { isRmRoleEnabled } from '../../config/feature-flags.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { documentService } from '../documents/service.js';
 // 2026-08-13 contract feature: createEmployee() below auto-generates the
@@ -1616,9 +1615,21 @@ export class EmployeeManagementService extends BaseService {
         throw new ForbiddenError(`Cannot ${action}: only Admin can manage Regional Manager applications`);
       }
       if (targetUser.role === 'MANAGER') {
-        if (actor.role === 'regional_manager' && !isRmRoleEnabled()) {
-          throw new ForbiddenError(`Cannot ${action}: only Admin can manage Manager applications while RM role is disabled`);
-        }
+        // A Regional Manager reviews Manager applications. This is no longer
+        // gated on FEATURE_RM_ROLE (owner decision, 2026-08-14: "RM should do
+        // it, keep the system consistent").
+        //
+        // The flag left the platform half-recognizing RMs: resolveScope()
+        // already grants an RM their hotel_group scope from
+        // HotelGroup.regional_manager_user_id without consulting it, so RMs
+        // sign in, hold scope, and see scoped data -- but were refused the one
+        // workflow the role exists for. An RM who creates a Manager could not
+        // then approve them, so the application escalated to Admin and the
+        // hierarchy the creation rule enforces was broken at review time.
+        //
+        // Scope still binds: the group check below requires the application to
+        // target this RM's own group (ADR-065 §6 item 5), so this widens WHICH
+        // role may review, never WHICH records they can reach.
         if (actor.role !== 'regional_manager') {
           throw new ForbiddenError(`Cannot ${action}: only Admin or Regional Manager can manage Manager applications`);
         }
@@ -1807,27 +1818,15 @@ export class EmployeeManagementService extends BaseService {
     if (actor.role === 'regional_manager' && actor.scope?.type !== 'hotel_group') {
       throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
     }
-    // Read/write consistency for a disabled RM role.
+    // NOTE: this deliberately no longer refuses a Regional Manager.
     //
-    // resolveScope() (auth/service.ts) grants an RM their hotel_group scope
-    // from HotelGroup.regional_manager_user_id without consulting
-    // FEATURE_RM_ROLE, so a Regional Manager signs in and reaches this queue
-    // normally. But resolveReviewerRecipients() DOES consult the flag and
-    // returns no RM while it is off, so every record routes to Admin and the
-    // ownership filter below matches nothing.
-    //
-    // The result was an empty queue that reads as "no applications waiting" --
-    // indistinguishable from genuinely having none, and flatly contradicting
-    // the write path, which already refuses the same actor with an explicit
-    // "only Admin can manage Manager applications while RM role is disabled"
-    // (assertLifecycleAuthority). Same actor, same feature, one path silent
-    // and one explicit. Say the same thing here rather than showing an empty
-    // list that hides the reason.
-    if (actor.role === 'regional_manager' && !isRmRoleEnabled()) {
-      throw new ForbiddenError(
-        'Applications are routed to Admin while the Regional Manager role is disabled'
-      );
-    }
+    // A previous fix threw here while FEATURE_RM_ROLE was off, because routing
+    // withheld every record from RMs and the resulting empty queue read as "no
+    // applications waiting". That was the right answer to the wrong problem:
+    // the RM review path is no longer flag-gated at all (see
+    // assertLifecycleAuthority), so an RM now legitimately owns records and
+    // must be able to open this queue. Keeping the refusal would lock them out
+    // of the very work they were just given.
 
     const records = await this.prisma.employmentRecord.findMany({
       where: {
@@ -2003,6 +2002,38 @@ export class EmployeeManagementService extends BaseService {
         })
       )?.role;
 
+    // The creator reviews what they created (owner decision, 2026-08-14).
+    //
+    // This routes BY HIERARCHY rather than around it. RULE A
+    // (lib/role-hierarchy.ts) already enforces "create is 1-level-down only"
+    // at creation time -- admin -> regional_manager -> manager ->
+    // worker/checker -- so the creator always outranks the applicant by
+    // exactly one level. Routing to them therefore cannot produce a peer
+    // approval (a manager can never have created another manager) and cannot
+    // route someone their own application (nobody creates their own account).
+    // canCreateRole() is re-checked here rather than assumed, so a record
+    // predating RULE A, or one whose creator has since changed role, falls
+    // through instead of handing review to someone who no longer outranks the
+    // applicant.
+    //
+    // Falls through to the target-group routing below when the creator is
+    // unknown (created_by_id is SetNull on user deletion) or deactivated.
+    const creatorId = record.created_by_id;
+    if (creatorId && creatorId !== record.user_id && role) {
+      const creator = await this.prisma.user.findUnique({
+        where: { id: creatorId },
+        select: { id: true, role: true, is_active: true, deleted_at: true },
+      });
+      if (
+        creator &&
+        creator.is_active &&
+        !creator.deleted_at &&
+        canCreateRole(creator.role, role)
+      ) {
+        return [creator.id];
+      }
+    }
+
     if (!role || role === UserRole.ADMIN || role === UserRole.REGIONAL_MANAGER) {
       return admins();
     }
@@ -2010,7 +2041,10 @@ export class EmployeeManagementService extends BaseService {
     const groupId = record.target_hotel_group_id ?? record.hotel_group_id ?? null;
 
     const regionalManagerId = async (): Promise<string | null> => {
-      if (!groupId || !isRmRoleEnabled()) return null;
+      // No FEATURE_RM_ROLE gate: the RM review path is no longer flag-gated
+      // (see assertLifecycleAuthority), so withholding records here would
+      // route work away from the only role allowed to do it.
+      if (!groupId) return null;
       const group = await this.prisma.hotelGroup.findUnique({
         where: { id: groupId },
         select: { regional_manager_user_id: true },
