@@ -716,23 +716,33 @@ function PlacementTag({
   size: "sm" | "md";
   onSelect: (entry: CalendarEntryDto) => void;
 }) {
+  // A placement cancelled through any path (manager cancel, worker cancel, or
+  // the auto-cancel that fires when a sick day is marked) stays on the grid so
+  // the day visibly shows it has lost its cover -- rendered struck-through in
+  // a muted tone, and not draggable, since rescheduling a cancelled shift is
+  // not a move the backend accepts.
+  const cancelled = entry.assignment_status === "CANCELLED";
   return (
     <button
       type="button"
-      draggable={draggable}
+      draggable={draggable && !cancelled}
       onClick={() => onSelect(entry)}
       onDragStart={(e) => {
         e.dataTransfer.setData(PLACEMENT_DRAG_TYPE, entry.id);
         e.dataTransfer.effectAllowed = "move";
       }}
       className={[
-        "block w-full truncate rounded bg-blue-50 text-left font-medium text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
+        "block w-full truncate rounded text-left font-medium",
+        cancelled
+          ? "bg-gray-100 text-gray-500 line-through hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700"
+          : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
         size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
-        draggable ? "cursor-grab active:cursor-grabbing" : undefined,
+        draggable && !cancelled ? "cursor-grab active:cursor-grabbing" : undefined,
         moving ? "opacity-50" : undefined,
       ]
         .filter(Boolean)
         .join(" ")}
+      title={cancelled ? `${label} — cancelled` : label}
     >
       {label}
     </button>
@@ -1403,7 +1413,12 @@ function EditEntryModal({
       await assignmentsApi.cancel(entry.assignment_id);
       await mutate(
         ["calendar-entries-range", range],
-        (current: CalendarEntryDto[] = []) => current.filter((e) => e.id !== entry.id),
+        // Marked cancelled in place rather than dropped: the grid keeps
+        // showing the day it lost cover, struck through.
+        (current: CalendarEntryDto[] = []) =>
+          current.map((e) =>
+            e.id === entry.id ? { ...e, assignment_status: "CANCELLED" as const } : e,
+          ),
         { revalidate: false },
       );
       onClose();
@@ -1423,7 +1438,7 @@ function EditEntryModal({
           <Button variant="outline" onClick={onClose} disabled={cancelling}>
             Close
           </Button>
-          {canWrite && (
+          {canWrite && entry.assignment_status !== "CANCELLED" && (
             <Button variant="danger" onClick={onCancelPlacement} loading={cancelling}>
               Cancel placement
             </Button>

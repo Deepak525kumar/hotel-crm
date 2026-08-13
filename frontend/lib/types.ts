@@ -767,6 +767,9 @@ export interface CalendarEntryDto {
   worker_id: string;
   hotel_id: string;
   day: string; // YYYY-MM-DD
+  /** Present on list responses, so a cancelled placement renders as cancelled
+   *  instead of silently disappearing from the grid. */
+  assignment_status?: AssignmentStatus;
   placed_by_id: string;
   created_at: string;
   updated_at: string;

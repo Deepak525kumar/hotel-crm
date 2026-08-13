@@ -632,7 +632,13 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
     // calendar grid during E2E audit): a cancelled/reassigned assignment's
     // CalendarEntry row was never touched by cancellation, so the grid kept
     // showing a fully-staffed placement for a shift nobody was coming to.
-    it('excludes calendar entries whose underlying assignment is CANCELLED or REASSIGNED', async () => {
+    // 2026-08-13 follow-up: the original fix also excluded CANCELLED, which
+    // over-corrected -- a shift cancelled by a sick-leave mark vanished from
+    // the grid entirely, so a manager could not see the day had lost cover.
+    // CANCELLED is now returned with its status so the grid can render it as
+    // a cancelled card; only REASSIGNED (whose replacement is a separate row)
+    // stays excluded.
+    it('excludes only REASSIGNED entries, keeping CANCELLED ones visible', async () => {
       mockCalendarEntry.findMany.mockResolvedValue([]);
       mockCalendarEntry.count.mockResolvedValue(0);
 
@@ -644,15 +650,44 @@ describe('AssignmentService.placeOnCalendar / listCalendarEntries', () => {
       expect(mockCalendarEntry.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            assignment: { status: { notIn: ['CANCELLED', 'REASSIGNED'] } },
+            assignment: { status: { not: 'REASSIGNED' } },
           }),
         })
       );
       expect(mockCalendarEntry.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            assignment: { status: { notIn: ['CANCELLED', 'REASSIGNED'] } },
+            assignment: { status: { not: 'REASSIGNED' } },
           }),
+        })
+      );
+    });
+
+    it('surfaces the underlying assignment status on each returned entry', async () => {
+      mockCalendarEntry.findMany.mockResolvedValue([
+        {
+          id: 'ce1',
+          assignment_id: 'a1',
+          worker_id: 'w1',
+          hotel_id: 'h1',
+          day: new Date('2026-08-20T00:00:00.000Z'),
+          placed_by_id: 'mgr1',
+          created_at: new Date('2026-08-01T00:00:00.000Z'),
+          updated_at: new Date('2026-08-01T00:00:00.000Z'),
+          assignment: { status: 'CANCELLED' },
+        },
+      ]);
+      mockCalendarEntry.count.mockResolvedValue(1);
+
+      const result = await service.listCalendarEntries({ page: 1, per_page: 20 } as any, {
+        userId: 'admin1',
+        role: 'admin',
+      });
+
+      expect(result.data[0].assignment_status).toBe('CANCELLED');
+      expect(mockCalendarEntry.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: { assignment: { select: { status: true } } },
         })
       );
     });
