@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyOnboarding } from "@/hooks/useMyOnboarding";
+import { useOnboardingLockout } from "@/hooks/useOnboardingLockout";
 import { Badge } from "@/components/ui";
 import type { Role } from "@/lib/types";
 
@@ -117,8 +118,17 @@ export function SidebarNav({
   const pathname = usePathname();
   const { user } = useAuth();
   const onboarding = useMyOnboarding();
+  const { isPathAllowed } = useOnboardingLockout();
 
   const items = NAV.filter((item) => {
+    // Owner decision (2026-08-13): a user who is not yet active sees only
+    // their own onboarding, plus Settings and Profile (both of which live in
+    // the pinned footer below, not in this list, so they are unaffected by
+    // this filter). Fails open — see useOnboardingLockout for why "no
+    // employment record" must NOT lock (admins and 12 pre-ADR-065 accounts).
+    // The route guard in AppShell enforces the same rule, so hiding a link
+    // here is never the only thing standing between a locked user and a page.
+    if (!isPathAllowed(item.href)) return false;
     if (item.roles && !(user && item.roles.includes(user.role))) return false;
     // Hide onboarding-gated items only once we KNOW there is no record.
     // While `phase === "loading"` the item is withheld rather than shown-then-
