@@ -1,5 +1,10 @@
 // Epic 7 PR 7.7: device push-token registration.
 // jest.mock calls are hoisted before imports, matching auth-store.test.ts.
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { api } from '@/lib/api';
+import { registerForPushNotificationsAsync, subscribeToPushNotifications, resolvePushTapRoute } from '@/lib/push-notifications';
+
 jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
@@ -10,11 +15,6 @@ jest.mock('expo-notifications', () => ({
 jest.mock('@/lib/api', () => ({
   api: { notifications: { registerPushToken: jest.fn() } },
 }));
-
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-import { api } from '@/lib/api';
-import { registerForPushNotificationsAsync, subscribeToPushNotifications, resolvePushTapRoute } from '@/lib/push-notifications';
 
 const mockNotifications = Notifications as unknown as {
   getPermissionsAsync: jest.Mock;
