@@ -2,6 +2,7 @@
 
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton, StatTile } from "@/components/ui";
 import { FULL_DAY_LABEL, toDateKey, type CalendarView } from "@/lib/calendar";
+import { isActivePlacement } from "@/lib/types";
 import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
 
 /** A day's placements/absences regrouped by hotel, for the breakdown panel. */
@@ -46,21 +47,24 @@ export function RangeBreakdown({
 }) {
   // Only days that actually have something to show. In month view this keeps
   // a 42-cell range from rendering 42 mostly-empty sections.
+  // Cancelled placements are returned by the API on purpose (so the grid can
+  // show them struck-through) but must not count as staffing anywhere in this
+  // summary — see isActivePlacement().
+  const activeEntriesOn = (d: Date) =>
+    (entriesByDay.get(toDateKey(d)) ?? []).filter(isActivePlacement);
+
   const activeDays = days.filter(
     (d) =>
-      (entriesByDay.get(toDateKey(d))?.length ?? 0) > 0 ||
+      activeEntriesOn(d).length > 0 ||
       (absencesByDay.get(toDateKey(d))?.length ?? 0) > 0,
   );
 
-  const totalPlacements = days.reduce(
-    (n, d) => n + (entriesByDay.get(toDateKey(d))?.length ?? 0),
-    0,
-  );
+  const totalPlacements = days.reduce((n, d) => n + activeEntriesOn(d).length, 0);
   const allAbsences = days.flatMap((d) => absencesByDay.get(toDateKey(d)) ?? []);
   const sickCount = allAbsences.filter((a) => a.kind === "SICK").length;
   const vacationCount = allAbsences.filter((a) => a.kind === "VACATION").length;
   const distinctWorkers = new Set(
-    days.flatMap((d) => (entriesByDay.get(toDateKey(d)) ?? []).map((e) => e.worker_id)),
+    days.flatMap((d) => activeEntriesOn(d).map((e) => e.worker_id)),
   ).size;
 
   if (loading) {
@@ -102,7 +106,7 @@ export function RangeBreakdown({
           <div className="space-y-6">
             {activeDays.map((d) => {
               const key = toDateKey(d);
-              const dayEntries = entriesByDay.get(key) ?? [];
+              const dayEntries = activeEntriesOn(d);
               const dayAbsences = absencesByDay.get(key) ?? [];
 
               // Regroup this day's placements by hotel.

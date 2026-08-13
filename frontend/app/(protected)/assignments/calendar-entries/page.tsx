@@ -8,6 +8,7 @@ import { useHotel } from "@/hooks/useHotels";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { formatDate } from "@/lib/format";
 import {
+  Badge,
   Button,
   Card,
   CardContent,
@@ -23,6 +24,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
+import { isActivePlacement } from "@/lib/types";
 import type { CalendarEntryDto } from "@/lib/types";
 
 const PER_PAGE = 20;
@@ -30,16 +32,27 @@ const COLUMNS = 4;
 
 function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
   const { data: hotel } = useHotel(entry.hotel_id);
+  // The API returns cancelled placements on purpose so they can be shown as
+  // cancelled rather than vanishing. Without this the row was indistinguishable
+  // from a live shift.
+  const cancelled = !isActivePlacement(entry);
 
   return (
-    <TR>
+    <TR className={cancelled ? "opacity-60" : undefined}>
       <TD className="font-medium">
-        <UserRef userId={entry.worker_id} fallback="The assigned worker" />
+        <span className={cancelled ? "line-through" : undefined}>
+          <UserRef userId={entry.worker_id} fallback="The assigned worker" />
+        </span>
+        {cancelled && (
+          <Badge tone="neutral" className="ml-2">
+            Cancelled
+          </Badge>
+        )}
       </TD>
       <TD>
         <TextLink href={`/hotels/${entry.hotel_id}`}>{hotel?.name ?? "View hotel"}</TextLink>
       </TD>
-      <TD>{formatDate(entry.day)}</TD>
+      <TD className={cancelled ? "line-through" : undefined}>{formatDate(entry.day)}</TD>
       <TD>
         <TextLink href={`/assignments/${entry.assignment_id}`}>View assignment</TextLink>
       </TD>
