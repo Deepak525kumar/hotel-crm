@@ -32,6 +32,12 @@ const mockPrisma = {
   auditLog: {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  // login() reads this (read-only) to populate the response's
+  // employment_status field (2026-08-13 fix). Defaults to null — this
+  // suite is about the scope claim, not onboarding state.
+  employmentRecord: {
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  },
   hotelGroup: {
     // findUnique, not findFirst: Regional Manager V1 Decision 1 made
     // regional_manager_user_id a unique FK, so resolveScope() switched

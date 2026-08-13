@@ -326,6 +326,12 @@ export class AuthService extends BaseService {
         // stored column (dropped).
         permissions: ROLE_PERMISSIONS[user.role] ?? [],
         is_active: user.is_active,
+        // Same field as login()/getCurrentUser() -- always null here, not a
+        // stub: this row was just created in the transaction above, so no
+        // EmploymentRecord can exist for it yet (that only comes from the
+        // authorized-creator path, users/service.ts#createUser, not this
+        // public self-signup one).
+        employment_status: null,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
         // Reuses the SAME `scope` already resolved above for the JWT -- no
@@ -400,6 +406,16 @@ export class AuthService extends BaseService {
 
     await this.logAudit(user.id, user.role, 'LOGIN', 'USER', user.id, { email: user.email }, ip);
 
+    // 2026-08-13 fix: same missing field as getCurrentUser (see that
+    // method's own note) -- without this, the store this response seeds
+    // shows a green "Active" badge on My Profile for the moment between
+    // login completing and useMe()'s first /auth/me revalidation, for
+    // anyone still mid-onboarding.
+    const employmentRecord = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: user.id },
+      select: { status: true },
+    });
+
     return {
       user: {
         id: user.id,
@@ -413,6 +429,7 @@ export class AuthService extends BaseService {
         // stored column (dropped).
         permissions: ROLE_PERMISSIONS[user.role] ?? [],
         is_active: user.is_active,
+        employment_status: employmentRecord?.status ?? null,
         created_at: user.created_at.toISOString(),
         updated_at: user.updated_at?.toISOString(),
         // Reuses the SAME `scope` already resolved above for the JWT -- no
@@ -500,6 +517,18 @@ export class AuthService extends BaseService {
         is_active: true,
         created_at: true,
         updated_at: true,
+        // 2026-08-13 fix (reported live: My Profile showed a green "Active"
+        // badge for a Manager still mid-onboarding, PENDING/Under Review).
+        // This endpoint is /auth/me -- what every "My Profile" page and
+        // SessionBootstrap read the signed-in user from -- and it never
+        // selected the EmploymentRecord at all, so the frontend had no
+        // employment_status to prefer and fell back to `is_active`, which is
+        // true from the moment the account exists and says nothing about
+        // onboarding. Same fix already applied to users/service.ts's
+        // listUsers/getUser (see that file's identical note); this endpoint
+        // was the one place it was missed, and the one every user's own
+        // Profile page depends on.
+        employment_record: { select: { status: true } },
       },
     });
     if (!user) throw new NotFoundError('User not found');
@@ -512,10 +541,15 @@ export class AuthService extends BaseService {
     // must see the CURRENT assignment in the UI, not the stale one baked
     // into a token issued up to an access-token lifetime ago.
     const scope = await this.resolveScope(user.id, user.role);
+    const { employment_record, ...rest } = user;
     return {
-      ...user,
+      ...rest,
       role: user.role.toLowerCase(),
       permissions: ROLE_PERMISSIONS[user.role] ?? [],
+      // Null = no EmploymentRecord (admin, or a pre-ADR-065 account) --
+      // deliberately distinct from any status value, matching
+      // users/service.ts's identical convention.
+      employment_status: employment_record?.status ?? null,
       ...AuthService.flattenScope(scope),
     };
   }

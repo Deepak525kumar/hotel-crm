@@ -8,8 +8,10 @@ import { ConsentCard } from "@/components/consent/ConsentCard";
 import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
 import { EditProfileCard } from "@/components/profile/EditProfileCard";
 import { formatDateTime } from "@/lib/format";
+import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import {
   ActiveBadge,
+  Badge,
   Card,
   CardContent,
   CardHeader,
@@ -45,7 +47,23 @@ export default function ProfilePage() {
         title={
           <span className="flex items-center gap-3">
             {user.first_name} {user.last_name}
-            <ActiveBadge active={user.is_active} />
+            {/* 2026-08-13 fix (reported live: this page showed a green
+                "Active" badge for a Manager still mid-onboarding, PENDING).
+                `is_active` is the account/sign-in flag and is true from the
+                moment the account exists -- it says nothing about
+                onboarding. Same fix already applied to the admin-facing
+                /users/:id page (see that page's identical note); this one,
+                which every signed-in person's OWN "My Profile" uses, was
+                missed. Falls back to the account flag only when no
+                EmploymentRecord exists at all (an admin, or a pre-ADR-065
+                account). */}
+            {user.employment_status ? (
+              <Badge tone={EMPLOYMENT_STATUS_TONE[user.employment_status]}>
+                {EMPLOYMENT_STATUS_LABEL[user.employment_status]}
+              </Badge>
+            ) : (
+              <ActiveBadge active={user.is_active} />
+            )}
           </span>
         }
         description={user.email}
