@@ -238,6 +238,34 @@ export class JobRequestService extends BaseService {
           ? query.hotel_id
           : '__none__'
         : { in: hotelIds };
+
+      // 2026-08-13 fix: this scoped a worker by hotel but never by SKILL,
+      // while acceptBroadcast() hard-rejects a worker who does not hold the
+      // slot's skill ("Cannot accept this broadcast", ForbiddenError). So a
+      // CLEANER browsing the board saw MAINTENANCE-only broadcasts, and the
+      // only way to discover they could never take one was to tap accept and
+      // get a 403. list() and acceptBroadcast() now agree on skill.
+      //
+      // Only BROADCASTS are filtered. A marketplace request carries no skill
+      // slots at all, and skill is not part of its acceptance path, so those
+      // rows stay visible exactly as before -- hence the `none` arm rather
+      // than a bare `some` filter, which would have hidden every marketplace
+      // request from every worker.
+      //
+      // Deliberately scoped to `worker`, not all self-scoped roles: a checker
+      // is self-scoped too but does not accept broadcasts, and its
+      // EmploymentRecord skills (if any) describe something else entirely.
+      if (actor.role === 'worker') {
+        const record = await this.prisma.employmentRecord.findUnique({
+          where: { user_id: actor.userId },
+          select: { skills: true },
+        });
+        const skills = record?.skills ?? [];
+        where.OR = [
+          { skill_slots: { none: {} } },
+          ...(skills.length > 0 ? [{ skill_slots: { some: { skill: { in: skills } } } }] : []),
+        ];
+      }
     } else if (isScopedManagerRole(actor.role)) {
       // IDOR fix (2026-08-08): create()/update()/raiseBroadcast() in this
       // same file already scope a manager/regional_manager to their own
