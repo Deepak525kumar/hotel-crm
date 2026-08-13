@@ -123,7 +123,20 @@ export function ContractCard({ workerId }: { workerId: string }) {
           ) : (
             <div className="space-y-4">
               <DataList>
-                <DataRow label="Status" value={<Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>} />
+                {/* An EXPIRED contract still reads status ACTIVE (nothing
+                    transitions it on lapse), so the badge must reflect the
+                    derived `is_expired`, not the raw status, or a lapsed
+                    contract shows a green "Active". */}
+                <DataRow
+                  label="Status"
+                  value={
+                    contract.is_expired ? (
+                      <Badge tone="danger">Expired</Badge>
+                    ) : (
+                      <Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>
+                    )
+                  }
+                />
                 <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
                 <DataRow label="Position" value={contract.position} />
                 <DataRow label="Start date" value={formatDate(contract.start_date)} />

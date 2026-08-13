@@ -180,6 +180,36 @@ const DEFAULT_CONTRACT_PDF_PATH = resolveDefaultContractPdfPath();
 // every findFirst-by-worker-and-status call site in this file will need to
 // evolve — most likely to accept an explicit contract id rather than
 // inferring "the" contract from worker_id + status alone.
+// 2026-08-13 re-onboarding: the single definition of "this contract is still
+// valid right now". Deliberately NOT a status check alone -- nothing in this
+// codebase ever transitions a Contract out of ACTIVE when its expiry passes
+// (sendExpiryReminders() only notifies; RULE-HR-06's extend/permanent step is
+// a manual manager action), so an ACTIVE contract can be years past
+// expires_at. PERMANENT contracts have expires_at = null by construction
+// (RULE-HR-06) and are therefore always valid, which falls out of the null
+// check rather than needing its own branch.
+//
+// Exported so employee-management's approve/rehire gate and the re-onboarding
+// UI answer this question identically -- a second, subtly-different copy of
+// this predicate is exactly how "reactivate says the contract is fine but
+// approve then rejects it" would happen.
+export function isContractValid(
+  contract: { status: ContractStatus; expires_at?: Date | null } | null | undefined,
+  now: Date = new Date()
+): boolean {
+  if (!contract) return false;
+  const statusOk =
+    contract.status === ContractStatus.ACTIVE ||
+    contract.status === ContractStatus.EXTENDED ||
+    contract.status === ContractStatus.PERMANENT;
+  if (!statusOk) return false;
+  // Absent/null expiry both mean "no expiry set" -> not expired. `expires_at`
+  // is nullable AND may simply not have been selected by the caller's query;
+  // treating a missing field as expired would silently invalidate contracts
+  // based on which columns a query happened to fetch.
+  return contract.expires_at == null || contract.expires_at > now;
+}
+
 export class HrService extends BaseService {
   // ---------------------------------------------------------------------------
   // IF-HR-CreateContract (RULE-HR-01/REQ-HR-001, generation half)
@@ -263,6 +293,50 @@ export class HrService extends BaseService {
       return this.toDto(existing);
     }
 
+    return this.createDefaultContract(workerId, jobTitle, startDate, employmentType, 'hr_default_contract_generated');
+  }
+
+  /**
+   * 2026-08-13 re-onboarding: issues a NEW default contract for a returning
+   * employee whose previous one has expired.
+   *
+   * Distinct from generateDefaultContract() purely in its idempotency rule:
+   * that one short-circuits whenever ANY contract exists (correct for
+   * first-time onboarding, where a second contract would be a duplicate),
+   * which is exactly the wrong behaviour here -- the whole point is that a
+   * contract exists and is no longer valid. The expired contract is left in
+   * place rather than mutated: it is the historical record of the previous
+   * employment cycle, and RULE-HR-06 defines no "expired" status to move it
+   * to. `getContractStatus`/`assertApprovedContract` both read the NEWEST
+   * contract, so the fresh PENDING row is the one that governs from here.
+   *
+   * The new contract's start_date is TODAY, not the record's original
+   * start_date: a returning employee's new engagement starts now, and dating
+   * it from the original hire would produce a contract that is already
+   * expired on issue (its 6-month window having elapsed years ago).
+   */
+  async reissueDefaultContract(
+    workerId: string,
+    jobTitle: string,
+    _originalStartDate: Date,
+    employmentType: EmploymentType
+  ): Promise<ContractDto> {
+    return this.createDefaultContract(
+      workerId,
+      jobTitle,
+      new Date(),
+      employmentType,
+      'hr_default_contract_reissued'
+    );
+  }
+
+  private async createDefaultContract(
+    workerId: string,
+    jobTitle: string,
+    startDate: Date,
+    employmentType: EmploymentType,
+    logEvent: string
+  ): Promise<ContractDto> {
     // 6-month default end date (owner decision, 2026-08-13): editable later
     // via any future contract-update path; not enforced against
     // employment_type (part-time contracts are not required to be shorter).
@@ -281,7 +355,7 @@ export class HrService extends BaseService {
       },
     });
 
-    logger.info('hr_default_contract_generated', { contractId: contract.id, workerId, employmentType });
+    logger.info(logEvent, { contractId: contract.id, workerId, employmentType });
 
     return this.toDto(contract);
   }
@@ -1028,6 +1102,10 @@ export class HrService extends BaseService {
       confirmed_by_id: contract.confirmed_by_id,
       confirmed_at: contract.confirmed_at ? contract.confirmed_at.toISOString() : null,
       expires_at: contract.expires_at ? contract.expires_at.toISOString() : null,
+      // Derived, not stored — see ContractDto's own note on why `status`
+      // alone cannot answer this.
+      is_valid: isContractValid(contract),
+      is_expired: contract.expires_at != null && contract.expires_at <= new Date(),
       created_at: contract.created_at.toISOString(),
       updated_at: contract.updated_at.toISOString(),
     };

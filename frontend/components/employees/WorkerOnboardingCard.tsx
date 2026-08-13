@@ -97,9 +97,11 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const { data: contractStatus } = useWorkerContract(
     isPendingAfterSubmit ? userId : null
   );
-  const hasApprovedContract = contractStatus?.status === "ACTIVE"
-    || contractStatus?.status === "EXTENDED"
-    || contractStatus?.status === "PERMANENT";
+  // Uses the server-derived `is_valid` (status AND unexpired), not a status
+  // comparison: nothing ever transitions a contract out of ACTIVE when its
+  // expiry passes, so a status-only check would show "contract approved" for
+  // a contract the backend's approve gate will reject as expired.
+  const hasApprovedContract = contractStatus?.is_valid === true;
 
   // Refreshes this card's own cache entry plus every other SWR cache whose
   // key could now be stale after a lifecycle transition: the org chart (any

@@ -1144,6 +1144,14 @@ export interface Contract {
   confirmed_by_id: string | null;
   confirmed_at: string | null;
   expires_at: string | null;
+  /**
+   * DERIVED server-side, not stored (hr/service.ts `isContractValid`).
+   * `status` alone is NOT sufficient: nothing ever transitions a contract out
+   * of ACTIVE when its expiry passes, so an ACTIVE contract can be long past
+   * `expires_at`. Always prefer this over checking `status` in UI code.
+   */
+  is_valid: boolean;
+  is_expired: boolean;
   created_at: string;
   updated_at: string;
 }

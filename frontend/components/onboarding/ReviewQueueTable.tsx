@@ -23,7 +23,7 @@ import {
   TR,
   Textarea,
 } from "@/components/ui";
-import { formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime } from "@/lib/format";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { useWorkerContract } from "@/hooks/useContract";
@@ -46,6 +46,17 @@ type ReviewQueueItem = EmploymentRecord & {
     last_name: string;
     role: string;
   } | null;
+  /**
+   * 2026-08-13 re-onboarding: attached by getReviewQueue() so the reviewer's
+   * decision and button label can be rendered from the list payload alone,
+   * with no per-row contract fetch. `contract_valid` is the DERIVED
+   * status-and-expiry check — never re-derive it from `contract_status`,
+   * which stays ACTIVE even after a contract lapses.
+   */
+  is_reonboarding?: boolean;
+  contract_status?: string | null;
+  contract_valid?: boolean;
+  contract_end_date?: string | null;
 };
 
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
@@ -83,15 +94,18 @@ export function ReviewQueueTable() {
   const [assignRecord, setAssignRecord] = useState<ReviewQueueItem | null>(null);
   const [assignTarget, setAssignTarget] = useState("");
 
-  // Contract status for the currently-open review — approve() requires an
-  // Active/Extended/Permanent contract server-side (assertApprovedContract,
+  // Contract status for the currently-open review — approve() requires a
+  // VALID contract server-side (assertApprovedContract,
   // employee-management/service.ts), so the reviewer sees that state
   // up front rather than discovering it only from a failed Approve call.
+  //
+  // Uses the server-derived `is_valid`, NOT a status comparison: nothing ever
+  // transitions a contract out of ACTIVE when its expiry passes, so checking
+  // status alone would show "contract approved" for a contract that expired
+  // years ago and that the backend will reject.
   const { data: contractStatus } = useWorkerContract(selectedRecord?.user_id ?? null);
-  const hasApprovedContract =
-    contractStatus?.status === "ACTIVE" ||
-    contractStatus?.status === "EXTENDED" ||
-    contractStatus?.status === "PERMANENT";
+  const hasApprovedContract = contractStatus?.is_valid === true;
+  const isReonboarding = selectedRecord?.is_reonboarding === true;
 
   const { hotels, isLoading: hotelsLoading } = useHotels({ page: 1, limit: 100 });
   const { groups, isLoading: groupsLoading } = useHotelGroups({ page: 1, limit: 100 });
@@ -188,7 +202,10 @@ export function ReviewQueueTable() {
                   {queue.map((record) => (
                     <TR key={record.id}>
                       <TD className="font-medium">
-                        <div>{record.user?.first_name} {record.user?.last_name}</div>
+                        <div className="flex items-center gap-2">
+                          <span>{record.user?.first_name} {record.user?.last_name}</span>
+                          {record.is_reonboarding && <Badge tone="info">Returning</Badge>}
+                        </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{record.user?.email}</div>
                       </TD>
                       <TD>{roleLabel(record.user?.role)}</TD>
@@ -199,7 +216,7 @@ export function ReviewQueueTable() {
                       <TD className="text-right">
                         <Button variant="outline" size="sm" onClick={() => setSelectedRecord(record)}>
                           <Eye className="mr-2 h-4 w-4" />
-                          Review
+                          {record.is_reonboarding ? "Reactivate" : "Review"}
                         </Button>
                       </TD>
                     </TR>
@@ -214,7 +231,7 @@ export function ReviewQueueTable() {
       <Modal
         open={!!selectedRecord}
         onClose={() => setSelectedRecord(null)}
-        title="Review application"
+        title={isReonboarding ? "Reactivate returning employee" : "Review application"}
       >
         {selectedRecord && (
           <div className="mt-4 space-y-6">
@@ -232,25 +249,50 @@ export function ReviewQueueTable() {
             </DataList>
 
             <div>
-              {contractStatus === undefined ? null : !hasApprovedContract ? (
+              {contractStatus === undefined ? null : hasApprovedContract ? (
+                <Badge tone="success">
+                  Contract valid
+                  {contractStatus?.end_date ? ` until ${formatDate(contractStatus.end_date)}` : ""}
+                </Badge>
+              ) : contractStatus?.is_expired ? (
+                <Badge tone="danger">
+                  Contract expired
+                  {contractStatus.end_date ? ` on ${formatDate(contractStatus.end_date)}` : ""}
+                </Badge>
+              ) : (
                 <Badge tone="warning">
                   {contractStatus ? "Contract not yet signed/confirmed" : "No contract on file"}
                 </Badge>
-              ) : (
-                <Badge tone="success">Contract approved</Badge>
               )}
             </div>
 
-            <div>
-              <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Submitted documents</h3>
-              <div className="rounded-md border border-gray-200 dark:border-gray-700">
-                <DocumentUploadList
-                  workerId={selectedRecord.user_id}
-                  workPermitRequired={selectedRecord.work_permit_required}
-                  disabled
-                />
+            {/* 2026-08-13 re-onboarding: a returning employee is a known
+                person whose documents are already on file and deliberately
+                preserved — the reviewer is reactivating them, not vetting
+                them from scratch, so the document checklist is replaced by
+                an explicit note. The only real question is the contract. */}
+            {isReonboarding ? (
+              <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
+                <p className="font-medium">Returning employee (cycle {selectedRecord.employment_cycle})</p>
+                <p className="mt-0.5">
+                  Previously-submitted documents are still on file and are not re-collected.
+                  {hasApprovedContract
+                    ? " Their contract is still valid, so they can be reactivated directly."
+                    : " Their contract is no longer valid — a new one has been issued for them to sign, and must be confirmed in HR before reactivation."}
+                </p>
               </div>
-            </div>
+            ) : (
+              <div>
+                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Submitted documents</h3>
+                <div className="rounded-md border border-gray-200 dark:border-gray-700">
+                  <DocumentUploadList
+                    workerId={selectedRecord.user_id}
+                    workPermitRequired={selectedRecord.work_permit_required}
+                    disabled
+                  />
+                </div>
+              </div>
+            )}
 
             <FormError>{approveAction.error}</FormError>
 
@@ -268,10 +310,16 @@ export function ReviewQueueTable() {
                 onClick={handleApprove}
                 loading={approveAction.pending}
                 disabled={rejectAction.pending || !hasApprovedContract}
-                title={!hasApprovedContract ? "Requires an Active, Extended, or Permanent contract" : undefined}
+                title={
+                  hasApprovedContract
+                    ? undefined
+                    : isReonboarding
+                      ? "A new contract has been issued — confirm it in HR before reactivating"
+                      : "Requires a valid (signed and unexpired) contract"
+                }
               >
                 <Check className="mr-2 h-4 w-4" />
-                Approve & activate
+                {isReonboarding ? "Reactivate" : "Approve & activate"}
               </Button>
             </div>
           </div>
