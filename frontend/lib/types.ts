@@ -151,6 +151,14 @@ export interface CreateUserInput {
   job_title?: string;
   start_date?: string;
   employment_type?: EmploymentType;
+  /**
+   * Whether this person must supply a WORK_PERMIT document. Omitting it
+   * defaults to false server-side, which is what silently disabled the
+   * work-permit requirement for every account created through the UI
+   * (2026-08-13 audit). ADR-065 §6 item 8: set explicitly by the creating
+   * actor, never inferred from nationality.
+   */
+  work_permit_required?: boolean;
 }
 
 /**

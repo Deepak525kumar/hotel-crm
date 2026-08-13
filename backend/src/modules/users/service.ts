@@ -284,12 +284,19 @@ export class UserService extends BaseService {
     // manual creation form anymore) from the new user's own id, which is
     // already globally unique, so no separate uniqueness check is needed.
     //
-    // Best-effort, like generateDefaultContract() below it in the call
-    // chain: a failure here must not roll back the just-created User account
-    // (the account is real and useful on its own -- login, profile -- even
-    // if onboarding setup hiccups). Logged loudly rather than silently
-    // swallowed; an admin can always create the missing record by hand via
-    // the pre-existing POST /employees route if this ever happens.
+    // NOT best-effort (2026-08-13 audit finding). This previously swallowed
+    // the error on the reasoning that "the account is useful on its own" --
+    // which is false for a non-admin: with no EmploymentRecord they cannot
+    // upload documents, cannot submit onboarding, and cannot be approved.
+    // They could log in and do nothing, while the manager who created them
+    // saw a success response. That is a stranded account nobody knows is
+    // broken.
+    //
+    // The failure now propagates, AND the orphaned User row is removed so the
+    // caller can simply retry: leaving it behind would make the retry fail on
+    // the unique-email check, turning a transient error into a permanently
+    // unusable email address. Deleted rather than soft-deleted -- this
+    // account never existed as far as the operator is concerned.
     if (role !== 'ADMIN') {
       try {
         await employeeManagementService.createEmployee(actor, {
@@ -298,12 +305,29 @@ export class UserService extends BaseService {
           job_title: data.job_title!,
           start_date: data.start_date!,
           employment_type: data.employment_type!,
+          // Threaded through explicitly: omitting it here is what silently
+          // disabled the work-permit requirement platform-wide.
+          work_permit_required: data.work_permit_required ?? false,
         });
       } catch (error) {
         logger.error('user_create_employment_record_failed', {
           userId: user.id,
           error: error instanceof Error ? error.message : String(error),
         });
+        try {
+          await this.prisma.user.delete({ where: { id: user.id } });
+        } catch (cleanupError) {
+          // Compensation failed too -- now there IS an orphan. Log loudly with
+          // both errors so it is recoverable by hand rather than invisible.
+          logger.error('user_create_rollback_failed', {
+            userId: user.id,
+            email: user.email,
+            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+          });
+        }
+        throw new ConflictError(
+          'Account could not be created: setting up the onboarding record failed. Please try again.',
+        );
       }
     }
 
@@ -727,6 +751,35 @@ export class UserService extends BaseService {
         }
       }
 
+      // PROMOTION/DEMOTION SCOPE DESYNC fix (2026-08-13 audit). A role change
+      // that does NOT carry an explicit hotel_group_id left the
+      // EmploymentRecord's old scope untouched. Demote a Manager back to
+      // WORKER and they silently regained roster access to whatever group
+      // they held before the promotion -- bypassing assign() entirely, and
+      // potentially a group they no longer work for.
+      //
+      // Clearing rather than guessing: after a role change with no explicit
+      // posting, the correct scope is genuinely unknown, and "no access
+      // pending assignment" is the safe reading of unknown. assign() is the
+      // deliberate step that grants it back.
+      if (
+        (newRole === 'WORKER' || newRole === 'CHECKER') &&
+        data.hotel_group_id === undefined &&
+        data.primary_hotel_id === undefined &&
+        user.role !== newRole
+      ) {
+        const existing = await tx.employmentRecord.findUnique({
+          where: { user_id: userId },
+          select: { id: true },
+        });
+        if (existing) {
+          await tx.employmentRecord.update({
+            where: { id: existing.id },
+            data: { hotel_group_id: null, primary_hotel_id: null },
+          });
+        }
+      }
+
       // ── worker/checker: EmploymentRecord.hotel_group_id (existing
       // eligibility semantics, unchanged) + primary_hotel_id (new,
       // display/default-selection only — never read by roster-scope.ts) ──
@@ -822,6 +875,35 @@ export class UserService extends BaseService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
     if (userId === actorId) throw new ForbiddenError('Cannot delete your own account');
+
+    // GHOST EMPLOYEE fix (2026-08-13 audit). This endpoint soft-deleted the
+    // User and stopped there: the EmploymentRecord stayed un-deleted, any
+    // hotel/group the person headed stayed pointing at them, and their
+    // contract stayed valid. The hotel then refused every replacement manager
+    // ("Hotel already has a different manager assigned") because the slot was
+    // still occupied by a deleted user.
+    //
+    // employee-management's own delete() already does all of that correctly,
+    // so this delegates to it rather than growing a second, divergent copy of
+    // the teardown -- the divergence between these two paths IS the bug.
+    // Only when an EmploymentRecord exists, which is the case that can ghost;
+    // an admin (no record) still takes the plain account soft-delete below.
+    const employmentRecord = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: userId },
+      select: { employee_id: true, deleted_at: true },
+    });
+
+    if (employmentRecord && !employmentRecord.deleted_at) {
+      await employeeManagementService.delete(
+        { userId: actorId, email: '', role: actorRole, permissions: [] },
+        employmentRecord.employee_id,
+        'Account deleted by administrator',
+      );
+      // delete() soft-deletes the User and bumps token_generation itself, so
+      // returning here avoids doing either twice.
+      await this.logAudit(actorId, actorRole, 'DELETE', 'USER', userId, { email: user.email }, ip);
+      return;
+    }
 
     // ADR-031 D-4 (C-5): bump commits with the soft delete itself — a
     // deleted account must never remain authorizable on its already-issued

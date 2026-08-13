@@ -565,52 +565,78 @@ export class EmployeeManagementService extends BaseService {
 
     // RE-ONBOARDING (2026-08-13, owner decision): a returning employee
     // (employment_cycle > 1, i.e. this record went DELETED -> PENDING via
-    // restore()) does NOT re-upload documents. WorkerDocument rows are never
-    // deleted by delete()/restore() -- the previous cycle's documents are
-    // still on file and are deliberately preserved so they can be re-checked
-    // later -- so re-demanding them would be asking for something the system
-    // already has. The ONLY thing re-onboarding gates on is the contract
-    // (below): if the old one is still valid the person is simply reactivated;
-    // if it expired they sign a freshly-issued one.
+    // restore()) does not RE-UPLOAD documents -- WorkerDocument rows survive
+    // delete()/restore(), so the previous cycle's files are still on file and
+    // re-demanding them would ask for something the system already has.
+    //
+    // But it must still CHECK they are there (audit finding #2). The old code
+    // skipped the completeness check entirely for a returning employee, which
+    // assumed documents could never disappear. They can: a departed worker
+    // could delete their own documents (e.g. for privacy) between cycles, and
+    // that assumption then let them be approved with nothing on file. The
+    // check runs for everyone; only the "please upload" framing differs, so a
+    // returning employee is told what to restore rather than being silently
+    // waved through.
     const isReonboarding = record.employment_cycle > 1;
 
-    if (!isReonboarding) {
-      // GATE: All required documents must be uploaded before onboarding can be
-      // submitted for review. ADR-065 §6 item 8: work permit requirement is
-      // explicitly driven by the record's work_permit_required flag, set at
-      // creation time, rather than inferred from nationality.
-      const isWorkPermitRequired = record.work_permit_required;
-
-      const completeness = await documentService.getDocumentCompleteness(record.user_id, isWorkPermitRequired);
-      if (!completeness.is_complete) {
-        throw new ConflictError(
-          `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
-        );
-      }
+    // GATE: All required documents must be present before onboarding can be
+    // submitted for review. ADR-065 §6 item 8: work permit requirement is
+    // explicitly driven by the record's work_permit_required flag, set at
+    // creation time, rather than inferred from nationality.
+    const completeness = await documentService.getDocumentCompleteness(
+      record.user_id,
+      record.work_permit_required,
+    );
+    if (!completeness.is_complete) {
+      throw new ConflictError(
+        isReonboarding
+          ? `Cannot submit for review: documents from your previous engagement are no longer on file (${completeness.missing_categories.join(', ')}). Please re-upload them.`
+          : `Cannot submit for review: required documents are missing (${completeness.missing_categories.join(', ')}). Please upload all required documents first.`,
+      );
     }
 
-    // GATE (2026-08-13 contract feature): a Contract row must exist before
-    // an application can be submitted for review -- createEmployee()
-    // auto-generates one, but that call is a best-effort side effect (its
-    // own comment) and could have failed, so this is re-checked here rather
-    // than assumed. Existence only, not signed/ACTIVE: the applicant is
-    // still expected to download, mark FULL_TIME/PART_TIME, sign, and
-    // return it (hr/service.ts's uploadSignedContract/
-    // confirmContractSigned flow) -- approve() already independently
-    // requires a VALID (status ok AND unexpired) contract
-    // (assertApprovedContract below), which stays the stricter, later gate.
+    // GATE (owner decision, 2026-08-13): the SIGNED contract is mandatory to
+    // send an application for review -- not merely a generated draft.
     //
-    // Re-onboarding with an EXPIRED contract lands here with no valid
-    // contract to sign, so ensureValidContract() issues a fresh PENDING one
-    // (same default template/6-month terms as a first-time hire) rather than
-    // dead-ending the submission -- the returning employee downloads, signs
-    // and returns THAT, and the reviewer sees the request in their pending
-    // queue exactly like any other.
+    // This closes audit findings #3/#4: submission previously required only
+    // that a Contract ROW existed, so applications landed in the reviewer's
+    // queue that the reviewer could not action, because approve() separately
+    // requires a valid (signed and confirmed) contract. Managers saw a
+    // "submitted" application and had nothing to do with it.
+    //
+    // The gate is "the applicant uploaded their signed scan", NOT "a manager
+    // confirmed it". That distinction is what keeps this satisfiable: only a
+    // manager may confirm a contract (PENDING -> ACTIVE, RULE-HR-03), so
+    // requiring CONFIRMATION here would deadlock -- the applicant could never
+    // meet a gate only someone else can clear, and re-onboarding issues its
+    // contract during this very call. Manager confirmation remains required,
+    // one step later, at approve().
     const contract = await this.ensureValidContract(record);
     if (!contract) {
       throw new ConflictError(
         'Cannot submit for review: no contract has been generated for this application yet. Contact an administrator.',
       );
+    }
+
+    // Already-valid contract (a returning employee whose contract still
+    // stands) needs no fresh signature -- there is nothing to re-sign.
+    if (!isContractValid(contract)) {
+      const signedScan = await this.prisma.workerDocument.findFirst({
+        where: { worker_id: record.user_id, category: 'CONTRACT_SCAN' },
+        orderBy: { created_at: 'desc' },
+        select: { id: true, created_at: true },
+      });
+      // Must post-date the contract it purports to sign: a scan uploaded
+      // against a PREVIOUS contract says nothing about the current one, which
+      // is exactly the re-onboarding case where a fresh contract was just
+      // issued (finding #4).
+      if (!signedScan || signedScan.created_at < contract.created_at) {
+        throw new ConflictError(
+          signedScan
+            ? 'Cannot submit for review: a new contract has been issued. Please download, sign and upload the current contract.'
+            : 'Cannot submit for review: please download your contract, sign it, and upload the signed copy first.',
+        );
+      }
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -930,6 +956,11 @@ export class EmployeeManagementService extends BaseService {
 
     this.logDomainEvent('EVT-EMP-rejected', record.employee_id, EmploymentStatus.REJECTED);
 
+    // Contract/onboarding desync fix (2026-08-13 audit): HR may already have
+    // confirmed the signature before the manager decided, leaving a REJECTED
+    // applicant holding an ACTIVE contract with a running expiry clock.
+    await hrService.standDownContractsFor(record.user_id, 'employment_rejected');
+
     await this.notifyOnboarding(
       [record.user_id],
       'ONBOARDING_REJECTED',
@@ -981,34 +1012,12 @@ export class EmployeeManagementService extends BaseService {
         data: { deactivation_reason: reason },
       });
 
-      const targetUser = await tx.user.findUnique({ where: { id: record.user_id }, select: { role: true } });
+      // Shared with delete() (vacateManagedScopes) so the two paths cannot
+      // drift -- delete() omitting this is exactly the "manager ghosting" bug.
+      // TEMPORARY here: a paused manager is expected back, unlike a
+      // termination.
       const now = new Date();
-
-      if (targetUser?.role === 'MANAGER') {
-        const ownedHotels = await tx.hotel.findMany({ where: { manager_user_id: record.user_id }, select: { id: true } });
-        for (const hotel of ownedHotels) {
-          await tx.hotel.update({
-            where: { id: hotel.id },
-            data: { manager_user_id: null, manager_assigned_at: null, manager_vacated_at: now, manager_vacancy_reason: 'TEMPORARY' },
-          });
-          await tx.hotelManagerAssignmentHistory.updateMany({
-            where: { hotel_id: hotel.id, manager_user_id: record.user_id, unassigned_at: null },
-            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
-          });
-        }
-      } else if (targetUser?.role === 'REGIONAL_MANAGER') {
-        const ownedGroup = await tx.hotelGroup.findUnique({ where: { regional_manager_user_id: record.user_id }, select: { id: true } });
-        if (ownedGroup) {
-          await tx.hotelGroup.update({
-            where: { id: ownedGroup.id },
-            data: { regional_manager_user_id: null, regional_manager_assigned_at: null, regional_manager_vacated_at: now, regional_manager_vacancy_reason: 'TEMPORARY' },
-          });
-          await tx.regionalManagerAssignmentHistory.updateMany({
-            where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: record.user_id, unassigned_at: null },
-            data: { unassigned_at: now, unassigned_by_id: actor.userId, reason: 'TEMPORARY' },
-          });
-        }
-      }
+      await this.vacateManagedScopes(tx, record.user_id, actor.userId, 'TEMPORARY', now);
 
       // Session invalidation (2026-08-07). DELETED (delete(),
       // deactivateForContractLapse()) and DELETED -> PENDING (restore())
@@ -1164,6 +1173,25 @@ export class EmployeeManagementService extends BaseService {
         data: { deleted_reason: reason, deleted_at: now },
       });
 
+      // Manager ghosting fix (2026-08-13 audit): deactivate() vacated managed
+      // hotels/groups but delete() did not, so terminating a manager left the
+      // hotel permanently pointing at a soft-deleted user and unassignable.
+      await this.vacateManagedScopes(tx, record.user_id, actor.userId, 'TERMINATED', now);
+
+      // Re-onboarding scope-leak fix (2026-08-13 audit): hotel_group_id and
+      // primary_hotel_id survived deletion, so a rehired worker came back
+      // still scoped to the group that let them go. That both LOCKED OUT the
+      // new manager (their scope check compares against the stale group) and
+      // LEAKED the returning worker's new contract/onboarding to the old
+      // manager, who could still see them via group-scoped list reads.
+      // Cleared here, at the point employment actually ends, rather than in
+      // restore(): the association is untrue the moment the person leaves,
+      // not merely when they come back.
+      await tx.employmentRecord.update({
+        where: { id: record.id },
+        data: { hotel_group_id: null, primary_hotel_id: null },
+      });
+
       await tx.user.update({
         where: { id: record.user_id },
         data: { deleted_at: now, is_active: false },
@@ -1188,6 +1216,10 @@ export class EmployeeManagementService extends BaseService {
     });
 
     this.logDomainEvent('EVT-EMP-deleted', record.employee_id, EmploymentStatus.DELETED);
+
+    // Same desync as reject(): a departed employee must not keep a contract
+    // the system still reports as valid.
+    await hrService.standDownContractsFor(record.user_id, 'employment_deleted');
 
     return toGeneralProfile(updated);
   }
@@ -1722,16 +1754,25 @@ export class EmployeeManagementService extends BaseService {
       //   - every fallback case (no creator recorded, or a manager creator
       //     with no resolvable RM) -- computed as "not claimed by any RM's
       //     queue" so the two queries can never silently disagree.
-      const managerIdsWithResolvableRm = await this.managerIdsWithResolvableRegionalManager();
+      // Managers who still head a hotel -- i.e. can still act on their own
+      // queue. Everything they created is theirs; anything created by a
+      // manager NOT in this set is orphaned and falls to admin.
+      const activeManagerIds = await this.activeManagerIds();
       query = {
         ...baseQuery,
         OR: [
           { created_by_id: null },
           { created_by: { role: UserRole.ADMIN } },
           { created_by: { role: UserRole.REGIONAL_MANAGER } },
+          // Manager-created records now belong to that manager's own queue
+          // (owner decision, 2026-08-13), so admin no longer claims them --
+          // EXCEPT where the creating manager can no longer act: they no
+          // longer head a hotel, so neither their queue nor any RM's would
+          // ever surface it. Without this clause such a record would be
+          // invisible to everyone.
           {
             created_by: { role: UserRole.MANAGER },
-            NOT: { created_by_id: { in: managerIdsWithResolvableRm } },
+            NOT: { created_by_id: { in: activeManagerIds.length ? activeManagerIds : ['__none__'] } },
           },
         ],
       };
@@ -1739,8 +1780,16 @@ export class EmployeeManagementService extends BaseService {
       if (actor.scope?.type !== 'hotel_group') {
         throw new ForbiddenError('Regional Manager must be scoped to a hotel group');
       }
-      // Managers whose hotel belongs to THIS RM's own group -- these
-      // managers' worker/checker applications are this RM's to review.
+      // An RM reviews the MANAGER applications they created. Worker/checker
+      // applications created by a manager now belong to that manager's own
+      // queue (owner decision, 2026-08-13) and are deliberately NOT duplicated
+      // here -- exactly one queue owns each record, or two reviewers could act
+      // on the same application and the second would hit a stale-state error.
+      //
+      // The manager-created set is still surfaced to the RM when the creating
+      // manager cannot act on it themselves, which today means only the
+      // no-longer-a-manager case: their hotel assignment is gone, so the
+      // record would otherwise be orphaned.
       const managersInGroup = await this.prisma.hotel.findMany({
         where: { hotel_group_id: actor.scope.hotel_group_id, manager_user_id: { not: null } },
         select: { manager_user_id: true },
@@ -1748,16 +1797,33 @@ export class EmployeeManagementService extends BaseService {
       const managerIds = managersInGroup
         .map((h) => h.manager_user_id)
         .filter((id): id is string => id !== null);
-      if (managerIds.length === 0) {
-        query = { ...baseQuery, id: '__none__' };
-      } else {
-        query = { ...baseQuery, created_by_id: { in: managerIds } };
-      }
+      // Records created by a manager who is STILL a manager in this group are
+      // that manager's own to review. What reaches the RM is: their own
+      // creations, plus any manager-created record whose creator no longer
+      // heads a hotel here (nobody else would ever see it).
+      const orphanedCreatorFilter: Prisma.EmploymentRecordWhereInput = {
+        created_by: { role: UserRole.MANAGER },
+        NOT: { created_by_id: { in: managerIds.length ? managerIds : ['__none__'] } },
+      };
+      query = {
+        ...baseQuery,
+        OR: [{ created_by_id: actor.userId }, orphanedCreatorFilter],
+      };
     } else if (actor.role === 'manager') {
-      // See header comment: a manager is never a creator's superior under
-      // this rule, so their queue is always empty. Distinct from a 403 --
-      // the role remains allowed to load the (empty) page.
-      query = { ...baseQuery, id: '__none__' };
+      // Owner decision (2026-08-13, revising the creator's-superior rule for
+      // this case only): a Hotel Manager reviews the worker/checker
+      // applications THEY created. The strict rule left their queue
+      // permanently empty and pushed every housekeeper and receptionist up to
+      // the Regional Manager, which does not scale -- an RM would approve
+      // every front-line hire across all their hotels.
+      //
+      // Deliberately scoped to their OWN creations, not "every application in
+      // my hotel": created_by_id is the same key getReviewQueue's other
+      // branches route on, so a manager cannot pick up an application that an
+      // RM's or admin's queue is also claiming. Manager-created applications
+      // therefore stop appearing in the RM queue (see the RM branch below,
+      // which now excludes them) -- exactly one queue owns each record.
+      query = { ...baseQuery, created_by_id: actor.userId };
     } else {
       throw new ForbiddenError('Role not authorized for review queue');
     }
@@ -1923,16 +1989,72 @@ export class EmployeeManagementService extends BaseService {
     }
   }
 
-  private async managerIdsWithResolvableRegionalManager(): Promise<string[]> {
+  /**
+   * Vacates any hotel/hotel-group this person currently heads.
+   *
+   * Extracted from deactivate() so delete() can reuse it verbatim. delete()
+   * previously omitted this entirely (2026-08-13 audit finding, "manager
+   * ghosting"): terminating a Hotel Manager soft-deleted their account but
+   * left hotel.manager_user_id pointing at them forever. The hotel then read
+   * as actively managed by a terminated employee, and assign() refused every
+   * replacement with "Hotel already has a different manager assigned" -- the
+   * hotel became unassignable without a manual database edit.
+   *
+   * `reason` differs by caller and is the whole point of parameterising
+   * rather than hardcoding: a temporary pause is TEMPORARY, a termination is
+   * TERMINATED, and the vacancy history rows must say which actually happened.
+   */
+  private async vacateManagedScopes(
+    tx: DatabaseTransaction,
+    userId: string,
+    actorUserId: string,
+    reason: 'TEMPORARY' | 'TERMINATED',
+    now: Date
+  ): Promise<void> {
+    const targetUser = await tx.user.findUnique({ where: { id: userId }, select: { role: true } });
+
+    if (targetUser?.role === 'MANAGER') {
+      const ownedHotels = await tx.hotel.findMany({ where: { manager_user_id: userId }, select: { id: true } });
+      for (const hotel of ownedHotels) {
+        await tx.hotel.update({
+          where: { id: hotel.id },
+          data: { manager_user_id: null, manager_assigned_at: null, manager_vacated_at: now, manager_vacancy_reason: reason },
+        });
+        await tx.hotelManagerAssignmentHistory.updateMany({
+          where: { hotel_id: hotel.id, manager_user_id: userId, unassigned_at: null },
+          data: { unassigned_at: now, unassigned_by_id: actorUserId, reason },
+        });
+      }
+    } else if (targetUser?.role === 'REGIONAL_MANAGER') {
+      const ownedGroup = await tx.hotelGroup.findUnique({ where: { regional_manager_user_id: userId }, select: { id: true } });
+      if (ownedGroup) {
+        await tx.hotelGroup.update({
+          where: { id: ownedGroup.id },
+          data: { regional_manager_user_id: null, regional_manager_assigned_at: null, regional_manager_vacated_at: now, regional_manager_vacancy_reason: reason },
+        });
+        await tx.regionalManagerAssignmentHistory.updateMany({
+          where: { hotel_group_id: ownedGroup.id, regional_manager_user_id: userId, unassigned_at: null },
+          data: { unassigned_at: now, unassigned_by_id: actorUserId, reason },
+        });
+      }
+    }
+  }
+
+  // Manager user ids who still head a hotel, i.e. who can still act on their
+  // own review queue. Anything created by a manager outside this set is
+  // orphaned -- neither that manager's queue nor an RM's would surface it --
+  // so admin picks it up. Replaces the previous
+  // managerIdsWithResolvableRegionalManager(), whose question ("does this
+  // manager have an RM above them?") stopped being the routing question once
+  // managers began reviewing their own creations.
+  private async activeManagerIds(): Promise<string[]> {
     const hotels = await this.prisma.hotel.findMany({
-      where: {
-        manager_user_id: { not: null },
-        hotel_group: { regional_manager_user_id: { not: null } },
-      },
+      where: { manager_user_id: { not: null } },
       select: { manager_user_id: true },
     });
     return hotels.map((h) => h.manager_user_id).filter((id): id is string => id !== null);
   }
+
 
   // ── By-user lookup (IF-EMP-GetByUserId) ─────────────────────────────────
 

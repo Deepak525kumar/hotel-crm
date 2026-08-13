@@ -25,6 +25,14 @@ export const CreateUserSchema = z
     job_title: z.string().min(1).max(200).optional(),
     start_date: z.coerce.date().optional(),
     employment_type: z.enum(['FULL_TIME', 'PART_TIME']).optional(),
+    // COMPLIANCE (2026-08-13 audit finding): without this the flag defaulted
+    // to false for EVERY account created through the normal UI, so the
+    // document-completeness check never demanded a WORK_PERMIT from anyone --
+    // a legal-compliance hole, not merely a missing field. Optional in the
+    // schema but defaulted explicitly at the call site; ADR-065 §6 item 8 is
+    // clear that this is set by the creating actor at creation time and is
+    // NOT inferred from nationality.
+    work_permit_required: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === 'admin') return;

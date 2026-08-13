@@ -1,4 +1,4 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals';
 
 /**
  * RULE A — "create is 1-level-down only" (project-owner decision, 2026-08-12),
@@ -56,7 +56,7 @@ jest.mock('../lib/db.js', () => ({
 
 import { PLATFORM_ROLES, type PlatformRole } from '../lib/role-hierarchy.js';
 import { UserService } from '../modules/users/service.js';
-import { EmployeeManagementService } from '../modules/employee-management/service.js';
+import { EmployeeManagementService, employeeManagementService } from '../modules/employee-management/service.js';
 
 /** The ratified table, transcribed independently of the implementation. */
 const RATIFIED: Record<PlatformRole, readonly PlatformRole[]> = {
@@ -119,6 +119,20 @@ describe('RULE A — create is 1-level-down only, enforced on both creation surf
   // Surface 1 — POST /users (account creation), users/service.ts#createUser
   // =====================================================================
   describe('createUser (account creation)', () => {
+    // ADR-065: createUser auto-creates the EmploymentRecord and, since the
+    // 2026-08-13 audit fix, FAILS the account creation if that step fails
+    // (previously it was swallowed, stranding the worker). These cases test
+    // RULE A authorization, not record creation, so the collaborator is
+    // stubbed to succeed -- otherwise every ALLOW case fails on the unmocked
+    // employment-record path rather than on the rule under test.
+    let createEmployeeSpy: jest.SpiedFunction<typeof employeeManagementService.createEmployee>;
+    beforeEach(() => {
+      createEmployeeSpy = jest
+        .spyOn(employeeManagementService, 'createEmployee')
+        .mockResolvedValue({} as any);
+    });
+    afterEach(() => createEmployeeSpy.mockRestore());
+
     const service = new UserService();
 
     for (const actor of PLATFORM_ROLES) {

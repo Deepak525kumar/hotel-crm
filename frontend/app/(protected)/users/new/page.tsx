@@ -32,6 +32,10 @@ function NewUser() {
       ...(values.job_title ? { job_title: values.job_title } : {}),
       ...(values.start_date ? { start_date: values.start_date } : {}),
       ...(values.employment_type ? { employment_type: values.employment_type } : {}),
+      // Always sent (not conditionally): `false` is a real, meaningful value
+      // here, and omitting it is exactly how the requirement got silently
+      // disabled for everyone.
+      ...(values.role !== "admin" ? { work_permit_required: values.work_permit_required } : {}),
     };
     try {
       const created = await usersApi.create(payload);

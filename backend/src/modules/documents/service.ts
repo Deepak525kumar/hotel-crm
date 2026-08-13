@@ -309,6 +309,52 @@ export class DocumentService extends BaseService {
       throw new ForbiddenError('Cannot delete a document that has been submitted as a signed contract scan');
     }
 
+    // REVIEW LOCK (2026-08-13, onboarding audit finding #1). Without this, a
+    // worker could submit a COMPLETE application, then delete mandatory
+    // documents while it sat in the reviewer's queue -- leaving the reviewer
+    // looking at a "submitted" application that is silently missing legally
+    // required files. Reproduced end-to-end before fixing: submit succeeded,
+    // PASSPORT was deleted, and completeness flipped to is_complete=false
+    // while the record stayed in the queue as submitted.
+    //
+    // Keyed on submitted_for_review_at (the PENDING sub-state that means
+    // "awaiting a decision"), not on status: status stays PENDING across both
+    // the pre-submit and awaiting-review phases, so it cannot distinguish
+    // them. Once a decision is made the record leaves this state -- approved
+    // (ACTIVE) or rejected (REJECTED, which clears nothing but is no longer
+    // awaiting review) -- and editing is possible again, which is the point:
+    // a rejected applicant must be able to replace the document that was
+    // wrong.
+    const record = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: doc.worker_id },
+      select: { status: true, submitted_for_review_at: true },
+    });
+    // The ONLY window in which a worker may delete their own documents is
+    // while they are still assembling an application nobody has acted on:
+    // PENDING and not yet submitted, or REJECTED (where the whole point is to
+    // replace the document that was wrong and try again).
+    //
+    // Everything else is locked, and the ACTIVE case is the important one: an
+    // employed worker deleting their Passport / Tax Number / Health Insurance
+    // destroys records the company is legally required to retain. An earlier
+    // version of this guard checked only `status === 'PENDING' &&
+    // submitted_for_review_at`, which disengaged the moment someone was hired
+    // -- narrower than the compliance requirement it was meant to serve.
+    // Expressed as an allow-list so a newly-added status is locked by default
+    // rather than silently permitted.
+    const canEditOwnDocuments =
+      !record ||
+      record.status === 'REJECTED' ||
+      (record.status === 'PENDING' && !record.submitted_for_review_at);
+
+    if (!canEditOwnDocuments) {
+      throw new ForbiddenError(
+        record?.status === 'PENDING'
+          ? 'Cannot delete documents while your application is under review. Contact your manager if a document needs to be replaced.'
+          : 'Cannot delete documents that form part of your employment record. Contact your manager if a document needs to be replaced.'
+      );
+    }
+
     const storage = await getStorageClient();
     await this.prisma.$transaction(async (tx) => {
       await tx.workerDocument.delete({ where: { id: documentId } });
