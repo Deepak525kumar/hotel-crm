@@ -663,13 +663,15 @@ function EditSkillsModal({
   // Keep local state in sync when the modal is opened
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setSkills(currentSkills);
     }
   }, [open, currentSkills]);
 
   const handleClose = () => {
     if (action.pending) return;
-    setSkills(currentSkills);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSkills(currentSkills);
     onClose();
   };
 
