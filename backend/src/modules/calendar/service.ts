@@ -5,6 +5,10 @@ import { logger } from '../../lib/logger.js';
 import { isScopedManagerRole, isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import { AssignmentService } from '../assignments/service.js';
+import {
+  ABSENCE_CANCEL_REASON_SELF,
+  ABSENCE_CANCEL_REASON_MANAGER,
+} from '../../config/constants.js';
 import { notificationService } from '../notifications/service.js';
 import type {
   MarkAbsenceInput,
@@ -31,8 +35,13 @@ import { todayInCalendarTimezone } from '../../lib/utils.js';
  * two copies of the same string in different methods is exactly the drift this
  * codebase has been bitten by before.
  */
-export const ABSENCE_CANCEL_REASON_SELF = 'Worker marked sick/vacation';
-export const ABSENCE_CANCEL_REASON_MANAGER = 'Marked sick/vacation by a manager';
+// Defined in config/constants.ts so the quality module can read them without
+// closing a calendar -> assignments -> quality import cycle; re-exported here
+// because this module is their long-standing import site.
+export {
+  ABSENCE_CANCEL_REASON_SELF,
+  ABSENCE_CANCEL_REASON_MANAGER,
+} from '../../config/constants.js';
 
 export class CalendarService extends BaseService {
   // REQ-CAL-T02: worker's own calendar view (this module's absence entries
@@ -226,6 +235,14 @@ export class CalendarService extends BaseService {
     if (actor.role === 'worker') {
       if (existing.worker_id !== actor.userId) {
         throw new ForbiddenError('Cannot delete another worker\'s absence');
+      }
+      // Only a manager-marked absence is off-limits. `marked_by_id` is
+      // nullable with onDelete: SetNull (schema.prisma:1404-1405), so a NULL
+      // means the marking user's row is gone -- not that a manager marked it.
+      // Treating NULL as "somebody else" would lock a worker out of their own
+      // absence permanently once that manager was deleted.
+      if (existing.marked_by_id != null && existing.marked_by_id !== actor.userId) {
+        throw new ForbiddenError('Cannot delete an absence marked by a manager');
       }
     } else if (actor.role !== 'admin') {
       const inScope = await isWorkerInGroupScope(actor.scope ?? null, existing.worker_id);

@@ -83,6 +83,10 @@ jest.mock('../config/env.js', () => ({
 
 import { QualityController } from '../modules/quality/controller.js';
 import { QualityService, refreshWorkerOverallRating } from '../modules/quality/service.js';
+import {
+  ABSENCE_CANCEL_REASON_SELF,
+  ABSENCE_CANCEL_REASON_MANAGER,
+} from '../config/constants.js';
 import { CreateRatingSchema } from '../modules/quality/types.js';
 import { Prisma } from '@prisma/client';
 
@@ -709,6 +713,35 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
         { status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, day: { lte: new Date('2026-08-13T00:00:00.000Z') } },
       ],
     });
+  });
+
+  // A worker standing themselves down is worth a manager seeing, but it is not
+  // a failed shift -- so it is reported as its own count and kept out of the
+  // ratio, where it would be indistinguishable from a no-show.
+  it('counts worker-initiated cancellations separately, without touching the denominator', async () => {
+    const tx = makeTx();
+    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.attendance.count.mockResolvedValue(1);
+    tx.workerAssignment.findFirst.mockResolvedValue(null);
+
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const cancellationCall = (tx.workerAssignment.count.mock.calls as any[]).find(
+      (c) => c[0]?.where?.cancellation_reason !== undefined
+    );
+    expect(cancellationCall[0].where).toEqual({
+      worker_id: 'w1',
+      status: 'CANCELLED',
+      cancellation_reason: ABSENCE_CANCEL_REASON_SELF,
+    });
+    // Manager-initiated cancellations are never attributed to the worker.
+    expect(JSON.stringify(cancellationCall[0].where)).not.toContain(
+      ABSENCE_CANCEL_REASON_MANAGER
+    );
+
+    // And it is written out as a count, not folded into a rate.
+    const upsert = (tx.workerOverallRating.upsert.mock.calls as any[])[0][0];
+    expect(upsert.create.worker_cancellations).toBe(1);
   });
 
   it('includes a future-dated CONFIRMED/IN_PROGRESS shift once its day is <= today, excludes it before', async () => {

@@ -1121,17 +1121,26 @@ export class JobRequestService extends BaseService {
    */
   async closeExpiredBroadcasts(cutoff: Date, batchSize: number): Promise<number> {
     let total = 0;
+    // Keyset pagination on `id` rather than Prisma's `cursor` option: the
+    // cursor form made `stale`'s own type depend on a variable assigned from
+    // `stale`, which TypeScript rejects as a circular initializer (TS7022).
+    // An `id > cursor` where-clause paginates identically with no such cycle.
+    let cursorId: string | undefined;
     for (;;) {
       const stale = await this.prisma.jobRequest.findMany({
         where: {
           status: WorkRequestStatus.OPEN,
           created_at: { lt: cutoff },
           skill_slots: { some: {} },
+          ...(cursorId === undefined ? {} : { id: { gt: cursorId } }),
         },
         include: { skill_slots: true },
         take: batchSize,
+        orderBy: { id: 'asc' },
       });
       if (stale.length === 0) break;
+
+      cursorId = stale[stale.length - 1].id;
 
       let closedThisBatch = 0;
       for (const wr of stale) {
@@ -1164,7 +1173,13 @@ export class JobRequestService extends BaseService {
       }
       total += closedThisBatch;
 
-      if (stale.length < batchSize || closedThisBatch === 0) break;
+      // A short page is the last page -- stop without spending another query.
+      // Note what is deliberately NOT here: the old `|| closedThisBatch === 0`
+      // clause. That one ended the sweep whenever a full batch happened to be
+      // entirely fully-staffed rows, silently leaving every later expired
+      // broadcast open. Keyset pagination advances past those rows instead, so
+      // only a genuinely short page ends the loop.
+      if (stale.length < batchSize) break;
     }
     return total;
   }

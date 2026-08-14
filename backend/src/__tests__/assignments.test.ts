@@ -69,8 +69,20 @@ const mockRoomsCompletedEntry = {
   findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
 };
 
+// reassign() retires the outgoing worker's calendar placement and writes one
+// for the incoming worker inside the same transaction; placeOnCalendar()/
+// moveCalendarEntry() use the same delegate.
+const mockCalendarEntry = {
+  create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'ce1' }),
+  update: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'ce1' }),
+  delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'ce1' }),
+  deleteMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
+  findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+};
+
 const mockPrisma = {
   workerAssignment: mockWorkerAssignment,
+  calendarEntry: mockCalendarEntry,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   calendarAbsence: mockCalendarAbsence,
@@ -680,6 +692,35 @@ describe('AssignmentService', () => {
       });
       expect(result.old_assignment.status).toBe('REASSIGNED');
       expect(result.new_assignment.worker_id).toBe('w2');
+    });
+
+    it('retires the outgoing worker\'s calendar placement before writing the incoming one', async () => {
+      // CalendarEntry is @@unique([worker_id, day]) and the old assignment is
+      // only marked REASSIGNED, never deleted -- so its entry outlives the
+      // status change. Leaving it behind kept the old worker rendered on the
+      // calendar grid (double-counting staffing for the day) and occupied
+      // (old_worker, day) forever, so reassigning a shift back to that worker
+      // on that day tripped the unique constraint and surfaced as a false
+      // "already has an assignment for this day" 409 -- isWorkerFreeOnDay()
+      // reads WorkerAssignment, where REASSIGNED counts as free, so nothing
+      // else caught the contradiction.
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ id: 'a1', worker_id: 'w1' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ id: 'a1', status: 'REASSIGNED' }));
+      mockWorkerAssignment.create.mockResolvedValue(makeAssignment({ id: 'a2', worker_id: 'w2' }));
+
+      await service.reassign('a1', { worker_id: 'w2' }, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockCalendarEntry.deleteMany).toHaveBeenCalledWith({
+        where: { assignment_id: 'a1' },
+      });
+      expect(mockCalendarEntry.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ assignment_id: 'a2', worker_id: 'w2' }),
+      });
+      // Order matters: creating before deleting would trip the unique
+      // constraint whenever both placements land on the same day.
+      const deleteOrder = mockCalendarEntry.deleteMany.mock.invocationCallOrder[0];
+      const createOrder = mockCalendarEntry.create.mock.invocationCallOrder[0];
+      expect(deleteOrder).toBeLessThan(createOrder);
     });
 
     it('inherits hotel_id, day, job_request_id, work_request_id, and skill_slot_id from the old assignment unchanged', async () => {

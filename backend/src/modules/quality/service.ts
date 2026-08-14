@@ -16,6 +16,7 @@ import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
 import { ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
+import { ABSENCE_CANCEL_REASON_SELF } from '../../config/constants.js';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 interface Actor {
@@ -69,10 +70,23 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
         day: { lte: today },
       },
+      // Worker-initiated cancellations are deliberately NOT here. Declaring
+      // sick/vacation is not a failure to complete a shift, so it must not
+      // move completion_rate -- the 2026-08-13 rule above stands. It is still
+      // worth seeing, so it is surfaced as its own count
+      // (worker_cancellations) rather than folded into a ratio where it would
+      // be indistinguishable from a no-show.
     ],
   };
 
-  const [agg, totalAssignments, completedAssignments, onTimeAttendance, lastWorked] =
+  const [
+    agg,
+    totalAssignments,
+    completedAssignments,
+    onTimeAttendance,
+    lastWorked,
+    workerCancellations,
+  ] =
     await Promise.all([
       tx.rating.aggregate({
         where: { worker_id },
@@ -95,6 +109,19 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         orderBy: { completed_at: 'desc' },
         select: { completed_at: true },
       }),
+      // Shifts the worker stood themselves down from. Reported as a plain
+      // count, never as a ratio: it is a visibility signal for a manager, not
+      // a penalty applied behind the worker's back. Matched on the exported
+      // constant so a reworded reason cannot silently stop counting, and
+      // scoped to the SELF reason so a manager-cancelled shift is never
+      // attributed to the worker.
+      tx.workerAssignment.count({
+        where: {
+          worker_id,
+          status: AssignmentStatus.CANCELLED,
+          cancellation_reason: ABSENCE_CANCEL_REASON_SELF,
+        },
+      }),
     ]);
 
   const averageScore = agg._avg.score ?? 0;
@@ -108,6 +135,7 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
     completion_rate: completionRate,
     on_time_rate: onTimeRate,
     last_worked_at: lastWorked?.completed_at ?? null,
+    worker_cancellations: workerCancellations,
   };
 
   await tx.workerOverallRating.upsert({

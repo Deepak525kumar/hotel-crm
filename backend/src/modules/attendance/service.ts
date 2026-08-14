@@ -409,6 +409,12 @@ export class AttendanceService extends BaseService {
     const effectiveCheckInAt =
       !isWorker && input.check_in_at !== undefined ? new Date(input.check_in_at) : record.check_in_at;
 
+    // check_in_at itself is written by the manager-only block further down
+    // (`data.check_in_at = effectiveCheckInAt`); writing it here as well was a
+    // redundant second assignment of the same value.
+    const effectiveCheckOutAt =
+      input.check_out_at !== undefined ? (isWorker ? new Date() : new Date(input.check_out_at)) : record.check_out_at;
+
     if (input.check_out_at !== undefined) {
       // Time-manipulation fix (2026-08-08): a worker's own check-out time was
       // taken verbatim from the request body and used unchanged to compute
@@ -418,14 +424,14 @@ export class AttendanceService extends BaseService {
       // A manager correcting a record after the fact is a distinct, already
       // more-trusted action (same tier as the minutes_worked/status override
       // below) and keeps using the value they supplied.
-      const checkOutTime = isWorker ? new Date() : new Date(input.check_out_at);
-      data.check_out_at = checkOutTime;
-      if (effectiveCheckInAt) {
-        data.minutes_worked = Math.max(
-          0,
-          Math.floor((checkOutTime.getTime() - effectiveCheckInAt.getTime()) / 60000)
-        );
-      }
+      data.check_out_at = isWorker ? new Date() : new Date(input.check_out_at);
+    }
+
+    if ((input.check_in_at !== undefined || input.check_out_at !== undefined) && effectiveCheckInAt && effectiveCheckOutAt) {
+      data.minutes_worked = Math.max(
+        0,
+        Math.floor((effectiveCheckOutAt.getTime() - effectiveCheckInAt.getTime()) / 60000)
+      );
     }
 
     if (input.notes !== undefined) data.notes = input.notes;
