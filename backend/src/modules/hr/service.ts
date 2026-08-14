@@ -1150,7 +1150,7 @@ export class HrService extends BaseService {
       title: 'Payslip request received',
       message: 'A worker has requested a payslip.',
       data: { worker_id: workerId, payslip_request_id: requestId },
-      transports: [OutboxTransport.PUSH],
+      transports: [OutboxTransport.PUSH, OutboxTransport.EMAIL],
       sourceModule: OutboxSourceModule.HR,
       producerService: 'HrService',
     }, tx);
