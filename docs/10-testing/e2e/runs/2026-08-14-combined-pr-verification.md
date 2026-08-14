@@ -29,7 +29,7 @@
 | 04 Document upload → S3 | **NOT RUN** | no AWS credentials in this container. Documents were seeded via Prisma; the real upload path was **not** exercised. Recorded as a gap, not a pass. |
 | 05 Race conditions | **NOT RUN** | out of budget this pass |
 | 06 Edge cases | **PARTIAL** | targeted checks only (see below) |
-| 07 Frontend UI (Playwright) | **NOT RUN** | none of #458's 11 frontend files were exercised |
+| 07 Frontend UI (Playwright) | **PARTIAL** | Superseded later the same day: #458's changed pages were driven in Chromium (login, dashboard, hotels, users/new, calendar, broadcasts, onboarding, users) — all 200, no crashes, no page errors, and bug 9 was verified end-to-end through the browser down to the database. Not a full scenario-07 walkthrough. |
 
 ## What was verified at the data layer
 
