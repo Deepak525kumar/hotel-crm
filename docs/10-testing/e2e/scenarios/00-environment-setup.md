@@ -47,6 +47,13 @@ docker exec hotel-crm-postgres-1 psql -U hotelcrm -d postgres -c "DROP DATABASE 
 ```
 
 **PASS:** `No difference detected.`
+
+This gate failed from the introduction of `DailyShiftSummary` until 2026-08-14 on a
+`updated_by_id` foreign key whose schema said `onDelete: Restrict` while every migration
+emitted `ON DELETE SET NULL` — so scenario 00 opened on a FAIL unrelated to whatever was
+under test, and a real drift would have been easy to wave through as "the usual one".
+Fixed by correcting `schema.prisma` (the migration was right). If this reports a difference
+again, it is new.
 **FAIL:** any listed difference — a fresh deploy (CI/prod/new dev) will be out of sync with
 `schema.prisma`. Do not proceed; fix the migrations first.
 
