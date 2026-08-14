@@ -1156,6 +1156,12 @@ model WorkerOverallRating {
   total_assignments Int       @default(0)
   completion_rate   Float     @default(0.0) // completed / total assignments
   on_time_rate      Float     @default(0.0) // present-on-time / total assignments
+  // Shifts the worker stood themselves down from (declared sick/vacation).
+  // Deliberately a count, not a rate, and deliberately absent from
+  // total_assignments: a self-declared absence is not a failure to complete a
+  // shift, so it must not move completion_rate. Kept visible so a manager can
+  // still see a pattern without it being silently priced into the leaderboard.
+  worker_cancellations Int    @default(0)
   last_worked_at    DateTime?
   updated_at        DateTime  @updatedAt
 

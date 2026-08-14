@@ -627,6 +627,31 @@ export class AssignmentService extends BaseService {
           },
         });
 
+        // The outgoing worker's placement must be retired before the incoming
+        // one is written. CalendarEntry is @@unique([worker_id, day]) and the
+        // old assignment is only marked REASSIGNED (never deleted), so its
+        // entry survives the status change and would otherwise:
+        //   - keep rendering the old worker on the calendar grid against a
+        //     REASSIGNED assignment, double-counting staffing for the day; and
+        //   - occupy (old_worker, day) forever, so reassigning a shift back to
+        //     that worker on that day trips the unique constraint and returns
+        //     a false "already has an assignment for this day" 409 --
+        //     isWorkerFreeOnDay() reads WorkerAssignment, where REASSIGNED
+        //     counts as free, so nothing else catches the contradiction.
+        // deleteMany (not delete): an assignment created via acceptBroadcast
+        // may never have had a CalendarEntry at all.
+        await tx.calendarEntry.deleteMany({ where: { assignment_id: oldAssignment.id } });
+
+        await tx.calendarEntry.create({
+          data: {
+            assignment_id: newAssignment.id,
+            worker_id: input.worker_id,
+            hotel_id: oldAssignment.hotel_id,
+            day: oldAssignment.day,
+            placed_by_id: actor.userId,
+          },
+        });
+
         // GD-04, same rule update() follows: REASSIGNED is a terminal
         // outcome for the OLD worker that never completes the shift, same
         // aggregate-affecting shape as CANCELLED -- their completion rate
@@ -1066,6 +1091,14 @@ export class AssignmentService extends BaseService {
     });
     if (!currentAssignment) throw new NotFoundError('Assignment not found');
 
+    if (
+      currentAssignment.status === AssignmentStatus.CANCELLED ||
+      currentAssignment.status === AssignmentStatus.COMPLETED ||
+      currentAssignment.status === AssignmentStatus.REASSIGNED
+    ) {
+      throw new ConflictError(`Cannot move an assignment in status ${currentAssignment.status}`);
+    }
+
     if (isScopedManagerRole(actor.role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, existing.hotel_id);
       if (!inScope) {
@@ -1096,6 +1129,25 @@ export class AssignmentService extends BaseService {
     let updated;
     try {
       updated = await this.prisma.$transaction(async (tx) => {
+        // Re-read the status inside the transaction. The guard above runs on a
+        // row read before the transaction opened, so a concurrent cancel or
+        // completion landing in that window would otherwise be overwritten --
+        // and this path carries no optimistic `version` check (ADR-036) to
+        // catch it. Re-checking here makes the terminal-status guard binding
+        // rather than advisory.
+        const fresh = await tx.workerAssignment.findUnique({
+          where: { id: existing.assignment_id },
+          select: { status: true },
+        });
+        if (!fresh) throw new NotFoundError('Assignment not found');
+        if (
+          fresh.status === AssignmentStatus.CANCELLED ||
+          fresh.status === AssignmentStatus.COMPLETED ||
+          fresh.status === AssignmentStatus.REASSIGNED
+        ) {
+          throw new ConflictError(`Cannot move an assignment in status ${fresh.status}`);
+        }
+
         const calendarEntry = await tx.calendarEntry.update({
           where: { id: calendarEntryId },
           data: { day },

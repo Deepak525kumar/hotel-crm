@@ -190,6 +190,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // Epic 5 PR 5.6 (SPEC-EMP-001): Checker views a worker's profile at their
     // assigned hotel (permission matrix), read-only.
     'employees:read',
+    // A checker onboards exactly as a worker does -- uploads their own
+    // documents, reads their own contract, requests their own payslip. These
+    // mirror WORKER's self-scoped HR tokens below and carry the same guarantee:
+    // worker_id is server-derived from the authenticated caller, never
+    // client-supplied, so a checker can only ever reach their own records
+    // (enforced in hr/service.ts and documents/service.ts, and verified by the
+    // cross-worker 403 these routes return).
+    'hr:contract:read-own',
+    'hr:payslip:read-own',
+    'hr:payslip:request',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
@@ -223,3 +233,16 @@ export const BCRYPT_ROUNDS = 12;
 // HOTFIX-AUTH-002: password-reset tokens are single-use and expire quickly to
 // bound the window an intercepted/leaked token remains exploitable.
 export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
+
+/**
+ * Cancellation reasons written when marking an absence auto-cancels that day's
+ * shift. They distinguish a worker standing themselves down from a manager
+ * standing them down, which the leaderboard depends on: only the worker-
+ * initiated form is counted as a worker-declared absence.
+ *
+ * They live here, in a module that imports nothing, because both the writer
+ * (calendar) and the reader (quality) need them. Importing calendar from
+ * quality would close a calendar -> assignments -> quality import cycle.
+ */
+export const ABSENCE_CANCEL_REASON_SELF = 'Worker marked sick/vacation';
+export const ABSENCE_CANCEL_REASON_MANAGER = 'Marked sick/vacation by a manager';

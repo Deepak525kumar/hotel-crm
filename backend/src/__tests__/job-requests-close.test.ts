@@ -340,19 +340,31 @@ describe('JobRequestService.closeExpiredBroadcasts', () => {
       );
     });
 
-    it('a batch that closes nothing (all rows fully staffed) still terminates the loop', async () => {
+    it('a batch that closes nothing (all rows fully staffed) advances past it instead of stopping', async () => {
       // A full page (== batchSize) where every row is skipped must not be
-      // re-fetched forever -- termination is keyed on closedThisBatch, not
-      // stale.length.
-      mockJobRequest.findMany.mockResolvedValueOnce([
-        makeJobRequestRow({ id: 'jr1', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
-        makeJobRequestRow({ id: 'jr2', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
-      ]);
+      // re-fetched forever. Termination used to be keyed on closedThisBatch,
+      // which terminated but also ENDED THE SWEEP: every expired broadcast
+      // ordered after a full page of fully-staffed rows was left open. Keyset
+      // pagination advances the cursor past the skipped rows, so the loop both
+      // terminates and finishes the sweep -- it asks for the next page and
+      // stops on the empty one.
+      mockJobRequest.findMany
+        .mockResolvedValueOnce([
+          makeJobRequestRow({ id: 'jr1', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
+          makeJobRequestRow({ id: 'jr2', skill_slots: [makeSkillSlotRow({ headcount: 1, confirmed_count: 1 })] }),
+        ])
+        .mockResolvedValueOnce([]);
 
       const closed = await service.closeExpiredBroadcasts(new Date(), 2);
 
       expect(closed).toBe(0);
-      expect(mockJobRequest.findMany).toHaveBeenCalledTimes(1);
+      expect(mockJobRequest.findMany).toHaveBeenCalledTimes(2);
+      // The second page is fetched from beyond the last row of the first.
+      expect(mockJobRequest.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { gt: 'jr2' } }),
+        })
+      );
     });
 
     it('a mixed batch closes only the non-fully-staffed rows and returns the correct count', async () => {

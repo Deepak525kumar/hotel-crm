@@ -117,6 +117,10 @@ export interface LeaderboardEntry {
   total_assignments: number;
   completion_rate: number;
   on_time_rate: number;
+  // Shifts the worker stood themselves down from (declared sick/vacation).
+  // A plain count, not a rate, and excluded from completion_rate on purpose --
+  // a self-declared absence is not a failed shift.
+  worker_cancellations: number;
   worker: {
     id: string;
     first_name: string;

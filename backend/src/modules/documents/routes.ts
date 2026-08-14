@@ -165,21 +165,21 @@ router.post(
 
 router.get(
   '/workers/:worker_id/documents',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   scopeWorkerReadRoute(),
   (req, res, next) => documentController.listWorkerDocuments(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/completeness',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   scopeWorkerReadRoute(),
   (req, res, next) => documentController.getDocumentCompleteness(req, res, next)
 );
 
 router.get(
   '/workers/:worker_id/documents/export',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   scopeWorkerReadRoute(),
   (req, res, next) => documentController.exportWorkerDocuments(req, res, next)
 );
@@ -188,7 +188,7 @@ router.get(
 // DocumentService.getDocument, not by a worker_id-keyed scope middleware.
 router.get(
   '/documents/:document_id',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   (req, res, next) => documentController.getDocument(req, res, next)
 );
 
@@ -202,7 +202,7 @@ router.get(
 // narrower permission check that could later be widened by mistake.
 router.delete(
   '/documents/:document_id',
-  requireRole('worker'),
+  requireRole(['worker', 'checker']),
   (req, res, next) => documentController.deleteDocument(req, res, next)
 );
 

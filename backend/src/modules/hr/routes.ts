@@ -88,7 +88,7 @@ function scopeWorkerRoute() {
 // rather than a literal requirePermission('...') call site.)
 function requireContractReadAccess() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const requiredToken = req.auth?.role === 'worker' ? 'hr:contract:read-own' : 'hr:read';
+    const requiredToken = (req.auth?.role === 'worker' || req.auth?.role === 'checker') ? 'hr:contract:read-own' : 'hr:read';
     requirePermission(requiredToken)(req, res, next);
   };
 }
@@ -103,7 +103,7 @@ function requireContractReadAccess() {
 // @requiresPermission hr:read hr:payslip:read-own
 function requirePayslipReadAccess() {
   return (req: Request, res: Response, next: NextFunction) => {
-    const requiredToken = req.auth?.role === 'worker' ? 'hr:payslip:read-own' : 'hr:read';
+    const requiredToken = (req.auth?.role === 'worker' || req.auth?.role === 'checker') ? 'hr:payslip:read-own' : 'hr:read';
     requirePermission(requiredToken)(req, res, next);
   };
 }
@@ -156,7 +156,7 @@ router.post(
 // via resolveNonAdminScopeFilter inside the service). Worker sees only their
 // own requests — self-scope enforced in hrService.listPayroll (FIND-SEC-HR-03
 // IDOR guard, actorId-override pattern mirroring getContractStatus).
-router.get('/payroll', requireRole(['admin', 'manager', 'regional_manager', 'worker']), requirePayslipReadAccess(), validateQuery(ListPayslipRequestsQuerySchema), (req, res, next) =>
+router.get('/payroll', requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']), requirePayslipReadAccess(), validateQuery(ListPayslipRequestsQuerySchema), (req, res, next) =>
   hrController.listPayroll(req, res, next)
 );
 router.post(
@@ -187,7 +187,7 @@ router.post(
 // use POST /payroll above to create a request on a worker's behalf instead.
 router.post(
   '/payslip-requests',
-  requireRole('worker'),
+  requireRole(['worker', 'checker']),
   requirePermission('hr:payslip:request'),
   (req, res, next) => hrController.requestPayslip(req, res, next)
 );
@@ -202,7 +202,7 @@ router.post(
 // rather than being denied by checkWorkerScope().
 router.get(
   '/workers/:worker_id/contract-status',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   requireContractReadAccess(),
   scopeWorkerRoute(),
   (req, res, next) => hrController.getContractStatus(req, res, next)
@@ -215,7 +215,7 @@ router.get(
 // manager/RM via checkWorkerScope() group-scope, admin unscoped.
 router.get(
   '/workers/:worker_id/contract-download',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
+  requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   requireContractReadAccess(),
   scopeWorkerRoute(),
   (req, res, next) => hrController.downloadDefaultContract(req, res, next)

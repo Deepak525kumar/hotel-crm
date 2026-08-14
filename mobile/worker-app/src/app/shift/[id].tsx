@@ -92,7 +92,19 @@ export default function ShiftDetailScreen() {
     if (!att?.id) return;
     setActing(true);
     try {
-      await api.attendance.checkOut(att.id);
+      let location: { latitude: number; longitude: number } | undefined;
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const position = await Location.getCurrentPositionAsync({});
+          location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        }
+      } catch {
+        // Location sampling failed -- fall through; backend decides whether
+        // this hotel requires it.
+      }
+
+      await api.attendance.checkOut(att.id, location);
       await reload();
       Alert.alert('Checked Out', 'You have successfully checked out.');
     } catch (err) {

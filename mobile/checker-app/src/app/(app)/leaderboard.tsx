@@ -73,6 +73,9 @@ export default function LeaderboardScreen() {
           </Text>
           <Text style={styles.sub}>
             {item.total_ratings} ratings · {Math.round(item.completion_rate * 100)}% completion
+            {item.worker_cancellations > 0
+              ? ` · ${item.worker_cancellations} absence${item.worker_cancellations === 1 ? '' : 's'}`
+              : ''}
           </Text>
         </View>
         <View style={styles.scoreCol}>
