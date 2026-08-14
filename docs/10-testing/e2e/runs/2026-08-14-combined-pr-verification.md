@@ -95,7 +95,7 @@ placed workers on calendar placement (3 rows, 2 distinct recipients).
 
 ## Scenario files that are now stale
 
-- **Scenario 01 steps 2 and 4** show the **manager** calling `submit-for-review`. The route now
+- **Scenario 01 steps 2 and 4** showed the **manager** calling `submit-for-review`. The route
   rejects that: *"Only the applicant may submit their own application for review; no role may
   submit on another user's behalf."* The commands must be re-written to authenticate as the
   applicant. Not corrected in this pass — flagged so the next run does not lose time on it.
@@ -114,4 +114,8 @@ placed workers on calendar placement (3 rows, 2 distinct recipients).
 
 ## Scenario files updated this run
 
-None. The staleness in scenario 01 is recorded above but not yet corrected.
+- `scenarios/01-onboarding-happy-path.md` — steps 2 and 4 now authenticate as the
+  **applicant** (the route rejects a manager submitting on their behalf), record that the
+  path segment is the human-facing `employee_id` rather than the record cuid, and add an
+  explicit check that the submit gate and `getDocumentCompleteness` agree on the
+  ID_CARD-or-PASSPORT rule.
