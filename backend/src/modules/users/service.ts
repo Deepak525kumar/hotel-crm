@@ -154,6 +154,8 @@ export class UserService extends BaseService {
         updated_at: true,
         deleted_at: true,
         created_by_id: true,
+        // See listUsers' note: `is_active` is the account flag and is true
+        // from creation, so it cannot answer "has this person completed
         // onboarding". Returned alongside it, flattened below.
         employment_record: { select: { status: true } },
         managed_hotels: { select: { id: true } },
