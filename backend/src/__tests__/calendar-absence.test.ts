@@ -862,6 +862,10 @@ describe('CalendarService.deleteAbsence — releasing an auto-cancelled shift', 
       worker_id: 'w1',
       day: new Date('2026-07-28T00:00:00.000Z'),
       kind: 'SICK',
+      // Self-marked: markAbsenceInternal() always stamps marked_by_id, and
+      // deleteAbsence now reads it to keep a worker from deleting an absence
+      // a manager issued for them.
+      marked_by_id: 'w1',
     });
     mockCalendarAbsence.delete.mockResolvedValue({ id: 'abs1' });
     mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });

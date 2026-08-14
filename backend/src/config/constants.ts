@@ -223,3 +223,16 @@ export const BCRYPT_ROUNDS = 12;
 // HOTFIX-AUTH-002: password-reset tokens are single-use and expire quickly to
 // bound the window an intercepted/leaked token remains exploitable.
 export const PASSWORD_RESET_TOKEN_TTL_MINUTES = 30;
+
+/**
+ * Cancellation reasons written when marking an absence auto-cancels that day's
+ * shift. They distinguish a worker standing themselves down from a manager
+ * standing them down, which the leaderboard depends on: only the worker-
+ * initiated form is counted as a worker-declared absence.
+ *
+ * They live here, in a module that imports nothing, because both the writer
+ * (calendar) and the reader (quality) need them. Importing calendar from
+ * quality would close a calendar -> assignments -> quality import cycle.
+ */
+export const ABSENCE_CANCEL_REASON_SELF = 'Worker marked sick/vacation';
+export const ABSENCE_CANCEL_REASON_MANAGER = 'Marked sick/vacation by a manager';
