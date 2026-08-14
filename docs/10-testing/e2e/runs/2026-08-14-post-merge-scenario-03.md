@@ -67,3 +67,48 @@ snippet omits the bodies; supply them or the step silently tests the wrong thing
 
 None. The Step 2 staleness and the Step 5 request-body trap are recorded above; correcting the
 scenario file is the next pass's work.
+
+---
+
+# Scenario 05 — Race Conditions (same run, same commit)
+
+## Results
+
+| Step | Result | Evidence |
+|---|---|---|
+| 1 Concurrent approve + reject | **PASS** | `approve 200`, `reject 422`, final `ACTIVE`, **one** history row `PENDING->ACTIVE` |
+| 2 Concurrent identical approvals | **PASS** | `200` + `409`, final `ACTIVE`, **one** history row |
+| 3 Concurrent assign to two groups | **PASS** | `200` + `409`, one group won, `version=2` |
+
+No step produced two successes or two history rows — the failure shape the scenario exists to
+catch (`PENDING->REJECTED` **and** `PENDING->ACTIVE` both claiming to start from `PENDING`) did
+not occur.
+
+## The trap that nearly produced a false pass
+
+The first attempt looked like a pass and was **vacuous**. Step 1 returned `approve 409` /
+`reject 200` with exactly one history row — which matches the stated pass criteria almost
+exactly. It was wrong: the `409` was the **contract gate**
+(*"the worker does not have an approved contract"*), not the optimistic-concurrency guard. The
+two requests never actually raced; one was refused on a precondition before reaching the write.
+
+Step 2 exposed it, because there **both** approvals returned `409` and no transition happened at
+all — impossible to read as a concurrency pass, which forced a look at the response bodies.
+
+`approve` requires a `Contract` in `ACTIVE`/`EXTENDED`/`PERMANENT`. Seeding a submitted
+`EmploymentRecord` is **not** sufficient to exercise the approve race. With contracts seeded,
+all three steps raced genuinely and passed.
+
+**The scenario's preconditions should say so.** They currently warn only that "a consumed record
+silently makes a race test vacuous"; an *ungated* record does the same thing, and the resulting
+409 is indistinguishable from the concurrency 409 unless the body is read. Always assert on the
+error **message**, not just the status code.
+
+## Deviation from the scenario's stated codes
+
+Step 1's loser returns **422** *"Illegal employment status transition: ACTIVE -> REJECTED"*, not
+the `409 "Record has been modified by another process."` the scenario predicts. Both are correct
+refusals and the invariant holds (one winner, one history row) — the loser is caught by the
+status-transition guard, having read the post-approve state, rather than by the version guard.
+Step 2 and step 3 do return the documented `409` from the version guard. Worth reflecting in the
+scenario so a future run does not treat the 422 as a failure.
