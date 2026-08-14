@@ -27,6 +27,16 @@ router.get(
 // enforced service-side, same as the profile/skills reads below.
 router.get('/by-user/:user_id', requirePermission('employees:read'), ...controller.getByUserId);
 
+
+// Update employee details (job title, employment type, skills).
+// Only allowed for managers/admins of the worker's group.
+router.patch(
+  '/:employee_id',
+  requireRole(['admin', 'manager', 'regional_manager']),
+  requirePermission('employees:write'),
+  ...controller.updateEmployee
+);
+
 // Profile / skills reads — visibility (self / group-scope / admin) enforced
 // service-side (RULE-EMP-08 / REQ-EMP-013).
 router.get('/:employee_id/profile', requirePermission('employees:read'), ...controller.getProfileHistory);

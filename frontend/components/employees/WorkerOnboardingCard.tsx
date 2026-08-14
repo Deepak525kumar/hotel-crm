@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { mutate } from "swr";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useDocumentCompleteness } from "@/hooks/useDocuments";
@@ -13,7 +13,7 @@ import { formatDate } from "@/lib/format";
 import {
   Badge,
   Button,
-  Card,
+  Card, Checkbox,
   CardContent,
   CardHeader,
   CardTitle,
@@ -65,7 +65,10 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   const [approveOpen, setApproveOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [editSkillsOpen, setEditSkillsOpen] = useState(false);
   const action = useAsyncAction();
+
+
 
   // Named capabilities, not a raw role check — see useEmploymentPermissions
   // for the full role->capability mapping and its own caveat (role-only,
@@ -181,6 +184,11 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 />
                 <DataRow label="Employee ID" value={record.employee_id} />
                 <DataRow label="Job title" value={record.job_title} />
+                
+                {record.skills && record.skills.length > 0 && (
+                  <DataRow label="Skills" value={record.skills.join(", ")} />
+                )}
+
                 <DataRow label="Start date" value={formatDate(record.start_date)} />
                 {/* Only meaningful once it can exceed 1 — a first-time hire
                     reading "Employment cycle: 1" for every worker is noise,
@@ -372,6 +380,13 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
             employeeId={record.employee_id}
             open={deleteOpen}
             onClose={() => setDeleteOpen(false)}
+          />
+          <EditSkillsModal
+            userId={userId}
+            employeeId={record.employee_id}
+            currentSkills={record.skills}
+            open={editSkillsOpen}
+            onClose={() => setEditSkillsOpen(false)}
           />
         </>
       )}
@@ -623,6 +638,93 @@ function DeleteModal({
           placeholder="e.g. Resigned, contract ended"
         />
         <FormError>{fieldError ?? deleteAction.error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
+
+function EditSkillsModal({
+  userId,
+  employeeId,
+  currentSkills = [],
+  open,
+  onClose,
+}: {
+  userId: string;
+  employeeId: string;
+  currentSkills?: string[];
+  open: boolean;
+  onClose: () => void;
+}) {
+  const [skills, setSkills] = useState<string[]>(currentSkills);
+  const action = useAsyncAction();
+
+  // Keep local state in sync when the modal is opened
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSkills(currentSkills);
+    }
+  }, [open, currentSkills]);
+
+  const handleClose = () => {
+    if (action.pending) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSkills(currentSkills);
+    onClose();
+  };
+
+  const onSubmit = () => {
+    action.run(() => employeesApi.update(employeeId, { skills }), {
+      onSuccess: async () => {
+        await mutate(["employment-record", userId]);
+        onClose();
+      },
+    });
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title="Edit Skills"
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={action.pending}>
+            Cancel
+          </Button>
+          <Button onClick={onSubmit} loading={action.pending}>
+            Save
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Select the skills this worker is qualified for. Broadcasts are matched against these skills.
+        </p>
+        <div className="grid grid-cols-2 gap-2 mt-4">
+          {[
+            { value: "CLEANER", label: "Cleaner" },
+            { value: "PUBLIC_SERVICE", label: "Public Service" },
+            { value: "KITCHEN_DISHWASHER", label: "Kitchen / Dishwasher" },
+            { value: "WAITER", label: "Waiter" },
+          ].map((opt) => (
+            <Checkbox
+              key={opt.value}
+              label={opt.label}
+              checked={skills.includes(opt.value)}
+              onChange={(e) => {
+                const newSkills = e.target.checked
+                  ? [...skills, opt.value]
+                  : skills.filter((s) => s !== opt.value);
+                setSkills(newSkills);
+              }}
+            />
+          ))}
+        </div>
+        <FormError>{action.error}</FormError>
       </div>
     </Modal>
   );
