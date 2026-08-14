@@ -16,7 +16,7 @@ export default function RatingsScreen() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api.analytics.leaderboard()
+    api.quality.leaderboard()
       .then((res) => setEntries(Array.isArray(res) ? res : []))
       .catch(() => setEntries([]))
       .finally(() => setLoading(false));
@@ -39,7 +39,7 @@ export default function RatingsScreen() {
               <ThemedView type="backgroundElement" style={styles.card}>
                 <View style={styles.rankContainer}>
                   <ThemedText type="smallBold" style={styles.rank}>
-                    {index < 3 ? MEDAL[index] : `#${item.rank}`}
+                    {index < 3 ? MEDAL[index] : `#${index + 1}`}
                   </ThemedText>
                 </View>
                 <View style={styles.info}>
@@ -49,7 +49,10 @@ export default function RatingsScreen() {
                       : item.worker_id}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {item.average_rating.toFixed(1)} ★ · {item.shifts_completed} shifts completed
+                    {item.average_score.toFixed(1)} ★ · {item.total_assignments} shifts
+                    {item.worker.employment_record?.primary_hotel
+                      ? ` · ${item.worker.employment_record.primary_hotel.name}`
+                      : ''}
                   </ThemedText>
                 </View>
               </ThemedView>

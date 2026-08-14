@@ -48,7 +48,14 @@ const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
+// ADR-067: getLeaderboard() reads the caller's own employment record to resolve
+// a worker's/checker's group server-side.
+const mockEmploymentRecord = {
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+};
+
 const mockPrisma = {
+  employmentRecord: mockEmploymentRecord,
   qualityVerification: mockQualityVerification,
   workerAssignment: mockWorkerAssignment,
   rating: mockRating,
@@ -604,6 +611,79 @@ describe('Quality getLeaderboard — hotel_id filter', () => {
       await service.getLeaderboard('', 1, 25, { role: 'manager', scope: null });
       const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
       expect(where).toEqual({ worker: { employment_record: { hotel_group_id: '__none__' } } });
+    });
+
+    // ADR-067 (2026-08-14) let WORKER onto this route. The capability matrix
+    // only proves the TOKEN grant matches the ratified record -- its own header
+    // says scope narrowing is a different seam. These are that seam. Without
+    // them a worker would have been admitted by a green matrix and still fallen
+    // through to the unrestricted `where`, receiving every worker on the
+    // platform: exactly the shape of SIR-ANLY-015, where role admission and the
+    // scope narrowing did not move in lockstep.
+    describe('worker/checker scope (ADR-067)', () => {
+      it("scopes a worker's leaderboard to their own hotel group, read server-side", async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        await service.getLeaderboard('', 1, 25, { userId: 'w1', role: 'worker', scope: null });
+        const call = mockEmploymentRecord.findUnique.mock.calls[0][0];
+        // The group comes from the CALLER's own record, never from the request.
+        expect(call.where).toEqual({ user_id: 'w1' });
+        const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+        expect(where).toEqual({ worker: { employment_record: { hotel_group_id: 'g1', status: 'ACTIVE' } } });
+      });
+
+      it('scopes a checker the same way', async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g2', status: 'ACTIVE' });
+        await service.getLeaderboard('', 1, 25, { userId: 'c1', role: 'checker', scope: null });
+        const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+        expect(where).toEqual({ worker: { employment_record: { hotel_group_id: 'g2', status: 'ACTIVE' } } });
+      });
+
+      it('shows an unapproved worker an EMPTY board, never an unscoped one', async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1', status: 'PENDING' });
+        await service.getLeaderboard('', 1, 25, { userId: 'w1', role: 'worker', scope: null });
+        const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+        expect(where.worker.employment_record.hotel_group_id).toBe('__none__');
+      });
+
+      it('shows a worker with no group an EMPTY board', async () => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: null, status: 'ACTIVE' });
+        await service.getLeaderboard('', 1, 25, { userId: 'w1', role: 'worker', scope: null });
+        const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+        expect(where.worker.employment_record.hotel_group_id).toBe('__none__');
+      });
+
+      it('ignores a client-supplied hotel_id rather than letting it widen scope', async () => {
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'someone-elses-group' });
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        // A hotelId argument takes the hotel branch, which resolves the GROUP of
+        // the requested hotel. The route that accepts one is checkHotelAccess()-
+        // gated, so a worker cannot reach it -- asserted here so that if it is
+        // ever opened up, this fails loudly rather than silently widening.
+        await service.getLeaderboard('other-hotel', 1, 25, { userId: 'w1', role: 'worker', scope: null });
+        const where = mockWorkerOverallRating.findMany.mock.calls[0][0].where;
+        expect(where.worker.employment_record.hotel_group_id).not.toBe('g1');
+      });
+
+      it('withholds email from a peer viewer but not from a manager', async () => {
+        const row = {
+          id: 'r1',
+          worker_id: 'w2',
+          worker: { id: 'w2', first_name: 'A', last_name: 'B', email: 'a.b@example.com' },
+        };
+        mockEmploymentRecord.findUnique.mockResolvedValue({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        mockWorkerOverallRating.findMany.mockResolvedValue([row]);
+
+        const asWorker = await service.getLeaderboard('', 1, 25, { userId: 'w1', role: 'worker', scope: null });
+        expect(asWorker.leaderboard[0].worker).not.toHaveProperty('email');
+        expect(asWorker.leaderboard[0].worker.first_name).toBe('A');
+
+        mockWorkerOverallRating.findMany.mockResolvedValue([row]);
+        const asManager = await service.getLeaderboard('', 1, 25, {
+          role: 'regional_manager',
+          scope: { type: 'hotel_group', hotel_group_id: 'g1' },
+        });
+        expect(asManager.leaderboard[0].worker).toHaveProperty('email', 'a.b@example.com');
+      });
     });
 
     it('does not scope-restrict an admin leaderboard', async () => {

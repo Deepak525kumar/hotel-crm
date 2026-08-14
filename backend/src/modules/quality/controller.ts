@@ -53,7 +53,7 @@ export class QualityController {
         req.params.hotel_id || '',
         parsed.data.page,
         parsed.data.per_page,
-        { role: req.auth.role, scope: req.auth.scope ?? null }
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null }
       );
       res.status(200).json({
         status: 'success',

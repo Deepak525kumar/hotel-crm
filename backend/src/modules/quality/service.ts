@@ -369,7 +369,7 @@ export class QualityService extends BaseService {
     hotelId: string,
     page = 1,
     perPage = 25,
-    actor?: { role: string; scope?: UserScope | null }
+    actor?: { userId?: string; role: string; scope?: UserScope | null }
   ) {
     let where: Record<string, unknown> = {};
     if (hotelId) {
@@ -415,6 +415,35 @@ export class QualityService extends BaseService {
       }
       // scope.type === 'global' -> no added restriction (unreachable for a
       // scoped-manager role in practice, kept for type completeness).
+    } else if (actor && (actor.role === 'worker' || actor.role === 'checker')) {
+      // A worker or checker sees the leaderboard for their OWN hotel group and
+      // no further. Their scope is not carried on the JWT the way a manager's
+      // is, so it is read from their employment record rather than actor.scope
+      // -- and read here, server-side, so the group can never be supplied by
+      // the caller.
+      //
+      // Without this branch they would fall through to the unrestricted `where`
+      // below and receive the platform-wide leaderboard: every worker on the
+      // system, their average score and shift counts. That is the same IDOR the
+      // 2026-08-08 fix above closed for managers, and it would have been
+      // reintroduced the moment these roles were let onto this route.
+      const record = await this.prisma.employmentRecord.findUnique({
+        where: { user_id: actor.userId },
+        select: { hotel_group_id: true, status: true },
+      });
+      where = {
+        worker: {
+          employment_record: {
+            // An unassigned or not-yet-approved account has no group to compare
+            // within, so it sees an empty board rather than everyone's.
+            hotel_group_id:
+              record?.status === 'ACTIVE' && record.hotel_group_id
+                ? record.hotel_group_id
+                : '__none__',
+            status: 'ACTIVE',
+          },
+        },
+      };
     }
 
     const skip = (page - 1) * perPage;
@@ -423,7 +452,19 @@ export class QualityService extends BaseService {
         where,
         include: {
           worker: {
-            select: { id: true, first_name: true, last_name: true, email: true },
+            select: {
+              id: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              // Display-only, and safe to show a peer: which hotel this person
+              // is normally based at. Read through primary_hotel for its NAME
+              // only -- primary_hotel_id is documented as display-only and must
+              // never drive an eligibility decision (schema.prisma).
+              employment_record: {
+                select: { primary_hotel: { select: { id: true, name: true } } },
+              },
+            },
           },
         },
         orderBy: { average_score: 'desc' },
@@ -433,8 +474,31 @@ export class QualityService extends BaseService {
       this.prisma.workerOverallRating.count({ where }),
     ]);
 
+    // A worker or checker sees their group's board, so every row is a
+    // colleague rather than a report. They get the identifying and
+    // work-related fields -- name, hotel, scores -- and not the contact
+    // details: email is a manager-facing field, and a leaderboard is not a
+    // reason to hand every worker in a group everyone else's address.
+    //
+    // Built as an allow-list rather than by deleting `email` from the row: a
+    // deny-list silently leaks the next field added to the `select` above,
+    // which is the wrong way round for a projection that crosses a privacy
+    // boundary. Adding a field here has to be a deliberate act.
+    const isPeerViewer = actor?.role === 'worker' || actor?.role === 'checker';
+    const visibleLeaderboard = isPeerViewer
+      ? leaderboard.map((row) => ({
+          ...row,
+          worker: {
+            id: row.worker.id,
+            first_name: row.worker.first_name,
+            last_name: row.worker.last_name,
+            employment_record: row.worker.employment_record,
+          },
+        }))
+      : leaderboard;
+
     return {
-      leaderboard,
+      leaderboard: visibleLeaderboard,
       pagination: {
         page, per_page: perPage, total,
         total_pages: Math.ceil(total / perPage),
