@@ -190,6 +190,16 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     // Epic 5 PR 5.6 (SPEC-EMP-001): Checker views a worker's profile at their
     // assigned hotel (permission matrix), read-only.
     'employees:read',
+    // A checker onboards exactly as a worker does -- uploads their own
+    // documents, reads their own contract, requests their own payslip. These
+    // mirror WORKER's self-scoped HR tokens below and carry the same guarantee:
+    // worker_id is server-derived from the authenticated caller, never
+    // client-supplied, so a checker can only ever reach their own records
+    // (enforced in hr/service.ts and documents/service.ts, and verified by the
+    // cross-worker 403 these routes return).
+    'hr:contract:read-own',
+    'hr:payslip:read-own',
+    'hr:payslip:request',
   ]) as string[],
   WORKER: Object.freeze([
     'hotels:read',
