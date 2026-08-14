@@ -479,12 +479,22 @@ export class QualityService extends BaseService {
     // work-related fields -- name, hotel, scores -- and not the contact
     // details: email is a manager-facing field, and a leaderboard is not a
     // reason to hand every worker in a group everyone else's address.
+    //
+    // Built as an allow-list rather than by deleting `email` from the row: a
+    // deny-list silently leaks the next field added to the `select` above,
+    // which is the wrong way round for a projection that crosses a privacy
+    // boundary. Adding a field here has to be a deliberate act.
     const isPeerViewer = actor?.role === 'worker' || actor?.role === 'checker';
     const visibleLeaderboard = isPeerViewer
-      ? leaderboard.map((row) => {
-          const { email: _email, ...worker } = row.worker;
-          return { ...row, worker };
-        })
+      ? leaderboard.map((row) => ({
+          ...row,
+          worker: {
+            id: row.worker.id,
+            first_name: row.worker.first_name,
+            last_name: row.worker.last_name,
+            employment_record: row.worker.employment_record,
+          },
+        }))
       : leaderboard;
 
     return {
