@@ -372,10 +372,14 @@ export const authApi = {
  * Serialises a query object into a URL search string, skipping
  * `undefined`/empty values. Returns `""` (no `?`) when nothing is set.
  */
-function toQuery(params: Record<string, string | number | undefined>): string {
+function toQuery(params: Record<string, string | number | undefined | string[]>): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== "") search.set(key, String(value));
+    if (Array.isArray(value)) {
+      value.forEach((v) => search.append(key, String(v)));
+    } else if (value !== undefined && value !== "") {
+      search.set(key, String(value));
+    }
   }
   const qs = search.toString();
   return qs ? `?${qs}` : "";

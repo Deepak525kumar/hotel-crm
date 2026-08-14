@@ -61,7 +61,7 @@ export default function BroadcastsPage() {
   const { broadcasts, isLoading, error, hasNext } = useBroadcasts({
     page,
     per_page: PER_PAGE,
-    ...(role === "worker" ? { status: "OPEN" } : {}),
+    ...(role === "worker" ? { status: ["OPEN", "PARTIALLY_FILLED"] } : {}),
   });
 
   return (
