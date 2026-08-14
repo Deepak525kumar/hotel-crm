@@ -377,9 +377,17 @@ export const api = {
   },
   analytics: {
     stats: () => request<DashboardStats>('/analytics/stats'),
-    leaderboard: () => request<LeaderboardEntry[]>('/analytics/leaderboard'),
     // GD-06: resolves the previously-silent 403 — /stats is admin/manager-only.
     myStats: () => request<WorkerStats>('/analytics/my-stats'),
+  },
+  quality: {
+    // The leaderboard lives here, not under /analytics. /analytics/leaderboard
+    // is gated requireRole(['admin','manager','regional_manager']) -- a worker
+    // got a flat 403, so this screen had never worked -- and it applies no
+    // actor scoping at all, so opening it up would have handed every worker the
+    // platform-wide board. /quality/leaderboard scopes server-side to the
+    // caller's own hotel group, and is the same endpoint the checker app uses.
+    leaderboard: () => request<LeaderboardEntry[]>('/quality/leaderboard'),
   },
   calendar: {
     // GD-18 narrow slice: self-scoped to the authenticated worker (server-side,

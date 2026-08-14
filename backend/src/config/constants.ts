@@ -206,6 +206,11 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = Object.freeze({
     'rooms:read',
     'tasks:read',
     'notifications:read',
+    // Read-only, and narrower than it looks: the only routes this token gates
+    // are the two quality leaderboards, and getLeaderboard() confines a worker
+    // to their own hotel group server-side. Rating and verification WRITES are
+    // gated by quality:write, which a worker does not hold.
+    'quality:read',
     // Epic 5 PR 5.6 (SPEC-EMP-001): a worker may view their own profile & history (self only).
     'employees:read',
     // ADR-042 (GD-15, OD-HR-10, 2026-07-28): two narrow, self-scoped HR

@@ -99,13 +99,30 @@ export interface PushToken {
   updated_at: string;
 }
 
+// Shape of GET /quality/leaderboard (a WorkerOverallRating row), not the older
+// /analytics/leaderboard DTO -- that route is admin/manager-only and applies no
+// scoping, so this app never had access to it. `email` is deliberately absent:
+// the backend strips it for worker and checker callers, who are looking at
+// colleagues rather than reports.
 export interface LeaderboardEntry {
-  rank: number;
+  id: string;
   worker_id: string;
-  worker?: { id: string; first_name: string; last_name: string };
-  average_rating: number;
+  average_score: number;
   total_ratings: number;
-  shifts_completed: number;
+  total_assignments: number;
+  completion_rate: number;
+  on_time_rate: number;
+  // Shifts the worker stood themselves down from (declared sick/vacation).
+  // A count, not a rate, and excluded from completion_rate on purpose.
+  worker_cancellations: number;
+  worker: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    employment_record?: {
+      primary_hotel?: { id: string; name: string } | null;
+    } | null;
+  };
 }
 
 export interface DashboardStats {
