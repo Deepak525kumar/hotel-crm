@@ -26,6 +26,16 @@ export const CreateEmployeeSchema = z.object({
 
 export type CreateEmployeeRequest = z.infer<typeof CreateEmployeeSchema>;
 
+// IF-EMP-UpdateEmployee / v0
+export const UpdateEmployeeSchema = z.object({
+  job_title: z.string().min(1).max(200).optional(),
+  employment_type: z.nativeEnum(EmploymentType).optional(),
+  skills: z.array(z.nativeEnum(SkillTag)).optional(),
+});
+
+export type UpdateEmployeeRequest = z.infer<typeof UpdateEmployeeSchema>;
+
+
 // REQ-EMP-006 / RULE-EMP-10: bulk CSV import, one row per employee, each row
 // routed through the same path as manual creation.
 export const BulkImportSchema = z.object({

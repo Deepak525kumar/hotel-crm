@@ -1148,22 +1148,22 @@ model Rating {
 // Materialised aggregate — updated by DB trigger after each Rating write.
 // Avoids expensive AVG() scans on marketplace listing pages.
 model WorkerOverallRating {
-  id                String    @id @default(cuid())
-  worker_id         String    @unique
-  worker            User      @relation(fields: [worker_id], references: [id], onDelete: Cascade)
-  average_score     Float // rolling average of Rating.score
-  total_ratings     Int       @default(0)
-  total_assignments Int       @default(0)
-  completion_rate   Float     @default(0.0) // completed / total assignments
-  on_time_rate      Float     @default(0.0) // present-on-time / total assignments
+  id                   String    @id @default(cuid())
+  worker_id            String    @unique
+  worker               User      @relation(fields: [worker_id], references: [id], onDelete: Cascade)
+  average_score        Float // rolling average of Rating.score
+  total_ratings        Int       @default(0)
+  total_assignments    Int       @default(0)
+  completion_rate      Float     @default(0.0) // completed / total assignments
+  on_time_rate         Float     @default(0.0) // present-on-time / total assignments
   // Shifts the worker stood themselves down from (declared sick/vacation).
   // Deliberately a count, not a rate, and deliberately absent from
   // total_assignments: a self-declared absence is not a failure to complete a
   // shift, so it must not move completion_rate. Kept visible so a manager can
   // still see a pattern without it being silently priced into the leaderboard.
-  worker_cancellations Int    @default(0)
-  last_worked_at    DateTime?
-  updated_at        DateTime  @updatedAt
+  worker_cancellations Int       @default(0)
+  last_worked_at       DateTime?
+  updated_at           DateTime  @updatedAt
 
   @@index([average_score])
   @@index([total_ratings])

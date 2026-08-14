@@ -16,6 +16,14 @@ import type { EmploymentType, Role, UserDetail, Hotel, HotelGroup } from "@/lib/
 
 // ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
 // creation — mirrors the backend CreateUserSchema.superRefine requirement.
+
+const SKILL_OPTIONS = [
+  { value: "CLEANER", label: "Cleaner" },
+  { value: "PUBLIC_SERVICE", label: "Public Service" },
+  { value: "KITCHEN_DISHWASHER", label: "Kitchen / Dishwasher" },
+  { value: "WAITER", label: "Waiter" },
+];
+
 const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
   { value: "FULL_TIME", label: "Full-time" },
   { value: "PART_TIME", label: "Part-time" },
@@ -53,6 +61,7 @@ export interface UserFormValues {
   job_title: string;
   start_date: string;
   employment_type: EmploymentType | "";
+  skills: string[];
   work_permit_required: boolean;
   hotel_id?: string;
   hotel_group_id?: string;
@@ -78,6 +87,7 @@ function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserF
     job_title: "",
     start_date: "",
     employment_type: "",
+    skills: [],
     work_permit_required: false,
     hotel_id: user?.managed_hotels?.[0]?.id ?? "",
     hotel_group_id: user?.managed_hotel_groups?.[0]?.id ?? "",
@@ -149,6 +159,7 @@ export function UserForm({
       // and "" collides with every other user who also left it blank.
       phone: form.phone.trim() || null,
       job_title: form.job_title.trim(),
+      ...(form.role === "worker" ? { skills: form.skills } : {}),
       ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
       ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
     });
@@ -298,6 +309,28 @@ export function UserForm({
                 checked={form.work_permit_required}
                 onChange={(e) => set("work_permit_required", e.target.checked)}
               />
+              
+              {form.role === "worker" && (
+                <div className="space-y-2 sm:col-span-2 pt-2">
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skills</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SKILL_OPTIONS.map((opt) => (
+                      <Checkbox
+                        key={opt.value}
+                        label={opt.label}
+                        checked={form.skills.includes(opt.value)}
+                        onChange={(e) => {
+                          const newSkills = e.target.checked
+                            ? [...form.skills, opt.value]
+                            : form.skills.filter((s) => s !== opt.value);
+                          set("skills", newSkills);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <Select
                 label="Employment type"
                 value={form.employment_type}

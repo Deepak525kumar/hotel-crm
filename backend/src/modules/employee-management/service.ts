@@ -233,6 +233,41 @@ export class EmployeeManagementService extends BaseService {
   // path as manual creation, starting Inactive. Per-row isolation: a failing
   // row (validation or duplicate) does not affect any other row. Row-level
   // duplicate/invalid-row semantics beyond isolation remain OPEN (OD-EMP-08).
+
+  async updateEmployee(actor: AuthContext, employeeId: string, data: { job_title?: string; employment_type?: any; skills?: SkillTag[] }) {
+    // 1. Enforce jurisdiction
+    const record = await this.prisma.employmentRecord.findUnique({ where: { employee_id: employeeId } });
+    if (!record) throw new NotFoundError('Employment record not found');
+    await this.assertLifecycleAuthority(actor, record, 'update');
+
+    // 2. Validate skills if provided
+    if (data.skills) {
+      this.assertValidSkills(data.skills);
+    }
+
+    // 3. Update the record
+    const updated = await this.prisma.employmentRecord.update({
+      where: { employee_id: employeeId },
+      data: {
+        ...(data.job_title ? { job_title: data.job_title } : {}),
+        ...(data.employment_type ? { employment_type: data.employment_type } : {}),
+        ...(data.skills ? { skills: data.skills } : {}),
+      }
+    });
+
+    // 4. Audit logging
+    await this.logAudit(
+      actor.userId,
+      actor.role,
+      'MODIFY',
+      'EMPLOYEE',
+      employeeId,
+      { action: 'update_employee_details', updated_fields: Object.keys(data) }
+    );
+
+    return updated;
+  }
+
   async bulkImport(actor: AuthContext, rows: CreateEmployeeRequest[]) {
     if (actor.role !== 'admin') {
       throw new ForbiddenError('Only Admin may bulk-import employment records');

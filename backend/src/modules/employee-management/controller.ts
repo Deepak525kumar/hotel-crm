@@ -6,7 +6,7 @@ import {
   BlocklistQuerySchema,
   BulkImportSchema,
   ByUserParamsSchema,
-  CreateEmployeeSchema,
+  CreateEmployeeSchema, UpdateEmployeeSchema,
   DeactivateEmployeeSchema,
   DeleteEmployeeSchema,
   OrgChartParamsSchema,
@@ -20,6 +20,27 @@ import { validateBody, validateParams, validateQuery } from '../../middleware/va
 import { UnauthorizedError } from '../../lib/errors.js';
 
 export class EmployeeManagementController {
+
+  updateEmployee = [
+    validateBody(UpdateEmployeeSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const { employee_id } = req.params;
+        if (!employee_id) throw new Error('employee_id parameter is required');
+
+        const result = await employeeManagementService.updateEmployee(req.auth, employee_id, req.body);
+        res.status(200).json({
+          status: 'success',
+          data: result,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
   createEmployee = [
     validateBody(CreateEmployeeSchema),
     async (req: Request, res: Response, next: NextFunction) => {
