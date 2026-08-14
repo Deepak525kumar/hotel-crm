@@ -6,6 +6,7 @@ import {
   EmploymentRecord,
   OutboxSourceModule,
   OutboxTransport,
+  NotificationType,
   Prisma,
   SkillTag,
   UserRole,
@@ -1114,6 +1115,31 @@ export class EmployeeManagementService extends BaseService {
       // counterpart bump, since a fresh login already picks up ACTIVE.
       await bumpTokenGeneration(tx, record.user_id);
 
+      // Tell the person it happened. Deactivation ends their current session
+      // (the bump above) and stops them being staffed, so without this the
+      // first they learn of it is being unable to work -- the account simply
+      // stops behaving and says nothing. ACCOUNT_DEACTIVATED has existed as a
+      // NotificationType since the account-lifecycle values were added and had
+      // no writer until now.
+      //
+      // Enqueued inside the transaction, per ADR-029's single-commit outbox:
+      // the notification and the status change either both land or neither
+      // does, so nobody is told about a transition that rolled back.
+      await notificationService.enqueue(
+        {
+          recipientId: record.user_id,
+          type: NotificationType.ACCOUNT_DEACTIVATED,
+          title: 'Your account has been deactivated',
+          message:
+            'You will not be scheduled for shifts while your account is deactivated. Contact your manager if you believe this is a mistake.',
+          data: { employment_record_id: record.id, reason },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.EMPLOYEE_MANAGEMENT,
+          producerService: 'EmployeeManagementService',
+        },
+        tx
+      );
+
       return result;
     });
 
@@ -1158,6 +1184,25 @@ export class EmployeeManagementService extends BaseService {
         from: record.status,
         to: EmploymentStatus.ACTIVE,
       }, undefined, undefined, undefined, tx);
+
+      // The counterpart to deactivate()'s notification. Reactivation is the
+      // one the person most needs pushed: they were told to stop, and nothing
+      // in the app would otherwise tell them they can work again -- they would
+      // have to keep checking. ACCOUNT_REACTIVATED likewise had no writer until
+      // now. Same single-commit outbox placement as deactivate().
+      await notificationService.enqueue(
+        {
+          recipientId: record.user_id,
+          type: NotificationType.ACCOUNT_REACTIVATED,
+          title: 'Your account is active again',
+          message: 'You can be scheduled for shifts again. Check your upcoming shifts.',
+          data: { employment_record_id: record.id },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.EMPLOYEE_MANAGEMENT,
+          producerService: 'EmployeeManagementService',
+        },
+        tx
+      );
 
       return transitionedRecord;
     });

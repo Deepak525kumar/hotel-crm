@@ -82,6 +82,14 @@ const mockPrisma: any = {
     findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  // deactivate()/reactivate() now tell the affected person, inside the same
+  // transaction as the status change (ADR-029 single-commit outbox).
+  notification: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'n1' }),
+  },
+  outboxEvent: {
+    create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'o1' }),
+  },
   // applyTransition() and delete()/restore()/deactivateForContractLapse()
   // run inside $transaction(tx => ...); the mock just invokes the callback
   // with itself, so every tx.X call hits the same mocked collections above.
@@ -343,6 +351,50 @@ describe('EmployeeManagementService', () => {
     // User column -- so nothing else in the pipeline caught it. Scheduling
     // failed closed via roster-scope.ts's ACTIVE gate, but documents/hr/
     // consent/notifications have no employment check at all.
+    // These two notifications are the only thing that tells the person their
+    // account changed state. Deactivation also ends their session, so without
+    // one the first they learn of it is being unable to work; without the
+    // other, nothing ever tells them they may work again. Both enum values sat
+    // in the schema with no writer until 2026-08-14, so they are easy to lose
+    // again -- asserted here rather than left to a manual check.
+    it('tells the person their account was deactivated, in the same transaction', async () => {
+      const record = fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
+      mockPrisma.employmentRecord.update.mockResolvedValue({
+        ...record,
+        status: EmploymentStatus.DEACTIVATED,
+        deactivation_reason: DeactivationReason.TEMPORARY_LEAVE,
+        deleted_at: null,
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockPrisma.user.update.mockResolvedValue({});
+
+      await service.deactivate(admin as any, 'E-001', DeactivationReason.TEMPORARY_LEAVE);
+
+      const call = mockPrisma.notification.create.mock.calls[0][0];
+      expect(call.data.type).toBe('ACCOUNT_DEACTIVATED');
+      expect(call.data.user_id).toBe(record.user_id);
+    });
+
+    it('tells the person their account was reactivated', async () => {
+      const record = fakeRecord({ status: EmploymentStatus.DEACTIVATED, employment_cycle: 1 });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
+      mockPrisma.employmentRecord.update.mockResolvedValue({
+        ...record,
+        status: EmploymentStatus.ACTIVE,
+        deactivation_reason: null,
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.reactivate(admin as any, 'E-001');
+
+      const call = mockPrisma.notification.create.mock.calls[0][0];
+      expect(call.data.type).toBe('ACCOUNT_REACTIVATED');
+      expect(call.data.user_id).toBe(record.user_id);
+    });
+
     it('bumps token_generation so the paused employee\'s current session ends immediately', async () => {
       const record = fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 });
       mockPrisma.employmentRecord.findUnique.mockResolvedValue(record);
