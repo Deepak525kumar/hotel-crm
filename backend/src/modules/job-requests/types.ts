@@ -58,7 +58,7 @@ export type UpdateWorkRequestInput = z.infer<typeof UpdateWorkRequestSchema>;
 
 export const ListWorkRequestsQuerySchema = z.object({
   hotel_id: z.string().optional(),
-  status: WorkRequestStatusEnum.optional(),
+  status: z.union([WorkRequestStatusEnum, z.array(WorkRequestStatusEnum)]).optional(),
   position: z.string().optional(),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   // Filters to broadcast rows only (has skill_slots) or marketplace rows

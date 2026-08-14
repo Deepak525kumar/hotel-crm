@@ -586,7 +586,7 @@ export interface UpdateWorkRequestInput {
 /** Query params accepted by `GET /work-requests`. */
 export interface ListWorkRequestsQuery {
   hotel_id?: string;
-  status?: WorkRequestStatus;
+  status?: WorkRequestStatus | WorkRequestStatus[];
   position?: string;
   shift_date?: string;
   /** Filters to broadcast rows only (true) or marketplace rows only (false). */
