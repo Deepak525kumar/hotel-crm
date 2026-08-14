@@ -130,7 +130,12 @@ export const CAPABILITY_MATRIX: readonly Capability[] = Object.freeze([
   { id: 'C-25', name: 'Write calendar operations', class: 'O', token: 'staffing:write', outcome: o(A, A, A, D, D) },
   { id: 'C-26', name: 'Approve / correct attendance', class: 'O', token: 'staffing:write', outcome: o(A, A, A, D, D) },
   { id: 'C-27', name: 'Submit quality rating / verification', class: 'O', token: 'quality:write', outcome: o(A, D, D, A, D) },
-  { id: 'C-28', name: 'View quality / leaderboard', class: 'O', token: 'quality:read', outcome: o(A, A, A, A, D) },
+  // WORKER amended D -> A by ADR-067 (2026-08-14), which resolves GD-06's
+  // leaderboard half: a worker may view the leaderboard for their OWN hotel
+  // group, scope resolved server-side from their employment record, with
+  // contact fields withheld. GD-06's analytics half stays open -- C-31 below is
+  // deliberately NOT amended.
+  { id: 'C-28', name: 'View quality / leaderboard', class: 'O', token: 'quality:read', outcome: o(A, A, A, A, A) },
   { id: 'C-29', name: 'Manage HR contracts / payroll', class: 'O', token: 'hr:write', outcome: o(A, A, A, D, D) },
   { id: 'C-30', name: 'View HR records', class: 'O', token: 'hr:read', outcome: o(A, A, A, D, D) },
   { id: 'C-31', name: 'View analytics', class: 'O', token: 'analytics:read', outcome: o(A, A, A, D, D) },

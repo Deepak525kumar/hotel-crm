@@ -138,7 +138,7 @@ Class: **M** = master data (D-2), **O** = operations.
 | C-25 | Write calendar operations | O | `staffing:write` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ |
 | C-26 | Approve / correct attendance | O | `staffing:write` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ own, limited fields |
 | C-27 | Submit quality rating / verification | O | `quality:write` | ✓ | ✗ | ✗ | ✓ᶜ | ✗ |
-| C-28 | View quality / leaderboard | O | `quality:read` | ✓ | ✓ᶜ | ✓ᶜ | ✓ᶜ | ✗ (GD-06) |
+| C-28 | View quality / leaderboard | O | `quality:read` | ✓ | ✓ᶜ | ✓ᶜ | ✓ᶜ | ✓ᶜ (ADR-067) |
 | C-29 | Manage HR contracts / payroll | O | `hr:write` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ |
 | C-30 | View HR records | O | `hr:read` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ |
 | C-31 | View analytics | O | `analytics:read` | ✓ | ✓ᶜ | ✓ᶜ | ✗ | ✗ (GD-06) |
