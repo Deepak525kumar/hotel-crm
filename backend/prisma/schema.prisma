@@ -1792,7 +1792,20 @@ model DailyShiftSummary {
 
   hotel      Hotel @relation(fields: [hotel_id], references: [id], onDelete: Restrict)
   created_by User  @relation("ShiftSummaryCreator", fields: [created_by_id], references: [id], onDelete: Restrict)
-  updated_by User? @relation("ShiftSummaryUpdater", fields: [updated_by_id], references: [id], onDelete: Restrict)
+  // SetNull, not Restrict, and deliberately unlike created_by above. The
+  // difference is nullability: created_by_id is required, so the summary cannot
+  // survive losing its creator and Restrict is the only coherent rule.
+  // updated_by_id is optional -- "nobody has edited this since" is already a
+  // representable state -- so a departing editor should leave the summary
+  // intact with the attribution cleared, exactly as CalendarAbsence.marked_by
+  // (also User?, also SetNull) already does.
+  //
+  // Restrict here was also unenforceable as written: the migration that created
+  // this table has always emitted ON DELETE SET NULL, so no database has ever
+  // behaved the way this line claimed. It made every fresh-database drift check
+  // fail, which is scenario 00's gate -- so the suite opened on a FAIL that had
+  // nothing to do with the change under test.
+  updated_by User? @relation("ShiftSummaryUpdater", fields: [updated_by_id], references: [id], onDelete: SetNull)
 
   @@unique([hotel_id, date])
   @@index([hotel_id])
