@@ -8,6 +8,8 @@ import type {
   Notification,
   PushToken,
   PushPlatform,
+  CalendarAbsence,
+  CalendarAbsenceKind,
   PushApp,
 } from '@/types/api';
 
@@ -329,5 +331,18 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(input),
       }),
+  },
+
+  // Self-scoped end to end: the backend resolves the caller from req.auth and
+  // no worker_id is ever sent, so these need no role gate and none exists.
+  calendar: {
+    myAbsences: () => request<CalendarAbsence[]>('/calendar/my-absences'),
+    markAbsence: (input: { day: string; kind: CalendarAbsenceKind }) =>
+      request<CalendarAbsence>('/calendar/my-absences', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    deleteAbsence: (absenceId: string) =>
+      request<void>(`/calendar/absences/${absenceId}`, { method: 'DELETE' }),
   },
 };

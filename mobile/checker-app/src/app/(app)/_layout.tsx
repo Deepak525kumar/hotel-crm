@@ -72,6 +72,19 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
+        name="absences"
+        options={{
+          title: 'Sick / Vacation',
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: 'calendar.badge.exclamationmark', android: 'event_busy', web: 'event_busy' }}
+              tintColor={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="notifications"
         options={{
           title: 'Alerts',
