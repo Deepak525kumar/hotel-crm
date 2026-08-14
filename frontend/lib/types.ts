@@ -1062,6 +1062,7 @@ export interface ListAbsencesQuery {
  */
 export type NotificationType =
   | "WORK_REQUEST_PUBLISHED"
+  | "JOB_REQUEST_BROADCAST"
   | "WORK_REQUEST_CANCELLED"
   | "WORK_REQUEST_EXPIRING_SOON"
   | "APPLICATION_RECEIVED"

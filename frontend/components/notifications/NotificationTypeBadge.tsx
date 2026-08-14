@@ -6,6 +6,7 @@ type Tone = "neutral" | "success" | "warning" | "danger" | "info";
 /** Maps each notification type to a Badge tone + human label. */
 const TYPES: Record<NotificationType, { tone: Tone; label: string }> = {
   WORK_REQUEST_PUBLISHED: { tone: "info", label: "Request published" },
+  JOB_REQUEST_BROADCAST: { tone: "info", label: "Broadcast received" },
   WORK_REQUEST_CANCELLED: { tone: "danger", label: "Request cancelled" },
   WORK_REQUEST_EXPIRING_SOON: { tone: "warning", label: "Request expiring" },
   APPLICATION_RECEIVED: { tone: "info", label: "Application received" },
