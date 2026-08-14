@@ -558,8 +558,8 @@ export class EmployeeManagementService extends BaseService {
       allowUnassignedGroup: true,
     });
 
-    if (record.status !== EmploymentStatus.PENDING) {
-      throw new ConflictError('Only a Pending employment record may be submitted for review');
+    if (record.status !== EmploymentStatus.PENDING && record.status !== EmploymentStatus.REJECTED) {
+      throw new ConflictError('Only a Pending or Rejected employment record may be submitted for review');
     }
 
     // RE-ONBOARDING (owner decision, 2026-08-13, REVISED after end-to-end
@@ -643,7 +643,11 @@ export class EmployeeManagementService extends BaseService {
       try {
         transitionedRecord = await tx.employmentRecord.update({
           where: { id: record.id, version: record.version },
-          data: { submitted_for_review_at: new Date(), version: { increment: 1 } },
+          data: { 
+            status: EmploymentStatus.PENDING,
+            submitted_for_review_at: new Date(), 
+            version: { increment: 1 } 
+          },
         });
       } catch (error: any) {
         if (error.code === 'P2025') {
@@ -655,7 +659,7 @@ export class EmployeeManagementService extends BaseService {
       await this.logAudit(
         actor.userId,
         actor.role,
-        'employee.lifecycle.submitted_for_review',
+        record.status === EmploymentStatus.REJECTED ? 'employee.lifecycle.resubmitted_for_review' : 'employee.lifecycle.submitted_for_review',
         'EMPLOYMENT_RECORD',
         record.id,
         { submitted_for_review_at: transitionedRecord.submitted_for_review_at },
@@ -665,7 +669,11 @@ export class EmployeeManagementService extends BaseService {
       return transitionedRecord;
     });
 
-    this.logDomainEvent('EVT-EMP-submitted_for_review', record.employee_id, EmploymentStatus.PENDING);
+    if (record.status === EmploymentStatus.REJECTED) {
+      this.logDomainEvent('EVT-EMP-resubmitted_for_review', record.employee_id, EmploymentStatus.PENDING);
+    } else {
+      this.logDomainEvent('EVT-EMP-submitted_for_review', record.employee_id, EmploymentStatus.PENDING);
+    }
 
     // Notify whoever this record actually routes to (resolveReviewerRecipients
     // mirrors getReviewQueue's rule), so the reviewer learns there is

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -18,6 +19,9 @@ function EditUser() {
   const router = useRouter();
 
   const { data: user, isLoading, error } = useUser(id);
+  const { hotels } = useHotels({ limit: 100 });
+  const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
+  
   const { user: actor } = useAuth();
   const canEditRole = actor?.role === "admin";
 
@@ -44,8 +48,21 @@ function EditUser() {
       // selector is disabled for everyone else, but a submit shouldn't hit a
       // route that would just 403.
       let updated = await usersApi.update(id, payload);
-      if (canEditRole && values.role !== user?.role) {
-        updated = await usersApi.updateRole(id, { role: values.role });
+      // PUT /users/:id/role carries the scope assignment as well as the role,
+      // so it is also the call that moves a manager between hotels or an RM
+      // between groups. Hence two reasons to make it: the role changed, or the
+      // role is one that owns an assignment and may have been re-pointed. Both
+      // send the identical body, so they are one condition rather than two
+      // branches with the same payload.
+      const roleChanged = values.role !== user?.role;
+      const roleOwnsAnAssignment =
+        values.role === 'manager' || values.role === 'regional_manager';
+      if (canEditRole && (roleChanged || roleOwnsAnAssignment)) {
+        updated = await usersApi.updateRole(id, {
+          role: values.role,
+          hotel_id: values.hotel_id || undefined,
+          hotel_group_id: values.hotel_group_id || undefined,
+        });
       }
       await Promise.all([
         globalMutate(["user", id], updated, false),
@@ -93,6 +110,8 @@ function EditUser() {
           mode="edit"
           user={user}
           canEditRole={canEditRole}
+          hotels={hotels}
+          hotelGroups={hotelGroups}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}

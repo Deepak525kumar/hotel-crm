@@ -1,6 +1,7 @@
 import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
@@ -26,6 +27,7 @@ function NotifCard({ item, onPress }: { item: Notification; onPress: () => void 
 }
 
 export default function NotificationsScreen() {
+  const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,6 +51,12 @@ export default function NotificationsScreen() {
       setItems((prev) =>
         prev.map((n) => n.id === item.id ? { ...n, read_at: new Date().toISOString() } : n)
       );
+    }
+
+    if (item.type === 'JOB_REQUEST_BROADCAST' && item.data?.work_request_id) {
+      router.push(`/offer/${item.data.work_request_id}`);
+    } else if (item.type === 'ASSIGNMENT_CONFIRMED' && item.data?.assignment_id) {
+      router.push(`/shift/${item.data.assignment_id}`);
     }
   };
 

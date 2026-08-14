@@ -68,7 +68,7 @@ export const NAV: NavItem[] = [
   // apply/approve step) from the marketplace `/requests` flow above — kept
   // as its own nav entry rather than a tab on `/requests` so the two
   // creation/detail flows don't get conflated.
-  { href: "/requests/broadcasts", label: "Broadcasts", icon: Megaphone },
+  { href: "/requests/broadcasts", label: "Broadcasts", icon: Megaphone, roles: ["worker", "manager", "regional_manager", "admin"] },
   { href: "/assignments", label: "Assignments", icon: ClipboardCheck },
   // Teams-style day-grid view of placements + absences (FEATURE_JOBDISPATCH_PHASE2
   // gates placement data server-side; absences are additionally manager/RM/admin-only

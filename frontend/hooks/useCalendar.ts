@@ -36,8 +36,8 @@ export function useAvailability(workerId: string | null | undefined) {
 }
 
 /** REQ-CAL-T02: the caller's own absences (self-scoped, any authenticated role). */
-export function useOwnAbsences() {
-  return useSWR(["my-absences"], () => calendarApi.listOwnAbsences());
+export function useOwnAbsences(enabled: boolean = true) {
+  return useSWR(enabled ? ["my-absences"] : null, () => calendarApi.listOwnAbsences());
 }
 
 /**

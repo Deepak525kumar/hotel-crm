@@ -12,7 +12,7 @@ import {
 } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import { creatableRolesFor } from "@/lib/roleHierarchy";
-import type { EmploymentType, Role, UserDetail } from "@/lib/types";
+import type { EmploymentType, Role, UserDetail, Hotel, HotelGroup } from "@/lib/types";
 
 // ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
 // creation — mirrors the backend CreateUserSchema.superRefine requirement.
@@ -54,6 +54,8 @@ export interface UserFormValues {
   start_date: string;
   employment_type: EmploymentType | "";
   work_permit_required: boolean;
+  hotel_id?: string;
+  hotel_group_id?: string;
 }
 
 /** Submitted shape: unlike form state, blank phone becomes `null`, not `""`. */
@@ -77,6 +79,8 @@ function toValues(user: UserDetail | null | undefined, defaultRole: Role): UserF
     start_date: "",
     employment_type: "",
     work_permit_required: false,
+    hotel_id: user?.managed_hotels?.[0]?.id ?? "",
+    hotel_group_id: user?.managed_hotel_groups?.[0]?.id ?? "",
   };
 }
 
@@ -85,6 +89,8 @@ export interface UserFormProps {
   user?: UserDetail | null;
   /** PUT /users/:id/role is admin-only backend-side; disable the selector for any other actor so a manager/RM can't submit a role change that will just be rejected. */
   canEditRole?: boolean;
+  hotels?: Hotel[];
+  hotelGroups?: HotelGroup[];
   submitting?: boolean;
   error?: string | null;
   onSubmit: (values: UserFormSubmitValues) => void;
@@ -96,6 +102,8 @@ export function UserForm({
   mode,
   user,
   canEditRole = true,
+  hotels = [],
+  hotelGroups = [],
   submitting = false,
   error,
   onSubmit,
@@ -141,6 +149,8 @@ export function UserForm({
       // and "" collides with every other user who also left it blank.
       phone: form.phone.trim() || null,
       job_title: form.job_title.trim(),
+      ...(form.role === "manager" ? { hotel_id: form.hotel_id } : {}),
+      ...(form.role === "regional_manager" ? { hotel_group_id: form.hotel_group_id } : {}),
     });
   };
 
@@ -228,6 +238,36 @@ export function UserForm({
               }
             />
           </div>
+
+          {form.role === "manager" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="Assigned Hotel"
+                value={form.hotel_id ?? ""}
+                onChange={(e) => set("hotel_id", e.target.value)}
+                options={[
+                  { value: "", label: "Unassigned (leave vacant)" },
+                  ...hotels.map((h) => ({ value: h.id, label: h.name })),
+                ]}
+                disabled={!canEditRole}
+              />
+            </div>
+          )}
+
+          {form.role === "regional_manager" && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                label="Assigned Hotel Group"
+                value={form.hotel_group_id ?? ""}
+                onChange={(e) => set("hotel_group_id", e.target.value)}
+                options={[
+                  { value: "", label: "Unassigned (leave vacant)" },
+                  ...hotelGroups.map((g) => ({ value: g.id, label: g.name })),
+                ]}
+                disabled={!canEditRole}
+              />
+            </div>
+          )}
 
           {requiresOnboardingFields && (
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-800">

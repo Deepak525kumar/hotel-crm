@@ -10,6 +10,7 @@ import { resolveNonAdminScopeFilter, isScopedManagerRole } from '../../lib/scope
 import { listEligibleHotelIds } from '../../lib/roster-scope.js';
 import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/service.js';
 import { jobRequestService } from '../job-requests/service.js';
+import { notificationService } from '../notifications/service.js';
 import type { UserScope } from '../../lib/jwt.js';
 
 export class CrmService extends BaseService {
@@ -233,6 +234,31 @@ export class CrmService extends BaseService {
         data: { is_active: false },
       });
       await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'deactivate', name: hotel.name }, ip, undefined, undefined, tx);
+      
+      // Notify associated users (manager, regional manager, active workers)
+      const fullHotel = await tx.hotel.findUnique({ where: { id: hotelId }, include: { hotel_group: true } });
+      const hotelWorkers = await tx.hotelWorker.findMany({ where: { hotel_id: hotelId, status: 'ACTIVE' } });
+      
+      const recipients = new Set<string>();
+      if (fullHotel?.manager_user_id) recipients.add(fullHotel.manager_user_id);
+      if (fullHotel?.hotel_group?.regional_manager_user_id) recipients.add(fullHotel.hotel_group.regional_manager_user_id);
+      (hotelWorkers || []).forEach(w => recipients.add(w.worker_id));
+
+      for (const recipientId of recipients) {
+        await notificationService.enqueue(
+          {
+            recipientId,
+            type: 'HOTEL_DEACTIVATED',
+            title: 'Hotel Deactivated',
+            message: `${hotel.name} has been deactivated.`,
+            hotelId,
+            sourceModule: 'CRM',
+            producerService: 'CrmService',
+          },
+          tx
+        );
+      }
+      
       return updated;
     });
     await this.cascadeCancelHotelWork(hotelId, actorId, actorRole);
@@ -252,6 +278,31 @@ export class CrmService extends BaseService {
         data: { is_active: true },
       });
       await this.logAudit(actorId, actorRole, 'MODIFY', 'HOTEL', hotelId, { action: 'reactivate', name: hotel.name }, ip, undefined, undefined, tx);
+      
+      // Notify associated users (manager, regional manager, active workers)
+      const fullHotel = await tx.hotel.findUnique({ where: { id: hotelId }, include: { hotel_group: true } });
+      const hotelWorkers = await tx.hotelWorker.findMany({ where: { hotel_id: hotelId, status: 'ACTIVE' } });
+      
+      const recipients = new Set<string>();
+      if (fullHotel?.manager_user_id) recipients.add(fullHotel.manager_user_id);
+      if (fullHotel?.hotel_group?.regional_manager_user_id) recipients.add(fullHotel.hotel_group.regional_manager_user_id);
+      (hotelWorkers || []).forEach(w => recipients.add(w.worker_id));
+
+      for (const recipientId of recipients) {
+        await notificationService.enqueue(
+          {
+            recipientId,
+            type: 'HOTEL_ACTIVATED',
+            title: 'Hotel Reactivated',
+            message: `${hotel.name} has been reactivated.`,
+            hotelId,
+            sourceModule: 'CRM',
+            producerService: 'CrmService',
+          },
+          tx
+        );
+      }
+      
       return updated;
     });
     return result;

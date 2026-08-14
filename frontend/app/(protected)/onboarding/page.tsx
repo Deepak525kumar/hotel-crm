@@ -150,14 +150,14 @@ export default function MyOnboardingPage() {
                 </div>
               )}
 
-              {!isSubmitted && !isActive && !isRejected && (
+              {!isSubmitted && !isActive && (
                 <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
                   <Button 
                     className="w-full justify-center" 
                     onClick={handleSubmit}
                     loading={submitting}
                   >
-                    Submit for Review
+                    {isRejected ? "Resubmit for Review" : "Submit for Review"}
                   </Button>
                   {submitError && (
                     <p className="mt-2 text-xs text-red-600 dark:text-red-400">{submitError}</p>

@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { EmploymentStatus } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
@@ -158,6 +159,8 @@ export class UserService extends BaseService {
         // from creation, so it cannot answer "has this person completed
         // onboarding". Returned alongside it, flattened below.
         employment_record: { select: { status: true } },
+        managed_hotels: { select: { id: true } },
+        managed_hotel_groups: { select: { id: true } },
       },
     });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
@@ -321,6 +324,15 @@ export class UserService extends BaseService {
           // Threaded through explicitly: omitting it here is what silently
           // disabled the work-permit requirement platform-wide.
           work_permit_required: data.work_permit_required ?? false,
+          // Same failure mode, same fix: the intended assignment reaches
+          // createEmployee as a TARGET, not as live scope (ADR-065 Decision 2
+          // -- an application holds no operational scope until it is approved
+          // and assigned). createEmployee still validates and may override
+          // these against the creating actor's own scope; passing them only
+          // supplies the case it cannot infer, an Admin creating a Regional
+          // Manager, where the Admin has no group of their own to copy.
+          ...(data.hotel_group_id ? { target_hotel_group_id: data.hotel_group_id } : {}),
+          ...(data.hotel_id ? { target_primary_hotel_id: data.hotel_id } : {}),
         });
       } catch (error) {
         logger.error('user_create_employment_record_failed', {
@@ -555,6 +567,36 @@ export class UserService extends BaseService {
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
+
+    // ADR-065 Decision 2: no operational scope before the application is
+    // approved. The assignment half of this endpoint writes
+    // Hotel.manager_user_id / HotelGroup.regional_manager_user_id directly --
+    // live scope, not a target -- and consulted the employment record nowhere,
+    // so a PENDING (or REJECTED, or DEACTIVATED) account could be made the
+    // acting manager of a hotel or group with a single call, straight past the
+    // onboarding gate. Verified reproducible before this guard: status PENDING,
+    // 200, HotelGroup.regional_manager_user_id set, status still PENDING.
+    //
+    // Scoped to the assignment, not the whole call: changing someone's ROLE
+    // while their application is in flight is legitimate (an admin correcting
+    // worker -> checker before approval). It is only handing them a live
+    // posting that has to wait. An account with no employment record at all
+    // (admin, or a pre-ADR-065 account) is unaffected.
+    if (data.hotel_id || data.hotel_group_id) {
+      const record = await this.prisma.employmentRecord.findUnique({
+        where: { user_id: userId },
+        select: { status: true },
+      });
+      // Blocks only on a status we positively know is not ACTIVE. A real row
+      // always carries one (it is selected above and non-null in the schema),
+      // so this is not a weakening in production -- it just declines to infer
+      // "not approved" from an absent field.
+      if (record?.status && record.status !== EmploymentStatus.ACTIVE) {
+        throw new ConflictError(
+          `Cannot assign a hotel or group to an account whose application is ${record.status}; approve it first`
+        );
+      }
+    }
 
     // Target-assignment payload validation, at the boundary: a hotel_id is
     // only meaningful for the manager role, a hotel_group_id only for

@@ -14,6 +14,9 @@ const mockPrisma = {
   hotelGroup: {
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
+  hotelWorker: {
+    findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  },
   // updateHotel()'s manager-assignment path validates the target user
   // (assertHotelManagerExists) and, on an actual manager change, bumps
   // token_generation for the outgoing/incoming manager inside a transaction.

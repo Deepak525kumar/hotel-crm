@@ -7,7 +7,7 @@ import { useHotelGroups } from "@/hooks/useHotels";
 import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
-import { useAbsencesInRange } from "@/hooks/useCalendar";
+import { useAbsencesInRange, useOwnAbsences } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, assignmentsApi, calendarApi } from "@/lib/api";
 import { ShiftSummaryPanel } from "@/components/calendar/ShiftSummaryPanel";
@@ -84,9 +84,13 @@ export default function CalendarGridPage() {
   // this grid simply sees no absence tags (403 -> useAbsencesInRange's own
   // "not visible to me" treatment), not an error.
   const canSeeAbsences = user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
-  const { data: absences, isLoading: absencesLoading } = useAbsencesInRange(
+  const { data: managerAbsences, isLoading: managerAbsencesLoading } = useAbsencesInRange(
     canSeeAbsences ? { from, to } : null,
   );
+  const { data: workerAbsences, isLoading: workerAbsencesLoading } = useOwnAbsences(!canSeeAbsences);
+
+  const absences = canSeeAbsences ? managerAbsences : workerAbsences;
+  const absencesLoading = canSeeAbsences ? managerAbsencesLoading : workerAbsencesLoading;
 
   // Unfiltered day-grouping; the hotel/group-filtered versions are derived
   // further down, once the filter state they depend on is in scope.
@@ -106,9 +110,12 @@ export default function CalendarGridPage() {
   const usersById = useUsersByIds(visibleWorkerIds);
   const workerNameById = useMemo(() => {
     const map = new Map<string, string>();
+    if (user) {
+      map.set(user.id, `${user.first_name} ${user.last_name}`);
+    }
     for (const [id, u] of usersById) map.set(id, `${u.first_name} ${u.last_name}`);
     return map;
-  }, [usersById]);
+  }, [usersById, user]);
 
   // Scope-driven filtering (2026-08-10). Three distinct shapes, driven by the
   // scope the backend resolved for this user (AuthUser.scope_*), NOT by role

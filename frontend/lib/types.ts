@@ -144,6 +144,8 @@ export interface UserSummary {
 /** A user with permissions, as returned by `GET /users/:id`. */
 export interface UserDetail extends UserSummary {
   permissions: string[];
+  managed_hotels?: { id: string }[];
+  managed_hotel_groups?: { id: string }[];
 }
 
 /** Body of `POST /users` (admin/manager). */
@@ -173,6 +175,14 @@ export interface CreateUserInput {
    * actor, never inferred from nationality.
    */
   work_permit_required?: boolean;
+  /**
+   * The assignment intended for this account — a hotel for a Manager, a group
+   * for a Regional Manager. These are recorded as the employment record's
+   * TARGET, not as live scope: ADR-065 Decision 2 is that an application holds
+   * no operational scope until it has been approved and assigned.
+   */
+  hotel_id?: string;
+  hotel_group_id?: string;
 }
 
 /**

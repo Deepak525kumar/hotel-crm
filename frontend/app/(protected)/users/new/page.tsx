@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
@@ -12,6 +13,9 @@ import type { CreateUserInput } from "@/lib/types";
 
 function NewUser() {
   const router = useRouter();
+  const { hotels } = useHotels({ limit: 100 });
+  const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
+  
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -36,9 +40,26 @@ function NewUser() {
       // here, and omitting it is exactly how the requirement got silently
       // disabled for everyone.
       ...(values.role !== "admin" ? { work_permit_required: values.work_permit_required } : {}),
+      // Sent as part of creation so the choice is recorded atomically, as the
+      // employment record's TARGET assignment.
+      //
+      // This deliberately does NOT go through PUT /users/:id/role after the
+      // create. That call writes HotelGroup.regional_manager_user_id /
+      // Hotel.manager_user_id directly, which is live operational scope, and it
+      // does not consult the employment record at all — so calling it here made
+      // every manager/RM created from this form the acting manager of a hotel or
+      // group while their own application was still PENDING, straight past the
+      // ADR-065 gate. It also split creation across two requests, so a rejected
+      // second call (a group that already has an RM, say) left an account behind
+      // with no assignment.
+      ...(values.role === "manager" && values.hotel_id ? { hotel_id: values.hotel_id } : {}),
+      ...(values.role === "regional_manager" && values.hotel_group_id
+        ? { hotel_group_id: values.hotel_group_id }
+        : {}),
     };
     try {
       const created = await usersApi.create(payload);
+      
       await mutate((key) => Array.isArray(key) && key[0] === "users");
       router.replace(`/users/${created.id}`);
     } catch (err) {
@@ -65,6 +86,8 @@ function NewUser() {
       </div>
       <UserForm
         mode="create"
+        hotels={hotels}
+        hotelGroups={hotelGroups}
         submitting={submitting}
         error={error}
         onSubmit={onSubmit}

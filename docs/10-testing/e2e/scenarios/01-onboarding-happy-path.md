@@ -37,10 +37,22 @@ and the whole Manager-initiated-creation feature was unreachable. Also verify a 
 
 ## Step 2 — Submit before uploading documents (must be blocked)
 
+**Submit as the applicant, not the manager.** The route rejects anyone else:
+*"Only the applicant may submit their own application for review; no role may
+submit on another user's behalf."* This scenario used to show `$MT` here and cost a
+later run time to rediscover.
+
 ```bash
+WT=$(curl -s -X POST http://localhost:3001/api/v1/auth/login -H "Content-Type: application/json" \
+  -d '{"email":"e2e-worker1@test.local","password":"E2EPass123!"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['access_token'])")
+
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/submit-for-review \
-  -H "Authorization: Bearer $MT"
+  -H "Authorization: Bearer $WT"
 ```
+
+Note the path segment is the **human-facing `employee_id`** (`EMP-…`/`E2E-W-01`), not
+the `EmploymentRecord.id` cuid — passing the cuid returns `Employment record not found`.
 
 **PASS:** `409 CONFLICT`, message naming **all six** missing categories:
 `TAX_NUMBER, SOCIAL_SECURITY_NUMBER, HEALTH_INSURANCE, ID_CARD, PASSPORT, ADDRESS`.
@@ -66,8 +78,16 @@ real defect. Also expect `missing_categories`, `is_complete`, `document_count`.
 
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/submit-for-review \
-  -H "Authorization: Bearer $MT" | python3 -m json.tool
+  -H "Authorization: Bearer $WT" | python3 -m json.tool
 ```
+
+**Also verify the ID/passport rule here, not just on the completeness endpoint.**
+`ID_CARD` **or** `PASSPORT` satisfies the identity requirement, and the submit gate
+must agree with `getDocumentCompleteness` about that. Upload five documents with an
+`ID_CARD` and no `PASSPORT`: `missing_categories` must be `[]`, `is_complete` true,
+and this submit must get past the document check (it will then stop on the contract
+requirement in Step 5, which is the expected next gate). If submit still complains
+about a missing `PASSPORT` while completeness reports none, the two have diverged.
 
 **PASS:** `status` stays `PENDING`; `submitted_for_review_at` becomes non-null (it is a
 *sub-state* of PENDING, not a separate status). Scope fields still `null`.

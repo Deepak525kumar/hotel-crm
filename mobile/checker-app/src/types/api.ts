@@ -10,6 +10,8 @@ export interface User {
   first_name: string;
   last_name: string;
   role: UserRole;
+  creator_name?: string | null;
+  manager_name?: string | null;
 }
 
 export interface AuthResponse {

@@ -1,0 +1,10 @@
+-- Postgres cannot drop a value from an enum type. Reversing this means
+-- recreating both types without the added values and rewriting every column
+-- that uses them, which is only safe once no row references any of them:
+--
+--   DELETE FROM "Notification" WHERE type IN
+--     ('ACCOUNT_DEACTIVATED','ACCOUNT_REACTIVATED','HOTEL_DEACTIVATED','HOTEL_ACTIVATED');
+--   DELETE FROM "OutboxEvent" WHERE source_module = 'CRM';
+--
+-- then rebuild the types. Left deliberately as a no-op: an unused enum value is
+-- inert, and a half-applied type rewrite is far more dangerous than one.
