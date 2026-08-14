@@ -175,6 +175,14 @@ export interface CreateUserInput {
    * actor, never inferred from nationality.
    */
   work_permit_required?: boolean;
+  /**
+   * The assignment intended for this account — a hotel for a Manager, a group
+   * for a Regional Manager. These are recorded as the employment record's
+   * TARGET, not as live scope: ADR-065 Decision 2 is that an application holds
+   * no operational scope until it has been approved and assigned.
+   */
+  hotel_id?: string;
+  hotel_group_id?: string;
 }
 
 /**

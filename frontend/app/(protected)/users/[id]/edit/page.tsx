@@ -48,18 +48,20 @@ function EditUser() {
       // selector is disabled for everyone else, but a submit shouldn't hit a
       // route that would just 403.
       let updated = await usersApi.update(id, payload);
-      if (canEditRole && values.role !== user?.role) {
-        updated = await usersApi.updateRole(id, { 
-          role: values.role, 
-          hotel_id: values.hotel_id || undefined, 
-          hotel_group_id: values.hotel_group_id || undefined 
-        });
-      } else if (canEditRole && values.role === user?.role && (values.role === 'manager' || values.role === 'regional_manager')) {
-        // Also update assignment if the role didn't change but the assignment might have
-        updated = await usersApi.updateRole(id, { 
-          role: values.role, 
-          hotel_id: values.hotel_id || undefined, 
-          hotel_group_id: values.hotel_group_id || undefined 
+      // PUT /users/:id/role carries the scope assignment as well as the role,
+      // so it is also the call that moves a manager between hotels or an RM
+      // between groups. Hence two reasons to make it: the role changed, or the
+      // role is one that owns an assignment and may have been re-pointed. Both
+      // send the identical body, so they are one condition rather than two
+      // branches with the same payload.
+      const roleChanged = values.role !== user?.role;
+      const roleOwnsAnAssignment =
+        values.role === 'manager' || values.role === 'regional_manager';
+      if (canEditRole && (roleChanged || roleOwnsAnAssignment)) {
+        updated = await usersApi.updateRole(id, {
+          role: values.role,
+          hotel_id: values.hotel_id || undefined,
+          hotel_group_id: values.hotel_group_id || undefined,
         });
       }
       await Promise.all([

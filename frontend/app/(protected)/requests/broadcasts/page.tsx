@@ -22,6 +22,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
+import { useAuthStore } from "@/stores/auth";
 import type { WorkRequest } from "@/lib/types";
 
 const PER_PAGE = 20;
@@ -52,8 +53,6 @@ function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
     </TR>
   );
 }
-
-import { useAuthStore } from "@/stores/auth";
 
 export default function BroadcastsPage() {
   const [page, setPage] = useState(1);

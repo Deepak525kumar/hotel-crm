@@ -323,6 +323,15 @@ export class UserService extends BaseService {
           // Threaded through explicitly: omitting it here is what silently
           // disabled the work-permit requirement platform-wide.
           work_permit_required: data.work_permit_required ?? false,
+          // Same failure mode, same fix: the intended assignment reaches
+          // createEmployee as a TARGET, not as live scope (ADR-065 Decision 2
+          // -- an application holds no operational scope until it is approved
+          // and assigned). createEmployee still validates and may override
+          // these against the creating actor's own scope; passing them only
+          // supplies the case it cannot infer, an Admin creating a Regional
+          // Manager, where the Admin has no group of their own to copy.
+          ...(data.hotel_group_id ? { target_hotel_group_id: data.hotel_group_id } : {}),
+          ...(data.hotel_id ? { target_primary_hotel_id: data.hotel_id } : {}),
         });
       } catch (error) {
         logger.error('user_create_employment_record_failed', {

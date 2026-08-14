@@ -33,6 +33,16 @@ export const CreateUserSchema = z
     // clear that this is set by the creating actor at creation time and is
     // NOT inferred from nationality.
     work_permit_required: z.boolean().optional(),
+    // The assignment the creating actor intends for this account: a hotel for
+    // a Manager, a group for a Regional Manager. These become the employment
+    // record's TARGET fields, never its live scope -- ADR-065 Decision 2 is
+    // that no operational scope exists until the application is approved and
+    // assigned. Without them the /users/new selector was inert: the form sent
+    // the chosen hotel/group, Zod stripped it as an unknown key, and the
+    // record was created with the target null, so the reviewer had nothing to
+    // assign from and the choice was silently lost.
+    hotel_id: z.string().min(1).optional(),
+    hotel_group_id: z.string().min(1).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.role === 'admin') return;
