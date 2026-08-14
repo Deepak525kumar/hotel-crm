@@ -586,7 +586,7 @@ export interface UpdateWorkRequestInput {
 /** Query params accepted by `GET /work-requests`. */
 export interface ListWorkRequestsQuery {
   hotel_id?: string;
-  status?: WorkRequestStatus;
+  status?: WorkRequestStatus | WorkRequestStatus[];
   position?: string;
   shift_date?: string;
   /** Filters to broadcast rows only (true) or marketplace rows only (false). */
@@ -1062,6 +1062,7 @@ export interface ListAbsencesQuery {
  */
 export type NotificationType =
   | "WORK_REQUEST_PUBLISHED"
+  | "JOB_REQUEST_BROADCAST"
   | "WORK_REQUEST_CANCELLED"
   | "WORK_REQUEST_EXPIRING_SOON"
   | "APPLICATION_RECEIVED"

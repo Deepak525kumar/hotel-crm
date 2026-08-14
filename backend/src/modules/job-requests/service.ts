@@ -215,7 +215,9 @@ export class JobRequestService extends BaseService {
   ): Promise<{ data: WorkRequestDto[]; total: number }> {
     const where: Prisma.JobRequestWhereInput = {
       ...(query.hotel_id ? { hotel_id: query.hotel_id } : {}),
-      ...(query.status ? { status: query.status as WorkRequestStatus } : {}),
+      ...(query.status
+        ? { status: Array.isArray(query.status) ? { in: query.status as WorkRequestStatus[] } : (query.status as WorkRequestStatus) }
+        : {}),
       ...(query.position ? { position: query.position } : {}),
       ...(query.shift_date
         ? { shift_date: new Date(`${query.shift_date}T00:00:00.000Z`) }
