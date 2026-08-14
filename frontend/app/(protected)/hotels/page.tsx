@@ -144,9 +144,10 @@ export default function HotelsPage() {
                       <TD className="text-gray-500 dark:text-gray-400">{h.timezone}</TD>
                       <TD>
                         <div className="flex items-center gap-2">
-                          <ActiveBadge active={h.is_active} />
-                          {!h.accepting_jobs && (
+                          {h.is_active && !h.accepting_jobs ? (
                             <Badge tone="warning">Paused</Badge>
+                          ) : (
+                            <ActiveBadge active={h.is_active} />
                           )}
                         </div>
                       </TD>

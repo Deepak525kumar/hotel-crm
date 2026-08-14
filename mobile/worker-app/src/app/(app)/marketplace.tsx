@@ -91,7 +91,7 @@ export default function MarketplaceScreen() {
         // FEATURE_JOBDISPATCH_PHASE2 server-side (404 while disabled,
         // treated as "no offers" here — the same graceful-degradation
         // shape the marketplace list already has for an empty result).
-        api.workRequests.list({ is_broadcast: true, limit: 50 }).catch(() => []),
+        api.workRequests.list({ status: 'OPEN', is_broadcast: true, limit: 50 }).catch(() => []),
       ]);
       setItems(Array.isArray(jobsRes) ? jobsRes : []);
       setOffers(Array.isArray(offersRes) ? (offersRes as Broadcast[]) : []);

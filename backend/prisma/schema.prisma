@@ -150,6 +150,12 @@ enum NotificationType {
   ONBOARDING_SUBMITTED // to the reviewer (the creator's own superior): an application awaits review
   ONBOARDING_APPROVED // to the applicant: their application was approved
   ONBOARDING_REJECTED // to the applicant: their application was rejected
+  // Account lifecycle (ADR-031 M-1/D-3/D-4)
+  ACCOUNT_DEACTIVATED // to the user: their account was deactivated
+  ACCOUNT_REACTIVATED // to the user: their account was restored
+  // Hotel status events
+  HOTEL_DEACTIVATED
+  HOTEL_ACTIVATED
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -195,6 +201,7 @@ enum OutboxSourceModule {
   // approved / rejected. Distinct from WORK_APPLICATIONS, which tags
   // job-application events, not employment-onboarding ones.
   EMPLOYEE_MANAGEMENT
+  CRM
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim

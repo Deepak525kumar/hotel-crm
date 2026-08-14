@@ -51,7 +51,7 @@ export default function BroadcastDetailPage() {
   // one is rendered.
   const role = useAuthStore((s) => s.user?.role);
   const canSeeAggregateEligibility = role === "admin" || role === "manager" || role === "regional_manager";
-  const canAccept = role === "worker" || role === "checker";
+  const canAccept = role === "worker";
 
   const { data: request, isLoading, error, mutate } = useWorkRequest(id);
   const { data: hotel } = useHotel(request?.hotel_id);

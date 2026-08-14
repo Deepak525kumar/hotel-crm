@@ -528,7 +528,14 @@ export class AuthService extends BaseService {
         // listUsers/getUser (see that file's identical note); this endpoint
         // was the one place it was missed, and the one every user's own
         // Profile page depends on.
-        employment_record: { select: { status: true } },
+        employment_record: { 
+          select: { 
+            status: true,
+            primary_hotel: { select: { manager: { select: { first_name: true, last_name: true } } } },
+            hotel_group: { select: { regional_manager: { select: { first_name: true, last_name: true } } } },
+          } 
+        },
+        created_by: { select: { first_name: true, last_name: true } },
       },
     });
     if (!user) throw new NotFoundError('User not found');
@@ -541,15 +548,24 @@ export class AuthService extends BaseService {
     // must see the CURRENT assignment in the UI, not the stale one baked
     // into a token issued up to an access-token lifetime ago.
     const scope = await this.resolveScope(user.id, user.role);
-    const { employment_record, ...rest } = user;
+    const { employment_record, created_by, ...rest } = user;
+    
+    let managerName: string | null = null;
+    if (employment_record?.primary_hotel?.manager) {
+      managerName = `${employment_record.primary_hotel.manager.first_name} ${employment_record.primary_hotel.manager.last_name}`.trim();
+    } else if (employment_record?.hotel_group?.regional_manager) {
+      managerName = `${employment_record.hotel_group.regional_manager.first_name} ${employment_record.hotel_group.regional_manager.last_name}`.trim();
+    }
+    
+    const creatorName = created_by ? `${created_by.first_name} ${created_by.last_name}`.trim() : null;
+
     return {
       ...rest,
       role: user.role.toLowerCase(),
       permissions: ROLE_PERMISSIONS[user.role] ?? [],
-      // Null = no EmploymentRecord (admin, or a pre-ADR-065 account) --
-      // deliberately distinct from any status value, matching
-      // users/service.ts's identical convention.
       employment_status: employment_record?.status ?? null,
+      creator_name: creatorName,
+      manager_name: managerName,
       ...AuthService.flattenScope(scope),
     };
   }

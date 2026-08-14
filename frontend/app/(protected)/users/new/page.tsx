@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { mutate } from "swr";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
@@ -12,6 +13,9 @@ import type { CreateUserInput } from "@/lib/types";
 
 function NewUser() {
   const router = useRouter();
+  const { hotels } = useHotels({ limit: 100 });
+  const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
+  
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -39,6 +43,17 @@ function NewUser() {
     };
     try {
       const created = await usersApi.create(payload);
+      
+      // If a hotel/group was selected, we must call updateRole to apply the assignment,
+      // as creation alone does not handle assignments.
+      if ((values.role === 'manager' && values.hotel_id) || (values.role === 'regional_manager' && values.hotel_group_id)) {
+        await usersApi.updateRole(created.id, { 
+          role: values.role, 
+          hotel_id: values.hotel_id || undefined, 
+          hotel_group_id: values.hotel_group_id || undefined 
+        });
+      }
+      
       await mutate((key) => Array.isArray(key) && key[0] === "users");
       router.replace(`/users/${created.id}`);
     } catch (err) {
@@ -65,6 +80,8 @@ function NewUser() {
       </div>
       <UserForm
         mode="create"
+        hotels={hotels}
+        hotelGroups={hotelGroups}
         submitting={submitting}
         error={error}
         onSubmit={onSubmit}

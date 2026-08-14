@@ -82,9 +82,10 @@ export default function HotelDetailPage() {
             title={
               <span className="flex items-center gap-3">
                 {hotel.name}
-                <ActiveBadge active={hotel.is_active} />
-                {!hotel.accepting_jobs && (
+                {hotel.is_active && !hotel.accepting_jobs ? (
                   <Badge tone="warning">Not accepting new work requests</Badge>
+                ) : (
+                  <ActiveBadge active={hotel.is_active} />
                 )}
               </span>
             }

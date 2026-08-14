@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useUser } from "@/hooks/useUsers";
+import { useHotels, useHotelGroups } from "@/hooks/useHotels";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -18,6 +19,9 @@ function EditUser() {
   const router = useRouter();
 
   const { data: user, isLoading, error } = useUser(id);
+  const { hotels } = useHotels({ limit: 100 });
+  const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
+  
   const { user: actor } = useAuth();
   const canEditRole = actor?.role === "admin";
 
@@ -45,7 +49,18 @@ function EditUser() {
       // route that would just 403.
       let updated = await usersApi.update(id, payload);
       if (canEditRole && values.role !== user?.role) {
-        updated = await usersApi.updateRole(id, { role: values.role });
+        updated = await usersApi.updateRole(id, { 
+          role: values.role, 
+          hotel_id: values.hotel_id || undefined, 
+          hotel_group_id: values.hotel_group_id || undefined 
+        });
+      } else if (canEditRole && values.role === user?.role && (values.role === 'manager' || values.role === 'regional_manager')) {
+        // Also update assignment if the role didn't change but the assignment might have
+        updated = await usersApi.updateRole(id, { 
+          role: values.role, 
+          hotel_id: values.hotel_id || undefined, 
+          hotel_group_id: values.hotel_group_id || undefined 
+        });
       }
       await Promise.all([
         globalMutate(["user", id], updated, false),
@@ -93,6 +108,8 @@ function EditUser() {
           mode="edit"
           user={user}
           canEditRole={canEditRole}
+          hotels={hotels}
+          hotelGroups={hotelGroups}
           submitting={submitting}
           error={submitError}
           onSubmit={onSubmit}

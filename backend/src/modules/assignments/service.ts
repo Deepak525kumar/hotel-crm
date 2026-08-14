@@ -981,6 +981,22 @@ export class AssignmentService extends BaseService {
           },
         });
 
+        // Notify the worker that they have been placed on the calendar (Bug fix).
+        await notificationService.enqueue(
+          {
+            recipientId: input.worker_id,
+            type: 'ASSIGNMENT_CONFIRMED',
+            title: 'You have been assigned a shift',
+            message: 'A manager has scheduled you for a shift.',
+            data: { assignment_id: assignment.id },
+            hotelId: input.hotel_id,
+            transports: [OutboxTransport.PUSH],
+            sourceModule: OutboxSourceModule.ASSIGNMENTS,
+            producerService: 'AssignmentService',
+          },
+          tx
+        );
+
         return { assignment, calendarEntry };
       });
     } catch (error) {

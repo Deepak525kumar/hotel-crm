@@ -58,6 +58,30 @@ export default function ProfileScreen() {
               {user.role}
             </ThemedText>
           </ThemedView>
+          
+          {user.creator_name && (
+            <>
+              <ThemedView style={styles.divider} type="backgroundSelected" />
+              <ThemedView style={styles.row} type="backgroundElement">
+                <ThemedText type="small" themeColor="textSecondary">
+                  Created By
+                </ThemedText>
+                <ThemedText type="small">{user.creator_name}</ThemedText>
+              </ThemedView>
+            </>
+          )}
+
+          {user.manager_name && (
+            <>
+              <ThemedView style={styles.divider} type="backgroundSelected" />
+              <ThemedView style={styles.row} type="backgroundElement">
+                <ThemedText type="small" themeColor="textSecondary">
+                  Direct Manager
+                </ThemedText>
+                <ThemedText type="small">{user.manager_name}</ThemedText>
+              </ThemedView>
+            </>
+          )}
         </ThemedView>
 
         <Pressable

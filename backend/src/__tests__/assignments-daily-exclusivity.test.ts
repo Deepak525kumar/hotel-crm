@@ -83,6 +83,8 @@ const mockPrisma = {
   hotel: mockHotel,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
   calendarAbsence: mockCalendarAbsence,
+  notification: { create: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ id: 'notif-1' }) },
+  outboxEvent: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };

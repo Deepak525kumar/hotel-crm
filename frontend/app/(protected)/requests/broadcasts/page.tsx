@@ -53,12 +53,16 @@ function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
   );
 }
 
+import { useAuthStore } from "@/stores/auth";
+
 export default function BroadcastsPage() {
   const [page, setPage] = useState(1);
+  const role = useAuthStore((s) => s.user?.role);
 
   const { broadcasts, isLoading, error, hasNext } = useBroadcasts({
     page,
     per_page: PER_PAGE,
+    ...(role === "worker" ? { status: "OPEN" } : {}),
   });
 
   return (

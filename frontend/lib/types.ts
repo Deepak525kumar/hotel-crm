@@ -144,6 +144,8 @@ export interface UserSummary {
 /** A user with permissions, as returned by `GET /users/:id`. */
 export interface UserDetail extends UserSummary {
   permissions: string[];
+  managed_hotels?: { id: string }[];
+  managed_hotel_groups?: { id: string }[];
 }
 
 /** Body of `POST /users` (admin/manager). */
