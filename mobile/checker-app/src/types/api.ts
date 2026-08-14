@@ -139,3 +139,21 @@ export interface Notification {
   read_at: string | null;
   created_at: string;
 }
+
+/**
+ * Self-declared sick/vacation day. The backend's /calendar/my-absences
+ * endpoints carry no role gate -- self-scope IS the authorization -- so a
+ * Checker has always been permitted to declare one; only this client was
+ * missing. `worker_id` is the backend's field name for the absence's owner
+ * whatever their role, not a claim that the owner is a Worker.
+ */
+export type CalendarAbsenceKind = 'SICK' | 'VACATION';
+
+export interface CalendarAbsence {
+  id: string;
+  worker_id: string;
+  day: string; // YYYY-MM-DD
+  kind: CalendarAbsenceKind;
+  created_at: string;
+  updated_at: string;
+}
