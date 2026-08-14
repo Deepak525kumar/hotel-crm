@@ -208,7 +208,7 @@ export class DocumentService extends BaseService {
     actorRole: string,
     categoryFilter?: DocumentCategoryType
   ): Promise<WorkerDocumentDto[]> {
-    if (actorRole === 'worker' && actorId !== workerId) {
+    if ((actorRole === 'worker' || actorRole === 'checker') && actorId !== workerId) {
       throw new ForbiddenError('Workers may only view their own documents');
     }
 
@@ -250,7 +250,7 @@ export class DocumentService extends BaseService {
     if (!doc) throw new NotFoundError('Document not found');
 
     // WORKER can only access their own document.
-    if (actorRole === 'worker' && doc.worker_id !== actorId) {
+    if ((actorRole === 'worker' || actorRole === 'checker') && doc.worker_id !== actorId) {
       throw new ForbiddenError('Workers may only access their own documents');
     } else if (actorRole === 'manager' || actorRole === 'regional_manager') {
       // IDOR fix (2026-08-08): routes.ts has no checkHotelAccess()/
@@ -296,7 +296,7 @@ export class DocumentService extends BaseService {
     });
     if (!doc) throw new NotFoundError('Document not found');
 
-    if (actorRole !== 'worker' || doc.worker_id !== actorId) {
+    if ((actorRole !== 'worker' && actorRole !== 'checker') || doc.worker_id !== actorId) {
       throw new ForbiddenError('Documents may only be deleted by the worker they belong to');
     }
 
@@ -402,7 +402,7 @@ export class DocumentService extends BaseService {
     actorId?: string,
     actorRole?: string
   ): Promise<DocumentCompleteness> {
-    if (actorRole === 'worker' && actorId !== workerId) {
+    if ((actorRole === 'worker' || actorRole === 'checker') && actorId !== workerId) {
       throw new ForbiddenError('Workers may only view their own documents');
     }
 
@@ -433,8 +433,10 @@ export class DocumentService extends BaseService {
     if (!categories.TAX_NUMBER) missing.push('TAX_NUMBER');
     if (!categories.SOCIAL_SECURITY_NUMBER) missing.push('SOCIAL_SECURITY_NUMBER');
     if (!categories.HEALTH_INSURANCE) missing.push('HEALTH_INSURANCE');
-    if (!categories.ID_CARD) missing.push('ID_CARD');
-    if (!categories.PASSPORT) missing.push('PASSPORT');
+    if (!categories.ID_CARD && !categories.PASSPORT) {
+      missing.push('ID_CARD');
+      missing.push('PASSPORT');
+    }
     if (!categories.ADDRESS) missing.push('ADDRESS');
     if (isWorkPermitRequired && !categories.WORK_PERMIT) missing.push('WORK_PERMIT');
 
@@ -461,7 +463,7 @@ export class DocumentService extends BaseService {
     actorRole: string
   ): Promise<WorkerDocumentDto[]> {
     // Self-scoped for worker role; Compliance/Admin calls pass through.
-    if (actorRole === 'worker' && actorId !== workerId) {
+    if ((actorRole === 'worker' || actorRole === 'checker') && actorId !== workerId) {
       throw new ForbiddenError('Workers may only export their own documents');
     }
 

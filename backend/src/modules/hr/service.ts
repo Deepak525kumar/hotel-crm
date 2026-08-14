@@ -477,7 +477,7 @@ export class HrService extends BaseService {
     actorId: string,
     actorRole: string
   ): Promise<ContractDto | null> {
-    if (actorRole === 'worker' && actorId !== workerId) {
+    if ((actorRole === 'worker' || actorRole === 'checker') && actorId !== workerId) {
       throw new ForbiddenError('Workers may only view their own contract status');
     }
 
@@ -999,7 +999,7 @@ export class HrService extends BaseService {
     // worker_id query param is never trusted for this role. Mirrors
     // getContractStatus's actorId !== workerId → ForbiddenError pattern exactly.
     // Worker callers never reach the resolveNonAdminScopeFilter branch below.
-    if (actor?.role === 'worker') {
+    if (actor?.role === 'worker' || actor?.role === 'checker') {
       if (!actor.userId) throw new ForbiddenError();
       if (filters.worker_id && filters.worker_id !== actor.userId) {
         throw new ForbiddenError();
@@ -1014,7 +1014,7 @@ export class HrService extends BaseService {
       ...(filters.status ? { status: filters.status as PayslipRequestStatus } : {}),
     };
 
-    if (actor && actor.role !== 'admin' && actor.role !== 'worker') {
+    if (actor && actor.role !== 'admin' && actor.role !== 'worker' && actor.role !== 'checker') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope ?? null);
       if (scopeFilter.kind === 'deny') {
         where.worker_id = '__none__';

@@ -349,10 +349,10 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ assignment_id: assignmentId, ...location }),
       }),
-    checkOut: (attendanceId: string) =>
+    checkOut: (attendanceId: string, location?: { latitude: number; longitude: number }) =>
       request<Attendance>(`/attendance/${attendanceId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ check_out_at: new Date().toISOString() }),
+        body: JSON.stringify({ check_out_at: new Date().toISOString(), ...location }),
       }),
     get: (id: string) => request<Attendance>(`/attendance/${id}`),
     // Resolve the attendance record for an assignment dynamically. The backend

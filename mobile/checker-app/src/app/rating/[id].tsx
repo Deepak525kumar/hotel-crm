@@ -33,7 +33,7 @@ export default function RatingScreen() {
       await api.quality.createRating({
         assignment_id: id,
         worker_id,
-        score,
+        score: score * 20, // scale 1-5 to 0-100
         comment: comment || undefined,
       });
       Alert.alert('Submitted', 'Rating recorded.', [
