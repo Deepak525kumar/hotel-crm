@@ -280,6 +280,10 @@ describe('EmployeeManagementService', () => {
       [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.ACTIVE],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.DELETED],
+      // DEACTIVATED -> PENDING: added for re-onboarding flow (2026-08-15). A
+      // temporarily-paused worker can re-enter the onboarding queue via
+      // triggerReonboarding() so that only the contract is re-checked.
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
       [EmploymentStatus.REJECTED, EmploymentStatus.ACTIVE],
       [EmploymentStatus.REJECTED, EmploymentStatus.DELETED],
       [EmploymentStatus.DELETED, EmploymentStatus.PENDING],
@@ -293,7 +297,6 @@ describe('EmployeeManagementService', () => {
       [EmploymentStatus.PENDING, EmploymentStatus.DELETED],
       [EmploymentStatus.ACTIVE, EmploymentStatus.PENDING],
       [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
-      [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.REJECTED],
       [EmploymentStatus.REJECTED, EmploymentStatus.PENDING],
       [EmploymentStatus.REJECTED, EmploymentStatus.REJECTED],
