@@ -527,9 +527,22 @@ export class EmployeeManagementService extends BaseService {
   ): Promise<EmploymentRecord> {
     assertTransition(record.status, toStatus);
 
-    const isRehire =
-      record.status === EmploymentStatus.DELETED && toStatus === EmploymentStatus.PENDING;
-    const nextCycle = isRehire ? record.employment_cycle + 1 : record.employment_cycle;
+    // A new engagement cycle starts on either return path -> PENDING: a full
+    // rehire (DELETED -> PENDING, via restore()) or a re-onboarding after a
+    // pause whose contract no longer stands (DEACTIVATED -> PENDING, via
+    // triggerReonboarding()). Both must bump employment_cycle for the same
+    // reason: submitForReview()'s document-gate skip and the review queue's
+    // "reonboarding" labeling are driven entirely by `employment_cycle > 1`
+    // (schema.prisma's own comment: a PENDING row's employment_cycle marks
+    // the start of that cycle). Leaving DEACTIVATED -> PENDING out of this
+    // check -- as an earlier version of this method did -- silently forced a
+    // re-onboarding worker back through the full document-completeness gate
+    // the feature exists to skip, since isReonboarding read employment_cycle
+    // === 1 for them.
+    const isNewCycle =
+      (record.status === EmploymentStatus.DELETED && toStatus === EmploymentStatus.PENDING) ||
+      (record.status === EmploymentStatus.DEACTIVATED && toStatus === EmploymentStatus.PENDING);
+    const nextCycle = isNewCycle ? record.employment_cycle + 1 : record.employment_cycle;
 
     try {
       const updated = await tx.employmentRecord.update({
@@ -537,7 +550,7 @@ export class EmployeeManagementService extends BaseService {
         data: {
           ...(opts.data ?? {}),
           status: toStatus,
-          ...(isRehire ? { employment_cycle: nextCycle } : {}),
+          ...(isNewCycle ? { employment_cycle: nextCycle } : {}),
           version: { increment: 1 },
         },
         include: { 
@@ -1180,21 +1193,38 @@ export class EmployeeManagementService extends BaseService {
   /**
    * DEACTIVATED -> PENDING: worker or manager triggers re-onboarding.
    *
-   * Increments employment_cycle exactly like restore() so this counts as a
-   * new engagement cycle, forcing contract re-checks but keeping previous
-   * static documents valid.
+   * Increments employment_cycle (applyTransition() bumps it for this edge
+   * alongside restore()'s DELETED -> PENDING, see that method's comment) so
+   * this counts as a new engagement cycle: submitForReview() re-checks the
+   * contract only, keeping previously-uploaded static documents valid.
+   *
+   * Only reachable when the existing contract can no longer stand -- see the
+   * guard below. A DEACTIVATED record whose contract is still valid returns
+   * via reactivate() instead, directly, with no re-submission at all.
    */
   async triggerReonboarding(actor: AuthContext, employeeId: string) {
     const record = await this.findRecordOrThrow(employeeId);
     if (record.status !== 'DEACTIVATED') {
       throw new ConflictError('Only a deactivated employee can start re-onboarding');
     }
-    
+
     // We allow self-triggering for workers, or scoped authority for managers
     if (actor.role === 'worker' && record.user_id !== actor.userId) {
       throw new ForbiddenError('Workers can only trigger re-onboarding for themselves');
     } else if (actor.role !== 'worker') {
       await this.assertLifecycleAuthority(actor, record, 'trigger re-onboarding');
+    }
+
+    // Without this, a worker (or manager) could call this endpoint on a
+    // DEACTIVATED record whose contract is still perfectly valid, forcing an
+    // unnecessary employment_cycle bump and a full re-submission cycle when
+    // reactivate() would return them directly. The frontend already gates its
+    // button on contract expiry; this is the authoritative check.
+    const contract = await this.ensureValidContract(record);
+    if (contract && isContractValid(contract)) {
+      throw new ConflictError(
+        "This employee's contract is still valid; use reactivate() instead of re-onboarding."
+      );
     }
 
     const updated = await this.prisma.$transaction(async (tx) => {
