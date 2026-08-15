@@ -280,6 +280,10 @@ describe('EmployeeManagementService', () => {
       [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.ACTIVE],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.DELETED],
+      // DEACTIVATED -> PENDING: added for re-onboarding flow (2026-08-15). A
+      // temporarily-paused worker can re-enter the onboarding queue via
+      // triggerReonboarding() so that only the contract is re-checked.
+      [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
       [EmploymentStatus.REJECTED, EmploymentStatus.ACTIVE],
       [EmploymentStatus.REJECTED, EmploymentStatus.DELETED],
       [EmploymentStatus.DELETED, EmploymentStatus.PENDING],
@@ -293,7 +297,6 @@ describe('EmployeeManagementService', () => {
       [EmploymentStatus.PENDING, EmploymentStatus.DELETED],
       [EmploymentStatus.ACTIVE, EmploymentStatus.PENDING],
       [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
-      [EmploymentStatus.DEACTIVATED, EmploymentStatus.PENDING],
       [EmploymentStatus.DEACTIVATED, EmploymentStatus.REJECTED],
       [EmploymentStatus.REJECTED, EmploymentStatus.PENDING],
       [EmploymentStatus.REJECTED, EmploymentStatus.REJECTED],
@@ -871,6 +874,97 @@ describe('EmployeeManagementService', () => {
       expect(result.employment_cycle).toBe(2);
       const historyCall = mockPrisma.employmentStatusHistory.create.mock.calls[0][0] as { data: { employment_cycle: number } };
       expect(historyCall.data.employment_cycle).toBe(2);
+    });
+  });
+
+  // triggerReonboarding(): DEACTIVATED -> PENDING, the second "return" edge
+  // alongside restore()'s DELETED -> PENDING. It must share that edge's
+  // employment_cycle-bump behavior, because submitForReview()'s document-gate
+  // skip (isReonboarding = employment_cycle > 1) and the review queue's
+  // button label read that exact counter -- a version of this method once
+  // shipped without the bump, which silently forced a re-onboarding worker
+  // back through the full six-document gate.
+  describe('triggerReonboarding (DEACTIVATED -> PENDING, contract-only re-check)', () => {
+    it('increments employment_cycle, clearing deactivation_reason and submitted_for_review_at', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, employment_cycle: 1, deactivation_reason: 'TEMPORARY_LEAVE' })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, employment_cycle: 2, deactivation_reason: null })
+      );
+      mockPrisma.contract.findFirst.mockResolvedValueOnce({
+        id: 'c1', status: 'EXPIRED', expires_at: new Date('2020-01-01'),
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.triggerReonboarding(admin as any, 'E-001');
+
+      expect(result.status).toBe(EmploymentStatus.PENDING);
+      expect(result.employment_cycle).toBe(2);
+      const updateCall = mockPrisma.employmentRecord.update.mock.calls[0][0] as { data: Record<string, unknown> };
+      expect(updateCall.data.employment_cycle).toBe(2);
+      expect(updateCall.data.submitted_for_review_at).toBeNull();
+      expect(updateCall.data.deactivation_reason).toBeNull();
+      // The history row is the audit trail the schema documents as the
+      // authority on cycle boundaries -- it must show the NEW cycle, not the
+      // stale one, or the two disagree about when this cycle started.
+      const historyCall = mockPrisma.employmentStatusHistory.create.mock.calls[0][0] as { data: { employment_cycle: number } };
+      expect(historyCall.data.employment_cycle).toBe(2);
+    });
+
+    it('rejects when the contract is still valid -- reactivate() is the correct path, not this', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, employment_cycle: 1 })
+      );
+      mockPrisma.contract.findFirst.mockResolvedValueOnce({ id: 'c1', status: 'ACTIVE', expires_at: null });
+
+      await expect(service.triggerReonboarding(admin as any, 'E-001')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects a record that is not DEACTIVATED', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.ACTIVE, employment_cycle: 1 })
+      );
+      await expect(service.triggerReonboarding(admin as any, 'E-001')).rejects.toMatchObject({
+        name: 'ConflictError',
+      });
+    });
+
+    it('lets a worker self-trigger their own re-onboarding', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, user_id: 'user_1', employment_cycle: 1 })
+      );
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, employment_cycle: 2 })
+      );
+      mockPrisma.contract.findFirst.mockResolvedValueOnce({
+        id: 'c1', status: 'EXPIRED', expires_at: new Date('2020-01-01'),
+      });
+      mockPrisma.employmentStatusHistory.create.mockResolvedValue({});
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      const result = await service.triggerReonboarding(
+        { userId: 'user_1', role: 'worker', permissions: [], scope: null } as any,
+        'E-001'
+      );
+      expect(result.status).toBe(EmploymentStatus.PENDING);
+    });
+
+    it('denies a worker triggering re-onboarding for someone else', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.DEACTIVATED, user_id: 'user_1', employment_cycle: 1 })
+      );
+      await expect(
+        service.triggerReonboarding(
+          { userId: 'user_other', role: 'worker', permissions: [], scope: null } as any,
+          'E-001'
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
     });
   });
 
