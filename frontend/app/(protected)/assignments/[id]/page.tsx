@@ -139,16 +139,21 @@ export default function AssignmentDetailPage() {
             }
           }
           const records = await attendanceApi.list({ assignment_id: id, per_page: 1 });
-          let record = records[0];
+          const record = records[0];
 
-          // Edge case: assignment is IN_PROGRESS but the manager used
-          // assignmentsApi.start() directly (no attendance record was created).
-          // Create the record lazily via checkIn so checkOut has something to update.
+          // Edge case: assignment is IN_PROGRESS but no attendance record exists.
+          // This happens when a manager/admin used assignmentsApi.start() directly
+          // (which does not create an attendance record). We cannot call checkIn()
+          // here because attendanceService.checkIn() calls
+          // assignmentService.update(id, { status: IN_PROGRESS }) internally and
+          // the assignment service throws ConflictError when the status is already
+          // IN_PROGRESS (see assignments/service.ts:428). The admin must complete
+          // this shift via the management interface.
           if (!record) {
-            record = await attendanceApi.checkIn({
-              assignment_id: id,
-              ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
-            });
+            throw new Error(
+              "This shift was started by a manager and has no check-in record. " +
+              "Please ask your manager to mark this shift as complete."
+            );
           }
 
           return attendanceApi.update(record.id, {
