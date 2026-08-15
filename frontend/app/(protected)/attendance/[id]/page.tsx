@@ -218,15 +218,12 @@ export default function AttendanceDetailPage() {
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-300">
-              You are checked in. Record your check-out to close out this shift.
+              You are checked in. Use the{" "}
+              <TextLink href={`/assignments/${record.assignment_id}`}>
+                assignment page
+              </TextLink>{" "}
+              to check out and complete your shift.
             </div>
-            <Button
-              onClick={checkOut}
-              loading={action.isPending("checkOut")}
-              className="shrink-0"
-            >
-              Check out
-            </Button>
           </CardContent>
         </Card>
       )}
