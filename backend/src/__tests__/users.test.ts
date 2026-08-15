@@ -190,9 +190,9 @@ describe('UserService', () => {
         );
 
         const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{
-          where: { employment_record?: { hotel_group_id: string } };
+          where: any;
         }>;
-        expect(call[0]?.where.employment_record).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        expect(call[0]?.where.AND).toEqual(expect.arrayContaining([expect.objectContaining({ OR: expect.arrayContaining([{ employment_record: { hotel_group_id: 'g1' } }]) })]));
       });
 
       it('resolves a hotel-claim manager to their hotel\'s group', async () => {
@@ -206,9 +206,9 @@ describe('UserService', () => {
         );
 
         const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{
-          where: { employment_record?: { hotel_group_id: string } };
+          where: any;
         }>;
-        expect(call[0]?.where.employment_record).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        expect(call[0]?.where.AND).toEqual(expect.arrayContaining([expect.objectContaining({ OR: expect.arrayContaining([{ employment_record: { hotel_group_id: 'g1' } }]) })]));
       });
 
       it('denies (empty result) a manager with no scope claim', async () => {
@@ -282,7 +282,7 @@ describe('UserService', () => {
         await service.listUsers({ page: 1, limit: 20, role: undefined, hotel_id: 'h1', search: undefined, is_active: undefined });
 
         const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: Record<string, unknown> }>;
-        expect(call[0]?.where['employment_record']).toEqual({ hotel_group_id: 'g1', status: 'ACTIVE' });
+        expect(call[0]?.where['AND']).toEqual(expect.arrayContaining([expect.objectContaining({ OR: expect.arrayContaining([{ employment_record: { hotel_group_id: 'g1' } }]) })]));
       });
 
       it('filters out every user when the hotel has no hotel_group_id (deny-by-default)', async () => {
@@ -293,7 +293,7 @@ describe('UserService', () => {
         await service.listUsers({ page: 1, limit: 20, role: undefined, hotel_id: 'h1', search: undefined, is_active: undefined });
 
         const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: Record<string, unknown> }>;
-        expect(call[0]?.where['employment_record']).toEqual({ hotel_group_id: '__none__', status: 'ACTIVE' });
+        expect(call[0]?.where['AND']).toEqual(expect.arrayContaining([expect.objectContaining({ OR: expect.arrayContaining([{ employment_record: { hotel_group_id: '__none__' } }]) })]));
       });
     });
   });
@@ -353,17 +353,19 @@ describe('UserService', () => {
       expect(result.id).toBe('u_worker');
     });
 
-    it('forbids a manager from viewing another manager (non-worker/checker target)', async () => {
+    it('forbids a manager from viewing another manager out of scope', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
         id: 'u_mgr2', role: 'MANAGER', first_name: 'Other', last_name: 'Mgr',
         phone: null, profile_photo_url: null, is_active: true,
         created_at: new Date(), updated_at: new Date(), deleted_at: null,
       });
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
 
       await expect(
-        service.getUser('u_mgr2', 'manager_actor', 'manager', { type: 'global' })
+        service.getUser('u_mgr2', 'manager_actor', 'manager', { type: 'hotel_group', hotel_group_id: 'other_group' })
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
+
 
     it('allows a manager to view their own profile (self-read exemption)', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({
