@@ -41,7 +41,7 @@ export function useOnboardingLockout(): {
 } {
   const { phase } = useMyOnboarding();
 
-  const isLocked = phase === "documents" || phase === "review" || phase === "rejected";
+  const isLocked = phase === "documents" || phase === "review" || phase === "rejected" || phase === "inactive";
 
   const isPathAllowed = (pathname: string) => {
     if (!isLocked) return true;
