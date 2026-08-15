@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuth, useMe } from "@/hooks/useAuth";
+import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { AbsencesCard } from "@/components/calendar/AbsencesCard";
 import { PayslipRequestsCard } from "@/components/hr/PayslipRequestsCard";
@@ -10,6 +11,7 @@ import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
 import { EditProfileCard } from "@/components/profile/EditProfileCard";
 import { formatDateTime } from "@/lib/format";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
+import { SKILL_LABEL } from "@/lib/skills";
 import {
   ActiveBadge,
   Badge,
@@ -27,6 +29,15 @@ export default function ProfilePage() {
   const { user } = useAuth();
   // Revalidate /auth/me so the view reflects any server-side changes.
   const { isLoading } = useMe();
+  // Skills live on EmploymentRecord, not on AuthUser — /auth/me's payload has
+  // no skills field, so they're not otherwise reachable from this page.
+  // getByUserId() is self-scoped for a worker caller (assertVisibility(),
+  // employee-management/service.ts), same access a worker already has to
+  // their own record elsewhere (WorkerOnboardingCard, for a manager viewing
+  // them) — this is the first place a worker can read it about themselves.
+  const { data: employmentRecord } = useEmploymentRecord(
+    user?.role === "worker" ? user.id : null,
+  );
 
   if (!user) {
     return (
@@ -79,6 +90,23 @@ export default function ProfilePage() {
             <DataRow label="Email" value={user.email} />
             <DataRow label="Phone" value={user.phone || "—"} />
             <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+            {/* Read-only: a worker views their own skills here but does not
+                edit them -- setting them is a manager/RM/admin decision
+                (employee-management/service.ts's updateEmployee is gated
+                requireRole(['admin','manager','regional_manager']), not
+                self-service), the same asymmetry submit-for-review has in
+                the other direction. Edited from WorkerOnboardingCard on the
+                admin-facing /users/:id page instead. */}
+            {user.role === "worker" && (
+              <DataRow
+                label="Skills"
+                value={
+                  employmentRecord?.skills && employmentRecord.skills.length > 0
+                    ? employmentRecord.skills.map((s) => SKILL_LABEL[s] ?? s).join(", ")
+                    : "None set"
+                }
+              />
+            )}
             <DataRow label="Member since" value={formatDateTime(user.created_at)} />
           </DataList>
         </CardContent>

@@ -26,7 +26,8 @@ import {
   Textarea,
 } from "@/components/ui";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import type { DeactivationReason } from "@/lib/types";
+import { SKILL_OPTIONS, SKILL_LABEL } from "@/lib/skills";
+import type { DeactivationReason, SkillTag } from "@/lib/types";
 
 // Mirrors the backend DeactivationReason Prisma enum (schema.prisma) — a
 // fixed set, same reasoning as SKILL_OPTIONS above.
@@ -187,9 +188,29 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 <DataRow label="Employee ID" value={record.employee_id} />
                 <DataRow label="Job title" value={record.job_title} />
                 
-                {record.skills && record.skills.length > 0 && (
-                  <DataRow label="Skills" value={record.skills.join(", ")} />
-                )}
+                {/* Always shown, not gated on skills.length > 0 -- a worker
+                    with no skills set yet is precisely the case that most
+                    needs the row visible, so there's somewhere to click
+                    "Edit" from. Previously hidden entirely when empty, which
+                    combined with the Edit trigger being unwired below (never
+                    called setEditSkillsOpen(true) anywhere in this file)
+                    meant skills could not be set on a worker's first pass
+                    through onboarding at all. */}
+                <DataRow
+                  label="Skills"
+                  value={
+                    <span className="flex items-center gap-2">
+                      <span>
+                        {record.skills && record.skills.length > 0
+                          ? record.skills.map((s) => SKILL_LABEL[s] ?? s).join(", ")
+                          : "None set"}
+                      </span>
+                      <Button size="sm" variant="outline" onClick={() => setEditSkillsOpen(true)}>
+                        Edit
+                      </Button>
+                    </span>
+                  }
+                />
 
                 <DataRow label="Start date" value={formatDate(record.start_date)} />
                 {/* Only meaningful once it can exceed 1 — a first-time hire
@@ -663,11 +684,11 @@ function EditSkillsModal({
 }: {
   userId: string;
   employeeId: string;
-  currentSkills?: string[];
+  currentSkills?: SkillTag[];
   open: boolean;
   onClose: () => void;
 }) {
-  const [skills, setSkills] = useState<string[]>(currentSkills);
+  const [skills, setSkills] = useState<SkillTag[]>(currentSkills);
   const action = useAsyncAction();
 
   // Keep local state in sync when the modal is opened
@@ -715,12 +736,7 @@ function EditSkillsModal({
           Select the skills this worker is qualified for. Broadcasts are matched against these skills.
         </p>
         <div className="grid grid-cols-2 gap-2 mt-4">
-          {[
-            { value: "CLEANER", label: "Cleaner" },
-            { value: "PUBLIC_SERVICE", label: "Public Service" },
-            { value: "KITCHEN_DISHWASHER", label: "Kitchen / Dishwasher" },
-            { value: "WAITER", label: "Waiter" },
-          ].map((opt) => (
+          {SKILL_OPTIONS.map((opt) => (
             <Checkbox
               key={opt.value}
               label={opt.label}
