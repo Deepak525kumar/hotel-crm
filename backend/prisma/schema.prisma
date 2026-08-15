@@ -1045,7 +1045,6 @@ model CalendarEntry {
   // constraint only guards against a duplicate CalendarEntry for the same
   // worker/day within this PR's own creation path, not against a competing
   // broadcast-accept assignment on the same day).
-  @@unique([worker_id, day])
   @@index([worker_id])
   @@index([hotel_id])
   @@index([day])
