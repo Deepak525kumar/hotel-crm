@@ -12,7 +12,7 @@ import {
   UpdateUserRoleRequest,
   ListUsersQuery,
 } from './types.js';
-import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isManagerInGroupScope, isScopedManagerRole, isHotelInScope } from '../../lib/scope.js';
 import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { AuthContext } from '../../lib/types.js';
@@ -71,14 +71,23 @@ export class UserService extends BaseService {
     }
 
     if (targetGroupId) {
-      where['employment_record'] = { hotel_group_id: targetGroupId, status: 'ACTIVE' };
+      if (!where['AND']) where['AND'] = [];
+      (where['AND'] as any[]).push({
+        OR: [
+          { employment_record: { hotel_group_id: targetGroupId } },
+          { managed_hotels: { some: { hotel_group_id: targetGroupId } } }
+        ]
+      });
     }
     if (search) {
-      where['OR'] = [
-        { first_name: { contains: search, mode: 'insensitive' } },
-        { last_name: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ];
+      if (!where['AND']) where['AND'] = [];
+      (where['AND'] as any[]).push({
+        OR: [
+          { first_name: { contains: search, mode: 'insensitive' } },
+          { last_name: { contains: search, mode: 'insensitive' } },
+          { email: { contains: search, mode: 'insensitive' } },
+        ]
+      });
     }
 
     const [users, total] = await Promise.all([
@@ -197,16 +206,15 @@ export class UserService extends BaseService {
       // create still falls through to the original WORKER/CHECKER + group-
       // scope check below.
       if (user.created_by_id !== actorId) {
-        if (user.role !== 'WORKER' && user.role !== 'CHECKER') {
+        if (user.role === 'MANAGER') {
+          const inScope = await isManagerInGroupScope(actorScope, userId);
+          if (!inScope) throw new ForbiddenError('User not in your scope');
+        } else if (user.role === 'WORKER' || user.role === 'CHECKER') {
+          const inScope = await isWorkerInGroupScope(actorScope, userId);
+          if (!inScope) throw new ForbiddenError('User not in your scope');
+        } else {
           throw new ForbiddenError('User not in your scope');
         }
-        // A freshly-created worker/checker has no EmploymentRecord yet
-        // (created separately, later, via POST /employees) --
-        // isWorkerInGroupScope has nothing to check against and always
-        // denies. Only reached here for a NON-creator now; the creator's own
-        // read of their own creation is already allowed above.
-        const inScope = await isWorkerInGroupScope(actorScope, userId);
-        if (!inScope) throw new ForbiddenError('User not in your scope');
       }
     }
 
@@ -555,15 +563,25 @@ export class UserService extends BaseService {
   // /users/:id) no longer accepts `role` at all, closing the data-integrity
   // bug where a role change via that endpoint could leave a stale manager/RM
   // pointer behind. See UpdateUserRoleSchema's comment for the payload shape.
-  async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, ip?: string) {
+  async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, actorScope: UserScope | null, ip?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
     if (actorRole !== 'admin' && user.role === 'ADMIN') {
       throw new ForbiddenError('Only admins can modify admin accounts');
     }
-    if (actorRole !== 'admin') {
-      throw new ForbiddenError('Only admins can assign roles');
+    
+    // Role Hierarchy & Privilege Escalation Checks
+    if (actorRole === 'regional_manager') {
+      if (user.role === 'REGIONAL_MANAGER') {
+        throw new ForbiddenError('Regional managers cannot modify other regional manager accounts');
+      }
+      const newRole = data.role.toUpperCase();
+      if (newRole === 'ADMIN' || newRole === 'REGIONAL_MANAGER') {
+        throw new ForbiddenError('Regional managers cannot assign the admin or regional_manager roles');
+      }
+    } else if (actorRole !== 'admin') {
+      throw new ForbiddenError('Only admins and regional managers can assign roles');
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
@@ -626,6 +644,38 @@ export class UserService extends BaseService {
       throw new ValidationError('primary_hotel_id is only valid for worker or checker', [
         { field: 'primary_hotel_id', message: 'Only valid for worker or checker' },
       ]);
+    }
+
+    if (actorRole === 'regional_manager') {
+      let targetInScope = false;
+      if (user.role === 'MANAGER') {
+        targetInScope = await isManagerInGroupScope(actorScope, userId);
+      } else if (user.role === 'WORKER' || user.role === 'CHECKER') {
+        targetInScope = await isWorkerInGroupScope(actorScope, userId);
+      }
+      // Exempt the creator (redirect-after-create flow) so they can assign
+      // a hotel to a MANAGER they just created (who inherently has no hotel yet).
+      if (!targetInScope && user.created_by_id !== actorId) {
+        throw new ForbiddenError('User is not in your scope');
+      }
+
+      if (data.hotel_id) {
+        const hotelInScope = await isHotelInScope(actorScope, data.hotel_id);
+        if (!hotelInScope) {
+          throw new ForbiddenError('Cannot assign a hotel outside your scope');
+        }
+      }
+      if (data.primary_hotel_id) {
+        const hotelInScope = await isHotelInScope(actorScope, data.primary_hotel_id);
+        if (!hotelInScope) {
+          throw new ForbiddenError('Cannot assign a primary hotel outside your scope');
+        }
+      }
+      if (data.hotel_group_id) {
+        if (actorScope?.type !== 'hotel_group' || actorScope.hotel_group_id !== data.hotel_group_id) {
+          throw new ForbiddenError('Cannot assign a group outside your scope');
+        }
+      }
     }
 
     // ADR-031 D-4 (C-5): the token_generation bump commits in the same

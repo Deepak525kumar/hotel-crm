@@ -23,7 +23,7 @@ function EditUser() {
   const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
   
   const { user: actor } = useAuth();
-  const canEditRole = actor?.role === "admin";
+  const canEditRole = actor?.role === "admin" || actor?.role === "regional_manager";
 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

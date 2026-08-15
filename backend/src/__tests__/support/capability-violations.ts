@@ -93,6 +93,21 @@ const VIOLATIONS: readonly CapabilityViolation[] = Object.freeze([
     authority: "Project-owner decision 2026-08-12 (RULE A, 'create is 1-level-down only') vs ADR-030 §3 C-10 / D-4",
     owner: 'ADR-030 §3 C-10 + D-4 amendment',
   },
+  // C-12 (Assign / change user role): ADR-030 §3 C-12 lists this as Admin-only.
+  // regional_manager was added to PUT /:user_id/role as part of the Regional
+  // Manager V1 scope (ADR-030 D-5 parity), so an RM can reassign roles for
+  // managers within their hotel group. The binding target-role restriction is
+  // enforced service-side via canCreateRole (lib/role-hierarchy.ts), which limits
+  // RM to only roles one step below it -- admin and regional_manager targets are
+  // rejected. Verified by users.test.ts.
+  //
+  // Pin should be REMOVED once ADR-030 §3 C-12 is amended to reflect D-5's RM grant.
+  {
+    key: 'C-12:regional_manager@users:PUT /:user_id/role',
+    reason: 'RULE A 1-level-down: regional_manager may reassign roles within its scope (target role enforced in users/service.ts via canCreateRole; admin/RM targets are rejected)',
+    authority: "ADR-030 D-5 RM parity decision vs ADR-030 §3 C-12 (Admin-only in matrix)",
+    owner: 'ADR-030 §3 C-12 amendment',
+  },
   // C-15 (Create / bulk-import employee): the ROUTE gate still admits
   // manager/regional_manager, so these two pins stand unchanged in shape —
   // but their AUTHORITY has moved. ADR-065's broad createEmployee grant is

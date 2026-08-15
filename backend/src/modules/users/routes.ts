@@ -49,7 +49,7 @@ router.put('/:user_id', requireRole(['admin', 'manager', 'regional_manager']), r
 // ADR-030 D-4a: the dedicated, Admin-only role-assignment endpoint. Mounted
 // unconditionally — see controller.ts's updateUserRole for why this is safe
 // before FEATURE_GD02_MATRIX flips (no legacy caller exists for this route).
-router.put('/:user_id/role', requireRole('admin'), ...userController.updateUserRole);
+router.put('/:user_id/role', requireRole(['admin', 'regional_manager']), ...userController.updateUserRole);
 // ADR-031 D-4 (PR-4): Admin-only "revoke all sessions" incident-response
 // action — bumps token_generation without touching Session rows (logout's
 // job, deliberately unchanged). Delegates to authController since

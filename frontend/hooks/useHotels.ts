@@ -60,7 +60,10 @@ export function useHotelGroup(id: string | null | undefined) {
  * pick a Regional Manager, and available for any other directory selector.
  */
 export function useUserOptions(query: ListUsersQuery = {}) {
-  const key = ["user-options", { ...query }] as const;
+  // We default to active users only for dropdown options (e.g. assigning a worker or manager)
+  // because the backend listUsers endpoint now returns deactivated/pending workers by default.
+  const activeQuery = { is_active: "true" as const, ...query };
+  const key = ["user-options", activeQuery] as const;
   const swr = useSWR(key, ([, q]) => usersApi.list({ limit: 100, ...q }));
   return { ...swr, users: swr.data ?? [] };
 }

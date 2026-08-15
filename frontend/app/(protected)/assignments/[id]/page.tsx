@@ -8,7 +8,8 @@ import { useHotel, useUserOptions } from "@/hooks/useHotels";
 import { useWorkRequest } from "@/hooks/useWorkRequests";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
-import { ApiError, assignmentsApi, qualityApi } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth";
+import { ApiError, assignmentsApi, attendanceApi, qualityApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { AssignmentStatusBadge } from "@/components/assignments/AssignmentStatusBadge";
 import { formatDateTime } from "@/lib/format";
@@ -34,6 +35,7 @@ import type { QualityVerification, Rating, RoomsCompletedEntry } from "@/lib/typ
 export default function AssignmentDetailPage() {
   const params = useParams<{ id: string }>();
   const { id } = params;
+  const currentUser = useAuthStore((s) => s.user);
 
   const { data: assignment, isLoading, error, mutate } = useAssignment(id);
   const { data: hotel } = useHotel(assignment?.hotel_id);
@@ -60,19 +62,121 @@ export default function AssignmentDetailPage() {
   const [ratingOpen, setRatingOpen] = useState(false);
   const [loggedRating, setLoggedRating] = useState<Rating | null>(null);
 
-  const start = () =>
-    action.run(() => assignmentsApi.start(id), {
-      key: "start",
-      onSuccess: (updated) => mutate(updated, { revalidate: false }),
-      errorMessage: "Failed to start assignment. Please try again.",
-    });
+  const start = () => {
+    // Workers must use the Attendance module (Bug 35): calling
+    // assignmentsApi.start() as a worker returns 403. Instead, issue a
+    // checkIn which syncs the assignment to IN_PROGRESS internally.
+    // The assignment page is the single interaction point — workers never
+    // need to navigate to /attendance to start or stop a shift.
+    if (currentUser?.role === "worker") {
+      action.run(
+        async () => {
+          // Collect geolocation if the browser supports it — required for
+          // hotels that have a geofence configured (backend returns 403 if
+          // a geofence is set and coordinates are absent).
+          let lat: number | undefined;
+          let lng: number | undefined;
+          if (typeof navigator !== "undefined" && navigator.geolocation) {
+            try {
+              const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 10000,
+                  maximumAge: 60000,
+                })
+              );
+              lat = pos.coords.latitude;
+              lng = pos.coords.longitude;
+            } catch {
+              // Location unavailable or denied — let the backend decide
+              // whether that's acceptable (non-geofenced hotels proceed).
+            }
+          }
+          return attendanceApi.checkIn({
+            assignment_id: id,
+            ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
+          });
+        },
+        {
+          key: "start",
+          onSuccess: async () => {
+            await mutate();
+          },
+          errorMessage: "Failed to check in. Please try again.",
+        }
+      );
+    } else {
+      action.run(() => assignmentsApi.start(id), {
+        key: "start",
+        onSuccess: (updated) => mutate(updated, { revalidate: false }),
+        errorMessage: "Failed to start assignment. Please try again.",
+      });
+    }
+  };
 
-  const complete = () =>
-    action.run(() => assignmentsApi.complete(id), {
-      key: "complete",
-      onSuccess: (updated) => mutate(updated, { revalidate: false }),
-      errorMessage: "Failed to complete assignment. Please try again.",
-    });
+  const complete = () => {
+    // Workers check out via Attendance, which syncs the assignment to
+    // COMPLETED via internalBypass. Managers/admin call the assignment API
+    // directly.
+    if (currentUser?.role === "worker") {
+      action.run(
+        async () => {
+          // Collect geolocation — checkout geofence mirrors check-in
+          // (backend enforces it on checkout too for geofenced hotels).
+          let lat: number | undefined;
+          let lng: number | undefined;
+          if (typeof navigator !== "undefined" && navigator.geolocation) {
+            try {
+              const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 10000,
+                  maximumAge: 60000,
+                })
+              );
+              lat = pos.coords.latitude;
+              lng = pos.coords.longitude;
+            } catch {
+              // Same as check-in: let backend decide.
+            }
+          }
+          const records = await attendanceApi.list({ assignment_id: id, per_page: 1 });
+          const record = records[0];
+
+          // Edge case: assignment is IN_PROGRESS but no attendance record exists.
+          // This happens when a manager/admin used assignmentsApi.start() directly
+          // (which does not create an attendance record). We cannot call checkIn()
+          // here because attendanceService.checkIn() calls
+          // assignmentService.update(id, { status: IN_PROGRESS }) internally and
+          // the assignment service throws ConflictError when the status is already
+          // IN_PROGRESS (see assignments/service.ts:428). The admin must complete
+          // this shift via the management interface.
+          if (!record) {
+            throw new Error(
+              "This shift was started by a manager and has no check-in record. " +
+              "Please ask your manager to mark this shift as complete."
+            );
+          }
+
+          return attendanceApi.update(record.id, {
+            check_out_at: new Date().toISOString(),
+            ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
+          });
+        },
+        {
+          key: "complete",
+          onSuccess: async () => {
+            await mutate();
+          },
+          errorMessage: "Failed to check out. Please try again.",
+        }
+      );
+    } else {
+      action.run(() => assignmentsApi.complete(id), {
+        key: "complete",
+        onSuccess: (updated) => mutate(updated, { revalidate: false }),
+        errorMessage: "Failed to complete assignment. Please try again.",
+      });
+    }
+  };
 
   const cancel = () =>
     action.run(
@@ -274,7 +378,7 @@ export default function AssignmentDetailPage() {
                   loading={action.isPending("start")}
                   disabled={action.isPending("cancel")}
                 >
-                  Start shift
+                  {currentUser?.role === "worker" ? "Check in" : "Start shift"}
                 </Button>
               )}
               {canComplete && (
@@ -283,7 +387,7 @@ export default function AssignmentDetailPage() {
                   loading={action.isPending("complete")}
                   disabled={action.isPending("cancel")}
                 >
-                  Complete
+                  {currentUser?.role === "worker" ? "Check out" : "Complete"}
                 </Button>
               )}
             </div>

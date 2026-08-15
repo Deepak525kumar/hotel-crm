@@ -134,6 +134,22 @@ export async function isWorkerInGroupScope(scope: UserScope | null, workerId: st
   return !!hotel && hotel.hotel_group_id === record.hotel_group_id;
 }
 
+export async function isManagerInGroupScope(scope: UserScope | null, managerUserId: string): Promise<boolean> {
+  if (!scope) return false;
+  if (scope.type === 'global') return true;
+
+  const targetGroupId = await resolveScopeGroupFilter(scope).then(f => f.kind === 'group' ? f.hotelGroupId : null);
+  if (!targetGroupId) return false;
+
+  const prisma = getPrisma();
+  const managedHotels = await prisma.hotel.findMany({
+    where: { manager_user_id: managerUserId, hotel_group_id: targetGroupId },
+    select: { id: true }
+  });
+  
+  return managedHotels.length > 0;
+}
+
 // 2026-08-13 (review-queue reviewing gap, found while rebuilding the review
 // queue UI): isWorkerInGroupScope() above denies by design when
 // hotel_group_id is null -- correct for the general case, but an

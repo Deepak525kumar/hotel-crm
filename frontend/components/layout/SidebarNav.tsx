@@ -80,9 +80,7 @@ export const NAV: NavItem[] = [
   // Geo check-ins is no longer a standalone tab: geofence-verification
   // events now render inline on the attendance detail page
   // (GeoVerificationCard, gated by the same GeoCheckinsGate roles).
-  // regional_manager added (ADR-030 D-5/PR-3): RM holds the same operational
-  // capability set as manager at group scope, so sees the same nav surface.
-  { href: "/analytics", label: "Analytics", icon: BarChart3, roles: ["manager", "regional_manager", "admin"] },
+
   { href: "/hotels", label: "Hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
   // Deleted entities are invisible everywhere else by design, so the archive
