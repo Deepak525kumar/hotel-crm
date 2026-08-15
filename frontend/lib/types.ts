@@ -1107,6 +1107,9 @@ export interface Notification {
 export interface CheckInInput {
   assignment_id: string;
   notes?: string;
+  /** Optional geolocation for geofenced hotels. Both must be present together. */
+  latitude?: number;
+  longitude?: number;
 }
 
 /**
@@ -1121,6 +1124,9 @@ export interface UpdateAttendanceInput {
   minutes_late?: number;
   minutes_worked?: number;
   is_verified?: boolean;
+  /** Optional geolocation for geofenced hotel check-out. Both must be present together. */
+  latitude?: number;
+  longitude?: number;
 }
 
 /* -------------------------------------------------------------------------- */

@@ -53,12 +53,6 @@ export default function AttendanceDetailPage() {
   const [markVerified, setMarkVerified] = useState(true);
   const action = useAsyncAction();
 
-  const checkOut = () =>
-    action.run(() => attendanceApi.checkOut(id), {
-      key: "checkOut",
-      onSuccess: (updated) => mutate(updated, { revalidate: false }),
-      errorMessage: "Failed to check out. Please try again.",
-    });
 
   const submitReview = () =>
     action.run(

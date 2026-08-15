@@ -70,11 +70,35 @@ export default function AssignmentDetailPage() {
     // need to navigate to /attendance to start or stop a shift.
     if (currentUser?.role === "worker") {
       action.run(
-        () => attendanceApi.checkIn({ assignment_id: id }),
+        async () => {
+          // Collect geolocation if the browser supports it — required for
+          // hotels that have a geofence configured (backend returns 403 if
+          // a geofence is set and coordinates are absent).
+          let lat: number | undefined;
+          let lng: number | undefined;
+          if (typeof navigator !== "undefined" && navigator.geolocation) {
+            try {
+              const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 10000,
+                  maximumAge: 60000,
+                })
+              );
+              lat = pos.coords.latitude;
+              lng = pos.coords.longitude;
+            } catch {
+              // Location unavailable or denied — let the backend decide
+              // whether that's acceptable (non-geofenced hotels proceed).
+            }
+          }
+          return attendanceApi.checkIn({
+            assignment_id: id,
+            ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
+          });
+        },
         {
           key: "start",
           onSuccess: async () => {
-            // Refetch the assignment so the status flips to IN_PROGRESS
             await mutate();
           },
           errorMessage: "Failed to check in. Please try again.",
@@ -92,14 +116,45 @@ export default function AssignmentDetailPage() {
   const complete = () => {
     // Workers check out via Attendance, which syncs the assignment to
     // COMPLETED via internalBypass. Managers/admin call the assignment API
-    // directly (same as before).
+    // directly.
     if (currentUser?.role === "worker") {
       action.run(
         async () => {
+          // Collect geolocation — checkout geofence mirrors check-in
+          // (backend enforces it on checkout too for geofenced hotels).
+          let lat: number | undefined;
+          let lng: number | undefined;
+          if (typeof navigator !== "undefined" && navigator.geolocation) {
+            try {
+              const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                  timeout: 10000,
+                  maximumAge: 60000,
+                })
+              );
+              lat = pos.coords.latitude;
+              lng = pos.coords.longitude;
+            } catch {
+              // Same as check-in: let backend decide.
+            }
+          }
           const records = await attendanceApi.list({ assignment_id: id, per_page: 1 });
-          const record = records[0];
-          if (!record) throw new Error("No attendance record found for this shift.");
-          return attendanceApi.checkOut(record.id);
+          let record = records[0];
+
+          // Edge case: assignment is IN_PROGRESS but the manager used
+          // assignmentsApi.start() directly (no attendance record was created).
+          // Create the record lazily via checkIn so checkOut has something to update.
+          if (!record) {
+            record = await attendanceApi.checkIn({
+              assignment_id: id,
+              ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
+            });
+          }
+
+          return attendanceApi.update(record.id, {
+            check_out_at: new Date().toISOString(),
+            ...(lat !== undefined && lng !== undefined ? { latitude: lat, longitude: lng } : {}),
+          });
         },
         {
           key: "complete",
