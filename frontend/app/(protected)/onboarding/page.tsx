@@ -5,6 +5,8 @@ import { PageHeader, Card, Badge, Button, EmptyState } from "@/components/ui";
 import { employeesApi } from "@/lib/api";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useMyOnboarding } from "@/hooks/useMyOnboarding";
+import { useWorkerContract } from "@/hooks/useContract";
+import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { DocumentUploadList } from "@/components/onboarding/DocumentUploadList";
 import { MyContractCard } from "@/components/onboarding/MyContractCard";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
@@ -24,8 +26,17 @@ export default function MyOnboardingPage() {
   // submit here left the other surfaces showing stale status.
   const { data: record, isLoading, error, mutate: refreshRecord } =
     useEmploymentRecord(user?.id);
-  const { label: statusLabel, description: statusDescription, tone: statusTone } =
-    useMyOnboarding();
+  const { label: statusLabel, description: statusDescription, tone: statusTone } = useMyOnboarding();
+  const { data: contract } = useWorkerContract(user?.id);
+  const isContractExpired = contract?.end_date ? new Date(contract.end_date) < new Date() : false;
+  const triggerAction = useAsyncAction();
+  
+  const handleTriggerReonboarding = () => {
+    triggerAction.run(() => employeesApi.triggerReonboarding(record!.employee_id), {
+      key: "trigger_reonboarding",
+      onSuccess: () => refreshRecord(),
+    });
+  };
 
   if (isLoading) return <div className="p-8 text-center text-gray-500">Loading your onboarding record...</div>;
   if (error) return <div className="p-8 text-center text-red-500">Failed to load onboarding record.</div>;
@@ -150,7 +161,27 @@ export default function MyOnboardingPage() {
                 </div>
               )}
 
-              {!isSubmitted && !isActive && (
+              {record.status === "DEACTIVATED" && isContractExpired && (
+                <div className="flex items-center gap-3 mt-4 p-3 bg-warning-50 text-warning-700 rounded-md text-sm border border-warning-100">
+                  <AlertCircle className="w-5 h-5 shrink-0" />
+                  <div>
+                    <span className="font-semibold block">Contract Expired</span>
+                    Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.
+                  </div>
+                </div>
+              )}
+              {record.status === "DEACTIVATED" && isContractExpired && (
+                <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
+                  <Button 
+                    className="w-full justify-center" 
+                    onClick={handleTriggerReonboarding}
+                    loading={triggerAction.isPending("trigger_reonboarding")}
+                  >
+                    Start Re-Onboarding
+                  </Button>
+                </div>
+              )}
+              {!isSubmitted && !isActive && record.status !== "DEACTIVATED" && (
                 <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800">
                   <Button 
                     className="w-full justify-center" 
