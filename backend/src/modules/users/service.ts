@@ -653,7 +653,9 @@ export class UserService extends BaseService {
       } else if (user.role === 'WORKER' || user.role === 'CHECKER') {
         targetInScope = await isWorkerInGroupScope(actorScope, userId);
       }
-      if (!targetInScope) {
+      // Exempt the creator (redirect-after-create flow) so they can assign
+      // a hotel to a MANAGER they just created (who inherently has no hotel yet).
+      if (!targetInScope && user.created_by_id !== actorId) {
         throw new ForbiddenError('User is not in your scope');
       }
 

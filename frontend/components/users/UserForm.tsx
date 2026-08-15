@@ -244,7 +244,7 @@ export function UserForm({
               disabled={!canEditRole || (mode === "create" && roleOptions.length <= 1)}
               hint={
                 !canEditRole
-                  ? "Only admins can change a user's role."
+                  ? "Only admins and regional managers can change a user's role."
                   : mode === "create" && roleOptions.length === 1
                     ? `You may only create ${ROLE_LABEL[roleOptions[0]!.value]} accounts.`
                     : undefined
