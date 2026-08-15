@@ -1048,8 +1048,6 @@ export const employeesApi = {
   /** DEACTIVATED -> ACTIVE, direct — the paused employee returns, no re-approval. */
   reactivate: (employeeId: string) =>
     apiFetch<EmploymentRecord>(`/employees/${employeeId}/reactivate`, { method: "POST" }),
-  triggerReonboarding: (employeeId: string) =>
-    apiFetch<EmploymentRecord>(`/employees/${employeeId}/trigger-reonboarding`, { method: "POST" }),
 
   /** REJECTED -> ACTIVE, direct — a previously-declined applicant is taken on after all. */
   rehire: (employeeId: string) =>

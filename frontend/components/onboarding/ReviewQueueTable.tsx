@@ -358,7 +358,7 @@ export function ReviewQueueTable() {
                 {isReonboarding
                   ? hasApprovedContract
                     ? "Reactivate"
-                    : "Reactivate & trigger new contract"
+                    : "Reactivate & confirm new contract"
                   : hasApprovedContract
                     ? "Approve & activate"
                     : "Confirm contract & approve"}

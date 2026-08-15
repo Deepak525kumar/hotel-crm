@@ -285,15 +285,6 @@ export class EmployeeManagementController {
     },
   ];
 
-  async triggerReonboarding(req: Request, res: Response, next: NextFunction) {
-    try {
-      const record = await employeeManagementService.triggerReonboarding(req.auth!, req.params.employee_id);
-      res.json(record);
-    } catch (err) {
-      next(err);
-    }
-  }
-
   async reactivate(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError();

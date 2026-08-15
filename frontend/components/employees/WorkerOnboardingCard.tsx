@@ -97,8 +97,9 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
   );
   // Contract status — needed to gate "Approve for work".
   // Only fetched when the record is submitted and awaiting approval.
-  const { data: contractStatus } = useWorkerContract(userId);
-  const isContractExpired = contractStatus?.end_date ? new Date(contractStatus.end_date) < new Date() : false;
+  const { data: contractStatus } = useWorkerContract(
+    isPendingAfterSubmit ? userId : null
+  );
   // Uses the server-derived `is_valid` (status AND unexpired), not a status
   // comparison: nothing ever transitions a contract out of ACTIVE when its
   // expiry passes, so a status-only check would show "contract approved" for
@@ -137,9 +138,6 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
 
   const onReactivate = () =>
     action.run(() => employeesApi.reactivate(record!.employee_id), { key: "reactivate" }).finally(refresh);
-
-  const onTriggerReonboarding = () =>
-    action.run(() => employeesApi.triggerReonboarding(record!.employee_id), { key: "reactivate_new_contract" }).finally(refresh);
 
   const onRehire = () =>
     action.run(() => employeesApi.rehire(record!.employee_id), { key: "rehire" }).finally(refresh);
@@ -308,19 +306,11 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               {record.status === "DEACTIVATED" && (
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                   <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                    {isContractExpired
-                      ? "Their contract has expired. Reactivating will trigger a new contract signature flow."
-                      : "Temporarily paused — their contract is still valid, so they can return directly."}
+                    Temporarily paused — this worker is still employed and can return directly.
                   </p>
-                  {isContractExpired ? (
-                    <Button size="sm" onClick={onTriggerReonboarding} loading={action.isPending("reactivate_new_contract")}>
-                      Reactivate & trigger new contract
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={onReactivate} loading={action.isPending("reactivate")}>
-                      Reactivate
-                    </Button>
-                  )}
+                  <Button size="sm" onClick={onReactivate} loading={action.isPending("reactivate")}>
+                    Reactivate
+                  </Button>
                 </div>
               )}
 

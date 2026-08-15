@@ -24,8 +24,8 @@ export const ASSESSMENT_BASIS: Record<SkillTag, string> = {
 export const ALLOWED_TRANSITIONS: Record<EmploymentStatus, EmploymentStatus[]> = {
   [EmploymentStatus.PENDING]: [EmploymentStatus.ACTIVE, EmploymentStatus.REJECTED],
   [EmploymentStatus.ACTIVE]: [EmploymentStatus.DEACTIVATED, EmploymentStatus.DELETED],
-  [EmploymentStatus.DEACTIVATED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED, EmploymentStatus.PENDING],
-  [EmploymentStatus.REJECTED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED, EmploymentStatus.PENDING],
+  [EmploymentStatus.DEACTIVATED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
+  [EmploymentStatus.REJECTED]: [EmploymentStatus.ACTIVE, EmploymentStatus.DELETED],
   [EmploymentStatus.DELETED]: [EmploymentStatus.PENDING],
 };
 

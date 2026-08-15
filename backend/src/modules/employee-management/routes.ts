@@ -116,11 +116,6 @@ router.post(
   ...controller.deactivate
 );
 router.post(
-  '/:employee_id/trigger-reonboarding',
-  requireRole(['admin', 'manager', 'regional_manager', 'worker']),
-  (req, res, next) => controller.triggerReonboarding(req, res, next)
-);
-router.post(
   '/:employee_id/reactivate',
   requireRole(['admin', 'manager', 'regional_manager']),
   requirePermission('employees:write'),

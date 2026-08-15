@@ -1176,47 +1176,6 @@ export class EmployeeManagementService extends BaseService {
    * the whole point of the DEACTIVATED/DELETED split — only a DELETED return
    * is a true rehire, and that one is gated through PENDING.
    */
-
-  /**
-   * DEACTIVATED -> PENDING: worker or manager triggers re-onboarding.
-   *
-   * Increments employment_cycle exactly like restore() so this counts as a
-   * new engagement cycle, forcing contract re-checks but keeping previous
-   * static documents valid.
-   */
-  async triggerReonboarding(actor: AuthContext, employeeId: string) {
-    const record = await this.findRecordOrThrow(employeeId);
-    if (record.status !== 'DEACTIVATED') {
-      throw new ConflictError('Only a deactivated employee can start re-onboarding');
-    }
-    
-    // We allow self-triggering for workers, or scoped authority for managers
-    if (actor.role === 'worker' && record.user_id !== actor.userId) {
-      throw new ForbiddenError('Workers can only trigger re-onboarding for themselves');
-    } else if (actor.role !== 'worker') {
-      await this.assertLifecycleAuthority(actor, record, 'trigger re-onboarding');
-    }
-
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const result = await this.applyTransition(tx, record, EmploymentStatus.PENDING, {
-        actorUserId: actor.userId,
-        data: {
-          submitted_for_review_at: null,
-          deactivation_reason: null,
-        },
-      });
-
-      await this.logAudit(actor.userId, actor.role, 'employee.trigger_reonboarding', 'EMPLOYMENT_RECORD', record.id, {
-        from: record.status,
-        to: EmploymentStatus.PENDING,
-      }, undefined, undefined, undefined, tx);
-
-      return result;
-    });
-
-    return toGeneralProfile(updated);
-  }
-
   async reactivate(actor: AuthContext, employeeId: string) {
     const record = await this.findRecordOrThrow(employeeId);
     await this.assertLifecycleAuthority(actor, record, 'reactivate an employee');
