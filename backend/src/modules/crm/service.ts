@@ -12,6 +12,7 @@ import { ACTIVE_ASSIGNMENT_STATUSES, assignmentService } from '../assignments/se
 import { jobRequestService } from '../job-requests/service.js';
 import { notificationService } from '../notifications/service.js';
 import type { UserScope } from '../../lib/jwt.js';
+import { OutboxTransport } from '@prisma/client';
 
 export class CrmService extends BaseService {
   // ── Hotels ─────────────────────────────────────────────────────────────────
@@ -254,6 +255,7 @@ export class CrmService extends BaseService {
             hotelId,
             sourceModule: 'CRM',
             producerService: 'CrmService',
+            transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
           },
           tx
         );
@@ -298,6 +300,7 @@ export class CrmService extends BaseService {
             hotelId,
             sourceModule: 'CRM',
             producerService: 'CrmService',
+            transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
           },
           tx
         );
