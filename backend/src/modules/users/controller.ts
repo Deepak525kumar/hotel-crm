@@ -135,7 +135,7 @@ export class UserController {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (!req.auth) throw new UnauthorizedError();
-        const user = await userService.updateUserRole(req.params['user_id']!, req.body, req.auth.userId, req.auth.role, req.ip);
+        const user = await userService.updateUserRole(req.params['user_id']!, req.body, req.auth.userId, req.auth.role, req.auth.scope ?? null, req.ip);
         res.status(200).json({
           status: 'success',
           data: user,

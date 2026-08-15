@@ -129,7 +129,9 @@ export function UserForm({
   const roleOptions =
     mode === "create"
       ? allowedCreateRoles.map((value) => ({ value, label: ROLE_LABEL[value] }))
-      : ALL_ROLE_OPTIONS;
+      : viewerRole === "regional_manager"
+        ? ALL_ROLE_OPTIONS.filter((o) => ["worker", "checker", "manager"].includes(o.value))
+        : ALL_ROLE_OPTIONS;
 
   // A viewer with exactly one creatable role (admin, regional_manager) gets a
   // single fixed option; worker/checker get none, in which case the form is not

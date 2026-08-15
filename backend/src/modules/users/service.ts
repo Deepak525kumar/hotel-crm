@@ -12,7 +12,7 @@ import {
   UpdateUserRoleRequest,
   ListUsersQuery,
 } from './types.js';
-import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isManagerInGroupScope, isScopedManagerRole } from '../../lib/scope.js';
+import { resolveNonAdminScopeFilter, isWorkerInGroupScope, isManagerInGroupScope, isScopedManagerRole, isHotelInScope } from '../../lib/scope.js';
 import { canCreateRole, createRoleDenialMessage } from '../../lib/role-hierarchy.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type { AuthContext } from '../../lib/types.js';
@@ -563,15 +563,25 @@ export class UserService extends BaseService {
   // /users/:id) no longer accepts `role` at all, closing the data-integrity
   // bug where a role change via that endpoint could leave a stale manager/RM
   // pointer behind. See UpdateUserRoleSchema's comment for the payload shape.
-  async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, ip?: string) {
+  async updateUserRole(userId: string, data: UpdateUserRoleRequest, actorId: string, actorRole: string, actorScope: UserScope | null, ip?: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.deleted_at) throw new NotFoundError('User not found');
 
     if (actorRole !== 'admin' && user.role === 'ADMIN') {
       throw new ForbiddenError('Only admins can modify admin accounts');
     }
-    if (actorRole !== 'admin') {
-      throw new ForbiddenError('Only admins can assign roles');
+    
+    // Role Hierarchy & Privilege Escalation Checks
+    if (actorRole === 'regional_manager') {
+      if (user.role === 'REGIONAL_MANAGER') {
+        throw new ForbiddenError('Regional managers cannot modify other regional manager accounts');
+      }
+      const newRole = data.role.toUpperCase();
+      if (newRole === 'ADMIN' || newRole === 'REGIONAL_MANAGER') {
+        throw new ForbiddenError('Regional managers cannot assign the admin or regional_manager roles');
+      }
+    } else if (actorRole !== 'admin') {
+      throw new ForbiddenError('Only admins and regional managers can assign roles');
     }
 
     const newRole = data.role.toUpperCase() as 'WORKER' | 'CHECKER' | 'MANAGER' | 'ADMIN' | 'REGIONAL_MANAGER';
@@ -634,6 +644,36 @@ export class UserService extends BaseService {
       throw new ValidationError('primary_hotel_id is only valid for worker or checker', [
         { field: 'primary_hotel_id', message: 'Only valid for worker or checker' },
       ]);
+    }
+
+    if (actorRole === 'regional_manager') {
+      let targetInScope = false;
+      if (user.role === 'MANAGER') {
+        targetInScope = await isManagerInGroupScope(actorScope, userId);
+      } else if (user.role === 'WORKER' || user.role === 'CHECKER') {
+        targetInScope = await isWorkerInGroupScope(actorScope, userId);
+      }
+      if (!targetInScope) {
+        throw new ForbiddenError('User is not in your scope');
+      }
+
+      if (data.hotel_id) {
+        const hotelInScope = await isHotelInScope(actorScope, data.hotel_id);
+        if (!hotelInScope) {
+          throw new ForbiddenError('Cannot assign a hotel outside your scope');
+        }
+      }
+      if (data.primary_hotel_id) {
+        const hotelInScope = await isHotelInScope(actorScope, data.primary_hotel_id);
+        if (!hotelInScope) {
+          throw new ForbiddenError('Cannot assign a primary hotel outside your scope');
+        }
+      }
+      if (data.hotel_group_id) {
+        if (actorScope?.type !== 'hotel_group' || actorScope.hotel_group_id !== data.hotel_group_id) {
+          throw new ForbiddenError('Cannot assign a group outside your scope');
+        }
+      }
     }
 
     // ADR-031 D-4 (C-5): the token_generation bump commits in the same

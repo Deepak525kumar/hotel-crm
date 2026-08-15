@@ -928,7 +928,7 @@ describe('UserService', () => {
       });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
-      await service.updateUserRole('u_worker', { role: 'manager' }, 'admin_actor', 'admin');
+      await service.updateUserRole('u_worker', { role: 'manager' }, 'admin_actor', 'admin', null);
 
       expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -957,7 +957,7 @@ describe('UserService', () => {
         mockPrisma.auditLog.create.mockResolvedValue({});
 
         await expect(
-          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin')
+          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin', null)
         ).resolves.toBeDefined();
 
         expect(mockHotelGroup.update).toHaveBeenCalledWith(
@@ -993,7 +993,7 @@ describe('UserService', () => {
         mockPrisma.auditLog.create.mockResolvedValue({});
 
         await expect(
-          service.updateUserRole('mgr1', { role: 'worker' }, 'admin_actor', 'admin')
+          service.updateUserRole('mgr1', { role: 'worker' }, 'admin_actor', 'admin', null)
         ).resolves.toBeDefined();
 
         expect(mockHotel.update).toHaveBeenCalledTimes(2);
@@ -1021,7 +1021,7 @@ describe('UserService', () => {
         });
         mockPrisma.auditLog.create.mockResolvedValue({});
 
-        await service.updateUserRole('w1', { role: 'checker' }, 'admin_actor', 'admin');
+        await service.updateUserRole('w1', { role: 'checker' }, 'admin_actor', 'admin', null);
 
         // The single-posting invariant (2026-08-07) reads Hotel back on every
         // call, so "never queried Hotel" is no longer the right assertion.
@@ -1041,7 +1041,7 @@ describe('UserService', () => {
         mockPrisma.auditLog.create.mockResolvedValue({});
 
         await expect(
-          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin')
+          service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin', null)
         ).resolves.toBeDefined();
 
         expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -1059,7 +1059,7 @@ describe('UserService', () => {
         });
         mockPrisma.auditLog.create.mockResolvedValue({});
 
-        await service.updateUserRole('rm1', { role: 'regional_manager' }, 'admin_actor', 'admin');
+        await service.updateUserRole('rm1', { role: 'regional_manager' }, 'admin_actor', 'admin', null);
 
         expect(mockHotelGroup.findUnique).not.toHaveBeenCalled();
       });
@@ -1074,7 +1074,7 @@ describe('UserService', () => {
         });
         mockPrisma.auditLog.create.mockResolvedValue({});
 
-        await service.updateUserRole('w1', { role: 'manager' }, 'admin_actor', 'admin');
+        await service.updateUserRole('w1', { role: 'manager' }, 'admin_actor', 'admin', null);
 
         expect(mockHotelGroup.findUnique).not.toHaveBeenCalled();
       });
@@ -1103,7 +1103,7 @@ describe('UserService', () => {
         });
         mockPrisma.auditLog.create.mockResolvedValue({});
 
-        await service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin');
+        await service.updateUserRole('rm1', { role: 'manager' }, 'admin_actor', 'admin', null);
 
         expect(callOrder).toEqual(['user-lock', 'hotelgroup-read']);
       });
@@ -1199,7 +1199,7 @@ describe('UserService', () => {
         phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole);
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole, null);
 
       expect(mockHotel.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1219,7 +1219,7 @@ describe('UserService', () => {
       mockHotel.findUnique.mockResolvedValue({ id: 'h1', manager_user_id: 'someone_else', deleted_at: null });
 
       await expect(
-        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole)
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1' }, adminActor.actorId, adminActor.actorRole, null)
       ).rejects.toMatchObject({ name: 'ConflictError' });
 
       expect(mockHotel.update).not.toHaveBeenCalled();
@@ -1236,7 +1236,7 @@ describe('UserService', () => {
         phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'hB' }, adminActor.actorId, adminActor.actorRole);
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'hB' }, adminActor.actorId, adminActor.actorRole, null);
 
       // Old hotel vacated with TRANSFERRED (not DEMOTED — they're still a manager).
       expect(mockHotel.update).toHaveBeenCalledWith(
@@ -1263,7 +1263,7 @@ describe('UserService', () => {
         phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole);
+      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole, null);
 
       // This is the exact drift the redesign exists to prevent: the old hotel
       // manager slot MUST be cleared in the same transaction that grants the
@@ -1284,7 +1284,7 @@ describe('UserService', () => {
       mockHotelGroup.findUnique.mockResolvedValue({ id: 'g1', regional_manager_user_id: 'other_rm' });
 
       await expect(
-        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole)
+        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, adminActor.actorId, adminActor.actorRole, null)
       ).rejects.toMatchObject({ name: 'ConflictError' });
 
       expect(mockHotelGroup.update).not.toHaveBeenCalled();
@@ -1302,7 +1302,8 @@ describe('UserService', () => {
 
       await service.updateUserRole(
         'w1', { role: 'worker', hotel_group_id: 'g1', primary_hotel_id: 'h1' },
-        adminActor.actorId, adminActor.actorRole
+        adminActor.actorId, adminActor.actorRole,
+        null
       );
 
       expect(mockPrisma.employmentRecord.update).toHaveBeenCalledWith(
@@ -1323,7 +1324,7 @@ describe('UserService', () => {
       });
 
       await expect(
-        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1', primary_hotel_id: 'h2' }, adminActor.actorId, adminActor.actorRole)
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h1', primary_hotel_id: 'h2' }, adminActor.actorId, adminActor.actorRole, null)
       ).rejects.toMatchObject({ name: 'ValidationError' });
     });
 
@@ -1337,7 +1338,7 @@ describe('UserService', () => {
         phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('rm1', { role: 'manager' }, adminActor.actorId, adminActor.actorRole);
+      await service.updateUserRole('rm1', { role: 'manager' }, adminActor.actorId, adminActor.actorRole, null);
 
       expect(mockHotelGroup.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'g1' }, data: expect.objectContaining({ regional_manager_user_id: null }) })
@@ -1391,7 +1392,7 @@ describe('UserService', () => {
       // whichever clause happens to fire first and would not detect this one
       // being removed.
       await expect(
-        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, 'admin_actor', 'admin')
+        service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g1' }, 'admin_actor', 'admin', null)
       ).rejects.toThrow(/both a Hotel Manager and a Regional Manager/);
     });
 
@@ -1409,7 +1410,7 @@ describe('UserService', () => {
       groupRow = { id: 'g_stale', rm: 'u1' };
 
       await expect(
-        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin')
+        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin', null)
       ).rejects.toThrow(/cannot hold a Regional Manager posting/);
     });
 
@@ -1425,7 +1426,7 @@ describe('UserService', () => {
       mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
 
       await expect(
-        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin')
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin', null)
       ).rejects.toThrow(/more than one hotel/);
     });
 
@@ -1445,7 +1446,7 @@ describe('UserService', () => {
       hotelRows.set('h_stale', 'u1');
 
       await expect(
-        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin')
+        service.updateUserRole('u1', { role: 'worker' }, 'admin_actor', 'admin', null)
       ).rejects.toThrow(/cannot hold a Hotel Manager posting/);
     });
 
@@ -1461,7 +1462,7 @@ describe('UserService', () => {
       mockHotel.findUnique.mockResolvedValue({ id: 'h_new', manager_user_id: null, deleted_at: null });
 
       await expect(
-        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin')
+        service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin', null)
       ).resolves.toBeDefined();
     });
   });
@@ -1517,7 +1518,7 @@ describe('UserService', () => {
         phone: null, role: upper(to), permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: to, ...payloadFor(to) }, 'admin_actor', 'admin');
+      await service.updateUserRole('u1', { role: to, ...payloadFor(to) }, 'admin_actor', 'admin', null);
 
       // 1. The role itself always lands.
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
@@ -1574,7 +1575,7 @@ describe('UserService', () => {
         phone: null, role: 'MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin');
+      await service.updateUserRole('u1', { role: 'manager', hotel_id: 'h_new' }, 'admin_actor', 'admin', null);
 
       expect(mockHotel.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1600,7 +1601,7 @@ describe('UserService', () => {
         phone: null, role: 'REGIONAL_MANAGER', permissions: [], is_active: true, updated_at: new Date(),
       });
 
-      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g_new' }, 'admin_actor', 'admin');
+      await service.updateUserRole('u1', { role: 'regional_manager', hotel_group_id: 'g_new' }, 'admin_actor', 'admin', null);
 
       expect(mockHotelGroup.update).toHaveBeenCalledWith(
         expect.objectContaining({
