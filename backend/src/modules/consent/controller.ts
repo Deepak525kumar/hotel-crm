@@ -7,9 +7,32 @@ import {
   GetAuditHistoryQuerySchema,
 } from './types.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
+import { getPrisma } from '../../lib/db.js';
 
 function zodDetails(error: import('zod').ZodError) {
   return error.errors.map((e) => ({ field: e.path.join('.'), message: e.message }));
+}
+
+// 2026-08-16: the caller's stored UI-language preference, or undefined when
+// they have never chosen one. Undefined (not DEFAULT_LANGUAGE) on purpose —
+// requestConsent already owns the unsupported/absent-language fallback per
+// OD-CONSENT-009, and duplicating that decision here would give this module
+// a second, competing default.
+//
+// A failed lookup is swallowed rather than propagated: the language of a
+// notice is a presentation concern, and a transient database hiccup reading
+// a preference must never block a GDPR consent flow that would otherwise
+// succeed in the default language.
+async function getPreferredLanguage(userId: string): Promise<string | undefined> {
+  try {
+    const user = await getPrisma().user.findUnique({
+      where: { id: userId },
+      select: { preferred_language: true },
+    });
+    return user?.preferred_language ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class ConsentController {
@@ -52,10 +75,25 @@ export class ConsentController {
         return;
       }
 
-      const result = await consentService.requestConsent(
-        consentInstance,
-        typeof req.body?.language === 'string' ? req.body.language : undefined
-      );
+      // 2026-08-16 (language-change feature): an explicit `language` in the
+      // body still wins — callers that know which language they want keep
+      // that control. When it's absent, fall back to the caller's own stored
+      // UI-language preference rather than going straight to
+      // DEFAULT_LANGUAGE, so a worker who switched the app to Arabic also
+      // gets the Arabic notice without the client having to remember to pass
+      // it on every call.
+      //
+      // Read here rather than in the service on purpose: this module is
+      // frozen spec (SPEC-CONSENT-001) and owns notice content, not user
+      // identity. Resolving "who is asking" is the controller's job, and
+      // requestConsent's own unsupported-language fallback (OD-CONSENT-009)
+      // still applies unchanged — which is exactly what handles a
+      // preference of 'uk', a UI locale that CRR §32 does not carry.
+      const bodyLanguage =
+        typeof req.body?.language === 'string' ? req.body.language : undefined;
+      const language = bodyLanguage ?? (await getPreferredLanguage(req.auth.userId));
+
+      const result = await consentService.requestConsent(consentInstance, language);
 
       res.status(200).json({
         status: 'success',

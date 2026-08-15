@@ -1,0 +1,16 @@
+-- 2026-08-16: per-user UI language preference, backing the language-change
+-- feature across the web frontend and the mobile worker app.
+--
+-- Nullable with NO default on purpose. NULL means "never chosen", which is
+-- distinct from an explicit choice of 'de': a NULL lets the client negotiate
+-- from the device/browser locale before falling back to the platform default,
+-- while a stored value always wins over device locale. Defaulting this column
+-- would erase that distinction for every existing row at backfill time and
+-- pin the entire user base to German regardless of their device settings.
+--
+-- Value domain is enforced in application code (backend/src/lib/locales.ts,
+-- UI_LOCALES) rather than by a CHECK constraint or a Postgres enum, so that
+-- adding a UI translation is a code deploy and not a schema migration. This
+-- matches how the neighbouring consent module already handles its own
+-- language list.
+ALTER TABLE "User" ADD COLUMN "preferred_language" TEXT;
