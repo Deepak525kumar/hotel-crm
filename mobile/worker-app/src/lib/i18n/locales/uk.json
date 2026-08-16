@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "locale": "uk",
+    "reviewed": false,
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. Note also that `uk` is a UI locale only: it is NOT in the frozen consent language list (CRR §32), so GDPR consent notices for these users still render in German until SPEC-CONSENT-001 is amended. See backend/src/lib/locales.ts."
+  },
+  "common": {
+    "save": "Зберегти",
+    "cancel": "Скасувати",
+    "edit": "Редагувати",
+    "delete": "Видалити",
+    "close": "Закрити",
+    "confirm": "Підтвердити",
+    "back": "Назад",
+    "next": "Далі",
+    "search": "Пошук",
+    "filter": "Фільтр",
+    "loading": "Завантаження…",
+    "saving": "Збереження…",
+    "retry": "Спробувати ще раз",
+    "yes": "Так",
+    "no": "Ні",
+    "all": "Усі",
+    "any": "Будь-який",
+    "none": "Немає",
+    "notSet": "Не вказано",
+    "details": "Деталі",
+    "total": "Разом",
+    "actions": "Дії",
+    "optional": "Необов'язково",
+    "required": "Обов'язково"
+  },
+  "fields": {
+    "name": "Ім'я",
+    "email": "Електронна пошта",
+    "phone": "Телефон",
+    "role": "Роль",
+    "status": "Статус",
+    "hotel": "Готель",
+    "worker": "Працівник",
+    "workers": "Працівники",
+    "location": "Місце",
+    "notes": "Нотатки",
+    "description": "Опис",
+    "title": "Назва",
+    "type": "Тип",
+    "time": "Час",
+    "date": "Дата",
+    "timezone": "Часовий пояс",
+    "skills": "Навички",
+    "theme": "Тема",
+    "language": "Мова",
+    "totalRooms": "Усього номерів"
+  },
+  "nav": {
+    "dashboard": "Панель",
+    "assignments": "Призначення",
+    "attendance": "Відвідуваність",
+    "calendar": "Календар",
+    "archive": "Архів",
+    "broadcasts": "Розсилки",
+    "requests": "Запити на роботу",
+    "hotels": "Готелі",
+    "hotelGroups": "Групи готелів",
+    "users": "Користувачі",
+    "notifications": "Сповіщення",
+    "analytics": "Аналітика",
+    "onboarding": "Адаптація",
+    "settings": "Налаштування",
+    "profile": "Профіль",
+    "account": "Обліковий запис",
+    "logout": "Вийти"
+  },
+  "roles": {
+    "admin": "Адміністратор",
+    "manager": "Менеджер",
+    "regionalManager": "Регіональний менеджер",
+    "worker": "Працівник",
+    "checker": "Контролер",
+    "cleaner": "Прибиральник"
+  },
+  "status": {
+    "active": "Активний",
+    "inactive": "Неактивний",
+    "absent": "Відсутній",
+    "pending": "Очікує",
+    "confirmed": "Підтверджено",
+    "cancelled": "Скасовано",
+    "completed": "Завершено",
+    "expired": "Термін минув",
+    "deleted": "Видалено",
+    "verified": "Перевірено",
+    "unverified": "Не перевірено",
+    "unavailable": "Недоступно",
+    "unassigned": "Не призначено",
+    "read": "Прочитано",
+    "unread": "Непрочитано",
+    "submitted": "Подано",
+    "uploaded": "Завантажено"
+  },
+  "assignments": {
+    "shiftDetails": "Деталі зміни",
+    "shiftDate": "Дата зміни",
+    "viewAssignment": "Переглянути призначення",
+    "leaveUnassigned": "Залишити без призначення",
+    "geoVerification": "Геоперевірка",
+    "checkIn": "Реєстрація приходу",
+    "checkOut": "Реєстрація виходу",
+    "stayOver": "Гість залишається",
+    "noEligibleWorkers": "Відповідних працівників не знайдено.",
+    "cancelReasonPlaceholder": "Вкажіть, чому це призначення було скасовано."
+  },
+  "settings": {
+    "language": {
+      "title": "Мова",
+      "description": "Виберіть мову для всього застосунку.",
+      "useDeviceLanguage": "Використовувати мову пристрою",
+      "changed": "Мову оновлено.",
+      "changeFailed": "Не вдалося зберегти вашу мову. Спробуйте ще раз.",
+      "untranslatedNotice": "Ця мова перекладена частково. Неперекладений текст відображається німецькою.",
+      "restartRequired": "Перезапустіть застосунок, щоб завершити зміну напрямку письма."
+    }
+  },
+  "auth": {
+    "login": "Увійти",
+    "password": "Пароль",
+    "forgotPassword": "Забули пароль?",
+    "resetSuccess": "Ваш пароль успішно змінено!"
+  },
+  "search": {
+    "byNameOrEmail": "Пошук за іменем або поштою…",
+    "nameOrCity": "Назва або місто…"
+  },
+  "filters": {
+    "allHotels": "Усі готелі",
+    "allRoles": "Усі ролі",
+    "allStatuses": "Усі статуси",
+    "allGroups": "Усі групи"
+  },
+  "errors": {
+    "generic": "Щось пішло не так. Спробуйте ще раз.",
+    "network": "Не вдалося зв'язатися із сервером. Перевірте з'єднання.",
+    "notFound": "Не знайдено.",
+    "forbidden": "У вас немає доступу до цього."
+  }
+}

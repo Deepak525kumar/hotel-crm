@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useState } from 'react';
+import { LanguagePicker } from '@/components/LanguagePicker';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuthStore();
@@ -119,6 +120,8 @@ export default function ProfileScreen() {
             <ThemedText type="smallBold">View HR & Payroll</ThemedText>
           </ThemedView>
         </Pressable>
+
+        <LanguagePicker />
 
         <Pressable
           onPress={handleLogout}

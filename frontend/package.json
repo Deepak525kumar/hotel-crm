@@ -14,11 +14,13 @@
     "test:coverage": "jest --coverage"
   },
   "dependencies": {
+    "i18next": "^26.3.6",
     "lucide-react": "^1.28.0",
     "next": "^16.2.6",
     "next-themes": "^0.4.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-i18next": "^17.0.11",
     "signature_pad": "^5.1.4",
     "swr": "^2.4.1",
     "zustand": "^5.0.14"

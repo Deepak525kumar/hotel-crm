@@ -48,7 +48,8 @@
         {
           "locationWhenInUsePermission": "Used only when you press Verify Location, to check whether you're at the hotel."
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "experiments": {
       "typedRoutes": true,

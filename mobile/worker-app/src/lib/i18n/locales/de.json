@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "locale": "de",
+    "reviewed": true,
+    "note": "Primary-market language AND the fallback every other locale resolves to. An error here surfaces in every partially-translated language, not just German."
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "close": "Schließen",
+    "confirm": "Bestätigen",
+    "back": "Zurück",
+    "next": "Weiter",
+    "search": "Suchen",
+    "filter": "Filter",
+    "loading": "Wird geladen…",
+    "saving": "Wird gespeichert…",
+    "retry": "Erneut versuchen",
+    "yes": "Ja",
+    "no": "Nein",
+    "all": "Alle",
+    "any": "Beliebig",
+    "none": "Keine",
+    "notSet": "Nicht festgelegt",
+    "details": "Details",
+    "total": "Gesamt",
+    "actions": "Aktionen",
+    "optional": "Optional",
+    "required": "Erforderlich"
+  },
+  "fields": {
+    "name": "Name",
+    "email": "E-Mail",
+    "phone": "Telefon",
+    "role": "Rolle",
+    "status": "Status",
+    "hotel": "Hotel",
+    "worker": "Mitarbeiter",
+    "workers": "Mitarbeiter",
+    "location": "Standort",
+    "notes": "Notizen",
+    "description": "Beschreibung",
+    "title": "Titel",
+    "type": "Typ",
+    "time": "Uhrzeit",
+    "date": "Datum",
+    "timezone": "Zeitzone",
+    "skills": "Qualifikationen",
+    "theme": "Design",
+    "language": "Sprache",
+    "totalRooms": "Zimmer gesamt"
+  },
+  "nav": {
+    "dashboard": "Übersicht",
+    "assignments": "Einsätze",
+    "attendance": "Anwesenheit",
+    "calendar": "Kalender",
+    "archive": "Archiv",
+    "broadcasts": "Rundrufe",
+    "requests": "Arbeitsanfragen",
+    "hotels": "Hotels",
+    "hotelGroups": "Hotelgruppen",
+    "users": "Benutzer",
+    "notifications": "Benachrichtigungen",
+    "analytics": "Auswertungen",
+    "onboarding": "Onboarding",
+    "settings": "Einstellungen",
+    "profile": "Profil",
+    "account": "Konto",
+    "logout": "Abmelden"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "manager": "Manager",
+    "regionalManager": "Regionalleiter",
+    "worker": "Mitarbeiter",
+    "checker": "Prüfer",
+    "cleaner": "Reinigungskraft"
+  },
+  "status": {
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "absent": "Abwesend",
+    "pending": "Ausstehend",
+    "confirmed": "Bestätigt",
+    "cancelled": "Storniert",
+    "completed": "Abgeschlossen",
+    "expired": "Abgelaufen",
+    "deleted": "Gelöscht",
+    "verified": "Verifiziert",
+    "unverified": "Nicht verifiziert",
+    "unavailable": "Nicht verfügbar",
+    "unassigned": "Nicht zugewiesen",
+    "read": "Gelesen",
+    "unread": "Ungelesen",
+    "submitted": "Eingereicht",
+    "uploaded": "Hochgeladen"
+  },
+  "assignments": {
+    "shiftDetails": "Schichtdetails",
+    "shiftDate": "Schichtdatum",
+    "viewAssignment": "Einsatz anzeigen",
+    "leaveUnassigned": "Nicht zuweisen",
+    "geoVerification": "Standortprüfung",
+    "checkIn": "Einchecken",
+    "checkOut": "Auschecken",
+    "stayOver": "Bleibegast",
+    "noEligibleWorkers": "Keine passenden Mitarbeiter gefunden.",
+    "cancelReasonPlaceholder": "Bitte geben Sie an, warum dieser Einsatz storniert wurde."
+  },
+  "settings": {
+    "language": {
+      "title": "Sprache",
+      "description": "Wählen Sie die Sprache für die gesamte App.",
+      "useDeviceLanguage": "Gerätesprache verwenden",
+      "changed": "Sprache aktualisiert.",
+      "changeFailed": "Ihre Sprache konnte nicht gespeichert werden. Bitte versuchen Sie es erneut.",
+      "untranslatedNotice": "Diese Sprache ist teilweise übersetzt. Nicht übersetzte Texte erscheinen auf Deutsch.",
+      "restartRequired": "Zum vollständigen Wechsel der Schreibrichtung starten Sie die App bitte neu."
+    }
+  },
+  "auth": {
+    "login": "Anmelden",
+    "password": "Passwort",
+    "forgotPassword": "Passwort vergessen?",
+    "resetSuccess": "Ihr Passwort wurde erfolgreich zurückgesetzt!"
+  },
+  "search": {
+    "byNameOrEmail": "Nach Name oder E-Mail suchen…",
+    "nameOrCity": "Name oder Stadt…"
+  },
+  "filters": {
+    "allHotels": "Alle Hotels",
+    "allRoles": "Alle Rollen",
+    "allStatuses": "Alle Status",
+    "allGroups": "Alle Gruppen"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
+    "network": "Der Server ist nicht erreichbar. Bitte prüfen Sie Ihre Verbindung.",
+    "notFound": "Nicht gefunden.",
+    "forbidden": "Sie haben keinen Zugriff darauf."
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "locale": "fr",
+    "reviewed": false,
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. Have a French speaker review before this reaches production users, particularly the consent, contract and payroll-adjacent strings."
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "close": "Fermer",
+    "confirm": "Confirmer",
+    "back": "Retour",
+    "next": "Suivant",
+    "search": "Rechercher",
+    "filter": "Filtrer",
+    "loading": "Chargement…",
+    "saving": "Enregistrement…",
+    "retry": "Réessayer",
+    "yes": "Oui",
+    "no": "Non",
+    "all": "Tous",
+    "any": "Indifférent",
+    "none": "Aucun",
+    "notSet": "Non défini",
+    "details": "Détails",
+    "total": "Total",
+    "actions": "Actions",
+    "optional": "Facultatif",
+    "required": "Obligatoire"
+  },
+  "fields": {
+    "name": "Nom",
+    "email": "E-mail",
+    "phone": "Téléphone",
+    "role": "Rôle",
+    "status": "Statut",
+    "hotel": "Hôtel",
+    "worker": "Employé",
+    "workers": "Employés",
+    "location": "Lieu",
+    "notes": "Notes",
+    "description": "Description",
+    "title": "Titre",
+    "type": "Type",
+    "time": "Heure",
+    "date": "Date",
+    "timezone": "Fuseau horaire",
+    "skills": "Compétences",
+    "theme": "Thème",
+    "language": "Langue",
+    "totalRooms": "Nombre de chambres"
+  },
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "assignments": "Affectations",
+    "attendance": "Présence",
+    "calendar": "Calendrier",
+    "archive": "Archives",
+    "broadcasts": "Diffusions",
+    "requests": "Demandes de travail",
+    "hotels": "Hôtels",
+    "hotelGroups": "Groupes hôteliers",
+    "users": "Utilisateurs",
+    "notifications": "Notifications",
+    "analytics": "Statistiques",
+    "onboarding": "Intégration",
+    "settings": "Paramètres",
+    "profile": "Profil",
+    "account": "Compte",
+    "logout": "Se déconnecter"
+  },
+  "roles": {
+    "admin": "Administrateur",
+    "manager": "Responsable",
+    "regionalManager": "Responsable régional",
+    "worker": "Employé",
+    "checker": "Contrôleur",
+    "cleaner": "Agent d'entretien"
+  },
+  "status": {
+    "active": "Actif",
+    "inactive": "Inactif",
+    "absent": "Absent",
+    "pending": "En attente",
+    "confirmed": "Confirmé",
+    "cancelled": "Annulé",
+    "completed": "Terminé",
+    "expired": "Expiré",
+    "deleted": "Supprimé",
+    "verified": "Vérifié",
+    "unverified": "Non vérifié",
+    "unavailable": "Indisponible",
+    "unassigned": "Non affecté",
+    "read": "Lu",
+    "unread": "Non lu",
+    "submitted": "Soumis",
+    "uploaded": "Téléversé"
+  },
+  "assignments": {
+    "shiftDetails": "Détails du service",
+    "shiftDate": "Date du service",
+    "viewAssignment": "Voir l'affectation",
+    "leaveUnassigned": "Laisser non affecté",
+    "geoVerification": "Vérification géographique",
+    "checkIn": "Pointer l'arrivée",
+    "checkOut": "Pointer le départ",
+    "stayOver": "Client restant",
+    "noEligibleWorkers": "Aucun employé éligible trouvé.",
+    "cancelReasonPlaceholder": "Indiquez pourquoi cette affectation a été annulée."
+  },
+  "settings": {
+    "language": {
+      "title": "Langue",
+      "description": "Choisissez la langue utilisée dans toute l'application.",
+      "useDeviceLanguage": "Utiliser la langue de l'appareil",
+      "changed": "Langue mise à jour.",
+      "changeFailed": "Impossible d'enregistrer votre langue. Veuillez réessayer.",
+      "untranslatedNotice": "Cette langue est partiellement traduite. Les textes non traduits s'affichent en allemand.",
+      "restartRequired": "Redémarrez l'application pour terminer le changement de sens d'écriture."
+    }
+  },
+  "auth": {
+    "login": "Se connecter",
+    "password": "Mot de passe",
+    "forgotPassword": "Mot de passe oublié ?",
+    "resetSuccess": "Votre mot de passe a été réinitialisé avec succès !"
+  },
+  "search": {
+    "byNameOrEmail": "Rechercher par nom ou e-mail…",
+    "nameOrCity": "Nom ou ville…"
+  },
+  "filters": {
+    "allHotels": "Tous les hôtels",
+    "allRoles": "Tous les rôles",
+    "allStatuses": "Tous les statuts",
+    "allGroups": "Tous les groupes"
+  },
+  "errors": {
+    "generic": "Une erreur est survenue. Veuillez réessayer.",
+    "network": "Impossible de joindre le serveur. Vérifiez votre connexion.",
+    "notFound": "Introuvable.",
+    "forbidden": "Vous n'avez pas accès à cet élément."
+  }
+}

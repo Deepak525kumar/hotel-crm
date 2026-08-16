@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { APP_COMMIT_SHA, APP_NAME, APP_OWNER, APP_VERSION } from "@/lib/config";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { LanguageSelect } from "@/components/i18n/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -32,6 +34,7 @@ const COMING_SOON: { title: string; detail: string }[] = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   if (!user) {
     return (
@@ -88,6 +91,19 @@ export default function SettingsPage() {
                 </span>
               }
               value={<ThemeToggle />}
+            />
+            <DataRow
+              label={
+                <span className="flex flex-col gap-0.5 text-left">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {t("settings.language.title")}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t("settings.language.description")}
+                  </span>
+                </span>
+              }
+              value={<LanguageSelect />}
             />
           </DataList>
         </CardContent>
