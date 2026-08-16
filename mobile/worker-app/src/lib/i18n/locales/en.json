@@ -156,7 +156,12 @@
     "placementDetails": "Placement details",
     "placeWorker": "Place worker",
     "calendarPlacement": "Calendar Placement",
-    "roomsCompleted": "Rooms completed"
+    "roomsCompleted": "Rooms completed",
+    "unavailable": "Unavailable",
+    "conflictSick": "Sick leave",
+    "conflictVacation": "On vacation",
+    "conflictAlreadyPlaced": "Already placed this day",
+    "unavailableHint": "Workers marked in red are unavailable on this day."
   },
   "settings": {
     "language": {

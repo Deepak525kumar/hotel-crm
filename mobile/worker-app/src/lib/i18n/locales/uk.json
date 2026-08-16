@@ -156,7 +156,12 @@
     "placementDetails": "Деталі розміщення",
     "placeWorker": "Призначити працівника",
     "calendarPlacement": "Розміщення в календарі",
-    "roomsCompleted": "Завершені номери"
+    "roomsCompleted": "Завершені номери",
+    "unavailable": "Недоступний",
+    "conflictSick": "Лікарняний",
+    "conflictVacation": "У відпустці",
+    "conflictAlreadyPlaced": "Уже призначений цього дня",
+    "unavailableHint": "Працівники, позначені червоним, недоступні цього дня."
   },
   "settings": {
     "language": {

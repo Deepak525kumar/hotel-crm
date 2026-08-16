@@ -156,7 +156,12 @@
     "placementDetails": "Einsatzdetails",
     "placeWorker": "Mitarbeiter einteilen",
     "calendarPlacement": "Kalendereinteilung",
-    "roomsCompleted": "Fertige Zimmer"
+    "roomsCompleted": "Fertige Zimmer",
+    "unavailable": "Nicht verfügbar",
+    "conflictSick": "Krankmeldung",
+    "conflictVacation": "Im Urlaub",
+    "conflictAlreadyPlaced": "An diesem Tag bereits eingeteilt",
+    "unavailableHint": "Rot markierte Mitarbeiter sind an diesem Tag nicht verfügbar."
   },
   "settings": {
     "language": {
