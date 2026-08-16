@@ -147,7 +147,9 @@
     "leaderboard": "Leaderboard",
     "marketplace": "Job Marketplace",
     "myOnboarding": "My Onboarding",
-    "reviewQueue": "Review Queue"
+    "reviewQueue": "Review Queue",
+    "docs": "Docs",
+    "explore": "Explore"
   },
   "roles": {
     "admin": "Admin",
@@ -227,7 +229,12 @@
     "noCalendarPlacements": "No calendar placements found",
     "noCalendarPlacementsDescription": "Place a worker directly on the calendar to see it here.",
     "pageDescription": "Confirmed workers and the shifts they are staffed on.",
-    "noneFound": "No assignments found"
+    "noneFound": "No assignments found",
+    "unavailable": "Unavailable",
+    "conflictSick": "Sick leave",
+    "conflictVacation": "On vacation",
+    "conflictAlreadyPlaced": "Already placed this day",
+    "unavailableHint": "Workers marked in red are unavailable on this day."
   },
   "settings": {
     "language": {

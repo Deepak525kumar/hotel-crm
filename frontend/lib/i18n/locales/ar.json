@@ -148,7 +148,9 @@
     "leaderboard": "لوحة الصدارة",
     "marketplace": "سوق الوظائف",
     "myOnboarding": "انضمامي",
-    "reviewQueue": "قائمة المراجعة"
+    "reviewQueue": "قائمة المراجعة",
+    "docs": "المستندات",
+    "explore": "استكشاف"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -228,7 +230,12 @@
     "noCalendarPlacements": "لم يتم العثور على تنسيبات في التقويم",
     "noCalendarPlacementsDescription": "قم بتنسيب موظف مباشرة في التقويم لرؤيته هنا.",
     "pageDescription": "الموظفون المؤكَّدون والورديات المُوظَّفون فيها.",
-    "noneFound": "لم يتم العثور على مهام"
+    "noneFound": "لم يتم العثور على مهام",
+    "unavailable": "غير متاح",
+    "conflictSick": "إجازة مرضية",
+    "conflictVacation": "في إجازة",
+    "conflictAlreadyPlaced": "مُعيَّن بالفعل في هذا اليوم",
+    "unavailableHint": "الموظفون المميزون بالأحمر غير متاحين في هذا اليوم."
   },
   "settings": {
     "language": {

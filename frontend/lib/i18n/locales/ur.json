@@ -148,7 +148,9 @@
     "leaderboard": "لیڈر بورڈ",
     "marketplace": "جاب مارکیٹ",
     "myOnboarding": "میری شمولیت",
-    "reviewQueue": "جائزہ قطار"
+    "reviewQueue": "جائزہ قطار",
+    "docs": "دستاویزات",
+    "explore": "دریافت کریں"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -228,7 +230,12 @@
     "noCalendarPlacements": "کوئی کیلنڈر تعیناتی نہیں ملی",
     "noCalendarPlacementsDescription": "یہاں دیکھنے کے لیے کارکن کو براہ راست کیلنڈر پر تعینات کریں۔",
     "pageDescription": "تصدیق شدہ کارکن اور وہ شفٹیں جن پر وہ تعینات ہیں۔",
-    "noneFound": "کوئی تفویض نہیں ملی"
+    "noneFound": "کوئی تفویض نہیں ملی",
+    "unavailable": "دستیاب نہیں",
+    "conflictSick": "بیماری کی چھٹی",
+    "conflictVacation": "چھٹی پر",
+    "conflictAlreadyPlaced": "اس دن پہلے سے تعینات",
+    "unavailableHint": "سرخ رنگ میں نشان زد کارکن اس دن دستیاب نہیں ہیں۔"
   },
   "settings": {
     "language": {

@@ -24,7 +24,8 @@ import {
   Skeleton,
   Textarea,
 } from "@/components/ui";
-import { placementAbsenceLabel } from "@/lib/types";
+import { isCompletedPlacement, placementAbsenceLabel, workerDayConflict } from "@/lib/types";
+import type { WorkerDayConflict } from "@/lib/types";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
 import {
   DAY_LABEL,
@@ -727,6 +728,7 @@ function PlacementTag({
   size: "sm" | "md";
   onSelect: (entry: CalendarEntryDto) => void;
 }) {
+  const { t } = useTranslation();
   // A placement nobody is working -- cancelled through any path (manager
   // cancel, worker cancel, or the auto-cancel that fires when a sick day is
   // marked), or a NO_SHOW where the worker simply never arrived -- stays on
@@ -739,6 +741,16 @@ function PlacementTag({
   // and could not tell a cancellation apart from a no-show at a glance.
   const absenceLabel = placementAbsenceLabel(entry);
   const cancelled = absenceLabel !== null;
+  // A worked shift reads green (2026-08-16), so a week's grid separates
+  // "done" from "still to come" at a glance rather than showing every
+  // staffed placement in the same blue.
+  //
+  // Checked AFTER `cancelled` and rendered only when not cancelled: the two
+  // states are mutually exclusive in the data (a CANCELLED/NO_SHOW row is
+  // never also COMPLETED), but ordering it this way means an unexpected
+  // combination still renders as cancelled — the more important warning —
+  // instead of a green chip implying work that never happened.
+  const completed = !cancelled && isCompletedPlacement(entry);
   return (
     <button
       type="button"
@@ -752,18 +764,32 @@ function PlacementTag({
         "block w-full truncate rounded text-start font-medium",
         cancelled
           ? "bg-gray-100 text-gray-500 line-through hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700"
-          : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
+          : completed
+            ? "bg-green-50 text-green-700 hover:bg-green-100 dark:bg-green-950 dark:text-green-400 dark:hover:bg-green-900/60"
+            : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
         size === "sm" ? "px-1.5 py-0.5 text-[11px]" : "rounded-md px-2 py-1 text-xs",
         draggable && !cancelled ? "cursor-grab active:cursor-grabbing" : undefined,
         moving ? "opacity-50" : undefined,
       ]
         .filter(Boolean)
         .join(" ")}
-      title={absenceLabel ? `${label} — ${absenceLabel.toLowerCase()}` : label}
+      title={
+        absenceLabel
+          ? `${label} — ${absenceLabel.toLowerCase()}`
+          : completed
+            ? `${label} — ${t("status.completed").toLowerCase()}`
+            : label
+      }
     >
       {label}
       {absenceLabel && (
         <span className="ms-1 whitespace-nowrap font-normal no-underline">· {absenceLabel}</span>
+      )}
+      {/* The state is carried in text as well as colour. Green alone is not
+          readable for a red/green-colourblind manager, and the cancelled
+          chip already sets the precedent of labelling its state. */}
+      {completed && (
+        <span className="ms-1 whitespace-nowrap font-normal">· {t("status.completed")}</span>
       )}
     </button>
   );
@@ -827,6 +853,13 @@ function AbsenceTag({
   );
 }
 
+/** Conflict reason -> catalogue key, so the picker never inlines copy. */
+const WORKER_CONFLICT_KEY: Record<WorkerDayConflict, string> = {
+  ABSENT_SICK: "assignments.conflictSick",
+  ABSENT_VACATION: "assignments.conflictVacation",
+  ALREADY_PLACED: "assignments.conflictAlreadyPlaced",
+};
+
 /**
  * Search-as-you-type worker picker, scoped to workers eligible for
  * `hotelId` (backend resolves `hotel_id` -> hotel_group -> ACTIVE
@@ -838,10 +871,17 @@ function WorkerPicker({
   hotelId,
   value,
   onChange,
+  conflictFor,
 }: {
   hotelId: string;
   value: string;
   onChange: (workerId: string, label: string) => void;
+  /**
+   * Why this worker cannot take the shift, or null when they can. Passed in
+   * rather than computed here so the picker stays presentational and the
+   * caller owns which day is being staffed.
+   */
+  conflictFor: (workerId: string) => WorkerDayConflict | null;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
@@ -872,22 +912,52 @@ function WorkerPicker({
             workers.map((w) => {
               const label = `${w.first_name} ${w.last_name}`;
               const selected = value === w.id;
+              const conflict = conflictFor(w.id);
               return (
                 <button
                   key={w.id}
                   type="button"
                   onClick={() => onChange(w.id, label)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
-                    selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
-                  }`}
+                  // Not `disabled`. The backend is the authority on whether a
+                  // placement is allowed, and a manager may legitimately need
+                  // to place someone the client believes is busy (covering a
+                  // shift that is about to be cancelled, for instance).
+                  // Marking the row is a warning, not a veto -- the server
+                  // still rejects a genuine double-booking with its own error.
+                  aria-describedby={conflict ? `worker-conflict-${w.id}` : undefined}
+                  className={[
+                    "flex w-full items-center justify-between gap-2 px-3 py-2 text-start text-sm",
+                    selected
+                      ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
+                      : conflict
+                        ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/50 dark:text-red-400 dark:hover:bg-red-900/40"
+                        : "text-gray-900 hover:bg-gray-50 dark:text-gray-100 dark:hover:bg-gray-800",
+                  ].join(" ")}
                 >
                   <span className="truncate">{label}</span>
-                  <span className="truncate text-xs text-gray-400 dark:text-gray-500">{w.email}</span>
+                  {conflict ? (
+                    // The reason is spelled out, not just coloured: red alone
+                    // is unreadable for a red/green-colourblind manager, and
+                    // "why" is more actionable than "no".
+                    <span
+                      id={`worker-conflict-${w.id}`}
+                      className="whitespace-nowrap text-xs font-medium"
+                    >
+                      {t(WORKER_CONFLICT_KEY[conflict])}
+                    </span>
+                  ) : (
+                    <span className="truncate text-xs text-gray-400 dark:text-gray-500">{w.email}</span>
+                  )}
                 </button>
               );
             })
           )}
         </div>
+      )}
+      {hotelId && workers.some((w) => conflictFor(w.id)) && (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          {t("assignments.unavailableHint")}
+        </p>
       )}
     </div>
   );
@@ -913,7 +983,24 @@ function AddEntryModal({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
+  // Same SWR keys the grid behind this modal already uses, so these resolve
+  // from cache -- the picker gains availability without a new request. The
+  // absence read is manager/RM/admin-only server-side; for anyone else it is
+  // simply absent (403 handled inside the hook) and the picker falls back to
+  // flagging double-bookings alone rather than erroring.
+  const canSeeAbsences =
+    user?.role === "admin" || user?.role === "manager" || user?.role === "regional_manager";
+  const { data: rangeEntries } = useCalendarEntriesInRange(range);
+  const { data: rangeAbsences } = useAbsencesInRange(canSeeAbsences ? range : null);
+
+  const conflictFor = useMemo(
+    () => (workerId: string) =>
+      workerDayConflict(workerId, day, rangeEntries ?? [], rangeAbsences ?? []),
+    [day, rangeEntries, rangeAbsences],
+  );
+
   const [hotelId, setHotelId] = useState("");
   const [workerId, setWorkerId] = useState("");
   const [workerLabel, setWorkerLabel] = useState("");
@@ -1039,6 +1126,7 @@ function AddEntryModal({
         />
         <WorkerPicker
           hotelId={hotelId}
+          conflictFor={conflictFor}
           value={workerId}
           onChange={(id, label) => {
             setWorkerId(id);

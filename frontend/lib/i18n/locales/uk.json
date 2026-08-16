@@ -147,7 +147,9 @@
     "leaderboard": "Рейтинг",
     "marketplace": "Біржа роботи",
     "myOnboarding": "Моя адаптація",
-    "reviewQueue": "Черга перевірки"
+    "reviewQueue": "Черга перевірки",
+    "docs": "Документи",
+    "explore": "Огляд"
   },
   "roles": {
     "admin": "Адміністратор",
@@ -227,7 +229,12 @@
     "noCalendarPlacements": "Розміщень у календарі не знайдено",
     "noCalendarPlacementsDescription": "Розмістіть працівника безпосередньо в календарі, щоб побачити його тут.",
     "pageDescription": "Підтверджені працівники та зміни, на які вони призначені.",
-    "noneFound": "Призначень не знайдено"
+    "noneFound": "Призначень не знайдено",
+    "unavailable": "Недоступний",
+    "conflictSick": "Лікарняний",
+    "conflictVacation": "У відпустці",
+    "conflictAlreadyPlaced": "Уже призначений цього дня",
+    "unavailableHint": "Працівники, позначені червоним, недоступні цього дня."
   },
   "settings": {
     "language": {

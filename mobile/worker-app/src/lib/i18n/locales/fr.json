@@ -147,7 +147,9 @@
     "leaderboard": "Classement",
     "marketplace": "Bourse d'emplois",
     "myOnboarding": "Mon intégration",
-    "reviewQueue": "File de validation"
+    "reviewQueue": "File de validation",
+    "docs": "Documents",
+    "explore": "Explorer"
   },
   "roles": {
     "admin": "Administrateur",
@@ -227,7 +229,12 @@
     "noCalendarPlacements": "Aucun placement au calendrier trouvé",
     "noCalendarPlacementsDescription": "Placez un employé directement sur le calendrier pour le voir ici.",
     "pageDescription": "Employés confirmés et les services sur lesquels ils sont affectés.",
-    "noneFound": "Aucune affectation trouvée"
+    "noneFound": "Aucune affectation trouvée",
+    "unavailable": "Indisponible",
+    "conflictSick": "Congé maladie",
+    "conflictVacation": "En congés",
+    "conflictAlreadyPlaced": "Déjà affecté ce jour-là",
+    "unavailableHint": "Les employés en rouge ne sont pas disponibles ce jour-là."
   },
   "settings": {
     "language": {
