@@ -17,8 +17,8 @@ import {
   Input,
   PageHeader,
   Select,
-  TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { CreateCalendarEntryInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -86,13 +86,11 @@ function NewCalendarEntryForm() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/assignments" className="text-sm">
-          ← Back to assignments
-        </TextLink>
+        <BackLink href="/assignments" className="text-sm" labelKey="common.backTo.assignments" />
         <PageHeader
           className="mt-2"
           title={t("assignments.placeOnCalendarTitle")}
-          description="Directly confirm a worker for a hotel and day — no broadcast, no accept step."
+          description={t("assignments.placeOnCalendarDescription")}
         />
       </div>
 
@@ -143,7 +141,7 @@ function NewCalendarEntryForm() {
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="submit" loading={submitting} disabled={submitting || !valid}>
-                Place worker
+                {t("requests.placeWorkerAction")}
               </Button>
             </div>
           </form>
@@ -154,13 +152,14 @@ function NewCalendarEntryForm() {
 }
 
 export default function NewCalendarEntryPage() {
+  const { t } = useTranslation();
   return (
     <StaffingWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only managers and admins can place a worker on the calendar.
+              {t("requests.adminOnlyPlaceOnCalendar")}
             </CardContent>
           </Card>
         </div>

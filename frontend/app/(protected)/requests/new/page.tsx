@@ -18,8 +18,8 @@ import {
   PageHeader,
   Select,
   Textarea,
-  TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { CreateWorkRequestInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -137,9 +137,7 @@ function NewWorkRequestForm() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/requests" className="text-sm">
-          ← Back to work requests
-        </TextLink>
+        <BackLink href="/requests" className="text-sm" labelKey="common.backTo.workRequests" />
         <PageHeader
           className="mt-2"
           title={t("requests.newTitle")}
@@ -255,7 +253,7 @@ function NewWorkRequestForm() {
                 loading={submitting === "draft"}
                 disabled={submitting !== null || !valid}
               >
-                Save draft
+                {t("requests.saveDraft")}
               </Button>
               <Button
                 type="button"
@@ -263,7 +261,7 @@ function NewWorkRequestForm() {
                 disabled={submitting !== null || !valid}
                 onClick={() => submit("OPEN")}
               >
-                Publish
+                {t("common.publish")}
               </Button>
             </div>
           </form>
@@ -274,13 +272,14 @@ function NewWorkRequestForm() {
 }
 
 export default function NewWorkRequestPage() {
+  const { t } = useTranslation();
   return (
     <StaffingWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only managers and admins can create work requests.
+              {t("requests.adminOnlyCreate")}
             </CardContent>
           </Card>
         </div>

@@ -96,7 +96,7 @@ export default function MyOnboardingPage() {
       <PageHeader
         title={
           <div className="flex items-center gap-4">
-            My Onboarding
+            {t("onboarding.myOnboardingTitle")}
             <Badge tone={statusTone}>{statusLabel}</Badge>
           </div>
         }
@@ -179,7 +179,7 @@ export default function MyOnboardingPage() {
                     onClick={handleTriggerReonboarding}
                     loading={triggerAction.isPending("trigger_reonboarding")}
                   >
-                    Start Re-Onboarding
+                    {t("onboarding.startReOnboarding")}
                   </Button>
                 </div>
               )}

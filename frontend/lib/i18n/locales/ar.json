@@ -41,7 +41,37 @@
     "coordinates": "الإحداثيات",
     "loadingLabel": "جارٍ التحميل",
     "navigation": "التنقل",
-    "openNavigation": "فتح التنقل"
+    "openNavigation": "فتح التنقل",
+    "backTo": {
+      "attendance": "العودة إلى الحضور",
+      "users": "العودة إلى المستخدمين",
+      "user": "العودة إلى المستخدم",
+      "notifications": "العودة إلى الإشعارات",
+      "workRequests": "العودة إلى طلبات العمل",
+      "broadcasts": "العودة إلى البث",
+      "hotels": "العودة إلى الفنادق",
+      "hotel": "العودة إلى الفندق",
+      "hotelGroups": "العودة إلى مجموعات الفنادق",
+      "hotelGroup": "العودة إلى مجموعة الفنادق",
+      "assignments": "العودة إلى المهام"
+    },
+    "add": "إضافة",
+    "approve": "الموافقة",
+    "reject": "رفض",
+    "remove": "إزالة",
+    "restore": "استعادة",
+    "verify": "التحقق",
+    "rate": "تقييم",
+    "reassign": "إعادة التعيين",
+    "publish": "نشر",
+    "previous": "السابق",
+    "tryAgain": "إعادة المحاولة",
+    "goToDashboard": "الانتقال إلى لوحة التحكم",
+    "somethingWentWrong": "حدث خطأ ما",
+    "pageNotFound": "الصفحة غير موجودة",
+    "today": "اليوم",
+    "file": "الملف",
+    "download": "تنزيل"
   },
   "fields": {
     "name": "الاسم",
@@ -123,7 +153,11 @@
     "lastName": "اسم العائلة",
     "workersNeeded": "الموظفون المطلوبون",
     "requiresWorkPermit": "يتطلب تصريح عمل (لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا)",
-    "activeCanSignIn": "نشط (يمكنه تسجيل الدخول إلى المنصة)"
+    "activeCanSignIn": "نشط (يمكنه تسجيل الدخول إلى المنصة)",
+    "score0to100": "النتيجة (0–100)",
+    "punctuality0to100": "الالتزام بالمواعيد (0–100)",
+    "quality0to100": "الجودة (0–100)",
+    "attitude0to100": "السلوك (0–100)"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -235,7 +269,18 @@
     "conflictSick": "إجازة مرضية",
     "conflictVacation": "في إجازة",
     "conflictAlreadyPlaced": "مُعيَّن بالفعل في هذا اليوم",
-    "unavailableHint": "الموظفون المميزون بالأحمر غير متاحين في هذا اليوم."
+    "unavailableHint": "الموظفون المميزون بالأحمر غير متاحين في هذا اليوم.",
+    "broadcastEpic9": "بث (Epic 9)",
+    "directRequestLegacy": "طلب مباشر (قديم)",
+    "keepAssignment": "الإبقاء على المهمة",
+    "log": "تسجيل",
+    "viewFailed": "تعذر تحميل المهام. يرجى المحاولة مرة أخرى.",
+    "roomsWholeNumber": "يجب أن تكون الغرف المنجزة عدداً صحيحاً من 0 أو أكثر.",
+    "scoreWholeNumber": "يجب أن تكون النتيجة عدداً صحيحاً من 0 إلى 100.",
+    "placeOnCalendarDescription": "أكّد موظفاً مباشرة لفندق ويوم — بدون بث وبدون خطوة قبول.",
+    "calendarPlacementsDescription": "الموظفون المُنسَّبون مباشرة في تقويم الفندق — بدون بث وبدون خطوة قبول.",
+    "calendarPlacementsLink": "التنسيبات في التقويم",
+    "scoreDerivedHint": "تُشتق الحالة من النتيجة: 70 فأكثر ناجح، 40–69 يحتاج إعادة عمل، أقل من 40 راسب."
   },
   "settings": {
     "language": {
@@ -254,7 +299,8 @@
     "themeSystemNote": "النظام يتبع إعداد جهازك.",
     "localDevBuild": "إصدار تطوير محلي",
     "pageDescription": "إعدادات حسابك وجلستك والتطبيق.",
-    "signedInAs": "تم تسجيل الدخول بصفة"
+    "signedInAs": "تم تسجيل الدخول بصفة",
+    "notAvailableYet": "غير متاح بعد"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -273,11 +319,21 @@
     "email": "البريد الإلكتروني",
     "resetYourPassword": "إعادة تعيين كلمة المرور",
     "setNewPassword": "تعيين كلمة مرور جديدة",
-    "invalidResetLink": "رابط إعادة تعيين كلمة المرور غير صالح. الرمز مفقود."
+    "invalidResetLink": "رابط إعادة تعيين كلمة المرور غير صالح. الرمز مفقود.",
+    "backToLogin": "العودة إلى تسجيل الدخول",
+    "returnToLogin": "العودة إلى تسجيل الدخول",
+    "requestNewLink": "طلب رابط جديد",
+    "enterEmailResetHint": "أدخل عنوان بريدك الإلكتروني وسنرسل لك رابطاً لإعادة تعيين كلمة المرور.",
+    "sendResetLinkAction": "إرسال رابط إعادة التعيين",
+    "resetLinkSentHint": "إذا كان هذا البريد الإلكتروني موجوداً، فقد أُرسل إليه رابط لإعادة تعيين كلمة المرور.",
+    "enterNewPasswordHint": "أدخل كلمة مرور جديدة لحسابك.",
+    "resetPasswordTitle": "إعادة تعيين كلمة المرور",
+    "invalidResetTokenMissing": "رمز إعادة التعيين غير صالح أو مفقود."
   },
   "search": {
     "byNameOrEmail": "ابحث بالاسم أو البريد الإلكتروني…",
-    "nameOrCity": "الاسم أو المدينة…"
+    "nameOrCity": "الاسم أو المدينة…",
+    "nameOrEmailShort": "الاسم أو البريد الإلكتروني…"
   },
   "filters": {
     "allHotels": "جميع الفنادق",
@@ -341,7 +397,13 @@
     "evaluateWorkPermitRequired": "التقييم مع اشتراط تصريح العمل",
     "noDocuments": "لا توجد مستندات",
     "uploadTitle": "رفع مستند",
-    "nonEuWorkPermit": "مستند تصريح عمل لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا"
+    "nonEuWorkPermit": "مستند تصريح عمل لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا",
+    "geoLoadFailed": "تعذر تحميل بيانات التحقق الجغرافي.",
+    "statusLoadFailed": "تعذر تحميل حالة المستند.",
+    "loadFailed": "تعذر تحميل المستندات.",
+    "deleteAction": "حذف",
+    "uploadAction": "رفع",
+    "fileTooLarge": "يتجاوز الملف حد 10 ميجابايت."
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -361,7 +423,22 @@
     "createContractTitle": "إنشاء عقد",
     "noPayslipRequests": "لا توجد طلبات كشوف رواتب",
     "noPayslipRequestsDescription": "تظهر الطلبات هنا بمجرد أن يطلب الموظف كشف راتب، أو ينشئه مدير نيابة عنه.",
-    "newPayslipRequestTitle": "طلب كشف راتب جديد"
+    "newPayslipRequestTitle": "طلب كشف راتب جديد",
+    "loadFailed": "تعذر تحميل حالة العقد.",
+    "downloadContractPdf": "تنزيل عقد PDF",
+    "uploadSignedContract": "رفع العقد الموقع",
+    "confirmSignature": "تأكيد التوقيع",
+    "confirmContinuation": "تأكيد الاستمرار",
+    "doNotContinue": "عدم الاستمرار",
+    "createContractAction": "إنشاء عقد",
+    "markFulfilledAction": "وضع علامة كمُنفَّذ",
+    "newRequestAction": "طلب جديد",
+    "payslipsLoadFailed": "تعذر تحميل طلبات كشوف الرواتب.",
+    "createRequestAction": "إنشاء طلب",
+    "bothDatesRequired": "كلا تاريخي الفترة مطلوبان.",
+    "periodEndAfterStart": "يجب أن تكون نهاية الفترة في تاريخ بداية الفترة أو بعده.",
+    "templateStartRequired": "القالب والمنصب وتاريخ البدء مطلوبة.",
+    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده."
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -373,14 +450,22 @@
     "reviewNotice": "مراجعة الإشعار",
     "loadFailed": "تعذر تحميل حالة موافقتك.",
     "history": "سجل الموافقات",
-    "auditTrail": "سجل التدقيق"
+    "auditTrail": "سجل التدقيق",
+    "loadOneFailed": "تعذر تحميل حالة موافقتك."
   },
   "notifications": {
     "title": "الإشعارات",
     "none": "لا توجد إشعارات.",
     "channel": "القناة",
     "readAt": "وقت القراءة",
-    "noneFound": "لم يتم العثور على إشعارات"
+    "noneFound": "لم يتم العثور على إشعارات",
+    "viewOneFailed": "لم يتم العثور على هذا الإشعار أو تعذر تحميله.",
+    "markAsReadAction": "وضع علامة كمقروء",
+    "markAllRead": "وضع علامة على الكل كمقروء",
+    "loadFailed": "تعذر تحميل الإشعارات. يرجى المحاولة مرة أخرى.",
+    "viewAllAction": "عرض جميع الإشعارات",
+    "markReadHint": "ضع علامة مقروء على هذا الإشعار بمجرد اطلاعك عليه.",
+    "allCaughtUp": "لقد اطلعت على كل شيء."
   },
   "leaderboard": {
     "none": "لا توجد بيانات لوحة الصدارة بعد.",
@@ -394,7 +479,13 @@
     "signOut": "تسجيل الخروج",
     "noAbsences": "لم يتم تسجيل أيام مرضية أو إجازات.",
     "editTitle": "تعديل الملف الشخصي",
-    "resetPasswordTitle": "إعادة تعيين كلمة المرور"
+    "resetPasswordTitle": "إعادة تعيين كلمة المرور",
+    "updateDetailsHint": "حدّث اسمك وبيانات الاتصال، أو أعد تعيين كلمة المرور.",
+    "saveChanges": "حفظ التغييرات",
+    "sendResetLink": "إرسال رابط إعادة التعيين",
+    "firstNameLastNameRequired": "الاسم الأول واسم العائلة مطلوبان.",
+    "phoneInvalid": "يجب أن يكون الهاتف رقماً دولياً صالحاً، مثل +49301234567.",
+    "viewProfile": "عرض الملف الشخصي"
   },
   "skills": {
     "CLEANER": "عامل نظافة",
@@ -421,7 +512,15 @@
     "workersPlaced": "الموظفون المُنسَّبون",
     "sick": "مريض",
     "onVacation": "في إجازة",
-    "nothingScheduled": "لا يوجد شيء مجدول"
+    "nothingScheduled": "لا يوجد شيء مجدول",
+    "selectHotelHint": "اختر فندقاً أعلاه لعرض أو تعديل ملخص ورديته اليومي.",
+    "markAbsentAction": "وضع علامة غياب",
+    "cancelPlacementTitle": "إلغاء التنسيب",
+    "dragToMoveHint": "لنقل هذا التنسيب إلى يوم آخر، اسحبه إلى خلية اليوم المقصود.",
+    "absencesLoadFailed": "تعذر تحميل حالات غيابك.",
+    "reasonRequiredVacation": "السبب مطلوب لغياب الإجازة.",
+    "roomsWholeNumber": "أدخل عدداً صحيحاً من الغرف (0 أو أكثر).",
+    "dateRequired": "التاريخ مطلوب."
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
@@ -438,7 +537,17 @@
     "pageDescription": "العقارات المزوَّدة بالموظفين عبر المنصة.",
     "noneFound": "لم يتم العثور على فنادق",
     "activeVisibleForStaffing": "نشط (مرئي للموظفين ومفتوح للتوظيف)",
-    "acceptingNewWorkRequests": "يقبل طلبات عمل جديدة"
+    "acceptingNewWorkRequests": "يقبل طلبات عمل جديدة",
+    "loadFailed": "تعذر تحميل الفنادق. يرجى المحاولة مرة أخرى.",
+    "loadOneFailed": "تعذر تحميل هذا الفندق.",
+    "loadOneFailedRemoved": "تعذر تحميل هذا الفندق. ربما تمت إزالته.",
+    "adminOnlyCreate": "يمكن للمسؤولين فقط إنشاء فنادق.",
+    "adminOnlyEdit": "يمكن للمسؤولين فقط تعديل الفنادق.",
+    "adminOnlyArchive": "يمكن للمسؤولين فقط عرض الأرشيف.",
+    "useCurrentLocation": "استخدام الموقع الحالي",
+    "loadArchivedFailed": "تعذر تحميل الفنادق المؤرشفة.",
+    "restoreAction": "استعادة",
+    "geofenceNotSet": "غير محدد — تسجيل حضور الموظف غير متاح"
   },
   "users": {
     "new": "مستخدم جديد",
@@ -460,7 +569,17 @@
     "noneFound": "لم يتم العثور على مستخدمين",
     "managesHotel": "يدير الفندق",
     "managesGroup": "يدير المجموعة",
-    "editAssignmentTitle": "تعديل التعيين"
+    "editAssignmentTitle": "تعديل التعيين",
+    "editNoPermission": "يمكن للمسؤولين والمديرين فقط تعديل المستخدمين.",
+    "viewNoPermission": "يمكن للمسؤولين والمديرين فقط عرض حسابات المستخدمين.",
+    "listNoPermission": "يمكن للمسؤولين والمديرين فقط عرض المستخدمين.",
+    "loadOneFailed": "تعذر تحميل هذا المستخدم.",
+    "loadOneFailedRemoved": "تعذر تحميل هذا المستخدم. ربما تمت إزالته.",
+    "loadFailed": "تعذر تحميل المستخدمين. يرجى المحاولة مرة أخرى.",
+    "sendResetLink": "إرسال رابط إعادة التعيين",
+    "revokeSessionsAction": "إلغاء الجلسات",
+    "deactivateAction": "إلغاء التفعيل",
+    "employeeManagement": "إدارة الموظفين"
   },
   "requests": {
     "title": "طلب عمل",
@@ -482,7 +601,27 @@
     "newTitle": "طلب عمل جديد",
     "newDescription": "احفظه كمسودة، أو انشره فوراً لفتحه للتوظيف.",
     "pageDescription": "الورديات المفتوحة للتوظيف عبر فنادقك.",
-    "noneFound": "لم يتم العثور على طلبات عمل"
+    "noneFound": "لم يتم العثور على طلبات عمل",
+    "loadFailed": "تعذر تحميل طلبات العمل. يرجى المحاولة مرة أخرى.",
+    "keepRequest": "الإبقاء على الطلب",
+    "cancelRequestAction": "إلغاء الطلب",
+    "saveDraft": "حفظ المسودة",
+    "adminOnlyCreate": "يمكن للمديرين والمسؤولين فقط إنشاء طلبات عمل.",
+    "adminOnlyPlaceOnCalendar": "يمكن للمديرين والمسؤولين فقط تنسيب موظف في التقويم.",
+    "adminOnlyRaiseBroadcast": "يمكن للمديرين والمسؤولين فقط إطلاق بث.",
+    "calendarLoadFailed": "تعذر تحميل التنسيبات في التقويم. يرجى المحاولة مرة أخرى.",
+    "placeWorkerAction": "تنسيب موظف",
+    "broadcastTitle": "البث",
+    "maps": "الخرائط",
+    "eligibilityLoadFailed": "تعذر تحميل الأهلية لهذا البث.",
+    "acceptAction": "قبول",
+    "closeBroadcastHint": "أغلق هذا البث مبكراً إذا لم تعد بحاجة إلى ملئه.",
+    "closeBroadcastTitle": "إغلاق البث",
+    "broadcastsLoadFailed": "تعذر تحميل البث. يرجى المحاولة مرة أخرى.",
+    "skillsNeeded": "المهارات المطلوبة",
+    "addSkill": "إضافة مهارة",
+    "raiseBroadcastAction": "إطلاق البث",
+    "slotClaimedByOther": "حجز شخص آخر هذا المكان قبلك مباشرة — لم يتم إسناد أي وردية."
   },
   "onboarding": {
     "managerReview": "مراجعة المدير",
@@ -525,7 +664,19 @@
     "reviewQueueEmptyDescription": "لا توجد طلبات بانتظار مراجعتك.",
     "assignApprovedEmployee": "تعيين الموظف المعتمد",
     "rejectApplication": "رفض الطلب",
-    "rejectionReason": "سبب الرفض"
+    "rejectionReason": "سبب الرفض",
+    "startReOnboarding": "بدء إعادة الانضمام",
+    "noPermissionReviewQueue": "ليس لديك إذن لعرض قائمة المراجعة.",
+    "rejectAction": "رفض",
+    "completeAssignmentAction": "إكمال المهمة",
+    "rejectionSentHint": "يُرسل هذا السبب إلى مقدم الطلب.",
+    "confirmRejectionAction": "تأكيد الرفض",
+    "reviewQueueLoadFailed": "تعذر تحميل قائمة المراجعة. يرجى المحاولة مرة أخرى.",
+    "myOnboardingTitle": "انضمامي",
+    "noPermissionCreateUsers": "ليس لديك إذن لإنشاء مستخدمين.",
+    "noContractYet": "لم يُصدر لك عقد بعد. تواصل مع مديرك.",
+    "downloadContract": "تنزيل العقد",
+    "completeOnboardingAction": "أكمل انضمامك"
   },
   "analytics": {
     "myPerformance": "أدائي",
@@ -543,7 +694,14 @@
     "attendanceRate": "معدل الحضور",
     "noRankedWorkers": "لا يوجد موظفون مصنّفون بعد",
     "noRankedWorkersDescription": "تظهر التصنيفات بمجرد أن يكمل الموظفون مهامهم.",
-    "shifts": "الورديات"
+    "shifts": "الورديات",
+    "loadFailed": "تعذر تحميل التحليلات. يرجى المحاولة مرة أخرى.",
+    "noPermission": "التحليلات متاحة للمديرين والمسؤولين.",
+    "leaderboardLoadFailed": "تعذر تحميل لوحة الصدارة.",
+    "statsLoadFailed": "تعذر تحميل إحصاءاتك.",
+    "platformOverview": "نظرة عامة على المنصة",
+    "viewAnalytics": "عرض التحليلات",
+    "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة."
   },
   "hotelGroups": {
     "noDeleted": "لا توجد مجموعات فنادق محذوفة",
@@ -560,7 +718,14 @@
     "newDescription": "قم بتجميع الفنادق ضمن منطقة واحدة. عيّن مديراً إقليمياً من صفحة المستخدم الخاصة به.",
     "pageDescription": "تجميعات إقليمية تحدد نطاق المديرين والفوترة.",
     "noneYet": "لا توجد مجموعات فنادق بعد",
-    "noneYetDescription": "تتيح لك المجموعات تعيين مدير إقليمي عبر عدة فنادق."
+    "noneYetDescription": "تتيح لك المجموعات تعيين مدير إقليمي عبر عدة فنادق.",
+    "loadFailed": "تعذر تحميل مجموعات الفنادق. يرجى المحاولة مرة أخرى.",
+    "loadOneFailed": "تعذر تحميل مجموعة الفنادق هذه.",
+    "adminOnlyCreate": "يمكن للمسؤولين فقط إنشاء مجموعات فنادق.",
+    "adminOnlyEdit": "يمكن للمسؤولين فقط تعديل مجموعات الفنادق.",
+    "orgChartAccess": "يمكن للمسؤولين والمديرين الإقليميين فقط عرض الهياكل التنظيمية.",
+    "loadArchivedFailed": "تعذر تحميل مجموعات الفنادق المؤرشفة.",
+    "billingPlaceholder": "عنوان الفوترة، الرقم الضريبي، مركز التكلفة…"
   },
   "attendance": {
     "expectedStart": "البدء المتوقع",
@@ -573,7 +738,10 @@
     "markVerified": "وضع علامة كمُتحقَّق منه",
     "pageDescription": "حالة تسجيل الدخول والخروج والتحقق للورديات المزوَّدة بالموظفين.",
     "records": "سجلات الحضور",
-    "noneFound": "لم يتم العثور على سجلات حضور"
+    "noneFound": "لم يتم العثور على سجلات حضور",
+    "viewAssignment": "عرض المهمة",
+    "saveReview": "حفظ المراجعة",
+    "loadFailed": "تعذر تحميل الحضور. يرجى المحاولة مرة أخرى."
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",
@@ -584,6 +752,31 @@
     "approveForWorkTitle": "الموافقة على العمل",
     "deactivateTemporaryTitle": "إلغاء التفعيل (توقف مؤقت)",
     "deleteLeftCompanyTitle": "حذف (غادر الشركة)",
-    "editSkillsTitle": "تعديل المهارات"
+    "editSkillsTitle": "تعديل المهارات",
+    "blocklistLoadFailed": "تعذر تحميل قائمة الحظر.",
+    "addAction": "إضافة",
+    "loadFailed": "تعذر تحميل حالة التوظيف.",
+    "noRecordFound": "لم يتم العثور على سجل توظيف. تواصل مع مسؤول النظام.",
+    "editAction": "تعديل",
+    "paperworkPendingHint": "أوراق/فحوصات معلقة قبل أن يمكن مراجعة هذا الموظف للموافقة.",
+    "confirmOnboardingComplete": "تأكيد اكتمال الانضمام",
+    "reactivateAndNewContract": "إعادة التفعيل وبدء عقد جديد",
+    "reactivateAction": "إعادة التفعيل",
+    "rehireAction": "إعادة التوظيف",
+    "restoredMustReapprove": "يجب أن يمر السجل المستعاد بالموافقة مرة أخرى قبل أن يصبح نشطاً.",
+    "restoreNewCycle": "استعادة (بدء دورة توظيف جديدة)",
+    "approveAction": "الموافقة",
+    "deactivateAction": "إلغاء التفعيل",
+    "deleteAction": "حذف",
+    "reasonRequired": "السبب مطلوب.",
+    "idAndReasonRequired": "معرّف الموظف والسبب مطلوبان كلاهما.",
+    "signedContractReceived": "تم استلام العقد الموقع — ستؤكده الموافقة."
+  },
+  "compliance": {
+    "exportDescription": "ينشئ نسخة من مستنداتك وسجل موافقاتك وسجل تدقيق حسابك.",
+    "downloadJson": "تنزيل JSON"
+  },
+  "archive": {
+    "description": "الفنادق ومجموعات الفنادق التي أُزيلت من التشغيل. يُحتفظ بالسجل — الاستعادة تجعل الكيان متاحاً فوراً."
   }
 }

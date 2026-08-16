@@ -99,14 +99,14 @@ export function ContractCard({ workerId }: { workerId: string }) {
           <CardTitle>{t("hr.contract")}</CardTitle>
           {isManagerOrAdmin && !contract && !isLoading && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
-              Create contract
+              {t("hr.createContractAction")}
             </Button>
           )}
         </CardHeader>
         <CardContent>
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load contract status.
+              {t("hr.loadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -162,7 +162,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
                     rel="noopener noreferrer"
                   >
                     <Button size="sm" variant="outline">
-                      Download contract PDF
+                      {t("hr.downloadContractPdf")}
                     </Button>
                   </a>
                 </div>
@@ -189,11 +189,11 @@ export function ContractCard({ workerId }: { workerId: string }) {
                       onClick={onUploadClick}
                       loading={action.isPending("upload")}
                     >
-                      Upload signed contract
+                      {t("hr.uploadSignedContract")}
                     </Button>
                   ) : (
                     <Button size="sm" onClick={onConfirm} loading={action.isPending("confirm")}>
-                      Confirm signature
+                      {t("hr.confirmSignature")}
                     </Button>
                   )}
                 </div>
@@ -202,7 +202,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
               {isManagerOrAdmin && (contract.status === "ACTIVE" || contract.status === "EXTENDED") && (
                 <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-4 dark:border-gray-800">
                   <Button size="sm" onClick={onExtend} loading={action.isPending("extend")}>
-                    Confirm continuation
+                    {t("hr.confirmContinuation")}
                   </Button>
                   <Button
                     size="sm"
@@ -210,7 +210,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
                     onClick={onLapse}
                     loading={action.isPending("lapse")}
                   >
-                    Do not continue
+                    {t("hr.doNotContinue")}
                   </Button>
                 </div>
               )}
@@ -264,11 +264,11 @@ function CreateContractModal({
   const onSubmit = () => {
     setFieldError(null);
     if (!templateId || !position || !startDate) {
-      setFieldError("Template, position, and start date are required.");
+      setFieldError(t("hr.templateStartRequired"));
       return;
     }
     if (endDate && endDate < startDate) {
-      setFieldError("End date must be on or after start date.");
+      setFieldError(t("hr.endDateAfterStart"));
       return;
     }
 
@@ -299,10 +299,10 @@ function CreateContractModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={create.pending}>
-            Create contract
+            {t("hr.createContractAction")}
           </Button>
         </>
       }

@@ -8,7 +8,8 @@ import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
 import type { UserFormSubmitValues } from "@/components/users/UserForm";
-import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
+import { Card, CardContent, PageHeader } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { CreateUserInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -77,9 +78,7 @@ function NewUser() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/users" className="text-sm">
-          ← Back to users
-        </TextLink>
+        <BackLink href="/users" className="text-sm" labelKey="common.backTo.users" />
         <PageHeader
           className="mt-2"
           title={t("users.new")}
@@ -100,6 +99,7 @@ function NewUser() {
 }
 
 export default function NewUserPage() {
+  const { t } = useTranslation();
   return (
     // RULE A (project-owner decision, 2026-08-12): create is 1-level-down, so
     // manager and regional_manager may now create users too — each restricted
@@ -112,7 +112,7 @@ export default function NewUserPage() {
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              You do not have permission to create users.
+              {t("onboarding.noPermissionCreateUsers")}
             </CardContent>
           </Card>
         </div>

@@ -8,7 +8,8 @@ import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
 import { useHotelGroups } from "@/hooks/useHotels";
-import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
+import { Card, CardContent, PageHeader } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { CreateHotelInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -71,9 +72,7 @@ function NewHotel() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/hotels" className="text-sm">
-          ← Back to hotels
-        </TextLink>
+        <BackLink href="/hotels" className="text-sm" labelKey="common.backTo.hotels" />
         <PageHeader
           className="mt-2"
           title={t("hotels.new")}
@@ -93,13 +92,14 @@ function NewHotel() {
 }
 
 export default function NewHotelPage() {
+  const { t } = useTranslation();
   return (
     <HotelWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only admins can create hotels.
+              {t("hotels.adminOnlyCreate")}
             </CardContent>
           </Card>
         </div>

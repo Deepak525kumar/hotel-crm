@@ -100,7 +100,7 @@ export default function NotificationsPage() {
             loading={markAll.pending}
             disabled={unreadCount === 0}
           >
-            Mark all as read
+            {t("notifications.markAllRead")}
           </Button>
         }
       />
@@ -122,7 +122,7 @@ export default function NotificationsPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600">
-              Failed to load notifications. Please try again.
+              {t("notifications.loadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.notifications")}>

@@ -102,11 +102,11 @@ function DocumentRow({
             rel="noreferrer"
             className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
           >
-            View
+            {t("documents.view")}
           </a>
         ) : (
           <span className="text-sm text-gray-400 dark:text-gray-500" title={t("documents.storageNotConfigured")}>
-            Unavailable
+            {t("assignments.unavailable")}
           </span>
         )}
         {canEdit && (
@@ -116,7 +116,7 @@ function DocumentRow({
             onClick={onDelete}
             loading={action.isPending(doc.id)}
           >
-            Delete
+            {t("employees.deleteAction")}
           </Button>
         )}
       </div>
@@ -181,7 +181,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
               under some condition, and it is not. */}
           {canUpload && (
             <Button size="sm" onClick={() => setUploadOpen(true)}>
-              Upload
+              {t("documents.uploadAction")}
             </Button>
           )}
         </CardHeader>
@@ -203,7 +203,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
 
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load documents.
+              {t("documents.loadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -319,10 +319,10 @@ function UploadDocumentModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={upload.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={upload.pending}>
-            Upload
+            {t("documents.uploadAction")}
           </Button>
         </>
       }
@@ -355,7 +355,7 @@ function UploadDocumentModal({
 
         <div className="flex flex-col gap-1">
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300" htmlFor="document-file">
-            File
+            {t("common.file")}
           </label>
           <input
             ref={fileInputRef}

@@ -160,7 +160,7 @@ export default function SettingsPage() {
                 }
                 value={
                   <span className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                    Not available yet
+                    {t("settings.notAvailableYet")}
                   </span>
                 }
               />

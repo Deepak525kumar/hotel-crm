@@ -24,6 +24,7 @@ import {
   Skeleton,
   Textarea,
 } from "@/components/ui";
+import { useDirectionalArrow } from "@/components/ui/BackLink";
 import { isCompletedPlacement, placementAbsenceLabel, workerDayConflict } from "@/lib/types";
 import type { WorkerDayConflict } from "@/lib/types";
 import type { AbsenceKind, Assignment, CalendarAbsence, CalendarEntryDto, RoomsCompletedEntry } from "@/lib/types";
@@ -46,6 +47,7 @@ import { useTranslation } from "react-i18next";
 
 export default function CalendarGridPage() {
   const { t } = useTranslation();
+  const forwardArrow = useDirectionalArrow("forward");
   const { user } = useAuth();
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -339,10 +341,10 @@ export default function CalendarGridPage() {
               disabled={isOnToday}
               aria-pressed={isOnToday}
             >
-              Today
+              {t("common.today")}
             </Button>
             <Button variant="outline" size="sm" onClick={goNext}>
-              Next →
+              {t("common.next")} {forwardArrow}
             </Button>
           </div>
         }
@@ -409,7 +411,7 @@ export default function CalendarGridPage() {
           // UI and was the reported defect).
           <Card className="p-4 border border-dashed border-gray-300 dark:border-gray-700 mb-4">
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              Select a hotel above to view or edit its daily shift summary.
+              {t("calendar.selectHotelHint")}
             </p>
           </Card>
         )
@@ -1107,7 +1109,7 @@ function AddEntryModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={submitting}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={submitting} disabled={submitting || !valid}>
             {repeatWeekly ? `Place worker (${occurrences}x)` : "Place worker"}
@@ -1257,10 +1259,10 @@ function MarkAbsenceForWorkerModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={submitting}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={submitting} disabled={!valid}>
-            Mark absent
+            {t("calendar.markAbsentAction")}
           </Button>
         </>
       }
@@ -1369,7 +1371,7 @@ function RoomsCompletedSection({
   const onSave = async () => {
     const parsed = Number(rooms);
     if (!Number.isInteger(parsed) || parsed < 0) {
-      setError("Enter a whole number of rooms (0 or more).");
+      setError(t("calendar.roomsWholeNumber"));
       return;
     }
     setError(null);
@@ -1441,7 +1443,7 @@ function RoomsCompletedSection({
           <FormError>{error}</FormError>
           <div className="flex gap-2">
             <Button size="sm" onClick={onSave} loading={saving}>
-              Save
+              {t("common.save")}
             </Button>
             <Button
               size="sm"
@@ -1449,7 +1451,7 @@ function RoomsCompletedSection({
               onClick={() => setEditing(false)}
               disabled={saving}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </div>
@@ -1477,13 +1479,13 @@ function RoomsCompletedSection({
           </div>
           {canWrite && (
             <Button size="sm" variant="outline" className="mt-1" onClick={startEditing}>
-              Edit
+              {t("employees.editAction")}
             </Button>
           )}
         </div>
       ) : canWrite ? (
         <Button size="sm" variant="outline" onClick={startEditing}>
-          Log rooms completed
+          {t("assignments.logRoomsCompletedTitle")}
         </Button>
       ) : (
         <p className="text-sm text-gray-500">{t("status.notYetLogged")}</p>
@@ -1549,11 +1551,11 @@ function EditEntryModal({
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={cancelling}>
-            Close
+            {t("common.close")}
           </Button>
           {canWrite && entry.assignment_status !== "CANCELLED" && (
             <Button variant="danger" onClick={onCancelPlacement} loading={cancelling}>
-              Cancel placement
+              {t("calendar.cancelPlacementTitle")}
             </Button>
           )}
         </>
@@ -1578,7 +1580,7 @@ function EditEntryModal({
             described a gesture they cannot perform. */}
         {canWrite && (
           <p className="text-xs text-gray-400 dark:text-gray-500">
-            To move this placement to a different day, drag it to the destination day cell.
+            {t("calendar.dragToMoveHint")}
           </p>
         )}
         <RoomsCompletedSection assignmentId={entry.assignment_id} canWrite={canWrite} />

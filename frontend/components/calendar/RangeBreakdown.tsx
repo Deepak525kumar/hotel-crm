@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton, StatTile } from "@/components/ui";
+import { useDirectionalArrow } from "@/components/ui/BackLink";
 import { FULL_DAY_LABEL, toDateKey, type CalendarView } from "@/lib/calendar";
 import { isActivePlacement } from "@/lib/types";
 import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
@@ -47,6 +48,7 @@ export function RangeBreakdown({
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
   const { t } = useTranslation();
+  const forwardArrow = useDirectionalArrow("forward");
   // Only days that actually have something to show. In month view this keeps
   // a 42-cell range from rendering 42 mostly-empty sections.
   // Cancelled placements are returned by the API on purpose (so the grid can
@@ -160,7 +162,7 @@ export function RangeBreakdown({
                                 {workerNameById.get(e.worker_id) ?? e.worker_id}
                               </span>
                               <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                                Details →
+                                {t("common.details")} {forwardArrow}
                               </span>
                             </button>
                           </li>
@@ -173,7 +175,7 @@ export function RangeBreakdown({
                     <div className="rounded-md border border-gray-200 dark:border-gray-700">
                       <div className="border-b border-gray-100 px-3 py-2 dark:border-gray-800">
                         <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                          Unavailable
+                          {t("assignments.unavailable")}
                         </span>
                       </div>
                       <ul className="divide-y divide-gray-100 dark:divide-gray-800">

@@ -165,7 +165,7 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
       </div>
       <div className="flex gap-2 justify-end">
         <Button variant="outline" size="sm" onClick={() => setEditing(false)} disabled={loading}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button size="sm" onClick={handleSave} disabled={loading}>
           {loading ? "Saving..." : "Save Summary"}

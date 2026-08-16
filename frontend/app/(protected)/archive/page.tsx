@@ -78,7 +78,7 @@ function ArchiveContent() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.archive")}
-        description="Hotels and hotel groups removed from operations. History is preserved — restoring makes an entity available again immediately."
+        description={t("archive.description")}
       />
 
       <FormError>{action.error}</FormError>
@@ -90,7 +90,7 @@ function ArchiveContent() {
         <CardContent className="p-0">
           {hotelsError ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load archived hotels.
+              {t("hotels.loadArchivedFailed")}
             </div>
           ) : hotelsLoading ? (
             <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
@@ -123,7 +123,7 @@ function ArchiveContent() {
                         onClick={() => restore("hotel", h.id)}
                         loading={action.pending && restoringId === h.id}
                       >
-                        Restore
+                        {t("hotels.restoreAction")}
                       </Button>
                     </TD>
                   </TR>
@@ -141,7 +141,7 @@ function ArchiveContent() {
         <CardContent className="p-0">
           {groupsError ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load archived hotel groups.
+              {t("hotelGroups.loadArchivedFailed")}
             </div>
           ) : groupsLoading ? (
             <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
@@ -170,7 +170,7 @@ function ArchiveContent() {
                         onClick={() => restore("group", g.id)}
                         loading={action.pending && restoringId === g.id}
                       >
-                        Restore
+                        {t("hotels.restoreAction")}
                       </Button>
                     </TD>
                   </TR>
@@ -185,13 +185,14 @@ function ArchiveContent() {
 }
 
 export default function ArchivePage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["admin"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-            Only admins can view the archive.
+            {t("hotels.adminOnlyArchive")}
           </CardContent>
         </Card>
       }

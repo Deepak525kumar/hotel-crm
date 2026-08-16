@@ -20,8 +20,8 @@ import {
   PageHeader,
   Select,
   Textarea,
-  TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { RaiseBroadcastInput, SkillTag } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -155,9 +155,7 @@ function NewBroadcastForm() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/requests/broadcasts" className="text-sm">
-          ← Back to broadcasts
-        </TextLink>
+        <BackLink href="/requests/broadcasts" className="text-sm" labelKey="common.backTo.broadcasts" />
         <PageHeader
           className="mt-2"
           title={t("requests.newBroadcast")}
@@ -239,10 +237,10 @@ function NewBroadcastForm() {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  Skills needed
+                  {t("requests.skillsNeeded")}
                 </span>
                 <Button type="button" variant="outline" size="sm" onClick={addSkillLine}>
-                  Add skill
+                  {t("requests.addSkill")}
                 </Button>
               </div>
 
@@ -275,7 +273,7 @@ function NewBroadcastForm() {
                       size="sm"
                       onClick={() => removeSkillLine(index)}
                     >
-                      Remove
+                      {t("common.remove")}
                     </Button>
                   )}
                 </div>
@@ -286,7 +284,7 @@ function NewBroadcastForm() {
 
             <div className="flex justify-end gap-3 pt-2">
               <Button type="submit" loading={submitting} disabled={submitting || !valid}>
-                Raise broadcast
+                {t("requests.raiseBroadcastAction")}
               </Button>
             </div>
           </form>
@@ -297,13 +295,14 @@ function NewBroadcastForm() {
 }
 
 export default function NewBroadcastPage() {
+  const { t } = useTranslation();
   return (
     <JobDispatchPhase2WriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only managers and admins can raise a broadcast.
+              {t("requests.adminOnlyRaiseBroadcast")}
             </CardContent>
           </Card>
         </div>

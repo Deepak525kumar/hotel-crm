@@ -88,7 +88,7 @@ export function NotificationsBell() {
 
           {preview.length === 0 ? (
             <p className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-              You&apos;re all caught up.
+              {t("notifications.allCaughtUp")}
             </p>
           ) : (
             <ul className="max-h-96 overflow-y-auto">
@@ -105,7 +105,7 @@ export function NotificationsBell() {
 
           <div className="border-t border-gray-100 px-4 py-2 text-center dark:border-gray-800">
             <TextLink href="/notifications" onClick={() => setOpen(false)} className="text-sm">
-              View all notifications
+              {t("notifications.viewAllAction")}
             </TextLink>
           </div>
         </div>
@@ -130,6 +130,7 @@ function NotificationRow({
   onClose: () => void;
   onMarkedRead: () => void;
 }) {
+  const { t } = useTranslation();
   const markRead = useAsyncAction();
 
   const onMarkRead = () =>
@@ -162,7 +163,7 @@ function NotificationRow({
             disabled={markRead.pending}
             className="text-xs font-medium text-blue-600 hover:underline disabled:opacity-50 dark:text-blue-400"
           >
-            Mark as read
+            {t("notifications.markAsReadAction")}
           </button>
         )}
       </div>

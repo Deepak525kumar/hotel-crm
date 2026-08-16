@@ -13,7 +13,7 @@ export default function ReviewQueuePage() {
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-            You do not have permission to view the review queue.
+            {t("onboarding.noPermissionReviewQueue")}
           </CardContent>
         </Card>
       }

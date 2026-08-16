@@ -40,8 +40,8 @@ import {
   Modal,
   PageHeader,
   Skeleton,
-  TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 function UserDetail() {
   const { t } = useTranslation();
@@ -106,14 +106,12 @@ function UserDetail() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <TextLink href="/users" className="text-sm">
-        ← Back to users
-      </TextLink>
+      <BackLink href="/users" className="text-sm" labelKey="common.backTo.users" />
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this user. They may have been removed.
+            {t("users.loadOneFailedRemoved")}
           </CardContent>
         </Card>
       ) : isLoading || !user ? (
@@ -255,7 +253,7 @@ function UserDetail() {
               <CardContent className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Reset password
+                    {t("profile.resetPasswordTitle")}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {passwordResetSentAt
@@ -269,7 +267,7 @@ function UserDetail() {
                   loading={passwordReset.pending}
                   className="shrink-0"
                 >
-                  Send reset link
+                  {t("auth.sendResetLinkAction")}
                 </Button>
               </CardContent>
               <FormError className="px-6 pb-4">{passwordReset.error}</FormError>
@@ -281,7 +279,7 @@ function UserDetail() {
               <CardContent className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    Revoke all sessions
+                    {t("users.revokeSessionsTitle")}
                   </p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     {sessionsRevokedAt
@@ -296,7 +294,7 @@ function UserDetail() {
                   onClick={() => setRevokeConfirmOpen(true)}
                   className="shrink-0"
                 >
-                  Revoke sessions
+                  {t("users.revokeSessionsAction")}
                 </Button>
               </CardContent>
             </Card>
@@ -308,7 +306,7 @@ function UserDetail() {
                 <CardContent className="flex items-center justify-between gap-4">
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      Deactivate account
+                      {t("users.deactivateAccountTitle")}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {isSelf
@@ -321,7 +319,7 @@ function UserDetail() {
                     disabled={isSelf}
                     onClick={() => setConfirmOpen(true)}
                   >
-                    Deactivate
+                    {t("employees.deactivateAction")}
                   </Button>
                 </CardContent>
               </Card>
@@ -341,10 +339,10 @@ function UserDetail() {
               onClick={() => setConfirmOpen(false)}
               disabled={deactivate.pending}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="danger" onClick={onDeactivate} loading={deactivate.pending}>
-              Deactivate
+              {t("employees.deactivateAction")}
             </Button>
           </>
         }
@@ -370,14 +368,14 @@ function UserDetail() {
               onClick={() => setRevokeConfirmOpen(false)}
               disabled={revokeSessions.pending}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
               onClick={onRevokeSessions}
               loading={revokeSessions.pending}
             >
-              Revoke sessions
+              {t("users.revokeSessionsAction")}
             </Button>
           </>
         }
@@ -402,13 +400,14 @@ function UserDetail() {
 }
 
 export default function UserDetailPage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-            Only admins and managers can view user accounts.
+            {t("users.viewNoPermission")}
           </CardContent>
         </Card>
       }

@@ -29,6 +29,7 @@ import {
   TR,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function HotelGroupDetailPage() {
   const { t } = useTranslation();
@@ -74,17 +75,12 @@ export default function HotelGroupDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <TextLink
-        href="/hotel-groups"
-        className="text-sm"
-      >
-        ← Back to hotel groups
-      </TextLink>
+      <BackLink href="/hotel-groups" className="text-sm" labelKey="common.backTo.hotelGroups" />
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this hotel group.
+            {t("hotelGroups.loadOneFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !group ? (

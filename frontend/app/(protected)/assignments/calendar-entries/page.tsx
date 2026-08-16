@@ -76,7 +76,7 @@ export default function CalendarEntriesPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("assignments.calendarPlacementsTitle")}
-        description="Workers placed directly on a hotel's calendar — no broadcast, no accept step."
+        description={t("assignments.calendarPlacementsDescription")}
         actions={
           <StaffingWriteGate>
             <Link href="/assignments/calendar-entries/new">
@@ -90,7 +90,7 @@ export default function CalendarEntriesPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600">
-              Failed to load calendar placements. Please try again.
+              {t("requests.calendarLoadFailed")}
             </div>
           ) : (
             <Table aria-label={t("assignments.calendarPlacementsTitle")}>

@@ -7,6 +7,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useHotelOptions, useHotelOptionsInGroup } from "@/hooks/useWorkRequests";
 import { useHotelGroups, useUserOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useAuthStore } from "@/stores/auth";
+// Side-effect import: initialises i18next so `t()` resolves real copy rather
+// than echoing key paths. Relying on a transitive import chain for this is
+// fragile -- it is what let these assertions bake in raw keys originally.
+import "@/lib/i18n";
 import type { AuthUser, CalendarAbsence, CalendarEntryDto } from "@/lib/types";
 
 /**
@@ -192,11 +196,16 @@ describe("unavailable workers in the placement picker", () => {
   });
 
   // The reason must be carried in TEXT, not colour alone -- red is unreadable
-  // for a red/green-colourblind manager. Asserted through the describedby
-  // element and its translation key rather than the rendered English: i18next
-  // is not initialised in this render, so t() returns the key here. That the
-  // key resolves to real copy in all six locales is covered by
-  // locales.test.ts's key-parity assertions.
+  // for a red/green-colourblind manager.
+  //
+  // These assertions previously expected the raw key path
+  // ("assignments.conflictAlreadyPlaced"), because i18next happened not to be
+  // initialised in this render and an uninitialised `t()` echoes its key.
+  // That made the test pass on output a user must never see. i18next is now
+  // initialised here (via the `@/lib/i18n` side-effect import below, matching
+  // the other component tests in this suite), so these assert the copy a
+  // manager actually reads. Key parity across all six locales stays covered
+  // by locales.test.ts.
   it("spells out the reason rather than relying on colour", async () => {
     const dialog = await openPickerWith(WORKERS, [entry({ worker_id: "w1" })]);
 
@@ -206,7 +215,7 @@ describe("unavailable workers in the placement picker", () => {
 
     const reason = document.getElementById(describedBy!);
     expect(reason).not.toBeNull();
-    expect(reason!.textContent).toBe("assignments.conflictAlreadyPlaced");
+    expect(reason!.textContent).toBe("Already placed this day");
   });
 
   it("distinguishes a sick day from a double-booking", async () => {
@@ -224,7 +233,7 @@ describe("unavailable workers in the placement picker", () => {
     const busy = within(dialog).getByRole("button", { name: /Wanda Worker/ });
     expect(busy.className).toMatch(/bg-red-50/);
     expect(document.getElementById("worker-conflict-w1")!.textContent).toBe(
-      "assignments.conflictSick",
+      "Sick leave",
     );
   });
 

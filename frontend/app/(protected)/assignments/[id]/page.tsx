@@ -30,6 +30,7 @@ import {
   Textarea,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { QualityVerification, Rating, RoomsCompletedEntry } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -211,12 +212,7 @@ export default function AssignmentDetailPage() {
   if (error || !assignment) {
     return (
       <div className="space-y-4">
-        <TextLink
-          href="/assignments"
-          className="text-sm"
-        >
-          ← Back to assignments
-        </TextLink>
+        <BackLink href="/assignments" className="text-sm" labelKey="common.backTo.assignments" />
         <Card>
           <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
@@ -241,17 +237,12 @@ export default function AssignmentDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href="/assignments"
-          className="text-sm"
-        >
-          ← Back to assignments
-        </TextLink>
+        <BackLink href="/assignments" className="text-sm" labelKey="common.backTo.assignments" />
         <PageHeader
           className="mt-2"
           title={
             <span className="flex items-center gap-3">
-              Assignment
+              {t("assignments.title")}
               <AssignmentStatusBadge status={assignment.status} />
             </span>
           }
@@ -283,11 +274,11 @@ export default function AssignmentDetailPage() {
               value={
                 assignment.job_request_id ? (
                   <TextLink href={`/requests/broadcasts/${assignment.job_request_id}`}>
-                    Broadcast (Epic 9)
+                    {t("assignments.broadcastEpic9")}
                   </TextLink>
                 ) : assignment.work_request_id ? (
                   <TextLink href={`/requests/${assignment.work_request_id}`}>
-                    Direct Request (Legacy)
+                    {t("assignments.directRequestLegacy")}
                   </TextLink>
                 ) : (
                   <span className="text-gray-500">Calendar Placement (Direct Schedule)</span>
@@ -361,7 +352,7 @@ export default function AssignmentDetailPage() {
                     onClick={() => setReassignOpen(true)}
                     disabled={action.pending}
                   >
-                    Reassign
+                    {t("common.reassign")}
                   </Button>
                 </RoleGate>
               )}
@@ -371,7 +362,7 @@ export default function AssignmentDetailPage() {
                   onClick={() => setCancelOpen(true)}
                   disabled={action.pending}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               )}
               {canStart && (
@@ -416,7 +407,7 @@ export default function AssignmentDetailPage() {
                   onClick={() => setRoomsCompletedOpen(true)}
                   className="shrink-0"
                 >
-                  Log rooms completed
+                  {t("assignments.logRoomsCompletedTitle")}
                 </Button>
               )}
             </CardContent>
@@ -457,7 +448,7 @@ export default function AssignmentDetailPage() {
                 onClick={() => setVerificationOpen(true)}
                 className="shrink-0"
               >
-                Verify
+                {t("common.verify")}
               </Button>
             )}
           </CardContent>
@@ -474,7 +465,7 @@ export default function AssignmentDetailPage() {
               <Badge tone="success">{t("status.rated")}</Badge>
             ) : (
               <Button variant="outline" onClick={() => setRatingOpen(true)} className="shrink-0">
-                Rate
+                {t("common.rate")}
               </Button>
             )}
           </CardContent>
@@ -496,14 +487,14 @@ export default function AssignmentDetailPage() {
               onClick={() => setCancelOpen(false)}
               disabled={action.isPending("cancel")}
             >
-              Keep assignment
+              {t("assignments.keepAssignment")}
             </Button>
             <Button
               variant="danger"
               onClick={cancel}
               loading={action.isPending("cancel")}
             >
-              Cancel assignment
+              {t("assignments.cancelTitle")}
             </Button>
           </>
         }
@@ -612,10 +603,10 @@ function ReassignModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={reassign.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={reassign.pending} disabled={!selectedWorkerId}>
-            Reassign
+            {t("common.reassign")}
           </Button>
         </>
       }
@@ -695,7 +686,7 @@ function LogRoomsCompletedModal({
     setFieldError(null);
     const parsed = Number(roomsCompleted);
     if (roomsCompleted === "" || !Number.isInteger(parsed) || parsed < 0) {
-      setFieldError("Rooms completed must be a whole number of 0 or more.");
+      setFieldError(t("assignments.roomsWholeNumber"));
       return;
     }
 
@@ -723,10 +714,10 @@ function LogRoomsCompletedModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={log.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={log.pending}>
-            Log
+            {t("assignments.log")}
           </Button>
         </>
       }
@@ -786,7 +777,7 @@ function CreateVerificationModal({
     setFieldError(null);
     const parsed = Number(score);
     if (score === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
-      setFieldError("Score must be a whole number from 0 to 100.");
+      setFieldError(t("assignments.scoreWholeNumber"));
       return;
     }
 
@@ -815,17 +806,17 @@ function CreateVerificationModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={create.pending}>
-            Verify
+            {t("common.verify")}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="Score (0–100)"
+          label={t("fields.score0to100")}
           type="number"
           min={0}
           max={100}
@@ -834,7 +825,7 @@ function CreateVerificationModal({
           onChange={(e) => setScore(e.target.value)}
         />
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails.
+          {t("assignments.scoreDerivedHint")}
         </p>
         <Textarea
           label={t("fields.notesOptional")}
@@ -890,7 +881,7 @@ function CreateRatingModal({
     setFieldError(null);
     const parsed = Number(score);
     if (score === "" || !Number.isInteger(parsed) || parsed < 0 || parsed > 100) {
-      setFieldError("Score must be a whole number from 0 to 100.");
+      setFieldError(t("assignments.scoreWholeNumber"));
       return;
     }
 
@@ -926,17 +917,17 @@ function CreateRatingModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={create.pending}>
-            Rate
+            {t("common.rate")}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <Input
-          label="Score (0–100)"
+          label={t("fields.score0to100")}
           type="number"
           min={0}
           max={100}
@@ -946,7 +937,7 @@ function CreateRatingModal({
         />
         <div className="grid grid-cols-3 gap-3">
           <Input
-            label="Punctuality (0–100)"
+            label={t("fields.punctuality0to100")}
             type="number"
             min={0}
             max={100}
@@ -954,7 +945,7 @@ function CreateRatingModal({
             onChange={(e) => setPunctuality(e.target.value)}
           />
           <Input
-            label="Quality (0–100)"
+            label={t("fields.quality0to100")}
             type="number"
             min={0}
             max={100}
@@ -962,7 +953,7 @@ function CreateRatingModal({
             onChange={(e) => setQuality(e.target.value)}
           />
           <Input
-            label="Attitude (0–100)"
+            label={t("fields.attitude0to100")}
             type="number"
             min={0}
             max={100}

@@ -26,6 +26,7 @@ import {
   TextLink,
   Textarea,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function WorkRequestDetailPage() {
   const { t } = useTranslation();
@@ -78,9 +79,7 @@ export default function WorkRequestDetailPage() {
   if (error || !request) {
     return (
       <div className="space-y-4">
-        <TextLink href="/requests" className="text-sm">
-          ← Back to work requests
-        </TextLink>
+        <BackLink href="/requests" className="text-sm" labelKey="common.backTo.workRequests" />
         <Card>
           <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
@@ -95,9 +94,7 @@ export default function WorkRequestDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/requests" className="text-sm">
-          ← Back to work requests
-        </TextLink>
+        <BackLink href="/requests" className="text-sm" labelKey="common.backTo.workRequests" />
         <PageHeader
           className="mt-2"
           title={
@@ -214,7 +211,7 @@ export default function WorkRequestDetailPage() {
                       onClick={() => setCancelOpen(true)}
                       disabled={action.pending}
                     >
-                      Cancel
+                      {t("common.cancel")}
                     </Button>
                   )}
                   {canPublish && (
@@ -223,7 +220,7 @@ export default function WorkRequestDetailPage() {
                       loading={action.isPending("publish")}
                       disabled={action.isPending("cancel")}
                     >
-                      Publish
+                      {t("common.publish")}
                     </Button>
                   )}
                 </div>
@@ -248,14 +245,14 @@ export default function WorkRequestDetailPage() {
               onClick={() => setCancelOpen(false)}
               disabled={action.isPending("cancel")}
             >
-              Keep request
+              {t("requests.keepRequest")}
             </Button>
             <Button
               variant="danger"
               onClick={onCancel}
               loading={action.isPending("cancel")}
             >
-              Cancel request
+              {t("requests.cancelRequestAction")}
             </Button>
           </>
         }

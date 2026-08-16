@@ -242,7 +242,7 @@ export function HotelForm({
                 onClick={useCurrentLocation}
               >
                 <LocationIcon />
-                Use current location
+                {t("hotels.useCurrentLocation")}
               </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -281,7 +281,7 @@ export function HotelForm({
                 onClick={onCancel}
                 disabled={submitting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             )}
             <Button type="submit" loading={submitting} disabled={submitting || !valid}>

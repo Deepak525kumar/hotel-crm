@@ -40,7 +40,37 @@
     "coordinates": "Coordonnées",
     "loadingLabel": "Chargement",
     "navigation": "Navigation",
-    "openNavigation": "Ouvrir la navigation"
+    "openNavigation": "Ouvrir la navigation",
+    "backTo": {
+      "attendance": "Retour à la présence",
+      "users": "Retour aux utilisateurs",
+      "user": "Retour à l'utilisateur",
+      "notifications": "Retour aux notifications",
+      "workRequests": "Retour aux demandes de travail",
+      "broadcasts": "Retour aux diffusions",
+      "hotels": "Retour aux hôtels",
+      "hotel": "Retour à l'hôtel",
+      "hotelGroups": "Retour aux groupes hôteliers",
+      "hotelGroup": "Retour au groupe hôtelier",
+      "assignments": "Retour aux affectations"
+    },
+    "add": "Ajouter",
+    "approve": "Approuver",
+    "reject": "Rejeter",
+    "remove": "Retirer",
+    "restore": "Restaurer",
+    "verify": "Vérifier",
+    "rate": "Évaluer",
+    "reassign": "Réaffecter",
+    "publish": "Publier",
+    "previous": "Précédent",
+    "tryAgain": "Réessayer",
+    "goToDashboard": "Aller au tableau de bord",
+    "somethingWentWrong": "Une erreur est survenue",
+    "pageNotFound": "Page introuvable",
+    "today": "Aujourd'hui",
+    "file": "Fichier",
+    "download": "Télécharger"
   },
   "fields": {
     "name": "Nom",
@@ -122,7 +152,11 @@
     "lastName": "Nom de famille",
     "workersNeeded": "Employés requis",
     "requiresWorkPermit": "Nécessite un permis de travail (hors UE/EEE/Suisse)",
-    "activeCanSignIn": "Actif (peut se connecter à la plateforme)"
+    "activeCanSignIn": "Actif (peut se connecter à la plateforme)",
+    "score0to100": "Score (0–100)",
+    "punctuality0to100": "Ponctualité (0–100)",
+    "quality0to100": "Qualité (0–100)",
+    "attitude0to100": "Attitude (0–100)"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -234,7 +268,18 @@
     "conflictSick": "Congé maladie",
     "conflictVacation": "En congés",
     "conflictAlreadyPlaced": "Déjà affecté ce jour-là",
-    "unavailableHint": "Les employés en rouge ne sont pas disponibles ce jour-là."
+    "unavailableHint": "Les employés en rouge ne sont pas disponibles ce jour-là.",
+    "broadcastEpic9": "Diffusion (Epic 9)",
+    "directRequestLegacy": "Demande directe (Ancien)",
+    "keepAssignment": "Conserver l'affectation",
+    "log": "Enregistrer",
+    "viewFailed": "Impossible de charger les affectations. Veuillez réessayer.",
+    "roomsWholeNumber": "Les chambres terminées doivent être un nombre entier de 0 ou plus.",
+    "scoreWholeNumber": "Le score doit être un nombre entier de 0 à 100.",
+    "placeOnCalendarDescription": "Confirmez directement un employé pour un hôtel et un jour — sans diffusion, sans étape d'acceptation.",
+    "calendarPlacementsDescription": "Employés placés directement sur le calendrier d'un hôtel — sans diffusion, sans étape d'acceptation.",
+    "calendarPlacementsLink": "Placements au calendrier",
+    "scoreDerivedHint": "Le statut découle du score : 70+ réussi, 40–69 à retravailler, en dessous de 40 échoué."
   },
   "settings": {
     "language": {
@@ -253,7 +298,8 @@
     "themeSystemNote": "Système suit le réglage de votre appareil.",
     "localDevBuild": "Build de développement local",
     "pageDescription": "Vos préférences de compte, de session et d'application.",
-    "signedInAs": "Connecté en tant que"
+    "signedInAs": "Connecté en tant que",
+    "notAvailableYet": "Pas encore disponible"
   },
   "auth": {
     "login": "Se connecter",
@@ -272,11 +318,21 @@
     "email": "E-mail",
     "resetYourPassword": "Réinitialiser votre mot de passe",
     "setNewPassword": "Définir un nouveau mot de passe",
-    "invalidResetLink": "Lien de réinitialisation invalide. Le jeton est manquant."
+    "invalidResetLink": "Lien de réinitialisation invalide. Le jeton est manquant.",
+    "backToLogin": "Retour à la connexion",
+    "returnToLogin": "Retourner à la connexion",
+    "requestNewLink": "Demander un nouveau lien",
+    "enterEmailResetHint": "Saisissez votre adresse e-mail et nous vous enverrons un lien pour réinitialiser votre mot de passe.",
+    "sendResetLinkAction": "Envoyer le lien de réinitialisation",
+    "resetLinkSentHint": "Si cet e-mail existe, un lien de réinitialisation du mot de passe lui a été envoyé.",
+    "enterNewPasswordHint": "Saisissez un nouveau mot de passe pour votre compte.",
+    "resetPasswordTitle": "Réinitialiser le mot de passe",
+    "invalidResetTokenMissing": "Jeton de réinitialisation invalide ou manquant."
   },
   "search": {
     "byNameOrEmail": "Rechercher par nom ou e-mail…",
-    "nameOrCity": "Nom ou ville…"
+    "nameOrCity": "Nom ou ville…",
+    "nameOrEmailShort": "Nom ou e-mail…"
   },
   "filters": {
     "allHotels": "Tous les hôtels",
@@ -340,7 +396,13 @@
     "evaluateWorkPermitRequired": "Évaluer avec permis de travail requis",
     "noDocuments": "Aucun document",
     "uploadTitle": "Téléverser un document",
-    "nonEuWorkPermit": "Document de permis de travail hors UE/EEE/Suisse"
+    "nonEuWorkPermit": "Document de permis de travail hors UE/EEE/Suisse",
+    "geoLoadFailed": "Impossible de charger les données de vérification géographique.",
+    "statusLoadFailed": "Impossible de charger le statut du document.",
+    "loadFailed": "Impossible de charger les documents.",
+    "deleteAction": "Supprimer",
+    "uploadAction": "Téléverser",
+    "fileTooLarge": "Le fichier dépasse la limite de 10 Mo."
   },
   "hr": {
     "title": "RH et paie",
@@ -360,7 +422,22 @@
     "createContractTitle": "Créer un contrat",
     "noPayslipRequests": "Aucune demande de bulletin de paie",
     "noPayslipRequestsDescription": "Les demandes apparaissent ici dès que l'employé demande un bulletin de paie, ou qu'un responsable en crée un en son nom.",
-    "newPayslipRequestTitle": "Nouvelle demande de bulletin de paie"
+    "newPayslipRequestTitle": "Nouvelle demande de bulletin de paie",
+    "loadFailed": "Impossible de charger le statut du contrat.",
+    "downloadContractPdf": "Télécharger le PDF du contrat",
+    "uploadSignedContract": "Téléverser le contrat signé",
+    "confirmSignature": "Confirmer la signature",
+    "confirmContinuation": "Confirmer la poursuite",
+    "doNotContinue": "Ne pas poursuivre",
+    "createContractAction": "Créer un contrat",
+    "markFulfilledAction": "Marquer comme honoré",
+    "newRequestAction": "Nouvelle demande",
+    "payslipsLoadFailed": "Impossible de charger les demandes de bulletin de paie.",
+    "createRequestAction": "Créer la demande",
+    "bothDatesRequired": "Les deux dates de période sont requises.",
+    "periodEndAfterStart": "La fin de la période doit être postérieure ou égale au début.",
+    "templateStartRequired": "Le modèle, le poste et la date de début sont requis.",
+    "endDateAfterStart": "La date de fin doit être postérieure ou égale à la date de début."
   },
   "consent": {
     "title": "Consentement à la protection des données",
@@ -372,14 +449,22 @@
     "reviewNotice": "Consulter l'avis",
     "loadFailed": "Impossible de charger votre statut de consentement.",
     "history": "Historique des consentements",
-    "auditTrail": "Piste d'audit"
+    "auditTrail": "Piste d'audit",
+    "loadOneFailed": "Impossible de charger votre statut de consentement."
   },
   "notifications": {
     "title": "Notifications",
     "none": "Aucune notification.",
     "channel": "Canal",
     "readAt": "Lu le",
-    "noneFound": "Aucune notification trouvée"
+    "noneFound": "Aucune notification trouvée",
+    "viewOneFailed": "Cette notification est introuvable ou n'a pas pu être chargée.",
+    "markAsReadAction": "Marquer comme lu",
+    "markAllRead": "Tout marquer comme lu",
+    "loadFailed": "Impossible de charger les notifications. Veuillez réessayer.",
+    "viewAllAction": "Voir toutes les notifications",
+    "markReadHint": "Marquez cette notification comme lue une fois que vous l’avez vue.",
+    "allCaughtUp": "Vous êtes à jour."
   },
   "leaderboard": {
     "none": "Aucune donnée de classement.",
@@ -393,7 +478,13 @@
     "signOut": "Se déconnecter",
     "noAbsences": "Aucun jour de maladie ou de congé enregistré.",
     "editTitle": "Modifier le profil",
-    "resetPasswordTitle": "Réinitialiser le mot de passe"
+    "resetPasswordTitle": "Réinitialiser le mot de passe",
+    "updateDetailsHint": "Mettez à jour votre nom et vos coordonnées, ou réinitialisez votre mot de passe.",
+    "saveChanges": "Enregistrer les modifications",
+    "sendResetLink": "Envoyer le lien de réinitialisation",
+    "firstNameLastNameRequired": "Le prénom et le nom sont requis.",
+    "phoneInvalid": "Le téléphone doit être un numéro international valide, par ex. +49301234567.",
+    "viewProfile": "Voir le profil"
   },
   "skills": {
     "CLEANER": "Agent d'entretien",
@@ -420,7 +511,15 @@
     "workersPlaced": "Employés placés",
     "sick": "Malade",
     "onVacation": "En congé",
-    "nothingScheduled": "Rien de prévu"
+    "nothingScheduled": "Rien de prévu",
+    "selectHotelHint": "Sélectionnez un hôtel ci-dessus pour afficher ou modifier son résumé quotidien des services.",
+    "markAbsentAction": "Marquer absent",
+    "cancelPlacementTitle": "Annuler le placement",
+    "dragToMoveHint": "Pour déplacer ce placement vers un autre jour, faites-le glisser vers la cellule du jour de destination.",
+    "absencesLoadFailed": "Impossible de charger vos absences.",
+    "reasonRequiredVacation": "Un motif est requis pour une absence pour congé.",
+    "roomsWholeNumber": "Saisissez un nombre entier de chambres (0 ou plus).",
+    "dateRequired": "La date est requise."
   },
   "hotels": {
     "inThisGroup": "Hôtels de ce groupe",
@@ -437,7 +536,17 @@
     "pageDescription": "Établissements dotés en personnel via la plateforme.",
     "noneFound": "Aucun hôtel trouvé",
     "activeVisibleForStaffing": "Actif (visible par les employés et ouvert à la dotation en personnel)",
-    "acceptingNewWorkRequests": "Accepte de nouvelles demandes de travail"
+    "acceptingNewWorkRequests": "Accepte de nouvelles demandes de travail",
+    "loadFailed": "Impossible de charger les hôtels. Veuillez réessayer.",
+    "loadOneFailed": "Impossible de charger cet hôtel.",
+    "loadOneFailedRemoved": "Impossible de charger cet hôtel. Il a peut-être été supprimé.",
+    "adminOnlyCreate": "Seuls les administrateurs peuvent créer des hôtels.",
+    "adminOnlyEdit": "Seuls les administrateurs peuvent modifier les hôtels.",
+    "adminOnlyArchive": "Seuls les administrateurs peuvent consulter les archives.",
+    "useCurrentLocation": "Utiliser la position actuelle",
+    "loadArchivedFailed": "Impossible de charger les hôtels archivés.",
+    "restoreAction": "Restaurer",
+    "geofenceNotSet": "Non défini — pointage employé indisponible"
   },
   "users": {
     "new": "Nouvel utilisateur",
@@ -459,7 +568,17 @@
     "noneFound": "Aucun utilisateur trouvé",
     "managesHotel": "Gère l'hôtel",
     "managesGroup": "Gère le groupe",
-    "editAssignmentTitle": "Modifier l'affectation"
+    "editAssignmentTitle": "Modifier l'affectation",
+    "editNoPermission": "Seuls les administrateurs et responsables peuvent modifier les utilisateurs.",
+    "viewNoPermission": "Seuls les administrateurs et responsables peuvent consulter les comptes utilisateurs.",
+    "listNoPermission": "Seuls les administrateurs et responsables peuvent consulter les utilisateurs.",
+    "loadOneFailed": "Impossible de charger cet utilisateur.",
+    "loadOneFailedRemoved": "Impossible de charger cet utilisateur. Il a peut-être été supprimé.",
+    "loadFailed": "Impossible de charger les utilisateurs. Veuillez réessayer.",
+    "sendResetLink": "Envoyer le lien de réinitialisation",
+    "revokeSessionsAction": "Révoquer les sessions",
+    "deactivateAction": "Désactiver",
+    "employeeManagement": "Gestion des employés"
   },
   "requests": {
     "title": "Demande de travail",
@@ -481,7 +600,27 @@
     "newTitle": "Nouvelle demande de travail",
     "newDescription": "Enregistrez comme brouillon, ou publiez immédiatement pour l'ouvrir à la dotation en personnel.",
     "pageDescription": "Services ouverts à la dotation en personnel dans vos hôtels.",
-    "noneFound": "Aucune demande de travail trouvée"
+    "noneFound": "Aucune demande de travail trouvée",
+    "loadFailed": "Impossible de charger les demandes de travail. Veuillez réessayer.",
+    "keepRequest": "Conserver la demande",
+    "cancelRequestAction": "Annuler la demande",
+    "saveDraft": "Enregistrer le brouillon",
+    "adminOnlyCreate": "Seuls les responsables et administrateurs peuvent créer des demandes de travail.",
+    "adminOnlyPlaceOnCalendar": "Seuls les responsables et administrateurs peuvent placer un employé sur le calendrier.",
+    "adminOnlyRaiseBroadcast": "Seuls les responsables et administrateurs peuvent lancer une diffusion.",
+    "calendarLoadFailed": "Impossible de charger les placements au calendrier. Veuillez réessayer.",
+    "placeWorkerAction": "Placer l'employé",
+    "broadcastTitle": "Diffusion",
+    "maps": "Cartes",
+    "eligibilityLoadFailed": "Impossible de charger l'éligibilité pour cette diffusion.",
+    "acceptAction": "Accepter",
+    "closeBroadcastHint": "Clôturez cette diffusion plus tôt si vous n'avez plus besoin de la pourvoir.",
+    "closeBroadcastTitle": "Clôturer la diffusion",
+    "broadcastsLoadFailed": "Impossible de charger les diffusions. Veuillez réessayer.",
+    "skillsNeeded": "Compétences requises",
+    "addSkill": "Ajouter une compétence",
+    "raiseBroadcastAction": "Lancer la diffusion",
+    "slotClaimedByOther": "Quelqu’un d’autre a pris cette place juste avant vous — aucun service n’a été attribué."
   },
   "onboarding": {
     "managerReview": "Validation par le responsable",
@@ -524,7 +663,19 @@
     "reviewQueueEmptyDescription": "Aucune candidature n'est en attente de votre validation.",
     "assignApprovedEmployee": "Affecter l'employé approuvé",
     "rejectApplication": "Rejeter la candidature",
-    "rejectionReason": "Motif de rejet"
+    "rejectionReason": "Motif de rejet",
+    "startReOnboarding": "Démarrer la réintégration",
+    "noPermissionReviewQueue": "Vous n'êtes pas autorisé à consulter la file de validation.",
+    "rejectAction": "Rejeter",
+    "completeAssignmentAction": "Terminer l'affectation",
+    "rejectionSentHint": "Ce motif est envoyé au candidat.",
+    "confirmRejectionAction": "Confirmer le rejet",
+    "reviewQueueLoadFailed": "Impossible de charger la file de validation. Veuillez réessayer.",
+    "myOnboardingTitle": "Mon intégration",
+    "noPermissionCreateUsers": "Vous n'êtes pas autorisé à créer des utilisateurs.",
+    "noContractYet": "Aucun contrat ne vous a encore été délivré. Contactez votre responsable.",
+    "downloadContract": "Télécharger le contrat",
+    "completeOnboardingAction": "Terminez votre intégration"
   },
   "analytics": {
     "myPerformance": "Mes performances",
@@ -542,7 +693,14 @@
     "attendanceRate": "Taux de présence",
     "noRankedWorkers": "Aucun employé classé pour le moment",
     "noRankedWorkersDescription": "Les classements apparaissent une fois que les employés ont terminé des missions.",
-    "shifts": "Services"
+    "shifts": "Services",
+    "loadFailed": "Impossible de charger les statistiques. Veuillez réessayer.",
+    "noPermission": "Les statistiques sont accessibles aux responsables et administrateurs.",
+    "leaderboardLoadFailed": "Impossible de charger le classement.",
+    "statsLoadFailed": "Impossible de charger vos statistiques.",
+    "platformOverview": "Aperçu de la plateforme",
+    "viewAnalytics": "Voir les statistiques",
+    "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme."
   },
   "hotelGroups": {
     "noDeleted": "Aucun groupe hôtelier supprimé",
@@ -559,7 +717,14 @@
     "newDescription": "Regroupez des hôtels sous une même région. Attribuez un responsable régional depuis sa page utilisateur.",
     "pageDescription": "Regroupements régionaux qui définissent la portée des responsables et de la facturation.",
     "noneYet": "Aucun groupe hôtelier pour le moment",
-    "noneYetDescription": "Les groupes permettent d'attribuer un responsable régional à plusieurs hôtels."
+    "noneYetDescription": "Les groupes permettent d'attribuer un responsable régional à plusieurs hôtels.",
+    "loadFailed": "Impossible de charger les groupes hôteliers. Veuillez réessayer.",
+    "loadOneFailed": "Impossible de charger ce groupe hôtelier.",
+    "adminOnlyCreate": "Seuls les administrateurs peuvent créer des groupes hôteliers.",
+    "adminOnlyEdit": "Seuls les administrateurs peuvent modifier les groupes hôteliers.",
+    "orgChartAccess": "Seuls les administrateurs et les responsables régionaux peuvent consulter les organigrammes.",
+    "loadArchivedFailed": "Impossible de charger les groupes hôteliers archivés.",
+    "billingPlaceholder": "Adresse de facturation, n° de TVA, centre de coûts…"
   },
   "attendance": {
     "expectedStart": "Début prévu",
@@ -572,7 +737,10 @@
     "markVerified": "Marquer comme vérifié",
     "pageDescription": "Statut de pointage d'arrivée, de départ et de vérification pour les services dotés en personnel.",
     "records": "Registres de présence",
-    "noneFound": "Aucun registre de présence trouvé"
+    "noneFound": "Aucun registre de présence trouvé",
+    "viewAssignment": "Voir l'affectation",
+    "saveReview": "Enregistrer la vérification",
+    "loadFailed": "Impossible de charger la présence. Veuillez réessayer."
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
@@ -583,6 +751,31 @@
     "approveForWorkTitle": "Approuver pour le travail",
     "deactivateTemporaryTitle": "Désactiver (pause temporaire)",
     "deleteLeftCompanyTitle": "Supprimer (a quitté l'entreprise)",
-    "editSkillsTitle": "Modifier les compétences"
+    "editSkillsTitle": "Modifier les compétences",
+    "blocklistLoadFailed": "Impossible de charger la liste de blocage.",
+    "addAction": "Ajouter",
+    "loadFailed": "Impossible de charger le statut d'emploi.",
+    "noRecordFound": "Aucun dossier d'emploi trouvé. Contactez un administrateur.",
+    "editAction": "Modifier",
+    "paperworkPendingHint": "Documents/vérifications en attente avant que cet employé puisse être examiné pour approbation.",
+    "confirmOnboardingComplete": "Confirmer la fin de l'intégration",
+    "reactivateAndNewContract": "Réactiver et déclencher un nouveau contrat",
+    "reactivateAction": "Réactiver",
+    "rehireAction": "Réembaucher",
+    "restoredMustReapprove": "Un dossier restauré doit repasser par l'approbation avant de redevenir actif.",
+    "restoreNewCycle": "Restaurer (démarrer un nouveau cycle d'emploi)",
+    "approveAction": "Approuver",
+    "deactivateAction": "Désactiver",
+    "deleteAction": "Supprimer",
+    "reasonRequired": "Un motif est requis.",
+    "idAndReasonRequired": "L'identifiant employé et le motif sont tous deux requis.",
+    "signedContractReceived": "Contrat signé reçu — l’approbation le confirmera."
+  },
+  "compliance": {
+    "exportDescription": "Génère une copie de vos documents, de votre historique de consentement et du journal d'audit de votre compte.",
+    "downloadJson": "Télécharger le JSON"
+  },
+  "archive": {
+    "description": "Hôtels et groupes hôteliers retirés de l'exploitation. L'historique est conservé — la restauration rend une entité immédiatement disponible."
   }
 }

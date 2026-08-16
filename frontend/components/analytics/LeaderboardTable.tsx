@@ -40,7 +40,7 @@ export function LeaderboardTable({
   if (error) {
     return (
       <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-        Failed to load the leaderboard.
+        {t("analytics.leaderboardLoadFailed")}
       </div>
     );
   }

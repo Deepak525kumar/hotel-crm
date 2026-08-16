@@ -20,6 +20,7 @@ import {
   StatTile,
   TextLink,
 } from "@/components/ui";
+import { useDirectionalArrow } from "@/components/ui/BackLink";
 
 /** Quick links surfaced to every user. */
 const QUICK_LINKS = [
@@ -31,6 +32,7 @@ const QUICK_LINKS = [
 
 function ManagerOverview() {
   const { t } = useTranslation();
+  const forwardArrow = useDirectionalArrow("forward");
   const { data: stats, isLoading, error } = useDashboardStats();
   const { entries, isLoading: leaderboardLoading, error: leaderboardError } =
     useLeaderboard();
@@ -39,20 +41,20 @@ function ManagerOverview() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          Platform overview
+          {t("analytics.platformOverview")}
         </h2>
         <TextLink
           href="/analytics"
           className="text-sm"
         >
-          View analytics →
+          {t("analytics.viewAnalytics")} {forwardArrow}
         </TextLink>
       </div>
 
       {error ? (
         <Card>
           <CardContent className="py-8 text-center text-sm text-red-600 dark:text-red-400">
-            Couldn’t load platform stats.
+            {t("analytics.statsLoadFailedShort")}
           </CardContent>
         </Card>
       ) : isLoading || !stats ? (
@@ -102,6 +104,7 @@ function ManagerOverview() {
 
 export default function DashboardPage() {
   const { t } = useTranslation();
+  const forwardArrow = useDirectionalArrow("forward");
   const { user } = useAuth();
 
   return (
@@ -132,7 +135,7 @@ export default function DashboardPage() {
               <TextLink
                 href="/profile"
               >
-                View profile →
+                {t("profile.viewProfile")} {forwardArrow}
               </TextLink>
             </p>
           </CardContent>

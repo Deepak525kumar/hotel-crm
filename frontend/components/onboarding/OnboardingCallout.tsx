@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AlertCircle, ClipboardList, Clock } from "lucide-react";
 import { Badge, Card, CardContent } from "@/components/ui";
 import { useMyOnboarding } from "@/hooks/useMyOnboarding";
+import { useTranslation } from "react-i18next";
 
 /**
  * Dashboard call-to-action pointing an applicant at their own `/onboarding`
@@ -26,6 +27,7 @@ import { useMyOnboarding } from "@/hooks/useMyOnboarding";
  * pre-assignment Manager/RM does not have.
  */
 export function OnboardingCallout() {
+  const { t } = useTranslation();
   const { phase, label, description, tone, needsAttention, isSubmitted } = useMyOnboarding();
 
   if (!needsAttention) return null;
@@ -48,7 +50,7 @@ export function OnboardingCallout() {
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                Complete your onboarding
+                {t("onboarding.completeOnboardingAction")}
               </span>
               <Badge tone={tone}>{label}</Badge>
             </div>

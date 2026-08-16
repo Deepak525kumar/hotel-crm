@@ -87,7 +87,7 @@ export function HotelGroupForm({
             rows={3}
             value={form.billing_info}
             onChange={(e) => set("billing_info", e.target.value)}
-            placeholder="Invoicing address, VAT id, cost center…"
+            placeholder={t("hotelGroups.billingPlaceholder")}
           />
 
           <FormError>{error}</FormError>
@@ -100,7 +100,7 @@ export function HotelGroupForm({
                 onClick={onCancel}
                 disabled={submitting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             )}
             <Button type="submit" loading={submitting} disabled={submitting || !valid}>

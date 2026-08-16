@@ -23,6 +23,7 @@ import {
   TD,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { Assignment, AssignmentStatus } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -105,9 +106,7 @@ export default function AssignmentsPage() {
         description={t("assignments.pageDescription")}
         actions={
           <StaffingWriteGate>
-            <TextLink href="/assignments/calendar-entries" className="text-sm">
-              Calendar placements →
-            </TextLink>
+            <BackLink href="/assignments/calendar-entries" className="text-sm" direction="forward" labelKey="assignments.calendarPlacementsLink" />
           </StaffingWriteGate>
         }
       />
@@ -127,7 +126,7 @@ export default function AssignmentsPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load assignments. Please try again.
+              {t("assignments.viewFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.assignments")}>

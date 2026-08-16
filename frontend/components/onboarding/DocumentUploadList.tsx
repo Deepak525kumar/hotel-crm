@@ -90,7 +90,7 @@ export function DocumentUploadList({
     return (
       <div className="p-4 text-red-600 bg-red-50 border-b border-red-100 flex items-center gap-2">
         <AlertCircle className="w-5 h-5" />
-        Failed to load document status.
+        {t("documents.statusLoadFailed")}
       </div>
     );
   }

@@ -125,7 +125,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                   href="/employees"
                   className="text-blue-600 dark:text-blue-400 underline underline-offset-2"
                 >
-                  Employee Management
+                  {t("users.employeeManagement")}
                 </Link>{" "}
                 before assigning a hotel group.
               </p>
@@ -187,7 +187,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
 
               <div className="flex justify-end pt-3">
                 <Button variant="outline" onClick={openModal}>
-                  Edit assignment
+                  {t("users.editAssignmentTitle")}
                 </Button>
               </div>
             </>
@@ -202,10 +202,10 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
         footer={
           <>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={action.pending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={save} loading={action.pending}>
-              Save
+              {t("common.save")}
             </Button>
           </>
         }
