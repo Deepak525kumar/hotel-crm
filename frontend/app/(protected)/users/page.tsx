@@ -28,6 +28,7 @@ import {
 } from "@/components/ui";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import type { Role } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const ROLE_FILTERS = [
   { value: "", label: "All roles" },
@@ -47,6 +48,7 @@ const ACTIVE_FILTERS = [
 const PER_PAGE = 20;
 
 function UsersDirectory() {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [role, setRole] = useState("");
   const [active, setActive] = useState("");
@@ -79,7 +81,7 @@ function UsersDirectory() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Users"
+        title={t("nav.users")}
         description="People with access to the platform."
         actions={
           // RULE A (project-owner decision, 2026-08-12): create is
@@ -89,7 +91,7 @@ function UsersDirectory() {
           // nobody and so get no button.
           <RoleGate allow={["admin", "regional_manager", "manager"]}>
             <Link href="/users/new">
-              <Button>New user</Button>
+              <Button>{t("users.new")}</Button>
             </Link>
           </RoleGate>
         }
@@ -98,7 +100,7 @@ function UsersDirectory() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:max-w-xs">
           <Input
-            label="Search"
+            label={t("common.search")}
             type="search"
             placeholder="Name or email…"
             value={searchInput}
@@ -107,7 +109,7 @@ function UsersDirectory() {
         </div>
         <div className="w-full sm:w-40">
           <Select
-            label="Role"
+            label={t("fields.role")}
             value={role}
             onChange={(e) => onRoleChange(e.target.value)}
             options={ROLE_FILTERS}
@@ -115,7 +117,7 @@ function UsersDirectory() {
         </div>
         <div className="w-full sm:w-40">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={active}
             onChange={(e) => onActiveChange(e.target.value)}
             options={ACTIVE_FILTERS}
@@ -130,13 +132,13 @@ function UsersDirectory() {
               Failed to load users. Please try again.
             </div>
           ) : (
-            <Table aria-label="Users">
+            <Table aria-label={t("nav.users")}>
               <THead>
                 <tr>
-                  <TH>Name</TH>
-                  <TH>Email</TH>
-                  <TH>Role</TH>
-                  <TH>Status</TH>
+                  <TH>{t("fields.name")}</TH>
+                  <TH>{t("fields.email")}</TH>
+                  <TH>{t("fields.role")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

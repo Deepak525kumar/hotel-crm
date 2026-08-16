@@ -152,7 +152,7 @@ export function RangeBreakdown({
                             <button
                               type="button"
                               onClick={() => onSelectEntry(e)}
-                              className="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+                              className="flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
                             >
                               <span className="truncate text-gray-900 dark:text-gray-100">
                                 {workerNameById.get(e.worker_id) ?? e.worker_id}

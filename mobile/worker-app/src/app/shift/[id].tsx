@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { api, ApiError } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkerAssignment, Attendance } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -19,6 +20,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function ShiftDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [shift, setShift] = useState<WorkerAssignment | null>(null);
@@ -80,9 +82,9 @@ export default function ShiftDetailScreen() {
 
       await api.attendance.checkIn(shift.id, location);
       await reload();
-      Alert.alert('Checked In', 'You have successfully checked in.');
+      Alert.alert(t('shifts.checkedIn'), t('shifts.checkInSuccess'));
     } catch (err) {
-      Alert.alert('Error', err instanceof ApiError ? err.message : 'Check-in failed.');
+      Alert.alert(t('errors.title'), err instanceof ApiError ? err.message : t('shifts.checkInFailed'));
     } finally {
       setActing(false);
     }
@@ -106,9 +108,9 @@ export default function ShiftDetailScreen() {
 
       await api.attendance.checkOut(att.id, location);
       await reload();
-      Alert.alert('Checked Out', 'You have successfully checked out.');
+      Alert.alert(t('shifts.checkedOut'), t('shifts.checkOutSuccess'));
     } catch (err) {
-      Alert.alert('Error', err instanceof ApiError ? err.message : 'Check-out failed.');
+      Alert.alert(t('errors.title'), err instanceof ApiError ? err.message : t('shifts.checkOutFailed'));
     } finally {
       setActing(false);
     }
@@ -125,7 +127,7 @@ export default function ShiftDetailScreen() {
   if (!shift) {
     return (
       <ThemedView style={styles.center}>
-        <ThemedText type="small" themeColor="textSecondary">Shift not found.</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t('shifts.notFound')}</ThemedText>
       </ThemedView>
     );
   }
@@ -142,24 +144,24 @@ export default function ShiftDetailScreen() {
         </Pressable>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText type="subtitle" style={styles.title}>
-            {wr?.position ?? 'Shift Details'}
+            {wr?.position ?? t('shifts.detailsTitle')}
           </ThemedText>
 
           <ThemedView type="backgroundElement" style={styles.section}>
             {wr ? (
               <>
                 <InfoRow
-                  label="Date"
+                  label={t('fields.date')}
                   value={new Date(wr.shift_date).toLocaleDateString('en-US', {
                     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
                   })}
                 />
                 <View style={styles.divider} />
-                <InfoRow label="Time" value={`${wr.shift_start_time} – ${wr.shift_end_time}`} />
+                <InfoRow label={t('fields.time')} value={`${wr.shift_start_time} – ${wr.shift_end_time}`} />
                 <View style={styles.divider} />
               </>
             ) : null}
-            <InfoRow label="Status" value={shift.status.replace(/_/g, ' ')} />
+            <InfoRow label={t('fields.status')} value={shift.status.replace(/_/g, ' ')} />
           </ThemedView>
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
@@ -167,18 +169,18 @@ export default function ShiftDetailScreen() {
           </ThemedText>
           <ThemedView type="backgroundElement" style={styles.section}>
             <InfoRow
-              label="Check-in"
+              label={t('shifts.checkIn')}
               value={att?.check_in_at ? new Date(att.check_in_at).toLocaleTimeString() : '—'}
             />
             <View style={styles.divider} />
             <InfoRow
-              label="Check-out"
+              label={t('shifts.checkOut')}
               value={att?.check_out_at ? new Date(att.check_out_at).toLocaleTimeString() : '—'}
             />
             {att?.status ? (
               <>
                 <View style={styles.divider} />
-                <InfoRow label="Attendance Status" value={att.status} />
+                <InfoRow label={t('shifts.attendanceStatus')} value={att.status} />
               </>
             ) : null}
           </ThemedView>
@@ -190,7 +192,7 @@ export default function ShiftDetailScreen() {
               style={({ pressed }) => [styles.checkInBtn, { opacity: pressed || acting ? 0.7 : 1 }]}
             >
               {acting ? <ActivityIndicator color="#fff" /> : (
-                <ThemedText type="smallBold" style={styles.btnText}>Check In</ThemedText>
+                <ThemedText type="smallBold" style={styles.btnText}>{t('shifts.checkIn')}</ThemedText>
               )}
             </Pressable>
           )}
@@ -202,7 +204,7 @@ export default function ShiftDetailScreen() {
               style={({ pressed }) => [styles.checkOutBtn, { opacity: pressed || acting ? 0.7 : 1 }]}
             >
               {acting ? <ActivityIndicator color="#fff" /> : (
-                <ThemedText type="smallBold" style={styles.btnText}>Check Out</ThemedText>
+                <ThemedText type="smallBold" style={styles.btnText}>{t('shifts.checkOut')}</ThemedText>
               )}
             </Pressable>
           )}

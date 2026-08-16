@@ -30,6 +30,7 @@ import { useWorkerContract } from "@/hooks/useContract";
 import { Eye, Check, X } from "lucide-react";
 import { DocumentUploadList } from "./DocumentUploadList";
 import type { EmploymentRecord, EmploymentType } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 // Extended type because the backend includes user info (and, since the
 // 2026-08-13 review-routing fix, the creator's own summary — see
@@ -80,6 +81,7 @@ function roleLabel(role: string | undefined): string {
 }
 
 export function ReviewQueueTable() {
+  const { t } = useTranslation();
   const { data: queue, isLoading, error, mutate } = useSWR<ReviewQueueItem[]>(
     "/employees/review-queue",
     () => employeesApi.getReviewQueue() as Promise<ReviewQueueItem[]>
@@ -192,11 +194,11 @@ export function ReviewQueueTable() {
             <Table aria-label="Review queue">
               <THead>
                 <tr>
-                  <TH>Applicant</TH>
-                  <TH>Role</TH>
-                  <TH>Employment type</TH>
-                  <TH>Submitted</TH>
-                  <TH className="text-right">Actions</TH>
+                  <TH>{t("users.applicant")}</TH>
+                  <TH>{t("fields.role")}</TH>
+                  <TH>{t("fields.employmentType")}</TH>
+                  <TH>{t("status.submitted")}</TH>
+                  <TH className="text-end">{t("common.actions")}</TH>
                 </tr>
               </THead>
               {isLoading ? (
@@ -219,7 +221,7 @@ export function ReviewQueueTable() {
                       <TD className="font-medium">
                         <div className="flex items-center gap-2">
                           <span>{record.user?.first_name} {record.user?.last_name}</span>
-                          {record.is_reonboarding && <Badge tone="info">Returning</Badge>}
+                          {record.is_reonboarding && <Badge tone="info">{t("status.returning")}</Badge>}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">{record.user?.email}</div>
                       </TD>
@@ -228,9 +230,9 @@ export function ReviewQueueTable() {
                       <TD className="text-gray-500 dark:text-gray-400">
                         {record.submitted_for_review_at ? formatDateTime(record.submitted_for_review_at) : "—"}
                       </TD>
-                      <TD className="text-right">
+                      <TD className="text-end">
                         <Button variant="outline" size="sm" onClick={() => setSelectedRecord(record)}>
-                          <Eye className="mr-2 h-4 w-4" />
+                          <Eye className="me-2 h-4 w-4" />
                           {record.is_reonboarding ? "Reactivate" : "Review"}
                         </Button>
                       </TD>
@@ -251,10 +253,10 @@ export function ReviewQueueTable() {
         {selectedRecord && (
           <div className="mt-4 space-y-6">
             <DataList>
-              <DataRow label="Name" value={`${selectedRecord.user?.first_name ?? ""} ${selectedRecord.user?.last_name ?? ""}`} />
-              <DataRow label="Email" value={selectedRecord.user?.email ?? "—"} />
-              <DataRow label="Role" value={roleLabel(selectedRecord.user?.role)} />
-              <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[selectedRecord.employment_type]} />
+              <DataRow label={t("fields.name")} value={`${selectedRecord.user?.first_name ?? ""} ${selectedRecord.user?.last_name ?? ""}`} />
+              <DataRow label={t("fields.email")} value={selectedRecord.user?.email ?? "—"} />
+              <DataRow label={t("fields.role")} value={roleLabel(selectedRecord.user?.role)} />
+              <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[selectedRecord.employment_type]} />
               {selectedRecord.created_by && (
                 <DataRow
                   label="Created by"
@@ -309,7 +311,7 @@ export function ReviewQueueTable() {
                   means they need not re-upload, NOT that the reviewer should
                   be unable to inspect what is already on file. */}
               <div>
-                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Documents on file</h3>
+                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">{t("onboarding.documentsOnFile")}</h3>
                 <div className="rounded-md border border-gray-200 dark:border-gray-700">
                   <DocumentUploadList
                     workerId={selectedRecord.user_id}
@@ -321,7 +323,7 @@ export function ReviewQueueTable() {
               </div>
             ) : (
               <div>
-                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">Submitted documents</h3>
+                <h3 className="mb-2 font-medium text-gray-900 dark:text-gray-100">{t("onboarding.submittedDocuments")}</h3>
                 <div className="rounded-md border border-gray-200 dark:border-gray-700">
                   <DocumentUploadList
                     workerId={selectedRecord.user_id}
@@ -341,7 +343,7 @@ export function ReviewQueueTable() {
                 loading={rejectAction.pending}
                 disabled={approveAction.pending}
               >
-                <X className="mr-2 h-4 w-4 text-red-500" />
+                <X className="me-2 h-4 w-4 text-red-500" />
                 Reject
               </Button>
               <Button
@@ -354,7 +356,7 @@ export function ReviewQueueTable() {
                     : "Waiting for the applicant to upload their signed contract"
                 }
               >
-                <Check className="mr-2 h-4 w-4" />
+                <Check className="me-2 h-4 w-4" />
                 {isReonboarding
                   ? hasApprovedContract
                     ? "Reactivate"

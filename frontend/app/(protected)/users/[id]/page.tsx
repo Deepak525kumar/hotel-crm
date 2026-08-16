@@ -25,6 +25,7 @@ import { AssignmentCard } from "@/components/users/AssignmentCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
+import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Badge,
@@ -43,6 +44,7 @@ import {
 } from "@/components/ui";
 
 function UserDetail() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const { user: currentUser } = useAuth();
@@ -156,7 +158,7 @@ function UserDetail() {
               user.role === "checker" ? (
                 <RoleGate allow={["admin", "manager", "regional_manager"]}>
                   <Link href={`/users/${id}/edit`}>
-                    <Button variant="outline">Edit</Button>
+                    <Button variant="outline">{t("common.edit")}</Button>
                   </Link>
                 </RoleGate>
               ) : null
@@ -165,13 +167,13 @@ function UserDetail() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Account</CardTitle>
+              <CardTitle>{t("nav.account")}</CardTitle>
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
-                <DataRow label="Email" value={user.email} />
-                <DataRow label="Phone" value={user.phone || "—"} />
-                <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+                <DataRow label={t("fields.email")} value={user.email} />
+                <DataRow label={t("fields.phone")} value={user.phone || "—"} />
+                <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
                 {user.role === "worker" && availability && (
                   <DataRow
                     label="Availability"
@@ -187,7 +189,7 @@ function UserDetail() {
           {user.permissions.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Permissions</CardTitle>
+                <CardTitle>{t("common.permissions")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="flex flex-wrap gap-2">

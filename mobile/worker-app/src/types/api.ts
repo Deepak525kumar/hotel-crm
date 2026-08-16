@@ -12,6 +12,11 @@ export interface User {
   role: UserRole;
   creator_name?: string | null;
   manager_name?: string | null;
+  /**
+   * Chosen UI language, or null when never chosen — in which case the app
+   * negotiates from the device's own languages instead of assuming German.
+   */
+  preferred_language?: string | null;
 }
 
 export interface AuthResponse {

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui";
 
 function ResetPasswordForm() {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
 
@@ -55,7 +57,7 @@ function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
-        <p className="mb-4">Invalid password reset link. The token is missing.</p>
+        <p className="mb-4">{t("auth.invalidResetLink")}</p>
         <Link href="/forgot-password" className="text-blue-600 hover:underline dark:text-blue-400">
           Request a new link
         </Link>
@@ -66,7 +68,7 @@ function ResetPasswordForm() {
   if (success) {
     return (
       <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
-        <p className="mb-4 text-green-600 font-medium dark:text-green-400">Your password has been reset successfully!</p>
+        <p className="mb-4 text-green-600 font-medium dark:text-green-400">{t("auth.resetSuccess")}</p>
         <Link href="/login" className="text-blue-600 hover:underline dark:text-blue-400">
           Return to login
         </Link>
@@ -96,14 +98,15 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-800">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Set New Password</CardTitle>
+          <CardTitle>{t("auth.setNewPassword")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <Suspense fallback={<div className="text-center text-sm text-gray-500 py-4 dark:text-gray-400">Loading...</div>}>
+          <Suspense fallback={<div className="text-center text-sm text-gray-500 py-4 dark:text-gray-400">{t("common.loading")}</div>}>
             <ResetPasswordForm />
           </Suspense>
         </CardContent>

@@ -26,6 +26,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { Notification } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const READ_FILTERS = [
   { value: "", label: "All" },
@@ -36,6 +37,7 @@ const READ_FILTERS = [
 const COLUMNS = 5;
 
 function NotificationRow({ notification: n }: { notification: Notification }) {
+  const { t } = useTranslation();
   const { data: hotel } = useHotel(n.hotel_id ?? undefined);
 
   return (
@@ -51,13 +53,14 @@ function NotificationRow({ notification: n }: { notification: Notification }) {
       <TD>{n.hotel_id ? hotel?.name ?? "—" : "—"}</TD>
       <TD>{formatDateTime(n.created_at)}</TD>
       <TD>
-        {n.is_read ? <Badge tone="neutral">Read</Badge> : <Badge tone="info">Unread</Badge>}
+        {n.is_read ? <Badge tone="neutral">{t("status.read")}</Badge> : <Badge tone="info">{t("status.unread")}</Badge>}
       </TD>
     </TR>
   );
 }
 
 export default function NotificationsPage() {
+  const { t } = useTranslation();
   const { notifications, unreadCount, isLoading, error, mutate } =
     useNotifications();
 
@@ -83,7 +86,7 @@ export default function NotificationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Notifications"
+        title={t("nav.notifications")}
         description={
           unreadCount > 0
             ? `You have ${unreadCount} unread notification${unreadCount === 1 ? "" : "s"}.`
@@ -122,14 +125,14 @@ export default function NotificationsPage() {
               Failed to load notifications. Please try again.
             </div>
           ) : (
-            <Table aria-label="Notifications">
+            <Table aria-label={t("nav.notifications")}>
               <THead>
                 <tr>
-                  <TH>Title</TH>
-                  <TH>Type</TH>
-                  <TH>Hotel</TH>
-                  <TH>Received</TH>
-                  <TH>Status</TH>
+                  <TH>{t("fields.title")}</TH>
+                  <TH>{t("fields.type")}</TH>
+                  <TH>{t("fields.hotel")}</TH>
+                  <TH>{t("status.received")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

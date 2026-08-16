@@ -24,6 +24,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { WorkRequest, WorkRequestStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -64,6 +65,7 @@ function WorkRequestRow({ request: wr }: { request: WorkRequest }) {
 }
 
 export default function WorkRequestsPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<WorkRequestStatus | "">("");
   const [page, setPage] = useState(1);
 
@@ -81,12 +83,12 @@ export default function WorkRequestsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Work requests"
+        title={t("nav.requests")}
         description="Shifts open for staffing across your hotels."
         actions={
           <StaffingWriteGate>
             <Link href="/requests/new">
-              <Button>New request</Button>
+              <Button>{t("requests.new")}</Button>
             </Link>
           </StaffingWriteGate>
         }
@@ -95,7 +97,7 @@ export default function WorkRequestsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:w-48">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={status}
             onChange={(e) => onStatusChange(e.target.value as WorkRequestStatus | "")}
             options={STATUS_FILTERS}
@@ -110,15 +112,15 @@ export default function WorkRequestsPage() {
               Failed to load work requests. Please try again.
             </div>
           ) : (
-            <Table aria-label="Work requests">
+            <Table aria-label={t("nav.requests")}>
               <THead>
                 <tr>
-                  <TH>Position</TH>
-                  <TH>Hotel</TH>
-                  <TH>Shift date</TH>
-                  <TH>Time</TH>
-                  <TH>Staffing</TH>
-                  <TH>Status</TH>
+                  <TH>{t("jobs.position")}</TH>
+                  <TH>{t("fields.hotel")}</TH>
+                  <TH>{t("assignments.shiftDate")}</TH>
+                  <TH>{t("fields.time")}</TH>
+                  <TH>{t("fields.staffing")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

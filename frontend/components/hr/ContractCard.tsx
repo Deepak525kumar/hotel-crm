@@ -23,6 +23,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { ContractStatus, EmploymentType } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const STATUS_TONE: Record<ContractStatus, "warning" | "success" | "neutral"> = {
   PENDING: "warning",
@@ -54,6 +55,7 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
  * out-of-scope viewer doesn't see a UI that will only ever 403.
  */
 export function ContractCard({ workerId }: { workerId: string }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   // regional_manager included (2026-08-08 fix): every contract action route
   // in hr/routes.ts (contract-scan/confirm/extend/lapse) already admits
@@ -94,7 +96,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Contract</CardTitle>
+          <CardTitle>{t("hr.contract")}</CardTitle>
           {isManagerOrAdmin && !contract && !isLoading && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               Create contract
@@ -128,17 +130,17 @@ export function ContractCard({ workerId }: { workerId: string }) {
                     derived `is_expired`, not the raw status, or a lapsed
                     contract shows a green "Active". */}
                 <DataRow
-                  label="Status"
+                  label={t("fields.status")}
                   value={
                     contract.is_expired ? (
-                      <Badge tone="danger">Expired</Badge>
+                      <Badge tone="danger">{t("status.expired")}</Badge>
                     ) : (
                       <Badge tone={STATUS_TONE[contract.status]}>{STATUS_LABEL[contract.status]}</Badge>
                     )
                   }
                 />
-                <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
-                <DataRow label="Position" value={contract.position} />
+                <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
+                <DataRow label={t("jobs.position")} value={contract.position} />
                 <DataRow label="Start date" value={formatDate(contract.start_date)} />
                 {contract.end_date && <DataRow label="End date" value={formatDate(contract.end_date)} />}
                 {contract.confirmed_at && (
@@ -237,6 +239,7 @@ function CreateContractModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [templateId, setTemplateId] = useState("");
   const [position, setPosition] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -315,7 +318,7 @@ function CreateContractModal({
           onChange={(e) => setTemplateId(e.target.value)}
         />
         <Input
-          label="Position"
+          label={t("jobs.position")}
           value={position}
           onChange={(e) => setPosition(e.target.value)}
         />

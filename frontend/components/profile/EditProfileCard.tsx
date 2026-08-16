@@ -15,6 +15,7 @@ import {
   Modal,
 } from "@/components/ui";
 import type { AuthUser } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /**
  * Self-service profile editing and password reset.
@@ -26,6 +27,7 @@ import type { AuthUser } from "@/lib/types";
  * logged-OUT login screen, so a signed-in user had no way to trigger one.
  */
 export function EditProfileCard({ user }: { user: AuthUser }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [firstName, setFirstName] = useState(user.first_name);
   const [lastName, setLastName] = useState(user.last_name);
@@ -90,7 +92,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Account settings</CardTitle>
+          <CardTitle>{t("users.accountSettings")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">

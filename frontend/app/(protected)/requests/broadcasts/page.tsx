@@ -24,6 +24,7 @@ import {
 } from "@/components/ui";
 import { useAuthStore } from "@/stores/auth";
 import type { WorkRequest } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const PER_PAGE = 20;
 const COLUMNS = 5;
@@ -55,6 +56,7 @@ function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
 }
 
 export default function BroadcastsPage() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const role = useAuthStore((s) => s.user?.role);
 
@@ -67,12 +69,12 @@ export default function BroadcastsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Broadcasts"
+        title={t("nav.broadcasts")}
         description="Shifts raised to every eligible worker at once. First accept per skill wins."
         actions={
           <JobDispatchPhase2WriteGate>
             <Link href="/requests/broadcasts/new">
-              <Button>New broadcast</Button>
+              <Button>{t("requests.newBroadcast")}</Button>
             </Link>
           </JobDispatchPhase2WriteGate>
         }
@@ -85,14 +87,14 @@ export default function BroadcastsPage() {
               Failed to load broadcasts. Please try again.
             </div>
           ) : (
-            <Table aria-label="Broadcasts">
+            <Table aria-label={t("nav.broadcasts")}>
               <THead>
                 <tr>
-                  <TH>Shift date</TH>
-                  <TH>Hotel</TH>
-                  <TH>Time</TH>
-                  <TH>Skills</TH>
-                  <TH>Status</TH>
+                  <TH>{t("assignments.shiftDate")}</TH>
+                  <TH>{t("fields.hotel")}</TH>
+                  <TH>{t("fields.time")}</TH>
+                  <TH>{t("fields.skills")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

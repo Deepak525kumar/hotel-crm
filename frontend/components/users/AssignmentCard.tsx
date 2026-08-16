@@ -21,6 +21,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { Role, UserDetail } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /**
  * Person-centric assignment (2026-08-07).
@@ -41,6 +42,7 @@ import type { Role, UserDetail } from "@/lib/types";
  *                        scheduling; see REQ-EMP-012)
  */
 export function AssignmentCard({ user }: { user: UserDetail }) {
+  const { t } = useTranslation();
   const isManager = user.role === "manager";
   const isRegionalManager = user.role === "regional_manager";
   const isStaff = user.role === "worker" || user.role === "checker";
@@ -106,13 +108,13 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
       },
     );
 
-  const unassigned = <span className="text-gray-500 dark:text-gray-400">Unassigned</span>;
+  const unassigned = <span className="text-gray-500 dark:text-gray-400">{t("status.unassigned")}</span>;
 
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Assignment</CardTitle>
+          <CardTitle>{t("assignments.title")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           {staffWithoutEmployment ? (
@@ -175,7 +177,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                         primaryHotel ? (
                           <TextLink href={`/hotels/${primaryHotel.id}`}>{primaryHotel.name}</TextLink>
                         ) : (
-                          <span className="text-gray-500 dark:text-gray-400">Not set</span>
+                          <span className="text-gray-500 dark:text-gray-400">{t("common.notSet")}</span>
                         )
                       }
                     />
@@ -211,12 +213,12 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
         <div className="space-y-4">
           {isManager && (
             <Select
-              label="Hotel"
+              label={t("fields.hotel")}
               hint="Assigning a hotel that already has a different manager is rejected."
               value={hotelId}
               onChange={(e) => setHotelId(e.target.value)}
             >
-              <option value="">Leave unassigned</option>
+              <option value="">{t("assignments.leaveUnassigned")}</option>
               {hotels.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.name}
@@ -233,7 +235,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
             >
-              <option value="">Leave unassigned</option>
+              <option value="">{t("assignments.leaveUnassigned")}</option>
               {hotelGroups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -253,7 +255,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
               >
-                <option value="">Leave unassigned</option>
+                <option value="">{t("assignments.leaveUnassigned")}</option>
                 {hotelGroups.map((g) => (
                   <option key={g.id} value={g.id}>
                     {g.name}
@@ -267,7 +269,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                 value={primaryHotelId}
                 onChange={(e) => setPrimaryHotelId(e.target.value)}
               >
-                <option value="">Not set</option>
+                <option value="">{t("common.notSet")}</option>
                 {hotels
                   .filter((h) => !groupId || h.hotel_group_id === groupId)
                   .map((h) => (

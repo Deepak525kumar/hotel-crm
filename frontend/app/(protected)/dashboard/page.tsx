@@ -9,6 +9,7 @@ import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { OnboardingCallout } from "@/components/onboarding/OnboardingCallout";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { formatPercent, formatScore } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ const QUICK_LINKS = [
 ];
 
 function ManagerOverview() {
+  const { t } = useTranslation();
   const { data: stats, isLoading, error } = useDashboardStats();
   const { entries, isLoading: leaderboardLoading, error: leaderboardError } =
     useLeaderboard();
@@ -75,7 +77,7 @@ function ManagerOverview() {
             value={formatPercent(stats.quality.pass_rate)}
           />
           <StatTile
-            label="Avg rating"
+            label={t("analytics.avgRating")}
             value={formatScore(stats.ratings.average_score, 2)}
           />
         </div>
@@ -83,7 +85,7 @@ function ManagerOverview() {
 
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Top workers</CardTitle>
+          <CardTitle>{t("users.topWorkers")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <LeaderboardTable
@@ -99,12 +101,13 @@ function ManagerOverview() {
 }
 
 export default function DashboardPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard"
+        title={t("nav.dashboard")}
         description={`Welcome back${user ? `, ${user.first_name}` : ""}.`}
       />
 
@@ -120,7 +123,7 @@ export default function DashboardPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Your account</CardTitle>
+            <CardTitle>{t("users.yourAccount")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
             <p>{user?.email}</p>
@@ -137,7 +140,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick links</CardTitle>
+            <CardTitle>{t("common.quickLinks")}</CardTitle>
           </CardHeader>
           <CardContent>
             <ul className="grid grid-cols-2 gap-2 text-sm">

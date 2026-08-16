@@ -4,6 +4,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { APP_COMMIT_SHA, APP_NAME, APP_OWNER, APP_VERSION } from "@/lib/config";
 import { RoleBadge } from "@/components/users/RoleBadge";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { LanguageSelect } from "@/components/i18n/LanguageSwitcher";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -32,11 +34,12 @@ const COMING_SOON: { title: string; detail: string }[] = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   if (!user) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <PageHeader title="Settings" />
+        <PageHeader title={t("nav.settings")} />
         <Card>
           <CardContent className="space-y-3">
             <Skeleton className="h-6 w-1/2" />
@@ -50,18 +53,18 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title="Settings"
+        title={t("nav.settings")}
         description="Your account, session and app preferences."
       />
 
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <CardTitle>{t("settings.account")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 py-2">
           <DataList>
             <DataRow label="Signed in as" value={user.email} />
-            <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+            <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
           </DataList>
           {/* Editing lives on /profile (EditProfileCard) — pointed at rather
               than duplicated, so there is only one place these fields change. */}
@@ -74,20 +77,33 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
+          <CardTitle>{t("settings.appearance")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
               label={
-                <span className="flex flex-col gap-0.5 text-left">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">Theme</span>
+                <span className="flex flex-col gap-0.5 text-start">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{t("fields.theme")}</span>
                   <span className="text-gray-500 dark:text-gray-400">
-                    System follows your device&apos;s setting.
+                    {t("settings.themeSystemNote")}
                   </span>
                 </span>
               }
               value={<ThemeToggle />}
+            />
+            <DataRow
+              label={
+                <span className="flex flex-col gap-0.5 text-start">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
+                    {t("settings.language.title")}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t("settings.language.description")}
+                  </span>
+                </span>
+              }
+              value={<LanguageSelect />}
             />
           </DataList>
         </CardContent>
@@ -95,7 +111,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>About</CardTitle>
+          <CardTitle>{t("settings.about")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
@@ -110,7 +126,7 @@ export default function SettingsPage() {
                 APP_COMMIT_SHA ? (
                   <span className="font-mono text-xs">{APP_COMMIT_SHA}</span>
                 ) : (
-                  <span className="text-gray-500 dark:text-gray-400">Local development build</span>
+                  <span className="text-gray-500 dark:text-gray-400">{t("settings.localDevBuild")}</span>
                 )
               }
             />
@@ -121,7 +137,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Coming soon</CardTitle>
+          <CardTitle>{t("settings.comingSoon")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
@@ -129,7 +145,7 @@ export default function SettingsPage() {
               <DataRow
                 key={item.title}
                 label={
-                  <span className="flex flex-col gap-0.5 text-left">
+                  <span className="flex flex-col gap-0.5 text-start">
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       {item.title}
                     </span>

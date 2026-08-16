@@ -21,6 +21,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { PayslipRequest, PayslipRequestStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const STATUS_TONE: Record<PayslipRequestStatus, "warning" | "success"> = {
   REQUESTED: "warning",
@@ -81,6 +82,7 @@ function PayslipRequestRow({
  * to the worker's own self-request endpoint at all).
  */
 export function PayslipRequestsCard({ workerId }: { workerId: string }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const isSelfWorker = user?.role === "worker" && user.id === workerId;
   const canManage =
@@ -102,7 +104,7 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Payslip requests</CardTitle>
+          <CardTitle>{t("hr.payslipRequests")}</CardTitle>
           {(isSelfWorker || canManage) && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
               New request

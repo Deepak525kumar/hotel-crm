@@ -1,3 +1,4 @@
+import type { UiLocale } from '@/lib/locales';
 import type {
   User,
   AuthResponse,
@@ -296,6 +297,18 @@ export const api = {
       }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<User>('/auth/me'),
+    // PUT /auth/profile — the self-service profile route, reachable by any
+    // authenticated user. Used here for the language preference: workers
+    // cannot call PUT /users/:id, which is gated to admin/manager/RM.
+    //
+    // `preferred_language: null` is meaningful and distinct from omitting
+    // the key — null clears the stored choice and returns the worker to
+    // device-locale negotiation.
+    updateProfile: (input: { preferred_language?: UiLocale | null }) =>
+      request<User>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
   },
   workRequests: {
     list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {

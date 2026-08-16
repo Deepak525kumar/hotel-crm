@@ -41,8 +41,10 @@ import {
 } from "@/lib/calendar";
 import { CalendarFilters } from "@/components/calendar/CalendarFilters";
 import { RangeBreakdown } from "@/components/calendar/RangeBreakdown";
+import { useTranslation } from "react-i18next";
 
 export default function CalendarGridPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -298,7 +300,7 @@ export default function CalendarGridPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Calendar"
+        title={t("nav.calendar")}
         description={
           view === "day"
             ? FULL_DAY_LABEL.format(anchor)
@@ -414,7 +416,7 @@ export default function CalendarGridPage() {
 
       {entriesError ? (
         <Card>
-          <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load the calendar. Please try again.</div>
+          <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">{t("calendar.loadFailed")}</div>
         </Card>
       ) : (
         <>
@@ -552,6 +554,7 @@ function DayCell({
   onMoveAbsence: (absenceId: string, newDay: string) => void;
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
+  const { t } = useTranslation();
   const isToday = dayKey === toDateKey(new Date());
   const isMonth = view === "month";
   const [dragOver, setDragOver] = useState(false);
@@ -693,7 +696,7 @@ function DayCell({
               />
             ))}
             {entries.length === 0 && absences.length === 0 && (
-              <div className="pt-2 text-center text-xs text-gray-400 dark:text-gray-500">No entries</div>
+              <div className="pt-2 text-center text-xs text-gray-400 dark:text-gray-500">{t("common.noEntries")}</div>
             )}
           </>
         )}
@@ -746,7 +749,7 @@ function PlacementTag({
         e.dataTransfer.effectAllowed = "move";
       }}
       className={[
-        "block w-full truncate rounded text-left font-medium",
+        "block w-full truncate rounded text-start font-medium",
         cancelled
           ? "bg-gray-100 text-gray-500 line-through hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-500 dark:hover:bg-gray-700"
           : "bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950 dark:text-blue-400 dark:hover:bg-blue-900/60",
@@ -760,7 +763,7 @@ function PlacementTag({
     >
       {label}
       {absenceLabel && (
-        <span className="ml-1 whitespace-nowrap font-normal no-underline">· {absenceLabel}</span>
+        <span className="ms-1 whitespace-nowrap font-normal no-underline">· {absenceLabel}</span>
       )}
     </button>
   );
@@ -808,7 +811,7 @@ function AbsenceTag({
         e.dataTransfer.effectAllowed = "move";
       }}
       className={[
-        "block w-full truncate rounded text-left font-medium",
+        "block w-full truncate rounded text-start font-medium",
         isSick
           ? "bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900/60"
           : "bg-amber-50 text-amber-700 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-400 dark:hover:bg-amber-900/60",
@@ -840,6 +843,7 @@ function WorkerPicker({
   value: string;
   onChange: (workerId: string, label: string) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const { users: workers, isLoading } = useUserOptions({
@@ -851,7 +855,7 @@ function WorkerPicker({
 
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worker</label>
+      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("fields.worker")}</label>
       <Input
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -863,7 +867,7 @@ function WorkerPicker({
           {isLoading ? (
             <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
           ) : workers.length === 0 ? (
-            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No eligible workers found.</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">{t("assignments.noEligibleWorkers")}</div>
           ) : (
             workers.map((w) => {
               const label = `${w.first_name} ${w.last_name}`;
@@ -873,7 +877,7 @@ function WorkerPicker({
                   key={w.id}
                   type="button"
                   onClick={() => onChange(w.id, label)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  className={`flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
                     selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
@@ -908,6 +912,7 @@ function AddEntryModal({
   range: { from: string; to: string };
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
   const [hotelId, setHotelId] = useState("");
   const [workerId, setWorkerId] = useState("");
@@ -1025,7 +1030,7 @@ function AddEntryModal({
     >
       <div className="space-y-4">
         <Select
-          label="Hotel"
+          label={t("fields.hotel")}
           value={hotelId}
           onChange={(e) => onHotelChange(e.target.value)}
           placeholder={hotelsLoading ? "Loading…" : "Select a hotel"}
@@ -1045,7 +1050,7 @@ function AddEntryModal({
             Selected worker: <span className="font-medium text-gray-700 dark:text-gray-300">{workerLabel}</span>
           </p>
         )}
-        <Input label="Day" type="date" value={day} readOnly disabled />
+        <Input label={t("common.day")} type="date" value={day} readOnly disabled />
         <Checkbox
           label="Repeat weekly"
           checked={repeatWeekly}
@@ -1069,7 +1074,7 @@ function AddEntryModal({
               {occurrences - partialFailures.length} of {occurrences} placements created. {partialFailures.length}{" "}
               failed:
             </p>
-            <ul className="mt-1 list-disc pl-4">
+            <ul className="mt-1 list-disc ps-4">
               {partialFailures.map((f) => (
                 <li key={f}>{f}</li>
               ))}
@@ -1103,6 +1108,7 @@ function MarkAbsenceForWorkerModal({
   range: { from: string; to: string };
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const { users: workers, isLoading: workersLoading } = useUserOptions({
@@ -1173,17 +1179,17 @@ function MarkAbsenceForWorkerModal({
     >
       <div className="space-y-4">
         <div className="flex flex-col gap-1">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Worker</label>
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("fields.worker")}</label>
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email…"
+            placeholder={t("search.byNameOrEmail")}
           />
           <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800">
             {workersLoading ? (
               <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
             ) : workers.length === 0 ? (
-              <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No workers found.</div>
+              <div className="p-3 text-sm text-gray-400 dark:text-gray-500">{t("users.none")}</div>
             ) : (
               workers.map((w) => {
                 const label = `${w.first_name} ${w.last_name}`;
@@ -1193,7 +1199,7 @@ function MarkAbsenceForWorkerModal({
                     key={w.id}
                     type="button"
                     onClick={() => setWorkerId(w.id)}
-                    className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    className={`flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
                       selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                     }`}
                   >
@@ -1206,7 +1212,7 @@ function MarkAbsenceForWorkerModal({
           </div>
         </div>
         <Select
-          label="Type"
+          label={t("fields.type")}
           value={kind}
           onChange={(e) => setKind(e.target.value as AbsenceKind)}
           options={[
@@ -1246,6 +1252,7 @@ function RoomsCompletedSection({
   assignmentId: string;
   canWrite: boolean;
 }) {
+  const { t } = useTranslation();
   const { data: assignment, isLoading } = useAssignment(assignmentId);
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
@@ -1326,11 +1333,11 @@ function RoomsCompletedSection({
 
   return (
     <div className="border-t border-gray-100 pt-3">
-      <p className="mb-2 text-sm font-medium text-gray-700">Rooms completed</p>
+      <p className="mb-2 text-sm font-medium text-gray-700">{t("assignments.roomsCompleted")}</p>
       {editing ? (
         <div className="space-y-2">
           <Input
-            label="Rooms completed"
+            label={t("assignments.roomsCompleted")}
             type="number"
             min={0}
             step={1}
@@ -1361,13 +1368,13 @@ function RoomsCompletedSection({
       ) : existing ? (
         <div className="space-y-1 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-500">Count</span>
+            <span className="text-gray-500">{t("common.count")}</span>
             <span className="font-medium text-gray-900">{existing.rooms_completed}</span>
           </div>
           {existing.notes && (
             <div className="flex justify-between gap-4">
-              <span className="shrink-0 text-gray-500">Notes</span>
-              <span className="text-right text-gray-700">{existing.notes}</span>
+              <span className="shrink-0 text-gray-500">{t("fields.notes")}</span>
+              <span className="text-end text-gray-700">{existing.notes}</span>
             </div>
           )}
           {/* review follow-up (PR #395 item A): who logged this count, not
@@ -1375,8 +1382,8 @@ function RoomsCompletedSection({
               back to the raw id on the rare chance the name failed to
               resolve rather than hiding the field entirely. */}
           <div className="flex justify-between gap-4">
-            <span className="shrink-0 text-gray-500">Logged by</span>
-            <span className="text-right text-gray-700">
+            <span className="shrink-0 text-gray-500">{t("assignments.loggedBy")}</span>
+            <span className="text-end text-gray-700">
               {existing.entered_by_name ?? existing.entered_by_id}
             </span>
           </div>
@@ -1391,7 +1398,7 @@ function RoomsCompletedSection({
           Log rooms completed
         </Button>
       ) : (
-        <p className="text-sm text-gray-500">Not yet logged.</p>
+        <p className="text-sm text-gray-500">{t("status.notYetLogged")}</p>
       )}
     </div>
   );
@@ -1418,6 +1425,7 @@ function EditEntryModal({
   canWrite: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const { hotels } = useHotelOptions();
   const hotelName = hotels.find((h) => h.id === entry.hotel_id)?.name ?? entry.hotel_id;
   const [cancelling, setCancelling] = useState(false);
@@ -1449,7 +1457,7 @@ function EditEntryModal({
     <Modal
       open
       onClose={onClose}
-      title="Placement details"
+      title={t("assignments.placementDetails")}
       footer={
         <>
           <Button variant="outline" onClick={onClose} disabled={cancelling}>
@@ -1465,15 +1473,15 @@ function EditEntryModal({
     >
       <div className="space-y-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-gray-500 dark:text-gray-400">Worker</span>
+          <span className="text-gray-500 dark:text-gray-400">{t("fields.worker")}</span>
           <span className="font-medium text-gray-900 dark:text-gray-100">{workerName}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500 dark:text-gray-400">Hotel</span>
+          <span className="text-gray-500 dark:text-gray-400">{t("fields.hotel")}</span>
           <span className="font-medium text-gray-900 dark:text-gray-100">{hotelName}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-gray-500 dark:text-gray-400">Day</span>
+          <span className="text-gray-500 dark:text-gray-400">{t("common.day")}</span>
           <span className="font-medium text-gray-900 dark:text-gray-100">{entry.day}</span>
         </div>
         {/* Gated on canWrite: dragging is only offered to the roles

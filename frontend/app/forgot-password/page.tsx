@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
 import { ApiError } from "@/lib/api";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui";
 
 export default function ForgotPasswordPage() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -51,7 +53,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-800">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Reset your password</CardTitle>
+          <CardTitle>{t("auth.resetYourPassword")}</CardTitle>
         </CardHeader>
         <CardContent>
           {success ? (
@@ -69,7 +71,7 @@ export default function ForgotPasswordPage() {
                 Enter your email address and we will send you a link to reset your password.
               </p>
               <Input
-                label="Email"
+                label={t("fields.email")}
                 type="email"
                 autoComplete="email"
                 required

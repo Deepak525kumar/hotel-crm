@@ -14,6 +14,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { Attendance } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /**
  * Embeds the geofence-verification events tied to one attendance record's
@@ -23,6 +24,7 @@ import type { Attendance } from "@/lib/types";
  * check-in/check-out, so no client-side heuristic is needed.
  */
 export function GeoVerificationCard({ record }: { record: Attendance }) {
+  const { t } = useTranslation();
   const { records, isLoading, error } = useGeoCheckins({
     attendance_id: record.id,
     per_page: 20,
@@ -32,7 +34,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Geo verification</CardTitle>
+          <CardTitle>{t("assignments.geoVerification")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 py-2">
           <Skeleton className="h-4 w-2/3" />
@@ -46,7 +48,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Geo verification</CardTitle>
+          <CardTitle>{t("assignments.geoVerification")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2 text-sm text-red-600 dark:text-red-400">
           Failed to load geo verification data.
@@ -61,7 +63,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
     <GeoCheckinsGate>
       <Card>
         <CardHeader>
-          <CardTitle>Geo verification</CardTitle>
+          <CardTitle>{t("assignments.geoVerification")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>

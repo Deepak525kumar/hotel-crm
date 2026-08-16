@@ -131,7 +131,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           // the link padding, and the label grid in SidebarNav. Previously
           // these used different property sets and no explicit curve, so
           // they visibly finished at different moments.
-          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-r border-gray-200 bg-white transition-[width] duration-200 ease-out dark:border-gray-800 dark:bg-gray-900 md:flex",
+          "sticky top-0 hidden h-screen min-h-0 shrink-0 flex-col overflow-hidden border-e border-gray-200 bg-white transition-[width] duration-200 ease-out dark:border-gray-800 dark:bg-gray-900 md:flex",
           sidebarExpanded ? "w-60" : "w-16",
         )}
       >
@@ -170,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileNavOpen(true)}
             aria-label="Open navigation"
             aria-expanded={mobileNavOpen}
-            className="-ml-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
+            className="-ms-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
           >
             <svg
               width="20"

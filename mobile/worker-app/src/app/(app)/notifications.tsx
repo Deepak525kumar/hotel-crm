@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { Notification } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 function NotifCard({ item, onPress }: { item: Notification; onPress: () => void }) {
   const unread = !item.read_at;
@@ -27,6 +28,7 @@ function NotifCard({ item, onPress }: { item: Notification; onPress: () => void 
 }
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,7 +65,7 @@ export default function NotificationsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>Notifications</ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t('notifications.title')}</ThemedText>
         {loading ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
@@ -75,7 +77,7 @@ export default function NotificationsScreen() {
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">No notifications.</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t('notifications.none')}</ThemedText>
               </ThemedView>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
