@@ -8,8 +8,10 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useState } from 'react';
 import { LanguagePicker } from '@/components/LanguagePicker';
+import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { user, logout } = useAuthStore();
   const router = useRouter();
   const theme = useTheme();
@@ -90,7 +92,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">View Leaderboard</ThemedText>
+            <ThemedText type="smallBold">{t('leaderboard.view')}</ThemedText>
           </ThemedView>
         </Pressable>
 
@@ -99,7 +101,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">View Documents</ThemedText>
+            <ThemedText type="smallBold">{t('documents.view')}</ThemedText>
           </ThemedView>
         </Pressable>
 
@@ -108,7 +110,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">View Consent</ThemedText>
+            <ThemedText type="smallBold">{t('consent.view')}</ThemedText>
           </ThemedView>
         </Pressable>
 
@@ -117,7 +119,7 @@ export default function ProfileScreen() {
           style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
         >
           <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">View HR & Payroll</ThemedText>
+            <ThemedText type="smallBold">{t('hr.view')}</ThemedText>
           </ThemedView>
         </Pressable>
 
@@ -133,7 +135,7 @@ export default function ProfileScreen() {
               <ActivityIndicator color={theme.text} />
             ) : (
               <ThemedText type="smallBold" style={styles.logoutText}>
-                Sign Out
+                {t('profile.signOut')}
               </ThemedText>
             )}
           </ThemedView>

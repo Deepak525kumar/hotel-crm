@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { WorkRequest, Broadcast } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 const SKILL_LABELS: Record<string, string> = {
   CLEANER: 'Cleaner',
@@ -49,11 +50,12 @@ function JobCard({ item, onPress }: { item: WorkRequest; onPress: () => void }) 
 // shade, so a worker immediately recognizes this as a targeted dispatch
 // offer (first-accept-wins) rather than an ordinary marketplace listing.
 function OfferCard({ item, onPress }: { item: Broadcast; onPress: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
       <ThemedView type="backgroundSelected" style={[styles.card, styles.offerCard]}>
         <View style={styles.offerBadge}>
-          <ThemedText type="small" style={styles.offerBadgeText}>OFFER</ThemedText>
+          <ThemedText type="small" style={styles.offerBadgeText}>{t('jobs.offerBadge')}</ThemedText>
         </View>
         {item.hotel && (
           <ThemedText type="small" themeColor="textSecondary">{item.hotel.name}</ThemedText>
@@ -75,6 +77,7 @@ function OfferCard({ item, onPress }: { item: Broadcast; onPress: () => void }) 
 }
 
 export default function MarketplaceScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const theme = useTheme();
   const [items, setItems] = useState<WorkRequest[]>([]);
@@ -115,10 +118,10 @@ export default function MarketplaceScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>Job Marketplace</ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t('nav.marketplace')}</ThemedText>
         <TextInput
           style={[styles.search, { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.backgroundSelected }]}
-          placeholder="Search jobs..."
+          placeholder={t('jobs.searchPlaceholder')}
           placeholderTextColor={theme.textSecondary}
           value={search}
           onChangeText={setSearch}
@@ -157,7 +160,7 @@ export default function MarketplaceScreen() {
             ListEmptyComponent={
               openOffers.length === 0 ? (
                 <ThemedView type="backgroundElement" style={styles.empty}>
-                  <ThemedText type="small" themeColor="textSecondary">No open jobs found.</ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary">{t('jobs.none')}</ThemedText>
                 </ThemedView>
               ) : null
             }

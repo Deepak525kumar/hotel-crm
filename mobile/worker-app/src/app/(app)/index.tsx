@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { WorkerStats, WorkerAssignment } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
   return (
@@ -23,6 +24,7 @@ function StatCard({ label, value, accent }: { label: string; value: string | num
 }
 
 export default function DashboardScreen() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const theme = useTheme();
   const [stats, setStats] = useState<WorkerStats | null>(null);
@@ -73,11 +75,11 @@ export default function DashboardScreen() {
                 Overview
               </ThemedText>
               <ThemedView style={styles.statsGrid}>
-                <StatCard label="Upcoming" value={upcoming.length} accent={theme.text} />
-                <StatCard label="Completed" value={stats?.completed_assignments ?? 0} />
-                <StatCard label="Rooms Completed" value={stats?.rooms_completed ?? 0} />
+                <StatCard label={t('shifts.upcoming')} value={upcoming.length} accent={theme.text} />
+                <StatCard label={t('status.completed')} value={stats?.completed_assignments ?? 0} />
+                <StatCard label={t('shifts.roomsCompleted')} value={stats?.rooms_completed ?? 0} />
                 <StatCard
-                  label="Rating"
+                  label={t('fields.rating')}
                   value={stats?.average_rating ? stats.average_rating.toFixed(1) : '—'}
                 />
               </ThemedView>

@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkRequest } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -18,6 +19,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function JobDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [job, setJob] = useState<WorkRequest | null>(null);
@@ -39,7 +41,7 @@ export default function JobDetailScreen() {
   if (!job) {
     return (
       <ThemedView style={styles.center}>
-        <ThemedText type="small" themeColor="textSecondary">Job not found.</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t('jobs.notFound')}</ThemedText>
       </ThemedView>
     );
   }
@@ -60,19 +62,19 @@ export default function JobDetailScreen() {
 
           <ThemedView type="backgroundElement" style={styles.section}>
             <InfoRow
-              label="Date"
+              label={t('fields.date')}
               value={new Date(job.shift_date).toLocaleDateString('en-US', {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
               })}
             />
             <View style={styles.divider} />
-            <InfoRow label="Time" value={`${job.shift_start_time} – ${job.shift_end_time}`} />
+            <InfoRow label={t('fields.time')} value={`${job.shift_start_time} – ${job.shift_end_time}`} />
             <View style={styles.divider} />
-            <InfoRow label="Pay" value={job.hourly_rate ? `$${job.hourly_rate}/hr` : 'TBD'} />
+            <InfoRow label={t('fields.pay')} value={job.hourly_rate ? `$${job.hourly_rate}/hr` : 'TBD'} />
             <View style={styles.divider} />
-            <InfoRow label="Spots" value={`${job.workers_confirmed}/${job.workers_needed} filled`} />
+            <InfoRow label={t('jobs.spots')} value={`${job.workers_confirmed}/${job.workers_needed} filled`} />
             <View style={styles.divider} />
-            <InfoRow label="Status" value={job.status.replace(/_/g, ' ')} />
+            <InfoRow label={t('fields.status')} value={job.status.replace(/_/g, ' ')} />
           </ThemedView>
 
           {job.description ? (

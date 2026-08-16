@@ -18,6 +18,7 @@ import {
   ListChecks,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/hooks/useAuth";
 import { useMyOnboarding } from "@/hooks/useMyOnboarding";
@@ -27,7 +28,14 @@ import type { Role } from "@/lib/types";
 
 export interface NavItem {
   href: string;
+  /**
+   * English fallback, kept so this exported array stays usable outside a
+   * React tree (tests, route metadata) where a `t()` call is not available.
+   * Rendering always prefers `labelKey`.
+   */
   label: string;
+  /** i18n key resolved at render time; see `label`. */
+  labelKey: string;
   icon: LucideIcon;
   /** When set, the item only shows for these roles. */
   roles?: Role[];
@@ -42,7 +50,7 @@ export interface NavItem {
 
 // Feature routes are added here as modules land under app/(protected)/.
 export const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", labelKey: "nav.dashboard", icon: LayoutDashboard },
   // Self-service onboarding entry point (owner decision, 2026-08-12). Shown to
   // every role that can BE an applicant — worker, checker, manager AND
   // regional_manager (a Manager/RM onboards through the same six-document gate;
@@ -58,46 +66,47 @@ export const NAV: NavItem[] = [
   {
     href: "/onboarding",
     label: "My Onboarding",
+    labelKey: "nav.myOnboarding",
     icon: ClipboardList,
     roles: ["worker", "checker", "manager", "regional_manager"],
     requiresOwnOnboarding: true,
   },
-  { href: "/onboarding/review-queue", label: "Review Queue", icon: ListChecks, roles: ["manager", "regional_manager", "admin"] },
+  { href: "/onboarding/review-queue", label: "Review Queue", labelKey: "nav.reviewQueue", icon: ListChecks, roles: ["manager", "regional_manager", "admin"] },
   // Job Dispatch Phase 2 (Epic 9 PRs 9.7/9.9/9.10, FEATURE_JOBDISPATCH_PHASE2):
   // broadcasts are a distinct JobRequest shape (skill x headcount, no
   // apply/approve step) from the marketplace `/requests` flow above — kept
   // as its own nav entry rather than a tab on `/requests` so the two
   // creation/detail flows don't get conflated.
-  { href: "/requests/broadcasts", label: "Broadcasts", icon: Megaphone, roles: ["worker", "manager", "regional_manager", "admin"] },
-  { href: "/assignments", label: "Assignments", icon: ClipboardCheck },
+  { href: "/requests/broadcasts", label: "Broadcasts", labelKey: "nav.broadcasts", icon: Megaphone, roles: ["worker", "manager", "regional_manager", "admin"] },
+  { href: "/assignments", label: "Assignments", labelKey: "nav.assignments", icon: ClipboardCheck },
   // Teams-style day-grid view of placements + absences (FEATURE_JOBDISPATCH_PHASE2
   // gates placement data server-side; absences are additionally manager/RM/admin-only
   // — a worker/checker still sees the page, just with an empty placements/absences
   // set until the flag is on, matching the "not visible to me, not an error" pattern
   // this app already uses elsewhere).
-  { href: "/calendar", label: "Calendar", icon: CalendarDays },
-  { href: "/attendance", label: "Attendance", icon: Clock },
+  { href: "/calendar", label: "Calendar", labelKey: "nav.calendar", icon: CalendarDays },
+  { href: "/attendance", label: "Attendance", labelKey: "nav.attendance", icon: Clock },
   // Geo check-ins is no longer a standalone tab: geofence-verification
   // events now render inline on the attendance detail page
   // (GeoVerificationCard, gated by the same GeoCheckinsGate roles).
 
-  { href: "/hotels", label: "Hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
-  { href: "/hotel-groups", label: "Hotel groups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
+  { href: "/hotels", label: "Hotels", labelKey: "nav.hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
+  { href: "/hotel-groups", label: "Hotel groups", labelKey: "nav.hotelGroups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
   // Deleted entities are invisible everywhere else by design, so the archive
   // is their only reachable surface. Admin-only, matching the backend gate.
-  { href: "/archive", label: "Archive", icon: Archive, roles: ["admin"] },
+  { href: "/archive", label: "Archive", labelKey: "nav.archive", icon: Archive, roles: ["admin"] },
   // Backend (GET /users, GET/PUT /users/:id) is scope-correct for manager
   // and regional_manager (2026-08-06 scope fixes) -- this nav entry was the
   // last remaining place a manager/RM had no way to browse or open their
   // own group's workers by name/email, despite the API already serving it.
-  { href: "/users", label: "Users", icon: UsersIcon, roles: ["admin", "manager", "regional_manager"] },
+  { href: "/users", label: "Users", labelKey: "nav.users", icon: UsersIcon, roles: ["admin", "manager", "regional_manager"] },
   // Notifications moved to a navbar bell icon (AppShell) -- no longer a
   // sidebar entry.
   // Deliberately last and deliberately unrestricted: settings is per-user
   // (session info + a pointer to /profile), not an admin surface, so every
   // role sees it. Keep it at the bottom -- it's a destination users go
   // looking for, not one they navigate between like the feature routes above.
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/settings", label: "Settings", labelKey: "nav.settings", icon: Settings },
 ];
 
 /**
@@ -113,6 +122,7 @@ export function SidebarNav({
   onNavigate?: () => void;
   collapsed?: boolean;
 }) {
+  const { t } = useTranslation();
   const pathname = usePathname();
   const { user } = useAuth();
   const onboarding = useMyOnboarding();
@@ -155,7 +165,7 @@ export function SidebarNav({
         href={item.href}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
-        title={collapsed ? item.label : undefined}
+        title={collapsed ? t(item.labelKey) : undefined}
         className={cn(
           "flex items-center rounded-md py-2 text-sm font-medium",
           "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600",
@@ -189,7 +199,7 @@ export function SidebarNav({
             )}
           >
             <span className="flex items-center gap-2 overflow-hidden whitespace-nowrap">
-              {item.label}
+              {t(item.labelKey)}
               {/* Live onboarding status, only while it still needs action.
                   Once ACTIVE this renders nothing, so the entry degrades to a
                   plain "view my onboarding" link instead of a standing

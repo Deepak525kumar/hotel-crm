@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -24,11 +25,12 @@ export default function LoginScreen() {
   const { login, logout, isLoading } = useAuthStore();
   const router = useRouter();
   const theme = useTheme();
+  const { t } = useTranslation();
 
   const handleLogin = async () => {
     setError(null);
     if (!email.trim() || !password.trim()) {
-      setError('Email and password are required.');
+      setError(t('auth.credentialsRequired'));
       return;
     }
     try {
@@ -36,7 +38,7 @@ export default function LoginScreen() {
       const user = useAuthStore.getState().user;
       if (user && !ALLOWED_ROLES.includes(user.role)) {
         await logout();
-        setError('Your account does not have access to this app.');
+        setError(t('auth.noAppAccess'));
         return;
       }
       router.replace('/(app)/');
@@ -44,13 +46,13 @@ export default function LoginScreen() {
       if (err instanceof ApiError && err.status === 429) {
         setError(
           err.retryAfterSeconds !== undefined
-            ? `Too many attempts. Please try again in ${err.retryAfterSeconds}s.`
-            : 'Too many attempts. Please wait before trying again.',
+            ? t('auth.tooManyAttemptsRetry', { seconds: err.retryAfterSeconds })
+            : t('auth.tooManyAttempts'),
         );
       } else if (err instanceof ApiError) {
         setError(err.message);
       } else {
-        setError('Login failed. Please try again.');
+        setError(t('auth.loginFailed'));
       }
     }
   };
@@ -83,7 +85,7 @@ export default function LoginScreen() {
                 backgroundColor: theme.backgroundElement,
               },
             ]}
-            placeholder="Email"
+            placeholder={t('auth.emailPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             value={email}
             onChangeText={setEmail}
@@ -101,7 +103,7 @@ export default function LoginScreen() {
                 backgroundColor: theme.backgroundElement,
               },
             ]}
-            placeholder="Password"
+            placeholder={t('auth.passwordPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             value={password}
             onChangeText={setPassword}
@@ -125,14 +127,14 @@ export default function LoginScreen() {
               {isLoading ? (
                 <ActivityIndicator color={theme.text} />
               ) : (
-                <ThemedText type="smallBold">Sign In</ThemedText>
+                <ThemedText type="smallBold">{t('auth.signIn')}</ThemedText>
               )}
             </ThemedView>
           </Pressable>
 
           <Pressable onPress={handleForgotPassword} style={styles.forgotPasswordContainer}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.forgotPasswordText}>
-              Forgot Password?
+              {t('auth.forgotPassword')}
             </ThemedText>
           </Pressable>
         </ThemedView>

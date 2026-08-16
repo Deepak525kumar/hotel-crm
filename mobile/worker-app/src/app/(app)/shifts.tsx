@@ -7,6 +7,7 @@ import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkerAssignment, AssignmentStatus } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 const STATUS_COLOR: Record<AssignmentStatus, string> = {
   CONFIRMED: '#3182CE',
@@ -55,6 +56,7 @@ function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => v
 }
 
 export default function ShiftsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [items, setItems] = useState<WorkerAssignment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ export default function ShiftsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>My Shifts</ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t('nav.myShifts')}</ThemedText>
         {loading ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
@@ -88,7 +90,7 @@ export default function ShiftsScreen() {
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">No shifts yet.</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t('shifts.none')}</ThemedText>
               </ThemedView>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

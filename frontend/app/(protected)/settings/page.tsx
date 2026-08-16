@@ -59,7 +59,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <CardTitle>{t("settings.account")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 py-2">
           <DataList>
@@ -77,16 +77,16 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Appearance</CardTitle>
+          <CardTitle>{t("settings.appearance")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
               label={
                 <span className="flex flex-col gap-0.5 text-left">
-                  <span className="font-medium text-gray-900 dark:text-gray-100">Theme</span>
+                  <span className="font-medium text-gray-900 dark:text-gray-100">{t("fields.theme")}</span>
                   <span className="text-gray-500 dark:text-gray-400">
-                    System follows your device&apos;s setting.
+                    {t("settings.themeSystemNote")}
                   </span>
                 </span>
               }
@@ -111,7 +111,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>About</CardTitle>
+          <CardTitle>{t("settings.about")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
@@ -137,7 +137,7 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Coming soon</CardTitle>
+          <CardTitle>{t("settings.comingSoon")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>

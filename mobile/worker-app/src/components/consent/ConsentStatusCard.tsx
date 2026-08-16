@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { statusAction, statusDescription, statusLabel } from '@/lib/consent-status';
 import type { ConsentStatus } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 // Colocated with the component that renders it, matching this app's existing
 // convention for status-color maps (e.g. shifts.tsx's STATUS_COLOR,
@@ -39,6 +40,7 @@ export function ConsentStatusCard({
   onWithdraw: () => void;
   withdrawing: boolean;
 }) {
+  const { t } = useTranslation();
   if (loading) {
     return <ActivityIndicator style={styles.loader} />;
   }
@@ -46,7 +48,7 @@ export function ConsentStatusCard({
   if (error || !status) {
     return (
       <ThemedText type="small" style={styles.errorText}>
-        {error ?? 'Failed to load your consent status.'}
+        {error ?? t('consent.loadFailed')}
       </ThemedText>
     );
   }
@@ -73,13 +75,13 @@ export function ConsentStatusCard({
             {withdrawing ? (
               <ActivityIndicator size="small" />
             ) : (
-              <ThemedText type="linkPrimary">Withdraw</ThemedText>
+              <ThemedText type="linkPrimary">{t('consent.withdraw')}</ThemedText>
             )}
           </Pressable>
         ) : (
           <Pressable onPress={onReviewNotice}>
             <ThemedText type="linkPrimary">
-              {action === 'review-again' ? 'Review again' : 'Review notice'}
+              {action === 'review-again' ? t('consent.reviewAgain') : t('consent.reviewNotice')}
             </ThemedText>
           </Pressable>
         )}
