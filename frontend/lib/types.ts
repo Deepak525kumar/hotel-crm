@@ -13,6 +13,8 @@
  * still behind `FEATURE_RM_ROLE` (default off). This widening exists so the
  * frontend doesn't reject/misrender a regional manager once one appears.
  */
+import type { UiLocale } from "@/lib/locales";
+
 export type Role = "worker" | "checker" | "manager" | "admin" | "regional_manager";
 
 export interface AuthUser {
@@ -24,6 +26,12 @@ export interface AuthUser {
   profile_photo_url?: string;
   role: Role;
   permissions: string[];
+  /**
+   * The user's chosen UI language, or null when they have never chosen one.
+   * Null is meaningful: it means the client should negotiate from the
+   * browser's own languages rather than assume the platform default.
+   */
+  preferred_language?: UiLocale | null;
   /**
    * ACCOUNT flag only — "can this person sign in". True from the moment the
    * account is created, so it does NOT mean the person has completed
@@ -204,6 +212,14 @@ export interface UpdateProfileInput {
   last_name?: string;
   phone?: string;
   profile_photo_url?: string;
+  /**
+   * UI language (lib/locales.ts `UiLocale`). Typed to allow an explicit
+   * `null`, which is not the same as omitting the key: `null` clears the
+   * stored preference and returns the user to device-locale negotiation,
+   * while omitting it leaves the current value untouched. The backend
+   * relies on exactly that distinction (auth/service.ts updateProfile).
+   */
+  preferred_language?: UiLocale | null;
 }
 
 export interface UpdateUserInput {

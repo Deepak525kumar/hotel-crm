@@ -1,0 +1,147 @@
+{
+  "_meta": {
+    "locale": "ur",
+    "reviewed": false,
+    "dir": "rtl",
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
+  },
+  "common": {
+    "save": "محفوظ کریں",
+    "cancel": "منسوخ کریں",
+    "edit": "ترمیم کریں",
+    "delete": "حذف کریں",
+    "close": "بند کریں",
+    "confirm": "تصدیق کریں",
+    "back": "واپس",
+    "next": "اگلا",
+    "search": "تلاش کریں",
+    "filter": "فلٹر",
+    "loading": "لوڈ ہو رہا ہے…",
+    "saving": "محفوظ ہو رہا ہے…",
+    "retry": "دوبارہ کوشش کریں",
+    "yes": "ہاں",
+    "no": "نہیں",
+    "all": "تمام",
+    "any": "کوئی بھی",
+    "none": "کوئی نہیں",
+    "notSet": "مقرر نہیں",
+    "details": "تفصیلات",
+    "total": "کل",
+    "actions": "اقدامات",
+    "optional": "اختیاری",
+    "required": "لازمی"
+  },
+  "fields": {
+    "name": "نام",
+    "email": "ای میل",
+    "phone": "فون",
+    "role": "کردار",
+    "status": "حالت",
+    "hotel": "ہوٹل",
+    "worker": "کارکن",
+    "workers": "کارکنان",
+    "location": "مقام",
+    "notes": "نوٹس",
+    "description": "تفصیل",
+    "title": "عنوان",
+    "type": "قسم",
+    "time": "وقت",
+    "date": "تاریخ",
+    "timezone": "ٹائم زون",
+    "skills": "مہارتیں",
+    "theme": "تھیم",
+    "language": "زبان",
+    "totalRooms": "کل کمرے"
+  },
+  "nav": {
+    "dashboard": "ڈیش بورڈ",
+    "assignments": "تفویضات",
+    "attendance": "حاضری",
+    "calendar": "کیلنڈر",
+    "archive": "آرکائیو",
+    "broadcasts": "اعلانات",
+    "requests": "کام کی درخواستیں",
+    "hotels": "ہوٹل",
+    "hotelGroups": "ہوٹل گروپس",
+    "users": "صارفین",
+    "notifications": "اطلاعات",
+    "analytics": "تجزیات",
+    "onboarding": "شمولیت",
+    "settings": "ترتیبات",
+    "profile": "پروفائل",
+    "account": "اکاؤنٹ",
+    "logout": "لاگ آؤٹ"
+  },
+  "roles": {
+    "admin": "ایڈمن",
+    "manager": "مینیجر",
+    "regionalManager": "علاقائی مینیجر",
+    "worker": "کارکن",
+    "checker": "جانچ کنندہ",
+    "cleaner": "صفائی کارکن"
+  },
+  "status": {
+    "active": "فعال",
+    "inactive": "غیر فعال",
+    "absent": "غیر حاضر",
+    "pending": "زیر التوا",
+    "confirmed": "تصدیق شدہ",
+    "cancelled": "منسوخ شدہ",
+    "completed": "مکمل",
+    "expired": "میعاد ختم",
+    "deleted": "حذف شدہ",
+    "verified": "تصدیق شدہ",
+    "unverified": "غیر تصدیق شدہ",
+    "unavailable": "دستیاب نہیں",
+    "unassigned": "غیر تفویض شدہ",
+    "read": "پڑھا گیا",
+    "unread": "غیر پڑھا",
+    "submitted": "جمع کرایا",
+    "uploaded": "اپ لوڈ شدہ"
+  },
+  "assignments": {
+    "shiftDetails": "شفٹ کی تفصیلات",
+    "shiftDate": "شفٹ کی تاریخ",
+    "viewAssignment": "تفویض دیکھیں",
+    "leaveUnassigned": "غیر تفویض چھوڑیں",
+    "geoVerification": "مقام کی تصدیق",
+    "checkIn": "چیک اِن",
+    "checkOut": "چیک آؤٹ",
+    "stayOver": "قیام کرنے والا مہمان",
+    "noEligibleWorkers": "کوئی اہل کارکن نہیں ملا۔",
+    "cancelReasonPlaceholder": "بتائیں کہ یہ تفویض کیوں منسوخ کی گئی۔"
+  },
+  "settings": {
+    "language": {
+      "title": "زبان",
+      "description": "پوری ایپ میں استعمال ہونے والی زبان منتخب کریں۔",
+      "useDeviceLanguage": "ڈیوائس کی زبان استعمال کریں",
+      "changed": "زبان اپ ڈیٹ ہو گئی۔",
+      "changeFailed": "آپ کی زبان محفوظ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+      "untranslatedNotice": "یہ زبان جزوی طور پر ترجمہ شدہ ہے۔ غیر ترجمہ شدہ متن جرمن میں ظاہر ہوگا۔",
+      "restartRequired": "تحریر کی سمت کی تبدیلی مکمل کرنے کے لیے ایپ دوبارہ شروع کریں۔"
+    }
+  },
+  "auth": {
+    "login": "لاگ اِن",
+    "password": "پاس ورڈ",
+    "forgotPassword": "پاس ورڈ بھول گئے؟",
+    "resetSuccess": "آپ کا پاس ورڈ کامیابی سے ری سیٹ ہو گیا!"
+  },
+  "search": {
+    "byNameOrEmail": "نام یا ای میل سے تلاش کریں…",
+    "nameOrCity": "نام یا شہر…"
+  },
+  "filters": {
+    "allHotels": "تمام ہوٹل",
+    "allRoles": "تمام کردار",
+    "allStatuses": "تمام حالتیں",
+    "allGroups": "تمام گروپس"
+  },
+  "errors": {
+    "generic": "کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔",
+    "network": "سرور تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں۔",
+    "notFound": "نہیں ملا۔",
+    "forbidden": "آپ کو اس تک رسائی حاصل نہیں ہے۔"
+  }
+}

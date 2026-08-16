@@ -1,0 +1,146 @@
+{
+  "_meta": {
+    "locale": "en",
+    "reviewed": true,
+    "note": "Source catalogue. Keys are authored here first; every other locale mirrors this key set."
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "close": "Close",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "search": "Search",
+    "filter": "Filter",
+    "loading": "Loading…",
+    "saving": "Saving…",
+    "retry": "Retry",
+    "yes": "Yes",
+    "no": "No",
+    "all": "All",
+    "any": "Any",
+    "none": "None",
+    "notSet": "Not set",
+    "details": "Details",
+    "total": "Total",
+    "actions": "Actions",
+    "optional": "Optional",
+    "required": "Required"
+  },
+  "fields": {
+    "name": "Name",
+    "email": "Email",
+    "phone": "Phone",
+    "role": "Role",
+    "status": "Status",
+    "hotel": "Hotel",
+    "worker": "Worker",
+    "workers": "Workers",
+    "location": "Location",
+    "notes": "Notes",
+    "description": "Description",
+    "title": "Title",
+    "type": "Type",
+    "time": "Time",
+    "date": "Date",
+    "timezone": "Timezone",
+    "skills": "Skills",
+    "theme": "Theme",
+    "language": "Language",
+    "totalRooms": "Total rooms"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "assignments": "Assignments",
+    "attendance": "Attendance",
+    "calendar": "Calendar",
+    "archive": "Archive",
+    "broadcasts": "Broadcasts",
+    "requests": "Work requests",
+    "hotels": "Hotels",
+    "hotelGroups": "Hotel groups",
+    "users": "Users",
+    "notifications": "Notifications",
+    "analytics": "Analytics",
+    "onboarding": "Onboarding",
+    "settings": "Settings",
+    "profile": "Profile",
+    "account": "Account",
+    "logout": "Log out"
+  },
+  "roles": {
+    "admin": "Admin",
+    "manager": "Manager",
+    "regionalManager": "Regional manager",
+    "worker": "Worker",
+    "checker": "Checker",
+    "cleaner": "Cleaner"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive",
+    "absent": "Absent",
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "cancelled": "Cancelled",
+    "completed": "Completed",
+    "expired": "Expired",
+    "deleted": "Deleted",
+    "verified": "Verified",
+    "unverified": "Unverified",
+    "unavailable": "Unavailable",
+    "unassigned": "Unassigned",
+    "read": "Read",
+    "unread": "Unread",
+    "submitted": "Submitted",
+    "uploaded": "Uploaded"
+  },
+  "assignments": {
+    "shiftDetails": "Shift details",
+    "shiftDate": "Shift date",
+    "viewAssignment": "View assignment",
+    "leaveUnassigned": "Leave unassigned",
+    "geoVerification": "Geo verification",
+    "checkIn": "Check in",
+    "checkOut": "Check out",
+    "stayOver": "Stay-over",
+    "noEligibleWorkers": "No eligible workers found.",
+    "cancelReasonPlaceholder": "Share why this assignment was cancelled."
+  },
+  "settings": {
+    "language": {
+      "title": "Language",
+      "description": "Choose the language used across the app.",
+      "useDeviceLanguage": "Use device language",
+      "changed": "Language updated.",
+      "changeFailed": "Could not save your language. Please try again.",
+      "untranslatedNotice": "This language is partially translated. Untranslated text appears in German.",
+      "restartRequired": "Restart the app to finish switching the writing direction."
+    }
+  },
+  "auth": {
+    "login": "Log in",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "resetSuccess": "Your password has been reset successfully!"
+  },
+  "search": {
+    "byNameOrEmail": "Search by name or email…",
+    "nameOrCity": "Name or city…"
+  },
+  "filters": {
+    "allHotels": "All hotels",
+    "allRoles": "All roles",
+    "allStatuses": "All statuses",
+    "allGroups": "All groups"
+  },
+  "errors": {
+    "generic": "Something went wrong. Please try again.",
+    "network": "Could not reach the server. Check your connection.",
+    "notFound": "Not found.",
+    "forbidden": "You do not have access to this."
+  }
+}

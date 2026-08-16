@@ -1,0 +1,147 @@
+{
+  "_meta": {
+    "locale": "ar",
+    "reviewed": false,
+    "dir": "rtl",
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
+  },
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "edit": "تعديل",
+    "delete": "حذف",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "back": "رجوع",
+    "next": "التالي",
+    "search": "بحث",
+    "filter": "تصفية",
+    "loading": "جارٍ التحميل…",
+    "saving": "جارٍ الحفظ…",
+    "retry": "إعادة المحاولة",
+    "yes": "نعم",
+    "no": "لا",
+    "all": "الكل",
+    "any": "أي",
+    "none": "لا شيء",
+    "notSet": "غير محدد",
+    "details": "التفاصيل",
+    "total": "الإجمالي",
+    "actions": "الإجراءات",
+    "optional": "اختياري",
+    "required": "مطلوب"
+  },
+  "fields": {
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "phone": "الهاتف",
+    "role": "الدور",
+    "status": "الحالة",
+    "hotel": "الفندق",
+    "worker": "الموظف",
+    "workers": "الموظفون",
+    "location": "الموقع",
+    "notes": "ملاحظات",
+    "description": "الوصف",
+    "title": "العنوان",
+    "type": "النوع",
+    "time": "الوقت",
+    "date": "التاريخ",
+    "timezone": "المنطقة الزمنية",
+    "skills": "المهارات",
+    "theme": "المظهر",
+    "language": "اللغة",
+    "totalRooms": "إجمالي الغرف"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "assignments": "المهام",
+    "attendance": "الحضور",
+    "calendar": "التقويم",
+    "archive": "الأرشيف",
+    "broadcasts": "الإشعارات العامة",
+    "requests": "طلبات العمل",
+    "hotels": "الفنادق",
+    "hotelGroups": "مجموعات الفنادق",
+    "users": "المستخدمون",
+    "notifications": "الإشعارات",
+    "analytics": "التحليلات",
+    "onboarding": "الانضمام",
+    "settings": "الإعدادات",
+    "profile": "الملف الشخصي",
+    "account": "الحساب",
+    "logout": "تسجيل الخروج"
+  },
+  "roles": {
+    "admin": "مدير النظام",
+    "manager": "مدير",
+    "regionalManager": "المدير الإقليمي",
+    "worker": "موظف",
+    "checker": "مدقق",
+    "cleaner": "عامل نظافة"
+  },
+  "status": {
+    "active": "نشط",
+    "inactive": "غير نشط",
+    "absent": "غائب",
+    "pending": "قيد الانتظار",
+    "confirmed": "مؤكد",
+    "cancelled": "ملغى",
+    "completed": "مكتمل",
+    "expired": "منتهي الصلاحية",
+    "deleted": "محذوف",
+    "verified": "موثق",
+    "unverified": "غير موثق",
+    "unavailable": "غير متاح",
+    "unassigned": "غير مُسند",
+    "read": "مقروء",
+    "unread": "غير مقروء",
+    "submitted": "تم الإرسال",
+    "uploaded": "تم الرفع"
+  },
+  "assignments": {
+    "shiftDetails": "تفاصيل الوردية",
+    "shiftDate": "تاريخ الوردية",
+    "viewAssignment": "عرض المهمة",
+    "leaveUnassigned": "ترك دون إسناد",
+    "geoVerification": "التحقق من الموقع",
+    "checkIn": "تسجيل الدخول",
+    "checkOut": "تسجيل الخروج",
+    "stayOver": "نزيل مقيم",
+    "noEligibleWorkers": "لم يتم العثور على موظفين مؤهلين.",
+    "cancelReasonPlaceholder": "يرجى بيان سبب إلغاء هذه المهمة."
+  },
+  "settings": {
+    "language": {
+      "title": "اللغة",
+      "description": "اختر اللغة المستخدمة في التطبيق بأكمله.",
+      "useDeviceLanguage": "استخدام لغة الجهاز",
+      "changed": "تم تحديث اللغة.",
+      "changeFailed": "تعذر حفظ اللغة. يرجى المحاولة مرة أخرى.",
+      "untranslatedNotice": "هذه اللغة مترجمة جزئياً. النصوص غير المترجمة تظهر بالألمانية.",
+      "restartRequired": "أعد تشغيل التطبيق لإكمال تغيير اتجاه الكتابة."
+    }
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "password": "كلمة المرور",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "resetSuccess": "تمت إعادة تعيين كلمة المرور بنجاح!"
+  },
+  "search": {
+    "byNameOrEmail": "ابحث بالاسم أو البريد الإلكتروني…",
+    "nameOrCity": "الاسم أو المدينة…"
+  },
+  "filters": {
+    "allHotels": "جميع الفنادق",
+    "allRoles": "جميع الأدوار",
+    "allStatuses": "جميع الحالات",
+    "allGroups": "جميع المجموعات"
+  },
+  "errors": {
+    "generic": "حدث خطأ ما. يرجى المحاولة مرة أخرى.",
+    "network": "تعذر الوصول إلى الخادم. تحقق من اتصالك.",
+    "notFound": "غير موجود.",
+    "forbidden": "ليس لديك صلاحية الوصول إلى هذا."
+  }
+}
