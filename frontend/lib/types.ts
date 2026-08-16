@@ -845,6 +845,59 @@ export function placementAbsenceLabel(entry: CalendarEntryDto): string | null {
   return null;
 }
 
+/**
+ * Has this placement's shift been worked to completion?
+ *
+ * Drives the green tone on the calendar grid (2026-08-16): a manager
+ * scanning a week needs to tell "this shift is done" from "this shift is
+ * still coming" without opening each placement. Blue — the tone every
+ * non-cancelled placement used to share — said only "someone is on it".
+ *
+ * Deliberately a separate predicate from `isActivePlacement`: a COMPLETED
+ * placement IS active (it was staffed and worked, and every count/breakdown
+ * must keep including it). The two answer different questions and must not
+ * be collapsed, or completed shifts would vanish from the staffing totals.
+ */
+export function isCompletedPlacement(entry: CalendarEntryDto): boolean {
+  return entry.assignment_status === "COMPLETED";
+}
+
+/** Why a worker cannot take a shift on a given day, or null when they can. */
+export type WorkerDayConflict = "ABSENT_SICK" | "ABSENT_VACATION" | "ALREADY_PLACED";
+
+/**
+ * Is this worker unavailable on `day`, and why?
+ *
+ * Two independent reasons, both derived from data the calendar grid has
+ * already loaded for the visible range — no extra request, and no per-row
+ * call to GET /calendar/availability (which takes a single worker_id and
+ * would mean one round-trip per row in the picker).
+ *
+ * `ALREADY_PLACED` deliberately ignores cancelled and no-show placements via
+ * `isActivePlacement`: a shift the worker is no longer working does not make
+ * them unavailable, and treating it as a conflict would block re-placing
+ * someone onto a day whose cover was just cancelled — the exact case a
+ * manager is most likely to be fixing.
+ *
+ * Absence wins over placement when both exist, because it is the more
+ * serious signal: a sick worker with a stale placement should read as sick,
+ * not as merely double-booked.
+ */
+export function workerDayConflict(
+  workerId: string,
+  day: string,
+  entries: readonly CalendarEntryDto[],
+  absences: readonly CalendarAbsence[],
+): WorkerDayConflict | null {
+  const absence = absences.find((a) => a.worker_id === workerId && a.day === day);
+  if (absence) return absence.kind === "SICK" ? "ABSENT_SICK" : "ABSENT_VACATION";
+
+  const placed = entries.some(
+    (e) => e.worker_id === workerId && e.day === day && isActivePlacement(e),
+  );
+  return placed ? "ALREADY_PLACED" : null;
+}
+
 /* -------------------------------------------------------------------------- */
 /*  Quality — Verifications & Ratings                                         */
 /* -------------------------------------------------------------------------- */

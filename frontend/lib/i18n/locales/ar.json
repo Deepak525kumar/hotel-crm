@@ -157,7 +157,12 @@
     "placementDetails": "تفاصيل التنسيب",
     "placeWorker": "تعيين موظف",
     "calendarPlacement": "التنسيب في التقويم",
-    "roomsCompleted": "الغرف المنجزة"
+    "roomsCompleted": "الغرف المنجزة",
+    "unavailable": "غير متاح",
+    "conflictSick": "إجازة مرضية",
+    "conflictVacation": "في إجازة",
+    "conflictAlreadyPlaced": "مُعيَّن بالفعل في هذا اليوم",
+    "unavailableHint": "الموظفون المميزون بالأحمر غير متاحين في هذا اليوم."
   },
   "settings": {
     "language": {

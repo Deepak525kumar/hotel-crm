@@ -156,7 +156,12 @@
     "placementDetails": "Détails du placement",
     "placeWorker": "Affecter un employé",
     "calendarPlacement": "Placement au calendrier",
-    "roomsCompleted": "Chambres terminées"
+    "roomsCompleted": "Chambres terminées",
+    "unavailable": "Indisponible",
+    "conflictSick": "Congé maladie",
+    "conflictVacation": "En congés",
+    "conflictAlreadyPlaced": "Déjà affecté ce jour-là",
+    "unavailableHint": "Les employés en rouge ne sont pas disponibles ce jour-là."
   },
   "settings": {
     "language": {

@@ -157,7 +157,12 @@
     "placementDetails": "تعیناتی کی تفصیلات",
     "placeWorker": "کارکن تعینات کریں",
     "calendarPlacement": "کیلنڈر تعیناتی",
-    "roomsCompleted": "مکمل کمرے"
+    "roomsCompleted": "مکمل کمرے",
+    "unavailable": "دستیاب نہیں",
+    "conflictSick": "بیماری کی چھٹی",
+    "conflictVacation": "چھٹی پر",
+    "conflictAlreadyPlaced": "اس دن پہلے سے تعینات",
+    "unavailableHint": "سرخ رنگ میں نشان زد کارکن اس دن دستیاب نہیں ہیں۔"
   },
   "settings": {
     "language": {
