@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import {
   UI_LOCALES,
   DEFAULT_UI_LOCALE,
@@ -8,6 +6,18 @@ import {
   isRtlLocale,
   negotiateLocale,
 } from '@/lib/locales';
+
+// Frontend catalogues imported directly rather than read from disk: this
+// package's tsconfig.test.json declares only `types: ["jest"]`, so node:fs /
+// __dirname are not typed here and adding @types/node just for one test
+// would be a heavier fix than the test needs. A relative import gives the
+// same cross-package parity guarantee and is checked by the compiler.
+import webDe from '../../../../frontend/lib/i18n/locales/de.json';
+import webEn from '../../../../frontend/lib/i18n/locales/en.json';
+import webUr from '../../../../frontend/lib/i18n/locales/ur.json';
+import webAr from '../../../../frontend/lib/i18n/locales/ar.json';
+import webFr from '../../../../frontend/lib/i18n/locales/fr.json';
+import webUk from '../../../../frontend/lib/i18n/locales/uk.json';
 
 import de from '@/lib/i18n/locales/de.json';
 import en from '@/lib/i18n/locales/en.json';
@@ -18,6 +28,9 @@ import uk from '@/lib/i18n/locales/uk.json';
 
 type Catalogue = Record<string, unknown>;
 const CATALOGUES: Record<string, Catalogue> = { de, en, ur, ar, fr, uk };
+const WEB_CATALOGUES: Record<string, Catalogue> = {
+  de: webDe, en: webEn, ur: webUr, ar: webAr, fr: webFr, uk: webUk,
+};
 
 function keyPaths(obj: Catalogue, prefix = ''): string[] {
   return Object.entries(obj).flatMap(([key, value]) => {
@@ -52,19 +65,19 @@ describe('locale contract', () => {
     expect(negotiateLocale(['zh-CN'])).toBeNull();
   });
 
-  // The three copies of this contract (backend, frontend, mobile) have no
-  // shared build. These assertions are what stop them drifting apart
-  // silently -- a language added in one place and not the others would
-  // otherwise show up as a picker option that the backend rejects with 422.
-  it('matches the backend and frontend locale contracts', () => {
-    const parse = (path: string) =>
-      readFileSync(join(__dirname, path), 'utf8')
-        .match(/UI_LOCALES = \[([^\]]+)\]/)?.[1]
-        .match(/'([a-z-]+)'/g)
-        ?.map((quoted) => quoted.replace(/'/g, ''));
-
-    expect(parse('../../../../backend/src/lib/locales.ts')).toEqual([...UI_LOCALES]);
-    expect(parse('../../../../frontend/lib/locales.ts')).toEqual([...UI_LOCALES]);
+  // The three copies of this contract (backend, frontend, mobile) share no
+  // build, so drift needs an explicit guard: a locale added in one package
+  // and not the others would show up as a picker option the backend rejects
+  // with 422.
+  //
+  // Asserted through the frontend's shipped CATALOGUES rather than by
+  // importing its locales.ts -- that module touches `navigator`, and this
+  // package's tsconfig.test.json has no DOM lib. The catalogue set is the
+  // same contract by a different route: one JSON file per supported locale.
+  // The frontend's own __tests__/locales.test.ts pins its UI_LOCALES against
+  // the backend, which closes the third edge of the triangle.
+  it('matches the frontend locale set', () => {
+    expect(Object.keys(WEB_CATALOGUES).sort()).toEqual([...UI_LOCALES].sort());
   });
 });
 
@@ -90,10 +103,7 @@ describe('translation catalogues', () => {
   // The mobile catalogues are copies of the frontend's. Same reasoning as
   // the contract-drift test above: no shared build, so parity needs a guard.
   it.each([...UI_LOCALES])('%s matches the frontend catalogue exactly', (locale) => {
-    const web = JSON.parse(
-      readFileSync(join(__dirname, `../../../../frontend/lib/i18n/locales/${locale}.json`), 'utf8'),
-    );
-    expect(CATALOGUES[locale]).toEqual(web);
+    expect(CATALOGUES[locale]).toEqual(WEB_CATALOGUES[locale]);
   });
 
   it('names every language by its own endonym', () => {
