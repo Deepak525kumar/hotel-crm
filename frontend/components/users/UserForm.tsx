@@ -1,5 +1,6 @@
 "use client";
 
+import { SKILL_OPTIONS } from "@/lib/skills";
 import { useState } from "react";
 import {
   Button,
@@ -17,13 +18,6 @@ import { useTranslation } from "react-i18next";
 
 // ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
 // creation — mirrors the backend CreateUserSchema.superRefine requirement.
-
-const SKILL_OPTIONS = [
-  { value: "CLEANER", label: "Cleaner" },
-  { value: "PUBLIC_SERVICE", label: "Public Service" },
-  { value: "KITCHEN_DISHWASHER", label: "Kitchen / Dishwasher" },
-  { value: "WAITER", label: "Waiter" },
-];
 
 const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
   { value: "FULL_TIME", label: "Full-time" },
@@ -321,7 +315,7 @@ export function UserForm({
                     {SKILL_OPTIONS.map((opt) => (
                       <Checkbox
                         key={opt.value}
-                        label={opt.label}
+                        label={t(opt.labelKey)}
                         checked={form.skills.includes(opt.value)}
                         onChange={(e) => {
                           const newSkills = e.target.checked

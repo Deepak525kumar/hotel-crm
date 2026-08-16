@@ -1,5 +1,6 @@
 "use client";
 
+import { SKILL_LABEL_KEY } from "@/lib/skills";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkRequest, useBroadcastEligibility } from "@/hooks/useWorkRequests";
@@ -30,13 +31,6 @@ import {
   Skeleton,
   TextLink,
 } from "@/components/ui";
-
-const SKILL_LABELS: Record<string, string> = {
-  CLEANER: "Cleaner",
-  PUBLIC_SERVICE: "Public service",
-  KITCHEN_DISHWASHER: "Kitchen dishwasher",
-  WAITER: "Waiter",
-};
 
 export default function BroadcastDetailPage() {
   const { t } = useTranslation();
@@ -236,7 +230,7 @@ export default function BroadcastDetailPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {SKILL_LABELS[slot.skill] ?? slot.skill}
+                      {t(SKILL_LABEL_KEY[slot.skill] ?? "") || slot.skill}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {slot.confirmed_count}/{slot.headcount} confirmed
@@ -272,7 +266,7 @@ export default function BroadcastDetailPage() {
               <>
                 <Badge tone="success">{t("status.confirmed")}</Badge>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  You&rsquo;re confirmed for this shift ({SKILL_LABELS[acceptResult.skill] ?? acceptResult.skill}).
+                  You&rsquo;re confirmed for this shift ({t(SKILL_LABEL_KEY[acceptResult.skill] ?? "") || acceptResult.skill}).
                 </p>
               </>
             ) : (
