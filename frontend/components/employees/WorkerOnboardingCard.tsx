@@ -694,18 +694,37 @@ function EditSkillsModal({
   const [skills, setSkills] = useState<SkillTag[]>(currentSkills);
   const action = useAsyncAction();
 
-  // Keep local state in sync when the modal is opened
+  // Re-seed local state each time the modal opens.
+  //
+  // `currentSkills` must NOT be a dependency. It carries a `= []` default, so
+  // for a worker who has no skills yet it is a BRAND NEW array on every
+  // render. Depending on the array identity meant that opening the modal for
+  // such a worker re-ran this effect, set state to yet another new array,
+  // re-rendered, and looped until React gave up with "Maximum update depth
+  // exceeded" -- from the outside, the Edit button simply did nothing.
+  //
+  // That hit precisely the workers the row was made visible for: the comment
+  // on the skills DataRow above notes it is rendered even when empty so a
+  // first-pass worker has somewhere to click Edit from. Empty was the broken
+  // case.
+  //
+  // Keying on the values rather than the reference makes the dependency
+  // stable, so the effect runs once per open, as intended.
+  const currentSkillsKey = currentSkills.join(",");
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setSkills(currentSkills);
     }
-  }, [open, currentSkills]);
+    // `currentSkills` is intentionally tracked via `currentSkillsKey`; see above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, currentSkillsKey]);
 
   const handleClose = () => {
     if (action.pending) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSkills(currentSkills);
+    // Discard unsaved edits. Safe to use the array directly here: this is an
+    // event handler, not an effect, so a fresh reference cannot feed back.
+    setSkills(currentSkills);
     onClose();
   };
 
