@@ -24,6 +24,7 @@ import {
   Skeleton,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function HotelDetailPage() {
   const { t } = useTranslation();
@@ -60,14 +61,12 @@ export default function HotelDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <TextLink href="/hotels" className="text-sm">
-        ← Back to hotels
-      </TextLink>
+      <BackLink href="/hotels" className="text-sm" labelKey="common.backTo.hotels" />
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this hotel. It may have been removed.
+            {t("hotels.loadOneFailedRemoved")}
           </CardContent>
         </Card>
       ) : isLoading || !hotel ? (
@@ -175,7 +174,7 @@ export default function HotelDetailPage() {
                       </span>
                     ) : (
                       <span className="text-gray-500 dark:text-gray-400">
-                        Not set — worker check-in unavailable
+                        {t("hotels.geofenceNotSet")}
                       </span>
                     )
                   }

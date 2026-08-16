@@ -60,7 +60,7 @@ export default function HotelGroupsPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600">
-              Failed to load hotel groups. Please try again.
+              {t("hotelGroups.loadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.hotelGroups")}>

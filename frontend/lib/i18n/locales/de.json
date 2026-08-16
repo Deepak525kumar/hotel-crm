@@ -40,7 +40,37 @@
     "coordinates": "Koordinaten",
     "loadingLabel": "Wird geladen",
     "navigation": "Navigation",
-    "openNavigation": "Navigation öffnen"
+    "openNavigation": "Navigation öffnen",
+    "backTo": {
+      "attendance": "Zurück zur Anwesenheit",
+      "users": "Zurück zu den Benutzern",
+      "user": "Zurück zum Benutzer",
+      "notifications": "Zurück zu den Benachrichtigungen",
+      "workRequests": "Zurück zu den Arbeitsanfragen",
+      "broadcasts": "Zurück zu den Rundmeldungen",
+      "hotels": "Zurück zu den Hotels",
+      "hotel": "Zurück zum Hotel",
+      "hotelGroups": "Zurück zu den Hotelgruppen",
+      "hotelGroup": "Zurück zur Hotelgruppe",
+      "assignments": "Zurück zu den Einsätzen"
+    },
+    "add": "Hinzufügen",
+    "approve": "Genehmigen",
+    "reject": "Ablehnen",
+    "remove": "Entfernen",
+    "restore": "Wiederherstellen",
+    "verify": "Verifizieren",
+    "rate": "Bewerten",
+    "reassign": "Neu zuweisen",
+    "publish": "Veröffentlichen",
+    "previous": "Zurück",
+    "tryAgain": "Erneut versuchen",
+    "goToDashboard": "Zum Dashboard",
+    "somethingWentWrong": "Etwas ist schiefgelaufen",
+    "pageNotFound": "Seite nicht gefunden",
+    "today": "Heute",
+    "file": "Datei",
+    "download": "Herunterladen"
   },
   "fields": {
     "name": "Name",
@@ -122,7 +152,11 @@
     "lastName": "Nachname",
     "workersNeeded": "Benötigte Mitarbeiter",
     "requiresWorkPermit": "Erfordert eine Arbeitserlaubnis (Nicht-EU/EWR/Schweiz)",
-    "activeCanSignIn": "Aktiv (kann sich auf der Plattform anmelden)"
+    "activeCanSignIn": "Aktiv (kann sich auf der Plattform anmelden)",
+    "score0to100": "Punktzahl (0–100)",
+    "punctuality0to100": "Pünktlichkeit (0–100)",
+    "quality0to100": "Qualität (0–100)",
+    "attitude0to100": "Einstellung (0–100)"
   },
   "nav": {
     "dashboard": "Übersicht",
@@ -234,7 +268,18 @@
     "conflictSick": "Krankmeldung",
     "conflictVacation": "Im Urlaub",
     "conflictAlreadyPlaced": "An diesem Tag bereits eingeteilt",
-    "unavailableHint": "Rot markierte Mitarbeiter sind an diesem Tag nicht verfügbar."
+    "unavailableHint": "Rot markierte Mitarbeiter sind an diesem Tag nicht verfügbar.",
+    "broadcastEpic9": "Rundmeldung (Epic 9)",
+    "directRequestLegacy": "Direktanfrage (Legacy)",
+    "keepAssignment": "Einsatz beibehalten",
+    "log": "Erfassen",
+    "viewFailed": "Einsätze konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "roomsWholeNumber": "Fertiggestellte Zimmer müssen eine ganze Zahl von 0 oder mehr sein.",
+    "scoreWholeNumber": "Die Punktzahl muss eine ganze Zahl von 0 bis 100 sein.",
+    "placeOnCalendarDescription": "Bestätigen Sie einen Mitarbeiter direkt für ein Hotel und einen Tag — ohne Rundmeldung, ohne Annahmeschritt.",
+    "calendarPlacementsDescription": "Mitarbeiter, die direkt im Kalender eines Hotels platziert wurden — ohne Rundmeldung, ohne Annahmeschritt.",
+    "calendarPlacementsLink": "Kalenderplatzierungen",
+    "scoreDerivedHint": "Der Status ergibt sich aus der Punktzahl: ab 70 bestanden, 40–69 Nacharbeit nötig, unter 40 nicht bestanden."
   },
   "settings": {
     "language": {
@@ -253,7 +298,8 @@
     "themeSystemNote": "System folgt der Einstellung Ihres Geräts.",
     "localDevBuild": "Lokaler Entwicklungs-Build",
     "pageDescription": "Ihre Konto-, Sitzungs- und App-Einstellungen.",
-    "signedInAs": "Angemeldet als"
+    "signedInAs": "Angemeldet als",
+    "notAvailableYet": "Noch nicht verfügbar"
   },
   "auth": {
     "login": "Anmelden",
@@ -272,11 +318,21 @@
     "email": "E-Mail",
     "resetYourPassword": "Passwort zurücksetzen",
     "setNewPassword": "Neues Passwort festlegen",
-    "invalidResetLink": "Ungültiger Link zum Zurücksetzen des Passworts. Das Token fehlt."
+    "invalidResetLink": "Ungültiger Link zum Zurücksetzen des Passworts. Das Token fehlt.",
+    "backToLogin": "Zurück zur Anmeldung",
+    "returnToLogin": "Zurück zur Anmeldung",
+    "requestNewLink": "Neuen Link anfordern",
+    "enterEmailResetHint": "Geben Sie Ihre E-Mail-Adresse ein, und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts.",
+    "sendResetLinkAction": "Zurücksetzungslink senden",
+    "resetLinkSentHint": "Falls diese E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts an sie gesendet.",
+    "enterNewPasswordHint": "Geben Sie ein neues Passwort für Ihr Konto ein.",
+    "resetPasswordTitle": "Passwort zurücksetzen",
+    "invalidResetTokenMissing": "Ungültiges oder fehlendes Zurücksetzungs-Token."
   },
   "search": {
     "byNameOrEmail": "Nach Name oder E-Mail suchen…",
-    "nameOrCity": "Name oder Stadt…"
+    "nameOrCity": "Name oder Stadt…",
+    "nameOrEmailShort": "Name oder E-Mail…"
   },
   "filters": {
     "allHotels": "Alle Hotels",
@@ -340,7 +396,13 @@
     "evaluateWorkPermitRequired": "Mit erforderlicher Arbeitserlaubnis bewerten",
     "noDocuments": "Keine Dokumente",
     "uploadTitle": "Dokument hochladen",
-    "nonEuWorkPermit": "Arbeitserlaubnisdokument für Nicht-EU/EWR/Schweiz"
+    "nonEuWorkPermit": "Arbeitserlaubnisdokument für Nicht-EU/EWR/Schweiz",
+    "geoLoadFailed": "Geo-Verifizierungsdaten konnten nicht geladen werden.",
+    "statusLoadFailed": "Dokumentstatus konnte nicht geladen werden.",
+    "loadFailed": "Dokumente konnten nicht geladen werden.",
+    "deleteAction": "Löschen",
+    "uploadAction": "Hochladen",
+    "fileTooLarge": "Datei überschreitet das Limit von 10 MB."
   },
   "hr": {
     "title": "Personal & Lohn",
@@ -360,7 +422,22 @@
     "createContractTitle": "Vertrag erstellen",
     "noPayslipRequests": "Keine Gehaltsabrechnungsanfragen",
     "noPayslipRequestsDescription": "Anfragen erscheinen hier, sobald der Mitarbeiter eine Gehaltsabrechnung anfordert oder ein Manager eine in seinem Namen erstellt.",
-    "newPayslipRequestTitle": "Neue Gehaltsabrechnungsanfrage"
+    "newPayslipRequestTitle": "Neue Gehaltsabrechnungsanfrage",
+    "loadFailed": "Vertragsstatus konnte nicht geladen werden.",
+    "downloadContractPdf": "Vertrags-PDF herunterladen",
+    "uploadSignedContract": "Unterschriebenen Vertrag hochladen",
+    "confirmSignature": "Unterschrift bestätigen",
+    "confirmContinuation": "Fortsetzung bestätigen",
+    "doNotContinue": "Nicht fortsetzen",
+    "createContractAction": "Vertrag erstellen",
+    "markFulfilledAction": "Als erfüllt markieren",
+    "newRequestAction": "Neue Anfrage",
+    "payslipsLoadFailed": "Gehaltsabrechnungsanfragen konnten nicht geladen werden.",
+    "createRequestAction": "Anfrage erstellen",
+    "bothDatesRequired": "Beide Zeitraumdaten sind erforderlich.",
+    "periodEndAfterStart": "Das Ende des Zeitraums muss am oder nach dem Beginn liegen.",
+    "templateStartRequired": "Vorlage, Position und Startdatum sind erforderlich.",
+    "endDateAfterStart": "Das Enddatum muss am oder nach dem Startdatum liegen."
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",
@@ -372,14 +449,22 @@
     "reviewNotice": "Hinweis ansehen",
     "loadFailed": "Ihr Einwilligungsstatus konnte nicht geladen werden.",
     "history": "Zustimmungsverlauf",
-    "auditTrail": "Prüfprotokoll"
+    "auditTrail": "Prüfprotokoll",
+    "loadOneFailed": "Ihr Zustimmungsstatus konnte nicht geladen werden."
   },
   "notifications": {
     "title": "Benachrichtigungen",
     "none": "Keine Benachrichtigungen.",
     "channel": "Kanal",
     "readAt": "Gelesen am",
-    "noneFound": "Keine Benachrichtigungen gefunden"
+    "noneFound": "Keine Benachrichtigungen gefunden",
+    "viewOneFailed": "Diese Benachrichtigung wurde nicht gefunden oder konnte nicht geladen werden.",
+    "markAsReadAction": "Als gelesen markieren",
+    "markAllRead": "Alle als gelesen markieren",
+    "loadFailed": "Benachrichtigungen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "viewAllAction": "Alle Benachrichtigungen ansehen",
+    "markReadHint": "Markieren Sie diese Benachrichtigung als gelesen, sobald Sie sie gesehen haben.",
+    "allCaughtUp": "Sie sind auf dem neuesten Stand."
   },
   "leaderboard": {
     "none": "Noch keine Ranglistendaten.",
@@ -393,7 +478,13 @@
     "signOut": "Abmelden",
     "noAbsences": "Keine Krank- oder Urlaubstage eingetragen.",
     "editTitle": "Profil bearbeiten",
-    "resetPasswordTitle": "Passwort zurücksetzen"
+    "resetPasswordTitle": "Passwort zurücksetzen",
+    "updateDetailsHint": "Aktualisieren Sie Ihren Namen und Ihre Kontaktdaten oder setzen Sie Ihr Passwort zurück.",
+    "saveChanges": "Änderungen speichern",
+    "sendResetLink": "Zurücksetzungslink senden",
+    "firstNameLastNameRequired": "Vor- und Nachname sind erforderlich.",
+    "phoneInvalid": "Die Telefonnummer muss eine gültige internationale Nummer sein, z. B. +49301234567.",
+    "viewProfile": "Profil ansehen"
   },
   "skills": {
     "CLEANER": "Reinigungskraft",
@@ -420,7 +511,15 @@
     "workersPlaced": "Platzierte Mitarbeiter",
     "sick": "Krank",
     "onVacation": "Im Urlaub",
-    "nothingScheduled": "Nichts geplant"
+    "nothingScheduled": "Nichts geplant",
+    "selectHotelHint": "Wählen Sie oben ein Hotel aus, um dessen tägliche Schichtübersicht anzuzeigen oder zu bearbeiten.",
+    "markAbsentAction": "Als abwesend markieren",
+    "cancelPlacementTitle": "Platzierung stornieren",
+    "dragToMoveHint": "Um diese Platzierung auf einen anderen Tag zu verschieben, ziehen Sie sie in die Zielzelle des Tages.",
+    "absencesLoadFailed": "Ihre Abwesenheiten konnten nicht geladen werden.",
+    "reasonRequiredVacation": "Für eine Urlaubsabwesenheit ist ein Grund erforderlich.",
+    "roomsWholeNumber": "Geben Sie eine ganze Zahl von Zimmern ein (0 oder mehr).",
+    "dateRequired": "Datum ist erforderlich."
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",
@@ -437,7 +536,17 @@
     "pageDescription": "Über die Plattform mit Personal versorgte Unterkünfte.",
     "noneFound": "Keine Hotels gefunden",
     "activeVisibleForStaffing": "Aktiv (für Mitarbeiter sichtbar und offen für Personaleinsatz)",
-    "acceptingNewWorkRequests": "Nimmt neue Arbeitsanfragen an"
+    "acceptingNewWorkRequests": "Nimmt neue Arbeitsanfragen an",
+    "loadFailed": "Hotels konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "loadOneFailed": "Dieses Hotel konnte nicht geladen werden.",
+    "loadOneFailedRemoved": "Dieses Hotel konnte nicht geladen werden. Es wurde möglicherweise entfernt.",
+    "adminOnlyCreate": "Nur Administratoren können Hotels erstellen.",
+    "adminOnlyEdit": "Nur Administratoren können Hotels bearbeiten.",
+    "adminOnlyArchive": "Nur Administratoren können das Archiv einsehen.",
+    "useCurrentLocation": "Aktuellen Standort verwenden",
+    "loadArchivedFailed": "Archivierte Hotels konnten nicht geladen werden.",
+    "restoreAction": "Wiederherstellen",
+    "geofenceNotSet": "Nicht festgelegt — Mitarbeiter-Check-in nicht verfügbar"
   },
   "users": {
     "new": "Neuer Benutzer",
@@ -459,7 +568,17 @@
     "noneFound": "Keine Benutzer gefunden",
     "managesHotel": "Verwaltet Hotel",
     "managesGroup": "Verwaltet Gruppe",
-    "editAssignmentTitle": "Zuweisung bearbeiten"
+    "editAssignmentTitle": "Zuweisung bearbeiten",
+    "editNoPermission": "Nur Administratoren und Manager können Benutzer bearbeiten.",
+    "viewNoPermission": "Nur Administratoren und Manager können Benutzerkonten einsehen.",
+    "listNoPermission": "Nur Administratoren und Manager können Benutzer einsehen.",
+    "loadOneFailed": "Dieser Benutzer konnte nicht geladen werden.",
+    "loadOneFailedRemoved": "Dieser Benutzer konnte nicht geladen werden. Er wurde möglicherweise entfernt.",
+    "loadFailed": "Benutzer konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "sendResetLink": "Zurücksetzungslink senden",
+    "revokeSessionsAction": "Sitzungen widerrufen",
+    "deactivateAction": "Deaktivieren",
+    "employeeManagement": "Mitarbeiterverwaltung"
   },
   "requests": {
     "title": "Arbeitsanfrage",
@@ -481,7 +600,27 @@
     "newTitle": "Neue Arbeitsanfrage",
     "newDescription": "Speichern Sie als Entwurf oder veröffentlichen Sie sofort, um sie für die Personalplanung zu öffnen.",
     "pageDescription": "Für die Personalplanung offene Schichten in Ihren Hotels.",
-    "noneFound": "Keine Arbeitsanfragen gefunden"
+    "noneFound": "Keine Arbeitsanfragen gefunden",
+    "loadFailed": "Arbeitsanfragen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "keepRequest": "Anfrage beibehalten",
+    "cancelRequestAction": "Anfrage stornieren",
+    "saveDraft": "Entwurf speichern",
+    "adminOnlyCreate": "Nur Manager und Administratoren können Arbeitsanfragen erstellen.",
+    "adminOnlyPlaceOnCalendar": "Nur Manager und Administratoren können einen Mitarbeiter im Kalender platzieren.",
+    "adminOnlyRaiseBroadcast": "Nur Manager und Administratoren können eine Rundmeldung senden.",
+    "calendarLoadFailed": "Kalenderplatzierungen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "placeWorkerAction": "Mitarbeiter platzieren",
+    "broadcastTitle": "Rundmeldung",
+    "maps": "Karten",
+    "eligibilityLoadFailed": "Berechtigung für diese Rundmeldung konnte nicht geladen werden.",
+    "acceptAction": "Annehmen",
+    "closeBroadcastHint": "Schließen Sie diese Rundmeldung vorzeitig, wenn Sie sie nicht mehr besetzen müssen.",
+    "closeBroadcastTitle": "Rundmeldung schließen",
+    "broadcastsLoadFailed": "Rundmeldungen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "skillsNeeded": "Benötigte Fähigkeiten",
+    "addSkill": "Fähigkeit hinzufügen",
+    "raiseBroadcastAction": "Rundmeldung senden",
+    "slotClaimedByOther": "Jemand anderes hat diesen Platz kurz vor Ihnen belegt — es wurde keine Schicht zugewiesen."
   },
   "onboarding": {
     "managerReview": "Manager-Prüfung",
@@ -524,7 +663,19 @@
     "reviewQueueEmptyDescription": "Es gibt keine Bewerbungen, die auf Ihre Prüfung warten.",
     "assignApprovedEmployee": "Genehmigten Mitarbeiter zuweisen",
     "rejectApplication": "Bewerbung ablehnen",
-    "rejectionReason": "Ablehnungsgrund"
+    "rejectionReason": "Ablehnungsgrund",
+    "startReOnboarding": "Wiedereingliederung starten",
+    "noPermissionReviewQueue": "Sie haben keine Berechtigung, die Prüfliste einzusehen.",
+    "rejectAction": "Ablehnen",
+    "completeAssignmentAction": "Einsatz abschließen",
+    "rejectionSentHint": "Dieser Grund wird an den Bewerber gesendet.",
+    "confirmRejectionAction": "Ablehnung bestätigen",
+    "reviewQueueLoadFailed": "Prüfliste konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "myOnboardingTitle": "Meine Einarbeitung",
+    "noPermissionCreateUsers": "Sie haben keine Berechtigung, Benutzer zu erstellen.",
+    "noContractYet": "Für Sie wurde noch kein Vertrag ausgestellt. Wenden Sie sich an Ihren Manager.",
+    "downloadContract": "Vertrag herunterladen",
+    "completeOnboardingAction": "Schließen Sie Ihre Einarbeitung ab"
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
@@ -542,7 +693,14 @@
     "attendanceRate": "Anwesenheitsquote",
     "noRankedWorkers": "Noch keine bewerteten Mitarbeiter",
     "noRankedWorkersDescription": "Rankings erscheinen, sobald Mitarbeiter Einsätze abgeschlossen haben.",
-    "shifts": "Schichten"
+    "shifts": "Schichten",
+    "loadFailed": "Analysen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "noPermission": "Analysen stehen Managern und Administratoren zur Verfügung.",
+    "leaderboardLoadFailed": "Rangliste konnte nicht geladen werden.",
+    "statsLoadFailed": "Ihre Statistiken konnten nicht geladen werden.",
+    "platformOverview": "Plattformübersicht",
+    "viewAnalytics": "Statistiken ansehen",
+    "statsLoadFailedShort": "Plattformstatistiken konnten nicht geladen werden."
   },
   "hotelGroups": {
     "noDeleted": "Keine gelöschten Hotelgruppen",
@@ -559,7 +717,14 @@
     "newDescription": "Fassen Sie Hotels unter einer Region zusammen. Weisen Sie einen Regionalmanager über dessen Benutzerseite zu.",
     "pageDescription": "Regionale Gruppierungen, die Manager und Abrechnung eingrenzen.",
     "noneYet": "Noch keine Hotelgruppen",
-    "noneYetDescription": "Gruppen ermöglichen es, einen Regionalmanager über mehrere Hotels hinweg zuzuweisen."
+    "noneYetDescription": "Gruppen ermöglichen es, einen Regionalmanager über mehrere Hotels hinweg zuzuweisen.",
+    "loadFailed": "Hotelgruppen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "loadOneFailed": "Diese Hotelgruppe konnte nicht geladen werden.",
+    "adminOnlyCreate": "Nur Administratoren können Hotelgruppen erstellen.",
+    "adminOnlyEdit": "Nur Administratoren können Hotelgruppen bearbeiten.",
+    "orgChartAccess": "Nur Administratoren und Regionalmanager können Organigramme einsehen.",
+    "loadArchivedFailed": "Archivierte Hotelgruppen konnten nicht geladen werden.",
+    "billingPlaceholder": "Rechnungsadresse, USt-IdNr., Kostenstelle…"
   },
   "attendance": {
     "expectedStart": "Erwarteter Beginn",
@@ -572,7 +737,10 @@
     "markVerified": "Als verifiziert markieren",
     "pageDescription": "Check-in-, Check-out- und Verifizierungsstatus für besetzte Schichten.",
     "records": "Anwesenheitsaufzeichnungen",
-    "noneFound": "Keine Anwesenheitsaufzeichnungen gefunden"
+    "noneFound": "Keine Anwesenheitsaufzeichnungen gefunden",
+    "viewAssignment": "Einsatz ansehen",
+    "saveReview": "Prüfung speichern",
+    "loadFailed": "Anwesenheit konnte nicht geladen werden. Bitte versuchen Sie es erneut."
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",
@@ -583,6 +751,31 @@
     "approveForWorkTitle": "Für Arbeit genehmigen",
     "deactivateTemporaryTitle": "Deaktivieren (vorübergehende Pause)",
     "deleteLeftCompanyTitle": "Löschen (Unternehmen verlassen)",
-    "editSkillsTitle": "Fähigkeiten bearbeiten"
+    "editSkillsTitle": "Fähigkeiten bearbeiten",
+    "blocklistLoadFailed": "Sperrliste konnte nicht geladen werden.",
+    "addAction": "Hinzufügen",
+    "loadFailed": "Beschäftigungsstatus konnte nicht geladen werden.",
+    "noRecordFound": "Kein Beschäftigungsdatensatz gefunden. Wenden Sie sich an einen Administrator.",
+    "editAction": "Bearbeiten",
+    "paperworkPendingHint": "Unterlagen/Prüfungen ausstehend, bevor dieser Mitarbeiter zur Genehmigung geprüft werden kann.",
+    "confirmOnboardingComplete": "Einarbeitung als abgeschlossen bestätigen",
+    "reactivateAndNewContract": "Reaktivieren & neuen Vertrag auslösen",
+    "reactivateAction": "Reaktivieren",
+    "rehireAction": "Wiedereinstellen",
+    "restoredMustReapprove": "Ein wiederhergestellter Datensatz muss erneut genehmigt werden, bevor er aktiv wird.",
+    "restoreNewCycle": "Wiederherstellen (neuen Beschäftigungszyklus starten)",
+    "approveAction": "Genehmigen",
+    "deactivateAction": "Deaktivieren",
+    "deleteAction": "Löschen",
+    "reasonRequired": "Ein Grund ist erforderlich.",
+    "idAndReasonRequired": "Mitarbeiter-ID und Grund sind beide erforderlich.",
+    "signedContractReceived": "Unterschriebener Vertrag erhalten — mit der Genehmigung wird er bestätigt."
+  },
+  "compliance": {
+    "exportDescription": "Erstellt eine Kopie Ihrer Dokumente, Ihres Zustimmungsverlaufs und Ihres Konto-Prüfprotokolls.",
+    "downloadJson": "JSON herunterladen"
+  },
+  "archive": {
+    "description": "Aus dem Betrieb genommene Hotels und Hotelgruppen. Die Historie bleibt erhalten — eine Wiederherstellung macht einen Eintrag sofort wieder verfügbar."
   }
 }

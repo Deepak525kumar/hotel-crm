@@ -49,7 +49,7 @@ export function MyContractCard({ workerId }: { workerId: string }) {
           </div>
         ) : !contract ? (
           <p className="py-4 text-sm text-gray-500 dark:text-gray-400">
-            No contract has been issued for you yet. Contact your manager.
+            {t("onboarding.noContractYet")}
           </p>
         ) : (
           <div className="space-y-4">
@@ -102,7 +102,7 @@ export function MyContractCard({ workerId }: { workerId: string }) {
                 <a href={hrApi.defaultContractDownloadUrl(workerId)} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline">
                     <Download className="me-2 h-4 w-4" />
-                    Download contract
+                    {t("onboarding.downloadContract")}
                   </Button>
                 </a>
               </div>

@@ -188,7 +188,7 @@ export function ReviewQueueTable() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load the review queue. Please try again.
+              {t("onboarding.reviewQueueLoadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.reviewQueue")}>
@@ -344,7 +344,7 @@ export function ReviewQueueTable() {
                 disabled={approveAction.pending}
               >
                 <X className="me-2 h-4 w-4 text-red-500" />
-                Reject
+                {t("onboarding.rejectAction")}
               </Button>
               <Button
                 onClick={handleApprove}
@@ -409,7 +409,7 @@ export function ReviewQueueTable() {
 
             <div className="flex items-center justify-end border-t border-gray-200 pt-4 dark:border-gray-700">
               <Button onClick={handleAssign} loading={assignAction.pending} disabled={!assignTarget}>
-                Complete assignment
+                {t("onboarding.completeAssignmentAction")}
               </Button>
             </div>
           </div>
@@ -423,7 +423,7 @@ export function ReviewQueueTable() {
       >
         <div className="mt-4 space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            This reason is sent to the applicant.
+            {t("onboarding.rejectionSentHint")}
           </p>
           <Textarea
             label={t("onboarding.rejectionReason")}
@@ -439,7 +439,7 @@ export function ReviewQueueTable() {
               onClick={() => setRejectModalOpen(false)}
               disabled={rejectAction.pending}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
@@ -447,7 +447,7 @@ export function ReviewQueueTable() {
               loading={rejectAction.pending}
               disabled={!rejectReason.trim()}
             >
-              Confirm rejection
+              {t("onboarding.confirmRejectionAction")}
             </Button>
           </div>
         </div>

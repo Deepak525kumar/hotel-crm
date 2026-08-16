@@ -20,8 +20,8 @@ import {
   TH,
   THead,
   TR,
-  TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 function OrgChart() {
   const { t } = useTranslation();
@@ -32,9 +32,7 @@ function OrgChart() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <TextLink href={`/hotel-groups/${id}`} className="text-sm">
-        ← Back to hotel group
-      </TextLink>
+      <BackLink href={`/hotel-groups/${id}`} className="text-sm" labelKey="common.backTo.hotelGroup" />
 
       {error ? (
         <Card>
@@ -160,6 +158,7 @@ function OrgChart() {
 }
 
 export default function OrgChartPage() {
+  const { t } = useTranslation();
   return (
     // CRR §1:23 / ADR-060 / ADR-030 §3 C-33: org chart visible ONLY to
     // Regional Manager (their own group, enforced service-side) and Admin.
@@ -169,7 +168,7 @@ export default function OrgChartPage() {
         <div className="mx-auto max-w-3xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only Admins and Regional Managers can view org charts.
+              {t("hotelGroups.orgChartAccess")}
             </CardContent>
           </Card>
         </div>

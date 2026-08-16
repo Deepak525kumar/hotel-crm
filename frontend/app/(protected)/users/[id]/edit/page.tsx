@@ -10,7 +10,8 @@ import { ApiError, usersApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { UserForm } from "@/components/users/UserForm";
 import type { UserFormSubmitValues } from "@/components/users/UserForm";
-import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { UpdateUserInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -84,19 +85,14 @@ function EditUser() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href={`/users/${id}`}
-          className="text-sm"
-        >
-          ← Back to user
-        </TextLink>
+        <BackLink href={`/users/${id}`} className="text-sm" labelKey="common.backTo.user" />
         <PageHeader className="mt-2" title={t("users.editTitle")} />
       </div>
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this user.
+            {t("users.loadOneFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !user ? (
@@ -125,6 +121,7 @@ function EditUser() {
 }
 
 export default function EditUserPage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["admin", "manager", "regional_manager"]}
@@ -132,7 +129,7 @@ export default function EditUserPage() {
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only admins and managers can edit users.
+              {t("users.editNoPermission")}
             </CardContent>
           </Card>
         </div>

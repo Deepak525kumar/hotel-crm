@@ -59,16 +59,16 @@ export default function ForgotPasswordPage() {
           {success ? (
             <div className="flex flex-col gap-4 text-center">
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                If that email exists, a password reset link has been sent to it.
+                {t("auth.resetLinkSentHint")}
               </p>
               <Link href="/login" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-                Return to login
+                {t("auth.returnToLogin")}
               </Link>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                Enter your email address and we will send you a link to reset your password.
+                {t("auth.enterEmailResetHint")}
               </p>
               <Input
                 label={t("fields.email")}
@@ -80,11 +80,11 @@ export default function ForgotPasswordPage() {
               />
               <FormError>{error}</FormError>
               <Button type="submit" loading={submitting} className="w-full">
-                Send reset link
+                {t("auth.sendResetLinkAction")}
               </Button>
               <div className="text-center mt-2">
                 <Link href="/login" className="text-sm text-blue-600 hover:underline dark:text-blue-400">
-                  Back to login
+                  {t("auth.backToLogin")}
                 </Link>
               </div>
             </form>

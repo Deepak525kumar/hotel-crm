@@ -35,6 +35,7 @@ const KIND_TONE: Record<AbsenceKind, "warning" | "neutral"> = {
 };
 
 function AbsenceRow({ absence }: { absence: CalendarAbsence }) {
+  const { t } = useTranslation();
   // Withdrawing a declared absence (2026-08-13): the backend endpoint has
   // existed since the feature shipped, but no UI ever called it, so a worker
   // who marked a sick day by mistake or recovered early was stuck with it.
@@ -63,7 +64,7 @@ function AbsenceRow({ absence }: { absence: CalendarAbsence }) {
           <Badge tone={KIND_TONE[absence.kind]}>{KIND_LABEL[absence.kind]}</Badge>
           {!isPast && (
             <Button size="sm" variant="outline" onClick={onWithdraw} loading={withdraw.pending}>
-              Withdraw
+              {t("consent.withdraw")}
             </Button>
           )}
         </div>
@@ -90,13 +91,13 @@ export function AbsencesCard() {
         <CardHeader className="flex items-center justify-between">
           <CardTitle>{t("calendar.absences")}</CardTitle>
           <Button size="sm" onClick={() => setMarkOpen(true)}>
-            Mark absence
+            {t("calendar.markAbsence")}
           </Button>
         </CardHeader>
         <CardContent>
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load your absences.
+              {t("calendar.absencesLoadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -154,11 +155,11 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
   const onSubmit = () => {
     setFieldError(null);
     if (!day) {
-      setFieldError("Date is required.");
+      setFieldError(t("calendar.dateRequired"));
       return;
     }
     if (reasonRequired && !reason.trim()) {
-      setFieldError("Reason is required for a vacation absence.");
+      setFieldError(t("calendar.reasonRequiredVacation"));
       return;
     }
 
@@ -183,10 +184,10 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={mark.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={mark.pending}>
-            Mark absence
+            {t("calendar.markAbsence")}
           </Button>
         </>
       }

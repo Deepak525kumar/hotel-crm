@@ -25,6 +25,7 @@ import {
   Skeleton,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 /**
  * `Notification.data` carries arbitrary resource ids for deep-linking (see
@@ -110,15 +111,10 @@ export default function NotificationDetailPage() {
   if (error || !notification) {
     return (
       <div className="space-y-4">
-        <TextLink
-          href="/notifications"
-          className="text-sm"
-        >
-          ← Back to notifications
-        </TextLink>
+        <BackLink href="/notifications" className="text-sm" labelKey="common.backTo.notifications" />
         <Card>
           <CardContent className="text-sm text-red-600 dark:text-red-400">
-            This notification was not found or could not be loaded.
+            {t("notifications.viewOneFailed")}
           </CardContent>
         </Card>
       </div>
@@ -133,12 +129,7 @@ export default function NotificationDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href="/notifications"
-          className="text-sm"
-        >
-          ← Back to notifications
-        </TextLink>
+        <BackLink href="/notifications" className="text-sm" labelKey="common.backTo.notifications" />
         <PageHeader
           className="mt-2"
           title={notification.title}
@@ -225,10 +216,10 @@ export default function NotificationDetailPage() {
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-400">
-              Mark this notification as read once you&apos;ve seen it.
+              {t("notifications.markReadHint")}
             </div>
             <Button onClick={markRead} loading={mark.pending} className="shrink-0">
-              Mark as read
+              {t("notifications.markAsReadAction")}
             </Button>
           </CardContent>
         </Card>

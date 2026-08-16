@@ -29,6 +29,7 @@ import {
   Skeleton,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { AttendanceReviewStatus } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -90,12 +91,7 @@ export default function AttendanceDetailPage() {
   if (error || !record) {
     return (
       <div className="space-y-4">
-        <TextLink
-          href="/attendance"
-          className="text-sm"
-        >
-          ← Back to attendance
-        </TextLink>
+        <BackLink href="/attendance" className="text-sm" labelKey="common.backTo.attendance" />
         <Card>
           <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
@@ -115,17 +111,12 @@ export default function AttendanceDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href="/attendance"
-          className="text-sm"
-        >
-          ← Back to attendance
-        </TextLink>
+        <BackLink href="/attendance" className="text-sm" labelKey="common.backTo.attendance" />
         <PageHeader
           className="mt-2"
           title={
             <span className="flex items-center gap-3">
-              Attendance
+              {t("nav.attendance")}
               <AttendanceStatusBadge status={record.status} />
               <VerificationBadge verified={record.is_verified} />
             </span>
@@ -177,7 +168,7 @@ export default function AttendanceDetailPage() {
               label={t("assignments.title")}
               value={
                 <TextLink href={`/assignments/${record.assignment_id}`}>
-                  View assignment
+                  {t("attendance.viewAssignment")}
                 </TextLink>
               }
             />
@@ -266,10 +257,10 @@ export default function AttendanceDetailPage() {
               onClick={() => setReviewOpen(false)}
               disabled={action.isPending("verify")}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={submitReview} loading={action.isPending("verify")}>
-              Save review
+              {t("attendance.saveReview")}
             </Button>
           </>
         }

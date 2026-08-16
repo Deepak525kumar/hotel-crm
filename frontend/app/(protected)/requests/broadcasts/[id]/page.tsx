@@ -31,6 +31,7 @@ import {
   Skeleton,
   TextLink,
 } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 
 export default function BroadcastDetailPage() {
   const { t } = useTranslation();
@@ -101,9 +102,7 @@ export default function BroadcastDetailPage() {
   if (error || !request || !request.skill_slots || request.skill_slots.length === 0) {
     return (
       <div className="space-y-4">
-        <TextLink href="/requests/broadcasts" className="text-sm">
-          ← Back to broadcasts
-        </TextLink>
+        <BackLink href="/requests/broadcasts" className="text-sm" labelKey="common.backTo.broadcasts" />
         <Card>
           <CardContent className="text-sm text-red-600 dark:text-red-400">
             {error instanceof ApiError && error.status === 404
@@ -122,14 +121,12 @@ export default function BroadcastDetailPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink href="/requests/broadcasts" className="text-sm">
-          ← Back to broadcasts
-        </TextLink>
+        <BackLink href="/requests/broadcasts" className="text-sm" labelKey="common.backTo.broadcasts" />
         <PageHeader
           className="mt-2"
           title={
             <span className="flex items-center gap-3">
-              Broadcast
+              {t("requests.broadcastTitle")}
               <WorkRequestStatusBadge status={request.status} />
             </span>
           }
@@ -164,7 +161,7 @@ export default function BroadcastDetailPage() {
                         }}
                       >
                         <MapPin className="h-4 w-4" />
-                        Maps
+                        {t("requests.maps")}
                       </Button>
                     </div>
                   )}
@@ -210,7 +207,7 @@ export default function BroadcastDetailPage() {
         <CardContent className="space-y-4">
           {eligibilityError ? (
             <p className="text-sm text-red-600 dark:text-red-400">
-              Failed to load eligibility for this broadcast.
+              {t("requests.eligibilityLoadFailed")}
             </p>
           ) : (
             request.skill_slots.map((slot) => {
@@ -249,7 +246,7 @@ export default function BroadcastDetailPage() {
                       loading={accept.isPending(slot.skill)}
                       disabled={accept.pending}
                     >
-                      Accept
+                      {t("requests.acceptAction")}
                     </Button>
                   ) : null}
                 </div>
@@ -273,7 +270,7 @@ export default function BroadcastDetailPage() {
               <>
                 <Badge tone="warning">{t("status.alreadyFilled")}</Badge>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Someone else claimed this slot just before you — no shift was assigned.
+                  {t("requests.slotClaimedByOther")}
                 </p>
               </>
             )}
@@ -288,10 +285,10 @@ export default function BroadcastDetailPage() {
           <Card>
             <CardContent className="flex items-center justify-between gap-4">
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                Close this broadcast early if you no longer need it filled.
+                {t("requests.closeBroadcastHint")}
               </div>
               <Button variant="outline" onClick={onClose} loading={close.pending}>
-                Close broadcast
+                {t("requests.closeBroadcastTitle")}
               </Button>
             </CardContent>
           </Card>
@@ -318,7 +315,7 @@ export default function BroadcastDetailPage() {
                     <div className="flex items-center gap-4">
                       <AssignmentStatusBadge status={assignment.status} />
                       <TextLink href={`/assignments/${assignment.id}`} className="text-sm">
-                        View
+                        {t("documents.view")}
                       </TextLink>
                     </div>
                   </div>

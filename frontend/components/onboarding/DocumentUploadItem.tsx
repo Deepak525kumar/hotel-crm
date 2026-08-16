@@ -44,7 +44,7 @@ export function DocumentUploadItem({
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) {
-      setError("File exceeds 10MB limit.");
+      setError(t("documents.fileTooLarge"));
       return;
     }
 
@@ -101,7 +101,7 @@ export function DocumentUploadItem({
             title={document.original_filename}
           >
             <Eye className="h-4 w-4" />
-            View
+            {t("documents.view")}
           </a>
         )}
         {isUploaded ? (
@@ -124,7 +124,7 @@ export function DocumentUploadItem({
               loading={uploading}
             >
               <UploadCloud className="w-4 h-4 me-2" />
-              Upload
+              {t("documents.uploadAction")}
             </Button>
           </>
         )}

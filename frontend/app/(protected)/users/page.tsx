@@ -102,7 +102,7 @@ function UsersDirectory() {
           <Input
             label={t("common.search")}
             type="search"
-            placeholder="Name or email…"
+            placeholder={t("search.nameOrEmailShort")}
             value={searchInput}
             onChange={(e) => onSearchChange(e.target.value)}
           />
@@ -129,7 +129,7 @@ function UsersDirectory() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load users. Please try again.
+              {t("users.loadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.users")}>
@@ -210,13 +210,14 @@ function UsersDirectory() {
 }
 
 export default function UsersPage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["admin", "manager", "regional_manager"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-            Only admins and managers can view users.
+            {t("users.listNoPermission")}
           </CardContent>
         </Card>
       }

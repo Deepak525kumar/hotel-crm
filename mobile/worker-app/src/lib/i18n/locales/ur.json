@@ -41,7 +41,37 @@
     "coordinates": "کوآرڈینیٹس",
     "loadingLabel": "لوڈ ہو رہا ہے",
     "navigation": "نیویگیشن",
-    "openNavigation": "نیویگیشن کھولیں"
+    "openNavigation": "نیویگیشن کھولیں",
+    "backTo": {
+      "attendance": "حاضری پر واپس",
+      "users": "صارفین پر واپس",
+      "user": "صارف پر واپس",
+      "notifications": "اطلاعات پر واپس",
+      "workRequests": "کام کی درخواستوں پر واپس",
+      "broadcasts": "اعلانات پر واپس",
+      "hotels": "ہوٹلوں پر واپس",
+      "hotel": "ہوٹل پر واپس",
+      "hotelGroups": "ہوٹل گروپس پر واپس",
+      "hotelGroup": "ہوٹل گروپ پر واپس",
+      "assignments": "تفویضات پر واپس"
+    },
+    "add": "شامل کریں",
+    "approve": "منظور کریں",
+    "reject": "مسترد کریں",
+    "remove": "ہٹائیں",
+    "restore": "بحال کریں",
+    "verify": "تصدیق کریں",
+    "rate": "درجہ دیں",
+    "reassign": "دوبارہ تفویض کریں",
+    "publish": "شائع کریں",
+    "previous": "پچھلا",
+    "tryAgain": "دوبارہ کوشش کریں",
+    "goToDashboard": "ڈیش بورڈ پر جائیں",
+    "somethingWentWrong": "کچھ غلط ہو گیا",
+    "pageNotFound": "صفحہ نہیں ملا",
+    "today": "آج",
+    "file": "فائل",
+    "download": "ڈاؤن لوڈ کریں"
   },
   "fields": {
     "name": "نام",
@@ -123,7 +153,11 @@
     "lastName": "آخری نام",
     "workersNeeded": "درکار کارکن",
     "requiresWorkPermit": "ورک پرمٹ درکار ہے (غیر EU/EEA/سوئس)",
-    "activeCanSignIn": "فعال (پلیٹ فارم میں سائن اِن کر سکتا ہے)"
+    "activeCanSignIn": "فعال (پلیٹ فارم میں سائن اِن کر سکتا ہے)",
+    "score0to100": "سکور (0–100)",
+    "punctuality0to100": "وقت کی پابندی (0–100)",
+    "quality0to100": "معیار (0–100)",
+    "attitude0to100": "رویہ (0–100)"
   },
   "nav": {
     "dashboard": "ڈیش بورڈ",
@@ -235,7 +269,18 @@
     "conflictSick": "بیماری کی چھٹی",
     "conflictVacation": "چھٹی پر",
     "conflictAlreadyPlaced": "اس دن پہلے سے تعینات",
-    "unavailableHint": "سرخ رنگ میں نشان زد کارکن اس دن دستیاب نہیں ہیں۔"
+    "unavailableHint": "سرخ رنگ میں نشان زد کارکن اس دن دستیاب نہیں ہیں۔",
+    "broadcastEpic9": "اعلان (Epic 9)",
+    "directRequestLegacy": "براہ راست درخواست (لیگیسی)",
+    "keepAssignment": "تفویض برقرار رکھیں",
+    "log": "درج کریں",
+    "viewFailed": "تفویضات لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+    "roomsWholeNumber": "مکمل کمرے 0 یا زیادہ کی مکمل تعداد ہونے چاہئیں۔",
+    "scoreWholeNumber": "سکور 0 سے 100 تک کی مکمل تعداد ہونا چاہیے۔",
+    "placeOnCalendarDescription": "کارکن کو ہوٹل اور دن کے لیے براہ راست تصدیق کریں — کوئی اعلان نہیں، کوئی قبولیت مرحلہ نہیں۔",
+    "calendarPlacementsDescription": "ہوٹل کے کیلنڈر پر براہ راست تعینات کارکن — کوئی اعلان نہیں، کوئی قبولیت مرحلہ نہیں۔",
+    "calendarPlacementsLink": "کیلنڈر تعیناتیاں",
+    "scoreDerivedHint": "حالت سکور سے اخذ کی جاتی ہے: 70+ کامیاب، 40–69 دوبارہ کام درکار، 40 سے کم ناکام۔"
   },
   "settings": {
     "language": {
@@ -254,7 +299,8 @@
     "themeSystemNote": "سسٹم آپ کے ڈیوائس کی ترتیب کے مطابق ہے۔",
     "localDevBuild": "مقامی ڈویلپمنٹ بلڈ",
     "pageDescription": "آپ کے اکاؤنٹ، سیشن اور ایپ کی ترجیحات۔",
-    "signedInAs": "بطور سائن اِن"
+    "signedInAs": "بطور سائن اِن",
+    "notAvailableYet": "ابھی دستیاب نہیں"
   },
   "auth": {
     "login": "لاگ اِن",
@@ -273,11 +319,21 @@
     "email": "ای میل",
     "resetYourPassword": "اپنا پاس ورڈ ری سیٹ کریں",
     "setNewPassword": "نیا پاس ورڈ مقرر کریں",
-    "invalidResetLink": "پاس ورڈ ری سیٹ لنک غلط ہے۔ ٹوکن موجود نہیں۔"
+    "invalidResetLink": "پاس ورڈ ری سیٹ لنک غلط ہے۔ ٹوکن موجود نہیں۔",
+    "backToLogin": "لاگ اِن پر واپس",
+    "returnToLogin": "لاگ اِن پر واپسی",
+    "requestNewLink": "نیا لنک درخواست کریں",
+    "enterEmailResetHint": "اپنا ای میل ایڈریس درج کریں اور ہم آپ کو پاس ورڈ ری سیٹ کرنے کے لیے لنک بھیجیں گے۔",
+    "sendResetLinkAction": "ری سیٹ لنک بھیجیں",
+    "resetLinkSentHint": "اگر یہ ای میل موجود ہے تو اسے پاس ورڈ ری سیٹ لنک بھیج دیا گیا ہے۔",
+    "enterNewPasswordHint": "اپنے اکاؤنٹ کے لیے نیا پاس ورڈ درج کریں۔",
+    "resetPasswordTitle": "پاس ورڈ ری سیٹ کریں",
+    "invalidResetTokenMissing": "غلط یا غائب ری سیٹ ٹوکن۔"
   },
   "search": {
     "byNameOrEmail": "نام یا ای میل سے تلاش کریں…",
-    "nameOrCity": "نام یا شہر…"
+    "nameOrCity": "نام یا شہر…",
+    "nameOrEmailShort": "نام یا ای میل…"
   },
   "filters": {
     "allHotels": "تمام ہوٹل",
@@ -341,7 +397,13 @@
     "evaluateWorkPermitRequired": "ورک پرمٹ درکار سمجھ کر جانچیں",
     "noDocuments": "کوئی دستاویز نہیں",
     "uploadTitle": "دستاویز اپ لوڈ کریں",
-    "nonEuWorkPermit": "غیر EU/EEA/سوئس ورک پرمٹ دستاویز"
+    "nonEuWorkPermit": "غیر EU/EEA/سوئس ورک پرمٹ دستاویز",
+    "geoLoadFailed": "جیو تصدیقی ڈیٹا لوڈ نہیں ہو سکا۔",
+    "statusLoadFailed": "دستاویز کی حالت لوڈ نہیں ہو سکی۔",
+    "loadFailed": "دستاویزات لوڈ نہیں ہو سکیں۔",
+    "deleteAction": "حذف کریں",
+    "uploadAction": "اپ لوڈ کریں",
+    "fileTooLarge": "فائل 10MB حد سے تجاوز کرتی ہے۔"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -361,7 +423,22 @@
     "createContractTitle": "معاہدہ بنائیں",
     "noPayslipRequests": "تنخواہ سلپ کی کوئی درخواست نہیں",
     "noPayslipRequestsDescription": "درخواستیں یہاں اس وقت ظاہر ہوں گی جب کارکن تنخواہ سلپ مانگے گا، یا مینیجر ان کی جانب سے ایک بنائے گا۔",
-    "newPayslipRequestTitle": "نئی تنخواہ سلپ درخواست"
+    "newPayslipRequestTitle": "نئی تنخواہ سلپ درخواست",
+    "loadFailed": "معاہدے کی حالت لوڈ نہیں ہو سکی۔",
+    "downloadContractPdf": "معاہدہ PDF ڈاؤن لوڈ کریں",
+    "uploadSignedContract": "دستخط شدہ معاہدہ اپ لوڈ کریں",
+    "confirmSignature": "دستخط کی تصدیق کریں",
+    "confirmContinuation": "تسلسل کی تصدیق کریں",
+    "doNotContinue": "جاری نہ رکھیں",
+    "createContractAction": "معاہدہ بنائیں",
+    "markFulfilledAction": "مکمل شدہ نشان زد کریں",
+    "newRequestAction": "نئی درخواست",
+    "payslipsLoadFailed": "تنخواہ سلپ کی درخواستیں لوڈ نہیں ہو سکیں۔",
+    "createRequestAction": "درخواست بنائیں",
+    "bothDatesRequired": "دونوں مدت کی تاریخیں درکار ہیں۔",
+    "periodEndAfterStart": "مدت کا اختتام آغاز کے برابر یا بعد میں ہونا چاہیے۔",
+    "templateStartRequired": "ٹیمپلیٹ، عہدہ اور آغاز کی تاریخ درکار ہیں۔",
+    "endDateAfterStart": "اختتامی تاریخ آغاز کی تاریخ کے برابر یا بعد میں ہونی چاہیے۔"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -373,14 +450,22 @@
     "reviewNotice": "نوٹس دیکھیں",
     "loadFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔",
     "history": "رضامندی کی تاریخ",
-    "auditTrail": "آڈٹ ٹریل"
+    "auditTrail": "آڈٹ ٹریل",
+    "loadOneFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔"
   },
   "notifications": {
     "title": "اطلاعات",
     "none": "کوئی اطلاع نہیں۔",
     "channel": "چینل",
     "readAt": "پڑھنے کا وقت",
-    "noneFound": "کوئی اطلاع نہیں ملی"
+    "noneFound": "کوئی اطلاع نہیں ملی",
+    "viewOneFailed": "یہ اطلاع نہیں ملی یا لوڈ نہیں ہو سکی۔",
+    "markAsReadAction": "پڑھا گیا نشان زد کریں",
+    "markAllRead": "سب کو پڑھا گیا نشان زد کریں",
+    "loadFailed": "اطلاعات لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+    "viewAllAction": "تمام اطلاعات دیکھیں",
+    "markReadHint": "اس اطلاع کو دیکھنے کے بعد پڑھا گیا نشان زد کریں۔",
+    "allCaughtUp": "آپ سب کچھ دیکھ چکے ہیں۔"
   },
   "leaderboard": {
     "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
@@ -394,7 +479,13 @@
     "signOut": "سائن آؤٹ",
     "noAbsences": "کوئی بیماری یا چھٹی درج نہیں۔",
     "editTitle": "پروفائل میں ترمیم کریں",
-    "resetPasswordTitle": "پاس ورڈ ری سیٹ کریں"
+    "resetPasswordTitle": "پاس ورڈ ری سیٹ کریں",
+    "updateDetailsHint": "اپنا نام اور رابطہ تفصیلات اپ ڈیٹ کریں، یا اپنا پاس ورڈ ری سیٹ کریں۔",
+    "saveChanges": "تبدیلیاں محفوظ کریں",
+    "sendResetLink": "ری سیٹ لنک بھیجیں",
+    "firstNameLastNameRequired": "پہلا اور آخری نام درکار ہیں۔",
+    "phoneInvalid": "فون ایک درست بین الاقوامی نمبر ہونا چاہیے، مثلاً +49301234567۔",
+    "viewProfile": "پروفائل دیکھیں"
   },
   "skills": {
     "CLEANER": "صفائی کارکن",
@@ -421,7 +512,15 @@
     "workersPlaced": "تعینات کارکن",
     "sick": "بیمار",
     "onVacation": "چھٹی پر",
-    "nothingScheduled": "کچھ بھی شیڈول نہیں"
+    "nothingScheduled": "کچھ بھی شیڈول نہیں",
+    "selectHotelHint": "روزانہ شفٹ خلاصہ دیکھنے یا ترمیم کرنے کے لیے اوپر ہوٹل منتخب کریں۔",
+    "markAbsentAction": "غیر حاضر نشان زد کریں",
+    "cancelPlacementTitle": "تعیناتی منسوخ کریں",
+    "dragToMoveHint": "اس تعیناتی کو دوسرے دن منتقل کرنے کے لیے، اسے منزل کے دن کے خانے میں گھسیٹیں۔",
+    "absencesLoadFailed": "آپ کی غیر حاضریاں لوڈ نہیں ہو سکیں۔",
+    "reasonRequiredVacation": "چھٹی کی غیر حاضری کے لیے وجہ درکار ہے۔",
+    "roomsWholeNumber": "کمروں کی مکمل تعداد درج کریں (0 یا زیادہ)۔",
+    "dateRequired": "تاریخ درکار ہے۔"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",
@@ -438,7 +537,17 @@
     "pageDescription": "پلیٹ فارم کے ذریعے عملے سے آراستہ پراپرٹیز۔",
     "noneFound": "کوئی ہوٹل نہیں ملا",
     "activeVisibleForStaffing": "فعال (کارکنوں کو نظر آتا ہے اور تعیناتی کے لیے کھلا ہے)",
-    "acceptingNewWorkRequests": "نئی کام کی درخواستیں قبول کر رہا ہے"
+    "acceptingNewWorkRequests": "نئی کام کی درخواستیں قبول کر رہا ہے",
+    "loadFailed": "ہوٹل لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+    "loadOneFailed": "یہ ہوٹل لوڈ نہیں ہو سکا۔",
+    "loadOneFailedRemoved": "یہ ہوٹل لوڈ نہیں ہو سکا۔ ہو سکتا ہے ہٹا دیا گیا ہو۔",
+    "adminOnlyCreate": "صرف ایڈمنز ہوٹل بنا سکتے ہیں۔",
+    "adminOnlyEdit": "صرف ایڈمنز ہوٹل میں ترمیم کر سکتے ہیں۔",
+    "adminOnlyArchive": "صرف ایڈمنز آرکائیو دیکھ سکتے ہیں۔",
+    "useCurrentLocation": "موجودہ مقام استعمال کریں",
+    "loadArchivedFailed": "آرکائیو شدہ ہوٹل لوڈ نہیں ہو سکے۔",
+    "restoreAction": "بحال کریں",
+    "geofenceNotSet": "مقرر نہیں — کارکن چیک اِن دستیاب نہیں"
   },
   "users": {
     "new": "نیا صارف",
@@ -460,7 +569,17 @@
     "noneFound": "کوئی صارف نہیں ملا",
     "managesHotel": "ہوٹل کا انتظام کرتا ہے",
     "managesGroup": "گروپ کا انتظام کرتا ہے",
-    "editAssignmentTitle": "تفویض میں ترمیم کریں"
+    "editAssignmentTitle": "تفویض میں ترمیم کریں",
+    "editNoPermission": "صرف ایڈمنز اور مینیجرز صارفین میں ترمیم کر سکتے ہیں۔",
+    "viewNoPermission": "صرف ایڈمنز اور مینیجرز صارف اکاؤنٹس دیکھ سکتے ہیں۔",
+    "listNoPermission": "صرف ایڈمنز اور مینیجرز صارفین دیکھ سکتے ہیں۔",
+    "loadOneFailed": "یہ صارف لوڈ نہیں ہو سکا۔",
+    "loadOneFailedRemoved": "یہ صارف لوڈ نہیں ہو سکا۔ ہو سکتا ہے ہٹا دیا گیا ہو۔",
+    "loadFailed": "صارفین لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+    "sendResetLink": "ری سیٹ لنک بھیجیں",
+    "revokeSessionsAction": "سیشن منسوخ کریں",
+    "deactivateAction": "غیر فعال کریں",
+    "employeeManagement": "ملازم مینجمنٹ"
   },
   "requests": {
     "title": "کام کی درخواست",
@@ -482,7 +601,27 @@
     "newTitle": "نئی کام کی درخواست",
     "newDescription": "مسودے کے طور پر محفوظ کریں، یا عملے کی تعیناتی کے لیے فوراً شائع کریں۔",
     "pageDescription": "آپ کے ہوٹلوں میں عملے کی تعیناتی کے لیے کھلی شفٹیں۔",
-    "noneFound": "کام کی کوئی درخواست نہیں ملی"
+    "noneFound": "کام کی کوئی درخواست نہیں ملی",
+    "loadFailed": "کام کی درخواستیں لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+    "keepRequest": "درخواست برقرار رکھیں",
+    "cancelRequestAction": "درخواست منسوخ کریں",
+    "saveDraft": "مسودہ محفوظ کریں",
+    "adminOnlyCreate": "صرف مینیجرز اور ایڈمنز کام کی درخواستیں بنا سکتے ہیں۔",
+    "adminOnlyPlaceOnCalendar": "صرف مینیجرز اور ایڈمنز کارکن کو کیلنڈر پر تعینات کر سکتے ہیں۔",
+    "adminOnlyRaiseBroadcast": "صرف مینیجرز اور ایڈمنز اعلان بھیج سکتے ہیں۔",
+    "calendarLoadFailed": "کیلنڈر تعیناتیاں لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
+    "placeWorkerAction": "کارکن تعینات کریں",
+    "broadcastTitle": "اعلان",
+    "maps": "نقشے",
+    "eligibilityLoadFailed": "اس اعلان کے لیے اہلیت لوڈ نہیں ہو سکی۔",
+    "acceptAction": "قبول کریں",
+    "closeBroadcastHint": "اگر اب اسے بھرنے کی ضرورت نہیں تو یہ اعلان جلد بند کریں۔",
+    "closeBroadcastTitle": "اعلان بند کریں",
+    "broadcastsLoadFailed": "اعلانات لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+    "skillsNeeded": "درکار مہارتیں",
+    "addSkill": "مہارت شامل کریں",
+    "raiseBroadcastAction": "اعلان بھیجیں",
+    "slotClaimedByOther": "کسی اور نے یہ جگہ آپ سے ذرا پہلے لے لی — کوئی شفٹ تفویض نہیں ہوئی۔"
   },
   "onboarding": {
     "managerReview": "مینیجر کا جائزہ",
@@ -525,7 +664,19 @@
     "reviewQueueEmptyDescription": "آپ کے جائزے کی منتظر کوئی درخواست نہیں۔",
     "assignApprovedEmployee": "منظور شدہ ملازم تفویض کریں",
     "rejectApplication": "درخواست مسترد کریں",
-    "rejectionReason": "مسترد کرنے کی وجہ"
+    "rejectionReason": "مسترد کرنے کی وجہ",
+    "startReOnboarding": "دوبارہ آن بورڈنگ شروع کریں",
+    "noPermissionReviewQueue": "آپ کو جائزہ قطار دیکھنے کی اجازت نہیں۔",
+    "rejectAction": "مسترد کریں",
+    "completeAssignmentAction": "تفویض مکمل کریں",
+    "rejectionSentHint": "یہ وجہ درخواست گزار کو بھیجی جاتی ہے۔",
+    "confirmRejectionAction": "مسترد کرنے کی تصدیق کریں",
+    "reviewQueueLoadFailed": "جائزہ قطار لوڈ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
+    "myOnboardingTitle": "میری شمولیت",
+    "noPermissionCreateUsers": "آپ کو صارفین بنانے کی اجازت نہیں۔",
+    "noContractYet": "آپ کے لیے ابھی تک کوئی معاہدہ جاری نہیں ہوا۔ اپنے مینیجر سے رابطہ کریں۔",
+    "downloadContract": "معاہدہ ڈاؤن لوڈ کریں",
+    "completeOnboardingAction": "اپنی آن بورڈنگ مکمل کریں"
   },
   "analytics": {
     "myPerformance": "میری کارکردگی",
@@ -543,7 +694,14 @@
     "attendanceRate": "حاضری کی شرح",
     "noRankedWorkers": "ابھی کوئی درجہ بند کارکن نہیں",
     "noRankedWorkersDescription": "درجہ بندیاں اس وقت ظاہر ہوں گی جب کارکن تفویضات مکمل کریں گے۔",
-    "shifts": "شفٹیں"
+    "shifts": "شفٹیں",
+    "loadFailed": "تجزیات لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+    "noPermission": "تجزیات مینیجرز اور ایڈمنز کے لیے دستیاب ہیں۔",
+    "leaderboardLoadFailed": "لیڈر بورڈ لوڈ نہیں ہو سکا۔",
+    "statsLoadFailed": "آپ کے اعداد و شمار لوڈ نہیں ہو سکے۔",
+    "platformOverview": "پلیٹ فارم کا جائزہ",
+    "viewAnalytics": "تجزیات دیکھیں",
+    "statsLoadFailedShort": "پلیٹ فارم کے اعداد و شمار لوڈ نہیں ہو سکے۔"
   },
   "hotelGroups": {
     "noDeleted": "کوئی حذف شدہ ہوٹل گروپ نہیں",
@@ -560,7 +718,14 @@
     "newDescription": "ہوٹلوں کو ایک علاقے کے تحت گروپ کریں۔ علاقائی مینیجر کو ان کے صارف صفحے سے تفویض کریں۔",
     "pageDescription": "علاقائی گروپ بندیاں جو مینیجرز اور بلنگ کا دائرہ کار طے کرتی ہیں۔",
     "noneYet": "ابھی کوئی ہوٹل گروپ نہیں",
-    "noneYetDescription": "گروپس آپ کو کئی ہوٹلوں پر علاقائی مینیجر تفویض کرنے دیتے ہیں۔"
+    "noneYetDescription": "گروپس آپ کو کئی ہوٹلوں پر علاقائی مینیجر تفویض کرنے دیتے ہیں۔",
+    "loadFailed": "ہوٹل گروپس لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
+    "loadOneFailed": "یہ ہوٹل گروپ لوڈ نہیں ہو سکا۔",
+    "adminOnlyCreate": "صرف ایڈمنز ہوٹل گروپس بنا سکتے ہیں۔",
+    "adminOnlyEdit": "صرف ایڈمنز ہوٹل گروپس میں ترمیم کر سکتے ہیں۔",
+    "orgChartAccess": "صرف ایڈمنز اور علاقائی مینیجرز تنظیمی چارٹس دیکھ سکتے ہیں۔",
+    "loadArchivedFailed": "آرکائیو شدہ ہوٹل گروپس لوڈ نہیں ہو سکے۔",
+    "billingPlaceholder": "بلنگ پتہ، وی اے ٹی آئی ڈی، لاگت مرکز…"
   },
   "attendance": {
     "expectedStart": "متوقع آغاز",
@@ -573,7 +738,10 @@
     "markVerified": "تصدیق شدہ کے طور پر نشان زد کریں",
     "pageDescription": "عملے سے آراستہ شفٹوں کے لیے چیک اِن، چیک آؤٹ اور تصدیق کی حالت۔",
     "records": "حاضری کے ریکارڈز",
-    "noneFound": "حاضری کا کوئی ریکارڈ نہیں ملا"
+    "noneFound": "حاضری کا کوئی ریکارڈ نہیں ملا",
+    "viewAssignment": "تفویض دیکھیں",
+    "saveReview": "جائزہ محفوظ کریں",
+    "loadFailed": "حاضری لوڈ نہیں ہو سکی۔ دوبارہ کوشش کریں۔"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
@@ -584,6 +752,31 @@
     "approveForWorkTitle": "کام کے لیے منظور کریں",
     "deactivateTemporaryTitle": "غیر فعال کریں (عارضی وقفہ)",
     "deleteLeftCompanyTitle": "حذف کریں (کمپنی چھوڑ دی)",
-    "editSkillsTitle": "مہارتوں میں ترمیم کریں"
+    "editSkillsTitle": "مہارتوں میں ترمیم کریں",
+    "blocklistLoadFailed": "بلاک لسٹ لوڈ نہیں ہو سکی۔",
+    "addAction": "شامل کریں",
+    "loadFailed": "ملازمت کی حالت لوڈ نہیں ہو سکی۔",
+    "noRecordFound": "ملازمت کا کوئی ریکارڈ نہیں ملا۔ ایڈمنسٹریٹر سے رابطہ کریں۔",
+    "editAction": "ترمیم کریں",
+    "paperworkPendingHint": "اس کارکن کی منظوری کا جائزہ لینے سے پہلے کاغذی کارروائی/چیک زیر التوا ہیں۔",
+    "confirmOnboardingComplete": "آن بورڈنگ مکمل ہونے کی تصدیق کریں",
+    "reactivateAndNewContract": "دوبارہ فعال کریں اور نیا معاہدہ شروع کریں",
+    "reactivateAction": "دوبارہ فعال کریں",
+    "rehireAction": "دوبارہ ملازمت دیں",
+    "restoredMustReapprove": "بحال شدہ ریکارڈ کو فعال ہونے سے پہلے دوبارہ منظوری سے گزرنا ہوگا۔",
+    "restoreNewCycle": "بحال کریں (نیا ملازمت دور شروع کریں)",
+    "approveAction": "منظور کریں",
+    "deactivateAction": "غیر فعال کریں",
+    "deleteAction": "حذف کریں",
+    "reasonRequired": "وجہ درکار ہے۔",
+    "idAndReasonRequired": "ملازم آئی ڈی اور وجہ دونوں درکار ہیں۔",
+    "signedContractReceived": "دستخط شدہ معاہدہ موصول ہوا — منظوری اس کی تصدیق کرے گی۔"
+  },
+  "compliance": {
+    "exportDescription": "آپ کی دستاویزات، رضامندی کی تاریخ اور اکاؤنٹ آڈٹ ٹریل کی کاپی تیار کرتا ہے۔",
+    "downloadJson": "JSON ڈاؤن لوڈ کریں"
+  },
+  "archive": {
+    "description": "آپریشنز سے ہٹائے گئے ہوٹل اور ہوٹل گروپس۔ تاریخ محفوظ رہتی ہے — بحالی سے ادارہ فوراً دستیاب ہو جاتا ہے۔"
   }
 }

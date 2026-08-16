@@ -8,7 +8,8 @@ import { ApiError, hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
-import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { UpdateHotelInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -75,19 +76,14 @@ function EditHotel() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href={`/hotels/${id}`}
-          className="text-sm"
-        >
-          ← Back to hotel
-        </TextLink>
+        <BackLink href={`/hotels/${id}`} className="text-sm" labelKey="common.backTo.hotel" />
         <PageHeader className="mt-2" title={t("hotels.editTitle")} />
       </div>
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this hotel.
+            {t("hotels.loadOneFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !hotel ? (
@@ -114,13 +110,14 @@ function EditHotel() {
 }
 
 export default function EditHotelPage() {
+  const { t } = useTranslation();
   return (
     <HotelWriteGate
       fallback={
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only admins can edit hotels.
+              {t("hotels.adminOnlyEdit")}
             </CardContent>
           </Card>
         </div>

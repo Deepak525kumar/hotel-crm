@@ -31,7 +31,7 @@ export function MyStatsCard() {
       <CardContent className="space-y-4">
         {error ? (
           <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load your stats.
+            {t("analytics.statsLoadFailed")}
           </p>
         ) : isLoading || !stats ? (
           <div className="grid gap-4 sm:grid-cols-3">

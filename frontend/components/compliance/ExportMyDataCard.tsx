@@ -73,7 +73,7 @@ export function ExportMyDataCard() {
       <CardContent className="space-y-4">
         {!bundle ? (
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Generates a copy of your documents, consent history, and account audit trail.
+            {t("compliance.exportDescription")}
           </p>
         ) : (
           <>
@@ -98,7 +98,7 @@ export function ExportMyDataCard() {
               />
             </ul>
             <Button size="sm" onClick={() => downloadJson(bundle)}>
-              Download JSON
+              {t("compliance.downloadJson")}
             </Button>
           </>
         )}

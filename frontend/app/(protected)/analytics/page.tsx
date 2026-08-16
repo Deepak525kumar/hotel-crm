@@ -65,7 +65,7 @@ function AnalyticsDashboard() {
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load analytics. Please try again.
+            {t("analytics.loadFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !stats ? (
@@ -229,13 +229,14 @@ function AnalyticsDashboard() {
 }
 
 export default function AnalyticsPage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["manager", "regional_manager", "admin"]}
       fallback={
         <Card>
           <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-            Analytics are available to managers and admins.
+            {t("analytics.noPermission")}
           </CardContent>
         </Card>
       }

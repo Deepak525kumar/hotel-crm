@@ -44,6 +44,7 @@ function PayslipRequestRow({
   onFulfil: () => void;
   fulfilling: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <div className="min-w-0">
@@ -61,7 +62,7 @@ function PayslipRequestRow({
             server-side -- gated here too so a worker never sees a button that only 403s. */}
         {canFulfil && request.status === "REQUESTED" && (
           <Button size="sm" variant="outline" onClick={onFulfil} loading={fulfilling}>
-            Mark fulfilled
+            {t("hr.markFulfilledAction")}
           </Button>
         )}
       </div>
@@ -107,14 +108,14 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
           <CardTitle>{t("hr.payslipRequests")}</CardTitle>
           {(isSelfWorker || canManage) && (
             <Button size="sm" onClick={() => setCreateOpen(true)}>
-              New request
+              {t("hr.newRequestAction")}
             </Button>
           )}
         </CardHeader>
         <CardContent>
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load payslip requests.
+              {t("hr.payslipsLoadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -190,11 +191,11 @@ function CreatePayslipRequestModal({
   const onSubmit = () => {
     setFieldError(null);
     if (!periodStart || !periodEnd) {
-      setFieldError("Both period dates are required.");
+      setFieldError(t("hr.bothDatesRequired"));
       return;
     }
     if (periodEnd < periodStart) {
-      setFieldError("Period end must be on or after period start.");
+      setFieldError(t("hr.periodEndAfterStart"));
       return;
     }
 
@@ -225,10 +226,10 @@ function CreatePayslipRequestModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={create.pending}>
-            Create request
+            {t("hr.createRequestAction")}
           </Button>
         </>
       }

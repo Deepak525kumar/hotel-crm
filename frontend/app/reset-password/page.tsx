@@ -34,7 +34,7 @@ function ResetPasswordForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!token) {
-      setError("Invalid or missing reset token.");
+      setError(t("auth.invalidResetTokenMissing"));
       return;
     }
     
@@ -59,7 +59,7 @@ function ResetPasswordForm() {
       <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
         <p className="mb-4">{t("auth.invalidResetLink")}</p>
         <Link href="/forgot-password" className="text-blue-600 hover:underline dark:text-blue-400">
-          Request a new link
+          {t("auth.requestNewLink")}
         </Link>
       </div>
     );
@@ -70,7 +70,7 @@ function ResetPasswordForm() {
       <div className="text-center text-sm text-gray-600 py-4 dark:text-gray-300">
         <p className="mb-4 text-green-600 font-medium dark:text-green-400">{t("auth.resetSuccess")}</p>
         <Link href="/login" className="text-blue-600 hover:underline dark:text-blue-400">
-          Return to login
+          {t("auth.returnToLogin")}
         </Link>
       </div>
     );
@@ -79,7 +79,7 @@ function ResetPasswordForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <p className="text-sm text-gray-600 dark:text-gray-300">
-        Enter a new password for your account.
+        {t("auth.enterNewPasswordHint")}
       </p>
       <Input
         label={t("fields.newPassword")}
@@ -91,7 +91,7 @@ function ResetPasswordForm() {
       />
       <FormError>{error}</FormError>
       <Button type="submit" loading={submitting} className="w-full">
-        Reset Password
+        {t("auth.resetPasswordTitle")}
       </Button>
     </form>
   );

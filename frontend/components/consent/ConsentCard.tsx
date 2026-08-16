@@ -104,7 +104,7 @@ export function ConsentCard() {
       <CardContent className="space-y-4">
         {error ? (
           <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load your consent status.
+            {t("consent.loadOneFailed")}
           </p>
         ) : isLoading ? (
           <Skeleton className="h-5 w-full" />
@@ -122,7 +122,7 @@ export function ConsentCard() {
               onClick={onWithdraw}
               loading={withdraw.pending}
             >
-              Withdraw
+              {t("consent.withdraw")}
             </Button>
           </div>
         ) : (
@@ -141,7 +141,7 @@ export function ConsentCard() {
                 onClick={onShowNotice}
                 loading={fetchNotice.pending}
               >
-                Review notice
+                {t("consent.reviewNotice")}
               </Button>
             ) : (
               <div className="space-y-3 rounded-md border border-gray-200 p-4 dark:border-gray-800">
@@ -159,7 +159,7 @@ export function ConsentCard() {
                     loading={decide.isPending("GRANTED")}
                     disabled={decide.isPending("DECLINED")}
                   >
-                    Grant
+                    {t("consent.grant")}
                   </Button>
                   <Button
                     size="sm"
@@ -168,7 +168,7 @@ export function ConsentCard() {
                     loading={decide.isPending("DECLINED")}
                     disabled={decide.isPending("GRANTED")}
                   >
-                    Decline
+                    {t("consent.decline")}
                   </Button>
                 </div>
               </div>

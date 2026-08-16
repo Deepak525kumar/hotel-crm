@@ -52,14 +52,14 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
   const onSave = () => {
     setFieldError(null);
     if (!firstName.trim() || !lastName.trim()) {
-      setFieldError("First and last name are required.");
+      setFieldError(t("profile.firstNameLastNameRequired"));
       return;
     }
     // Backend requires E.164 when phone is present (auth/validation.ts). Check
     // here too so the user gets a field-level message instead of a 400.
     const trimmedPhone = phone.trim();
     if (trimmedPhone && !/^\+?[1-9]\d{1,14}$/.test(trimmedPhone)) {
-      setFieldError("Phone must be a valid international number, e.g. +49301234567.");
+      setFieldError(t("profile.phoneInvalid"));
       return;
     }
 
@@ -96,11 +96,11 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
         </CardHeader>
         <CardContent className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Update your name and contact details, or reset your password.
+            {t("profile.updateDetailsHint")}
           </p>
           <div className="flex shrink-0 gap-2">
             <Button variant="outline" onClick={openEdit}>
-              Edit profile
+              {t("profile.editTitle")}
             </Button>
             <Button
               variant="outline"
@@ -109,7 +109,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
                 setResetOpen(true);
               }}
             >
-              Reset password
+              {t("profile.resetPasswordTitle")}
             </Button>
           </div>
         </CardContent>
@@ -122,10 +122,10 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
         footer={
           <>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={save.pending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={onSave} loading={save.pending}>
-              Save changes
+              {t("profile.saveChanges")}
             </Button>
           </>
         }
@@ -167,7 +167,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
             </Button>
             {!resetSent && (
               <Button onClick={onRequestReset} loading={reset.pending}>
-                Send reset link
+                {t("auth.sendResetLinkAction")}
               </Button>
             )}
           </>

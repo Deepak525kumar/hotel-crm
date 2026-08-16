@@ -51,7 +51,7 @@ export function GeoVerificationCard({ record }: { record: Attendance }) {
           <CardTitle>{t("assignments.geoVerification")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2 text-sm text-red-600 dark:text-red-400">
-          Failed to load geo verification data.
+          {t("documents.geoLoadFailed")}
         </CardContent>
       </Card>
     );

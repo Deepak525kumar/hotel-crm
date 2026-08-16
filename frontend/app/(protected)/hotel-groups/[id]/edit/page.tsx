@@ -8,7 +8,8 @@ import { ApiError, hotelGroupsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
 import type { HotelGroupFormValues } from "@/components/hotels/HotelGroupForm";
-import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
+import { Card, CardContent, PageHeader, Skeleton } from "@/components/ui";
+import { BackLink } from "@/components/ui/BackLink";
 import type { UpdateHotelGroupInput } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -50,19 +51,14 @@ function EditHotelGroup() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
-        <TextLink
-          href={`/hotel-groups/${id}`}
-          className="text-sm"
-        >
-          ← Back to hotel group
-        </TextLink>
+        <BackLink href={`/hotel-groups/${id}`} className="text-sm" labelKey="common.backTo.hotelGroup" />
         <PageHeader className="mt-2" title={t("hotelGroups.editTitle")} />
       </div>
 
       {error ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-red-600 dark:text-red-400">
-            Failed to load this hotel group.
+            {t("hotelGroups.loadOneFailed")}
           </CardContent>
         </Card>
       ) : isLoading || !group ? (
@@ -88,6 +84,7 @@ function EditHotelGroup() {
 }
 
 export default function EditHotelGroupPage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["admin"]}
@@ -95,7 +92,7 @@ export default function EditHotelGroupPage() {
         <div className="mx-auto max-w-2xl">
           <Card>
             <CardContent className="text-sm text-gray-500 dark:text-gray-400">
-              Only admins can edit hotel groups.
+              {t("hotelGroups.adminOnlyEdit")}
             </CardContent>
           </Card>
         </div>

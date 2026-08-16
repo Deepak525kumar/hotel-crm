@@ -99,7 +99,7 @@ export default function HotelsPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load hotels. Please try again.
+              {t("hotels.loadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.hotels")}>

@@ -57,14 +57,14 @@ export function BlocklistCard({ hotelId }: { hotelId: string }) {
           <CardTitle>{t("users.blocklist")}</CardTitle>
           <BlocklistWriteGate>
             <Button size="sm" onClick={() => setAddOpen(true)}>
-              Add to blocklist
+              {t("employees.addToBlocklistTitle")}
             </Button>
           </BlocklistWriteGate>
         </CardHeader>
         <CardContent>
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load the blocklist.
+              {t("employees.blocklistLoadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -121,7 +121,7 @@ function AddBlocklistEntryModal({
   const onSubmit = () => {
     setFieldError(null);
     if (!employeeId.trim() || !reason.trim()) {
-      setFieldError("Employee ID and reason are both required.");
+      setFieldError(t("employees.idAndReasonRequired"));
       return;
     }
 
@@ -149,10 +149,10 @@ function AddBlocklistEntryModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={create.pending}>
-            Add
+            {t("employees.addAction")}
           </Button>
         </>
       }

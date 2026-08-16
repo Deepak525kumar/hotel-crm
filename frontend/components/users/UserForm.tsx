@@ -281,7 +281,7 @@ export function UserForm({
           {requiresOnboardingFields && (
             <div className="space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-800">
               <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Onboarding
+                {t("nav.onboarding")}
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
                 An employment record is created automatically — {form.first_name.trim() || "this person"} will
@@ -372,7 +372,7 @@ export function UserForm({
                 onClick={onCancel}
                 disabled={submitting}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             )}
             <Button type="submit" loading={submitting} disabled={submitting || !valid}>

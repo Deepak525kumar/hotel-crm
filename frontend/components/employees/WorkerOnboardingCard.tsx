@@ -156,7 +156,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
         <CardContent>
           {error ? (
             <p className="py-6 text-center text-sm text-red-600 dark:text-red-400">
-              Failed to load employment status.
+              {t("employees.loadFailed")}
             </p>
           ) : isLoading ? (
             <div className="space-y-3 py-2">
@@ -172,7 +172,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
             // failed (logged server-side as user_create_employment_record_failed).
             <div className="space-y-4">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                No employment record found. Contact an administrator.
+                {t("employees.noRecordFound")}
               </p>
               <FormError>{action.error}</FormError>
             </div>
@@ -208,7 +208,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                           : t("common.notSet")}
                       </span>
                       <Button size="sm" variant="outline" onClick={() => setEditSkillsOpen(true)}>
-                        Edit
+                        {t("employees.editAction")}
                       </Button>
                     </span>
                   }
@@ -245,7 +245,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               {record.status === "PENDING" && !record.submitted_for_review_at && (
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800 space-y-3">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Paperwork/checks pending before this worker can be reviewed for approval.
+                    {t("employees.paperworkPendingHint")}
                   </p>
                   {docCompleteness && !docCompleteness.is_complete && (
                     <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
@@ -269,7 +269,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       loading={action.isPending("submit")}
                       disabled={docCompleteness != null && !docCompleteness.is_complete}
                     >
-                      Confirm onboarding complete
+                      {t("employees.confirmOnboardingComplete")}
                     </Button>
                   ) : (
                     <p className="text-sm text-gray-400 dark:text-gray-500">
@@ -293,7 +293,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   )}
                   {!hasApprovedContract && hasSignedContract && (
                     <div className="rounded-md bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 px-3 py-2 text-sm text-blue-800 dark:text-blue-300">
-                      Signed contract received — approving will confirm it.
+                      {t("employees.signedContractReceived")}
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2">
@@ -302,7 +302,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       onClick={() => setApproveOpen(true)}
                       disabled={!canApproveForWork}
                     >
-                      Approve for work
+                      {t("employees.approveForWorkTitle")}
                     </Button>
                     <Button
                       size="sm"
@@ -310,7 +310,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       onClick={onReject}
                       loading={action.isPending("reject")}
                     >
-                      Reject
+                      {t("onboarding.rejectAction")}
                     </Button>
                   </div>
                 </div>
@@ -323,7 +323,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     variant="outline"
                     onClick={() => setDeactivateOpen(true)}
                   >
-                    Deactivate (temporary pause)
+                    {t("employees.deactivateTemporaryTitle")}
                   </Button>
                 </div>
               )}
@@ -337,11 +337,11 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   </p>
                   {isContractExpired ? (
                     <Button size="sm" onClick={onTriggerReonboarding} loading={action.isPending("reactivate_new_contract")}>
-                      Reactivate & trigger new contract
+                      {t("employees.reactivateAndNewContract")}
                     </Button>
                   ) : (
                     <Button size="sm" onClick={onReactivate} loading={action.isPending("reactivate")}>
-                      Reactivate
+                      {t("employees.reactivateAction")}
                     </Button>
                   )}
                 </div>
@@ -363,7 +363,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     </p>
                   )}
                   <Button size="sm" onClick={onRehire} loading={action.isPending("rehire")}>
-                    Rehire
+                    {t("employees.rehireAction")}
                   </Button>
                 </div>
               )}
@@ -374,7 +374,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 canDeleteEmployment && (
                   <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                     <Button size="sm" variant="outline" onClick={() => setDeleteOpen(true)}>
-                      Delete (left the company)
+                      {t("employees.deleteLeftCompanyTitle")}
                     </Button>
                   </div>
                 )}
@@ -382,7 +382,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
               {record.status === "DELETED" && canRestoreEmployment && (
                 <div className="border-t border-gray-100 pt-4 dark:border-gray-800">
                   <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
-                    A restored record must go through approval again before becoming active.
+                    {t("employees.restoredMustReapprove")}
                   </p>
                   <RestoreButton employeeId={record.employee_id} onDone={refresh} />
                 </div>
@@ -434,6 +434,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
 // how the rest of this card relies on the API's own authorization rather
 // than duplicating role checks client-side.
 function RestoreButton({ employeeId, onDone }: { employeeId: string; onDone: () => void }) {
+  const { t } = useTranslation();
   const action = useAsyncAction();
   const onRestore = () =>
     action.run(() => employeesApi.restore(employeeId), { key: "restore" }).finally(onDone);
@@ -441,7 +442,7 @@ function RestoreButton({ employeeId, onDone }: { employeeId: string; onDone: () 
   return (
     <div className="space-y-2">
       <Button size="sm" onClick={onRestore} loading={action.pending}>
-        Restore (start a new employment cycle)
+        {t("employees.restoreNewCycle")}
       </Button>
       <FormError>{action.error}</FormError>
     </div>
@@ -496,10 +497,10 @@ function ApproveModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={approve.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={approve.pending}>
-            Approve
+            {t("employees.approveAction")}
           </Button>
         </>
       }
@@ -555,7 +556,7 @@ function DeactivateModal({
   const onSubmit = () => {
     setFieldError(null);
     if (!reason) {
-      setFieldError("A reason is required.");
+      setFieldError(t("employees.reasonRequired"));
       return;
     }
     deactivate.run(() => employeesApi.deactivate(employeeId, { deactivation_reason: reason }), {
@@ -575,10 +576,10 @@ function DeactivateModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={deactivate.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={deactivate.pending}>
-            Deactivate
+            {t("employees.deactivateAction")}
           </Button>
         </>
       }
@@ -633,7 +634,7 @@ function DeleteModal({
   const onSubmit = () => {
     setFieldError(null);
     if (!reason.trim()) {
-      setFieldError("A reason is required.");
+      setFieldError(t("employees.reasonRequired"));
       return;
     }
     deleteAction.run(() => employeesApi.deleteEmployee(employeeId, { deleted_reason: reason.trim() }), {
@@ -653,10 +654,10 @@ function DeleteModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={deleteAction.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button variant="danger" onClick={onSubmit} loading={deleteAction.pending}>
-            Delete
+            {t("employees.deleteAction")}
           </Button>
         </>
       }
@@ -748,10 +749,10 @@ function EditSkillsModal({
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={action.pending}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button onClick={onSubmit} loading={action.pending}>
-            Save
+            {t("common.save")}
           </Button>
         </>
       }

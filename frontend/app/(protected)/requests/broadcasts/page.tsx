@@ -84,7 +84,7 @@ export default function BroadcastsPage() {
         <CardContent className="p-0">
           {error ? (
             <div className="px-6 py-10 text-center text-sm text-red-600">
-              Failed to load broadcasts. Please try again.
+              {t("requests.broadcastsLoadFailed")}
             </div>
           ) : (
             <Table aria-label={t("nav.broadcasts")}>

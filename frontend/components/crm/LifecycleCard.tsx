@@ -10,6 +10,7 @@ import {
 } from "@/components/ui";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 
 /**
  * Entity lifecycle controls, shared by Hotels and Hotel Groups (2026-08-07).
@@ -51,6 +52,7 @@ export function LifecycleCard({
   onDelete: () => Promise<unknown>;
   onRestore: () => Promise<unknown>;
 }) {
+  const { t } = useTranslation();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const action = useAsyncAction();
 
@@ -80,7 +82,7 @@ export function LifecycleCard({
             loading={action.isPending("restore")}
             className="shrink-0"
           >
-            Restore
+            {t("hotels.restoreAction")}
           </Button>
         </CardContent>
         <FormError className="px-6 pb-4">{action.error}</FormError>
@@ -109,18 +111,18 @@ export function LifecycleCard({
                 onClick={() => run(onDeactivate, "deactivate")}
                 loading={action.isPending("deactivate")}
               >
-                Deactivate
+                {t("employees.deactivateAction")}
               </Button>
             ) : (
               <Button
                 onClick={() => run(onReactivate, "reactivate")}
                 loading={action.isPending("reactivate")}
               >
-                Reactivate
+                {t("employees.reactivateAction")}
               </Button>
             )}
             <Button variant="danger" onClick={() => setConfirmDelete(true)}>
-              Delete
+              {t("employees.deleteAction")}
             </Button>
           </div>
         </CardContent>
@@ -138,14 +140,14 @@ export function LifecycleCard({
               onClick={() => setConfirmDelete(false)}
               disabled={action.pending}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               variant="danger"
               onClick={() => run(onDelete, "delete")}
               loading={action.isPending("delete")}
             >
-              Delete
+              {t("employees.deleteAction")}
             </Button>
           </>
         }
