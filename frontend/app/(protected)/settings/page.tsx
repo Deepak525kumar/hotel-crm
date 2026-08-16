@@ -21,16 +21,21 @@ import {
 /**
  * Items we deliberately show as unbuilt rather than rendering dead controls:
  * a disabled toggle reads as "broken", a listed intent reads as "not yet".
- * Dark mode moved out of this list (2026-08-09, shipped as a real control
- * below) -- Language stays, its scope (full app + notification-text
- * translation) isn't built yet.
+ *
+ * Dark mode left this list on 2026-08-09 when it shipped as a real control.
+ * Language followed it out on 2026-08-16 for the same reason: the picker in
+ * the Appearance card above is live, so listing "Language -- Not available
+ * yet" directly beneath a working language selector described the page as
+ * broken. The entry's stated scope was "full app + notification-text
+ * translation"; the app half is built, and the notification-text half is
+ * tracked as remaining i18n work rather than advertised here as an unbuilt
+ * setting the user could otherwise expect to appear in this list.
+ *
+ * Kept as an empty array rather than deleted: the card below is the standing
+ * home for the next such item, and the render is guarded so an empty list
+ * shows nothing at all.
  */
-const COMING_SOON: { title: string; detail: string }[] = [
-  {
-    title: "Language",
-    detail: "Choosing the display language for the app interface.",
-  },
-];
+const COMING_SOON: { title: string; detail: string }[] = [];
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -135,6 +140,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {COMING_SOON.length > 0 && (
       <Card>
         <CardHeader>
           <CardTitle>{t("settings.comingSoon")}</CardTitle>
@@ -162,6 +168,7 @@ export default function SettingsPage() {
           </DataList>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
