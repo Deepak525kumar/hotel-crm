@@ -82,7 +82,7 @@ function ResetPasswordForm() {
         Enter a new password for your account.
       </p>
       <Input
-        label="New Password"
+        label={t("fields.newPassword")}
         type="password"
         autoComplete="new-password"
         required

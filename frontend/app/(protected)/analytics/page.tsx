@@ -43,11 +43,11 @@ function AnalyticsDashboard() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.analytics")}
-        description="Operational performance across staffing, attendance and quality."
+        description={t("analytics.description")}
         actions={
           <div className="w-full sm:w-64">
             <Select
-              aria-label="Scope"
+              aria-label={t("analytics.scope")}
               value={hotelId}
               onChange={(e) => setHotelId(e.target.value)}
             >
@@ -74,17 +74,17 @@ function AnalyticsDashboard() {
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile
-              label="Open requests"
+              label={t("analytics.openRequests")}
               value={stats.work_requests.open}
               hint={`${stats.work_requests.total} total`}
             />
             <StatTile
-              label="On-time rate"
+              label={t("analytics.onTimeRate")}
               value={formatPercent(stats.attendance.on_time_rate)}
               hint={`${stats.attendance.total} check-ins`}
             />
             <StatTile
-              label="Quality pass rate"
+              label={t("analytics.qualityPassRate")}
               value={formatPercent(stats.quality.pass_rate)}
               hint={`${stats.quality.total_verifications} verifications`}
             />
@@ -102,11 +102,11 @@ function AnalyticsDashboard() {
               hint={`${stats.assignments.completed} completed`}
             />
             <StatTile
-              label="In progress"
+              label={t("status.inProgress")}
               value={stats.assignments.in_progress}
             />
             <StatTile
-              label="No-shows"
+              label={t("analytics.noShows")}
               value={stats.assignments.no_show}
             />
             <StatTile

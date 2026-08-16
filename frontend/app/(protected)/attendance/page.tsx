@@ -94,7 +94,7 @@ export default function AttendancePage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.attendance")}
-        description="Check-in, check-out and verification status for staffed shifts."
+        description={t("attendance.pageDescription")}
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -125,7 +125,7 @@ export default function AttendancePage() {
               Failed to load attendance. Please try again.
             </div>
           ) : (
-            <Table aria-label="Attendance records">
+            <Table aria-label={t("attendance.records")}>
               <THead>
                 <tr>
                   <TH>{t("fields.worker")}</TH>
@@ -142,7 +142,7 @@ export default function AttendancePage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No attendance records found"
+                        title={t("attendance.noneFound")}
                         description={
                           status || verified
                             ? "Try adjusting your filters."

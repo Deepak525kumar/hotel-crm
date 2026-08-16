@@ -96,8 +96,8 @@ function ArchiveContent() {
             <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
           ) : deletedHotels.length === 0 ? (
             <EmptyState
-              title="No deleted hotels"
-              description="Deleted hotels appear here and can be restored."
+              title={t("hotels.noDeleted")}
+              description={t("hotels.noDeletedDescription")}
             />
           ) : (
             <Table aria-label={t("hotels.deleted")}>
@@ -147,8 +147,8 @@ function ArchiveContent() {
             <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
           ) : deletedGroups.length === 0 ? (
             <EmptyState
-              title="No deleted hotel groups"
-              description="Deleted groups appear here and can be restored."
+              title={t("hotelGroups.noDeleted")}
+              description={t("hotelGroups.noDeletedDescription")}
             />
           ) : (
             <Table aria-label={t("hotels.deletedGroups")}>

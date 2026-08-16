@@ -118,7 +118,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
       <Modal
         open={open}
         onClose={() => !save.pending && setOpen(false)}
-        title="Edit profile"
+        title={t("profile.editTitle")}
         footer={
           <>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={save.pending}>
@@ -132,19 +132,19 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
       >
         <div className="space-y-4">
           <Input
-            label="First name"
+            label={t("fields.firstName")}
             required
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
           />
           <Input
-            label="Last name"
+            label={t("fields.lastName")}
             required
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
           />
           <Input
-            label="Phone (optional)"
+            label={t("fields.phoneOptional")}
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+49301234567"
@@ -159,7 +159,7 @@ export function EditProfileCard({ user }: { user: AuthUser }) {
       <Modal
         open={resetOpen}
         onClose={() => !reset.pending && setResetOpen(false)}
-        title="Reset password"
+        title={t("profile.resetPasswordTitle")}
         footer={
           <>
             <Button variant="outline" onClick={() => setResetOpen(false)} disabled={reset.pending}>

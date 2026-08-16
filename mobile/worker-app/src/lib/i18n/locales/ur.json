@@ -38,7 +38,10 @@
     "thisMonth": "اس مہینے",
     "quickLinks": "فوری لنکس",
     "permissions": "اجازتیں",
-    "coordinates": "کوآرڈینیٹس"
+    "coordinates": "کوآرڈینیٹس",
+    "loadingLabel": "لوڈ ہو رہا ہے",
+    "navigation": "نیویگیشن",
+    "openNavigation": "نیویگیشن کھولیں"
   },
   "fields": {
     "name": "نام",
@@ -69,7 +72,58 @@
     "employment": "ملازمت",
     "employmentType": "ملازمت کی قسم",
     "requirements": "تقاضے",
-    "staffing": "عملہ"
+    "staffing": "عملہ",
+    "address": "پتہ",
+    "city": "شہر",
+    "country": "ملک",
+    "hotelGroup": "ہوٹل گروپ",
+    "geofence": "جیو فینس",
+    "reason": "وجہ",
+    "reasonOptional": "وجہ (اختیاری)",
+    "notesOptional": "نوٹس (اختیاری)",
+    "commentOptional": "تبصرہ (اختیاری)",
+    "created": "تخلیق شدہ",
+    "updated": "اپ ڈیٹ شدہ",
+    "category": "زمرہ",
+    "currency": "کرنسی",
+    "latitude": "طول البلد",
+    "longitude": "خط طول",
+    "primaryHotel": "بنیادی ہوٹل",
+    "primaryHotelOptional": "بنیادی ہوٹل (اختیاری)",
+    "groupName": "گروپ کا نام",
+    "employeeId": "ملازم آئی ڈی",
+    "templateId": "ٹیمپلیٹ آئی ڈی",
+    "channel": "چینل",
+    "readAt": "پڑھنے کا وقت",
+    "memberSince": "رکن بہ تاریخ",
+    "owner": "مالک",
+    "application": "ایپلیکیشن",
+    "version": "ورژن",
+    "build": "بلڈ",
+    "show": "دکھائیں",
+    "expiryDateOptional": "میعاد ختم ہونے کی تاریخ (اختیاری)",
+    "periodStart": "مدت کا آغاز",
+    "periodEnd": "مدت کا اختتام",
+    "phoneOptional": "فون (اختیاری)",
+    "startTime": "شروع ہونے کا وقت",
+    "endTime": "ختم ہونے کا وقت",
+    "hourlyRate": "فی گھنٹہ اجرت",
+    "hourlyRateOptional": "فی گھنٹہ اجرت (اختیاری)",
+    "descriptionOptional": "تفصیل (اختیاری)",
+    "requirementsOptional": "تقاضے (اختیاری)",
+    "endDateOptional": "اختتامی تاریخ (اختیاری)",
+    "streetAndNumber": "گلی اور نمبر",
+    "billingInfo": "بلنگ کی معلومات",
+    "billingInfoOptional": "بلنگ کی معلومات (اختیاری)",
+    "assignedHotel": "تفویض کردہ ہوٹل",
+    "assignedHotelGroup": "تفویض کردہ ہوٹل گروپ",
+    "temporaryPassword": "عارضی پاس ورڈ",
+    "newPassword": "نیا پاس ورڈ",
+    "firstName": "پہلا نام",
+    "lastName": "آخری نام",
+    "workersNeeded": "درکار کارکن",
+    "requiresWorkPermit": "ورک پرمٹ درکار ہے (غیر EU/EEA/سوئس)",
+    "activeCanSignIn": "فعال (پلیٹ فارم میں سائن اِن کر سکتا ہے)"
   },
   "nav": {
     "dashboard": "ڈیش بورڈ",
@@ -91,12 +145,12 @@
     "logout": "لاگ آؤٹ",
     "home": "ہوم",
     "myShifts": "میری شفٹیں",
-    "docs": "دستاویزات",
     "leaderboard": "لیڈر بورڈ",
     "marketplace": "جاب مارکیٹ",
-    "explore": "دریافت کریں",
     "myOnboarding": "میری شمولیت",
-    "reviewQueue": "جائزہ قطار"
+    "reviewQueue": "جائزہ قطار",
+    "docs": "دستاویزات",
+    "explore": "دریافت کریں"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -132,7 +186,8 @@
     "logged": "درج",
     "notYetLogged": "ابھی درج نہیں۔",
     "awaitingSignature": "دستخط کا انتظار",
-    "alreadyFilled": "پہلے سے بھرا ہوا"
+    "alreadyFilled": "پہلے سے بھرا ہوا",
+    "inProgress": "جاری"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",
@@ -158,6 +213,24 @@
     "placeWorker": "کارکن تعینات کریں",
     "calendarPlacement": "کیلنڈر تعیناتی",
     "roomsCompleted": "مکمل کمرے",
+    "source": "ماخذ",
+    "requestedPosition": "درخواست شدہ عہدہ",
+    "shift": "شفٹ",
+    "assignedBy": "تفویض کردہ از",
+    "started": "شروع ہوئی",
+    "cancellationReason": "منسوخی کی وجہ",
+    "cancelTitle": "تفویض منسوخ کریں",
+    "reassignTitle": "کسی اور کارکن کو دوبارہ تفویض کریں",
+    "searchWorkersAtHotel": "اس ہوٹل میں کارکن تلاش کریں",
+    "logRoomsCompletedTitle": "مکمل کمرے درج کریں",
+    "verifyTitle": "تفویض کی تصدیق کریں",
+    "rateWorkerTitle": "کارکن کو درجہ دیں",
+    "placeOnCalendarTitle": "کارکن کو کیلنڈر پر تعینات کریں",
+    "calendarPlacementsTitle": "کیلنڈر تعیناتیاں",
+    "noCalendarPlacements": "کوئی کیلنڈر تعیناتی نہیں ملی",
+    "noCalendarPlacementsDescription": "یہاں دیکھنے کے لیے کارکن کو براہ راست کیلنڈر پر تعینات کریں۔",
+    "pageDescription": "تصدیق شدہ کارکن اور وہ شفٹیں جن پر وہ تعینات ہیں۔",
+    "noneFound": "کوئی تفویض نہیں ملی",
     "unavailable": "دستیاب نہیں",
     "conflictSick": "بیماری کی چھٹی",
     "conflictVacation": "چھٹی پر",
@@ -179,7 +252,9 @@
     "about": "متعلق",
     "comingSoon": "جلد آ رہا ہے",
     "themeSystemNote": "سسٹم آپ کے ڈیوائس کی ترتیب کے مطابق ہے۔",
-    "localDevBuild": "مقامی ڈویلپمنٹ بلڈ"
+    "localDevBuild": "مقامی ڈویلپمنٹ بلڈ",
+    "pageDescription": "آپ کے اکاؤنٹ، سیشن اور ایپ کی ترجیحات۔",
+    "signedInAs": "بطور سائن اِن"
   },
   "auth": {
     "login": "لاگ اِن",
@@ -261,7 +336,12 @@
     "categoryGENERAL": "عمومی",
     "categoryWORK_PERMIT": "ورک پرمٹ",
     "upload": "اپ لوڈ",
-    "retryUpload": "دوبارہ اپ لوڈ کریں"
+    "retryUpload": "دوبارہ اپ لوڈ کریں",
+    "storageNotConfigured": "اس ماحول میں سٹوریج تشکیل نہیں دی گئی",
+    "evaluateWorkPermitRequired": "ورک پرمٹ درکار سمجھ کر جانچیں",
+    "noDocuments": "کوئی دستاویز نہیں",
+    "uploadTitle": "دستاویز اپ لوڈ کریں",
+    "nonEuWorkPermit": "غیر EU/EEA/سوئس ورک پرمٹ دستاویز"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -275,7 +355,13 @@
     "signedContract": "دستخط شدہ معاہدہ",
     "contractExpired": "معاہدے کی میعاد ختم",
     "noSignedContract": "دستخط شدہ معاہدہ ابھی فائل پر نہیں",
-    "loadContractFailed": "آپ کا معاہدہ لوڈ نہیں ہو سکا۔"
+    "loadContractFailed": "آپ کا معاہدہ لوڈ نہیں ہو سکا۔",
+    "noContract": "کوئی معاہدہ نہیں",
+    "signatureConfirmed": "دستخط کی تصدیق ہو گئی",
+    "createContractTitle": "معاہدہ بنائیں",
+    "noPayslipRequests": "تنخواہ سلپ کی کوئی درخواست نہیں",
+    "noPayslipRequestsDescription": "درخواستیں یہاں اس وقت ظاہر ہوں گی جب کارکن تنخواہ سلپ مانگے گا، یا مینیجر ان کی جانب سے ایک بنائے گا۔",
+    "newPayslipRequestTitle": "نئی تنخواہ سلپ درخواست"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -285,11 +371,16 @@
     "withdraw": "واپس لیں",
     "reviewAgain": "دوبارہ جائزہ لیں",
     "reviewNotice": "نوٹس دیکھیں",
-    "loadFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔"
+    "loadFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔",
+    "history": "رضامندی کی تاریخ",
+    "auditTrail": "آڈٹ ٹریل"
   },
   "notifications": {
     "title": "اطلاعات",
-    "none": "کوئی اطلاع نہیں۔"
+    "none": "کوئی اطلاع نہیں۔",
+    "channel": "چینل",
+    "readAt": "پڑھنے کا وقت",
+    "noneFound": "کوئی اطلاع نہیں ملی"
   },
   "leaderboard": {
     "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
@@ -301,7 +392,9 @@
     "createdBy": "بنایا گیا از",
     "directManager": "براہ راست مینیجر",
     "signOut": "سائن آؤٹ",
-    "noAbsences": "کوئی بیماری یا چھٹی درج نہیں۔"
+    "noAbsences": "کوئی بیماری یا چھٹی درج نہیں۔",
+    "editTitle": "پروفائل میں ترمیم کریں",
+    "resetPasswordTitle": "پاس ورڈ ری سیٹ کریں"
   },
   "skills": {
     "CLEANER": "صفائی کارکن",
@@ -317,7 +410,18 @@
     "noSummary": "اس دن کے لیے کوئی خلاصہ شامل نہیں۔",
     "loadFailed": "کیلنڈر لوڈ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
     "assignedOrOnLeave": "آج تعینات یا چھٹی پر",
-    "freeToday": "آج فارغ"
+    "freeToday": "آج فارغ",
+    "markAbsentTitle": "اس دن کارکن کو غیر حاضر نشان زد کریں",
+    "repeatWeekly": "ہفتہ وار دہرائیں",
+    "numberOfWeeks": "ہفتوں کی تعداد",
+    "noAbsencesRecorded": "کوئی غیر حاضری درج نہیں",
+    "noAbsencesDescription": "آپ کی نشان زد کردہ بیماری اور چھٹی کے دن یہاں ظاہر ہوں گے۔",
+    "markAbsence": "غیر حاضری نشان زد کریں",
+    "placements": "تعیناتیاں",
+    "workersPlaced": "تعینات کارکن",
+    "sick": "بیمار",
+    "onVacation": "چھٹی پر",
+    "nothingScheduled": "کچھ بھی شیڈول نہیں"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",
@@ -326,7 +430,15 @@
     "new": "نیا ہوٹل",
     "newGroup": "نیا گروپ",
     "noGroup": "کوئی ہوٹل گروپ تفویض نہیں",
-    "orgChart": "تنظیمی چارٹ"
+    "orgChart": "تنظیمی چارٹ",
+    "noDeleted": "کوئی حذف شدہ ہوٹل نہیں",
+    "noDeletedDescription": "حذف شدہ ہوٹل یہاں ظاہر ہوں گے اور بحال کیے جا سکتے ہیں۔",
+    "editTitle": "ہوٹل میں ترمیم کریں",
+    "newDescription": "ایک پراپرٹی شامل کریں۔ گروپ اور مینیجر کی تفویض یہاں اختیاری ہے اور بعد میں بھی مقرر کی جا سکتی ہے۔",
+    "pageDescription": "پلیٹ فارم کے ذریعے عملے سے آراستہ پراپرٹیز۔",
+    "noneFound": "کوئی ہوٹل نہیں ملا",
+    "activeVisibleForStaffing": "فعال (کارکنوں کو نظر آتا ہے اور تعیناتی کے لیے کھلا ہے)",
+    "acceptingNewWorkRequests": "نئی کام کی درخواستیں قبول کر رہا ہے"
   },
   "users": {
     "new": "نیا صارف",
@@ -337,7 +449,18 @@
     "applicant": "درخواست گزار",
     "yourAccount": "آپ کا اکاؤنٹ",
     "accountSettings": "اکاؤنٹ کی ترتیبات",
-    "exportMyData": "میرا ڈیٹا برآمد کریں"
+    "exportMyData": "میرا ڈیٹا برآمد کریں",
+    "editTitle": "صارف میں ترمیم کریں",
+    "availability": "دستیابی",
+    "deactivateAccountTitle": "اکاؤنٹ غیر فعال کریں",
+    "revokeSessionsTitle": "تمام سیشن منسوخ کریں",
+    "newTitle": "نیا صارف",
+    "newDescription": "ایک اکاؤنٹ بنائیں اور ابتدائی کردار مقرر کریں۔ ان کی آن بورڈنگ خودکار طور پر شروع ہو جائے گی۔",
+    "pageDescription": "پلیٹ فارم تک رسائی رکھنے والے افراد۔",
+    "noneFound": "کوئی صارف نہیں ملا",
+    "managesHotel": "ہوٹل کا انتظام کرتا ہے",
+    "managesGroup": "گروپ کا انتظام کرتا ہے",
+    "editAssignmentTitle": "تفویض میں ترمیم کریں"
   },
   "requests": {
     "title": "کام کی درخواست",
@@ -345,7 +468,21 @@
     "newBroadcast": "نیا اعلان",
     "acceptedWorkers": "قبول شدہ کارکن",
     "noneAccepted": "ابھی کسی کارکن نے یہ اعلان قبول نہیں کیا۔",
-    "notAcceptingNew": "نئی کام کی درخواستیں قبول نہیں"
+    "notAcceptingNew": "نئی کام کی درخواستیں قبول نہیں",
+    "createdBy": "بنایا گیا از",
+    "published": "شائع شدہ",
+    "expires": "میعاد ختم ہونا",
+    "cancellationReason": "منسوخی کی وجہ",
+    "cancelTitle": "کام کی درخواست منسوخ کریں",
+    "cancelPlaceholder": "بتائیں کہ کام کی یہ درخواست کیوں منسوخ کی گئی۔",
+    "broadcastDescription": "تمام اہل کارکنوں کو بیک وقت شفٹ پیش کریں۔ جو مہارت کے لیے پہلے قبول کرے گا وہ جگہ حاصل کرے گا۔",
+    "broadcastsDescription": "تمام اہل کارکنوں کو بیک وقت پیش کی گئی شفٹیں۔ ہر مہارت کے لیے پہلی قبولیت جیت جاتی ہے۔",
+    "noBroadcastsFound": "کوئی اعلان نہیں ملا",
+    "noBroadcastsDescription": "تمام اہل کارکنوں کے لیے شفٹ کھولنے کے لیے ایک اعلان بھیجیں۔",
+    "newTitle": "نئی کام کی درخواست",
+    "newDescription": "مسودے کے طور پر محفوظ کریں، یا عملے کی تعیناتی کے لیے فوراً شائع کریں۔",
+    "pageDescription": "آپ کے ہوٹلوں میں عملے کی تعیناتی کے لیے کھلی شفٹیں۔",
+    "noneFound": "کام کی کوئی درخواست نہیں ملی"
   },
   "onboarding": {
     "managerReview": "مینیجر کا جائزہ",
@@ -378,11 +515,75 @@
         "label": "غیر فعال",
         "description": "آپ کا ملازمت ریکارڈ اس وقت فعال نہیں ہے۔"
       }
-    }
+    },
+    "noRecordFound": "کوئی آن بورڈنگ ریکارڈ نہیں ملا",
+    "noRecordDescription": "آپ کا آن بورڈنگ ریکارڈ ابھی تک نہیں بنایا گیا۔ براہ کرم اپنے مینیجر سے رابطہ کریں۔",
+    "applicationStatus": "درخواست کی حالت",
+    "reviewQueueTitle": "جائزہ قطار",
+    "reviewQueueDescription": "آپ کی ٹیم کی جمع کرائی گئی درخواستیں، آپ کے جائزے کی منتظر۔",
+    "reviewQueueEmpty": "جائزہ قطار خالی ہے",
+    "reviewQueueEmptyDescription": "آپ کے جائزے کی منتظر کوئی درخواست نہیں۔",
+    "assignApprovedEmployee": "منظور شدہ ملازم تفویض کریں",
+    "rejectApplication": "درخواست مسترد کریں",
+    "rejectionReason": "مسترد کرنے کی وجہ"
   },
   "analytics": {
     "myPerformance": "میری کارکردگی",
     "avgRating": "اوسط درجہ بندی",
-    "recentRatings": "حالیہ درجہ بندیاں"
+    "recentRatings": "حالیہ درجہ بندیاں",
+    "description": "عملے، حاضری اور معیار کے حوالے سے آپریشنل کارکردگی۔",
+    "scope": "دائرہ کار",
+    "openRequests": "کھلی درخواستیں",
+    "onTimeRate": "بروقت شرح",
+    "qualityPassRate": "معیار پاس کرنے کی شرح",
+    "noShows": "عدم حاضری",
+    "completedShifts": "مکمل شفٹیں",
+    "totalShifts": "کل شفٹیں",
+    "averageRating": "اوسط درجہ بندی",
+    "attendanceRate": "حاضری کی شرح",
+    "noRankedWorkers": "ابھی کوئی درجہ بند کارکن نہیں",
+    "noRankedWorkersDescription": "درجہ بندیاں اس وقت ظاہر ہوں گی جب کارکن تفویضات مکمل کریں گے۔",
+    "shifts": "شفٹیں"
+  },
+  "hotelGroups": {
+    "noDeleted": "کوئی حذف شدہ ہوٹل گروپ نہیں",
+    "noDeletedDescription": "حذف شدہ گروپس یہاں ظاہر ہوں گے اور بحال کیے جا سکتے ہیں۔",
+    "editTitle": "ہوٹل گروپ میں ترمیم کریں",
+    "noHotelsInGroup": "اس گروپ میں کوئی ہوٹل نہیں",
+    "assignHotelsHint": "ہوٹل کی ترمیمی سکرین سے اس گروپ کو ہوٹل تفویض کریں۔",
+    "noEmployees": "اس گروپ میں کوئی ملازم نہیں",
+    "noEmployeesDescription": "ملازمین یہاں اس وقت ظاہر ہوں گے جب ان کا اس گروپ کے کسی ہوٹل میں ملازمت ریکارڈ ہوگا۔",
+    "employeesInGroup": "اس گروپ کے ملازمین",
+    "billingInfo": "بلنگ کی معلومات",
+    "noHotelsAssigned": "کوئی ہوٹل تفویض نہیں",
+    "newTitle": "نیا ہوٹل گروپ",
+    "newDescription": "ہوٹلوں کو ایک علاقے کے تحت گروپ کریں۔ علاقائی مینیجر کو ان کے صارف صفحے سے تفویض کریں۔",
+    "pageDescription": "علاقائی گروپ بندیاں جو مینیجرز اور بلنگ کا دائرہ کار طے کرتی ہیں۔",
+    "noneYet": "ابھی کوئی ہوٹل گروپ نہیں",
+    "noneYetDescription": "گروپس آپ کو کئی ہوٹلوں پر علاقائی مینیجر تفویض کرنے دیتے ہیں۔"
+  },
+  "attendance": {
+    "expectedStart": "متوقع آغاز",
+    "expectedEnd": "متوقع اختتام",
+    "minutesLate": "منٹ کی تاخیر",
+    "minutesWorked": "کام کیے گئے منٹ",
+    "verifiedBy": "تصدیق کنندہ",
+    "verifiedAt": "تصدیق کا وقت",
+    "reviewTitle": "حاضری کا جائزہ لیں",
+    "markVerified": "تصدیق شدہ کے طور پر نشان زد کریں",
+    "pageDescription": "عملے سے آراستہ شفٹوں کے لیے چیک اِن، چیک آؤٹ اور تصدیق کی حالت۔",
+    "records": "حاضری کے ریکارڈز",
+    "noneFound": "حاضری کا کوئی ریکارڈ نہیں ملا"
+  },
+  "employees": {
+    "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
+    "noBlockedDescription": "اس ہوٹل میں تفویض سے بلاک کیے گئے ملازمین یہاں ظاہر ہوں گے۔",
+    "addToBlocklistTitle": "بلاک لسٹ میں شامل کریں",
+    "employmentCycle": "ملازمت کا دور",
+    "deactivationReason": "غیر فعال کرنے کی وجہ",
+    "approveForWorkTitle": "کام کے لیے منظور کریں",
+    "deactivateTemporaryTitle": "غیر فعال کریں (عارضی وقفہ)",
+    "deleteLeftCompanyTitle": "حذف کریں (کمپنی چھوڑ دی)",
+    "editSkillsTitle": "مہارتوں میں ترمیم کریں"
   }
 }

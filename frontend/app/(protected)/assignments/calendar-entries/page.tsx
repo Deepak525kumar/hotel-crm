@@ -75,7 +75,7 @@ export default function CalendarEntriesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Calendar placements"
+        title={t("assignments.calendarPlacementsTitle")}
         description="Workers placed directly on a hotel's calendar — no broadcast, no accept step."
         actions={
           <StaffingWriteGate>
@@ -93,7 +93,7 @@ export default function CalendarEntriesPage() {
               Failed to load calendar placements. Please try again.
             </div>
           ) : (
-            <Table aria-label="Calendar placements">
+            <Table aria-label={t("assignments.calendarPlacementsTitle")}>
               <THead>
                 <tr>
                   <TH>{t("fields.worker")}</TH>
@@ -109,8 +109,8 @@ export default function CalendarEntriesPage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No calendar placements found"
-                        description="Place a worker directly on the calendar to see it here."
+                        title={t("assignments.noCalendarPlacements")}
+                        description={t("assignments.noCalendarPlacementsDescription")}
                       />
                     </TD>
                   </tr>

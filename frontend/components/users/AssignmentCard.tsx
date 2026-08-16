@@ -135,7 +135,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
               <DataList>
                 {isManager && (
                   <DataRow
-                    label="Manages hotel"
+                    label={t("users.managesHotel")}
                     value={
                       managedHotel ? (
                         <TextLink href={`/hotels/${managedHotel.id}`}>{managedHotel.name}</TextLink>
@@ -147,7 +147,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                 )}
                 {isRegionalManager && (
                   <DataRow
-                    label="Manages group"
+                    label={t("users.managesGroup")}
                     value={
                       managedGroup ? (
                         <TextLink href={`/hotel-groups/${managedGroup.id}`}>{managedGroup.name}</TextLink>
@@ -160,7 +160,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                 {isStaff && (
                   <>
                     <DataRow
-                      label="Hotel group"
+                      label={t("fields.hotelGroup")}
                       value={
                         employmentGroup ? (
                           <TextLink href={`/hotel-groups/${employmentGroup.id}`}>
@@ -172,7 +172,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
                       }
                     />
                     <DataRow
-                      label="Primary hotel"
+                      label={t("fields.primaryHotel")}
                       value={
                         primaryHotel ? (
                           <TextLink href={`/hotels/${primaryHotel.id}`}>{primaryHotel.name}</TextLink>
@@ -198,7 +198,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
       <Modal
         open={open}
         onClose={() => !action.pending && setOpen(false)}
-        title="Edit assignment"
+        title={t("users.editAssignmentTitle")}
         footer={
           <>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={action.pending}>
@@ -230,7 +230,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
 
           {isRegionalManager && (
             <Select
-              label="Hotel group"
+              label={t("fields.hotelGroup")}
               hint="Assigning a group that already has a different regional manager is rejected."
               value={groupId}
               onChange={(e) => setGroupId(e.target.value)}
@@ -250,7 +250,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
           {isStaff && (
             <>
               <Select
-                label="Hotel group"
+                label={t("fields.hotelGroup")}
                 hint="Where this person is allowed to work."
                 value={groupId}
                 onChange={(e) => setGroupId(e.target.value)}
@@ -264,7 +264,7 @@ export function AssignmentCard({ user }: { user: UserDetail }) {
               </Select>
 
               <Select
-                label="Primary hotel (optional)"
+                label={t("fields.primaryHotelOptional")}
                 hint="Where they normally work. Does not limit which hotels they can be scheduled at."
                 value={primaryHotelId}
                 onChange={(e) => setPrimaryHotelId(e.target.value)}

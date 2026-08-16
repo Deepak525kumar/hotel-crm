@@ -48,8 +48,8 @@ export default function MyOnboardingPage() {
       <div className="space-y-6">
         <PageHeader title={t("nav.myOnboarding")} />
         <EmptyState
-          title="No onboarding record found"
-          description="Your onboarding record has not been created yet. Please contact your manager."
+          title={t("onboarding.noRecordFound")}
+          description={t("onboarding.noRecordDescription")}
         />
       </div>
     );
@@ -127,7 +127,7 @@ export default function MyOnboardingPage() {
         </div>
 
         <div className="space-y-6">
-          <Card title="Application Status">
+          <Card title={t("onboarding.applicationStatus")}>
             <div className="p-4 space-y-4">
               <div className="flex items-center gap-3">
                 <div className={`p-2 rounded-full ${isSubmitted || isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>

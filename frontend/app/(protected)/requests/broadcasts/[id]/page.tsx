@@ -177,7 +177,7 @@ export default function BroadcastDetailPage() {
               value={`${request.shift_start_time}–${request.shift_end_time}`}
             />
             <DataRow
-              label="Hourly rate"
+              label={t("fields.hourlyRate")}
               value={
                 request.hourly_rate != null
                   ? `${request.hourly_rate} ${request.currency}`
@@ -185,7 +185,7 @@ export default function BroadcastDetailPage() {
               }
             />
             <DataRow
-              label="Published"
+              label={t("requests.published")}
               value={request.published_at ? formatDateTime(request.published_at) : "—"}
             />
           </DataList>

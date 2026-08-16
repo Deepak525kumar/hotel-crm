@@ -91,7 +91,7 @@ function NewCalendarEntryForm() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="Place worker on calendar"
+          title={t("assignments.placeOnCalendarTitle")}
           description="Directly confirm a worker for a hotel and day — no broadcast, no accept step."
         />
       </div>

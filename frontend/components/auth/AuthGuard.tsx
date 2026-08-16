@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth";
 import { useMe } from "@/hooks/useAuth";
+import { useTranslation } from "react-i18next";
 
 /**
  * Client-side route guard. Renders a loading state while the persisted
@@ -11,6 +12,7 @@ import { useMe } from "@/hooks/useAuth";
  * otherwise renders the protected tree (while revalidating `/auth/me`).
  */
 export function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
 
@@ -27,7 +29,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <span
-          aria-label="Loading"
+          aria-label={t("common.loadingLabel")}
           className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-500"
         />
       </div>

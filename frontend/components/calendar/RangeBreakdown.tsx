@@ -4,6 +4,7 @@ import { Badge, Card, CardContent, CardHeader, CardTitle, EmptyState, Skeleton, 
 import { FULL_DAY_LABEL, toDateKey, type CalendarView } from "@/lib/calendar";
 import { isActivePlacement } from "@/lib/types";
 import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /** A day's placements/absences regrouped by hotel, for the breakdown panel. */
 interface HotelDayBucket {
@@ -45,6 +46,7 @@ export function RangeBreakdown({
   canSeeAbsences: boolean;
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
+  const { t } = useTranslation();
   // Only days that actually have something to show. In month view this keeps
   // a 42-cell range from rendering 42 mostly-empty sections.
   // Cancelled placements are returned by the API on purpose (so the grid can
@@ -87,15 +89,15 @@ export function RangeBreakdown({
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatTile label="Placements" value={String(totalPlacements)} />
-          <StatTile label="Workers placed" value={String(distinctWorkers)} />
-          {canSeeAbsences && <StatTile label="Sick" value={String(sickCount)} />}
-          {canSeeAbsences && <StatTile label="On vacation" value={String(vacationCount)} />}
+          <StatTile label={t("calendar.placements")} value={String(totalPlacements)} />
+          <StatTile label={t("calendar.workersPlaced")} value={String(distinctWorkers)} />
+          {canSeeAbsences && <StatTile label={t("calendar.sick")} value={String(sickCount)} />}
+          {canSeeAbsences && <StatTile label={t("calendar.onVacation")} value={String(vacationCount)} />}
         </div>
 
         {activeDays.length === 0 ? (
           <EmptyState
-            title="Nothing scheduled"
+            title={t("calendar.nothingScheduled")}
             description={
               view === "day"
                 ? "No placements or absences recorded for this day."

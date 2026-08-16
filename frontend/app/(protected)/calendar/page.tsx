@@ -630,7 +630,7 @@ function DayCell({
             <button
               type="button"
               onClick={onMarkAbsence}
-              title="Mark a worker absent on this day"
+              title={t("calendar.markAbsentTitle")}
               aria-label={`Mark a worker absent on ${dayKey}`}
               className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-amber-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-amber-400"
             >
@@ -1140,13 +1140,13 @@ function AddEntryModal({
         )}
         <Input label={t("common.day")} type="date" value={day} readOnly disabled />
         <Checkbox
-          label="Repeat weekly"
+          label={t("calendar.repeatWeekly")}
           checked={repeatWeekly}
           onChange={(e) => setRepeatWeekly(e.target.checked)}
         />
         {repeatWeekly && (
           <Input
-            label="Number of weeks"
+            label={t("calendar.numberOfWeeks")}
             type="number"
             min={1}
             max={MAX_RECURRING_OCCURRENCES}
@@ -1433,7 +1433,7 @@ function RoomsCompletedSection({
             onChange={(e) => setRooms(e.target.value)}
           />
           <Textarea
-            label="Notes (optional)"
+            label={t("fields.notesOptional")}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             maxLength={1000}

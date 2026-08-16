@@ -124,7 +124,7 @@ export default function WorkRequestDetailPage() {
               }
             />
             <DataRow
-              label="Created by"
+              label={t("profile.createdBy")}
               value={
                 <UserRef userId={request.created_by_id} fallback="A manager" />
               }
@@ -139,7 +139,7 @@ export default function WorkRequestDetailPage() {
               value={`${request.workers_confirmed}/${request.workers_needed} confirmed`}
             />
             <DataRow
-              label="Hourly rate"
+              label={t("fields.hourlyRate")}
               value={
                 request.hourly_rate != null
                   ? `${request.hourly_rate} ${request.currency}`
@@ -147,7 +147,7 @@ export default function WorkRequestDetailPage() {
               }
             />
             <DataRow
-              label="Published"
+              label={t("requests.published")}
               value={
                 request.published_at
                   ? formatDateTime(request.published_at)
@@ -155,11 +155,11 @@ export default function WorkRequestDetailPage() {
               }
             />
             {request.expires_at && (
-              <DataRow label="Expires" value={formatDateTime(request.expires_at)} />
+              <DataRow label={t("requests.expires")} value={formatDateTime(request.expires_at)} />
             )}
             {request.cancellation_reason && (
               <DataRow
-                label="Cancellation reason"
+                label={t("requests.cancellationReason")}
                 value={request.cancellation_reason}
               />
             )}
@@ -240,7 +240,7 @@ export default function WorkRequestDetailPage() {
         onClose={() => {
           if (!action.isPending("cancel")) setCancelOpen(false);
         }}
-        title="Cancel work request"
+        title={t("requests.cancelTitle")}
         footer={
           <>
             <Button
@@ -261,12 +261,12 @@ export default function WorkRequestDetailPage() {
         }
       >
         <Textarea
-          label="Reason (optional)"
+          label={t("fields.reasonOptional")}
           value={cancelReason}
           onChange={(e) => setCancelReason(e.target.value)}
           maxLength={500}
           rows={4}
-          placeholder="Share why this work request was cancelled."
+          placeholder={t("requests.cancelPlaceholder")}
         />
       </Modal>
     </div>

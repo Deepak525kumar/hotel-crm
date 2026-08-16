@@ -176,12 +176,12 @@ export default function NotificationDetailPage() {
               label={t("fields.type")}
               value={notificationTypeLabel(notification.type)}
             />
-            <DataRow label="Channel" value={notification.channel} />
+            <DataRow label={t("notifications.channel")} value={notification.channel} />
             <DataRow
               label={t("status.received")}
               value={formatDateTime(notification.created_at)}
             />
-            <DataRow label="Read at" value={formatDateTime(notification.read_at)} />
+            <DataRow label={t("notifications.readAt")} value={formatDateTime(notification.read_at)} />
             {notification.hotel_id && (
               <DataRow
                 label={t("fields.hotel")}

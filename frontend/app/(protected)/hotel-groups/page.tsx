@@ -46,7 +46,7 @@ export default function HotelGroupsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.hotelGroups")}
-        description="Regional groupings that scope managers and billing."
+        description={t("hotelGroups.pageDescription")}
         actions={
           <RoleGate allow={["admin"]}>
             <Link href="/hotel-groups/new">
@@ -77,8 +77,8 @@ export default function HotelGroupsPage() {
                   <tr>
                     <TD colSpan={columns} className="p-0">
                       <EmptyState
-                        title="No hotel groups yet"
-                        description="Groups let you assign a regional manager across several hotels."
+                        title={t("hotelGroups.noneYet")}
+                        description={t("hotelGroups.noneYetDescription")}
                       />
                     </TD>
                   </tr>

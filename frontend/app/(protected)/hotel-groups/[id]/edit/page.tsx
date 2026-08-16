@@ -10,8 +10,10 @@ import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
 import type { HotelGroupFormValues } from "@/components/hotels/HotelGroupForm";
 import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateHotelGroupInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function EditHotelGroup() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -54,7 +56,7 @@ function EditHotelGroup() {
         >
           ← Back to hotel group
         </TextLink>
-        <PageHeader className="mt-2" title="Edit hotel group" />
+        <PageHeader className="mt-2" title={t("hotelGroups.editTitle")} />
       </div>
 
       {error ? (

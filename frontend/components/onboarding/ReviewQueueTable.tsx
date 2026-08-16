@@ -191,7 +191,7 @@ export function ReviewQueueTable() {
               Failed to load the review queue. Please try again.
             </div>
           ) : (
-            <Table aria-label="Review queue">
+            <Table aria-label={t("nav.reviewQueue")}>
               <THead>
                 <tr>
                   <TH>{t("users.applicant")}</TH>
@@ -208,8 +208,8 @@ export function ReviewQueueTable() {
                   <tr>
                     <TD colSpan={columns} className="p-0">
                       <EmptyState
-                        title="Review queue empty"
-                        description="There are no applications waiting for your review."
+                        title={t("onboarding.reviewQueueEmpty")}
+                        description={t("onboarding.reviewQueueEmptyDescription")}
                       />
                     </TD>
                   </tr>
@@ -259,7 +259,7 @@ export function ReviewQueueTable() {
               <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[selectedRecord.employment_type]} />
               {selectedRecord.created_by && (
                 <DataRow
-                  label="Created by"
+                  label={t("profile.createdBy")}
                   value={`${selectedRecord.created_by.first_name} ${selectedRecord.created_by.last_name} (${roleLabel(selectedRecord.created_by.role)})`}
                 />
               )}
@@ -373,7 +373,7 @@ export function ReviewQueueTable() {
       <Modal
         open={!!assignRecord}
         onClose={() => setAssignRecord(null)}
-        title="Assign approved employee"
+        title={t("onboarding.assignApprovedEmployee")}
       >
         {assignRecord && (
           <div className="mt-4 space-y-6">
@@ -383,7 +383,7 @@ export function ReviewQueueTable() {
             </p>
             {assignRecord.user?.role === "MANAGER" ? (
               <Select
-                label="Primary hotel"
+                label={t("fields.primaryHotel")}
                 value={assignTarget}
                 onChange={(e) => setAssignTarget(e.target.value)}
                 disabled={hotelsLoading}
@@ -394,7 +394,7 @@ export function ReviewQueueTable() {
               />
             ) : (
               <Select
-                label="Hotel group"
+                label={t("fields.hotelGroup")}
                 value={assignTarget}
                 onChange={(e) => setAssignTarget(e.target.value)}
                 disabled={groupsLoading}
@@ -419,14 +419,14 @@ export function ReviewQueueTable() {
       <Modal
         open={rejectModalOpen}
         onClose={() => !rejectAction.pending && setRejectModalOpen(false)}
-        title="Reject application"
+        title={t("onboarding.rejectApplication")}
       >
         <div className="mt-4 space-y-4">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             This reason is sent to the applicant.
           </p>
           <Textarea
-            label="Rejection reason"
+            label={t("onboarding.rejectionReason")}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
             placeholder="e.g. Invalid document uploaded"

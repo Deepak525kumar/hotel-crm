@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SidebarNav } from "@/components/layout/SidebarNav";
 import { NotificationsBell } from "@/components/layout/NotificationsBell";
 import { cn } from "@/lib/cn";
+import { useTranslation } from "react-i18next";
 
 /**
  * `collapsed` swaps the full wordmark for just the initial, matching the
@@ -42,6 +43,7 @@ const BrandMark = ({ collapsed = false }: { collapsed?: boolean }) => (
 );
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -145,7 +147,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="fixed inset-0 z-50 md:hidden"
           role="dialog"
           aria-modal="true"
-          aria-label="Navigation"
+          aria-label={t("common.navigation")}
         >
           <div
             className="absolute inset-0 bg-black/50 dark:bg-black/70"
@@ -168,7 +170,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             ref={menuButtonRef}
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            aria-label="Open navigation"
+            aria-label={t("common.openNavigation")}
             aria-expanded={mobileNavOpen}
             className="-ms-1 rounded-md p-2 text-gray-600 hover:bg-gray-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-400 dark:hover:bg-gray-800 md:hidden"
           >

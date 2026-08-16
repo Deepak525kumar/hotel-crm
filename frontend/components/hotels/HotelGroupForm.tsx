@@ -10,6 +10,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { HotelGroup } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export interface HotelGroupFormValues {
   name: string;
@@ -50,6 +51,7 @@ export function HotelGroupForm({
   onSubmit,
   onCancel,
 }: HotelGroupFormProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<HotelGroupFormValues>(() => toValues(group));
 
   const set = <K extends keyof HotelGroupFormValues>(
@@ -73,7 +75,7 @@ export function HotelGroupForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Group name"
+            label={t("fields.groupName")}
             required
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
@@ -81,7 +83,7 @@ export function HotelGroupForm({
           />
 
           <Textarea
-            label="Billing info (optional)"
+            label={t("fields.billingInfoOptional")}
             rows={3}
             value={form.billing_info}
             onChange={(e) => set("billing_info", e.target.value)}

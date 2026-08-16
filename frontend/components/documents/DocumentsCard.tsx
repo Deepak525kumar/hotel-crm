@@ -63,6 +63,7 @@ function DocumentRow({
   canEdit: boolean;
   onDeleted: () => void;
 }) {
+  const { t } = useTranslation();
   const action = useAsyncAction();
 
   // 2026-08-13 (worker edit/replace fix): delete-then-reupload is how
@@ -104,7 +105,7 @@ function DocumentRow({
             View
           </a>
         ) : (
-          <span className="text-sm text-gray-400 dark:text-gray-500" title="Storage not configured in this environment">
+          <span className="text-sm text-gray-400 dark:text-gray-500" title={t("documents.storageNotConfigured")}>
             Unavailable
           </span>
         )}
@@ -187,7 +188,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
         <CardContent>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4 dark:border-gray-800">
             <Checkbox
-              label="Evaluate with work permit required"
+              label={t("documents.evaluateWorkPermitRequired")}
               checked={workPermitRequired}
               onChange={(e) => setWorkPermitRequired(e.target.checked)}
             />
@@ -211,7 +212,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
             </div>
           ) : !documents || documents.length === 0 ? (
             <EmptyState
-              title="No documents"
+              title={t("documents.noDocuments")}
               description={
                 canUpload
                   ? "Upload your identity and work-permit documents."
@@ -253,6 +254,7 @@ function UploadDocumentModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState<DocumentCategory>("ID_CARD");
   const [isWorkPermit, setIsWorkPermit] = useState(false);
@@ -313,7 +315,7 @@ function UploadDocumentModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Upload document"
+      title={t("documents.uploadTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={upload.pending}>
@@ -327,7 +329,7 @@ function UploadDocumentModal({
     >
       <div className="space-y-4">
         <Select
-          label="Category"
+          label={t("fields.category")}
           value={category}
           onChange={(e) => setCategory(e.target.value as DocumentCategory)}
           options={[
@@ -338,14 +340,14 @@ function UploadDocumentModal({
 
         {category === "WORK_PERMIT" && (
           <Checkbox
-            label="Non-EU/EEA/Swiss work-permit document"
+            label={t("documents.nonEuWorkPermit")}
             checked={isWorkPermit}
             onChange={(e) => setIsWorkPermit(e.target.checked)}
           />
         )}
 
         <Input
-          label="Expiry date (optional)"
+          label={t("fields.expiryDateOptional")}
           type="date"
           value={expiresAt}
           onChange={(e) => setExpiresAt(e.target.value)}

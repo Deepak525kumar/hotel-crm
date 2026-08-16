@@ -65,7 +65,7 @@ export default function HotelsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.hotels")}
-        description="Properties staffed through the platform."
+        description={t("hotels.pageDescription")}
         actions={
           <HotelWriteGate>
             <Link href="/hotels/new">
@@ -118,7 +118,7 @@ export default function HotelsPage() {
                   <tr>
                     <TD colSpan={columns} className="p-0">
                       <EmptyState
-                        title="No hotels found"
+                        title={t("hotels.noneFound")}
                         description={
                           search || active
                             ? "Try adjusting your search or filters."

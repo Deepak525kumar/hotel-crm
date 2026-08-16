@@ -176,12 +176,12 @@ function UserDetail() {
                 <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
                 {user.role === "worker" && availability && (
                   <DataRow
-                    label="Availability"
+                    label={t("users.availability")}
                     value={<AvailabilityBadge available={availability.available} />}
                   />
                 )}
-                <DataRow label="Created" value={formatDateTime(user.created_at)} />
-                <DataRow label="Updated" value={formatDateTime(user.updated_at)} />
+                <DataRow label={t("fields.created")} value={formatDateTime(user.created_at)} />
+                <DataRow label={t("fields.updated")} value={formatDateTime(user.updated_at)} />
               </DataList>
             </CardContent>
           </Card>
@@ -333,7 +333,7 @@ function UserDetail() {
       <Modal
         open={confirmOpen}
         onClose={() => !deactivate.pending && setConfirmOpen(false)}
-        title="Deactivate account"
+        title={t("users.deactivateAccountTitle")}
         footer={
           <>
             <Button
@@ -362,7 +362,7 @@ function UserDetail() {
       <Modal
         open={revokeConfirmOpen}
         onClose={() => !revokeSessions.pending && setRevokeConfirmOpen(false)}
-        title="Revoke all sessions"
+        title={t("users.revokeSessionsTitle")}
         footer={
           <>
             <Button

@@ -37,7 +37,10 @@
     "thisMonth": "Ce mois-ci",
     "quickLinks": "Liens rapides",
     "permissions": "Autorisations",
-    "coordinates": "Coordonnées"
+    "coordinates": "Coordonnées",
+    "loadingLabel": "Chargement",
+    "navigation": "Navigation",
+    "openNavigation": "Ouvrir la navigation"
   },
   "fields": {
     "name": "Nom",
@@ -68,7 +71,58 @@
     "employment": "Emploi",
     "employmentType": "Type de contrat",
     "requirements": "Exigences",
-    "staffing": "Effectifs"
+    "staffing": "Effectifs",
+    "address": "Adresse",
+    "city": "Ville",
+    "country": "Pays",
+    "hotelGroup": "Groupe hôtelier",
+    "geofence": "Géorepérage",
+    "reason": "Motif",
+    "reasonOptional": "Motif (facultatif)",
+    "notesOptional": "Notes (facultatif)",
+    "commentOptional": "Commentaire (facultatif)",
+    "created": "Créé le",
+    "updated": "Mis à jour",
+    "category": "Catégorie",
+    "currency": "Devise",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "primaryHotel": "Hôtel principal",
+    "primaryHotelOptional": "Hôtel principal (facultatif)",
+    "groupName": "Nom du groupe",
+    "employeeId": "Identifiant employé",
+    "templateId": "Identifiant du modèle",
+    "channel": "Canal",
+    "readAt": "Lu le",
+    "memberSince": "Membre depuis",
+    "owner": "Propriétaire",
+    "application": "Application",
+    "version": "Version",
+    "build": "Build",
+    "show": "Afficher",
+    "expiryDateOptional": "Date d'expiration (facultative)",
+    "periodStart": "Début de la période",
+    "periodEnd": "Fin de la période",
+    "phoneOptional": "Téléphone (facultatif)",
+    "startTime": "Heure de début",
+    "endTime": "Heure de fin",
+    "hourlyRate": "Taux horaire",
+    "hourlyRateOptional": "Taux horaire (facultatif)",
+    "descriptionOptional": "Description (facultative)",
+    "requirementsOptional": "Exigences (facultatives)",
+    "endDateOptional": "Date de fin (facultative)",
+    "streetAndNumber": "Rue et numéro",
+    "billingInfo": "Informations de facturation",
+    "billingInfoOptional": "Informations de facturation (facultatives)",
+    "assignedHotel": "Hôtel attribué",
+    "assignedHotelGroup": "Groupe hôtelier attribué",
+    "temporaryPassword": "Mot de passe temporaire",
+    "newPassword": "Nouveau mot de passe",
+    "firstName": "Prénom",
+    "lastName": "Nom de famille",
+    "workersNeeded": "Employés requis",
+    "requiresWorkPermit": "Nécessite un permis de travail (hors UE/EEE/Suisse)",
+    "activeCanSignIn": "Actif (peut se connecter à la plateforme)"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -90,12 +144,12 @@
     "logout": "Se déconnecter",
     "home": "Accueil",
     "myShifts": "Mes services",
-    "docs": "Documents",
     "leaderboard": "Classement",
     "marketplace": "Bourse d'emplois",
-    "explore": "Explorer",
     "myOnboarding": "Mon intégration",
-    "reviewQueue": "File de validation"
+    "reviewQueue": "File de validation",
+    "docs": "Documents",
+    "explore": "Explorer"
   },
   "roles": {
     "admin": "Administrateur",
@@ -131,7 +185,8 @@
     "logged": "Enregistré",
     "notYetLogged": "Pas encore enregistré.",
     "awaitingSignature": "En attente de signature",
-    "alreadyFilled": "Déjà pourvu"
+    "alreadyFilled": "Déjà pourvu",
+    "inProgress": "En cours"
   },
   "assignments": {
     "shiftDetails": "Détails du service",
@@ -157,6 +212,24 @@
     "placeWorker": "Affecter un employé",
     "calendarPlacement": "Placement au calendrier",
     "roomsCompleted": "Chambres terminées",
+    "source": "Source",
+    "requestedPosition": "Poste demandé",
+    "shift": "Service",
+    "assignedBy": "Attribué par",
+    "started": "Commencé",
+    "cancellationReason": "Motif d'annulation",
+    "cancelTitle": "Annuler l'affectation",
+    "reassignTitle": "Réaffecter à un autre employé",
+    "searchWorkersAtHotel": "Rechercher des employés de cet hôtel",
+    "logRoomsCompletedTitle": "Enregistrer les chambres terminées",
+    "verifyTitle": "Vérifier l'affectation",
+    "rateWorkerTitle": "Évaluer l'employé",
+    "placeOnCalendarTitle": "Placer l'employé sur le calendrier",
+    "calendarPlacementsTitle": "Placements au calendrier",
+    "noCalendarPlacements": "Aucun placement au calendrier trouvé",
+    "noCalendarPlacementsDescription": "Placez un employé directement sur le calendrier pour le voir ici.",
+    "pageDescription": "Employés confirmés et les services sur lesquels ils sont affectés.",
+    "noneFound": "Aucune affectation trouvée",
     "unavailable": "Indisponible",
     "conflictSick": "Congé maladie",
     "conflictVacation": "En congés",
@@ -178,7 +251,9 @@
     "about": "À propos",
     "comingSoon": "Bientôt disponible",
     "themeSystemNote": "Système suit le réglage de votre appareil.",
-    "localDevBuild": "Build de développement local"
+    "localDevBuild": "Build de développement local",
+    "pageDescription": "Vos préférences de compte, de session et d'application.",
+    "signedInAs": "Connecté en tant que"
   },
   "auth": {
     "login": "Se connecter",
@@ -260,7 +335,12 @@
     "categoryGENERAL": "Général",
     "categoryWORK_PERMIT": "Permis de travail",
     "upload": "Téléverser",
-    "retryUpload": "Réessayer le téléversement"
+    "retryUpload": "Réessayer le téléversement",
+    "storageNotConfigured": "Stockage non configuré dans cet environnement",
+    "evaluateWorkPermitRequired": "Évaluer avec permis de travail requis",
+    "noDocuments": "Aucun document",
+    "uploadTitle": "Téléverser un document",
+    "nonEuWorkPermit": "Document de permis de travail hors UE/EEE/Suisse"
   },
   "hr": {
     "title": "RH et paie",
@@ -274,7 +354,13 @@
     "signedContract": "Contrat signé",
     "contractExpired": "Contrat expiré",
     "noSignedContract": "Contrat signé pas encore au dossier",
-    "loadContractFailed": "Impossible de charger votre contrat."
+    "loadContractFailed": "Impossible de charger votre contrat.",
+    "noContract": "Aucun contrat",
+    "signatureConfirmed": "Signature confirmée",
+    "createContractTitle": "Créer un contrat",
+    "noPayslipRequests": "Aucune demande de bulletin de paie",
+    "noPayslipRequestsDescription": "Les demandes apparaissent ici dès que l'employé demande un bulletin de paie, ou qu'un responsable en crée un en son nom.",
+    "newPayslipRequestTitle": "Nouvelle demande de bulletin de paie"
   },
   "consent": {
     "title": "Consentement à la protection des données",
@@ -284,11 +370,16 @@
     "withdraw": "Retirer",
     "reviewAgain": "Revoir",
     "reviewNotice": "Consulter l'avis",
-    "loadFailed": "Impossible de charger votre statut de consentement."
+    "loadFailed": "Impossible de charger votre statut de consentement.",
+    "history": "Historique des consentements",
+    "auditTrail": "Piste d'audit"
   },
   "notifications": {
     "title": "Notifications",
-    "none": "Aucune notification."
+    "none": "Aucune notification.",
+    "channel": "Canal",
+    "readAt": "Lu le",
+    "noneFound": "Aucune notification trouvée"
   },
   "leaderboard": {
     "none": "Aucune donnée de classement.",
@@ -300,7 +391,9 @@
     "createdBy": "Créé par",
     "directManager": "Responsable direct",
     "signOut": "Se déconnecter",
-    "noAbsences": "Aucun jour de maladie ou de congé enregistré."
+    "noAbsences": "Aucun jour de maladie ou de congé enregistré.",
+    "editTitle": "Modifier le profil",
+    "resetPasswordTitle": "Réinitialiser le mot de passe"
   },
   "skills": {
     "CLEANER": "Agent d'entretien",
@@ -316,7 +409,18 @@
     "noSummary": "Aucun résumé pour cette journée.",
     "loadFailed": "Impossible de charger le calendrier. Veuillez réessayer.",
     "assignedOrOnLeave": "Affecté ou en congé aujourd'hui",
-    "freeToday": "Libre aujourd'hui"
+    "freeToday": "Libre aujourd'hui",
+    "markAbsentTitle": "Marquer un employé absent ce jour-là",
+    "repeatWeekly": "Répéter chaque semaine",
+    "numberOfWeeks": "Nombre de semaines",
+    "noAbsencesRecorded": "Aucune absence enregistrée",
+    "noAbsencesDescription": "Les jours de maladie et congés que vous signalez apparaissent ici.",
+    "markAbsence": "Signaler une absence",
+    "placements": "Placements",
+    "workersPlaced": "Employés placés",
+    "sick": "Malade",
+    "onVacation": "En congé",
+    "nothingScheduled": "Rien de prévu"
   },
   "hotels": {
     "inThisGroup": "Hôtels de ce groupe",
@@ -325,7 +429,15 @@
     "new": "Nouvel hôtel",
     "newGroup": "Nouveau groupe",
     "noGroup": "Aucun groupe hôtelier attribué",
-    "orgChart": "Organigramme"
+    "orgChart": "Organigramme",
+    "noDeleted": "Aucun hôtel supprimé",
+    "noDeletedDescription": "Les hôtels supprimés apparaissent ici et peuvent être restaurés.",
+    "editTitle": "Modifier l'hôtel",
+    "newDescription": "Ajoutez un établissement. L'attribution du groupe et du responsable est facultative ici et peut aussi être définie plus tard.",
+    "pageDescription": "Établissements dotés en personnel via la plateforme.",
+    "noneFound": "Aucun hôtel trouvé",
+    "activeVisibleForStaffing": "Actif (visible par les employés et ouvert à la dotation en personnel)",
+    "acceptingNewWorkRequests": "Accepte de nouvelles demandes de travail"
   },
   "users": {
     "new": "Nouvel utilisateur",
@@ -336,7 +448,18 @@
     "applicant": "Candidat",
     "yourAccount": "Votre compte",
     "accountSettings": "Paramètres du compte",
-    "exportMyData": "Exporter mes données"
+    "exportMyData": "Exporter mes données",
+    "editTitle": "Modifier l'utilisateur",
+    "availability": "Disponibilité",
+    "deactivateAccountTitle": "Désactiver le compte",
+    "revokeSessionsTitle": "Révoquer toutes les sessions",
+    "newTitle": "Nouvel utilisateur",
+    "newDescription": "Créez un compte et définissez un rôle initial. Son intégration démarre automatiquement.",
+    "pageDescription": "Personnes ayant accès à la plateforme.",
+    "noneFound": "Aucun utilisateur trouvé",
+    "managesHotel": "Gère l'hôtel",
+    "managesGroup": "Gère le groupe",
+    "editAssignmentTitle": "Modifier l'affectation"
   },
   "requests": {
     "title": "Demande de travail",
@@ -344,7 +467,21 @@
     "newBroadcast": "Nouvelle diffusion",
     "acceptedWorkers": "Employés acceptés",
     "noneAccepted": "Aucun employé n'a encore accepté cette diffusion.",
-    "notAcceptingNew": "N'accepte pas de nouvelles demandes de travail"
+    "notAcceptingNew": "N'accepte pas de nouvelles demandes de travail",
+    "createdBy": "Créé par",
+    "published": "Publié",
+    "expires": "Expire",
+    "cancellationReason": "Motif d'annulation",
+    "cancelTitle": "Annuler la demande de travail",
+    "cancelPlaceholder": "Indiquez pourquoi cette demande de travail a été annulée.",
+    "broadcastDescription": "Proposez un service à tous les employés éligibles en même temps. Le premier à accepter pour une compétence obtient la place.",
+    "broadcastsDescription": "Services proposés à tous les employés éligibles en même temps. La première acceptation par compétence l'emporte.",
+    "noBroadcastsFound": "Aucune diffusion trouvée",
+    "noBroadcastsDescription": "Lancez une diffusion pour ouvrir un service à tous les employés éligibles.",
+    "newTitle": "Nouvelle demande de travail",
+    "newDescription": "Enregistrez comme brouillon, ou publiez immédiatement pour l'ouvrir à la dotation en personnel.",
+    "pageDescription": "Services ouverts à la dotation en personnel dans vos hôtels.",
+    "noneFound": "Aucune demande de travail trouvée"
   },
   "onboarding": {
     "managerReview": "Validation par le responsable",
@@ -377,11 +514,75 @@
         "label": "Inactif",
         "description": "Votre dossier d'emploi n'est pas actif actuellement."
       }
-    }
+    },
+    "noRecordFound": "Aucun dossier d'intégration trouvé",
+    "noRecordDescription": "Votre dossier d'intégration n'a pas encore été créé. Veuillez contacter votre responsable.",
+    "applicationStatus": "Statut de la candidature",
+    "reviewQueueTitle": "File de validation",
+    "reviewQueueDescription": "Candidatures soumises par votre équipe, en attente de votre validation.",
+    "reviewQueueEmpty": "File de validation vide",
+    "reviewQueueEmptyDescription": "Aucune candidature n'est en attente de votre validation.",
+    "assignApprovedEmployee": "Affecter l'employé approuvé",
+    "rejectApplication": "Rejeter la candidature",
+    "rejectionReason": "Motif de rejet"
   },
   "analytics": {
     "myPerformance": "Mes performances",
     "avgRating": "Note moyenne",
-    "recentRatings": "Évaluations récentes"
+    "recentRatings": "Évaluations récentes",
+    "description": "Performance opérationnelle en matière de personnel, de présence et de qualité.",
+    "scope": "Périmètre",
+    "openRequests": "Demandes ouvertes",
+    "onTimeRate": "Taux de ponctualité",
+    "qualityPassRate": "Taux de réussite qualité",
+    "noShows": "Absences non signalées",
+    "completedShifts": "Services terminés",
+    "totalShifts": "Total des services",
+    "averageRating": "Note moyenne",
+    "attendanceRate": "Taux de présence",
+    "noRankedWorkers": "Aucun employé classé pour le moment",
+    "noRankedWorkersDescription": "Les classements apparaissent une fois que les employés ont terminé des missions.",
+    "shifts": "Services"
+  },
+  "hotelGroups": {
+    "noDeleted": "Aucun groupe hôtelier supprimé",
+    "noDeletedDescription": "Les groupes supprimés apparaissent ici et peuvent être restaurés.",
+    "editTitle": "Modifier le groupe hôtelier",
+    "noHotelsInGroup": "Aucun hôtel dans ce groupe",
+    "assignHotelsHint": "Attribuez des hôtels à ce groupe depuis l'écran de modification d'un hôtel.",
+    "noEmployees": "Aucun employé dans ce groupe",
+    "noEmployeesDescription": "Les employés apparaissent ici dès qu'ils ont un dossier d'emploi dans l'un des hôtels de ce groupe.",
+    "employeesInGroup": "Employés de ce groupe",
+    "billingInfo": "Informations de facturation",
+    "noHotelsAssigned": "Aucun hôtel attribué",
+    "newTitle": "Nouveau groupe hôtelier",
+    "newDescription": "Regroupez des hôtels sous une même région. Attribuez un responsable régional depuis sa page utilisateur.",
+    "pageDescription": "Regroupements régionaux qui définissent la portée des responsables et de la facturation.",
+    "noneYet": "Aucun groupe hôtelier pour le moment",
+    "noneYetDescription": "Les groupes permettent d'attribuer un responsable régional à plusieurs hôtels."
+  },
+  "attendance": {
+    "expectedStart": "Début prévu",
+    "expectedEnd": "Fin prévue",
+    "minutesLate": "Minutes de retard",
+    "minutesWorked": "Minutes travaillées",
+    "verifiedBy": "Vérifié par",
+    "verifiedAt": "Vérifié le",
+    "reviewTitle": "Vérifier la présence",
+    "markVerified": "Marquer comme vérifié",
+    "pageDescription": "Statut de pointage d'arrivée, de départ et de vérification pour les services dotés en personnel.",
+    "records": "Registres de présence",
+    "noneFound": "Aucun registre de présence trouvé"
+  },
+  "employees": {
+    "noBlocked": "Aucun employé bloqué",
+    "noBlockedDescription": "Les employés bloqués pour affectation dans cet hôtel apparaissent ici.",
+    "addToBlocklistTitle": "Ajouter à la liste de blocage",
+    "employmentCycle": "Cycle d'emploi",
+    "deactivationReason": "Motif de désactivation",
+    "approveForWorkTitle": "Approuver pour le travail",
+    "deactivateTemporaryTitle": "Désactiver (pause temporaire)",
+    "deleteLeftCompanyTitle": "Supprimer (a quitté l'entreprise)",
+    "editSkillsTitle": "Modifier les compétences"
   }
 }

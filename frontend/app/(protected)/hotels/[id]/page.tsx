@@ -107,12 +107,12 @@ export default function HotelDetailPage() {
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
-                <DataRow label="Address" value={hotel.address} />
-                <DataRow label="City" value={hotel.city} />
-                <DataRow label="Country" value={hotel.country} />
+                <DataRow label={t("fields.address")} value={hotel.address} />
+                <DataRow label={t("fields.city")} value={hotel.city} />
+                <DataRow label={t("fields.country")} value={hotel.country} />
                 <DataRow label={t("fields.timezone")} value={hotel.timezone} />
                 <DataRow
-                  label="Hotel group"
+                  label={t("fields.hotelGroup")}
                   value={
                     hotel.hotel_group_id ? (
                       <TextLink
@@ -167,7 +167,7 @@ export default function HotelDetailPage() {
                   }
                 />
                 <DataRow
-                  label="Geofence"
+                  label={t("fields.geofence")}
                   value={
                     hotel.latitude != null && hotel.longitude != null ? (
                       <span className="text-green-700 dark:text-green-400">
@@ -180,8 +180,8 @@ export default function HotelDetailPage() {
                     )
                   }
                 />
-                <DataRow label="Created" value={formatDateTime(hotel.created_at)} />
-                <DataRow label="Updated" value={formatDateTime(hotel.updated_at)} />
+                <DataRow label={t("fields.created")} value={formatDateTime(hotel.created_at)} />
+                <DataRow label={t("fields.updated")} value={formatDateTime(hotel.updated_at)} />
               </DataList>
             </CardContent>
           </Card>

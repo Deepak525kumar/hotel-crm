@@ -82,7 +82,7 @@ function UsersDirectory() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.users")}
-        description="People with access to the platform."
+        description={t("users.pageDescription")}
         actions={
           // RULE A (project-owner decision, 2026-08-12): create is
           // 1-level-down, so manager/RM may create too — each limited to its
@@ -148,7 +148,7 @@ function UsersDirectory() {
                   <tr>
                     <TD colSpan={columns} className="p-0">
                       <EmptyState
-                        title="No users found"
+                        title={t("users.noneFound")}
                         description={
                           search || role || active
                             ? "Try adjusting your search or filters."

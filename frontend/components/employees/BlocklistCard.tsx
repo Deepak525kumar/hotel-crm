@@ -73,8 +73,8 @@ export function BlocklistCard({ hotelId }: { hotelId: string }) {
             </div>
           ) : !entries || entries.length === 0 ? (
             <EmptyState
-              title="No blocked employees"
-              description="Employees blocked from assignment at this hotel appear here."
+              title={t("employees.noBlocked")}
+              description={t("employees.noBlockedDescription")}
             />
           ) : (
             <ul>
@@ -100,6 +100,7 @@ function AddBlocklistEntryModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [employeeId, setEmployeeId] = useState("");
   const [reason, setReason] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -144,7 +145,7 @@ function AddBlocklistEntryModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Add to blocklist"
+      title={t("employees.addToBlocklistTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
@@ -158,12 +159,12 @@ function AddBlocklistEntryModal({
     >
       <div className="space-y-4">
         <Input
-          label="Employee ID"
+          label={t("fields.employeeId")}
           hint="The Employee Management employee ID (EmploymentRecord.employee_id) — not this person's account/user ID."
           value={employeeId}
           onChange={(e) => setEmployeeId(e.target.value)}
         />
-        <Input label="Reason" value={reason} onChange={(e) => setReason(e.target.value)} />
+        <Input label={t("fields.reason")} value={reason} onChange={(e) => setReason(e.target.value)} />
         <FormError>{fieldError ?? create.error}</FormError>
       </div>
     </Modal>

@@ -158,22 +158,22 @@ export function HotelForm({
           />
 
           <Input
-            label="Address"
+            label={t("fields.address")}
             required
             value={form.address}
             onChange={(e) => set("address", e.target.value)}
-            placeholder="Street and number"
+            placeholder={t("fields.streetAndNumber")}
           />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="City"
+              label={t("fields.city")}
               required
               value={form.city}
               onChange={(e) => set("city", e.target.value)}
             />
             <Input
-              label="Country"
+              label={t("fields.country")}
               required
               value={form.country}
               onChange={(e) => set("country", e.target.value)}
@@ -188,7 +188,7 @@ export function HotelForm({
               options={TIMEZONES.map((tz) => ({ value: tz, label: tz }))}
             />
             <Select
-              label="Hotel group"
+              label={t("fields.hotelGroup")}
               hint={mode === "create" ? "Optional — can also be assigned later." : undefined}
               value={form.hotel_group_id}
               onChange={(e) => set("hotel_group_id", e.target.value)}
@@ -212,12 +212,12 @@ export function HotelForm({
           {mode === "edit" && (
             <>
               <Checkbox
-                label="Active (visible to workers and open for staffing)"
+                label={t("hotels.activeVisibleForStaffing")}
                 checked={form.is_active}
                 onChange={(e) => set("is_active", e.target.checked)}
               />
               <Checkbox
-                label="Accepting new work requests"
+                label={t("hotels.acceptingNewWorkRequests")}
                 checked={form.accepting_jobs}
                 onChange={(e) => set("accepting_jobs", e.target.checked)}
               />
@@ -247,7 +247,7 @@ export function HotelForm({
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Latitude"
+                label={t("fields.latitude")}
                 type="number"
                 step="any"
                 min={-90}
@@ -258,7 +258,7 @@ export function HotelForm({
                 hint="Required for worker geofence check-in (GD-14)"
               />
               <Input
-                label="Longitude"
+                label={t("fields.longitude")}
                 type="number"
                 step="any"
                 min={-180}

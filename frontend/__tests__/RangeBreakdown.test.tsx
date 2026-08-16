@@ -2,6 +2,10 @@ import { render, screen } from "@testing-library/react";
 import { RangeBreakdown } from "@/components/calendar/RangeBreakdown";
 import { toDateKey } from "@/lib/calendar";
 import type { CalendarAbsence, CalendarEntryDto } from "@/lib/types";
+// Side-effect import: initialises i18next so `t()` resolves real copy rather
+// than falling back to the raw key path (e.g. "calendar.placements" instead
+// of "Placements", which these assertions search for literally).
+import "@/lib/i18n";
 
 /**
  * The staffing summary a manager reads to decide whether a day is covered.

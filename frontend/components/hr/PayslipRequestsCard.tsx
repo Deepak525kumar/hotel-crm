@@ -123,8 +123,8 @@ export function PayslipRequestsCard({ workerId }: { workerId: string }) {
             </div>
           ) : !requests || requests.length === 0 ? (
             <EmptyState
-              title="No payslip requests"
-              description="Requests appear here once the worker asks for a payslip, or a manager creates one on their behalf."
+              title={t("hr.noPayslipRequests")}
+              description={t("hr.noPayslipRequestsDescription")}
             />
           ) : (
             <>
@@ -169,6 +169,7 @@ function CreatePayslipRequestModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -220,7 +221,7 @@ function CreatePayslipRequestModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="New payslip request"
+      title={t("hr.newPayslipRequestTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
@@ -234,13 +235,13 @@ function CreatePayslipRequestModal({
     >
       <div className="space-y-4">
         <Input
-          label="Period start"
+          label={t("fields.periodStart")}
           type="date"
           value={periodStart}
           onChange={(e) => setPeriodStart(e.target.value)}
         />
         <Input
-          label="Period end"
+          label={t("fields.periodEnd")}
           type="date"
           value={periodEnd}
           onChange={(e) => setPeriodEnd(e.target.value)}

@@ -37,7 +37,10 @@
     "thisMonth": "Цього місяця",
     "quickLinks": "Швидкі посилання",
     "permissions": "Дозволи",
-    "coordinates": "Координати"
+    "coordinates": "Координати",
+    "loadingLabel": "Завантаження",
+    "navigation": "Навігація",
+    "openNavigation": "Відкрити навігацію"
   },
   "fields": {
     "name": "Ім'я",
@@ -68,7 +71,58 @@
     "employment": "Працевлаштування",
     "employmentType": "Тип працевлаштування",
     "requirements": "Вимоги",
-    "staffing": "Персонал"
+    "staffing": "Персонал",
+    "address": "Адреса",
+    "city": "Місто",
+    "country": "Країна",
+    "hotelGroup": "Група готелів",
+    "geofence": "Геозона",
+    "reason": "Причина",
+    "reasonOptional": "Причина (необов'язково)",
+    "notesOptional": "Нотатки (необов'язково)",
+    "commentOptional": "Коментар (необов'язково)",
+    "created": "Створено",
+    "updated": "Оновлено",
+    "category": "Категорія",
+    "currency": "Валюта",
+    "latitude": "Широта",
+    "longitude": "Довгота",
+    "primaryHotel": "Основний готель",
+    "primaryHotelOptional": "Основний готель (необов'язково)",
+    "groupName": "Назва групи",
+    "employeeId": "ID працівника",
+    "templateId": "ID шаблону",
+    "channel": "Канал",
+    "readAt": "Прочитано о",
+    "memberSince": "Учасник з",
+    "owner": "Власник",
+    "application": "Застосунок",
+    "version": "Версія",
+    "build": "Збірка",
+    "show": "Показати",
+    "expiryDateOptional": "Термін дії (необов'язково)",
+    "periodStart": "Початок періоду",
+    "periodEnd": "Кінець періоду",
+    "phoneOptional": "Телефон (необов'язково)",
+    "startTime": "Час початку",
+    "endTime": "Час завершення",
+    "hourlyRate": "Погодинна ставка",
+    "hourlyRateOptional": "Погодинна ставка (необов'язково)",
+    "descriptionOptional": "Опис (необов'язково)",
+    "requirementsOptional": "Вимоги (необов'язково)",
+    "endDateOptional": "Дата завершення (необов'язково)",
+    "streetAndNumber": "Вулиця та номер",
+    "billingInfo": "Платіжна інформація",
+    "billingInfoOptional": "Платіжна інформація (необов'язково)",
+    "assignedHotel": "Призначений готель",
+    "assignedHotelGroup": "Призначена група готелів",
+    "temporaryPassword": "Тимчасовий пароль",
+    "newPassword": "Новий пароль",
+    "firstName": "Ім'я",
+    "lastName": "Прізвище",
+    "workersNeeded": "Потрібно працівників",
+    "requiresWorkPermit": "Потребує дозволу на роботу (не з ЄС/ЄЕЗ/Швейцарії)",
+    "activeCanSignIn": "Активний (може входити на платформу)"
   },
   "nav": {
     "dashboard": "Панель",
@@ -90,12 +144,12 @@
     "logout": "Вийти",
     "home": "Головна",
     "myShifts": "Мої зміни",
-    "docs": "Документи",
     "leaderboard": "Рейтинг",
     "marketplace": "Біржа роботи",
-    "explore": "Огляд",
     "myOnboarding": "Моя адаптація",
-    "reviewQueue": "Черга перевірки"
+    "reviewQueue": "Черга перевірки",
+    "docs": "Документи",
+    "explore": "Огляд"
   },
   "roles": {
     "admin": "Адміністратор",
@@ -131,7 +185,8 @@
     "logged": "Зафіксовано",
     "notYetLogged": "Ще не зафіксовано.",
     "awaitingSignature": "Очікує підпису",
-    "alreadyFilled": "Уже заповнено"
+    "alreadyFilled": "Уже заповнено",
+    "inProgress": "У процесі"
   },
   "assignments": {
     "shiftDetails": "Деталі зміни",
@@ -157,6 +212,24 @@
     "placeWorker": "Призначити працівника",
     "calendarPlacement": "Розміщення в календарі",
     "roomsCompleted": "Завершені номери",
+    "source": "Джерело",
+    "requestedPosition": "Запитувана посада",
+    "shift": "Зміна",
+    "assignedBy": "Призначив",
+    "started": "Розпочато",
+    "cancellationReason": "Причина скасування",
+    "cancelTitle": "Скасувати призначення",
+    "reassignTitle": "Перепризначити іншому працівнику",
+    "searchWorkersAtHotel": "Пошук працівників у цьому готелі",
+    "logRoomsCompletedTitle": "Записати завершені номери",
+    "verifyTitle": "Перевірити призначення",
+    "rateWorkerTitle": "Оцінити працівника",
+    "placeOnCalendarTitle": "Розмістити працівника в календарі",
+    "calendarPlacementsTitle": "Розміщення в календарі",
+    "noCalendarPlacements": "Розміщень у календарі не знайдено",
+    "noCalendarPlacementsDescription": "Розмістіть працівника безпосередньо в календарі, щоб побачити його тут.",
+    "pageDescription": "Підтверджені працівники та зміни, на які вони призначені.",
+    "noneFound": "Призначень не знайдено",
     "unavailable": "Недоступний",
     "conflictSick": "Лікарняний",
     "conflictVacation": "У відпустці",
@@ -178,7 +251,9 @@
     "about": "Про застосунок",
     "comingSoon": "Незабаром",
     "themeSystemNote": "Системна тема відповідає налаштуванню пристрою.",
-    "localDevBuild": "Локальна збірка розробки"
+    "localDevBuild": "Локальна збірка розробки",
+    "pageDescription": "Налаштування вашого облікового запису, сеансу та застосунку.",
+    "signedInAs": "Увійшли як"
   },
   "auth": {
     "login": "Увійти",
@@ -260,7 +335,12 @@
     "categoryGENERAL": "Загальне",
     "categoryWORK_PERMIT": "Дозвіл на роботу",
     "upload": "Завантажити",
-    "retryUpload": "Повторити завантаження"
+    "retryUpload": "Повторити завантаження",
+    "storageNotConfigured": "Сховище не налаштоване в цьому середовищі",
+    "evaluateWorkPermitRequired": "Оцінити з урахуванням потрібного дозволу на роботу",
+    "noDocuments": "Немає документів",
+    "uploadTitle": "Завантажити документ",
+    "nonEuWorkPermit": "Документ дозволу на роботу для не з ЄС/ЄЕЗ/Швейцарії"
   },
   "hr": {
     "title": "Кадри та зарплата",
@@ -274,7 +354,13 @@
     "signedContract": "Підписаний договір",
     "contractExpired": "Термін договору минув",
     "noSignedContract": "Підписаного договору ще немає у справі",
-    "loadContractFailed": "Не вдалося завантажити ваш договір."
+    "loadContractFailed": "Не вдалося завантажити ваш договір.",
+    "noContract": "Немає договору",
+    "signatureConfirmed": "Підпис підтверджено",
+    "createContractTitle": "Створити договір",
+    "noPayslipRequests": "Немає запитів на розрахунковий лист",
+    "noPayslipRequestsDescription": "Запити з'являються тут, щойно працівник запросить розрахунковий лист або менеджер створить його від його імені.",
+    "newPayslipRequestTitle": "Новий запит на розрахунковий лист"
   },
   "consent": {
     "title": "Згода на захист даних",
@@ -284,11 +370,16 @@
     "withdraw": "Відкликати",
     "reviewAgain": "Переглянути знову",
     "reviewNotice": "Переглянути повідомлення",
-    "loadFailed": "Не вдалося завантажити статус вашої згоди."
+    "loadFailed": "Не вдалося завантажити статус вашої згоди.",
+    "history": "Історія згод",
+    "auditTrail": "Журнал аудиту"
   },
   "notifications": {
     "title": "Сповіщення",
-    "none": "Немає сповіщень."
+    "none": "Немає сповіщень.",
+    "channel": "Канал",
+    "readAt": "Прочитано о",
+    "noneFound": "Сповіщень не знайдено"
   },
   "leaderboard": {
     "none": "Даних рейтингу ще немає.",
@@ -300,7 +391,9 @@
     "createdBy": "Створив",
     "directManager": "Безпосередній керівник",
     "signOut": "Вийти",
-    "noAbsences": "Лікарняних чи відпусток не позначено."
+    "noAbsences": "Лікарняних чи відпусток не позначено.",
+    "editTitle": "Редагувати профіль",
+    "resetPasswordTitle": "Скинути пароль"
   },
   "skills": {
     "CLEANER": "Прибиральник",
@@ -316,7 +409,18 @@
     "noSummary": "Для цього дня підсумок не додано.",
     "loadFailed": "Не вдалося завантажити календар. Спробуйте ще раз.",
     "assignedOrOnLeave": "Призначено або у відпустці сьогодні",
-    "freeToday": "Вільний сьогодні"
+    "freeToday": "Вільний сьогодні",
+    "markAbsentTitle": "Позначити працівника відсутнім цього дня",
+    "repeatWeekly": "Повторювати щотижня",
+    "numberOfWeeks": "Кількість тижнів",
+    "noAbsencesRecorded": "Відсутностей не зафіксовано",
+    "noAbsencesDescription": "Позначені вами лікарняні та відпустки з'являються тут.",
+    "markAbsence": "Позначити відсутність",
+    "placements": "Розміщення",
+    "workersPlaced": "Розміщено працівників",
+    "sick": "Хворий",
+    "onVacation": "У відпустці",
+    "nothingScheduled": "Нічого не заплановано"
   },
   "hotels": {
     "inThisGroup": "Готелі цієї групи",
@@ -325,7 +429,15 @@
     "new": "Новий готель",
     "newGroup": "Нова група",
     "noGroup": "Групу готелів не призначено",
-    "orgChart": "Оргструктура"
+    "orgChart": "Оргструктура",
+    "noDeleted": "Немає видалених готелів",
+    "noDeletedDescription": "Видалені готелі з'являються тут і можуть бути відновлені.",
+    "editTitle": "Редагувати готель",
+    "newDescription": "Додайте об'єкт. Призначення групи та менеджера тут необов'язкове й може бути виконане пізніше.",
+    "pageDescription": "Об'єкти, укомплектовані персоналом через платформу.",
+    "noneFound": "Готелів не знайдено",
+    "activeVisibleForStaffing": "Активний (видимий для працівників і відкритий для укомплектування)",
+    "acceptingNewWorkRequests": "Приймає нові запити на роботу"
   },
   "users": {
     "new": "Новий користувач",
@@ -336,7 +448,18 @@
     "applicant": "Кандидат",
     "yourAccount": "Ваш обліковий запис",
     "accountSettings": "Налаштування облікового запису",
-    "exportMyData": "Експортувати мої дані"
+    "exportMyData": "Експортувати мої дані",
+    "editTitle": "Редагувати користувача",
+    "availability": "Доступність",
+    "deactivateAccountTitle": "Деактивувати обліковий запис",
+    "revokeSessionsTitle": "Скасувати всі сеанси",
+    "newTitle": "Новий користувач",
+    "newDescription": "Створіть обліковий запис і встановіть початкову роль. Адаптація почнеться автоматично.",
+    "pageDescription": "Люди з доступом до платформи.",
+    "noneFound": "Користувачів не знайдено",
+    "managesHotel": "Керує готелем",
+    "managesGroup": "Керує групою",
+    "editAssignmentTitle": "Редагувати призначення"
   },
   "requests": {
     "title": "Запит на роботу",
@@ -344,7 +467,21 @@
     "newBroadcast": "Нова розсилка",
     "acceptedWorkers": "Прийняті працівники",
     "noneAccepted": "Жоден працівник ще не прийняв цю розсилку.",
-    "notAcceptingNew": "Не приймає нових запитів на роботу"
+    "notAcceptingNew": "Не приймає нових запитів на роботу",
+    "createdBy": "Створив",
+    "published": "Опубліковано",
+    "expires": "Закінчується",
+    "cancellationReason": "Причина скасування",
+    "cancelTitle": "Скасувати запит на роботу",
+    "cancelPlaceholder": "Вкажіть, чому цей запит на роботу було скасовано.",
+    "broadcastDescription": "Запропонуйте зміну всім придатним працівникам одночасно. Хто перший прийме за навичкою, той і отримає місце.",
+    "broadcastsDescription": "Зміни, запропоновані всім придатним працівникам одночасно. Перше прийняття за навичкою перемагає.",
+    "noBroadcastsFound": "Розсилок не знайдено",
+    "noBroadcastsDescription": "Розішліть розсилку, щоб відкрити зміну для всіх придатних працівників.",
+    "newTitle": "Новий запит на роботу",
+    "newDescription": "Збережіть як чернетку або опублікуйте одразу, щоб відкрити для укомплектування персоналом.",
+    "pageDescription": "Зміни, відкриті для укомплектування персоналом у ваших готелях.",
+    "noneFound": "Запитів на роботу не знайдено"
   },
   "onboarding": {
     "managerReview": "Перевірка менеджером",
@@ -377,11 +514,75 @@
         "label": "Неактивний",
         "description": "Ваш запис про працевлаштування наразі неактивний."
       }
-    }
+    },
+    "noRecordFound": "Запис адаптації не знайдено",
+    "noRecordDescription": "Ваш запис адаптації ще не створено. Зверніться до свого менеджера.",
+    "applicationStatus": "Статус заявки",
+    "reviewQueueTitle": "Черга перевірки",
+    "reviewQueueDescription": "Заявки, подані вашою командою, очікують на вашу перевірку.",
+    "reviewQueueEmpty": "Черга перевірки порожня",
+    "reviewQueueEmptyDescription": "Немає заявок, що очікують на вашу перевірку.",
+    "assignApprovedEmployee": "Призначити затвердженого працівника",
+    "rejectApplication": "Відхилити заявку",
+    "rejectionReason": "Причина відхилення"
   },
   "analytics": {
     "myPerformance": "Моя результативність",
     "avgRating": "Середня оцінка",
-    "recentRatings": "Останні оцінки"
+    "recentRatings": "Останні оцінки",
+    "description": "Операційна ефективність за персоналом, відвідуваністю та якістю.",
+    "scope": "Область",
+    "openRequests": "Відкриті запити",
+    "onTimeRate": "Показник вчасності",
+    "qualityPassRate": "Показник проходження якості",
+    "noShows": "Неявки",
+    "completedShifts": "Завершені зміни",
+    "totalShifts": "Усього змін",
+    "averageRating": "Середня оцінка",
+    "attendanceRate": "Показник відвідуваності",
+    "noRankedWorkers": "Ще немає працівників у рейтингу",
+    "noRankedWorkersDescription": "Рейтинги з'являються після виконання працівниками призначень.",
+    "shifts": "Зміни"
+  },
+  "hotelGroups": {
+    "noDeleted": "Немає видалених груп готелів",
+    "noDeletedDescription": "Видалені групи з'являються тут і можуть бути відновлені.",
+    "editTitle": "Редагувати групу готелів",
+    "noHotelsInGroup": "Немає готелів у цій групі",
+    "assignHotelsHint": "Призначайте готелі цій групі з екрана редагування готелю.",
+    "noEmployees": "Немає працівників у цій групі",
+    "noEmployeesDescription": "Працівники з'являються тут, щойно вони отримають запис про працевлаштування в одному з готелів цієї групи.",
+    "employeesInGroup": "Працівники цієї групи",
+    "billingInfo": "Платіжна інформація",
+    "noHotelsAssigned": "Готелів не призначено",
+    "newTitle": "Нова група готелів",
+    "newDescription": "Об'єднайте готелі в одному регіоні. Призначте регіонального менеджера з його сторінки користувача.",
+    "pageDescription": "Регіональні групування, що визначають область менеджерів і виставлення рахунків.",
+    "noneYet": "Ще немає груп готелів",
+    "noneYetDescription": "Групи дозволяють призначити регіонального менеджера для кількох готелів."
+  },
+  "attendance": {
+    "expectedStart": "Очікуваний початок",
+    "expectedEnd": "Очікуване завершення",
+    "minutesLate": "Хвилин запізнення",
+    "minutesWorked": "Відпрацьовано хвилин",
+    "verifiedBy": "Перевірив",
+    "verifiedAt": "Перевірено о",
+    "reviewTitle": "Перевірити відвідуваність",
+    "markVerified": "Позначити як перевірено",
+    "pageDescription": "Статус приходу, виходу та перевірки для укомплектованих змін.",
+    "records": "Записи відвідуваності",
+    "noneFound": "Записів відвідуваності не знайдено"
+  },
+  "employees": {
+    "noBlocked": "Немає заблокованих працівників",
+    "noBlockedDescription": "Працівники, заблоковані для призначення в цьому готелі, з'являються тут.",
+    "addToBlocklistTitle": "Додати до чорного списку",
+    "employmentCycle": "Цикл працевлаштування",
+    "deactivationReason": "Причина деактивації",
+    "approveForWorkTitle": "Затвердити для роботи",
+    "deactivateTemporaryTitle": "Деактивувати (тимчасова пауза)",
+    "deleteLeftCompanyTitle": "Видалити (пішов з компанії)",
+    "editSkillsTitle": "Редагувати навички"
   }
 }

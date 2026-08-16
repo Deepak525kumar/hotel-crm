@@ -192,7 +192,7 @@ export function UserForm({
                 onChange={(e) => set("email", e.target.value)}
               />
               <Input
-                label="Temporary password"
+                label={t("fields.temporaryPassword")}
                 type="password"
                 required
                 autoComplete="new-password"
@@ -208,13 +208,13 @@ export function UserForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Input
-              label="First name"
+              label={t("fields.firstName")}
               required
               value={form.first_name}
               onChange={(e) => set("first_name", e.target.value)}
             />
             <Input
-              label="Last name"
+              label={t("fields.lastName")}
               required
               value={form.last_name}
               onChange={(e) => set("last_name", e.target.value)}
@@ -251,7 +251,7 @@ export function UserForm({
           {form.role === "manager" && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Select
-                label="Assigned Hotel"
+                label={t("fields.assignedHotel")}
                 value={form.hotel_id ?? ""}
                 onChange={(e) => set("hotel_id", e.target.value)}
                 options={[
@@ -266,7 +266,7 @@ export function UserForm({
           {form.role === "regional_manager" && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Select
-                label="Assigned Hotel Group"
+                label={t("fields.assignedHotelGroup")}
                 value={form.hotel_group_id ?? ""}
                 onChange={(e) => set("hotel_group_id", e.target.value)}
                 options={[
@@ -295,7 +295,7 @@ export function UserForm({
                   onChange={(e) => set("job_title", e.target.value)}
                 />
                 <Input
-                  label="Start date"
+                  label={t("fields.startDate")}
                   type="date"
                   required
                   value={form.start_date}
@@ -303,7 +303,7 @@ export function UserForm({
                 />
               </div>
               <Checkbox
-                label="Requires a work permit (non-EU/EEA/Swiss)"
+                label={t("fields.requiresWorkPermit")}
                 checked={form.work_permit_required}
                 onChange={(e) => set("work_permit_required", e.target.checked)}
               />
@@ -356,7 +356,7 @@ export function UserForm({
             // system thinks this unapproved worker can already be assigned
             // work."
             <Checkbox
-              label="Active (can sign in to the platform)"
+              label={t("fields.activeCanSignIn")}
               checked={form.is_active}
               onChange={(e) => set("is_active", e.target.checked)}
             />

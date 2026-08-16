@@ -9,8 +9,10 @@ import { HotelGroupForm } from "@/components/hotels/HotelGroupForm";
 import type { HotelGroupFormValues } from "@/components/hotels/HotelGroupForm";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateHotelGroupInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function NewHotelGroup() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -47,8 +49,8 @@ function NewHotelGroup() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New hotel group"
-          description="Group hotels under one region. Assign a regional manager from their user page."
+          title={t("hotelGroups.newTitle")}
+          description={t("hotelGroups.newDescription")}
         />
       </div>
       <HotelGroupForm

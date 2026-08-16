@@ -187,7 +187,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     </Badge>
                   }
                 />
-                <DataRow label="Employee ID" value={record.employee_id} />
+                <DataRow label={t("fields.employeeId")} value={record.employee_id} />
                 <DataRow label={t("fields.jobTitle")} value={record.job_title} />
                 
                 {/* Always shown, not gated on skills.length > 0 -- a worker
@@ -214,16 +214,16 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   }
                 />
 
-                <DataRow label="Start date" value={formatDate(record.start_date)} />
+                <DataRow label={t("fields.startDate")} value={formatDate(record.start_date)} />
                 {/* Only meaningful once it can exceed 1 — a first-time hire
                     reading "Employment cycle: 1" for every worker is noise,
                     not information. Shows starting with the first rehire
                     (DELETED -> PENDING), the only transition that increments it. */}
                 {record.employment_cycle > 1 && (
-                  <DataRow label="Employment cycle" value={String(record.employment_cycle)} />
+                  <DataRow label={t("employees.employmentCycle")} value={String(record.employment_cycle)} />
                 )}
                 {record.status === "DEACTIVATED" && record.deactivation_reason && (
-                  <DataRow label="Deactivation reason" value={record.deactivation_reason} />
+                  <DataRow label={t("employees.deactivationReason")} value={record.deactivation_reason} />
                 )}
                 {record.status === "DELETED" && (
                   <>
@@ -236,7 +236,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                       }
                     />
                     {record.deleted_reason && (
-                      <DataRow label="Reason" value={record.deleted_reason} />
+                      <DataRow label={t("fields.reason")} value={record.deleted_reason} />
                     )}
                   </>
                 )}
@@ -459,6 +459,7 @@ function ApproveModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [hotelGroupId, setHotelGroupId] = useState("");
   const { groups } = useHotelGroups();
   const approve = useAsyncAction();
@@ -491,7 +492,7 @@ function ApproveModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Approve for work"
+      title={t("employees.approveForWorkTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={approve.pending}>
@@ -510,7 +511,7 @@ function ApproveModal({
           but unassignable to any hotel.
         </p>
         <Select
-          label="Hotel group"
+          label={t("fields.hotelGroup")}
           value={hotelGroupId}
           onChange={(e) => setHotelGroupId(e.target.value)}
           options={[
@@ -535,6 +536,7 @@ function DeactivateModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState<DeactivationReason | "">("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const deactivate = useAsyncAction();
@@ -569,7 +571,7 @@ function DeactivateModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Deactivate (temporary pause)"
+      title={t("employees.deactivateTemporaryTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={deactivate.pending}>
@@ -587,7 +589,7 @@ function DeactivateModal({
           assignments are cancelled. If this person has left the company, use Delete instead.
         </p>
         <Select
-          label="Reason"
+          label={t("fields.reason")}
           value={reason}
           onChange={(e) => setReason(e.target.value as DeactivationReason)}
           options={[
@@ -612,6 +614,7 @@ function DeleteModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const deleteAction = useAsyncAction();
@@ -646,7 +649,7 @@ function DeleteModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Delete (left the company)"
+      title={t("employees.deleteLeftCompanyTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={deleteAction.pending}>
@@ -665,7 +668,7 @@ function DeleteModal({
           active again.
         </p>
         <Textarea
-          label="Reason"
+          label={t("fields.reason")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="e.g. Resigned, contract ended"
@@ -741,7 +744,7 @@ function EditSkillsModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Edit Skills"
+      title={t("employees.editSkillsTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={action.pending}>

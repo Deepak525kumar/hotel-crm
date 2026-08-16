@@ -87,12 +87,12 @@ export function ExportMyDataCard() {
                 count={bundle.documents.data?.length ?? null}
               />
               <SourceRow
-                label="Consent history"
+                label={t("consent.history")}
                 result={bundle.consent_history}
                 count={bundle.consent_history.data?.total ?? null}
               />
               <SourceRow
-                label="Audit trail"
+                label={t("consent.auditTrail")}
                 result={bundle.audit_trail}
                 count={bundle.audit_trail.data?.total ?? null}
               />

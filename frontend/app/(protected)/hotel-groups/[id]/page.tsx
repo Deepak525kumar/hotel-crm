@@ -142,15 +142,15 @@ export default function HotelGroupDetailPage() {
                   }
                 />
                 <DataRow
-                  label="Billing info"
+                  label={t("hotelGroups.billingInfo")}
                   value={
                     group.billing_info || (
                       <span className="text-gray-500 dark:text-gray-400">{t("common.notSet")}</span>
                     )
                   }
                 />
-                <DataRow label="Created" value={formatDateTime(group.created_at)} />
-                <DataRow label="Updated" value={formatDateTime(group.updated_at)} />
+                <DataRow label={t("fields.created")} value={formatDateTime(group.created_at)} />
+                <DataRow label={t("fields.updated")} value={formatDateTime(group.updated_at)} />
               </DataList>
             </CardContent>
           </Card>
@@ -162,8 +162,8 @@ export default function HotelGroupDetailPage() {
             <CardContent className="p-0">
               {groupHotels.length === 0 ? (
                 <EmptyState
-                  title="No hotels assigned"
-                  description="Assign hotels to this group from a hotel's edit screen."
+                  title={t("hotelGroups.noHotelsAssigned")}
+                  description={t("hotelGroups.assignHotelsHint")}
                 />
               ) : (
                 <Table aria-label={t("hotels.inThisGroup")}>
