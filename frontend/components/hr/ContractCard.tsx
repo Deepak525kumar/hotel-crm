@@ -115,7 +115,7 @@ export function ContractCard({ workerId }: { workerId: string }) {
             </div>
           ) : !contract ? (
             <EmptyState
-              title="No contract"
+              title={t("hr.noContract")}
               description={
                 isManagerOrAdmin
                   ? "Create a contract once this worker's Personalfragebogen data is recorded."
@@ -141,10 +141,10 @@ export function ContractCard({ workerId }: { workerId: string }) {
                 />
                 <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
                 <DataRow label={t("jobs.position")} value={contract.position} />
-                <DataRow label="Start date" value={formatDate(contract.start_date)} />
-                {contract.end_date && <DataRow label="End date" value={formatDate(contract.end_date)} />}
+                <DataRow label={t("fields.startDate")} value={formatDate(contract.start_date)} />
+                {contract.end_date && <DataRow label={t("fields.endDate")} value={formatDate(contract.end_date)} />}
                 {contract.confirmed_at && (
-                  <DataRow label="Signature confirmed" value={formatDate(contract.confirmed_at)} />
+                  <DataRow label={t("hr.signatureConfirmed")} value={formatDate(contract.confirmed_at)} />
                 )}
               </DataList>
 
@@ -295,7 +295,7 @@ function CreateContractModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Create contract"
+      title={t("hr.createContractTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
@@ -313,7 +313,7 @@ function CreateContractModal({
           fails otherwise.
         </p>
         <Input
-          label="Template ID"
+          label={t("fields.templateId")}
           value={templateId}
           onChange={(e) => setTemplateId(e.target.value)}
         />
@@ -323,13 +323,13 @@ function CreateContractModal({
           onChange={(e) => setPosition(e.target.value)}
         />
         <Input
-          label="Start date"
+          label={t("fields.startDate")}
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
         />
         <Input
-          label="End date (optional)"
+          label={t("fields.endDateOptional")}
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}

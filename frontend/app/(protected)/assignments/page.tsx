@@ -102,7 +102,7 @@ export default function AssignmentsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.assignments")}
-        description="Confirmed workers and the shifts they are staffed on."
+        description={t("assignments.pageDescription")}
         actions={
           <StaffingWriteGate>
             <TextLink href="/assignments/calendar-entries" className="text-sm">
@@ -147,7 +147,7 @@ export default function AssignmentsPage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No assignments found"
+                        title={t("assignments.noneFound")}
                         description={
                           status
                             ? "Try adjusting your filters."

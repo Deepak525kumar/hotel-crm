@@ -84,7 +84,7 @@ export default function WorkRequestsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.requests")}
-        description="Shifts open for staffing across your hotels."
+        description={t("requests.pageDescription")}
         actions={
           <StaffingWriteGate>
             <Link href="/requests/new">
@@ -130,7 +130,7 @@ export default function WorkRequestsPage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No work requests found"
+                        title={t("requests.noneFound")}
                         description={
                           status
                             ? "Try adjusting your filters."

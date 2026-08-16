@@ -161,7 +161,7 @@ function NewBroadcastForm() {
         <PageHeader
           className="mt-2"
           title={t("requests.newBroadcast")}
-          description="Raise a shift to every eligible worker at once. Whoever accepts first for a skill claims that slot."
+          description={t("requests.broadcastDescription")}
         />
       </div>
 
@@ -195,14 +195,14 @@ function NewBroadcastForm() {
                 onChange={(e) => set("shift_date", e.target.value)}
               />
               <Input
-                label="Start time"
+                label={t("fields.startTime")}
                 type="time"
                 required
                 value={form.shift_start_time}
                 onChange={(e) => set("shift_start_time", e.target.value)}
               />
               <Input
-                label="End time"
+                label={t("fields.endTime")}
                 type="time"
                 required
                 min={form.shift_start_time || undefined}
@@ -213,7 +213,7 @@ function NewBroadcastForm() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Hourly rate (optional)"
+                label={t("fields.hourlyRateOptional")}
                 type="number"
                 min={0}
                 step="0.01"
@@ -221,7 +221,7 @@ function NewBroadcastForm() {
                 onChange={(e) => set("hourly_rate", e.target.value)}
               />
               <Input
-                label="Currency"
+                label={t("fields.currency")}
                 maxLength={3}
                 value={form.currency}
                 onChange={(e) => set("currency", e.target.value.toUpperCase())}
@@ -230,7 +230,7 @@ function NewBroadcastForm() {
             </div>
 
             <Textarea
-              label="Description (optional)"
+              label={t("fields.descriptionOptional")}
               rows={3}
               value={form.description}
               onChange={(e) => set("description", e.target.value)}

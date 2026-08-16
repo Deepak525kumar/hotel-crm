@@ -37,7 +37,10 @@
     "thisMonth": "This month",
     "quickLinks": "Quick links",
     "permissions": "Permissions",
-    "coordinates": "Coordinates"
+    "coordinates": "Coordinates",
+    "loadingLabel": "Loading",
+    "navigation": "Navigation",
+    "openNavigation": "Open navigation"
   },
   "fields": {
     "name": "Name",
@@ -68,7 +71,58 @@
     "employment": "Employment",
     "employmentType": "Employment type",
     "requirements": "Requirements",
-    "staffing": "Staffing"
+    "staffing": "Staffing",
+    "address": "Address",
+    "city": "City",
+    "country": "Country",
+    "hotelGroup": "Hotel group",
+    "geofence": "Geofence",
+    "reason": "Reason",
+    "reasonOptional": "Reason (optional)",
+    "notesOptional": "Notes (optional)",
+    "commentOptional": "Comment (optional)",
+    "created": "Created",
+    "updated": "Updated",
+    "category": "Category",
+    "currency": "Currency",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "primaryHotel": "Primary hotel",
+    "primaryHotelOptional": "Primary hotel (optional)",
+    "groupName": "Group name",
+    "employeeId": "Employee ID",
+    "templateId": "Template ID",
+    "channel": "Channel",
+    "readAt": "Read at",
+    "memberSince": "Member since",
+    "owner": "Owner",
+    "application": "Application",
+    "version": "Version",
+    "build": "Build",
+    "show": "Show",
+    "expiryDateOptional": "Expiry date (optional)",
+    "periodStart": "Period start",
+    "periodEnd": "Period end",
+    "phoneOptional": "Phone (optional)",
+    "startTime": "Start time",
+    "endTime": "End time",
+    "hourlyRate": "Hourly rate",
+    "hourlyRateOptional": "Hourly rate (optional)",
+    "descriptionOptional": "Description (optional)",
+    "requirementsOptional": "Requirements (optional)",
+    "endDateOptional": "End date (optional)",
+    "streetAndNumber": "Street and number",
+    "billingInfo": "Billing info",
+    "billingInfoOptional": "Billing info (optional)",
+    "assignedHotel": "Assigned Hotel",
+    "assignedHotelGroup": "Assigned Hotel Group",
+    "temporaryPassword": "Temporary password",
+    "newPassword": "New Password",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "workersNeeded": "Workers needed",
+    "requiresWorkPermit": "Requires a work permit (non-EU/EEA/Swiss)",
+    "activeCanSignIn": "Active (can sign in to the platform)"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -129,7 +183,8 @@
     "logged": "Logged",
     "notYetLogged": "Not yet logged.",
     "awaitingSignature": "Awaiting signature",
-    "alreadyFilled": "Already filled"
+    "alreadyFilled": "Already filled",
+    "inProgress": "In progress"
   },
   "assignments": {
     "shiftDetails": "Shift details",
@@ -154,7 +209,25 @@
     "placementDetails": "Placement details",
     "placeWorker": "Place worker",
     "calendarPlacement": "Calendar Placement",
-    "roomsCompleted": "Rooms completed"
+    "roomsCompleted": "Rooms completed",
+    "source": "Source",
+    "requestedPosition": "Requested position",
+    "shift": "Shift",
+    "assignedBy": "Assigned by",
+    "started": "Started",
+    "cancellationReason": "Cancellation reason",
+    "cancelTitle": "Cancel assignment",
+    "reassignTitle": "Reassign to a different worker",
+    "searchWorkersAtHotel": "Search workers at this hotel",
+    "logRoomsCompletedTitle": "Log rooms completed",
+    "verifyTitle": "Verify assignment",
+    "rateWorkerTitle": "Rate worker",
+    "placeOnCalendarTitle": "Place worker on calendar",
+    "calendarPlacementsTitle": "Calendar placements",
+    "noCalendarPlacements": "No calendar placements found",
+    "noCalendarPlacementsDescription": "Place a worker directly on the calendar to see it here.",
+    "pageDescription": "Confirmed workers and the shifts they are staffed on.",
+    "noneFound": "No assignments found"
   },
   "settings": {
     "language": {
@@ -171,7 +244,9 @@
     "about": "About",
     "comingSoon": "Coming soon",
     "themeSystemNote": "System follows your device's setting.",
-    "localDevBuild": "Local development build"
+    "localDevBuild": "Local development build",
+    "pageDescription": "Your account, session and app preferences.",
+    "signedInAs": "Signed in as"
   },
   "auth": {
     "login": "Log in",
@@ -253,7 +328,12 @@
     "categoryGENERAL": "General",
     "categoryWORK_PERMIT": "Work permit",
     "upload": "Upload",
-    "retryUpload": "Retry upload"
+    "retryUpload": "Retry upload",
+    "storageNotConfigured": "Storage not configured in this environment",
+    "evaluateWorkPermitRequired": "Evaluate with work permit required",
+    "noDocuments": "No documents",
+    "uploadTitle": "Upload document",
+    "nonEuWorkPermit": "Non-EU/EEA/Swiss work-permit document"
   },
   "hr": {
     "title": "HR & Payroll",
@@ -267,7 +347,13 @@
     "signedContract": "Signed Contract",
     "contractExpired": "Contract Expired",
     "noSignedContract": "Signed contract not yet on file",
-    "loadContractFailed": "Failed to load your contract."
+    "loadContractFailed": "Failed to load your contract.",
+    "noContract": "No contract",
+    "signatureConfirmed": "Signature confirmed",
+    "createContractTitle": "Create contract",
+    "noPayslipRequests": "No payslip requests",
+    "noPayslipRequestsDescription": "Requests appear here once the worker asks for a payslip, or a manager creates one on their behalf.",
+    "newPayslipRequestTitle": "New payslip request"
   },
   "consent": {
     "title": "Data-protection consent",
@@ -277,11 +363,16 @@
     "withdraw": "Withdraw",
     "reviewAgain": "Review again",
     "reviewNotice": "Review notice",
-    "loadFailed": "Failed to load your consent status."
+    "loadFailed": "Failed to load your consent status.",
+    "history": "Consent history",
+    "auditTrail": "Audit trail"
   },
   "notifications": {
     "title": "Notifications",
-    "none": "No notifications."
+    "none": "No notifications.",
+    "channel": "Channel",
+    "readAt": "Read at",
+    "noneFound": "No notifications found"
   },
   "leaderboard": {
     "none": "No leaderboard data yet.",
@@ -293,7 +384,9 @@
     "createdBy": "Created By",
     "directManager": "Direct Manager",
     "signOut": "Sign Out",
-    "noAbsences": "No sick or vacation days marked."
+    "noAbsences": "No sick or vacation days marked.",
+    "editTitle": "Edit profile",
+    "resetPasswordTitle": "Reset password"
   },
   "skills": {
     "CLEANER": "Cleaner",
@@ -309,7 +402,18 @@
     "noSummary": "No summary added for this day.",
     "loadFailed": "Failed to load the calendar. Please try again.",
     "assignedOrOnLeave": "Assigned or on leave today",
-    "freeToday": "Free today"
+    "freeToday": "Free today",
+    "markAbsentTitle": "Mark a worker absent on this day",
+    "repeatWeekly": "Repeat weekly",
+    "numberOfWeeks": "Number of weeks",
+    "noAbsencesRecorded": "No absences recorded",
+    "noAbsencesDescription": "Sick days and vacation you mark appear here.",
+    "markAbsence": "Mark absence",
+    "placements": "Placements",
+    "workersPlaced": "Workers placed",
+    "sick": "Sick",
+    "onVacation": "On vacation",
+    "nothingScheduled": "Nothing scheduled"
   },
   "hotels": {
     "inThisGroup": "Hotels in this group",
@@ -318,7 +422,15 @@
     "new": "New hotel",
     "newGroup": "New group",
     "noGroup": "No hotel group assigned",
-    "orgChart": "Org chart"
+    "orgChart": "Org chart",
+    "noDeleted": "No deleted hotels",
+    "noDeletedDescription": "Deleted hotels appear here and can be restored.",
+    "editTitle": "Edit hotel",
+    "newDescription": "Add a property. Group and manager assignment are optional here and can also be set later.",
+    "pageDescription": "Properties staffed through the platform.",
+    "noneFound": "No hotels found",
+    "activeVisibleForStaffing": "Active (visible to workers and open for staffing)",
+    "acceptingNewWorkRequests": "Accepting new work requests"
   },
   "users": {
     "new": "New user",
@@ -329,7 +441,18 @@
     "applicant": "Applicant",
     "yourAccount": "Your account",
     "accountSettings": "Account settings",
-    "exportMyData": "Export my data"
+    "exportMyData": "Export my data",
+    "editTitle": "Edit user",
+    "availability": "Availability",
+    "deactivateAccountTitle": "Deactivate account",
+    "revokeSessionsTitle": "Revoke all sessions",
+    "newTitle": "New user",
+    "newDescription": "Create an account and set an initial role. Their onboarding starts automatically.",
+    "pageDescription": "People with access to the platform.",
+    "noneFound": "No users found",
+    "managesHotel": "Manages hotel",
+    "managesGroup": "Manages group",
+    "editAssignmentTitle": "Edit assignment"
   },
   "requests": {
     "title": "Work request",
@@ -337,7 +460,21 @@
     "newBroadcast": "New broadcast",
     "acceptedWorkers": "Accepted workers",
     "noneAccepted": "No workers have accepted this broadcast yet.",
-    "notAcceptingNew": "Not accepting new work requests"
+    "notAcceptingNew": "Not accepting new work requests",
+    "createdBy": "Created by",
+    "published": "Published",
+    "expires": "Expires",
+    "cancellationReason": "Cancellation reason",
+    "cancelTitle": "Cancel work request",
+    "cancelPlaceholder": "Share why this work request was cancelled.",
+    "broadcastDescription": "Raise a shift to every eligible worker at once. Whoever accepts first for a skill claims that slot.",
+    "broadcastsDescription": "Shifts raised to every eligible worker at once. First accept per skill wins.",
+    "noBroadcastsFound": "No broadcasts found",
+    "noBroadcastsDescription": "Raise a broadcast to open a shift to every eligible worker.",
+    "newTitle": "New work request",
+    "newDescription": "Save as a draft, or publish it straight away to open it for staffing.",
+    "pageDescription": "Shifts open for staffing across your hotels.",
+    "noneFound": "No work requests found"
   },
   "onboarding": {
     "managerReview": "Manager Review",
@@ -370,11 +507,75 @@
         "label": "Inactive",
         "description": "Your employment record is not currently active."
       }
-    }
+    },
+    "noRecordFound": "No onboarding record found",
+    "noRecordDescription": "Your onboarding record has not been created yet. Please contact your manager.",
+    "applicationStatus": "Application Status",
+    "reviewQueueTitle": "Review queue",
+    "reviewQueueDescription": "Applications submitted by your team, awaiting your review.",
+    "reviewQueueEmpty": "Review queue empty",
+    "reviewQueueEmptyDescription": "There are no applications waiting for your review.",
+    "assignApprovedEmployee": "Assign approved employee",
+    "rejectApplication": "Reject application",
+    "rejectionReason": "Rejection reason"
   },
   "analytics": {
     "myPerformance": "My performance",
     "avgRating": "Avg rating",
-    "recentRatings": "Recent ratings"
+    "recentRatings": "Recent ratings",
+    "description": "Operational performance across staffing, attendance and quality.",
+    "scope": "Scope",
+    "openRequests": "Open requests",
+    "onTimeRate": "On-time rate",
+    "qualityPassRate": "Quality pass rate",
+    "noShows": "No-shows",
+    "completedShifts": "Completed shifts",
+    "totalShifts": "Total shifts",
+    "averageRating": "Average rating",
+    "attendanceRate": "Attendance rate",
+    "noRankedWorkers": "No ranked workers yet",
+    "noRankedWorkersDescription": "Rankings appear once workers complete assignments.",
+    "shifts": "Shifts"
+  },
+  "hotelGroups": {
+    "noDeleted": "No deleted hotel groups",
+    "noDeletedDescription": "Deleted groups appear here and can be restored.",
+    "editTitle": "Edit hotel group",
+    "noHotelsInGroup": "No hotels in this group",
+    "assignHotelsHint": "Assign hotels to this group from a hotel's edit screen.",
+    "noEmployees": "No employees in this group",
+    "noEmployeesDescription": "Employees appear here once they have an EmploymentRecord in one of this group's hotels.",
+    "employeesInGroup": "Employees in this group",
+    "billingInfo": "Billing info",
+    "noHotelsAssigned": "No hotels assigned",
+    "newTitle": "New hotel group",
+    "newDescription": "Group hotels under one region. Assign a regional manager from their user page.",
+    "pageDescription": "Regional groupings that scope managers and billing.",
+    "noneYet": "No hotel groups yet",
+    "noneYetDescription": "Groups let you assign a regional manager across several hotels."
+  },
+  "attendance": {
+    "expectedStart": "Expected start",
+    "expectedEnd": "Expected end",
+    "minutesLate": "Minutes late",
+    "minutesWorked": "Minutes worked",
+    "verifiedBy": "Verified by",
+    "verifiedAt": "Verified at",
+    "reviewTitle": "Review attendance",
+    "markVerified": "Mark as verified",
+    "pageDescription": "Check-in, check-out and verification status for staffed shifts.",
+    "records": "Attendance records",
+    "noneFound": "No attendance records found"
+  },
+  "employees": {
+    "noBlocked": "No blocked employees",
+    "noBlockedDescription": "Employees blocked from assignment at this hotel appear here.",
+    "addToBlocklistTitle": "Add to blocklist",
+    "employmentCycle": "Employment cycle",
+    "deactivationReason": "Deactivation reason",
+    "approveForWorkTitle": "Approve for work",
+    "deactivateTemporaryTitle": "Deactivate (temporary pause)",
+    "deleteLeftCompanyTitle": "Delete (left the company)",
+    "editSkillsTitle": "Edit Skills"
   }
 }

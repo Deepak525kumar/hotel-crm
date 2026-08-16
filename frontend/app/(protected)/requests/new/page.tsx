@@ -142,8 +142,8 @@ function NewWorkRequestForm() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New work request"
-          description="Save as a draft, or publish it straight away to open it for staffing."
+          title={t("requests.newTitle")}
+          description={t("requests.newDescription")}
         />
       </div>
 
@@ -177,7 +177,7 @@ function NewWorkRequestForm() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Workers needed"
+                label={t("fields.workersNeeded")}
                 type="number"
                 min={1}
                 required
@@ -196,14 +196,14 @@ function NewWorkRequestForm() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Start time"
+                label={t("fields.startTime")}
                 type="time"
                 required
                 value={form.shift_start_time}
                 onChange={(e) => set("shift_start_time", e.target.value)}
               />
               <Input
-                label="End time"
+                label={t("fields.endTime")}
                 type="time"
                 required
                 min={form.shift_start_time || undefined}
@@ -214,7 +214,7 @@ function NewWorkRequestForm() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Hourly rate (optional)"
+                label={t("fields.hourlyRateOptional")}
                 type="number"
                 min={0}
                 step="0.01"
@@ -222,7 +222,7 @@ function NewWorkRequestForm() {
                 onChange={(e) => set("hourly_rate", e.target.value)}
               />
               <Input
-                label="Currency"
+                label={t("fields.currency")}
                 maxLength={3}
                 value={form.currency}
                 onChange={(e) =>
@@ -233,14 +233,14 @@ function NewWorkRequestForm() {
             </div>
 
             <Textarea
-              label="Description (optional)"
+              label={t("fields.descriptionOptional")}
               rows={3}
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
             />
 
             <Textarea
-              label="Requirements (optional)"
+              label={t("fields.requirementsOptional")}
               rows={3}
               value={form.requirements}
               onChange={(e) => set("requirements", e.target.value)}

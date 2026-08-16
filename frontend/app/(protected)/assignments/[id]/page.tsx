@@ -279,7 +279,7 @@ export default function AssignmentDetailPage() {
               }
             />
             <DataRow
-              label="Source"
+              label={t("assignments.source")}
               value={
                 assignment.job_request_id ? (
                   <TextLink href={`/requests/broadcasts/${assignment.job_request_id}`}>
@@ -296,12 +296,12 @@ export default function AssignmentDetailPage() {
             />
             {(assignment.job_request_id || assignment.work_request_id) && (
               <DataRow
-                label="Requested position"
+                label={t("assignments.requestedPosition")}
                 value={workRequest?.position ?? "—"}
               />
             )}
             <DataRow
-              label="Shift"
+              label={t("assignments.shift")}
               value={
                 workRequest
                   ? `${workRequest.shift_date} · ${workRequest.shift_start_time}–${workRequest.shift_end_time}`
@@ -309,7 +309,7 @@ export default function AssignmentDetailPage() {
               }
             />
             <DataRow
-              label="Assigned by"
+              label={t("assignments.assignedBy")}
               value={
                 <UserRef userId={assignment.assigned_by_id} fallback="A manager" />
               }
@@ -320,7 +320,7 @@ export default function AssignmentDetailPage() {
             />
             {assignment.started_at && (
               <DataRow
-                label="Started"
+                label={t("assignments.started")}
                 value={formatDateTime(assignment.started_at)}
               />
             )}
@@ -338,7 +338,7 @@ export default function AssignmentDetailPage() {
             )}
             {assignment.cancellation_reason && (
               <DataRow
-                label="Cancellation reason"
+                label={t("requests.cancellationReason")}
                 value={assignment.cancellation_reason}
               />
             )}
@@ -488,7 +488,7 @@ export default function AssignmentDetailPage() {
         onClose={() => {
           if (!action.isPending("cancel")) setCancelOpen(false);
         }}
-        title="Cancel assignment"
+        title={t("assignments.cancelTitle")}
         footer={
           <>
             <Button
@@ -509,7 +509,7 @@ export default function AssignmentDetailPage() {
         }
       >
         <Textarea
-          label="Reason (optional)"
+          label={t("fields.reasonOptional")}
           value={cancelReason}
           onChange={(e) => setCancelReason(e.target.value)}
           maxLength={500}
@@ -608,7 +608,7 @@ function ReassignModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Reassign to a different worker"
+      title={t("assignments.reassignTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={reassign.pending}>
@@ -626,7 +626,7 @@ function ReassignModal({
           the selected worker at the same hotel and day.
         </p>
         <Input
-          label="Search workers at this hotel"
+          label={t("assignments.searchWorkersAtHotel")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("search.byNameOrEmail")}
@@ -719,7 +719,7 @@ function LogRoomsCompletedModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Log rooms completed"
+      title={t("assignments.logRoomsCompletedTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={log.pending}>
@@ -741,7 +741,7 @@ function LogRoomsCompletedModal({
           onChange={(e) => setRoomsCompleted(e.target.value)}
         />
         <Textarea
-          label="Notes (optional)"
+          label={t("fields.notesOptional")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
@@ -764,6 +764,7 @@ function CreateVerificationModal({
   onClose: () => void;
   onCreated: (verification: QualityVerification) => void;
 }) {
+  const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [notes, setNotes] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -810,7 +811,7 @@ function CreateVerificationModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Verify assignment"
+      title={t("assignments.verifyTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
@@ -836,7 +837,7 @@ function CreateVerificationModal({
           Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails.
         </p>
         <Textarea
-          label="Notes (optional)"
+          label={t("fields.notesOptional")}
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           maxLength={1000}
@@ -861,6 +862,7 @@ function CreateRatingModal({
   onClose: () => void;
   onCreated: (rating: Rating) => void;
 }) {
+  const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [comment, setComment] = useState("");
   const [punctuality, setPunctuality] = useState("");
@@ -920,7 +922,7 @@ function CreateRatingModal({
     <Modal
       open={open}
       onClose={handleClose}
-      title="Rate worker"
+      title={t("assignments.rateWorkerTitle")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={create.pending}>
@@ -969,7 +971,7 @@ function CreateRatingModal({
           />
         </div>
         <Textarea
-          label="Comment (optional)"
+          label={t("fields.commentOptional")}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           maxLength={1000}

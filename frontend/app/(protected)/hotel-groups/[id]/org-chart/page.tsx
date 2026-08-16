@@ -82,8 +82,8 @@ function OrgChart() {
             <CardContent className="py-2">
               {chart.hotels.length === 0 ? (
                 <EmptyState
-                  title="No hotels in this group"
-                  description="Assign hotels to this group from a hotel's edit screen."
+                  title={t("hotelGroups.noHotelsInGroup")}
+                  description={t("hotelGroups.assignHotelsHint")}
                 />
               ) : (
                 <Table aria-label={t("hotels.inThisGroup")}>
@@ -122,11 +122,11 @@ function OrgChart() {
             <CardContent className="py-2">
               {chart.employees.length === 0 ? (
                 <EmptyState
-                  title="No employees in this group"
-                  description="Employees appear here once they have an EmploymentRecord in one of this group's hotels."
+                  title={t("hotelGroups.noEmployees")}
+                  description={t("hotelGroups.noEmployeesDescription")}
                 />
               ) : (
-                <Table aria-label="Employees in this group">
+                <Table aria-label={t("hotelGroups.employeesInGroup")}>
                   <THead>
                     <TR>
                       <TH>{t("fields.name")}</TH>

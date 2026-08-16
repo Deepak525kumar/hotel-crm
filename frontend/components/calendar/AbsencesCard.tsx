@@ -105,8 +105,8 @@ export function AbsencesCard() {
             </div>
           ) : !absences || absences.length === 0 ? (
             <EmptyState
-              title="No absences recorded"
-              description="Sick days and vacation you mark appear here."
+              title={t("calendar.noAbsencesRecorded")}
+              description={t("calendar.noAbsencesDescription")}
             />
           ) : (
             <ul>
@@ -179,7 +179,7 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
     <Modal
       open={open}
       onClose={handleClose}
-      title="Mark absence"
+      title={t("calendar.markAbsence")}
       footer={
         <>
           <Button variant="outline" onClick={handleClose} disabled={mark.pending}>

@@ -64,16 +64,16 @@ function ManagerOverview() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
-            label="Open requests"
+            label={t("analytics.openRequests")}
             value={stats.work_requests.open}
             hint={`${stats.work_requests.total} total`}
           />
           <StatTile
-            label="On-time rate"
+            label={t("analytics.onTimeRate")}
             value={formatPercent(stats.attendance.on_time_rate)}
           />
           <StatTile
-            label="Quality pass rate"
+            label={t("analytics.qualityPassRate")}
             value={formatPercent(stats.quality.pass_rate)}
           />
           <StatTile

@@ -5,6 +5,12 @@ import { useOwnAbsences } from "@/hooks/useCalendar";
 import { ApiError, calendarApi } from "@/lib/api";
 import { localToday } from "@/lib/format";
 import type { CalendarAbsence } from "@/lib/types";
+// Side-effect import: initialises i18next so `t()` resolves real copy rather
+// than falling back to the raw key path. Most existing assertions here only
+// happened to still pass against an uninitialised `t()` because their regex
+// (e.g. /withdraw/i) matched a substring of the key itself (jobs.withdraw);
+// the empty-state assertion below does not share that coincidence.
+import "@/lib/i18n";
 
 /**
  * A worker's own absences, and withdrawing one.

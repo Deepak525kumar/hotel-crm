@@ -70,7 +70,7 @@ export default function BroadcastsPage() {
     <div className="space-y-6">
       <PageHeader
         title={t("nav.broadcasts")}
-        description="Shifts raised to every eligible worker at once. First accept per skill wins."
+        description={t("requests.broadcastsDescription")}
         actions={
           <JobDispatchPhase2WriteGate>
             <Link href="/requests/broadcasts/new">
@@ -104,8 +104,8 @@ export default function BroadcastsPage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No broadcasts found"
-                        description="Raise a broadcast to open a shift to every eligible worker."
+                        title={t("requests.noBroadcastsFound")}
+                        description={t("requests.noBroadcastsDescription")}
                       />
                     </TD>
                   </tr>

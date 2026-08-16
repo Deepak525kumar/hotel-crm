@@ -10,8 +10,10 @@ import { UserForm } from "@/components/users/UserForm";
 import type { UserFormSubmitValues } from "@/components/users/UserForm";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateUserInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function NewUser() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { hotels } = useHotels({ limit: 100 });
   const { groups: hotelGroups } = useHotelGroups({ limit: 100 });
@@ -80,8 +82,8 @@ function NewUser() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New user"
-          description="Create an account and set an initial role. Their onboarding starts automatically."
+          title={t("users.new")}
+          description={t("users.newDescription")}
         />
       </div>
       <UserForm

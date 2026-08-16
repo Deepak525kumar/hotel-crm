@@ -59,7 +59,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={t("nav.settings")}
-        description="Your account, session and app preferences."
+        description={t("settings.pageDescription")}
       />
 
       <Card>
@@ -68,7 +68,7 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4 py-2">
           <DataList>
-            <DataRow label="Signed in as" value={user.email} />
+            <DataRow label={t("settings.signedInAs")} value={user.email} />
             <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
           </DataList>
           {/* Editing lives on /profile (EditProfileCard) — pointed at rather
@@ -120,13 +120,13 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            <DataRow label="Application" value={APP_NAME} />
-            <DataRow label="Version" value={APP_VERSION} />
+            <DataRow label={t("fields.application")} value={APP_NAME} />
+            <DataRow label={t("fields.version")} value={APP_VERSION} />
             {/* Shown for support, not for users: a bug report is far more
                 actionable when it names the exact build. Absent on a local dev
                 build, where a SHA would be misleading rather than useful. */}
             <DataRow
-              label="Build"
+              label={t("fields.build")}
               value={
                 APP_COMMIT_SHA ? (
                   <span className="font-mono text-xs">{APP_COMMIT_SHA}</span>
@@ -135,7 +135,7 @@ export default function SettingsPage() {
                 )
               }
             />
-            <DataRow label="Owner" value={APP_OWNER} />
+            <DataRow label={t("fields.owner")} value={APP_OWNER} />
           </DataList>
         </CardContent>
       </Card>

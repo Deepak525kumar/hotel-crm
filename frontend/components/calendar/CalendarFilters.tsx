@@ -50,7 +50,7 @@ export function CalendarFilters({
       {isAdmin && (
         <div className="w-full sm:w-64">
           <Select
-            label="Hotel group"
+            label={t("fields.hotelGroup")}
             value={groupFilter}
             onChange={(e) => onGroupFilterChange(e.target.value)}
             placeholder={t("filters.allGroups")}

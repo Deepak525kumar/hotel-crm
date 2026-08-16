@@ -10,8 +10,10 @@ import { HotelForm } from "@/components/hotels/HotelForm";
 import type { HotelFormValues } from "@/components/hotels/HotelForm";
 import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateHotelInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function EditHotel() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -79,7 +81,7 @@ function EditHotel() {
         >
           ← Back to hotel
         </TextLink>
-        <PageHeader className="mt-2" title="Edit hotel" />
+        <PageHeader className="mt-2" title={t("hotels.editTitle")} />
       </div>
 
       {error ? (

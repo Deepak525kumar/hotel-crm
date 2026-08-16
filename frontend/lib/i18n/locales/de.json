@@ -37,7 +37,10 @@
     "thisMonth": "Diesen Monat",
     "quickLinks": "Schnellzugriff",
     "permissions": "Berechtigungen",
-    "coordinates": "Koordinaten"
+    "coordinates": "Koordinaten",
+    "loadingLabel": "Wird geladen",
+    "navigation": "Navigation",
+    "openNavigation": "Navigation öffnen"
   },
   "fields": {
     "name": "Name",
@@ -68,7 +71,58 @@
     "employment": "Beschäftigung",
     "employmentType": "Beschäftigungsart",
     "requirements": "Anforderungen",
-    "staffing": "Personalbesetzung"
+    "staffing": "Personalbesetzung",
+    "address": "Adresse",
+    "city": "Stadt",
+    "country": "Land",
+    "hotelGroup": "Hotelgruppe",
+    "geofence": "Geofence",
+    "reason": "Grund",
+    "reasonOptional": "Grund (optional)",
+    "notesOptional": "Notizen (optional)",
+    "commentOptional": "Kommentar (optional)",
+    "created": "Erstellt",
+    "updated": "Aktualisiert",
+    "category": "Kategorie",
+    "currency": "Währung",
+    "latitude": "Breitengrad",
+    "longitude": "Längengrad",
+    "primaryHotel": "Primäres Hotel",
+    "primaryHotelOptional": "Primäres Hotel (optional)",
+    "groupName": "Gruppenname",
+    "employeeId": "Mitarbeiter-ID",
+    "templateId": "Vorlagen-ID",
+    "channel": "Kanal",
+    "readAt": "Gelesen am",
+    "memberSince": "Mitglied seit",
+    "owner": "Eigentümer",
+    "application": "Anwendung",
+    "version": "Version",
+    "build": "Build",
+    "show": "Anzeigen",
+    "expiryDateOptional": "Ablaufdatum (optional)",
+    "periodStart": "Zeitraum Beginn",
+    "periodEnd": "Zeitraum Ende",
+    "phoneOptional": "Telefon (optional)",
+    "startTime": "Beginnzeit",
+    "endTime": "Endzeit",
+    "hourlyRate": "Stundenlohn",
+    "hourlyRateOptional": "Stundenlohn (optional)",
+    "descriptionOptional": "Beschreibung (optional)",
+    "requirementsOptional": "Anforderungen (optional)",
+    "endDateOptional": "Enddatum (optional)",
+    "streetAndNumber": "Straße und Hausnummer",
+    "billingInfo": "Rechnungsinformationen",
+    "billingInfoOptional": "Rechnungsinformationen (optional)",
+    "assignedHotel": "Zugewiesenes Hotel",
+    "assignedHotelGroup": "Zugewiesene Hotelgruppe",
+    "temporaryPassword": "Vorläufiges Passwort",
+    "newPassword": "Neues Passwort",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "workersNeeded": "Benötigte Mitarbeiter",
+    "requiresWorkPermit": "Erfordert eine Arbeitserlaubnis (Nicht-EU/EWR/Schweiz)",
+    "activeCanSignIn": "Aktiv (kann sich auf der Plattform anmelden)"
   },
   "nav": {
     "dashboard": "Übersicht",
@@ -129,7 +183,8 @@
     "logged": "Erfasst",
     "notYetLogged": "Noch nicht erfasst.",
     "awaitingSignature": "Warten auf Unterschrift",
-    "alreadyFilled": "Bereits besetzt"
+    "alreadyFilled": "Bereits besetzt",
+    "inProgress": "In Bearbeitung"
   },
   "assignments": {
     "shiftDetails": "Schichtdetails",
@@ -154,7 +209,25 @@
     "placementDetails": "Einsatzdetails",
     "placeWorker": "Mitarbeiter einteilen",
     "calendarPlacement": "Kalendereinteilung",
-    "roomsCompleted": "Fertige Zimmer"
+    "roomsCompleted": "Fertige Zimmer",
+    "source": "Quelle",
+    "requestedPosition": "Angeforderte Position",
+    "shift": "Schicht",
+    "assignedBy": "Zugewiesen von",
+    "started": "Begonnen",
+    "cancellationReason": "Stornierungsgrund",
+    "cancelTitle": "Einsatz stornieren",
+    "reassignTitle": "Einem anderen Mitarbeiter neu zuweisen",
+    "searchWorkersAtHotel": "Mitarbeiter in diesem Hotel suchen",
+    "logRoomsCompletedTitle": "Fertiggestellte Zimmer erfassen",
+    "verifyTitle": "Einsatz verifizieren",
+    "rateWorkerTitle": "Mitarbeiter bewerten",
+    "placeOnCalendarTitle": "Mitarbeiter im Kalender platzieren",
+    "calendarPlacementsTitle": "Kalenderplatzierungen",
+    "noCalendarPlacements": "Keine Kalenderplatzierungen gefunden",
+    "noCalendarPlacementsDescription": "Platzieren Sie einen Mitarbeiter direkt im Kalender, um ihn hier zu sehen.",
+    "pageDescription": "Bestätigte Mitarbeiter und die Schichten, für die sie eingeteilt sind.",
+    "noneFound": "Keine Einsätze gefunden"
   },
   "settings": {
     "language": {
@@ -171,7 +244,9 @@
     "about": "Über",
     "comingSoon": "Demnächst",
     "themeSystemNote": "System folgt der Einstellung Ihres Geräts.",
-    "localDevBuild": "Lokaler Entwicklungs-Build"
+    "localDevBuild": "Lokaler Entwicklungs-Build",
+    "pageDescription": "Ihre Konto-, Sitzungs- und App-Einstellungen.",
+    "signedInAs": "Angemeldet als"
   },
   "auth": {
     "login": "Anmelden",
@@ -253,7 +328,12 @@
     "categoryGENERAL": "Allgemein",
     "categoryWORK_PERMIT": "Arbeitserlaubnis",
     "upload": "Hochladen",
-    "retryUpload": "Erneut hochladen"
+    "retryUpload": "Erneut hochladen",
+    "storageNotConfigured": "Speicher in dieser Umgebung nicht konfiguriert",
+    "evaluateWorkPermitRequired": "Mit erforderlicher Arbeitserlaubnis bewerten",
+    "noDocuments": "Keine Dokumente",
+    "uploadTitle": "Dokument hochladen",
+    "nonEuWorkPermit": "Arbeitserlaubnisdokument für Nicht-EU/EWR/Schweiz"
   },
   "hr": {
     "title": "Personal & Lohn",
@@ -267,7 +347,13 @@
     "signedContract": "Unterschriebener Vertrag",
     "contractExpired": "Vertrag abgelaufen",
     "noSignedContract": "Unterschriebener Vertrag noch nicht hinterlegt",
-    "loadContractFailed": "Ihr Vertrag konnte nicht geladen werden."
+    "loadContractFailed": "Ihr Vertrag konnte nicht geladen werden.",
+    "noContract": "Kein Vertrag",
+    "signatureConfirmed": "Unterschrift bestätigt",
+    "createContractTitle": "Vertrag erstellen",
+    "noPayslipRequests": "Keine Gehaltsabrechnungsanfragen",
+    "noPayslipRequestsDescription": "Anfragen erscheinen hier, sobald der Mitarbeiter eine Gehaltsabrechnung anfordert oder ein Manager eine in seinem Namen erstellt.",
+    "newPayslipRequestTitle": "Neue Gehaltsabrechnungsanfrage"
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",
@@ -277,11 +363,16 @@
     "withdraw": "Widerrufen",
     "reviewAgain": "Erneut ansehen",
     "reviewNotice": "Hinweis ansehen",
-    "loadFailed": "Ihr Einwilligungsstatus konnte nicht geladen werden."
+    "loadFailed": "Ihr Einwilligungsstatus konnte nicht geladen werden.",
+    "history": "Zustimmungsverlauf",
+    "auditTrail": "Prüfprotokoll"
   },
   "notifications": {
     "title": "Benachrichtigungen",
-    "none": "Keine Benachrichtigungen."
+    "none": "Keine Benachrichtigungen.",
+    "channel": "Kanal",
+    "readAt": "Gelesen am",
+    "noneFound": "Keine Benachrichtigungen gefunden"
   },
   "leaderboard": {
     "none": "Noch keine Ranglistendaten.",
@@ -293,7 +384,9 @@
     "createdBy": "Erstellt von",
     "directManager": "Direkte Führungskraft",
     "signOut": "Abmelden",
-    "noAbsences": "Keine Krank- oder Urlaubstage eingetragen."
+    "noAbsences": "Keine Krank- oder Urlaubstage eingetragen.",
+    "editTitle": "Profil bearbeiten",
+    "resetPasswordTitle": "Passwort zurücksetzen"
   },
   "skills": {
     "CLEANER": "Reinigungskraft",
@@ -309,7 +402,18 @@
     "noSummary": "Für diesen Tag wurde keine Übersicht hinterlegt.",
     "loadFailed": "Der Kalender konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
     "assignedOrOnLeave": "Heute eingeteilt oder abwesend",
-    "freeToday": "Heute frei"
+    "freeToday": "Heute frei",
+    "markAbsentTitle": "Einen Mitarbeiter an diesem Tag als abwesend markieren",
+    "repeatWeekly": "Wöchentlich wiederholen",
+    "numberOfWeeks": "Anzahl der Wochen",
+    "noAbsencesRecorded": "Keine Abwesenheiten erfasst",
+    "noAbsencesDescription": "Von Ihnen markierte Kranktage und Urlaub erscheinen hier.",
+    "markAbsence": "Abwesenheit markieren",
+    "placements": "Platzierungen",
+    "workersPlaced": "Platzierte Mitarbeiter",
+    "sick": "Krank",
+    "onVacation": "Im Urlaub",
+    "nothingScheduled": "Nichts geplant"
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",
@@ -318,7 +422,15 @@
     "new": "Neues Hotel",
     "newGroup": "Neue Gruppe",
     "noGroup": "Keine Hotelgruppe zugewiesen",
-    "orgChart": "Organigramm"
+    "orgChart": "Organigramm",
+    "noDeleted": "Keine gelöschten Hotels",
+    "noDeletedDescription": "Gelöschte Hotels erscheinen hier und können wiederhergestellt werden.",
+    "editTitle": "Hotel bearbeiten",
+    "newDescription": "Fügen Sie eine Unterkunft hinzu. Gruppen- und Managerzuweisung sind hier optional und können auch später festgelegt werden.",
+    "pageDescription": "Über die Plattform mit Personal versorgte Unterkünfte.",
+    "noneFound": "Keine Hotels gefunden",
+    "activeVisibleForStaffing": "Aktiv (für Mitarbeiter sichtbar und offen für Personaleinsatz)",
+    "acceptingNewWorkRequests": "Nimmt neue Arbeitsanfragen an"
   },
   "users": {
     "new": "Neuer Benutzer",
@@ -329,7 +441,18 @@
     "applicant": "Bewerber",
     "yourAccount": "Ihr Konto",
     "accountSettings": "Kontoeinstellungen",
-    "exportMyData": "Meine Daten exportieren"
+    "exportMyData": "Meine Daten exportieren",
+    "editTitle": "Benutzer bearbeiten",
+    "availability": "Verfügbarkeit",
+    "deactivateAccountTitle": "Konto deaktivieren",
+    "revokeSessionsTitle": "Alle Sitzungen widerrufen",
+    "newTitle": "Neuer Benutzer",
+    "newDescription": "Erstellen Sie ein Konto und legen Sie eine anfängliche Rolle fest. Das Onboarding beginnt automatisch.",
+    "pageDescription": "Personen mit Zugriff auf die Plattform.",
+    "noneFound": "Keine Benutzer gefunden",
+    "managesHotel": "Verwaltet Hotel",
+    "managesGroup": "Verwaltet Gruppe",
+    "editAssignmentTitle": "Zuweisung bearbeiten"
   },
   "requests": {
     "title": "Arbeitsanfrage",
@@ -337,7 +460,21 @@
     "newBroadcast": "Neuer Rundruf",
     "acceptedWorkers": "Angenommene Mitarbeiter",
     "noneAccepted": "Bisher hat kein Mitarbeiter diesen Rundruf angenommen.",
-    "notAcceptingNew": "Nimmt keine neuen Arbeitsanfragen an"
+    "notAcceptingNew": "Nimmt keine neuen Arbeitsanfragen an",
+    "createdBy": "Erstellt von",
+    "published": "Veröffentlicht",
+    "expires": "Läuft ab",
+    "cancellationReason": "Stornierungsgrund",
+    "cancelTitle": "Arbeitsanfrage stornieren",
+    "cancelPlaceholder": "Teilen Sie mit, warum diese Arbeitsanfrage storniert wurde.",
+    "broadcastDescription": "Bieten Sie eine Schicht allen berechtigten Mitarbeitern gleichzeitig an. Wer für eine Qualifikation zuerst annimmt, erhält den Platz.",
+    "broadcastsDescription": "Schichten, die allen berechtigten Mitarbeitern gleichzeitig angeboten werden. Die erste Annahme je Qualifikation gewinnt.",
+    "noBroadcastsFound": "Keine Rundmeldungen gefunden",
+    "noBroadcastsDescription": "Senden Sie eine Rundmeldung, um eine Schicht für alle berechtigten Mitarbeiter zu öffnen.",
+    "newTitle": "Neue Arbeitsanfrage",
+    "newDescription": "Speichern Sie als Entwurf oder veröffentlichen Sie sofort, um sie für die Personalplanung zu öffnen.",
+    "pageDescription": "Für die Personalplanung offene Schichten in Ihren Hotels.",
+    "noneFound": "Keine Arbeitsanfragen gefunden"
   },
   "onboarding": {
     "managerReview": "Manager-Prüfung",
@@ -370,11 +507,75 @@
         "label": "Inaktiv",
         "description": "Ihr Beschäftigungsdatensatz ist derzeit nicht aktiv."
       }
-    }
+    },
+    "noRecordFound": "Kein Onboarding-Datensatz gefunden",
+    "noRecordDescription": "Ihr Onboarding-Datensatz wurde noch nicht erstellt. Bitte wenden Sie sich an Ihren Manager.",
+    "applicationStatus": "Bewerbungsstatus",
+    "reviewQueueTitle": "Prüfliste",
+    "reviewQueueDescription": "Von Ihrem Team eingereichte Bewerbungen, die auf Ihre Prüfung warten.",
+    "reviewQueueEmpty": "Prüfliste leer",
+    "reviewQueueEmptyDescription": "Es gibt keine Bewerbungen, die auf Ihre Prüfung warten.",
+    "assignApprovedEmployee": "Genehmigten Mitarbeiter zuweisen",
+    "rejectApplication": "Bewerbung ablehnen",
+    "rejectionReason": "Ablehnungsgrund"
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
     "avgRating": "Ø Bewertung",
-    "recentRatings": "Neueste Bewertungen"
+    "recentRatings": "Neueste Bewertungen",
+    "description": "Operative Leistung über Personaleinsatz, Anwesenheit und Qualität.",
+    "scope": "Bereich",
+    "openRequests": "Offene Anfragen",
+    "onTimeRate": "Pünktlichkeitsquote",
+    "qualityPassRate": "Qualitätsbestehensquote",
+    "noShows": "Nichterscheinen",
+    "completedShifts": "Abgeschlossene Schichten",
+    "totalShifts": "Schichten insgesamt",
+    "averageRating": "Durchschnittliche Bewertung",
+    "attendanceRate": "Anwesenheitsquote",
+    "noRankedWorkers": "Noch keine bewerteten Mitarbeiter",
+    "noRankedWorkersDescription": "Rankings erscheinen, sobald Mitarbeiter Einsätze abgeschlossen haben.",
+    "shifts": "Schichten"
+  },
+  "hotelGroups": {
+    "noDeleted": "Keine gelöschten Hotelgruppen",
+    "noDeletedDescription": "Gelöschte Gruppen erscheinen hier und können wiederhergestellt werden.",
+    "editTitle": "Hotelgruppe bearbeiten",
+    "noHotelsInGroup": "Keine Hotels in dieser Gruppe",
+    "assignHotelsHint": "Weisen Sie dieser Gruppe Hotels über den Bearbeitungsbildschirm eines Hotels zu.",
+    "noEmployees": "Keine Mitarbeiter in dieser Gruppe",
+    "noEmployeesDescription": "Mitarbeiter erscheinen hier, sobald sie einen Beschäftigungsdatensatz in einem der Hotels dieser Gruppe haben.",
+    "employeesInGroup": "Mitarbeiter in dieser Gruppe",
+    "billingInfo": "Rechnungsinformationen",
+    "noHotelsAssigned": "Keine Hotels zugewiesen",
+    "newTitle": "Neue Hotelgruppe",
+    "newDescription": "Fassen Sie Hotels unter einer Region zusammen. Weisen Sie einen Regionalmanager über dessen Benutzerseite zu.",
+    "pageDescription": "Regionale Gruppierungen, die Manager und Abrechnung eingrenzen.",
+    "noneYet": "Noch keine Hotelgruppen",
+    "noneYetDescription": "Gruppen ermöglichen es, einen Regionalmanager über mehrere Hotels hinweg zuzuweisen."
+  },
+  "attendance": {
+    "expectedStart": "Erwarteter Beginn",
+    "expectedEnd": "Erwartetes Ende",
+    "minutesLate": "Minuten verspätet",
+    "minutesWorked": "Gearbeitete Minuten",
+    "verifiedBy": "Verifiziert von",
+    "verifiedAt": "Verifiziert am",
+    "reviewTitle": "Anwesenheit prüfen",
+    "markVerified": "Als verifiziert markieren",
+    "pageDescription": "Check-in-, Check-out- und Verifizierungsstatus für besetzte Schichten.",
+    "records": "Anwesenheitsaufzeichnungen",
+    "noneFound": "Keine Anwesenheitsaufzeichnungen gefunden"
+  },
+  "employees": {
+    "noBlocked": "Keine gesperrten Mitarbeiter",
+    "noBlockedDescription": "Mitarbeiter, die für Einsätze in diesem Hotel gesperrt sind, erscheinen hier.",
+    "addToBlocklistTitle": "Zur Sperrliste hinzufügen",
+    "employmentCycle": "Beschäftigungszyklus",
+    "deactivationReason": "Deaktivierungsgrund",
+    "approveForWorkTitle": "Für Arbeit genehmigen",
+    "deactivateTemporaryTitle": "Deaktivieren (vorübergehende Pause)",
+    "deleteLeftCompanyTitle": "Löschen (Unternehmen verlassen)",
+    "editSkillsTitle": "Fähigkeiten bearbeiten"
   }
 }

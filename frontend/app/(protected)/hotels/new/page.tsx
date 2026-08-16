@@ -10,8 +10,10 @@ import type { HotelFormValues } from "@/components/hotels/HotelForm";
 import { useHotelGroups } from "@/hooks/useHotels";
 import { Card, CardContent, PageHeader, TextLink } from "@/components/ui";
 import type { CreateHotelInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function NewHotel() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { groups } = useHotelGroups({ limit: 100 });
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +76,8 @@ function NewHotel() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New hotel"
-          description="Add a property. Group and manager assignment are optional here and can also be set later."
+          title={t("hotels.new")}
+          description={t("hotels.newDescription")}
         />
       </div>
       <HotelForm

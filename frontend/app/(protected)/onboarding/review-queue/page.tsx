@@ -3,8 +3,10 @@
 import { PageHeader, Card, CardContent } from "@/components/ui";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { ReviewQueueTable } from "@/components/onboarding/ReviewQueueTable";
+import { useTranslation } from "react-i18next";
 
 export default function ReviewQueuePage() {
+  const { t } = useTranslation();
   return (
     <RoleGate
       allow={["manager", "regional_manager", "admin"]}
@@ -18,8 +20,8 @@ export default function ReviewQueuePage() {
     >
       <div className="space-y-6">
         <PageHeader
-          title="Review queue"
-          description="Applications submitted by your team, awaiting your review."
+          title={t("nav.reviewQueue")}
+          description={t("onboarding.reviewQueueDescription")}
         />
         <ReviewQueueTable />
       </div>

@@ -139,22 +139,22 @@ export default function AttendanceDetailPage() {
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            <DataRow label="Checked in" value={formatDateTime(record.check_in_at)} />
+            <DataRow label={t("shifts.checkedIn")} value={formatDateTime(record.check_in_at)} />
             <DataRow
-              label="Checked out"
+              label={t("shifts.checkedOut")}
               value={formatDateTime(record.check_out_at)}
             />
             <DataRow
-              label="Expected start"
+              label={t("attendance.expectedStart")}
               value={formatDateTime(record.expected_start)}
             />
             <DataRow
-              label="Expected end"
+              label={t("attendance.expectedEnd")}
               value={formatDateTime(record.expected_end)}
             />
-            <DataRow label="Minutes late" value={record.minutes_late ?? "—"} />
+            <DataRow label={t("attendance.minutesLate")} value={record.minutes_late ?? "—"} />
             <DataRow
-              label="Minutes worked"
+              label={t("attendance.minutesWorked")}
               value={record.minutes_worked ?? "—"}
             />
           </DataList>
@@ -191,7 +191,7 @@ export default function AttendanceDetailPage() {
             />
             {record.verified_by_id && (
               <DataRow
-                label="Verified by"
+                label={t("attendance.verifiedBy")}
                 value={
                   <UserRef userId={record.verified_by_id} fallback="A manager" />
                 }
@@ -199,7 +199,7 @@ export default function AttendanceDetailPage() {
             )}
             {record.verified_at && (
               <DataRow
-                label="Verified at"
+                label={t("attendance.verifiedAt")}
                 value={formatDateTime(record.verified_at)}
               />
             )}
@@ -258,7 +258,7 @@ export default function AttendanceDetailPage() {
         onClose={() => {
           if (!action.isPending("verify")) setReviewOpen(false);
         }}
-        title="Review attendance"
+        title={t("attendance.reviewTitle")}
         footer={
           <>
             <Button
@@ -285,7 +285,7 @@ export default function AttendanceDetailPage() {
           />
 
           <Checkbox
-            label="Mark as verified"
+            label={t("attendance.markVerified")}
             checked={markVerified}
             onChange={(e) => setMarkVerified(e.target.checked)}
           />

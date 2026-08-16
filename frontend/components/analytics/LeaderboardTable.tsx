@@ -63,8 +63,8 @@ export function LeaderboardTable({
           <tr>
             <TD colSpan={columns} className="p-0">
               <EmptyState
-                title="No ranked workers yet"
-                description="Rankings appear once workers complete assignments."
+                title={t("analytics.noRankedWorkers")}
+                description={t("analytics.noRankedWorkersDescription")}
               />
             </TD>
           </tr>

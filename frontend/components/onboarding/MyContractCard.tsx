@@ -73,8 +73,8 @@ export function MyContractCard({ workerId }: { workerId: string }) {
               />
               <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
               <DataRow label={t("jobs.position")} value={contract.position} />
-              <DataRow label="Start date" value={formatDate(contract.start_date)} />
-              {contract.end_date && <DataRow label="End date" value={formatDate(contract.end_date)} />}
+              <DataRow label={t("fields.startDate")} value={formatDate(contract.start_date)} />
+              {contract.end_date && <DataRow label={t("fields.endDate")} value={formatDate(contract.end_date)} />}
             </DataList>
 
             {!contract.is_valid && (

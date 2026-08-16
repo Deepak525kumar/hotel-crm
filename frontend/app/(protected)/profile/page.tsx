@@ -109,7 +109,7 @@ export default function ProfilePage() {
                 }
               />
             )}
-            <DataRow label="Member since" value={formatDateTime(user.created_at)} />
+            <DataRow label={t("fields.memberSince")} value={formatDateTime(user.created_at)} />
           </DataList>
         </CardContent>
       </Card>

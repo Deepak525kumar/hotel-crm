@@ -12,8 +12,10 @@ import { UserForm } from "@/components/users/UserForm";
 import type { UserFormSubmitValues } from "@/components/users/UserForm";
 import { Card, CardContent, PageHeader, Skeleton, TextLink } from "@/components/ui";
 import type { UpdateUserInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function EditUser() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -88,7 +90,7 @@ function EditUser() {
         >
           ← Back to user
         </TextLink>
-        <PageHeader className="mt-2" title="Edit user" />
+        <PageHeader className="mt-2" title={t("users.editTitle")} />
       </div>
 
       {error ? (

@@ -38,7 +38,10 @@
     "thisMonth": "هذا الشهر",
     "quickLinks": "روابط سريعة",
     "permissions": "الأذونات",
-    "coordinates": "الإحداثيات"
+    "coordinates": "الإحداثيات",
+    "loadingLabel": "جارٍ التحميل",
+    "navigation": "التنقل",
+    "openNavigation": "فتح التنقل"
   },
   "fields": {
     "name": "الاسم",
@@ -69,7 +72,58 @@
     "employment": "التوظيف",
     "employmentType": "نوع التوظيف",
     "requirements": "المتطلبات",
-    "staffing": "التوظيف"
+    "staffing": "التوظيف",
+    "address": "العنوان",
+    "city": "المدينة",
+    "country": "الدولة",
+    "hotelGroup": "مجموعة الفنادق",
+    "geofence": "النطاق الجغرافي",
+    "reason": "السبب",
+    "reasonOptional": "السبب (اختياري)",
+    "notesOptional": "ملاحظات (اختياري)",
+    "commentOptional": "تعليق (اختياري)",
+    "created": "تاريخ الإنشاء",
+    "updated": "تاريخ التحديث",
+    "category": "الفئة",
+    "currency": "العملة",
+    "latitude": "خط العرض",
+    "longitude": "خط الطول",
+    "primaryHotel": "الفندق الرئيسي",
+    "primaryHotelOptional": "الفندق الرئيسي (اختياري)",
+    "groupName": "اسم المجموعة",
+    "employeeId": "معرّف الموظف",
+    "templateId": "معرّف القالب",
+    "channel": "القناة",
+    "readAt": "وقت القراءة",
+    "memberSince": "عضو منذ",
+    "owner": "المالك",
+    "application": "التطبيق",
+    "version": "الإصدار",
+    "build": "الإصدار البرمجي",
+    "show": "عرض",
+    "expiryDateOptional": "تاريخ الانتهاء (اختياري)",
+    "periodStart": "بداية الفترة",
+    "periodEnd": "نهاية الفترة",
+    "phoneOptional": "الهاتف (اختياري)",
+    "startTime": "وقت البدء",
+    "endTime": "وقت الانتهاء",
+    "hourlyRate": "الأجر بالساعة",
+    "hourlyRateOptional": "الأجر بالساعة (اختياري)",
+    "descriptionOptional": "الوصف (اختياري)",
+    "requirementsOptional": "المتطلبات (اختياري)",
+    "endDateOptional": "تاريخ الانتهاء (اختياري)",
+    "streetAndNumber": "الشارع ورقم المبنى",
+    "billingInfo": "معلومات الفوترة",
+    "billingInfoOptional": "معلومات الفوترة (اختياري)",
+    "assignedHotel": "الفندق المُسند",
+    "assignedHotelGroup": "مجموعة الفنادق المُسندة",
+    "temporaryPassword": "كلمة مرور مؤقتة",
+    "newPassword": "كلمة مرور جديدة",
+    "firstName": "الاسم الأول",
+    "lastName": "اسم العائلة",
+    "workersNeeded": "الموظفون المطلوبون",
+    "requiresWorkPermit": "يتطلب تصريح عمل (لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا)",
+    "activeCanSignIn": "نشط (يمكنه تسجيل الدخول إلى المنصة)"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -130,7 +184,8 @@
     "logged": "مُسجَّل",
     "notYetLogged": "لم يُسجَّل بعد.",
     "awaitingSignature": "بانتظار التوقيع",
-    "alreadyFilled": "مكتمل بالفعل"
+    "alreadyFilled": "مكتمل بالفعل",
+    "inProgress": "قيد التنفيذ"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",
@@ -155,7 +210,25 @@
     "placementDetails": "تفاصيل التنسيب",
     "placeWorker": "تعيين موظف",
     "calendarPlacement": "التنسيب في التقويم",
-    "roomsCompleted": "الغرف المنجزة"
+    "roomsCompleted": "الغرف المنجزة",
+    "source": "المصدر",
+    "requestedPosition": "المنصب المطلوب",
+    "shift": "الوردية",
+    "assignedBy": "عُيِّن بواسطة",
+    "started": "بدأت",
+    "cancellationReason": "سبب الإلغاء",
+    "cancelTitle": "إلغاء المهمة",
+    "reassignTitle": "إعادة التعيين لموظف آخر",
+    "searchWorkersAtHotel": "البحث عن موظفين في هذا الفندق",
+    "logRoomsCompletedTitle": "تسجيل الغرف المنجزة",
+    "verifyTitle": "التحقق من المهمة",
+    "rateWorkerTitle": "تقييم الموظف",
+    "placeOnCalendarTitle": "تنسيب الموظف في التقويم",
+    "calendarPlacementsTitle": "التنسيبات في التقويم",
+    "noCalendarPlacements": "لم يتم العثور على تنسيبات في التقويم",
+    "noCalendarPlacementsDescription": "قم بتنسيب موظف مباشرة في التقويم لرؤيته هنا.",
+    "pageDescription": "الموظفون المؤكَّدون والورديات المُوظَّفون فيها.",
+    "noneFound": "لم يتم العثور على مهام"
   },
   "settings": {
     "language": {
@@ -172,7 +245,9 @@
     "about": "حول",
     "comingSoon": "قريباً",
     "themeSystemNote": "النظام يتبع إعداد جهازك.",
-    "localDevBuild": "إصدار تطوير محلي"
+    "localDevBuild": "إصدار تطوير محلي",
+    "pageDescription": "إعدادات حسابك وجلستك والتطبيق.",
+    "signedInAs": "تم تسجيل الدخول بصفة"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -254,7 +329,12 @@
     "categoryGENERAL": "عام",
     "categoryWORK_PERMIT": "تصريح عمل",
     "upload": "رفع",
-    "retryUpload": "إعادة الرفع"
+    "retryUpload": "إعادة الرفع",
+    "storageNotConfigured": "التخزين غير مُهيَّأ في هذه البيئة",
+    "evaluateWorkPermitRequired": "التقييم مع اشتراط تصريح العمل",
+    "noDocuments": "لا توجد مستندات",
+    "uploadTitle": "رفع مستند",
+    "nonEuWorkPermit": "مستند تصريح عمل لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا"
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -268,7 +348,13 @@
     "signedContract": "العقد الموقع",
     "contractExpired": "انتهى العقد",
     "noSignedContract": "العقد الموقع غير محفوظ بعد",
-    "loadContractFailed": "تعذر تحميل عقدك."
+    "loadContractFailed": "تعذر تحميل عقدك.",
+    "noContract": "لا يوجد عقد",
+    "signatureConfirmed": "تم تأكيد التوقيع",
+    "createContractTitle": "إنشاء عقد",
+    "noPayslipRequests": "لا توجد طلبات كشوف رواتب",
+    "noPayslipRequestsDescription": "تظهر الطلبات هنا بمجرد أن يطلب الموظف كشف راتب، أو ينشئه مدير نيابة عنه.",
+    "newPayslipRequestTitle": "طلب كشف راتب جديد"
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -278,11 +364,16 @@
     "withdraw": "سحب",
     "reviewAgain": "مراجعة مرة أخرى",
     "reviewNotice": "مراجعة الإشعار",
-    "loadFailed": "تعذر تحميل حالة موافقتك."
+    "loadFailed": "تعذر تحميل حالة موافقتك.",
+    "history": "سجل الموافقات",
+    "auditTrail": "سجل التدقيق"
   },
   "notifications": {
     "title": "الإشعارات",
-    "none": "لا توجد إشعارات."
+    "none": "لا توجد إشعارات.",
+    "channel": "القناة",
+    "readAt": "وقت القراءة",
+    "noneFound": "لم يتم العثور على إشعارات"
   },
   "leaderboard": {
     "none": "لا توجد بيانات لوحة الصدارة بعد.",
@@ -294,7 +385,9 @@
     "createdBy": "أنشئ بواسطة",
     "directManager": "المدير المباشر",
     "signOut": "تسجيل الخروج",
-    "noAbsences": "لم يتم تسجيل أيام مرضية أو إجازات."
+    "noAbsences": "لم يتم تسجيل أيام مرضية أو إجازات.",
+    "editTitle": "تعديل الملف الشخصي",
+    "resetPasswordTitle": "إعادة تعيين كلمة المرور"
   },
   "skills": {
     "CLEANER": "عامل نظافة",
@@ -310,7 +403,18 @@
     "noSummary": "لم يُضف ملخص لهذا اليوم.",
     "loadFailed": "تعذر تحميل التقويم. يرجى المحاولة مرة أخرى.",
     "assignedOrOnLeave": "مُعيَّن أو في إجازة اليوم",
-    "freeToday": "متاح اليوم"
+    "freeToday": "متاح اليوم",
+    "markAbsentTitle": "وضع علامة غياب لموظف في هذا اليوم",
+    "repeatWeekly": "تكرار أسبوعي",
+    "numberOfWeeks": "عدد الأسابيع",
+    "noAbsencesRecorded": "لم يتم تسجيل أي غياب",
+    "noAbsencesDescription": "تظهر هنا أيام المرض والإجازات التي تسجلها.",
+    "markAbsence": "تسجيل غياب",
+    "placements": "التنسيبات",
+    "workersPlaced": "الموظفون المُنسَّبون",
+    "sick": "مريض",
+    "onVacation": "في إجازة",
+    "nothingScheduled": "لا يوجد شيء مجدول"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
@@ -319,7 +423,15 @@
     "new": "فندق جديد",
     "newGroup": "مجموعة جديدة",
     "noGroup": "لم يتم تعيين مجموعة فنادق",
-    "orgChart": "الهيكل التنظيمي"
+    "orgChart": "الهيكل التنظيمي",
+    "noDeleted": "لا توجد فنادق محذوفة",
+    "noDeletedDescription": "تظهر الفنادق المحذوفة هنا ويمكن استعادتها.",
+    "editTitle": "تعديل الفندق",
+    "newDescription": "أضف عقاراً. تعيين المجموعة والمدير اختياري هنا ويمكن أيضاً تحديده لاحقاً.",
+    "pageDescription": "العقارات المزوَّدة بالموظفين عبر المنصة.",
+    "noneFound": "لم يتم العثور على فنادق",
+    "activeVisibleForStaffing": "نشط (مرئي للموظفين ومفتوح للتوظيف)",
+    "acceptingNewWorkRequests": "يقبل طلبات عمل جديدة"
   },
   "users": {
     "new": "مستخدم جديد",
@@ -330,7 +442,18 @@
     "applicant": "مقدم الطلب",
     "yourAccount": "حسابك",
     "accountSettings": "إعدادات الحساب",
-    "exportMyData": "تصدير بياناتي"
+    "exportMyData": "تصدير بياناتي",
+    "editTitle": "تعديل المستخدم",
+    "availability": "التوفر",
+    "deactivateAccountTitle": "إلغاء تفعيل الحساب",
+    "revokeSessionsTitle": "إلغاء جميع الجلسات",
+    "newTitle": "مستخدم جديد",
+    "newDescription": "أنشئ حساباً وحدّد دوراً أولياً. سيبدأ انضمامه تلقائياً.",
+    "pageDescription": "الأشخاص الذين لديهم إمكانية الوصول إلى المنصة.",
+    "noneFound": "لم يتم العثور على مستخدمين",
+    "managesHotel": "يدير الفندق",
+    "managesGroup": "يدير المجموعة",
+    "editAssignmentTitle": "تعديل التعيين"
   },
   "requests": {
     "title": "طلب عمل",
@@ -338,7 +461,21 @@
     "newBroadcast": "بث جديد",
     "acceptedWorkers": "الموظفون المقبولون",
     "noneAccepted": "لم يقبل أي موظف هذا البث بعد.",
-    "notAcceptingNew": "لا يقبل طلبات عمل جديدة"
+    "notAcceptingNew": "لا يقبل طلبات عمل جديدة",
+    "createdBy": "أنشئ بواسطة",
+    "published": "منشور",
+    "expires": "تنتهي صلاحيته",
+    "cancellationReason": "سبب الإلغاء",
+    "cancelTitle": "إلغاء طلب العمل",
+    "cancelPlaceholder": "يرجى بيان سبب إلغاء طلب العمل هذا.",
+    "broadcastDescription": "اطرح وردية على جميع الموظفين المؤهلين دفعة واحدة. من يقبل أولاً لمهارة معينة يحصل على ذلك المكان.",
+    "broadcastsDescription": "ورديات تُطرح على جميع الموظفين المؤهلين دفعة واحدة. أول قبول لكل مهارة يفوز.",
+    "noBroadcastsFound": "لم يتم العثور على بث",
+    "noBroadcastsDescription": "أطلق بثاً لفتح وردية أمام جميع الموظفين المؤهلين.",
+    "newTitle": "طلب عمل جديد",
+    "newDescription": "احفظه كمسودة، أو انشره فوراً لفتحه للتوظيف.",
+    "pageDescription": "الورديات المفتوحة للتوظيف عبر فنادقك.",
+    "noneFound": "لم يتم العثور على طلبات عمل"
   },
   "onboarding": {
     "managerReview": "مراجعة المدير",
@@ -371,11 +508,75 @@
         "label": "غير نشط",
         "description": "سجل توظيفك غير نشط حالياً."
       }
-    }
+    },
+    "noRecordFound": "لم يتم العثور على سجل انضمام",
+    "noRecordDescription": "لم يتم إنشاء سجل انضمامك بعد. يرجى التواصل مع مديرك.",
+    "applicationStatus": "حالة الطلب",
+    "reviewQueueTitle": "قائمة المراجعة",
+    "reviewQueueDescription": "الطلبات المقدَّمة من فريقك، بانتظار مراجعتك.",
+    "reviewQueueEmpty": "قائمة المراجعة فارغة",
+    "reviewQueueEmptyDescription": "لا توجد طلبات بانتظار مراجعتك.",
+    "assignApprovedEmployee": "تعيين الموظف المعتمد",
+    "rejectApplication": "رفض الطلب",
+    "rejectionReason": "سبب الرفض"
   },
   "analytics": {
     "myPerformance": "أدائي",
     "avgRating": "متوسط التقييم",
-    "recentRatings": "التقييمات الأخيرة"
+    "recentRatings": "التقييمات الأخيرة",
+    "description": "الأداء التشغيلي عبر التوظيف والحضور والجودة.",
+    "scope": "النطاق",
+    "openRequests": "الطلبات المفتوحة",
+    "onTimeRate": "معدل الالتزام بالوقت",
+    "qualityPassRate": "معدل اجتياز الجودة",
+    "noShows": "حالات عدم الحضور",
+    "completedShifts": "الورديات المكتملة",
+    "totalShifts": "إجمالي الورديات",
+    "averageRating": "متوسط التقييم",
+    "attendanceRate": "معدل الحضور",
+    "noRankedWorkers": "لا يوجد موظفون مصنّفون بعد",
+    "noRankedWorkersDescription": "تظهر التصنيفات بمجرد أن يكمل الموظفون مهامهم.",
+    "shifts": "الورديات"
+  },
+  "hotelGroups": {
+    "noDeleted": "لا توجد مجموعات فنادق محذوفة",
+    "noDeletedDescription": "تظهر المجموعات المحذوفة هنا ويمكن استعادتها.",
+    "editTitle": "تعديل مجموعة الفنادق",
+    "noHotelsInGroup": "لا توجد فنادق في هذه المجموعة",
+    "assignHotelsHint": "قم بتعيين فنادق لهذه المجموعة من شاشة تعديل الفندق.",
+    "noEmployees": "لا يوجد موظفون في هذه المجموعة",
+    "noEmployeesDescription": "يظهر الموظفون هنا بمجرد أن يكون لديهم سجل توظيف في أحد فنادق هذه المجموعة.",
+    "employeesInGroup": "الموظفون في هذه المجموعة",
+    "billingInfo": "معلومات الفوترة",
+    "noHotelsAssigned": "لم يتم تعيين فنادق",
+    "newTitle": "مجموعة فنادق جديدة",
+    "newDescription": "قم بتجميع الفنادق ضمن منطقة واحدة. عيّن مديراً إقليمياً من صفحة المستخدم الخاصة به.",
+    "pageDescription": "تجميعات إقليمية تحدد نطاق المديرين والفوترة.",
+    "noneYet": "لا توجد مجموعات فنادق بعد",
+    "noneYetDescription": "تتيح لك المجموعات تعيين مدير إقليمي عبر عدة فنادق."
+  },
+  "attendance": {
+    "expectedStart": "البدء المتوقع",
+    "expectedEnd": "الانتهاء المتوقع",
+    "minutesLate": "دقائق التأخير",
+    "minutesWorked": "دقائق العمل",
+    "verifiedBy": "تم التحقق بواسطة",
+    "verifiedAt": "وقت التحقق",
+    "reviewTitle": "مراجعة الحضور",
+    "markVerified": "وضع علامة كمُتحقَّق منه",
+    "pageDescription": "حالة تسجيل الدخول والخروج والتحقق للورديات المزوَّدة بالموظفين.",
+    "records": "سجلات الحضور",
+    "noneFound": "لم يتم العثور على سجلات حضور"
+  },
+  "employees": {
+    "noBlocked": "لا يوجد موظفون محظورون",
+    "noBlockedDescription": "يظهر هنا الموظفون المحظورون من التعيين في هذا الفندق.",
+    "addToBlocklistTitle": "إضافة إلى قائمة الحظر",
+    "employmentCycle": "دورة التوظيف",
+    "deactivationReason": "سبب إلغاء التفعيل",
+    "approveForWorkTitle": "الموافقة على العمل",
+    "deactivateTemporaryTitle": "إلغاء التفعيل (توقف مؤقت)",
+    "deleteLeftCompanyTitle": "حذف (غادر الشركة)",
+    "editSkillsTitle": "تعديل المهارات"
   }
 }

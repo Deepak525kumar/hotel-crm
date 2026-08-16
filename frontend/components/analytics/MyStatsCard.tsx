@@ -42,11 +42,11 @@ export function MyStatsCard() {
         ) : (
           <>
             <div className="grid gap-4 sm:grid-cols-3">
-              <StatTile label="Completed shifts" value={stats.completed_assignments} />
-              <StatTile label="Total shifts" value={stats.total_assignments} />
+              <StatTile label={t("analytics.completedShifts")} value={stats.completed_assignments} />
+              <StatTile label={t("analytics.totalShifts")} value={stats.total_assignments} />
               <StatTile label={t("assignments.roomsCompleted")} value={stats.rooms_completed} />
-              <StatTile label="Average rating" value={formatScore(stats.average_rating, 2)} />
-              <StatTile label="Attendance rate" value={formatPercent(stats.attendance_rate)} />
+              <StatTile label={t("analytics.averageRating")} value={formatScore(stats.average_rating, 2)} />
+              <StatTile label={t("analytics.attendanceRate")} value={formatPercent(stats.attendance_rate)} />
             </div>
 
             <div>
@@ -63,10 +63,10 @@ export function MyStatsCard() {
             <div>
               <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("common.thisMonth")}</p>
               <div className="grid gap-4 sm:grid-cols-3">
-                <StatTile label="Shifts" value={stats.current_month.assignments} />
+                <StatTile label={t("analytics.shifts")} value={stats.current_month.assignments} />
                 <StatTile label={t("status.completed")} value={stats.current_month.completed} />
                 <StatTile
-                  label="Average rating"
+                  label={t("analytics.averageRating")}
                   value={formatScore(stats.current_month.average_rating, 2)}
                 />
               </div>

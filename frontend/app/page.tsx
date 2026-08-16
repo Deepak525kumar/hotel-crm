@@ -3,12 +3,14 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth";
+import { useTranslation } from "react-i18next";
 
 /**
  * Entry route. Auth state lives client-side, so we wait for the store to
  * rehydrate and then route to the dashboard or login accordingly.
  */
 export default function Home() {
+  const { t } = useTranslation();
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
 
@@ -21,7 +23,7 @@ export default function Home() {
     <div className="flex min-h-screen items-center justify-center">
       <span
         role="status"
-        aria-label="Loading"
+        aria-label={t("common.loadingLabel")}
         className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-blue-600 dark:border-gray-700 dark:border-t-blue-500"
       />
     </div>

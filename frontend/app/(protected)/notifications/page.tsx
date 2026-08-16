@@ -108,7 +108,7 @@ export default function NotificationsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:w-48">
           <Select
-            label="Show"
+            label={t("fields.show")}
             value={filter}
             onChange={(e) => setFilter(e.target.value as "" | "unread" | "read")}
             options={READ_FILTERS}
@@ -142,7 +142,7 @@ export default function NotificationsPage() {
                   <tr>
                     <TD colSpan={COLUMNS} className="p-0">
                       <EmptyState
-                        title="No notifications found"
+                        title={t("notifications.noneFound")}
                         description={
                           filter
                             ? "Try a different filter."
