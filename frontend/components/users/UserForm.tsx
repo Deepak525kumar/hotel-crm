@@ -1,5 +1,6 @@
 "use client";
 
+import { SKILL_OPTIONS } from "@/lib/skills";
 import { useState } from "react";
 import {
   Button,
@@ -13,16 +14,10 @@ import {
 import { useAuthStore } from "@/stores/auth";
 import { creatableRolesFor } from "@/lib/roleHierarchy";
 import type { EmploymentType, Role, UserDetail, Hotel, HotelGroup } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 // ADR-065 (Universal Onboarding Gate): mandatory for every non-admin role at
 // creation — mirrors the backend CreateUserSchema.superRefine requirement.
-
-const SKILL_OPTIONS = [
-  { value: "CLEANER", label: "Cleaner" },
-  { value: "PUBLIC_SERVICE", label: "Public Service" },
-  { value: "KITCHEN_DISHWASHER", label: "Kitchen / Dishwasher" },
-  { value: "WAITER", label: "Waiter" },
-];
 
 const EMPLOYMENT_TYPE_OPTIONS: { value: EmploymentType; label: string }[] = [
   { value: "FULL_TIME", label: "Full-time" },
@@ -119,6 +114,7 @@ export function UserForm({
   onSubmit,
   onCancel,
 }: UserFormProps) {
+  const { t } = useTranslation();
   // RULE A (project-owner decision, 2026-08-12): a create form may only offer
   // the roles the CURRENT viewer may create — one level below itself. See
   // lib/roleHierarchy.ts. UI affordance only; the backend enforces the same
@@ -188,7 +184,7 @@ export function UserForm({
           {mode === "create" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
-                label="Email"
+                label={t("fields.email")}
                 type="email"
                 required
                 autoComplete="off"
@@ -207,7 +203,7 @@ export function UserForm({
               />
             </div>
           ) : (
-            <Input label="Email" value={form.email} disabled readOnly />
+            <Input label={t("fields.email")} value={form.email} disabled readOnly />
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -234,7 +230,7 @@ export function UserForm({
               onChange={(e) => set("phone", e.target.value)}
             />
             <Select
-              label="Role"
+              label={t("fields.role")}
               value={form.role}
               onChange={(e) => set("role", e.target.value as Role)}
               options={roleOptions}
@@ -293,7 +289,7 @@ export function UserForm({
               </p>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
-                  label="Job title"
+                  label={t("fields.jobTitle")}
                   required
                   value={form.job_title}
                   onChange={(e) => set("job_title", e.target.value)}
@@ -314,12 +310,12 @@ export function UserForm({
               
               {form.role === "worker" && (
                 <div className="space-y-2 sm:col-span-2 pt-2">
-                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">Skills</span>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300">{t("fields.skills")}</span>
                   <div className="grid grid-cols-2 gap-2">
                     {SKILL_OPTIONS.map((opt) => (
                       <Checkbox
                         key={opt.value}
-                        label={opt.label}
+                        label={t(opt.labelKey)}
                         checked={form.skills.includes(opt.value)}
                         onChange={(e) => {
                           const newSkills = e.target.checked
@@ -334,7 +330,7 @@ export function UserForm({
               )}
 
               <Select
-                label="Employment type"
+                label={t("fields.employmentType")}
                 value={form.employment_type}
                 onChange={(e) => set("employment_type", e.target.value as EmploymentType)}
                 options={[

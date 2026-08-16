@@ -6,6 +6,7 @@ import { complianceApi } from "@/lib/api";
 import { formatDateTime } from "@/lib/format";
 import { Badge, Button, Card, CardContent, CardHeader, CardTitle, FormError } from "@/components/ui";
 import type { SubjectRightsBundle } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function downloadJson(bundle: SubjectRightsBundle) {
   const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
@@ -26,11 +27,12 @@ function SourceRow({
   result: { status: "ok" | "unavailable" };
   count: number | null;
 }) {
+  const { t } = useTranslation();
   return (
     <li className="flex items-center justify-between gap-4 border-b border-gray-100 py-3 last:border-b-0 dark:border-gray-800">
       <p className="text-sm text-gray-700 dark:text-gray-300">{label}</p>
       {result.status === "unavailable" ? (
-        <Badge tone="warning">Unavailable</Badge>
+        <Badge tone="warning">{t("status.unavailable")}</Badge>
       ) : (
         <Badge tone="neutral">{count} {count === 1 ? "record" : "records"}</Badge>
       )}
@@ -51,6 +53,7 @@ function SourceRow({
  * here as a fourth source.
  */
 export function ExportMyDataCard() {
+  const { t } = useTranslation();
   const [bundle, setBundle] = useState<SubjectRightsBundle | null>(null);
   const request = useAsyncAction();
 
@@ -62,7 +65,7 @@ export function ExportMyDataCard() {
   return (
     <Card>
       <CardHeader className="flex items-center justify-between">
-        <CardTitle>Export my data</CardTitle>
+        <CardTitle>{t("users.exportMyData")}</CardTitle>
         <Button size="sm" variant="outline" onClick={onRequest} loading={request.pending}>
           {bundle ? "Refresh" : "Request export"}
         </Button>
@@ -79,7 +82,7 @@ export function ExportMyDataCard() {
             </p>
             <ul>
               <SourceRow
-                label="Documents"
+                label={t("documents.title")}
                 result={bundle.documents}
                 count={bundle.documents.data?.length ?? null}
               />

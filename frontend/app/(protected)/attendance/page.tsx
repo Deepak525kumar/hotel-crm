@@ -23,6 +23,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { Attendance, AttendanceStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -67,6 +68,7 @@ function AttendanceRow({ record: r }: { record: Attendance }) {
 }
 
 export default function AttendancePage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AttendanceStatus | "">("");
   const [verified, setVerified] = useState<"" | "true" | "false">("");
   const [page, setPage] = useState(1);
@@ -91,14 +93,14 @@ export default function AttendancePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Attendance"
+        title={t("nav.attendance")}
         description="Check-in, check-out and verification status for staffed shifts."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:w-48">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={status}
             onChange={(e) => onStatusChange(e.target.value as AttendanceStatus | "")}
             options={STATUS_FILTERS}
@@ -106,7 +108,7 @@ export default function AttendancePage() {
         </div>
         <div className="w-full sm:w-48">
           <Select
-            label="Verification"
+            label={t("assignments.verification")}
             value={verified}
             onChange={(e) =>
               onVerifiedChange(e.target.value as "" | "true" | "false")
@@ -126,11 +128,11 @@ export default function AttendancePage() {
             <Table aria-label="Attendance records">
               <THead>
                 <tr>
-                  <TH>Worker</TH>
-                  <TH>Status</TH>
-                  <TH>Check-in</TH>
-                  <TH>Check-out</TH>
-                  <TH>Verification</TH>
+                  <TH>{t("fields.worker")}</TH>
+                  <TH>{t("fields.status")}</TH>
+                  <TH>{t("assignments.checkInLabel")}</TH>
+                  <TH>{t("assignments.checkOutLabel")}</TH>
+                  <TH>{t("assignments.verification")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

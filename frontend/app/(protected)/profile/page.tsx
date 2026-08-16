@@ -11,7 +11,8 @@ import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
 import { EditProfileCard } from "@/components/profile/EditProfileCard";
 import { formatDateTime } from "@/lib/format";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import { SKILL_LABEL } from "@/lib/skills";
+import { SKILL_LABEL_KEY } from "@/lib/skills";
+import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Badge,
@@ -26,6 +27,7 @@ import {
 } from "@/components/ui";
 
 export default function ProfilePage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   // Revalidate /auth/me so the view reflects any server-side changes.
   const { isLoading } = useMe();
@@ -42,7 +44,7 @@ export default function ProfilePage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <PageHeader title="Profile" />
+        <PageHeader title={t("nav.profile")} />
         <Card>
           <CardContent className="space-y-3">
             <Skeleton className="h-6 w-1/2" />
@@ -83,13 +85,13 @@ export default function ProfilePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Account</CardTitle>
+          <CardTitle>{t("nav.account")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
-            <DataRow label="Email" value={user.email} />
-            <DataRow label="Phone" value={user.phone || "—"} />
-            <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+            <DataRow label={t("fields.email")} value={user.email} />
+            <DataRow label={t("fields.phone")} value={user.phone || "—"} />
+            <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
             {/* Read-only: a worker views their own skills here but does not
                 edit them -- setting them is a manager/RM/admin decision
                 (employee-management/service.ts's updateEmployee is gated
@@ -99,11 +101,11 @@ export default function ProfilePage() {
                 admin-facing /users/:id page instead. */}
             {user.role === "worker" && (
               <DataRow
-                label="Skills"
+                label={t("fields.skills")}
                 value={
                   employmentRecord?.skills && employmentRecord.skills.length > 0
-                    ? employmentRecord.skills.map((s) => SKILL_LABEL[s] ?? s).join(", ")
-                    : "None set"
+                    ? employmentRecord.skills.map((s) => t(SKILL_LABEL_KEY[s]) ?? s).join(", ")
+                    : t("common.notSet")
                 }
               />
             )}

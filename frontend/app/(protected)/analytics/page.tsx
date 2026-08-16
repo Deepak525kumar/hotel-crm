@@ -7,6 +7,7 @@ import { RoleGate } from "@/components/auth/RoleGate";
 import { BreakdownBar } from "@/components/analytics/BreakdownBar";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
 import { formatPercent, formatScore } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   Card,
   CardContent,
@@ -29,6 +30,7 @@ function StatTilesSkeleton() {
 }
 
 function AnalyticsDashboard() {
+  const { t } = useTranslation();
   const [hotelId, setHotelId] = useState("");
   const scope = hotelId || undefined;
 
@@ -40,7 +42,7 @@ function AnalyticsDashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Analytics"
+        title={t("nav.analytics")}
         description="Operational performance across staffing, attendance and quality."
         actions={
           <div className="w-full sm:w-64">
@@ -49,7 +51,7 @@ function AnalyticsDashboard() {
               value={hotelId}
               onChange={(e) => setHotelId(e.target.value)}
             >
-              <option value="">All hotels</option>
+              <option value="">{t("filters.allHotels")}</option>
               {hotels.map((h) => (
                 <option key={h.id} value={h.id}>
                   {h.name}
@@ -87,7 +89,7 @@ function AnalyticsDashboard() {
               hint={`${stats.quality.total_verifications} verifications`}
             />
             <StatTile
-              label="Avg rating"
+              label={t("analytics.avgRating")}
               value={formatScore(stats.ratings.average_score, 2)}
               hint={`${stats.ratings.total} ratings`}
             />
@@ -95,7 +97,7 @@ function AnalyticsDashboard() {
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatTile
-              label="Assignments"
+              label={t("nav.assignments")}
               value={stats.assignments.total}
               hint={`${stats.assignments.completed} completed`}
             />
@@ -108,7 +110,7 @@ function AnalyticsDashboard() {
               value={stats.assignments.no_show}
             />
             <StatTile
-              label="Rooms completed"
+              label={t("assignments.roomsCompleted")}
               value={stats.rooms_completed.total}
               hint={`${stats.rooms_completed.entries} entries`}
             />
@@ -117,7 +119,7 @@ function AnalyticsDashboard() {
           <div className="grid gap-4 lg:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle>Work requests</CardTitle>
+                <CardTitle>{t("nav.requests")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <BreakdownBar
@@ -150,7 +152,7 @@ function AnalyticsDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Assignments</CardTitle>
+                <CardTitle>{t("nav.assignments")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <BreakdownBar
@@ -182,7 +184,7 @@ function AnalyticsDashboard() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Attendance</CardTitle>
+                <CardTitle>{t("nav.attendance")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <BreakdownBar
@@ -212,7 +214,7 @@ function AnalyticsDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Worker leaderboard</CardTitle>
+          <CardTitle>{t("users.leaderboard")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <LeaderboardTable

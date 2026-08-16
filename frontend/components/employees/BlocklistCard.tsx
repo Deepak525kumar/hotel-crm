@@ -20,6 +20,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { EmployeeBlocklistEntry } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 function BlocklistRow({ entry }: { entry: EmployeeBlocklistEntry }) {
   return (
@@ -45,6 +46,7 @@ function BlocklistRow({ entry }: { entry: EmployeeBlocklistEntry }) {
  * see a button that will only ever 403.
  */
 export function BlocklistCard({ hotelId }: { hotelId: string }) {
+  const { t } = useTranslation();
   const { data: entries, isLoading, error } = useHotelBlocklist(hotelId);
   const [addOpen, setAddOpen] = useState(false);
 
@@ -52,7 +54,7 @@ export function BlocklistCard({ hotelId }: { hotelId: string }) {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Employee blocklist</CardTitle>
+          <CardTitle>{t("users.blocklist")}</CardTitle>
           <BlocklistWriteGate>
             <Button size="sm" onClick={() => setAddOpen(true)}>
               Add to blocklist

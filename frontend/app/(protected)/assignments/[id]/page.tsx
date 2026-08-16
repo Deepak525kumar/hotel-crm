@@ -31,8 +31,10 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { QualityVerification, Rating, RoomsCompletedEntry } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export default function AssignmentDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const { id } = params;
   const currentUser = useAuthStore((s) => s.user);
@@ -258,18 +260,18 @@ export default function AssignmentDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t("common.details")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
-              label="Worker"
+              label={t("fields.worker")}
               value={
                 <UserRef userId={assignment.worker_id} fallback="The assigned worker" />
               }
             />
             <DataRow
-              label="Hotel"
+              label={t("fields.hotel")}
               value={
                 <TextLink href={`/hotels/${assignment.hotel_id}`}>
                   {hotel?.name ?? "View hotel"}
@@ -313,7 +315,7 @@ export default function AssignmentDetailPage() {
               }
             />
             <DataRow
-              label="Confirmed"
+              label={t("status.confirmed")}
               value={formatDateTime(assignment.confirmed_at)}
             />
             {assignment.started_at && (
@@ -324,13 +326,13 @@ export default function AssignmentDetailPage() {
             )}
             {assignment.completed_at && (
               <DataRow
-                label="Completed"
+                label={t("status.completed")}
                 value={formatDateTime(assignment.completed_at)}
               />
             )}
             {assignment.cancelled_at && (
               <DataRow
-                label="Cancelled"
+                label={t("status.cancelled")}
                 value={formatDateTime(assignment.cancelled_at)}
               />
             )}
@@ -407,7 +409,7 @@ export default function AssignmentDetailPage() {
                   : "Log the rooms completed count for this assignment."}
               </div>
               {(loggedRoomsCompleted ?? assignment.rooms_completed) ? (
-                <Badge tone="success">Logged</Badge>
+                <Badge tone="success">{t("status.logged")}</Badge>
               ) : (
                 <Button
                   variant="outline"
@@ -469,7 +471,7 @@ export default function AssignmentDetailPage() {
                 : "Rate the worker's performance for this assignment."}
             </div>
             {loggedRating ? (
-              <Badge tone="success">Rated</Badge>
+              <Badge tone="success">{t("status.rated")}</Badge>
             ) : (
               <Button variant="outline" onClick={() => setRatingOpen(true)} className="shrink-0">
                 Rate
@@ -512,7 +514,7 @@ export default function AssignmentDetailPage() {
           onChange={(e) => setCancelReason(e.target.value)}
           maxLength={500}
           rows={4}
-          placeholder="Share why this assignment was cancelled."
+          placeholder={t("assignments.cancelReasonPlaceholder")}
         />
       </Modal>
 
@@ -565,6 +567,7 @@ function ReassignModal({
   onClose: () => void;
   onReassigned: (updated: import("@/lib/types").Assignment) => void;
 }) {
+  const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
   const { users: workers, isLoading: workersLoading } = useUserOptions({
@@ -626,13 +629,13 @@ function ReassignModal({
           label="Search workers at this hotel"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by name or email…"
+          placeholder={t("search.byNameOrEmail")}
         />
         <div className="max-h-40 overflow-y-auto rounded-md border border-gray-200 dark:border-gray-800">
           {workersLoading ? (
             <div className="p-3 text-sm text-gray-400 dark:text-gray-500">Searching…</div>
           ) : eligibleWorkers.length === 0 ? (
-            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">No eligible workers found.</div>
+            <div className="p-3 text-sm text-gray-400 dark:text-gray-500">{t("assignments.noEligibleWorkers")}</div>
           ) : (
             eligibleWorkers.map((w) => {
               const label = `${w.first_name} ${w.last_name}`;
@@ -642,7 +645,7 @@ function ReassignModal({
                   key={w.id}
                   type="button"
                   onClick={() => setSelectedWorkerId(w.id)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  className={`flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
                     selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >
@@ -670,6 +673,7 @@ function LogRoomsCompletedModal({
   onClose: () => void;
   onLogged: (entry: RoomsCompletedEntry) => void;
 }) {
+  const { t } = useTranslation();
   const [roomsCompleted, setRoomsCompleted] = useState("");
   const [notes, setNotes] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
@@ -729,7 +733,7 @@ function LogRoomsCompletedModal({
     >
       <div className="space-y-4">
         <Input
-          label="Rooms completed"
+          label={t("assignments.roomsCompleted")}
           type="number"
           min={0}
           step={1}

@@ -28,7 +28,16 @@
     "total": "Total",
     "actions": "Actions",
     "optional": "Optional",
-    "required": "Required"
+    "required": "Required",
+    "count": "Count",
+    "day": "Day",
+    "message": "Message",
+    "record": "Record",
+    "noEntries": "No entries",
+    "thisMonth": "This month",
+    "quickLinks": "Quick links",
+    "permissions": "Permissions",
+    "coordinates": "Coordinates"
   },
   "fields": {
     "name": "Name",
@@ -54,7 +63,12 @@
     "pay": "Pay",
     "rating": "Rating",
     "startDate": "Start Date",
-    "endDate": "End Date"
+    "endDate": "End Date",
+    "jobTitle": "Job title",
+    "employment": "Employment",
+    "employmentType": "Employment type",
+    "requirements": "Requirements",
+    "staffing": "Staffing"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -108,7 +122,16 @@
     "read": "Read",
     "unread": "Unread",
     "submitted": "Submitted",
-    "uploaded": "Uploaded"
+    "uploaded": "Uploaded",
+    "granted": "Granted",
+    "paused": "Paused",
+    "returning": "Returning",
+    "rated": "Rated",
+    "received": "Received",
+    "logged": "Logged",
+    "notYetLogged": "Not yet logged.",
+    "awaitingSignature": "Awaiting signature",
+    "alreadyFilled": "Already filled"
   },
   "assignments": {
     "shiftDetails": "Shift details",
@@ -120,7 +143,20 @@
     "checkOut": "Check out",
     "stayOver": "Stay-over",
     "noEligibleWorkers": "No eligible workers found.",
-    "cancelReasonPlaceholder": "Share why this assignment was cancelled."
+    "cancelReasonPlaceholder": "Share why this assignment was cancelled.",
+    "title": "Assignment",
+    "checkInLabel": "Check-in",
+    "checkOutLabel": "Check-out",
+    "checkout": "Checkout",
+    "insideGeofence": "Inside geofence",
+    "outsideGeofence": "Outside geofence",
+    "verification": "Verification",
+    "loggedBy": "Logged by",
+    "loading": "Loading assignments…",
+    "placementDetails": "Placement details",
+    "placeWorker": "Place worker",
+    "calendarPlacement": "Calendar Placement",
+    "roomsCompleted": "Rooms completed"
   },
   "settings": {
     "language": {
@@ -136,7 +172,8 @@
     "appearance": "Appearance",
     "about": "About",
     "comingSoon": "Coming soon",
-    "themeSystemNote": "System follows your device's setting."
+    "themeSystemNote": "System follows your device's setting.",
+    "localDevBuild": "Local development build"
   },
   "auth": {
     "login": "Log in",
@@ -152,7 +189,10 @@
     "tooManyAttempts": "Too many attempts. Please wait before trying again.",
     "loginFailed": "Login failed. Please try again.",
     "signInTo": "Sign in to {{app}}",
-    "email": "Email"
+    "email": "Email",
+    "resetYourPassword": "Reset your password",
+    "setNewPassword": "Set New Password",
+    "invalidResetLink": "Invalid password reset link. The token is missing."
   },
   "search": {
     "byNameOrEmail": "Search by name or email…",
@@ -224,7 +264,12 @@
     "noActiveContract": "No Active Contract",
     "payslipRequests": "Payslip Requests",
     "noRequests": "No Requests",
-    "payslipRequestFailed": "Failed to request payslip"
+    "payslipRequestFailed": "Failed to request payslip",
+    "contract": "Contract",
+    "signedContract": "Signed Contract",
+    "contractExpired": "Contract Expired",
+    "noSignedContract": "Signed contract not yet on file",
+    "loadContractFailed": "Failed to load your contract."
   },
   "consent": {
     "title": "Data-protection consent",
@@ -257,5 +302,81 @@
     "PUBLIC_SERVICE": "Public service",
     "KITCHEN_DISHWASHER": "Kitchen dishwasher",
     "WAITER": "Waiter"
+  },
+  "calendar": {
+    "absences": "Absences",
+    "dailySummary": "Daily Shift Summary",
+    "editDailySummary": "Edit Daily Shift Summary",
+    "loadingSummary": "Loading daily summary…",
+    "noSummary": "No summary added for this day.",
+    "loadFailed": "Failed to load the calendar. Please try again.",
+    "assignedOrOnLeave": "Assigned or on leave today",
+    "freeToday": "Free today"
+  },
+  "hotels": {
+    "inThisGroup": "Hotels in this group",
+    "deleted": "Deleted hotels",
+    "deletedGroups": "Deleted hotel groups",
+    "new": "New hotel",
+    "newGroup": "New group",
+    "noGroup": "No hotel group assigned",
+    "orgChart": "Org chart"
+  },
+  "users": {
+    "new": "New user",
+    "none": "No workers found.",
+    "leaderboard": "Worker leaderboard",
+    "topWorkers": "Top workers",
+    "blocklist": "Employee blocklist",
+    "applicant": "Applicant",
+    "yourAccount": "Your account",
+    "accountSettings": "Account settings",
+    "exportMyData": "Export my data"
+  },
+  "requests": {
+    "title": "Work request",
+    "new": "New request",
+    "newBroadcast": "New broadcast",
+    "acceptedWorkers": "Accepted workers",
+    "noneAccepted": "No workers have accepted this broadcast yet.",
+    "notAcceptingNew": "Not accepting new work requests"
+  },
+  "onboarding": {
+    "managerReview": "Manager Review",
+    "applicationRejected": "Application Rejected",
+    "documentsUploaded": "Documents Uploaded",
+    "documentsOnFile": "Documents on file",
+    "submittedDocuments": "Submitted documents",
+    "documentsRequired": "Documents required before submission:",
+    "loadingRecord": "Loading your onboarding record…",
+    "loadRecordFailed": "Failed to load onboarding record.",
+    "loadingRequirements": "Loading document requirements…",
+    "phase": {
+      "documents": {
+        "label": "Pending Documents",
+        "description": "Complete your required documentation to activate your account."
+      },
+      "review": {
+        "label": "Under Review",
+        "description": "Your application is under review by your manager."
+      },
+      "rejected": {
+        "label": "Rejected",
+        "description": "Your application was rejected. Please review your documents and contact your manager."
+      },
+      "active": {
+        "label": "Active",
+        "description": "Your onboarding is complete. Welcome to the team!"
+      },
+      "inactive": {
+        "label": "Inactive",
+        "description": "Your employment record is not currently active."
+      }
+    }
+  },
+  "analytics": {
+    "myPerformance": "My performance",
+    "avgRating": "Avg rating",
+    "recentRatings": "Recent ratings"
   }
 }

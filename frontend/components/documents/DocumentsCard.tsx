@@ -23,6 +23,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { DocumentCategory, WorkerDocument } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   TAX_NUMBER: "Tax Number",
@@ -147,6 +148,7 @@ function DocumentRow({
  * wrong in the other direction.
  */
 export function DocumentsCard({ workerId }: { workerId: string }) {
+  const { t } = useTranslation();
   const { data: documents, isLoading, error } = useWorkerDocuments(workerId);
   const [uploadOpen, setUploadOpen] = useState(false);
   const viewerId = useAuthStore((s) => s.user?.id);
@@ -172,7 +174,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Documents</CardTitle>
+          <CardTitle>{t("documents.title")}</CardTitle>
           {/* RULE B: self-only upload. Omitted rather than disabled on another
               user's profile — a disabled button implies the action is possible
               under some condition, and it is not. */}
@@ -358,7 +360,7 @@ function UploadDocumentModal({
             id="document-file"
             type="file"
             accept={ALLOWED_MIME_TYPES.join(",")}
-            className="text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100 dark:hover:file:bg-gray-700"
+            className="text-sm text-gray-700 file:me-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100 dark:hover:file:bg-gray-700"
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             PDF, JPEG, PNG, or WEBP. Max {formatBytes(MAX_FILE_SIZE_BYTES)}.

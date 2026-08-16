@@ -6,6 +6,7 @@ import { hrApi } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { Download } from "lucide-react";
 import type { EmploymentType } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
   FULL_TIME: "Full-time",
@@ -30,16 +31,17 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
  * exactly that instead of offering an upload control that would 403.
  */
 export function MyContractCard({ workerId }: { workerId: string }) {
+  const { t } = useTranslation();
   const { data: contract, isLoading, error } = useWorkerContract(workerId);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Contract</CardTitle>
+        <CardTitle>{t("hr.contract")}</CardTitle>
       </CardHeader>
       <CardContent>
         {error ? (
-          <p className="py-4 text-sm text-red-600 dark:text-red-400">Failed to load your contract.</p>
+          <p className="py-4 text-sm text-red-600 dark:text-red-400">{t("hr.loadContractFailed")}</p>
         ) : isLoading ? (
           <div className="space-y-3 py-2">
             <Skeleton className="h-5 w-full" />
@@ -53,24 +55,24 @@ export function MyContractCard({ workerId }: { workerId: string }) {
           <div className="space-y-4">
             <DataList>
               <DataRow
-                label="Status"
+                label={t("fields.status")}
                 value={
                   contract.is_valid ? (
-                    <Badge tone="success">Active</Badge>
+                    <Badge tone="success">{t("status.active")}</Badge>
                   ) : contract.signed_scan_uploaded ? (
                     // Their signed copy is on file — the outstanding action is
                     // the reviewer's, not theirs. Showing "Awaiting signature"
                     // here told them to do something they had already done.
                     <Badge tone="info">Signed copy received — awaiting confirmation</Badge>
                   ) : contract.is_expired ? (
-                    <Badge tone="danger">Expired</Badge>
+                    <Badge tone="danger">{t("status.expired")}</Badge>
                   ) : (
-                    <Badge tone="warning">Awaiting signature</Badge>
+                    <Badge tone="warning">{t("status.awaitingSignature")}</Badge>
                   )
                 }
               />
-              <DataRow label="Employment type" value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
-              <DataRow label="Position" value={contract.position} />
+              <DataRow label={t("fields.employmentType")} value={EMPLOYMENT_TYPE_LABEL[contract.employment_type]} />
+              <DataRow label={t("jobs.position")} value={contract.position} />
               <DataRow label="Start date" value={formatDate(contract.start_date)} />
               {contract.end_date && <DataRow label="End date" value={formatDate(contract.end_date)} />}
             </DataList>
@@ -88,7 +90,7 @@ export function MyContractCard({ workerId }: { workerId: string }) {
                     <>
                       Download your contract, mark it as{" "}
                       <span className="font-medium">{EMPLOYMENT_TYPE_LABEL[contract.employment_type]}</span>, sign
-                      it, and upload the signed copy under <span className="font-medium">Signed Contract</span> in
+                      it, and upload the signed copy under <span className="font-medium">{t("hr.signedContract")}</span> in
                       your document list. Your reviewer confirms it when they approve your
                       onboarding.
                     </>
@@ -99,7 +101,7 @@ export function MyContractCard({ workerId }: { workerId: string }) {
                     than navigating away. */}
                 <a href={hrApi.defaultContractDownloadUrl(workerId)} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="me-2 h-4 w-4" />
                     Download contract
                   </Button>
                 </a>

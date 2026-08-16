@@ -20,6 +20,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { CreateCalendarEntryInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 interface FormState {
   hotel_id: string;
@@ -34,6 +35,7 @@ const INITIAL: FormState = {
 };
 
 function NewCalendarEntryForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
   
@@ -96,12 +98,12 @@ function NewCalendarEntryForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Placement details</CardTitle>
+          <CardTitle>{t("assignments.placementDetails")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <Select
-              label="Hotel"
+              label={t("fields.hotel")}
               required
               value={form.hotel_id}
               onChange={(e) => set("hotel_id", e.target.value)}
@@ -115,7 +117,7 @@ function NewCalendarEntryForm() {
             </Select>
 
             <Select
-              label="Worker"
+              label={t("fields.worker")}
               required
               value={form.worker_id}
               onChange={(e) => set("worker_id", e.target.value)}
@@ -129,7 +131,7 @@ function NewCalendarEntryForm() {
             </Select>
 
             <Input
-              label="Day"
+              label={t("common.day")}
               type="date"
               required
               min={today}

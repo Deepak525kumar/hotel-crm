@@ -7,6 +7,7 @@ import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { hotelGroupsApi, hotelsApi } from "@/lib/api";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -37,6 +38,7 @@ import {
  * This gate is UX, not the security boundary.
  */
 function ArchiveContent() {
+  const { t } = useTranslation();
   // include_deleted returns BOTH live and deleted rows, so filter to the
   // deleted ones here — this page is the archive, not a superset listing.
   const { hotels, isLoading: hotelsLoading, error: hotelsError } = useHotels({
@@ -75,7 +77,7 @@ function ArchiveContent() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Archive"
+        title={t("nav.archive")}
         description="Hotels and hotel groups removed from operations. History is preserved — restoring makes an entity available again immediately."
       />
 
@@ -83,7 +85,7 @@ function ArchiveContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Deleted hotels</CardTitle>
+          <CardTitle>{t("hotels.deleted")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {hotelsError ? (
@@ -91,19 +93,19 @@ function ArchiveContent() {
               Failed to load archived hotels.
             </div>
           ) : hotelsLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</div>
+            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
           ) : deletedHotels.length === 0 ? (
             <EmptyState
               title="No deleted hotels"
               description="Deleted hotels appear here and can be restored."
             />
           ) : (
-            <Table aria-label="Deleted hotels">
+            <Table aria-label={t("hotels.deleted")}>
               <THead>
                 <tr>
-                  <TH>Name</TH>
-                  <TH>Location</TH>
-                  <TH>Deleted</TH>
+                  <TH>{t("fields.name")}</TH>
+                  <TH>{t("fields.location")}</TH>
+                  <TH>{t("status.deleted")}</TH>
                   <TH>{""}</TH>
                 </tr>
               </THead>
@@ -134,7 +136,7 @@ function ArchiveContent() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Deleted hotel groups</CardTitle>
+          <CardTitle>{t("hotels.deletedGroups")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           {groupsError ? (
@@ -142,18 +144,18 @@ function ArchiveContent() {
               Failed to load archived hotel groups.
             </div>
           ) : groupsLoading ? (
-            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">Loading…</div>
+            <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">{t("common.loading")}</div>
           ) : deletedGroups.length === 0 ? (
             <EmptyState
               title="No deleted hotel groups"
               description="Deleted groups appear here and can be restored."
             />
           ) : (
-            <Table aria-label="Deleted hotel groups">
+            <Table aria-label={t("hotels.deletedGroups")}>
               <THead>
                 <tr>
-                  <TH>Name</TH>
-                  <TH>Deleted</TH>
+                  <TH>{t("fields.name")}</TH>
+                  <TH>{t("status.deleted")}</TH>
                   <TH>{""}</TH>
                 </tr>
               </THead>

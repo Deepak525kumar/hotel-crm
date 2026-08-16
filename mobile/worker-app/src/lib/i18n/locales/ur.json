@@ -3,7 +3,7 @@
     "locale": "ur",
     "reviewed": false,
     "dir": "rtl",
-    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. An AI review pass (2026-08-16) corrected the defects listed in the PR and found no others, but it is the same class of tool that produced the catalogue and is NOT a substitute for native-speaker sign-off. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
   },
   "common": {
     "save": "محفوظ کریں",
@@ -29,7 +29,16 @@
     "total": "کل",
     "actions": "اقدامات",
     "optional": "اختیاری",
-    "required": "لازمی"
+    "required": "لازمی",
+    "count": "تعداد",
+    "day": "دن",
+    "message": "پیغام",
+    "record": "ریکارڈ",
+    "noEntries": "کوئی اندراج نہیں",
+    "thisMonth": "اس مہینے",
+    "quickLinks": "فوری لنکس",
+    "permissions": "اجازتیں",
+    "coordinates": "کوآرڈینیٹس"
   },
   "fields": {
     "name": "نام",
@@ -55,7 +64,12 @@
     "pay": "اجرت",
     "rating": "درجہ بندی",
     "startDate": "آغاز کی تاریخ",
-    "endDate": "اختتام کی تاریخ"
+    "endDate": "اختتام کی تاریخ",
+    "jobTitle": "عہدے کا نام",
+    "employment": "ملازمت",
+    "employmentType": "ملازمت کی قسم",
+    "requirements": "تقاضے",
+    "staffing": "عملہ"
   },
   "nav": {
     "dashboard": "ڈیش بورڈ",
@@ -102,14 +116,23 @@
     "completed": "مکمل",
     "expired": "میعاد ختم",
     "deleted": "حذف شدہ",
-    "verified": "تصدیق شدہ",
-    "unverified": "غیر تصدیق شدہ",
+    "verified": "توثیق شدہ",
+    "unverified": "غیر توثیق شدہ",
     "unavailable": "دستیاب نہیں",
     "unassigned": "غیر تفویض شدہ",
     "read": "پڑھا گیا",
     "unread": "غیر پڑھا",
     "submitted": "جمع کرایا",
-    "uploaded": "اپ لوڈ شدہ"
+    "uploaded": "اپ لوڈ شدہ",
+    "granted": "دیا گیا",
+    "paused": "روکا گیا",
+    "returning": "واپس آنے والا",
+    "rated": "درجہ بند",
+    "received": "موصول",
+    "logged": "درج",
+    "notYetLogged": "ابھی درج نہیں۔",
+    "awaitingSignature": "دستخط کا انتظار",
+    "alreadyFilled": "پہلے سے بھرا ہوا"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",
@@ -121,7 +144,20 @@
     "checkOut": "چیک آؤٹ",
     "stayOver": "قیام کرنے والا مہمان",
     "noEligibleWorkers": "کوئی اہل کارکن نہیں ملا۔",
-    "cancelReasonPlaceholder": "بتائیں کہ یہ تفویض کیوں منسوخ کی گئی۔"
+    "cancelReasonPlaceholder": "بتائیں کہ یہ تفویض کیوں منسوخ کی گئی۔",
+    "title": "تفویض",
+    "checkInLabel": "چیک اِن",
+    "checkOutLabel": "چیک آؤٹ",
+    "checkout": "چیک آؤٹ",
+    "insideGeofence": "جیو فینس کے اندر",
+    "outsideGeofence": "جیو فینس کے باہر",
+    "verification": "تصدیق",
+    "loggedBy": "درج کیا از",
+    "loading": "تفویضات لوڈ ہو رہی ہیں…",
+    "placementDetails": "تعیناتی کی تفصیلات",
+    "placeWorker": "کارکن تعینات کریں",
+    "calendarPlacement": "کیلنڈر تعیناتی",
+    "roomsCompleted": "مکمل کمرے"
   },
   "settings": {
     "language": {
@@ -137,7 +173,8 @@
     "appearance": "ظاہری شکل",
     "about": "متعلق",
     "comingSoon": "جلد آ رہا ہے",
-    "themeSystemNote": "سسٹم آپ کے ڈیوائس کی ترتیب کے مطابق ہے۔"
+    "themeSystemNote": "سسٹم آپ کے ڈیوائس کی ترتیب کے مطابق ہے۔",
+    "localDevBuild": "مقامی ڈویلپمنٹ بلڈ"
   },
   "auth": {
     "login": "لاگ اِن",
@@ -153,7 +190,10 @@
     "tooManyAttempts": "بہت زیادہ کوششیں۔ دوبارہ کوشش سے پہلے انتظار کریں۔",
     "loginFailed": "لاگ اِن ناکام۔ دوبارہ کوشش کریں۔",
     "signInTo": "{{app}} میں سائن اِن کریں",
-    "email": "ای میل"
+    "email": "ای میل",
+    "resetYourPassword": "اپنا پاس ورڈ ری سیٹ کریں",
+    "setNewPassword": "نیا پاس ورڈ مقرر کریں",
+    "invalidResetLink": "پاس ورڈ ری سیٹ لنک غلط ہے۔ ٹوکن موجود نہیں۔"
   },
   "search": {
     "byNameOrEmail": "نام یا ای میل سے تلاش کریں…",
@@ -225,7 +265,12 @@
     "noActiveContract": "کوئی فعال معاہدہ نہیں",
     "payslipRequests": "تنخواہ سلپ کی درخواستیں",
     "noRequests": "کوئی درخواست نہیں",
-    "payslipRequestFailed": "تنخواہ سلپ کی درخواست ناکام"
+    "payslipRequestFailed": "تنخواہ سلپ کی درخواست ناکام",
+    "contract": "معاہدہ",
+    "signedContract": "دستخط شدہ معاہدہ",
+    "contractExpired": "معاہدے کی میعاد ختم",
+    "noSignedContract": "دستخط شدہ معاہدہ ابھی فائل پر نہیں",
+    "loadContractFailed": "آپ کا معاہدہ لوڈ نہیں ہو سکا۔"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -258,5 +303,81 @@
     "PUBLIC_SERVICE": "عوامی خدمت",
     "KITCHEN_DISHWASHER": "کچن ڈش واشر",
     "WAITER": "ویٹر"
+  },
+  "calendar": {
+    "absences": "غیر حاضریاں",
+    "dailySummary": "روزانہ شفٹ خلاصہ",
+    "editDailySummary": "روزانہ شفٹ خلاصہ ترمیم کریں",
+    "loadingSummary": "روزانہ خلاصہ لوڈ ہو رہا ہے…",
+    "noSummary": "اس دن کے لیے کوئی خلاصہ شامل نہیں۔",
+    "loadFailed": "کیلنڈر لوڈ نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+    "assignedOrOnLeave": "آج تعینات یا چھٹی پر",
+    "freeToday": "آج فارغ"
+  },
+  "hotels": {
+    "inThisGroup": "اس گروپ کے ہوٹل",
+    "deleted": "حذف شدہ ہوٹل",
+    "deletedGroups": "حذف شدہ ہوٹل گروپس",
+    "new": "نیا ہوٹل",
+    "newGroup": "نیا گروپ",
+    "noGroup": "کوئی ہوٹل گروپ تفویض نہیں",
+    "orgChart": "تنظیمی چارٹ"
+  },
+  "users": {
+    "new": "نیا صارف",
+    "none": "کوئی کارکن نہیں ملا۔",
+    "leaderboard": "کارکن لیڈر بورڈ",
+    "topWorkers": "بہترین کارکن",
+    "blocklist": "ملازم بلاک لسٹ",
+    "applicant": "درخواست گزار",
+    "yourAccount": "آپ کا اکاؤنٹ",
+    "accountSettings": "اکاؤنٹ کی ترتیبات",
+    "exportMyData": "میرا ڈیٹا برآمد کریں"
+  },
+  "requests": {
+    "title": "کام کی درخواست",
+    "new": "نئی درخواست",
+    "newBroadcast": "نیا اعلان",
+    "acceptedWorkers": "قبول شدہ کارکن",
+    "noneAccepted": "ابھی کسی کارکن نے یہ اعلان قبول نہیں کیا۔",
+    "notAcceptingNew": "نئی کام کی درخواستیں قبول نہیں"
+  },
+  "onboarding": {
+    "managerReview": "مینیجر کا جائزہ",
+    "applicationRejected": "درخواست مسترد",
+    "documentsUploaded": "دستاویزات اپ لوڈ ہو گئیں",
+    "documentsOnFile": "فائل پر دستاویزات",
+    "submittedDocuments": "جمع کرائی گئی دستاویزات",
+    "documentsRequired": "جمع کرانے سے پہلے درکار دستاویزات:",
+    "loadingRecord": "آپ کا آن بورڈنگ ریکارڈ لوڈ ہو رہا ہے…",
+    "loadRecordFailed": "آن بورڈنگ ریکارڈ لوڈ نہیں ہو سکا۔",
+    "loadingRequirements": "دستاویزی تقاضے لوڈ ہو رہے ہیں…",
+    "phase": {
+      "documents": {
+        "label": "زیر التوا دستاویزات",
+        "description": "اپنا اکاؤنٹ فعال کرنے کے لیے مطلوبہ دستاویزات مکمل کریں۔"
+      },
+      "review": {
+        "label": "زیر جائزہ",
+        "description": "آپ کی درخواست آپ کے مینیجر کے زیر جائزہ ہے۔"
+      },
+      "rejected": {
+        "label": "مسترد",
+        "description": "آپ کی درخواست مسترد کر دی گئی۔ براہ کرم اپنی دستاویزات دیکھیں اور اپنے مینیجر سے رابطہ کریں۔"
+      },
+      "active": {
+        "label": "فعال",
+        "description": "آپ کی شمولیت مکمل ہو گئی۔ ٹیم میں خوش آمدید!"
+      },
+      "inactive": {
+        "label": "غیر فعال",
+        "description": "آپ کا ملازمت ریکارڈ اس وقت فعال نہیں ہے۔"
+      }
+    }
+  },
+  "analytics": {
+    "myPerformance": "میری کارکردگی",
+    "avgRating": "اوسط درجہ بندی",
+    "recentRatings": "حالیہ درجہ بندیاں"
   }
 }

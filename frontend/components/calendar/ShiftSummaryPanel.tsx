@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Textarea";
+import { useTranslation } from "react-i18next";
 
 interface ShiftSummaryPanelProps {
   hotelId: string;
@@ -14,6 +15,7 @@ interface ShiftSummaryPanelProps {
 }
 
 export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPanelProps) {
+  const { t } = useTranslation();
   const [summary, setSummary] = useState<DailyShiftSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -74,14 +76,14 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
   };
 
   if (loading && !summary && !editing) {
-    return <div className="text-sm text-gray-500">Loading daily summary...</div>;
+    return <div className="text-sm text-gray-500">{t("calendar.loadingSummary")}</div>;
   }
 
   if (!editing) {
     return (
       <Card className="p-4 border border-blue-100 bg-blue-50/30 dark:border-blue-900/30 dark:bg-blue-900/10 mb-4">
         <div className="flex justify-between items-center mb-3">
-          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">Daily Shift Summary</h3>
+          <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100">{t("calendar.dailySummary")}</h3>
           {canWrite && (
             <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
               {summary ? "Edit" : "Add Details"}
@@ -92,30 +94,30 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
         {summary ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Total Rooms</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{t("fields.totalRooms")}</p>
               <p className="font-medium">{summary.total_rooms}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Stay-over</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{t("assignments.stayOver")}</p>
               <p className="font-medium">{summary.stay_over_rooms}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Checkout</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{t("assignments.checkout")}</p>
               <p className="font-medium">{summary.checkout_rooms}</p>
             </div>
             <div>
-              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Workers</p>
+              <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{t("fields.workers")}</p>
               <p className="font-medium">{summary.total_people_working}</p>
             </div>
             {summary.notes && (
               <div className="col-span-2 sm:col-span-4 mt-2 pt-2 border-t border-blue-100/50 dark:border-blue-800/50">
-                <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">Notes</p>
+                <p className="text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wider mb-1">{t("fields.notes")}</p>
                 <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">{summary.notes}</p>
               </div>
             )}
           </div>
         ) : (
-          <p className="text-sm text-gray-500 italic">No summary added for this day.</p>
+          <p className="text-sm text-gray-500 italic">{t("calendar.noSummary")}</p>
         )}
       </Card>
     );
@@ -123,31 +125,31 @@ export function ShiftSummaryPanel({ hotelId, dateStr, canWrite }: ShiftSummaryPa
 
   return (
     <Card className="p-4 border-blue-200 bg-white dark:bg-gray-900 mb-4 shadow-sm ring-1 ring-blue-500">
-      <h3 className="text-sm font-semibold mb-3">Edit Daily Shift Summary</h3>
+      <h3 className="text-sm font-semibold mb-3">{t("calendar.editDailySummary")}</h3>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-sm">
         <div>
-          <label className="block text-xs font-medium mb-1">Total Rooms</label>
+          <label className="block text-xs font-medium mb-1">{t("fields.totalRooms")}</label>
           <Input 
             type="number" min={0} value={form.total_rooms} 
             onChange={e => setForm({...form, total_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1">Stay-over</label>
+          <label className="block text-xs font-medium mb-1">{t("assignments.stayOver")}</label>
           <Input 
             type="number" min={0} value={form.stay_over_rooms} 
             onChange={e => setForm({...form, stay_over_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1">Checkout</label>
+          <label className="block text-xs font-medium mb-1">{t("assignments.checkout")}</label>
           <Input 
             type="number" min={0} value={form.checkout_rooms} 
             onChange={e => setForm({...form, checkout_rooms: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}
           />
         </div>
         <div>
-          <label className="block text-xs font-medium mb-1">Workers</label>
+          <label className="block text-xs font-medium mb-1">{t("fields.workers")}</label>
           <Input 
             type="number" min={0} value={form.total_people_working} 
             onChange={e => setForm({...form, total_people_working: isNaN(e.target.valueAsNumber) ? 0 : e.target.valueAsNumber})}

@@ -1,5 +1,6 @@
 "use client";
 
+import { SKILL_OPTIONS } from "@/lib/skills";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
@@ -22,13 +23,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { RaiseBroadcastInput, SkillTag } from "@/lib/types";
-
-const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
-  { value: "CLEANER", label: "Cleaner" },
-  { value: "PUBLIC_SERVICE", label: "Public service" },
-  { value: "KITCHEN_DISHWASHER", label: "Kitchen dishwasher" },
-  { value: "WAITER", label: "Waiter" },
-];
+import { useTranslation } from "react-i18next";
 
 interface SkillLine {
   skill: SkillTag;
@@ -58,6 +53,7 @@ const INITIAL: FormState = {
 };
 
 function NewBroadcastForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
 
@@ -164,19 +160,19 @@ function NewBroadcastForm() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New broadcast"
+          title={t("requests.newBroadcast")}
           description="Raise a shift to every eligible worker at once. Whoever accepts first for a skill claims that slot."
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
+          <CardTitle>{t("assignments.shiftDetails")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <Select
-              label="Hotel"
+              label={t("fields.hotel")}
               required
               value={form.hotel_id}
               onChange={(e) => set("hotel_id", e.target.value)}
@@ -191,7 +187,7 @@ function NewBroadcastForm() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="Shift date"
+                label={t("assignments.shiftDate")}
                 type="date"
                 required
                 min={today}
@@ -259,7 +255,7 @@ function NewBroadcastForm() {
                       onChange={(e) =>
                         setSkillLine(index, { skill: e.target.value as SkillTag })
                       }
-                      options={SKILL_OPTIONS}
+                      options={SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                     />
                   </div>
                   <div className="w-28">

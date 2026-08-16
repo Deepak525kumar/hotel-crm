@@ -8,6 +8,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useHotelGroup, useHotels, useUsersByIds } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Button,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui";
 
 export default function HotelGroupDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -100,12 +102,12 @@ export default function HotelGroupDetailPage() {
               <div className="flex gap-2">
                 <RoleGate allow={["admin", "regional_manager"]}>
                   <Link href={`/hotel-groups/${id}/org-chart`}>
-                    <Button variant="outline">Org chart</Button>
+                    <Button variant="outline">{t("hotels.orgChart")}</Button>
                   </Link>
                 </RoleGate>
                 <RoleGate allow={["admin"]}>
                   <Link href={`/hotel-groups/${id}/edit`}>
-                    <Button variant="outline">Edit</Button>
+                    <Button variant="outline">{t("common.edit")}</Button>
                   </Link>
                 </RoleGate>
               </div>
@@ -114,12 +116,12 @@ export default function HotelGroupDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t("common.details")}</CardTitle>
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
                 <DataRow
-                  label="Regional manager"
+                  label={t("roles.regionalManager")}
                   value={
                     group.regional_manager_user_id ? (
                       <TextLink href={`/users/${group.regional_manager_user_id}`}>
@@ -143,7 +145,7 @@ export default function HotelGroupDetailPage() {
                   label="Billing info"
                   value={
                     group.billing_info || (
-                      <span className="text-gray-500 dark:text-gray-400">Not set</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t("common.notSet")}</span>
                     )
                   }
                 />
@@ -155,7 +157,7 @@ export default function HotelGroupDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Hotels in this group</CardTitle>
+              <CardTitle>{t("hotels.inThisGroup")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {groupHotels.length === 0 ? (
@@ -164,12 +166,12 @@ export default function HotelGroupDetailPage() {
                   description="Assign hotels to this group from a hotel's edit screen."
                 />
               ) : (
-                <Table aria-label="Hotels in this group">
+                <Table aria-label={t("hotels.inThisGroup")}>
                   <THead>
                     <tr>
-                      <TH>Name</TH>
-                      <TH>Location</TH>
-                      <TH>Status</TH>
+                      <TH>{t("fields.name")}</TH>
+                      <TH>{t("fields.location")}</TH>
+                      <TH>{t("fields.status")}</TH>
                     </tr>
                   </THead>
                   <TBody>

@@ -22,6 +22,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import type { AbsenceKind, CalendarAbsence } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const KIND_LABEL: Record<AbsenceKind, string> = {
   SICK: "Sick",
@@ -79,6 +80,7 @@ function AbsenceRow({ absence }: { absence: CalendarAbsence }) {
  * the caller), so this needs no gate beyond being authenticated.
  */
 export function AbsencesCard() {
+  const { t } = useTranslation();
   const { data: absences, isLoading, error } = useOwnAbsences();
   const [markOpen, setMarkOpen] = useState(false);
 
@@ -86,7 +88,7 @@ export function AbsencesCard() {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Absences</CardTitle>
+          <CardTitle>{t("calendar.absences")}</CardTitle>
           <Button size="sm" onClick={() => setMarkOpen(true)}>
             Mark absence
           </Button>
@@ -122,6 +124,7 @@ export function AbsencesCard() {
 }
 
 function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { t } = useTranslation();
   const [day, setDay] = useState("");
   const [kind, setKind] = useState<AbsenceKind>("SICK");
   const [reason, setReason] = useState("");
@@ -190,7 +193,7 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
     >
       <div className="space-y-4">
         <Input
-          label="Date"
+          label={t("fields.date")}
           type="date"
           // Best-effort guard only, using the browser's local date (see
           // localToday()'s own comment: `toISOString()` would give the UTC
@@ -204,7 +207,7 @@ function MarkAbsenceModal({ open, onClose }: { open: boolean; onClose: () => voi
           onChange={(e) => setDay(e.target.value)}
         />
         <Select
-          label="Type"
+          label={t("fields.type")}
           value={kind}
           onChange={(e) => setKind(e.target.value as AbsenceKind)}
           options={[

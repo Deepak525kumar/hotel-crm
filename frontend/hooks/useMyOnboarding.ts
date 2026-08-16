@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "react-i18next";
+
 import { useAuth } from "@/hooks/useAuth";
 import { useEmploymentRecord } from "@/hooks/useEmployment";
 import type { EmploymentRecord } from "@/lib/types";
@@ -73,34 +75,44 @@ export interface MyOnboarding {
   isRejected: boolean;
 }
 
+/**
+ * Per-phase display metadata.
+ *
+ * `label`/`description` are i18n KEYS, not copy. They are resolved through
+ * `t()` in the hook body so that all three surfaces reading this vocabulary
+ * (the sidebar status pill, the dashboard callout, and `/onboarding`) render
+ * in the user's own language from one definition. Holding literal English
+ * here is what previously leaked "Pending Documents" into every locale.
+ *
+ * `tone` stays a literal: it is a `Badge` tone token, not user-visible text.
+ */
 const PHASE_COPY: Record<
   Exclude<OnboardingPhase, "loading" | "none">,
-  { label: string; description: string; tone: MyOnboarding["tone"] }
+  { labelKey: string; descriptionKey: string; tone: MyOnboarding["tone"] }
 > = {
   documents: {
-    label: "Pending Documents",
-    description: "Complete your required documentation to activate your account.",
+    labelKey: "onboarding.phase.documents.label",
+    descriptionKey: "onboarding.phase.documents.description",
     tone: "warning",
   },
   review: {
-    label: "Under Review",
-    description: "Your application is under review by your manager.",
+    labelKey: "onboarding.phase.review.label",
+    descriptionKey: "onboarding.phase.review.description",
     tone: "info",
   },
   rejected: {
-    label: "Rejected",
-    description:
-      "Your application was rejected. Please review your documents and contact your manager.",
+    labelKey: "onboarding.phase.rejected.label",
+    descriptionKey: "onboarding.phase.rejected.description",
     tone: "danger",
   },
   active: {
-    label: "Active",
-    description: "Your onboarding is complete. Welcome to the team!",
+    labelKey: "onboarding.phase.active.label",
+    descriptionKey: "onboarding.phase.active.description",
     tone: "success",
   },
   inactive: {
-    label: "Inactive",
-    description: "Your employment record is not currently active.",
+    labelKey: "onboarding.phase.inactive.label",
+    descriptionKey: "onboarding.phase.inactive.description",
     tone: "neutral",
   },
 };
@@ -118,6 +130,8 @@ const PHASE_COPY: Record<
 export function useMyOnboarding(): MyOnboarding {
   const { user } = useAuth();
   const { data: record, isLoading } = useEmploymentRecord(user?.id);
+  // Called before the early returns below: hooks must run unconditionally.
+  const { t } = useTranslation();
 
   const base = { record, isSubmitted: false, isActive: false, isRejected: false };
 
@@ -157,10 +171,14 @@ export function useMyOnboarding(): MyOnboarding {
           : "documents"
         : "inactive";
 
+  const copy = PHASE_COPY[phase];
+
   return {
     record,
     phase,
-    ...PHASE_COPY[phase],
+    label: t(copy.labelKey),
+    description: t(copy.descriptionKey),
+    tone: copy.tone,
     // Only the two PENDING sub-states and REJECTED are actionable by the user.
     needsAttention: phase === "documents" || phase === "review" || phase === "rejected",
     isSubmitted,

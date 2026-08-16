@@ -4,6 +4,7 @@ import { useMyStats } from "@/hooks/useAnalytics";
 import { BreakdownBar } from "@/components/analytics/BreakdownBar";
 import { formatDate, formatPercent, formatScore } from "@/lib/format";
 import { Card, CardContent, CardHeader, CardTitle, Skeleton, StatTile } from "@/components/ui";
+import { useTranslation } from "react-i18next";
 
 /**
  * GD-06 (`IF-ANALYTICS-GetMyStats`): a worker's own performance summary —
@@ -19,12 +20,13 @@ import { Card, CardContent, CardHeader, CardTitle, Skeleton, StatTile } from "@/
  * boundary is GD-06's whole point, re-confirmed rather than relaxed.
  */
 export function MyStatsCard() {
+  const { t } = useTranslation();
   const { data: stats, isLoading, error } = useMyStats();
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>My performance</CardTitle>
+        <CardTitle>{t("analytics.myPerformance")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -42,13 +44,13 @@ export function MyStatsCard() {
             <div className="grid gap-4 sm:grid-cols-3">
               <StatTile label="Completed shifts" value={stats.completed_assignments} />
               <StatTile label="Total shifts" value={stats.total_assignments} />
-              <StatTile label="Rooms completed" value={stats.rooms_completed} />
+              <StatTile label={t("assignments.roomsCompleted")} value={stats.rooms_completed} />
               <StatTile label="Average rating" value={formatScore(stats.average_rating, 2)} />
               <StatTile label="Attendance rate" value={formatPercent(stats.attendance_rate)} />
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Attendance</p>
+              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("nav.attendance")}</p>
               <BreakdownBar
                 segments={[
                   { label: "Present", value: stats.attendance.present, tone: "success" },
@@ -59,10 +61,10 @@ export function MyStatsCard() {
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">This month</p>
+              <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("common.thisMonth")}</p>
               <div className="grid gap-4 sm:grid-cols-3">
                 <StatTile label="Shifts" value={stats.current_month.assignments} />
-                <StatTile label="Completed" value={stats.current_month.completed} />
+                <StatTile label={t("status.completed")} value={stats.current_month.completed} />
                 <StatTile
                   label="Average rating"
                   value={formatScore(stats.current_month.average_rating, 2)}
@@ -72,7 +74,7 @@ export function MyStatsCard() {
 
             {stats.recent_ratings.length > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Recent ratings</p>
+                <p className="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">{t("analytics.recentRatings")}</p>
                 <ul className="space-y-1">
                   {stats.recent_ratings.map((r) => (
                     <li

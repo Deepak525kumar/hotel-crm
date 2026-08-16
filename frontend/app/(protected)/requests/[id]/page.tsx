@@ -10,6 +10,7 @@ import { ApiError, workRequestsApi } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -27,6 +28,7 @@ import {
 } from "@/components/ui";
 
 export default function WorkRequestDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -109,12 +111,12 @@ export default function WorkRequestDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
+          <CardTitle>{t("assignments.shiftDetails")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
-              label="Hotel"
+              label={t("fields.hotel")}
               value={
                 <TextLink href={`/hotels/${request.hotel_id}`}>
                   {hotel?.name ?? "View hotel"}
@@ -127,13 +129,13 @@ export default function WorkRequestDetailPage() {
                 <UserRef userId={request.created_by_id} fallback="A manager" />
               }
             />
-            <DataRow label="Shift date" value={request.shift_date} />
+            <DataRow label={t("assignments.shiftDate")} value={request.shift_date} />
             <DataRow
-              label="Time"
+              label={t("fields.time")}
               value={`${request.shift_start_time}–${request.shift_end_time}`}
             />
             <DataRow
-              label="Staffing"
+              label={t("fields.staffing")}
               value={`${request.workers_confirmed}/${request.workers_needed} confirmed`}
             />
             <DataRow
@@ -168,18 +170,18 @@ export default function WorkRequestDetailPage() {
       {(request.description || request.requirements) && (
         <Card>
           <CardHeader>
-            <CardTitle>Notes</CardTitle>
+            <CardTitle>{t("fields.notes")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-gray-700 dark:text-gray-300">
             {request.description && (
               <div>
-                <p className="font-medium text-gray-900 dark:text-gray-100">Description</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{t("fields.description")}</p>
                 <p className="whitespace-pre-wrap">{request.description}</p>
               </div>
             )}
             {request.requirements && (
               <div>
-                <p className="font-medium text-gray-900 dark:text-gray-100">Requirements</p>
+                <p className="font-medium text-gray-900 dark:text-gray-100">{t("fields.requirements")}</p>
                 <p className="whitespace-pre-wrap">{request.requirements}</p>
               </div>
             )}

@@ -9,6 +9,7 @@ import { hotelsApi } from "@/lib/api";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Badge,
@@ -25,6 +26,7 @@ import {
 } from "@/components/ui";
 
 export default function HotelDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
@@ -83,7 +85,7 @@ export default function HotelDetailPage() {
               <span className="flex items-center gap-3">
                 {hotel.name}
                 {hotel.is_active && !hotel.accepting_jobs ? (
-                  <Badge tone="warning">Not accepting new work requests</Badge>
+                  <Badge tone="warning">{t("requests.notAcceptingNew")}</Badge>
                 ) : (
                   <ActiveBadge active={hotel.is_active} />
                 )}
@@ -93,7 +95,7 @@ export default function HotelDetailPage() {
             actions={
               <HotelWriteGate>
                 <Link href={`/hotels/${id}/edit`}>
-                  <Button variant="outline">Edit</Button>
+                  <Button variant="outline">{t("common.edit")}</Button>
                 </Link>
               </HotelWriteGate>
             }
@@ -101,14 +103,14 @@ export default function HotelDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Details</CardTitle>
+              <CardTitle>{t("common.details")}</CardTitle>
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
                 <DataRow label="Address" value={hotel.address} />
                 <DataRow label="City" value={hotel.city} />
                 <DataRow label="Country" value={hotel.country} />
-                <DataRow label="Timezone" value={hotel.timezone} />
+                <DataRow label={t("fields.timezone")} value={hotel.timezone} />
                 <DataRow
                   label="Hotel group"
                   value={
@@ -119,12 +121,12 @@ export default function HotelDetailPage() {
                         {group?.name ?? "View group"}
                       </TextLink>
                     ) : (
-                      <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t("status.unassigned")}</span>
                     )
                   }
                 />
                 <DataRow
-                  label="Manager"
+                  label={t("roles.manager")}
                   value={
                     hotel.manager_user_id ? (
                       <TextLink href={`/users/${hotel.manager_user_id}`}>
@@ -142,7 +144,7 @@ export default function HotelDetailPage() {
                   }
                 />
                 <DataRow
-                  label="Regional manager"
+                  label={t("roles.regionalManager")}
                   value={
                     group?.regional_manager_user_id ? (
                       <TextLink href={`/users/${group.regional_manager_user_id}`}>
@@ -160,7 +162,7 @@ export default function HotelDetailPage() {
                           ` (${group.regional_manager_vacancy_reason.toLowerCase()})`}
                       </span>
                     ) : (
-                      <span className="text-gray-500 dark:text-gray-400">No hotel group assigned</span>
+                      <span className="text-gray-500 dark:text-gray-400">{t("hotels.noGroup")}</span>
                     )
                   }
                 />

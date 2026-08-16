@@ -3,6 +3,7 @@
 import { useEffect, useId, useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { useTranslation } from "react-i18next";
 
 export interface ModalProps {
   open: boolean;
@@ -24,6 +25,7 @@ export function Modal({
   footer,
   className,
 }: ModalProps) {
+  const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -122,7 +124,7 @@ export function Modal({
             <button
               type="button"
               onClick={onClose}
-              aria-label="Close"
+              aria-label={t("common.close")}
               className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-400 dark:text-gray-500 dark:hover:bg-gray-800 dark:hover:text-gray-400"
             >
               <svg

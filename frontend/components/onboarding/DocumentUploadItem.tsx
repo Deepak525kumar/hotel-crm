@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/Button";
 import { CheckCircle2, UploadCloud, FileType2, Eye } from "lucide-react";
 import { documentsApi } from "@/lib/api";
 import type { DocumentCategory, WorkerDocument } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export interface DocumentUploadItemProps {
   category: DocumentCategory;
@@ -33,6 +34,7 @@ export function DocumentUploadItem({
   disabled,
   onUploadSuccess
 }: DocumentUploadItemProps) {
+  const { t } = useTranslation();
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -103,7 +105,7 @@ export function DocumentUploadItem({
           </a>
         )}
         {isUploaded ? (
-          <span className="text-sm font-medium text-green-700">Uploaded</span>
+          <span className="text-sm font-medium text-green-700">{t("status.uploaded")}</span>
         ) : (
           <>
             <input
@@ -121,7 +123,7 @@ export function DocumentUploadItem({
               disabled={disabled || uploading}
               loading={uploading}
             >
-              <UploadCloud className="w-4 h-4 mr-2" />
+              <UploadCloud className="w-4 h-4 me-2" />
               Upload
             </Button>
           </>

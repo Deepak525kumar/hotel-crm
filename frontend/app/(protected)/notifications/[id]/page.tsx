@@ -10,6 +10,7 @@ import {
   notificationTypeLabel,
 } from "@/components/notifications/NotificationTypeBadge";
 import { formatDateTime } from "@/lib/format";
+import { useTranslation } from "react-i18next";
 import {
   Badge,
   Button,
@@ -71,6 +72,7 @@ const DATA_KEY_LABELS: Record<string, string> = {
 };
 
 export default function NotificationDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const { id } = params;
 
@@ -144,9 +146,9 @@ export default function NotificationDetailPage() {
             <div className="flex items-center gap-2">
               <NotificationTypeBadge type={notification.type} />
               {notification.is_read ? (
-                <Badge tone="neutral">Read</Badge>
+                <Badge tone="neutral">{t("status.read")}</Badge>
               ) : (
-                <Badge tone="info">Unread</Badge>
+                <Badge tone="info">{t("status.unread")}</Badge>
               )}
             </div>
           }
@@ -155,7 +157,7 @@ export default function NotificationDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Message</CardTitle>
+          <CardTitle>{t("common.message")}</CardTitle>
         </CardHeader>
         <CardContent>
           <p className="whitespace-pre-line text-sm text-gray-900 dark:text-gray-100">
@@ -166,23 +168,23 @@ export default function NotificationDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Details</CardTitle>
+          <CardTitle>{t("common.details")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
-              label="Type"
+              label={t("fields.type")}
               value={notificationTypeLabel(notification.type)}
             />
             <DataRow label="Channel" value={notification.channel} />
             <DataRow
-              label="Received"
+              label={t("status.received")}
               value={formatDateTime(notification.created_at)}
             />
             <DataRow label="Read at" value={formatDateTime(notification.read_at)} />
             {notification.hotel_id && (
               <DataRow
-                label="Hotel"
+                label={t("fields.hotel")}
                 value={
                   <TextLink href={`/hotels/${notification.hotel_id}`}>
                     {hotel?.name ?? "View hotel"}
