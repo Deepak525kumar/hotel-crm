@@ -360,7 +360,7 @@ function UploadDocumentModal({
             id="document-file"
             type="file"
             accept={ALLOWED_MIME_TYPES.join(",")}
-            className="text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100 dark:hover:file:bg-gray-700"
+            className="text-sm text-gray-700 file:me-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-900 hover:file:bg-gray-200 dark:text-gray-300 dark:file:bg-gray-800 dark:file:text-gray-100 dark:hover:file:bg-gray-700"
           />
           <p className="text-xs text-gray-500 dark:text-gray-400">
             PDF, JPEG, PNG, or WEBP. Max {formatBytes(MAX_FILE_SIZE_BYTES)}.

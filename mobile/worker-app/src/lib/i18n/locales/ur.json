@@ -3,7 +3,7 @@
     "locale": "ur",
     "reviewed": false,
     "dir": "rtl",
-    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. An AI review pass (2026-08-16) corrected the defects listed in the PR and found no others, but it is the same class of tool that produced the catalogue and is NOT a substitute for native-speaker sign-off. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
   },
   "common": {
     "save": "محفوظ کریں",
@@ -116,8 +116,8 @@
     "completed": "مکمل",
     "expired": "میعاد ختم",
     "deleted": "حذف شدہ",
-    "verified": "تصدیق شدہ",
-    "unverified": "غیر تصدیق شدہ",
+    "verified": "توثیق شدہ",
+    "unverified": "غیر توثیق شدہ",
     "unavailable": "دستیاب نہیں",
     "unassigned": "غیر تفویض شدہ",
     "read": "پڑھا گیا",
@@ -351,7 +351,29 @@
     "documentsRequired": "جمع کرانے سے پہلے درکار دستاویزات:",
     "loadingRecord": "آپ کا آن بورڈنگ ریکارڈ لوڈ ہو رہا ہے…",
     "loadRecordFailed": "آن بورڈنگ ریکارڈ لوڈ نہیں ہو سکا۔",
-    "loadingRequirements": "دستاویزی تقاضے لوڈ ہو رہے ہیں…"
+    "loadingRequirements": "دستاویزی تقاضے لوڈ ہو رہے ہیں…",
+    "phase": {
+      "documents": {
+        "label": "زیر التوا دستاویزات",
+        "description": "اپنا اکاؤنٹ فعال کرنے کے لیے مطلوبہ دستاویزات مکمل کریں۔"
+      },
+      "review": {
+        "label": "زیر جائزہ",
+        "description": "آپ کی درخواست آپ کے مینیجر کے زیر جائزہ ہے۔"
+      },
+      "rejected": {
+        "label": "مسترد",
+        "description": "آپ کی درخواست مسترد کر دی گئی۔ براہ کرم اپنی دستاویزات دیکھیں اور اپنے مینیجر سے رابطہ کریں۔"
+      },
+      "active": {
+        "label": "فعال",
+        "description": "آپ کی شمولیت مکمل ہو گئی۔ ٹیم میں خوش آمدید!"
+      },
+      "inactive": {
+        "label": "غیر فعال",
+        "description": "آپ کا ملازمت ریکارڈ اس وقت فعال نہیں ہے۔"
+      }
+    }
   },
   "analytics": {
     "myPerformance": "میری کارکردگی",

@@ -19,7 +19,7 @@ export function DataRow({
       )}
     >
       <span className="shrink-0 text-gray-500 dark:text-gray-400">{label}</span>
-      <span className="text-right font-medium text-gray-900 dark:text-gray-100">{value}</span>
+      <span className="text-end font-medium text-gray-900 dark:text-gray-100">{value}</span>
     </div>
   );
 }

@@ -40,7 +40,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           {label}
         </label>
         {hint && (
-          <p id={hintId} className="pl-6 text-sm text-gray-500 dark:text-gray-400">
+          <p id={hintId} className="ps-6 text-sm text-gray-500 dark:text-gray-400">
             {hint}
           </p>
         )}

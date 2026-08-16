@@ -51,9 +51,9 @@ export function LeaderboardTable({
         <tr>
           <TH className="w-12">#</TH>
           <TH>{t("fields.worker")}</TH>
-          <TH className="text-right">{t("status.completed")}</TH>
-          <TH className="text-right">{t("common.total")}</TH>
-          <TH className="text-right">{t("analytics.avgRating")}</TH>
+          <TH className="text-end">{t("status.completed")}</TH>
+          <TH className="text-end">{t("common.total")}</TH>
+          <TH className="text-end">{t("analytics.avgRating")}</TH>
         </tr>
       </THead>
       {isLoading ? (
@@ -75,9 +75,9 @@ export function LeaderboardTable({
             <TR key={e.worker_id}>
               <TD className="font-medium text-gray-500 dark:text-gray-400">{e.position}</TD>
               <TD className="font-medium">{e.name}</TD>
-              <TD className="text-right">{e.completed_tasks}</TD>
-              <TD className="text-right">{e.total_tasks}</TD>
-              <TD className="text-right">{formatScore(e.average_rating, 2)}</TD>
+              <TD className="text-end">{e.completed_tasks}</TD>
+              <TD className="text-end">{e.total_tasks}</TD>
+              <TD className="text-end">{formatScore(e.average_rating, 2)}</TD>
             </TR>
           ))}
         </TBody>

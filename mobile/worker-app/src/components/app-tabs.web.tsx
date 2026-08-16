@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
   },
   brandText: {
-    marginRight: 'auto',
+    marginEnd: 'auto',
   },
   pressed: {
     opacity: 0.7,
@@ -113,6 +113,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: Spacing.one,
-    marginLeft: Spacing.three,
+    marginStart: Spacing.three,
   },
 });

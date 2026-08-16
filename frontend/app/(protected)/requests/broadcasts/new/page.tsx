@@ -1,5 +1,6 @@
 "use client";
 
+import { SKILL_OPTIONS } from "@/lib/skills";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
@@ -23,13 +24,6 @@ import {
 } from "@/components/ui";
 import type { RaiseBroadcastInput, SkillTag } from "@/lib/types";
 import { useTranslation } from "react-i18next";
-
-const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
-  { value: "CLEANER", label: "Cleaner" },
-  { value: "PUBLIC_SERVICE", label: "Public service" },
-  { value: "KITCHEN_DISHWASHER", label: "Kitchen dishwasher" },
-  { value: "WAITER", label: "Waiter" },
-];
 
 interface SkillLine {
   skill: SkillTag;
@@ -261,7 +255,7 @@ function NewBroadcastForm() {
                       onChange={(e) =>
                         setSkillLine(index, { skill: e.target.value as SkillTag })
                       }
-                      options={SKILL_OPTIONS}
+                      options={SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
                     />
                   </div>
                   <div className="w-28">

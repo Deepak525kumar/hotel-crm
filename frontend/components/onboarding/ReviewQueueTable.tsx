@@ -198,7 +198,7 @@ export function ReviewQueueTable() {
                   <TH>{t("fields.role")}</TH>
                   <TH>{t("fields.employmentType")}</TH>
                   <TH>{t("status.submitted")}</TH>
-                  <TH className="text-right">{t("common.actions")}</TH>
+                  <TH className="text-end">{t("common.actions")}</TH>
                 </tr>
               </THead>
               {isLoading ? (
@@ -230,9 +230,9 @@ export function ReviewQueueTable() {
                       <TD className="text-gray-500 dark:text-gray-400">
                         {record.submitted_for_review_at ? formatDateTime(record.submitted_for_review_at) : "—"}
                       </TD>
-                      <TD className="text-right">
+                      <TD className="text-end">
                         <Button variant="outline" size="sm" onClick={() => setSelectedRecord(record)}>
-                          <Eye className="mr-2 h-4 w-4" />
+                          <Eye className="me-2 h-4 w-4" />
                           {record.is_reonboarding ? "Reactivate" : "Review"}
                         </Button>
                       </TD>
@@ -343,7 +343,7 @@ export function ReviewQueueTable() {
                 loading={rejectAction.pending}
                 disabled={approveAction.pending}
               >
-                <X className="mr-2 h-4 w-4 text-red-500" />
+                <X className="me-2 h-4 w-4 text-red-500" />
                 Reject
               </Button>
               <Button
@@ -356,7 +356,7 @@ export function ReviewQueueTable() {
                     : "Waiting for the applicant to upload their signed contract"
                 }
               >
-                <Check className="mr-2 h-4 w-4" />
+                <Check className="me-2 h-4 w-4" />
                 {isReonboarding
                   ? hasApprovedContract
                     ? "Reactivate"

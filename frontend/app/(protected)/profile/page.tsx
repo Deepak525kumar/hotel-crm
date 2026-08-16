@@ -11,7 +11,7 @@ import { ExportMyDataCard } from "@/components/compliance/ExportMyDataCard";
 import { EditProfileCard } from "@/components/profile/EditProfileCard";
 import { formatDateTime } from "@/lib/format";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import { SKILL_LABEL } from "@/lib/skills";
+import { SKILL_LABEL_KEY } from "@/lib/skills";
 import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
@@ -104,8 +104,8 @@ export default function ProfilePage() {
                 label={t("fields.skills")}
                 value={
                   employmentRecord?.skills && employmentRecord.skills.length > 0
-                    ? employmentRecord.skills.map((s) => SKILL_LABEL[s] ?? s).join(", ")
-                    : "None set"
+                    ? employmentRecord.skills.map((s) => t(SKILL_LABEL_KEY[s]) ?? s).join(", ")
+                    : t("common.notSet")
                 }
               />
             )}

@@ -26,7 +26,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import { SKILL_OPTIONS, SKILL_LABEL } from "@/lib/skills";
+import { SKILL_OPTIONS, SKILL_LABEL_KEY } from "@/lib/skills";
 import type { DeactivationReason, SkillTag } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
@@ -204,8 +204,8 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     <span className="flex items-center gap-2">
                       <span>
                         {record.skills && record.skills.length > 0
-                          ? record.skills.map((s) => SKILL_LABEL[s] ?? s).join(", ")
-                          : "None set"}
+                          ? record.skills.map((s) => t(SKILL_LABEL_KEY[s]) ?? s).join(", ")
+                          : t("common.notSet")}
                       </span>
                       <Button size="sm" variant="outline" onClick={() => setEditSkillsOpen(true)}>
                         Edit
@@ -690,6 +690,7 @@ function EditSkillsModal({
   open: boolean;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [skills, setSkills] = useState<SkillTag[]>(currentSkills);
   const action = useAsyncAction();
 
@@ -741,7 +742,7 @@ function EditSkillsModal({
           {SKILL_OPTIONS.map((opt) => (
             <Checkbox
               key={opt.value}
-              label={opt.label}
+              label={t(opt.labelKey)}
               checked={skills.includes(opt.value)}
               onChange={(e) => {
                 const newSkills = e.target.checked

@@ -30,6 +30,25 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement;
     root.lang = locale;
     root.dir = dirFor(locale);
+    // i18next must track the store unconditionally, not only on the paths
+    // that happen to call the store's own `apply()`.
+    //
+    // The catalogue language is initialised from `initialLocale()`, which
+    // reads `navigator.languages` and NEVER consults localStorage, while the
+    // store seeds `locale` from localStorage first. Two paths that were meant
+    // to reconcile them both miss the common cases: the store applies only
+    // inside `setLocale`/`reconcileFromServer`, never for its initial value,
+    // and `reconcileFromServer` short-circuits on `preferred === locale` —
+    // which is exactly a returning user whose stored choice already matches
+    // the server. An unauthenticated visitor never reconciles at all, so the
+    // public login and password-reset screens were pinned to the browser's
+    // language outright.
+    //
+    // The visible symptom was direction without translation: `dir="rtl"` and
+    // `lang="ar"` on a page still rendering English. Driving it from the same
+    // effect that owns `lang`/`dir` keeps all three in step by construction.
+    // `changeLanguage` is a no-op when the language already matches.
+    void i18n.changeLanguage(locale);
   }, [locale]);
 
   useEffect(() => {

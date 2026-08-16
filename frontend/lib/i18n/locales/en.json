@@ -350,7 +350,29 @@
     "documentsRequired": "Documents required before submission:",
     "loadingRecord": "Loading your onboarding record…",
     "loadRecordFailed": "Failed to load onboarding record.",
-    "loadingRequirements": "Loading document requirements…"
+    "loadingRequirements": "Loading document requirements…",
+    "phase": {
+      "documents": {
+        "label": "Pending Documents",
+        "description": "Complete your required documentation to activate your account."
+      },
+      "review": {
+        "label": "Under Review",
+        "description": "Your application is under review by your manager."
+      },
+      "rejected": {
+        "label": "Rejected",
+        "description": "Your application was rejected. Please review your documents and contact your manager."
+      },
+      "active": {
+        "label": "Active",
+        "description": "Your onboarding is complete. Welcome to the team!"
+      },
+      "inactive": {
+        "label": "Inactive",
+        "description": "Your employment record is not currently active."
+      }
+    }
   },
   "analytics": {
     "myPerformance": "My performance",
