@@ -352,6 +352,14 @@ model User {
   // creator gets the exception, not every manager who happens to share a
   // scope, and it stops mattering the moment a real EmploymentRecord (with
   // its own group-grain scope) exists.
+  // 2026-08-16: the user's chosen UI language (lib/locales.ts UI_LOCALES).
+  // Nullable and with NO database default on purpose — null means "this user
+  // has never chosen", which is materially different from "this user chose
+  // German". A null lets the client negotiate from the device/browser locale
+  // first and only then fall back to DEFAULT_UI_LOCALE, whereas a stored 'de'
+  // is an explicit choice that must override device locale. A column default
+  // would collapse those two states permanently on the backfill.
+  preferred_language String?
   created_by_id      String?
   created_by         User?     @relation("user_created_by", fields: [created_by_id], references: [id], onDelete: SetNull)
   users_created      User[]    @relation("user_created_by")

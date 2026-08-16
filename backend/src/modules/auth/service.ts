@@ -515,6 +515,11 @@ export class AuthService extends BaseService {
         profile_photo_url: true,
         role: true,
         is_active: true,
+        // 2026-08-16: read by SessionBootstrap on both clients to pick the
+        // initial UI language before first paint. Null here is not "no data"
+        // — it means the user has never chosen, and the client should
+        // negotiate from device/browser locale instead.
+        preferred_language: true,
         created_at: true,
         updated_at: true,
         // 2026-08-13 fix (reported live: My Profile showed a green "Active"
@@ -687,6 +692,17 @@ export class AuthService extends BaseService {
         last_name: data.last_name ?? user.last_name,
         phone: data.phone ?? user.phone,
         profile_photo_url: data.profile_photo_url ?? user.profile_photo_url,
+        // Deliberately NOT the `data.x ?? user.x` idiom used above. That
+        // pattern cannot distinguish "key absent" from "key present and
+        // null", and for this field the difference is the whole feature:
+        // an explicit null clears the preference and hands the user back to
+        // device-locale negotiation, whereas `?? user.preferred_language`
+        // would silently treat that clear as "leave unchanged" and make the
+        // preference impossible to unset. Keyed off `in` so only an actually
+        // supplied key writes.
+        ...('preferred_language' in data
+          ? { preferred_language: data.preferred_language ?? null }
+          : {}),
       },
       select: {
         id: true,
@@ -697,6 +713,7 @@ export class AuthService extends BaseService {
         profile_photo_url: true,
         role: true,
         is_active: true,
+        preferred_language: true,
         updated_at: true,
       },
     });

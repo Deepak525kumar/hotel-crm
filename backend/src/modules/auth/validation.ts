@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { UI_LOCALES } from '../../lib/locales.js';
 
 export const SignupSchema = z.object({
   email: z.string().email('Invalid email address').toLowerCase(),
@@ -34,6 +35,18 @@ export const UpdateProfileSchema = z.object({
   last_name: z.string().min(2).max(50).optional(),
   phone: z.string().regex(/^\+?[1-9]\d{1,14}$/, 'Invalid phone number').optional(),
   profile_photo_url: z.string().url('Invalid URL').optional(),
+  // 2026-08-16: the user's own UI language choice. This route (PUT
+  // /auth/profile) is the self-service one — reachable by ANY authenticated
+  // user including workers — which is why the language setting lives here
+  // rather than on PUT /users/:id, whose role gate (admin/manager/
+  // regional_manager) would leave workers unable to change their own
+  // language at all.
+  //
+  // `.nullable()` is meaningful, not incidental: passing null explicitly
+  // clears the preference and returns the user to device-locale negotiation,
+  // which a plain `.optional()` could not express (an absent key means
+  // "leave unchanged"). See lib/locales.ts.
+  preferred_language: z.enum(UI_LOCALES).nullable().optional(),
 });
 
 // HOTFIX-AUTH-002: password reset is a two-step, server-authoritative flow.
