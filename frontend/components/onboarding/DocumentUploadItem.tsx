@@ -123,7 +123,7 @@ export function DocumentUploadItem({
               disabled={disabled || uploading}
               loading={uploading}
             >
-              <UploadCloud className="w-4 h-4 mr-2" />
+              <UploadCloud className="w-4 h-4 me-2" />
               Upload
             </Button>
           </>

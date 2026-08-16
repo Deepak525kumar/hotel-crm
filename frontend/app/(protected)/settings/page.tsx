@@ -83,7 +83,7 @@ export default function SettingsPage() {
           <DataList>
             <DataRow
               label={
-                <span className="flex flex-col gap-0.5 text-left">
+                <span className="flex flex-col gap-0.5 text-start">
                   <span className="font-medium text-gray-900 dark:text-gray-100">{t("fields.theme")}</span>
                   <span className="text-gray-500 dark:text-gray-400">
                     {t("settings.themeSystemNote")}
@@ -94,7 +94,7 @@ export default function SettingsPage() {
             />
             <DataRow
               label={
-                <span className="flex flex-col gap-0.5 text-left">
+                <span className="flex flex-col gap-0.5 text-start">
                   <span className="font-medium text-gray-900 dark:text-gray-100">
                     {t("settings.language.title")}
                   </span>
@@ -145,7 +145,7 @@ export default function SettingsPage() {
               <DataRow
                 key={item.title}
                 label={
-                  <span className="flex flex-col gap-0.5 text-left">
+                  <span className="flex flex-col gap-0.5 text-start">
                     <span className="font-medium text-gray-900 dark:text-gray-100">
                       {item.title}
                     </span>

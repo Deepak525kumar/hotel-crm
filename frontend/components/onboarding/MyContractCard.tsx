@@ -101,7 +101,7 @@ export function MyContractCard({ workerId }: { workerId: string }) {
                     than navigating away. */}
                 <a href={hrApi.defaultContractDownloadUrl(workerId)} target="_blank" rel="noopener noreferrer">
                   <Button size="sm" variant="outline">
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="me-2 h-4 w-4" />
                     Download contract
                   </Button>
                 </a>

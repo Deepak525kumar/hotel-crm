@@ -350,7 +350,29 @@
     "documentsRequired": "Vor dem Absenden erforderliche Dokumente:",
     "loadingRecord": "Ihr Onboarding-Datensatz wird geladen…",
     "loadRecordFailed": "Onboarding-Datensatz konnte nicht geladen werden.",
-    "loadingRequirements": "Dokumentanforderungen werden geladen…"
+    "loadingRequirements": "Dokumentanforderungen werden geladen…",
+    "phase": {
+      "documents": {
+        "label": "Ausstehende Dokumente",
+        "description": "Vervollständigen Sie Ihre erforderlichen Unterlagen, um Ihr Konto zu aktivieren."
+      },
+      "review": {
+        "label": "In Prüfung",
+        "description": "Ihre Bewerbung wird von Ihrem Manager geprüft."
+      },
+      "rejected": {
+        "label": "Abgelehnt",
+        "description": "Ihre Bewerbung wurde abgelehnt. Bitte prüfen Sie Ihre Dokumente und wenden Sie sich an Ihren Manager."
+      },
+      "active": {
+        "label": "Aktiv",
+        "description": "Ihr Onboarding ist abgeschlossen. Willkommen im Team!"
+      },
+      "inactive": {
+        "label": "Inaktiv",
+        "description": "Ihr Beschäftigungsdatensatz ist derzeit nicht aktiv."
+      }
+    }
   },
   "analytics": {
     "myPerformance": "Meine Leistung",

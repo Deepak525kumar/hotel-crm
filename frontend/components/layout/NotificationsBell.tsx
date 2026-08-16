@@ -61,7 +61,7 @@ export function NotificationsBell() {
         <Bell className="h-5 w-5" aria-hidden />
         {unreadCount > 0 && (
           <span
-            className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-medium text-white"
+            className="absolute end-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-blue-600 px-1 text-[10px] font-medium text-white"
             aria-hidden
           >
             {unreadCount > 99 ? "99+" : unreadCount}
@@ -77,7 +77,7 @@ export function NotificationsBell() {
       {open && (
         <div
           aria-label={t("nav.notifications")}
-          className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900"
+          className="absolute end-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
             <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("nav.notifications")}</span>

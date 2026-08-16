@@ -3,7 +3,7 @@
     "locale": "ar",
     "reviewed": false,
     "dir": "rtl",
-    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. An AI review pass (2026-08-16) corrected the defects listed in the PR and found no others, but it is the same class of tool that produced the catalogue and is NOT a substitute for native-speaker sign-off. Approved by the project owner (2026-08-16) on that basis. RTL: layout direction is driven by RTL_UI_LOCALES in lib/locales.ts, not by this flag — the flag is documentation."
   },
   "common": {
     "save": "حفظ",
@@ -90,7 +90,7 @@
     "account": "الحساب",
     "logout": "تسجيل الخروج",
     "home": "الرئيسية",
-    "myShifts": "ورادياتي",
+    "myShifts": "وردياتي",
     "docs": "المستندات",
     "leaderboard": "لوحة الصدارة",
     "marketplace": "سوق الوظائف",
@@ -140,14 +140,14 @@
     "viewAssignment": "عرض المهمة",
     "leaveUnassigned": "ترك دون إسناد",
     "geoVerification": "التحقق من الموقع",
-    "checkIn": "تسجيل الدخول",
-    "checkOut": "تسجيل الخروج",
+    "checkIn": "تسجيل الحضور",
+    "checkOut": "تسجيل الانصراف",
     "stayOver": "نزيل مقيم",
     "noEligibleWorkers": "لم يتم العثور على موظفين مؤهلين.",
     "cancelReasonPlaceholder": "يرجى بيان سبب إلغاء هذه المهمة.",
     "title": "المهمة",
-    "checkInLabel": "تسجيل الدخول",
-    "checkOutLabel": "تسجيل الخروج",
+    "checkInLabel": "تسجيل الحضور",
+    "checkOutLabel": "تسجيل الانصراف",
     "checkout": "المغادرة",
     "insideGeofence": "داخل النطاق الجغرافي",
     "outsideGeofence": "خارج النطاق الجغرافي",
@@ -213,14 +213,14 @@
     "title": "خطأ"
   },
   "shifts": {
-    "checkIn": "تسجيل الدخول",
-    "checkOut": "تسجيل الخروج",
-    "checkedIn": "تم تسجيل الدخول",
-    "checkedOut": "تم تسجيل الخروج",
-    "checkInSuccess": "تم تسجيل دخولك بنجاح.",
-    "checkOutSuccess": "تم تسجيل خروجك بنجاح.",
-    "checkInFailed": "فشل تسجيل الدخول.",
-    "checkOutFailed": "فشل تسجيل الخروج.",
+    "checkIn": "تسجيل الحضور",
+    "checkOut": "تسجيل الانصراف",
+    "checkedIn": "تم تسجيل الحضور",
+    "checkedOut": "تم تسجيل الانصراف",
+    "checkInSuccess": "تم تسجيل حضورك بنجاح.",
+    "checkOutSuccess": "تم تسجيل انصرافك بنجاح.",
+    "checkInFailed": "فشل تسجيل الحضور.",
+    "checkOutFailed": "فشل تسجيل الانصراف.",
     "none": "لا توجد ورديات بعد.",
     "noneUpcoming": "لا توجد ورديات قادمة. تصفح سوق الوظائف!",
     "notFound": "لم يتم العثور على الوردية.",
@@ -351,7 +351,29 @@
     "documentsRequired": "المستندات المطلوبة قبل التقديم:",
     "loadingRecord": "جارٍ تحميل سجل انضمامك…",
     "loadRecordFailed": "تعذر تحميل سجل الانضمام.",
-    "loadingRequirements": "جارٍ تحميل متطلبات المستندات…"
+    "loadingRequirements": "جارٍ تحميل متطلبات المستندات…",
+    "phase": {
+      "documents": {
+        "label": "مستندات معلقة",
+        "description": "أكمل المستندات المطلوبة لتفعيل حسابك."
+      },
+      "review": {
+        "label": "قيد المراجعة",
+        "description": "طلبك قيد المراجعة من قبل مديرك."
+      },
+      "rejected": {
+        "label": "مرفوض",
+        "description": "تم رفض طلبك. يرجى مراجعة مستنداتك والتواصل مع مديرك."
+      },
+      "active": {
+        "label": "نشط",
+        "description": "اكتمل انضمامك. مرحباً بك في الفريق!"
+      },
+      "inactive": {
+        "label": "غير نشط",
+        "description": "سجل توظيفك غير نشط حالياً."
+      }
+    }
   },
   "analytics": {
     "myPerformance": "أدائي",

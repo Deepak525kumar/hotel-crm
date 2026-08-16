@@ -47,7 +47,7 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
           <UserRef userId={entry.worker_id} fallback="The assigned worker" />
         </span>
         {cancelled && (
-          <Badge tone="neutral" className="ml-2">
+          <Badge tone="neutral" className="ms-2">
             {absenceLabel}
           </Badge>
         )}

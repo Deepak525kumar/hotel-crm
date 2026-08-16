@@ -645,7 +645,7 @@ function ReassignModal({
                   key={w.id}
                   type="button"
                   onClick={() => setSelectedWorkerId(w.id)}
-                  className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                  className={`flex w-full items-center justify-between px-3 py-2 text-start text-sm hover:bg-gray-50 dark:hover:bg-gray-800 ${
                     selected ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 >

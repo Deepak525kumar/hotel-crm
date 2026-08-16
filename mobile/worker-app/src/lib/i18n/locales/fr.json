@@ -2,7 +2,7 @@
   "_meta": {
     "locale": "fr",
     "reviewed": false,
-    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. Approved by the project owner (2026-08-16) on that basis. Have a French speaker review before this reaches production users, particularly the consent, contract and payroll-adjacent strings."
+    "note": "MACHINE-TRANSLATED, NOT REVIEWED BY A HUMAN SPEAKER. An AI review pass (2026-08-16) corrected the defects listed in the PR and found no others, but it is the same class of tool that produced the catalogue and is NOT a substitute for native-speaker sign-off. Approved by the project owner (2026-08-16) on that basis. Have a French speaker review before this reaches production users, particularly the consent, contract and payroll-adjacent strings."
   },
   "common": {
     "save": "Enregistrer",
@@ -350,7 +350,29 @@
     "documentsRequired": "Documents requis avant soumission :",
     "loadingRecord": "Chargement de votre dossier d'intégration…",
     "loadRecordFailed": "Impossible de charger le dossier d'intégration.",
-    "loadingRequirements": "Chargement des documents requis…"
+    "loadingRequirements": "Chargement des documents requis…",
+    "phase": {
+      "documents": {
+        "label": "Documents en attente",
+        "description": "Complétez les documents requis pour activer votre compte."
+      },
+      "review": {
+        "label": "En cours d'examen",
+        "description": "Votre candidature est en cours d'examen par votre responsable."
+      },
+      "rejected": {
+        "label": "Rejetée",
+        "description": "Votre candidature a été rejetée. Veuillez vérifier vos documents et contacter votre responsable."
+      },
+      "active": {
+        "label": "Actif",
+        "description": "Votre intégration est terminée. Bienvenue dans l'équipe !"
+      },
+      "inactive": {
+        "label": "Inactif",
+        "description": "Votre dossier d'emploi n'est pas actif actuellement."
+      }
+    }
   },
   "analytics": {
     "myPerformance": "Mes performances",
