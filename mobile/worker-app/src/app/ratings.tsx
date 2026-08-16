@@ -7,10 +7,12 @@ import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { LeaderboardEntry } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
 export default function RatingsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,7 +30,7 @@ export default function RatingsScreen() {
         <Pressable onPress={() => router.back()} style={styles.back}>
           <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
         </Pressable>
-        <ThemedText type="subtitle" style={styles.header}>Leaderboard</ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t('nav.leaderboard')}</ThemedText>
         {loading ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
@@ -59,7 +61,7 @@ export default function RatingsScreen() {
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">No leaderboard data yet.</ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t('leaderboard.none')}</ThemedText>
               </ThemedView>
             }
             contentContainerStyle={styles.list}

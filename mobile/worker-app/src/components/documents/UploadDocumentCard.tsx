@@ -6,10 +6,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
-const CATEGORY_LABEL: Record<DocumentCategory, string> = {
-  GENERAL: 'General',
-  WORK_PERMIT: 'Work permit',
+// Translation KEYS, not display strings: this map is module-scope, where
+// t() cannot be called. Each value is resolved at render time instead, so
+// the label follows the active language rather than being frozen at import.
+const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
+  GENERAL: 'documents.categoryGENERAL',
+  WORK_PERMIT: 'documents.categoryWORK_PERMIT',
 };
 
 export function UploadDocumentCard({
@@ -19,6 +23,7 @@ export function UploadDocumentCard({
   workerId: string;
   onUploaded: (doc: WorkerDocument) => void;
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [category, setCategory] = useState<DocumentCategory>('GENERAL');
   const [isWorkPermit, setIsWorkPermit] = useState(false);
@@ -90,7 +95,7 @@ export function UploadDocumentCard({
                   type="small"
                   style={category === c ? { color: theme.background } : undefined}
                 >
-                  {CATEGORY_LABEL[c]}
+                  {t(CATEGORY_LABEL_KEY[c])}
                 </ThemedText>
               </Pressable>
             ))}
@@ -135,7 +140,7 @@ export function UploadDocumentCard({
               <ActivityIndicator color={theme.background} size="small" />
             ) : (
               <ThemedText type="small" style={{ color: theme.background }}>
-                {error ? 'Retry upload' : 'Upload'}
+                {error ? t('documents.retryUpload') : t('documents.upload')}
               </ThemedText>
             )}
           </Pressable>

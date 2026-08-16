@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
+import { APP_NAME } from "@/lib/config";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -15,6 +17,7 @@ import {
 } from "@/components/ui";
 
 export default function LoginPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { login, status } = useAuth();
   const [email, setEmail] = useState("");
@@ -39,13 +42,13 @@ export default function LoginPage() {
         setError(
           err.retryAfterSeconds !== undefined
             ? `Too many attempts. Please try again in ${err.retryAfterSeconds}s.`
-            : "Too many attempts. Please wait before trying again.",
+            : t("auth.tooManyAttempts"),
         );
       } else {
         setError(
           err instanceof ApiError
             ? err.message
-            : "Something went wrong. Please try again.",
+            : t("errors.generic"),
         );
       }
     } finally {
@@ -57,12 +60,12 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4 dark:bg-gray-800">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Sign in to FHM Hotelservice</CardTitle>
+          <CardTitle>{t("auth.signInTo", { app: APP_NAME })}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <Input
-              label="Email"
+              label={t("auth.email")}
               type="email"
               autoComplete="email"
               required
@@ -70,7 +73,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
             />
             <Input
-              label="Password"
+              label={t("auth.password")}
               type="password"
               autoComplete="current-password"
               required
@@ -79,7 +82,7 @@ export default function LoginPage() {
             />
             <FormError>{error}</FormError>
             <Button type="submit" loading={submitting} className="w-full">
-              Sign in
+              {t("auth.login")}
             </Button>
           </form>
         </CardContent>

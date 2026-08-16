@@ -50,7 +50,11 @@
     "skills": "Skills",
     "theme": "Theme",
     "language": "Language",
-    "totalRooms": "Total rooms"
+    "totalRooms": "Total rooms",
+    "pay": "Pay",
+    "rating": "Rating",
+    "startDate": "Start Date",
+    "endDate": "End Date"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -69,7 +73,15 @@
     "settings": "Settings",
     "profile": "Profile",
     "account": "Account",
-    "logout": "Log out"
+    "logout": "Log out",
+    "home": "Home",
+    "myShifts": "My Shifts",
+    "docs": "Docs",
+    "leaderboard": "Leaderboard",
+    "marketplace": "Job Marketplace",
+    "explore": "Explore",
+    "myOnboarding": "My Onboarding",
+    "reviewQueue": "Review Queue"
   },
   "roles": {
     "admin": "Admin",
@@ -119,13 +131,28 @@
       "changeFailed": "Could not save your language. Please try again.",
       "untranslatedNotice": "This language is partially translated. Untranslated text appears in German.",
       "restartRequired": "Restart the app to finish switching the writing direction."
-    }
+    },
+    "account": "Account",
+    "appearance": "Appearance",
+    "about": "About",
+    "comingSoon": "Coming soon",
+    "themeSystemNote": "System follows your device's setting."
   },
   "auth": {
     "login": "Log in",
     "password": "Password",
     "forgotPassword": "Forgot password?",
-    "resetSuccess": "Your password has been reset successfully!"
+    "resetSuccess": "Your password has been reset successfully!",
+    "signIn": "Sign In",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Password",
+    "credentialsRequired": "Email and password are required.",
+    "noAppAccess": "Your account does not have access to this app.",
+    "tooManyAttemptsRetry": "Too many attempts. Please try again in {{seconds}}s.",
+    "tooManyAttempts": "Too many attempts. Please wait before trying again.",
+    "loginFailed": "Login failed. Please try again.",
+    "signInTo": "Sign in to {{app}}",
+    "email": "Email"
   },
   "search": {
     "byNameOrEmail": "Search by name or email…",
@@ -141,6 +168,94 @@
     "generic": "Something went wrong. Please try again.",
     "network": "Could not reach the server. Check your connection.",
     "notFound": "Not found.",
-    "forbidden": "You do not have access to this."
+    "forbidden": "You do not have access to this.",
+    "title": "Error"
+  },
+  "shifts": {
+    "checkIn": "Check In",
+    "checkOut": "Check Out",
+    "checkedIn": "Checked In",
+    "checkedOut": "Checked Out",
+    "checkInSuccess": "You have successfully checked in.",
+    "checkOutSuccess": "You have successfully checked out.",
+    "checkInFailed": "Check-in failed.",
+    "checkOutFailed": "Check-out failed.",
+    "none": "No shifts yet.",
+    "noneUpcoming": "No upcoming shifts. Browse the job marketplace!",
+    "notFound": "Shift not found.",
+    "upcoming": "Upcoming",
+    "attendanceStatus": "Attendance Status",
+    "roomsCompleted": "Rooms Completed",
+    "offer": "Shift offer",
+    "offerNotFound": "Offer not found.",
+    "detailsTitle": "Shift Details"
+  },
+  "jobs": {
+    "none": "No open jobs found.",
+    "notFound": "Job not found.",
+    "searchPlaceholder": "Search jobs…",
+    "open": "Open jobs",
+    "offersForYou": "Offers for you",
+    "accept": "Accept",
+    "decline": "Decline",
+    "withdraw": "Withdraw",
+    "spots": "Spots",
+    "filled": "Filled",
+    "position": "Position",
+    "pay": "Pay",
+    "offerBadge": "OFFER"
+  },
+  "documents": {
+    "title": "Documents",
+    "none": "No documents uploaded yet",
+    "chooseFile": "Choose file",
+    "expiryPlaceholder": "Expiry date (optional, YYYY-MM-DD)",
+    "expiryFormat": "Expiry date must use YYYY-MM-DD.",
+    "view": "View",
+    "categoryGENERAL": "General",
+    "categoryWORK_PERMIT": "Work permit",
+    "upload": "Upload",
+    "retryUpload": "Retry upload"
+  },
+  "hr": {
+    "title": "HR & Payroll",
+    "view": "View HR & Payroll",
+    "contractStatus": "Contract Status",
+    "noActiveContract": "No Active Contract",
+    "payslipRequests": "Payslip Requests",
+    "noRequests": "No Requests",
+    "payslipRequestFailed": "Failed to request payslip"
+  },
+  "consent": {
+    "title": "Data-protection consent",
+    "view": "View Consent",
+    "grant": "Grant",
+    "decline": "Decline",
+    "withdraw": "Withdraw",
+    "reviewAgain": "Review again",
+    "reviewNotice": "Review notice",
+    "loadFailed": "Failed to load your consent status."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "none": "No notifications."
+  },
+  "leaderboard": {
+    "none": "No leaderboard data yet.",
+    "view": "View Leaderboard"
+  },
+  "profile": {
+    "title": "Profile",
+    "overview": "Overview",
+    "createdBy": "Created By",
+    "directManager": "Direct Manager",
+    "signOut": "Sign Out",
+    "noAbsences": "No sick or vacation days marked."
+  },
+  "skills": {
+    "CLEANER": "Cleaner",
+    "PUBLIC_SERVICE": "Public service",
+    "KITCHEN_DISHWASHER": "Kitchen dishwasher",
+    "WAITER": "Waiter"
   }
 }

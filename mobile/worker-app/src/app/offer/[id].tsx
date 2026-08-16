@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { resolveMySlots } from '@/lib/broadcast-eligibility';
 import { Spacing } from '@/constants/theme';
 import type { Broadcast, BroadcastEligibility, SkillTag } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 const SKILL_LABELS: Record<string, string> = {
   CLEANER: 'Cleaner',
@@ -26,6 +27,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export default function OfferDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
@@ -70,7 +72,7 @@ export default function OfferDetailScreen() {
       setFulfilledSkill(skill);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.');
+      setError(err instanceof ApiError ? err.message : t('errors.generic'));
     } finally {
       setAccepting(null);
     }
@@ -87,7 +89,7 @@ export default function OfferDetailScreen() {
   if (!offer || !offer.skill_slots || offer.skill_slots.length === 0) {
     return (
       <ThemedView style={styles.center}>
-        <ThemedText type="small" themeColor="textSecondary">Offer not found.</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t('shifts.offerNotFound')}</ThemedText>
       </ThemedView>
     );
   }
@@ -102,7 +104,7 @@ export default function OfferDetailScreen() {
           <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
         </Pressable>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-          <ThemedText type="subtitle" style={styles.title}>Shift offer</ThemedText>
+          <ThemedText type="subtitle" style={styles.title}>{t('shifts.offer')}</ThemedText>
           {offer.hotel && (
             <ThemedText type="small" themeColor="textSecondary" style={styles.hotelName}>
               {offer.hotel.name}
@@ -111,17 +113,17 @@ export default function OfferDetailScreen() {
 
           <ThemedView type="backgroundElement" style={styles.section}>
             <InfoRow
-              label="Date"
+              label={t('fields.date')}
               value={new Date(offer.shift_date).toLocaleDateString('en-US', {
                 weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
               })}
             />
             <View style={styles.divider} />
-            <InfoRow label="Time" value={`${offer.shift_start_time} – ${offer.shift_end_time}`} />
+            <InfoRow label={t('fields.time')} value={`${offer.shift_start_time} – ${offer.shift_end_time}`} />
             {offer.hourly_rate ? (
               <>
                 <View style={styles.divider} />
-                <InfoRow label="Pay" value={`$${offer.hourly_rate}/hr`} />
+                <InfoRow label={t('fields.pay')} value={`$${offer.hourly_rate}/hr`} />
               </>
             ) : null}
           </ThemedView>
@@ -160,11 +162,11 @@ export default function OfferDetailScreen() {
                     {accepting === slot.skill ? (
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : (
-                      <ThemedText type="smallBold" style={styles.acceptButtonText}>Accept</ThemedText>
+                      <ThemedText type="smallBold" style={styles.acceptButtonText}>{t('jobs.accept')}</ThemedText>
                     )}
                   </Pressable>
                 )}
-                {filled && <ThemedText type="small" themeColor="textSecondary">Filled</ThemedText>}
+                {filled && <ThemedText type="small" themeColor="textSecondary">{t('jobs.filled')}</ThemedText>}
               </ThemedView>
             );
           })}

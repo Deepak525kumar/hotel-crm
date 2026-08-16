@@ -51,7 +51,11 @@
     "skills": "مہارتیں",
     "theme": "تھیم",
     "language": "زبان",
-    "totalRooms": "کل کمرے"
+    "totalRooms": "کل کمرے",
+    "pay": "اجرت",
+    "rating": "درجہ بندی",
+    "startDate": "آغاز کی تاریخ",
+    "endDate": "اختتام کی تاریخ"
   },
   "nav": {
     "dashboard": "ڈیش بورڈ",
@@ -70,7 +74,15 @@
     "settings": "ترتیبات",
     "profile": "پروفائل",
     "account": "اکاؤنٹ",
-    "logout": "لاگ آؤٹ"
+    "logout": "لاگ آؤٹ",
+    "home": "ہوم",
+    "myShifts": "میری شفٹیں",
+    "docs": "دستاویزات",
+    "leaderboard": "لیڈر بورڈ",
+    "marketplace": "جاب مارکیٹ",
+    "explore": "دریافت کریں",
+    "myOnboarding": "میری شمولیت",
+    "reviewQueue": "جائزہ قطار"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -120,13 +132,28 @@
       "changeFailed": "آپ کی زبان محفوظ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
       "untranslatedNotice": "یہ زبان جزوی طور پر ترجمہ شدہ ہے۔ غیر ترجمہ شدہ متن جرمن میں ظاہر ہوگا۔",
       "restartRequired": "تحریر کی سمت کی تبدیلی مکمل کرنے کے لیے ایپ دوبارہ شروع کریں۔"
-    }
+    },
+    "account": "اکاؤنٹ",
+    "appearance": "ظاہری شکل",
+    "about": "متعلق",
+    "comingSoon": "جلد آ رہا ہے",
+    "themeSystemNote": "سسٹم آپ کے ڈیوائس کی ترتیب کے مطابق ہے۔"
   },
   "auth": {
     "login": "لاگ اِن",
     "password": "پاس ورڈ",
     "forgotPassword": "پاس ورڈ بھول گئے؟",
-    "resetSuccess": "آپ کا پاس ورڈ کامیابی سے ری سیٹ ہو گیا!"
+    "resetSuccess": "آپ کا پاس ورڈ کامیابی سے ری سیٹ ہو گیا!",
+    "signIn": "سائن اِن",
+    "emailPlaceholder": "ای میل",
+    "passwordPlaceholder": "پاس ورڈ",
+    "credentialsRequired": "ای میل اور پاس ورڈ لازمی ہیں۔",
+    "noAppAccess": "آپ کے اکاؤنٹ کو اس ایپ تک رسائی نہیں ہے۔",
+    "tooManyAttemptsRetry": "بہت زیادہ کوششیں۔ {{seconds}} سیکنڈ میں دوبارہ کوشش کریں۔",
+    "tooManyAttempts": "بہت زیادہ کوششیں۔ دوبارہ کوشش سے پہلے انتظار کریں۔",
+    "loginFailed": "لاگ اِن ناکام۔ دوبارہ کوشش کریں۔",
+    "signInTo": "{{app}} میں سائن اِن کریں",
+    "email": "ای میل"
   },
   "search": {
     "byNameOrEmail": "نام یا ای میل سے تلاش کریں…",
@@ -142,6 +169,94 @@
     "generic": "کچھ غلط ہو گیا۔ دوبارہ کوشش کریں۔",
     "network": "سرور تک رسائی نہیں ہو سکی۔ اپنا کنکشن چیک کریں۔",
     "notFound": "نہیں ملا۔",
-    "forbidden": "آپ کو اس تک رسائی حاصل نہیں ہے۔"
+    "forbidden": "آپ کو اس تک رسائی حاصل نہیں ہے۔",
+    "title": "خرابی"
+  },
+  "shifts": {
+    "checkIn": "چیک اِن",
+    "checkOut": "چیک آؤٹ",
+    "checkedIn": "چیک اِن ہو گیا",
+    "checkedOut": "چیک آؤٹ ہو گیا",
+    "checkInSuccess": "آپ کا چیک اِن کامیابی سے ہو گیا۔",
+    "checkOutSuccess": "آپ کا چیک آؤٹ کامیابی سے ہو گیا۔",
+    "checkInFailed": "چیک اِن ناکام ہو گیا۔",
+    "checkOutFailed": "چیک آؤٹ ناکام ہو گیا۔",
+    "none": "ابھی کوئی شفٹ نہیں۔",
+    "noneUpcoming": "کوئی آنے والی شفٹ نہیں۔ جاب مارکیٹ دیکھیں!",
+    "notFound": "شفٹ نہیں ملی۔",
+    "upcoming": "آنے والی",
+    "attendanceStatus": "حاضری کی حالت",
+    "roomsCompleted": "مکمل کمرے",
+    "offer": "شفٹ کی پیشکش",
+    "offerNotFound": "پیشکش نہیں ملی۔",
+    "detailsTitle": "شفٹ کی تفصیلات"
+  },
+  "jobs": {
+    "none": "کوئی کھلی نوکری نہیں ملی۔",
+    "notFound": "نوکری نہیں ملی۔",
+    "searchPlaceholder": "نوکریاں تلاش کریں…",
+    "open": "کھلی نوکریاں",
+    "offersForYou": "آپ کے لیے پیشکشیں",
+    "accept": "قبول کریں",
+    "decline": "مسترد کریں",
+    "withdraw": "واپس لیں",
+    "spots": "جگہیں",
+    "filled": "بھر گیا",
+    "position": "عہدہ",
+    "pay": "اجرت",
+    "offerBadge": "پیشکش"
+  },
+  "documents": {
+    "title": "دستاویزات",
+    "none": "ابھی کوئی دستاویز اپ لوڈ نہیں ہوئی",
+    "chooseFile": "فائل منتخب کریں",
+    "expiryPlaceholder": "میعاد ختم ہونے کی تاریخ (اختیاری، YYYY-MM-DD)",
+    "expiryFormat": "میعاد کی تاریخ YYYY-MM-DD کی شکل میں ہونی چاہیے۔",
+    "view": "دیکھیں",
+    "categoryGENERAL": "عمومی",
+    "categoryWORK_PERMIT": "ورک پرمٹ",
+    "upload": "اپ لوڈ",
+    "retryUpload": "دوبارہ اپ لوڈ کریں"
+  },
+  "hr": {
+    "title": "ایچ آر اور پے رول",
+    "view": "ایچ آر اور پے رول دیکھیں",
+    "contractStatus": "معاہدے کی حالت",
+    "noActiveContract": "کوئی فعال معاہدہ نہیں",
+    "payslipRequests": "تنخواہ سلپ کی درخواستیں",
+    "noRequests": "کوئی درخواست نہیں",
+    "payslipRequestFailed": "تنخواہ سلپ کی درخواست ناکام"
+  },
+  "consent": {
+    "title": "ڈیٹا تحفظ کی رضامندی",
+    "view": "رضامندی دیکھیں",
+    "grant": "دیں",
+    "decline": "مسترد کریں",
+    "withdraw": "واپس لیں",
+    "reviewAgain": "دوبارہ جائزہ لیں",
+    "reviewNotice": "نوٹس دیکھیں",
+    "loadFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔"
+  },
+  "notifications": {
+    "title": "اطلاعات",
+    "none": "کوئی اطلاع نہیں۔"
+  },
+  "leaderboard": {
+    "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
+    "view": "لیڈر بورڈ دیکھیں"
+  },
+  "profile": {
+    "title": "پروفائل",
+    "overview": "جائزہ",
+    "createdBy": "بنایا گیا از",
+    "directManager": "براہ راست مینیجر",
+    "signOut": "سائن آؤٹ",
+    "noAbsences": "کوئی بیماری یا چھٹی درج نہیں۔"
+  },
+  "skills": {
+    "CLEANER": "صفائی کارکن",
+    "PUBLIC_SERVICE": "عوامی خدمت",
+    "KITCHEN_DISHWASHER": "کچن ڈش واشر",
+    "WAITER": "ویٹر"
   }
 }

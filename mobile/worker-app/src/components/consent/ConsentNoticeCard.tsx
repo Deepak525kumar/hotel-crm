@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import type { ConsentNotice } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Renders a fetched notice and the Grant/Decline decision — only shown once
@@ -21,6 +22,7 @@ export function ConsentNoticeCard({
   deciding: 'GRANTED' | 'DECLINED' | null;
   onDecide: (decision: 'GRANTED' | 'DECLINED') => void;
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   return (
@@ -48,7 +50,7 @@ export function ConsentNoticeCard({
             <ActivityIndicator color={theme.background} size="small" />
           ) : (
             <ThemedText type="small" style={{ color: theme.background }}>
-              Grant
+              {t('consent.grant')}
             </ThemedText>
           )}
         </Pressable>
@@ -64,7 +66,7 @@ export function ConsentNoticeCard({
           {deciding === 'DECLINED' ? (
             <ActivityIndicator color={theme.text} size="small" />
           ) : (
-            <ThemedText type="small">Decline</ThemedText>
+            <ThemedText type="small">{t('consent.decline')}</ThemedText>
           )}
         </Pressable>
       </ThemedView>

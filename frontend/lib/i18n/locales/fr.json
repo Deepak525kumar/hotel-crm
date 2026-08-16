@@ -50,7 +50,11 @@
     "skills": "Compétences",
     "theme": "Thème",
     "language": "Langue",
-    "totalRooms": "Nombre de chambres"
+    "totalRooms": "Nombre de chambres",
+    "pay": "Rémunération",
+    "rating": "Évaluation",
+    "startDate": "Date de début",
+    "endDate": "Date de fin"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -69,7 +73,15 @@
     "settings": "Paramètres",
     "profile": "Profil",
     "account": "Compte",
-    "logout": "Se déconnecter"
+    "logout": "Se déconnecter",
+    "home": "Accueil",
+    "myShifts": "Mes services",
+    "docs": "Documents",
+    "leaderboard": "Classement",
+    "marketplace": "Bourse d'emplois",
+    "explore": "Explorer",
+    "myOnboarding": "Mon intégration",
+    "reviewQueue": "File de validation"
   },
   "roles": {
     "admin": "Administrateur",
@@ -119,13 +131,28 @@
       "changeFailed": "Impossible d'enregistrer votre langue. Veuillez réessayer.",
       "untranslatedNotice": "Cette langue est partiellement traduite. Les textes non traduits s'affichent en allemand.",
       "restartRequired": "Redémarrez l'application pour terminer le changement de sens d'écriture."
-    }
+    },
+    "account": "Compte",
+    "appearance": "Apparence",
+    "about": "À propos",
+    "comingSoon": "Bientôt disponible",
+    "themeSystemNote": "Système suit le réglage de votre appareil."
   },
   "auth": {
     "login": "Se connecter",
     "password": "Mot de passe",
     "forgotPassword": "Mot de passe oublié ?",
-    "resetSuccess": "Votre mot de passe a été réinitialisé avec succès !"
+    "resetSuccess": "Votre mot de passe a été réinitialisé avec succès !",
+    "signIn": "Se connecter",
+    "emailPlaceholder": "E-mail",
+    "passwordPlaceholder": "Mot de passe",
+    "credentialsRequired": "L'e-mail et le mot de passe sont obligatoires.",
+    "noAppAccess": "Votre compte n'a pas accès à cette application.",
+    "tooManyAttemptsRetry": "Trop de tentatives. Réessayez dans {{seconds}} s.",
+    "tooManyAttempts": "Trop de tentatives. Veuillez patienter avant de réessayer.",
+    "loginFailed": "Échec de la connexion. Veuillez réessayer.",
+    "signInTo": "Se connecter à {{app}}",
+    "email": "E-mail"
   },
   "search": {
     "byNameOrEmail": "Rechercher par nom ou e-mail…",
@@ -141,6 +168,94 @@
     "generic": "Une erreur est survenue. Veuillez réessayer.",
     "network": "Impossible de joindre le serveur. Vérifiez votre connexion.",
     "notFound": "Introuvable.",
-    "forbidden": "Vous n'avez pas accès à cet élément."
+    "forbidden": "Vous n'avez pas accès à cet élément.",
+    "title": "Erreur"
+  },
+  "shifts": {
+    "checkIn": "Pointer l'arrivée",
+    "checkOut": "Pointer le départ",
+    "checkedIn": "Arrivée pointée",
+    "checkedOut": "Départ pointé",
+    "checkInSuccess": "Votre arrivée a bien été enregistrée.",
+    "checkOutSuccess": "Votre départ a bien été enregistré.",
+    "checkInFailed": "Échec du pointage d'arrivée.",
+    "checkOutFailed": "Échec du pointage de départ.",
+    "none": "Aucun service pour le moment.",
+    "noneUpcoming": "Aucun service à venir. Parcourez la bourse d'emplois !",
+    "notFound": "Service introuvable.",
+    "upcoming": "À venir",
+    "attendanceStatus": "Statut de présence",
+    "roomsCompleted": "Chambres terminées",
+    "offer": "Offre de service",
+    "offerNotFound": "Offre introuvable.",
+    "detailsTitle": "Détails du service"
+  },
+  "jobs": {
+    "none": "Aucune offre disponible.",
+    "notFound": "Offre introuvable.",
+    "searchPlaceholder": "Rechercher des offres…",
+    "open": "Offres ouvertes",
+    "offersForYou": "Offres pour vous",
+    "accept": "Accepter",
+    "decline": "Refuser",
+    "withdraw": "Retirer",
+    "spots": "Places",
+    "filled": "Pourvu",
+    "position": "Poste",
+    "pay": "Rémunération",
+    "offerBadge": "OFFRE"
+  },
+  "documents": {
+    "title": "Documents",
+    "none": "Aucun document téléversé",
+    "chooseFile": "Choisir un fichier",
+    "expiryPlaceholder": "Date d'expiration (facultatif, AAAA-MM-JJ)",
+    "expiryFormat": "La date d'expiration doit être au format AAAA-MM-JJ.",
+    "view": "Voir",
+    "categoryGENERAL": "Général",
+    "categoryWORK_PERMIT": "Permis de travail",
+    "upload": "Téléverser",
+    "retryUpload": "Réessayer le téléversement"
+  },
+  "hr": {
+    "title": "RH et paie",
+    "view": "Voir RH et paie",
+    "contractStatus": "Statut du contrat",
+    "noActiveContract": "Aucun contrat actif",
+    "payslipRequests": "Demandes de bulletin de paie",
+    "noRequests": "Aucune demande",
+    "payslipRequestFailed": "Échec de la demande de bulletin de paie"
+  },
+  "consent": {
+    "title": "Consentement à la protection des données",
+    "view": "Voir le consentement",
+    "grant": "Accorder",
+    "decline": "Refuser",
+    "withdraw": "Retirer",
+    "reviewAgain": "Revoir",
+    "reviewNotice": "Consulter l'avis",
+    "loadFailed": "Impossible de charger votre statut de consentement."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "none": "Aucune notification."
+  },
+  "leaderboard": {
+    "none": "Aucune donnée de classement.",
+    "view": "Voir le classement"
+  },
+  "profile": {
+    "title": "Profil",
+    "overview": "Aperçu",
+    "createdBy": "Créé par",
+    "directManager": "Responsable direct",
+    "signOut": "Se déconnecter",
+    "noAbsences": "Aucun jour de maladie ou de congé enregistré."
+  },
+  "skills": {
+    "CLEANER": "Agent d'entretien",
+    "PUBLIC_SERVICE": "Service public",
+    "KITCHEN_DISHWASHER": "Plongeur en cuisine",
+    "WAITER": "Serveur"
   }
 }
