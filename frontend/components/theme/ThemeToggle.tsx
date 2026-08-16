@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { useTheme } from "next-themes";
 import { Select } from "@/components/ui";
+import { useTranslation } from "react-i18next";
 
 const THEME_OPTIONS = [
   { value: "system", label: "System" },
@@ -36,12 +37,13 @@ function useIsMounted(): boolean {
  * would flash the wrong selection or mismatch during hydration.
  */
 export function ThemeToggle() {
+  const { t } = useTranslation();
   const { theme, setTheme } = useTheme();
   const mounted = useIsMounted();
 
   return (
     <Select
-      aria-label="Theme"
+      aria-label={t("fields.theme")}
       className="w-32"
       value={mounted ? (theme ?? "system") : "system"}
       onChange={(e) => setTheme(e.target.value)}

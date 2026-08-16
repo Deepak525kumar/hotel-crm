@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useHotelGroups, useRegionalManagerCandidates } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
+import { useTranslation } from "react-i18next";
 import {
   Button,
   Card,
@@ -24,6 +25,7 @@ import {
 const PER_PAGE = 20;
 
 export default function HotelGroupsPage() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const { groups, isLoading, error, hasNext } = useHotelGroups({
     page,
@@ -43,12 +45,12 @@ export default function HotelGroupsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Hotel groups"
+        title={t("nav.hotelGroups")}
         description="Regional groupings that scope managers and billing."
         actions={
           <RoleGate allow={["admin"]}>
             <Link href="/hotel-groups/new">
-              <Button>New group</Button>
+              <Button>{t("hotels.newGroup")}</Button>
             </Link>
           </RoleGate>
         }
@@ -61,11 +63,11 @@ export default function HotelGroupsPage() {
               Failed to load hotel groups. Please try again.
             </div>
           ) : (
-            <Table aria-label="Hotel groups">
+            <Table aria-label={t("nav.hotelGroups")}>
               <THead>
                 <tr>
-                  <TH>Name</TH>
-                  <TH>Regional manager</TH>
+                  <TH>{t("fields.name")}</TH>
+                  <TH>{t("roles.regionalManager")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

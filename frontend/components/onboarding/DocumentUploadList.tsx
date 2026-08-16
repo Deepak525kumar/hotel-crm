@@ -6,6 +6,7 @@ import { documentsApi } from "@/lib/api";
 import { DocumentUploadItem } from "./DocumentUploadItem";
 import type { DocumentCategory, WorkerDocument } from "@/lib/types";
 import { AlertCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export interface DocumentUploadListProps {
   workerId: string;
@@ -40,6 +41,7 @@ export function DocumentUploadList({
   disabled = false,
   includeContract = true,
 }: DocumentUploadListProps) {
+  const { t } = useTranslation();
   const { data: completeness, isLoading, error, mutate } = useSWR(
     `/documents/workers/${workerId}/documents/completeness?work_permit_required=${workPermitRequired}`,
     () => documentsApi.completeness(workerId, workPermitRequired)
@@ -94,7 +96,7 @@ export function DocumentUploadList({
   }
 
   if (isLoading) {
-    return <div className="p-8 text-center text-gray-500">Loading document requirements...</div>;
+    return <div className="p-8 text-center text-gray-500">{t("onboarding.loadingRequirements")}</div>;
   }
 
   return (

@@ -26,11 +26,13 @@ import {
 } from "@/components/ui";
 import { placementAbsenceLabel } from "@/lib/types";
 import type { CalendarEntryDto } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const PER_PAGE = 20;
 const COLUMNS = 4;
 
 function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
+  const { t } = useTranslation();
   const { data: hotel } = useHotel(entry.hotel_id);
   // The API returns cancelled placements on purpose so they can be shown as
   // cancelled rather than vanishing. Without this the row was indistinguishable
@@ -55,13 +57,14 @@ function CalendarEntryRow({ entry }: { entry: CalendarEntryDto }) {
       </TD>
       <TD className={cancelled ? "line-through" : undefined}>{formatDate(entry.day)}</TD>
       <TD>
-        <TextLink href={`/assignments/${entry.assignment_id}`}>View assignment</TextLink>
+        <TextLink href={`/assignments/${entry.assignment_id}`}>{t("assignments.viewAssignment")}</TextLink>
       </TD>
     </TR>
   );
 }
 
 export default function CalendarEntriesPage() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
 
   const { calendarEntries, isLoading, error, hasNext } = useCalendarEntries({
@@ -77,7 +80,7 @@ export default function CalendarEntriesPage() {
         actions={
           <StaffingWriteGate>
             <Link href="/assignments/calendar-entries/new">
-              <Button>Place worker</Button>
+              <Button>{t("assignments.placeWorker")}</Button>
             </Link>
           </StaffingWriteGate>
         }
@@ -93,10 +96,10 @@ export default function CalendarEntriesPage() {
             <Table aria-label="Calendar placements">
               <THead>
                 <tr>
-                  <TH>Worker</TH>
-                  <TH>Hotel</TH>
-                  <TH>Day</TH>
-                  <TH>Assignment</TH>
+                  <TH>{t("fields.worker")}</TH>
+                  <TH>{t("fields.hotel")}</TH>
+                  <TH>{t("common.day")}</TH>
+                  <TH>{t("assignments.title")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

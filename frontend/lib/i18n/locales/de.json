@@ -28,7 +28,16 @@
     "total": "Gesamt",
     "actions": "Aktionen",
     "optional": "Optional",
-    "required": "Erforderlich"
+    "required": "Erforderlich",
+    "count": "Anzahl",
+    "day": "Tag",
+    "message": "Nachricht",
+    "record": "Eintrag",
+    "noEntries": "Keine Einträge",
+    "thisMonth": "Diesen Monat",
+    "quickLinks": "Schnellzugriff",
+    "permissions": "Berechtigungen",
+    "coordinates": "Koordinaten"
   },
   "fields": {
     "name": "Name",
@@ -54,7 +63,12 @@
     "pay": "Vergütung",
     "rating": "Bewertung",
     "startDate": "Startdatum",
-    "endDate": "Enddatum"
+    "endDate": "Enddatum",
+    "jobTitle": "Stellenbezeichnung",
+    "employment": "Beschäftigung",
+    "employmentType": "Beschäftigungsart",
+    "requirements": "Anforderungen",
+    "staffing": "Personalbesetzung"
   },
   "nav": {
     "dashboard": "Übersicht",
@@ -108,7 +122,16 @@
     "read": "Gelesen",
     "unread": "Ungelesen",
     "submitted": "Eingereicht",
-    "uploaded": "Hochgeladen"
+    "uploaded": "Hochgeladen",
+    "granted": "Erteilt",
+    "paused": "Pausiert",
+    "returning": "Rückkehrend",
+    "rated": "Bewertet",
+    "received": "Erhalten",
+    "logged": "Erfasst",
+    "notYetLogged": "Noch nicht erfasst.",
+    "awaitingSignature": "Warten auf Unterschrift",
+    "alreadyFilled": "Bereits besetzt"
   },
   "assignments": {
     "shiftDetails": "Schichtdetails",
@@ -120,7 +143,20 @@
     "checkOut": "Auschecken",
     "stayOver": "Bleibegast",
     "noEligibleWorkers": "Keine passenden Mitarbeiter gefunden.",
-    "cancelReasonPlaceholder": "Bitte geben Sie an, warum dieser Einsatz storniert wurde."
+    "cancelReasonPlaceholder": "Bitte geben Sie an, warum dieser Einsatz storniert wurde.",
+    "title": "Einsatz",
+    "checkInLabel": "Einchecken",
+    "checkOutLabel": "Auschecken",
+    "checkout": "Abreise",
+    "insideGeofence": "Innerhalb des Geofence",
+    "outsideGeofence": "Außerhalb des Geofence",
+    "verification": "Überprüfung",
+    "loggedBy": "Erfasst von",
+    "loading": "Einsätze werden geladen…",
+    "placementDetails": "Einsatzdetails",
+    "placeWorker": "Mitarbeiter einteilen",
+    "calendarPlacement": "Kalendereinteilung",
+    "roomsCompleted": "Fertige Zimmer"
   },
   "settings": {
     "language": {
@@ -136,7 +172,8 @@
     "appearance": "Darstellung",
     "about": "Über",
     "comingSoon": "Demnächst",
-    "themeSystemNote": "System folgt der Einstellung Ihres Geräts."
+    "themeSystemNote": "System folgt der Einstellung Ihres Geräts.",
+    "localDevBuild": "Lokaler Entwicklungs-Build"
   },
   "auth": {
     "login": "Anmelden",
@@ -152,7 +189,10 @@
     "tooManyAttempts": "Zu viele Versuche. Bitte warten Sie, bevor Sie es erneut versuchen.",
     "loginFailed": "Anmeldung fehlgeschlagen. Bitte versuchen Sie es erneut.",
     "signInTo": "Bei {{app}} anmelden",
-    "email": "E-Mail"
+    "email": "E-Mail",
+    "resetYourPassword": "Passwort zurücksetzen",
+    "setNewPassword": "Neues Passwort festlegen",
+    "invalidResetLink": "Ungültiger Link zum Zurücksetzen des Passworts. Das Token fehlt."
   },
   "search": {
     "byNameOrEmail": "Nach Name oder E-Mail suchen…",
@@ -224,7 +264,12 @@
     "noActiveContract": "Kein aktiver Vertrag",
     "payslipRequests": "Lohnabrechnungsanfragen",
     "noRequests": "Keine Anfragen",
-    "payslipRequestFailed": "Lohnabrechnung konnte nicht angefordert werden"
+    "payslipRequestFailed": "Lohnabrechnung konnte nicht angefordert werden",
+    "contract": "Vertrag",
+    "signedContract": "Unterschriebener Vertrag",
+    "contractExpired": "Vertrag abgelaufen",
+    "noSignedContract": "Unterschriebener Vertrag noch nicht hinterlegt",
+    "loadContractFailed": "Ihr Vertrag konnte nicht geladen werden."
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",
@@ -257,5 +302,59 @@
     "PUBLIC_SERVICE": "Öffentlicher Dienst",
     "KITCHEN_DISHWASHER": "Küchenhilfe (Spüle)",
     "WAITER": "Kellner"
+  },
+  "calendar": {
+    "absences": "Abwesenheiten",
+    "dailySummary": "Tägliche Schichtübersicht",
+    "editDailySummary": "Tägliche Schichtübersicht bearbeiten",
+    "loadingSummary": "Tagesübersicht wird geladen…",
+    "noSummary": "Für diesen Tag wurde keine Übersicht hinterlegt.",
+    "loadFailed": "Der Kalender konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "assignedOrOnLeave": "Heute eingeteilt oder abwesend",
+    "freeToday": "Heute frei"
+  },
+  "hotels": {
+    "inThisGroup": "Hotels in dieser Gruppe",
+    "deleted": "Gelöschte Hotels",
+    "deletedGroups": "Gelöschte Hotelgruppen",
+    "new": "Neues Hotel",
+    "newGroup": "Neue Gruppe",
+    "noGroup": "Keine Hotelgruppe zugewiesen",
+    "orgChart": "Organigramm"
+  },
+  "users": {
+    "new": "Neuer Benutzer",
+    "none": "Keine Mitarbeiter gefunden.",
+    "leaderboard": "Mitarbeiter-Rangliste",
+    "topWorkers": "Top-Mitarbeiter",
+    "blocklist": "Mitarbeiter-Sperrliste",
+    "applicant": "Bewerber",
+    "yourAccount": "Ihr Konto",
+    "accountSettings": "Kontoeinstellungen",
+    "exportMyData": "Meine Daten exportieren"
+  },
+  "requests": {
+    "title": "Arbeitsanfrage",
+    "new": "Neue Anfrage",
+    "newBroadcast": "Neuer Rundruf",
+    "acceptedWorkers": "Angenommene Mitarbeiter",
+    "noneAccepted": "Bisher hat kein Mitarbeiter diesen Rundruf angenommen.",
+    "notAcceptingNew": "Nimmt keine neuen Arbeitsanfragen an"
+  },
+  "onboarding": {
+    "managerReview": "Manager-Prüfung",
+    "applicationRejected": "Bewerbung abgelehnt",
+    "documentsUploaded": "Dokumente hochgeladen",
+    "documentsOnFile": "Hinterlegte Dokumente",
+    "submittedDocuments": "Eingereichte Dokumente",
+    "documentsRequired": "Vor dem Absenden erforderliche Dokumente:",
+    "loadingRecord": "Ihr Onboarding-Datensatz wird geladen…",
+    "loadRecordFailed": "Onboarding-Datensatz konnte nicht geladen werden.",
+    "loadingRequirements": "Dokumentanforderungen werden geladen…"
+  },
+  "analytics": {
+    "myPerformance": "Meine Leistung",
+    "avgRating": "Ø Bewertung",
+    "recentRatings": "Neueste Bewertungen"
   }
 }

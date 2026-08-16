@@ -18,6 +18,7 @@ import {
 } from "@/components/ui";
 import { DAILY_ACCESS_GATE_INSTANCE } from "@/lib/types";
 import type { ConsentNotice, ConsentRecord, ConsentStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /**
  * Derives the `ConsentStatus` shape a fresh `getStatus()` call would return
@@ -53,6 +54,7 @@ function statusFromRecord(record: ConsentRecord): ConsentStatus {
  * something this component fabricates or finalizes.
  */
 export function ConsentCard() {
+  const { t } = useTranslation();
   const { data: status, isLoading, error } = useConsentStatus(DAILY_ACCESS_GATE_INSTANCE);
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
   const fetchNotice = useAsyncAction();
@@ -97,7 +99,7 @@ export function ConsentCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Data-protection consent</CardTitle>
+        <CardTitle>{t("consent.title")}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
@@ -109,7 +111,7 @@ export function ConsentCard() {
         ) : status?.status === "granted" ? (
           <div className="flex items-center justify-between gap-4">
             <div>
-              <Badge tone="success">Granted</Badge>
+              <Badge tone="success">{t("status.granted")}</Badge>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 Decided {formatDateTime(status.decided_at)} · notice {status.notice_version}
               </p>

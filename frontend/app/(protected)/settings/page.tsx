@@ -39,7 +39,7 @@ export default function SettingsPage() {
   if (!user) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <PageHeader title="Settings" />
+        <PageHeader title={t("nav.settings")} />
         <Card>
           <CardContent className="space-y-3">
             <Skeleton className="h-6 w-1/2" />
@@ -53,7 +53,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
-        title="Settings"
+        title={t("nav.settings")}
         description="Your account, session and app preferences."
       />
 
@@ -64,7 +64,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4 py-2">
           <DataList>
             <DataRow label="Signed in as" value={user.email} />
-            <DataRow label="Role" value={<RoleBadge role={user.role} />} />
+            <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
           </DataList>
           {/* Editing lives on /profile (EditProfileCard) — pointed at rather
               than duplicated, so there is only one place these fields change. */}
@@ -126,7 +126,7 @@ export default function SettingsPage() {
                 APP_COMMIT_SHA ? (
                   <span className="font-mono text-xs">{APP_COMMIT_SHA}</span>
                 ) : (
-                  <span className="text-gray-500 dark:text-gray-400">Local development build</span>
+                  <span className="text-gray-500 dark:text-gray-400">{t("settings.localDevBuild")}</span>
                 )
               }
             />

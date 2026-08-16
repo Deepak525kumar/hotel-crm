@@ -28,6 +28,7 @@ import {
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
 import { SKILL_OPTIONS, SKILL_LABEL } from "@/lib/skills";
 import type { DeactivationReason, SkillTag } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 // Mirrors the backend DeactivationReason Prisma enum (schema.prisma) — a
 // fixed set, same reasoning as SKILL_OPTIONS above.
@@ -62,6 +63,7 @@ const DEACTIVATION_REASON_OPTIONS: { value: DeactivationReason; label: string }[
  * module instead.
  */
 export function WorkerOnboardingCard({ userId }: { userId: string }) {
+  const { t } = useTranslation();
   const { data: record, isLoading, error } = useEmploymentRecord(userId);
   const [approveOpen, setApproveOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
@@ -149,7 +151,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Employment</CardTitle>
+          <CardTitle>{t("fields.employment")}</CardTitle>
         </CardHeader>
         <CardContent>
           {error ? (
@@ -178,7 +180,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
             <div className="space-y-4">
               <DataList>
                 <DataRow
-                  label="Status"
+                  label={t("fields.status")}
                   value={
                     <Badge tone={EMPLOYMENT_STATUS_TONE[record.status]}>
                       {EMPLOYMENT_STATUS_LABEL[record.status]}
@@ -186,7 +188,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   }
                 />
                 <DataRow label="Employee ID" value={record.employee_id} />
-                <DataRow label="Job title" value={record.job_title} />
+                <DataRow label={t("fields.jobTitle")} value={record.job_title} />
                 
                 {/* Always shown, not gated on skills.length > 0 -- a worker
                     with no skills set yet is precisely the case that most
@@ -197,7 +199,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                     meant skills could not be set on a worker's first pass
                     through onboarding at all. */}
                 <DataRow
-                  label="Skills"
+                  label={t("fields.skills")}
                   value={
                     <span className="flex items-center gap-2">
                       <span>
@@ -226,7 +228,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 {record.status === "DELETED" && (
                   <>
                     <DataRow
-                      label="Deleted"
+                      label={t("status.deleted")}
                       value={
                         <span className="text-red-700 dark:text-red-400">
                           {record.deleted_at ? formatDate(record.deleted_at) : "—"}
@@ -247,7 +249,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                   </p>
                   {docCompleteness && !docCompleteness.is_complete && (
                     <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                      <p className="font-medium">Documents required before submission:</p>
+                      <p className="font-medium">{t("onboarding.documentsRequired")}</p>
                       <ul className="mt-1 list-disc list-inside">
                         {docCompleteness.missing_categories.map((cat) => (
                           <li key={cat} className="capitalize">{cat.replace(/_/g, " ").toLowerCase()}</li>
@@ -282,7 +284,7 @@ export function WorkerOnboardingCard({ userId }: { userId: string }) {
                 <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
                   {!canApproveForWork && contractStatus !== undefined && (
                     <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-3 py-2 text-sm text-amber-800 dark:text-amber-300">
-                      <p className="font-medium">Signed contract not yet on file</p>
+                      <p className="font-medium">{t("hr.noSignedContract")}</p>
                       <p className="mt-0.5">
                         The worker must upload their signed contract before they can be approved
                         for work.

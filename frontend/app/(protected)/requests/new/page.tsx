@@ -21,6 +21,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { CreateWorkRequestInput } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 interface FormState {
   hotel_id: string;
@@ -49,6 +50,7 @@ const INITIAL: FormState = {
 };
 
 function NewWorkRequestForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
 
@@ -147,12 +149,12 @@ function NewWorkRequestForm() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
+          <CardTitle>{t("assignments.shiftDetails")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4">
             <Select
-              label="Hotel"
+              label={t("fields.hotel")}
               required
               value={form.hotel_id}
               onChange={(e) => set("hotel_id", e.target.value)}
@@ -166,7 +168,7 @@ function NewWorkRequestForm() {
             </Select>
 
             <Input
-              label="Position"
+              label={t("jobs.position")}
               required
               value={form.position}
               onChange={(e) => set("position", e.target.value)}
@@ -183,7 +185,7 @@ function NewWorkRequestForm() {
                 onChange={(e) => set("workers_needed", e.target.value)}
               />
               <Input
-                label="Shift date"
+                label={t("assignments.shiftDate")}
                 type="date"
                 required
                 min={today}

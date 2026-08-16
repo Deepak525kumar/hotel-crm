@@ -10,6 +10,7 @@ import { formatDateTime } from "@/lib/format";
 import { Badge, FormError, TextLink } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import type { Notification } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const PREVIEW_COUNT = 5;
 
@@ -21,6 +22,7 @@ const PREVIEW_COUNT = 5;
  * shared SWR cache, so marking read here or there stays in sync).
  */
 export function NotificationsBell() {
+  const { t } = useTranslation();
   const { notifications, unreadCount, mutate } = useNotifications();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -74,11 +76,11 @@ export function NotificationsBell() {
           unmet) contract. */}
       {open && (
         <div
-          aria-label="Notifications"
+          aria-label={t("nav.notifications")}
           className="absolute right-0 z-50 mt-2 w-80 max-w-[90vw] rounded-md border border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3 dark:border-gray-800">
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">Notifications</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("nav.notifications")}</span>
             {unreadCount > 0 && (
               <Badge tone="info">{unreadCount} unread</Badge>
             )}

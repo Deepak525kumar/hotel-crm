@@ -30,6 +30,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { AttendanceReviewStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const REVIEW_STATUSES = [
   { value: "PRESENT", label: "Present" },
@@ -40,6 +41,7 @@ const REVIEW_STATUSES = [
 ];
 
 export default function AttendanceDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const { id } = params;
 
@@ -161,18 +163,18 @@ export default function AttendanceDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Record</CardTitle>
+          <CardTitle>{t("common.record")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
-              label="Worker"
+              label={t("fields.worker")}
               value={
                 <UserRef userId={record.worker_id} fallback="The assigned worker" />
               }
             />
             <DataRow
-              label="Assignment"
+              label={t("assignments.title")}
               value={
                 <TextLink href={`/assignments/${record.assignment_id}`}>
                   View assignment
@@ -180,7 +182,7 @@ export default function AttendanceDetailPage() {
               }
             />
             <DataRow
-              label="Hotel"
+              label={t("fields.hotel")}
               value={
                 <TextLink href={`/hotels/${record.hotel_id}`}>
                   {hotel?.name ?? "View hotel"}
@@ -201,7 +203,7 @@ export default function AttendanceDetailPage() {
                 value={formatDateTime(record.verified_at)}
               />
             )}
-            {record.notes && <DataRow label="Notes" value={record.notes} />}
+            {record.notes && <DataRow label={t("fields.notes")} value={record.notes} />}
           </DataList>
         </CardContent>
       </Card>
@@ -274,7 +276,7 @@ export default function AttendanceDetailPage() {
       >
         <div className="space-y-4">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={reviewStatus}
             onChange={(e) =>
               setReviewStatus(e.target.value as AttendanceReviewStatus)

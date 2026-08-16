@@ -24,6 +24,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { Assignment, AssignmentStatus } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const STATUS_FILTERS = [
   { value: "", label: "All statuses" },
@@ -39,6 +40,7 @@ const PER_PAGE = 20;
 const COLUMNS = 5;
 
 function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
+  const { t } = useTranslation();
   const { data: hotel } = useHotel(a.hotel_id);
   const { data: workRequest } = useWorkRequest(a.job_request_id ?? a.work_request_id);
   const peopleById = useUsersByIds([a.worker_id]);
@@ -64,7 +66,7 @@ function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
             {workRequest?.position ?? "View request"}
           </TextLink>
         ) : (
-          <span className="text-gray-500">Calendar Placement</span>
+          <span className="text-gray-500">{t("assignments.calendarPlacement")}</span>
         )}
         {workRequest && (
           <div className="text-xs text-gray-500 dark:text-gray-400">
@@ -81,6 +83,7 @@ function AssignmentRow({ assignment: a }: { assignment: Assignment }) {
 }
 
 export default function AssignmentsPage() {
+  const { t } = useTranslation();
   const [status, setStatus] = useState<AssignmentStatus | "">("");
   const [page, setPage] = useState(1);
 
@@ -98,7 +101,7 @@ export default function AssignmentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Assignments"
+        title={t("nav.assignments")}
         description="Confirmed workers and the shifts they are staffed on."
         actions={
           <StaffingWriteGate>
@@ -112,7 +115,7 @@ export default function AssignmentsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:w-48">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={status}
             onChange={(e) => onStatusChange(e.target.value as AssignmentStatus | "")}
             options={STATUS_FILTERS}
@@ -127,14 +130,14 @@ export default function AssignmentsPage() {
               Failed to load assignments. Please try again.
             </div>
           ) : (
-            <Table aria-label="Assignments">
+            <Table aria-label={t("nav.assignments")}>
               <THead>
                 <tr>
-                  <TH>Worker</TH>
-                  <TH>Hotel</TH>
-                  <TH>Work request</TH>
-                  <TH>Confirmed</TH>
-                  <TH>Status</TH>
+                  <TH>{t("fields.worker")}</TH>
+                  <TH>{t("fields.hotel")}</TH>
+                  <TH>{t("requests.title")}</TH>
+                  <TH>{t("status.confirmed")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (

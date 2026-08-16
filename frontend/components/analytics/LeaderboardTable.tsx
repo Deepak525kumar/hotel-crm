@@ -1,3 +1,9 @@
+"use client";
+
+// "use client" added with i18n extraction (2026-08-16): this component now
+// calls the useTranslation hook. It was already rendered exclusively from
+// client components and has no server-only dependency, so the directive
+// makes explicit what was already true rather than moving a boundary.
 import {
   EmptyState,
   Table,
@@ -10,6 +16,7 @@ import {
 } from "@/components/ui";
 import { formatScore } from "@/lib/format";
 import type { LeaderboardEntry } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 export interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
@@ -26,6 +33,7 @@ export function LeaderboardTable({
   error,
   limit,
 }: LeaderboardTableProps) {
+  const { t } = useTranslation();
   const rows = limit ? entries.slice(0, limit) : entries;
   const columns = 5;
 
@@ -38,14 +46,14 @@ export function LeaderboardTable({
   }
 
   return (
-    <Table aria-label="Worker leaderboard">
+    <Table aria-label={t("users.leaderboard")}>
       <THead>
         <tr>
           <TH className="w-12">#</TH>
-          <TH>Worker</TH>
-          <TH className="text-right">Completed</TH>
-          <TH className="text-right">Total</TH>
-          <TH className="text-right">Avg rating</TH>
+          <TH>{t("fields.worker")}</TH>
+          <TH className="text-right">{t("status.completed")}</TH>
+          <TH className="text-right">{t("common.total")}</TH>
+          <TH className="text-right">{t("analytics.avgRating")}</TH>
         </tr>
       </THead>
       {isLoading ? (

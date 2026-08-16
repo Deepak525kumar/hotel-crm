@@ -22,6 +22,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import type { RaiseBroadcastInput, SkillTag } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const SKILL_OPTIONS: { value: SkillTag; label: string }[] = [
   { value: "CLEANER", label: "Cleaner" },
@@ -58,6 +59,7 @@ const INITIAL: FormState = {
 };
 
 function NewBroadcastForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { hotels, isLoading: hotelsLoading } = useHotelOptions();
 
@@ -164,19 +166,19 @@ function NewBroadcastForm() {
         </TextLink>
         <PageHeader
           className="mt-2"
-          title="New broadcast"
+          title={t("requests.newBroadcast")}
           description="Raise a shift to every eligible worker at once. Whoever accepts first for a skill claims that slot."
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
+          <CardTitle>{t("assignments.shiftDetails")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <Select
-              label="Hotel"
+              label={t("fields.hotel")}
               required
               value={form.hotel_id}
               onChange={(e) => set("hotel_id", e.target.value)}
@@ -191,7 +193,7 @@ function NewBroadcastForm() {
 
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
-                label="Shift date"
+                label={t("assignments.shiftDate")}
                 type="date"
                 required
                 min={today}

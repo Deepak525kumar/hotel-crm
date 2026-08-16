@@ -12,8 +12,10 @@ import { MyContractCard } from "@/components/onboarding/MyContractCard";
 import { AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { formatDateTime } from "@/lib/format";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function MyOnboardingPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -38,13 +40,13 @@ export default function MyOnboardingPage() {
     });
   };
 
-  if (isLoading) return <div className="p-8 text-center text-gray-500">Loading your onboarding record...</div>;
-  if (error) return <div className="p-8 text-center text-red-500">Failed to load onboarding record.</div>;
+  if (isLoading) return <div className="p-8 text-center text-gray-500">{t("onboarding.loadingRecord")}</div>;
+  if (error) return <div className="p-8 text-center text-red-500">{t("onboarding.loadRecordFailed")}</div>;
 
   if (!record) {
     return (
       <div className="space-y-6">
-        <PageHeader title="My Onboarding" />
+        <PageHeader title={t("nav.myOnboarding")} />
         <EmptyState
           title="No onboarding record found"
           description="Your onboarding record has not been created yet. Please contact your manager."
@@ -132,7 +134,7 @@ export default function MyOnboardingPage() {
                   <CheckCircle2 className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-medium">Documents Uploaded</div>
+                  <div className="font-medium">{t("onboarding.documentsUploaded")}</div>
                   <div className="text-xs text-gray-500">
                     {isSubmitted || isActive ? "Complete" : "Pending your action"}
                   </div>
@@ -144,7 +146,7 @@ export default function MyOnboardingPage() {
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="font-medium">Manager Review</div>
+                  <div className="font-medium">{t("onboarding.managerReview")}</div>
                   <div className="text-xs text-gray-500">
                     {isActive ? "Approved" : isSubmitted ? `Submitted ${formatDateTime(record.submitted_for_review_at!)}` : "Awaiting submission"}
                   </div>
@@ -155,7 +157,7 @@ export default function MyOnboardingPage() {
                 <div className="flex items-center gap-3 mt-4 p-3 bg-red-50 text-red-700 rounded-md text-sm border border-red-100">
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   <div>
-                    <span className="font-semibold block">Application Rejected</span>
+                    <span className="font-semibold block">{t("onboarding.applicationRejected")}</span>
                     {record.deleted_reason || "Please review your documents and contact your manager."}
                   </div>
                 </div>
@@ -165,7 +167,7 @@ export default function MyOnboardingPage() {
                 <div className="flex items-center gap-3 mt-4 p-3 bg-warning-50 text-warning-700 rounded-md text-sm border border-warning-100">
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   <div>
-                    <span className="font-semibold block">Contract Expired</span>
+                    <span className="font-semibold block">{t("hr.contractExpired")}</span>
                     Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.
                   </div>
                 </div>

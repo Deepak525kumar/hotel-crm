@@ -29,7 +29,16 @@
     "total": "الإجمالي",
     "actions": "الإجراءات",
     "optional": "اختياري",
-    "required": "مطلوب"
+    "required": "مطلوب",
+    "count": "العدد",
+    "day": "اليوم",
+    "message": "الرسالة",
+    "record": "السجل",
+    "noEntries": "لا توجد إدخالات",
+    "thisMonth": "هذا الشهر",
+    "quickLinks": "روابط سريعة",
+    "permissions": "الأذونات",
+    "coordinates": "الإحداثيات"
   },
   "fields": {
     "name": "الاسم",
@@ -55,7 +64,12 @@
     "pay": "الأجر",
     "rating": "التقييم",
     "startDate": "تاريخ البدء",
-    "endDate": "تاريخ الانتهاء"
+    "endDate": "تاريخ الانتهاء",
+    "jobTitle": "المسمى الوظيفي",
+    "employment": "التوظيف",
+    "employmentType": "نوع التوظيف",
+    "requirements": "المتطلبات",
+    "staffing": "التوظيف"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -109,7 +123,16 @@
     "read": "مقروء",
     "unread": "غير مقروء",
     "submitted": "تم الإرسال",
-    "uploaded": "تم الرفع"
+    "uploaded": "تم الرفع",
+    "granted": "ممنوح",
+    "paused": "متوقف مؤقتاً",
+    "returning": "عائد",
+    "rated": "مُقيَّم",
+    "received": "مستلم",
+    "logged": "مُسجَّل",
+    "notYetLogged": "لم يُسجَّل بعد.",
+    "awaitingSignature": "بانتظار التوقيع",
+    "alreadyFilled": "مكتمل بالفعل"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",
@@ -121,7 +144,20 @@
     "checkOut": "تسجيل الخروج",
     "stayOver": "نزيل مقيم",
     "noEligibleWorkers": "لم يتم العثور على موظفين مؤهلين.",
-    "cancelReasonPlaceholder": "يرجى بيان سبب إلغاء هذه المهمة."
+    "cancelReasonPlaceholder": "يرجى بيان سبب إلغاء هذه المهمة.",
+    "title": "المهمة",
+    "checkInLabel": "تسجيل الدخول",
+    "checkOutLabel": "تسجيل الخروج",
+    "checkout": "المغادرة",
+    "insideGeofence": "داخل النطاق الجغرافي",
+    "outsideGeofence": "خارج النطاق الجغرافي",
+    "verification": "التحقق",
+    "loggedBy": "سُجِّل بواسطة",
+    "loading": "جارٍ تحميل المهام…",
+    "placementDetails": "تفاصيل التنسيب",
+    "placeWorker": "تعيين موظف",
+    "calendarPlacement": "التنسيب في التقويم",
+    "roomsCompleted": "الغرف المنجزة"
   },
   "settings": {
     "language": {
@@ -137,7 +173,8 @@
     "appearance": "المظهر",
     "about": "حول",
     "comingSoon": "قريباً",
-    "themeSystemNote": "النظام يتبع إعداد جهازك."
+    "themeSystemNote": "النظام يتبع إعداد جهازك.",
+    "localDevBuild": "إصدار تطوير محلي"
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -153,7 +190,10 @@
     "tooManyAttempts": "محاولات كثيرة جداً. يرجى الانتظار قبل المحاولة مرة أخرى.",
     "loginFailed": "فشل تسجيل الدخول. يرجى المحاولة مرة أخرى.",
     "signInTo": "تسجيل الدخول إلى {{app}}",
-    "email": "البريد الإلكتروني"
+    "email": "البريد الإلكتروني",
+    "resetYourPassword": "إعادة تعيين كلمة المرور",
+    "setNewPassword": "تعيين كلمة مرور جديدة",
+    "invalidResetLink": "رابط إعادة تعيين كلمة المرور غير صالح. الرمز مفقود."
   },
   "search": {
     "byNameOrEmail": "ابحث بالاسم أو البريد الإلكتروني…",
@@ -225,7 +265,12 @@
     "noActiveContract": "لا يوجد عقد نشط",
     "payslipRequests": "طلبات كشوف الرواتب",
     "noRequests": "لا توجد طلبات",
-    "payslipRequestFailed": "تعذر طلب كشف الراتب"
+    "payslipRequestFailed": "تعذر طلب كشف الراتب",
+    "contract": "العقد",
+    "signedContract": "العقد الموقع",
+    "contractExpired": "انتهى العقد",
+    "noSignedContract": "العقد الموقع غير محفوظ بعد",
+    "loadContractFailed": "تعذر تحميل عقدك."
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -258,5 +303,59 @@
     "PUBLIC_SERVICE": "الخدمة العامة",
     "KITCHEN_DISHWASHER": "غسال أطباق المطبخ",
     "WAITER": "نادل"
+  },
+  "calendar": {
+    "absences": "حالات الغياب",
+    "dailySummary": "ملخص الورديات اليومي",
+    "editDailySummary": "تعديل ملخص الورديات اليومي",
+    "loadingSummary": "جارٍ تحميل الملخص اليومي…",
+    "noSummary": "لم يُضف ملخص لهذا اليوم.",
+    "loadFailed": "تعذر تحميل التقويم. يرجى المحاولة مرة أخرى.",
+    "assignedOrOnLeave": "مُعيَّن أو في إجازة اليوم",
+    "freeToday": "متاح اليوم"
+  },
+  "hotels": {
+    "inThisGroup": "الفنادق في هذه المجموعة",
+    "deleted": "الفنادق المحذوفة",
+    "deletedGroups": "مجموعات الفنادق المحذوفة",
+    "new": "فندق جديد",
+    "newGroup": "مجموعة جديدة",
+    "noGroup": "لم يتم تعيين مجموعة فنادق",
+    "orgChart": "الهيكل التنظيمي"
+  },
+  "users": {
+    "new": "مستخدم جديد",
+    "none": "لم يتم العثور على موظفين.",
+    "leaderboard": "لوحة صدارة الموظفين",
+    "topWorkers": "أفضل الموظفين",
+    "blocklist": "قائمة حظر الموظفين",
+    "applicant": "مقدم الطلب",
+    "yourAccount": "حسابك",
+    "accountSettings": "إعدادات الحساب",
+    "exportMyData": "تصدير بياناتي"
+  },
+  "requests": {
+    "title": "طلب عمل",
+    "new": "طلب جديد",
+    "newBroadcast": "بث جديد",
+    "acceptedWorkers": "الموظفون المقبولون",
+    "noneAccepted": "لم يقبل أي موظف هذا البث بعد.",
+    "notAcceptingNew": "لا يقبل طلبات عمل جديدة"
+  },
+  "onboarding": {
+    "managerReview": "مراجعة المدير",
+    "applicationRejected": "تم رفض الطلب",
+    "documentsUploaded": "تم رفع المستندات",
+    "documentsOnFile": "المستندات المحفوظة",
+    "submittedDocuments": "المستندات المقدمة",
+    "documentsRequired": "المستندات المطلوبة قبل التقديم:",
+    "loadingRecord": "جارٍ تحميل سجل انضمامك…",
+    "loadRecordFailed": "تعذر تحميل سجل الانضمام.",
+    "loadingRequirements": "جارٍ تحميل متطلبات المستندات…"
+  },
+  "analytics": {
+    "myPerformance": "أدائي",
+    "avgRating": "متوسط التقييم",
+    "recentRatings": "التقييمات الأخيرة"
   }
 }

@@ -15,6 +15,7 @@ import { useAssignments } from "@/hooks/useAssignments";
 import { formatDateTime } from "@/lib/format";
 import type { AcceptBroadcastResultDto, SkillTag } from "@/lib/types";
 import { MapPin } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   Badge,
   Button,
@@ -38,6 +39,7 @@ const SKILL_LABELS: Record<string, string> = {
 };
 
 export default function BroadcastDetailPage() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -142,12 +144,12 @@ export default function BroadcastDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Shift details</CardTitle>
+          <CardTitle>{t("assignments.shiftDetails")}</CardTitle>
         </CardHeader>
         <CardContent className="py-2">
           <DataList>
             <DataRow
-              label="Hotel"
+              label={t("fields.hotel")}
               value={
                 <div className="flex flex-col gap-1">
                   <TextLink href={`/hotels/${request.hotel_id}`}>
@@ -175,9 +177,9 @@ export default function BroadcastDetailPage() {
                 </div>
               }
             />
-            <DataRow label="Shift date" value={request.shift_date} />
+            <DataRow label={t("assignments.shiftDate")} value={request.shift_date} />
             <DataRow
-              label="Time"
+              label={t("fields.time")}
               value={`${request.shift_start_time}–${request.shift_end_time}`}
             />
             <DataRow
@@ -199,7 +201,7 @@ export default function BroadcastDetailPage() {
       {request.description && (
         <Card>
           <CardHeader>
-            <CardTitle>Description</CardTitle>
+            <CardTitle>{t("fields.description")}</CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-gray-700 dark:text-gray-300">
             <p className="whitespace-pre-wrap">{request.description}</p>
@@ -244,7 +246,7 @@ export default function BroadcastDetailPage() {
                     </p>
                   </div>
                   {filled ? (
-                    <span className="shrink-0 text-sm font-medium text-green-700 dark:text-green-400">Filled</span>
+                    <span className="shrink-0 text-sm font-medium text-green-700 dark:text-green-400">{t("jobs.filled")}</span>
                   ) : canAcceptThisSlot ? (
                     <Button
                       size="sm"
@@ -268,14 +270,14 @@ export default function BroadcastDetailPage() {
           <CardContent className="flex items-center gap-3">
             {acceptResult.status === "accepted" ? (
               <>
-                <Badge tone="success">Confirmed</Badge>
+                <Badge tone="success">{t("status.confirmed")}</Badge>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   You&rsquo;re confirmed for this shift ({SKILL_LABELS[acceptResult.skill] ?? acceptResult.skill}).
                 </p>
               </>
             ) : (
               <>
-                <Badge tone="warning">Already filled</Badge>
+                <Badge tone="warning">{t("status.alreadyFilled")}</Badge>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
                   Someone else claimed this slot just before you — no shift was assigned.
                 </p>
@@ -307,13 +309,13 @@ export default function BroadcastDetailPage() {
       {canSeeAggregateEligibility && (
         <Card>
           <CardHeader>
-            <CardTitle>Accepted workers</CardTitle>
+            <CardTitle>{t("requests.acceptedWorkers")}</CardTitle>
           </CardHeader>
           <CardContent className="py-2">
             {assignmentsLoading ? (
-              <div className="py-4 text-center text-sm text-gray-500">Loading assignments...</div>
+              <div className="py-4 text-center text-sm text-gray-500">{t("assignments.loading")}</div>
             ) : assignments.length === 0 ? (
-              <div className="py-4 text-center text-sm text-gray-500">No workers have accepted this broadcast yet.</div>
+              <div className="py-4 text-center text-sm text-gray-500">{t("requests.noneAccepted")}</div>
             ) : (
               <div className="divide-y divide-gray-100 dark:divide-gray-800">
                 {assignments.map((assignment) => (

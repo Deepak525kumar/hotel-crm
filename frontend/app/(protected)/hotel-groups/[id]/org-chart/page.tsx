@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useOrgChart } from "@/hooks/useEmployment";
 import { RoleGate } from "@/components/auth/RoleGate";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
+import { useTranslation } from "react-i18next";
 import {
   Badge,
   Card,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui";
 
 function OrgChart() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const id = params.id;
 
@@ -56,7 +58,7 @@ function OrgChart() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Regional Manager</CardTitle>
+              <CardTitle>{t("roles.regionalManager")}</CardTitle>
             </CardHeader>
             <CardContent className="py-2 text-sm">
               {chart.regional_manager ? (
@@ -68,7 +70,7 @@ function OrgChart() {
                   </span>
                 </>
               ) : (
-                <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
+                <span className="text-gray-500 dark:text-gray-400">{t("status.unassigned")}</span>
               )}
             </CardContent>
           </Card>
@@ -84,11 +86,11 @@ function OrgChart() {
                   description="Assign hotels to this group from a hotel's edit screen."
                 />
               ) : (
-                <Table aria-label="Hotels in this group">
+                <Table aria-label={t("hotels.inThisGroup")}>
                   <THead>
                     <TR>
-                      <TH>Hotel</TH>
-                      <TH>Manager</TH>
+                      <TH>{t("fields.hotel")}</TH>
+                      <TH>{t("roles.manager")}</TH>
                     </TR>
                   </THead>
                   <TBody>
@@ -99,7 +101,7 @@ function OrgChart() {
                           {h.manager ? (
                             `${h.manager.first_name} ${h.manager.last_name}`
                           ) : (
-                            <span className="text-gray-500 dark:text-gray-400">Unassigned</span>
+                            <span className="text-gray-500 dark:text-gray-400">{t("status.unassigned")}</span>
                           )}
                         </TD>
                       </TR>
@@ -127,9 +129,9 @@ function OrgChart() {
                 <Table aria-label="Employees in this group">
                   <THead>
                     <TR>
-                      <TH>Name</TH>
-                      <TH>Job title</TH>
-                      <TH>Status</TH>
+                      <TH>{t("fields.name")}</TH>
+                      <TH>{t("fields.jobTitle")}</TH>
+                      <TH>{t("fields.status")}</TH>
                     </TR>
                   </THead>
                   <TBody>

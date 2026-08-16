@@ -23,6 +23,7 @@ import {
   Skeleton,
 } from "@/components/ui";
 import type { DocumentCategory, WorkerDocument } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 const CATEGORY_LABEL: Record<DocumentCategory, string> = {
   TAX_NUMBER: "Tax Number",
@@ -147,6 +148,7 @@ function DocumentRow({
  * wrong in the other direction.
  */
 export function DocumentsCard({ workerId }: { workerId: string }) {
+  const { t } = useTranslation();
   const { data: documents, isLoading, error } = useWorkerDocuments(workerId);
   const [uploadOpen, setUploadOpen] = useState(false);
   const viewerId = useAuthStore((s) => s.user?.id);
@@ -172,7 +174,7 @@ export function DocumentsCard({ workerId }: { workerId: string }) {
     <>
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <CardTitle>Documents</CardTitle>
+          <CardTitle>{t("documents.title")}</CardTitle>
           {/* RULE B: self-only upload. Omitted rather than disabled on another
               user's profile — a disabled button implies the action is possible
               under some condition, and it is not. */}

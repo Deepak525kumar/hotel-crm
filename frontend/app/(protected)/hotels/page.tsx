@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useHotels } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { HotelWriteGate } from "@/components/auth/RoleGate";
+import { useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Badge,
@@ -35,6 +36,7 @@ const ACTIVE_FILTERS = [
 const PER_PAGE = 20;
 
 export default function HotelsPage() {
+  const { t } = useTranslation();
   const [searchInput, setSearchInput] = useState("");
   const [active, setActive] = useState("");
   const [page, setPage] = useState(1);
@@ -62,12 +64,12 @@ export default function HotelsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Hotels"
+        title={t("nav.hotels")}
         description="Properties staffed through the platform."
         actions={
           <HotelWriteGate>
             <Link href="/hotels/new">
-              <Button>New hotel</Button>
+              <Button>{t("hotels.new")}</Button>
             </Link>
           </HotelWriteGate>
         }
@@ -76,16 +78,16 @@ export default function HotelsPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="w-full sm:max-w-xs">
           <Input
-            label="Search"
+            label={t("common.search")}
             type="search"
-            placeholder="Name or city…"
+            placeholder={t("search.nameOrCity")}
             value={searchInput}
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
         <div className="w-full sm:w-48">
           <Select
-            label="Status"
+            label={t("fields.status")}
             value={active}
             onChange={(e) => onActiveChange(e.target.value)}
             options={ACTIVE_FILTERS}
@@ -100,13 +102,13 @@ export default function HotelsPage() {
               Failed to load hotels. Please try again.
             </div>
           ) : (
-            <Table aria-label="Hotels">
+            <Table aria-label={t("nav.hotels")}>
               <THead>
                 <tr>
-                  <TH>Name</TH>
-                  <TH>Location</TH>
-                  <TH>Timezone</TH>
-                  <TH>Status</TH>
+                  <TH>{t("fields.name")}</TH>
+                  <TH>{t("fields.location")}</TH>
+                  <TH>{t("fields.timezone")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (
@@ -145,7 +147,7 @@ export default function HotelsPage() {
                       <TD>
                         <div className="flex items-center gap-2">
                           {h.is_active && !h.accepting_jobs ? (
-                            <Badge tone="warning">Paused</Badge>
+                            <Badge tone="warning">{t("status.paused")}</Badge>
                           ) : (
                             <ActiveBadge active={h.is_active} />
                           )}

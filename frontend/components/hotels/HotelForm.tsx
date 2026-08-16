@@ -11,6 +11,7 @@ import {
   Select,
 } from "@/components/ui";
 import type { Hotel, HotelGroup } from "@/lib/types";
+import { useTranslation } from "react-i18next";
 
 /** Inline pin icon for the "use current location" button — no icon set in the ui barrel. */
 function LocationIcon() {
@@ -102,6 +103,7 @@ export function HotelForm({
   onSubmit,
   onCancel,
 }: HotelFormProps) {
+  const { t } = useTranslation();
   const [form, setForm] = useState<HotelFormValues>(() => toValues(hotel));
   const [locating, setLocating] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -148,7 +150,7 @@ export function HotelForm({
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <Input
-            label="Name"
+            label={t("fields.name")}
             required
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
@@ -180,7 +182,7 @@ export function HotelForm({
 
           <div className="grid gap-4 sm:grid-cols-2">
             <Select
-              label="Timezone"
+              label={t("fields.timezone")}
               value={form.timezone}
               onChange={(e) => set("timezone", e.target.value)}
               options={TIMEZONES.map((tz) => ({ value: tz, label: tz }))}
@@ -191,7 +193,7 @@ export function HotelForm({
               value={form.hotel_group_id}
               onChange={(e) => set("hotel_group_id", e.target.value)}
             >
-              <option value="">Unassigned</option>
+              <option value="">{t("status.unassigned")}</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -225,7 +227,7 @@ export function HotelForm({
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Coordinates</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{t("common.coordinates")}</span>
                 {form.latitude.trim() && form.longitude.trim() && (
                   <span className="text-xs text-green-700 dark:text-green-400">
                     Configured ({form.latitude}, {form.longitude})

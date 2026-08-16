@@ -28,7 +28,16 @@
     "total": "Разом",
     "actions": "Дії",
     "optional": "Необов'язково",
-    "required": "Обов'язково"
+    "required": "Обов'язково",
+    "count": "Кількість",
+    "day": "День",
+    "message": "Повідомлення",
+    "record": "Запис",
+    "noEntries": "Немає записів",
+    "thisMonth": "Цього місяця",
+    "quickLinks": "Швидкі посилання",
+    "permissions": "Дозволи",
+    "coordinates": "Координати"
   },
   "fields": {
     "name": "Ім'я",
@@ -54,7 +63,12 @@
     "pay": "Оплата",
     "rating": "Оцінка",
     "startDate": "Дата початку",
-    "endDate": "Дата завершення"
+    "endDate": "Дата завершення",
+    "jobTitle": "Посада",
+    "employment": "Працевлаштування",
+    "employmentType": "Тип працевлаштування",
+    "requirements": "Вимоги",
+    "staffing": "Персонал"
   },
   "nav": {
     "dashboard": "Панель",
@@ -108,7 +122,16 @@
     "read": "Прочитано",
     "unread": "Непрочитано",
     "submitted": "Подано",
-    "uploaded": "Завантажено"
+    "uploaded": "Завантажено",
+    "granted": "Надано",
+    "paused": "Призупинено",
+    "returning": "Повертається",
+    "rated": "Оцінено",
+    "received": "Отримано",
+    "logged": "Зафіксовано",
+    "notYetLogged": "Ще не зафіксовано.",
+    "awaitingSignature": "Очікує підпису",
+    "alreadyFilled": "Уже заповнено"
   },
   "assignments": {
     "shiftDetails": "Деталі зміни",
@@ -120,7 +143,20 @@
     "checkOut": "Реєстрація виходу",
     "stayOver": "Гість залишається",
     "noEligibleWorkers": "Відповідних працівників не знайдено.",
-    "cancelReasonPlaceholder": "Вкажіть, чому це призначення було скасовано."
+    "cancelReasonPlaceholder": "Вкажіть, чому це призначення було скасовано.",
+    "title": "Призначення",
+    "checkInLabel": "Прихід",
+    "checkOutLabel": "Вихід",
+    "checkout": "Виїзд",
+    "insideGeofence": "У межах геозони",
+    "outsideGeofence": "Поза геозоною",
+    "verification": "Перевірка",
+    "loggedBy": "Зафіксував",
+    "loading": "Завантаження призначень…",
+    "placementDetails": "Деталі розміщення",
+    "placeWorker": "Призначити працівника",
+    "calendarPlacement": "Розміщення в календарі",
+    "roomsCompleted": "Завершені номери"
   },
   "settings": {
     "language": {
@@ -136,7 +172,8 @@
     "appearance": "Вигляд",
     "about": "Про застосунок",
     "comingSoon": "Незабаром",
-    "themeSystemNote": "Системна тема відповідає налаштуванню пристрою."
+    "themeSystemNote": "Системна тема відповідає налаштуванню пристрою.",
+    "localDevBuild": "Локальна збірка розробки"
   },
   "auth": {
     "login": "Увійти",
@@ -152,7 +189,10 @@
     "tooManyAttempts": "Забагато спроб. Зачекайте, перш ніж повторити.",
     "loginFailed": "Не вдалося увійти. Спробуйте ще раз.",
     "signInTo": "Увійти до {{app}}",
-    "email": "Електронна пошта"
+    "email": "Електронна пошта",
+    "resetYourPassword": "Скинути пароль",
+    "setNewPassword": "Встановити новий пароль",
+    "invalidResetLink": "Недійсне посилання для скидання пароля. Відсутній токен."
   },
   "search": {
     "byNameOrEmail": "Пошук за іменем або поштою…",
@@ -224,7 +264,12 @@
     "noActiveContract": "Немає активного договору",
     "payslipRequests": "Запити на розрахунковий лист",
     "noRequests": "Немає запитів",
-    "payslipRequestFailed": "Не вдалося запитати розрахунковий лист"
+    "payslipRequestFailed": "Не вдалося запитати розрахунковий лист",
+    "contract": "Договір",
+    "signedContract": "Підписаний договір",
+    "contractExpired": "Термін договору минув",
+    "noSignedContract": "Підписаного договору ще немає у справі",
+    "loadContractFailed": "Не вдалося завантажити ваш договір."
   },
   "consent": {
     "title": "Згода на захист даних",
@@ -257,5 +302,59 @@
     "PUBLIC_SERVICE": "Громадське обслуговування",
     "KITCHEN_DISHWASHER": "Кухонний посудомийник",
     "WAITER": "Офіціант"
+  },
+  "calendar": {
+    "absences": "Відсутності",
+    "dailySummary": "Щоденний підсумок змін",
+    "editDailySummary": "Редагувати щоденний підсумок",
+    "loadingSummary": "Завантаження щоденного підсумку…",
+    "noSummary": "Для цього дня підсумок не додано.",
+    "loadFailed": "Не вдалося завантажити календар. Спробуйте ще раз.",
+    "assignedOrOnLeave": "Призначено або у відпустці сьогодні",
+    "freeToday": "Вільний сьогодні"
+  },
+  "hotels": {
+    "inThisGroup": "Готелі цієї групи",
+    "deleted": "Видалені готелі",
+    "deletedGroups": "Видалені групи готелів",
+    "new": "Новий готель",
+    "newGroup": "Нова група",
+    "noGroup": "Групу готелів не призначено",
+    "orgChart": "Оргструктура"
+  },
+  "users": {
+    "new": "Новий користувач",
+    "none": "Працівників не знайдено.",
+    "leaderboard": "Рейтинг працівників",
+    "topWorkers": "Найкращі працівники",
+    "blocklist": "Чорний список працівників",
+    "applicant": "Кандидат",
+    "yourAccount": "Ваш обліковий запис",
+    "accountSettings": "Налаштування облікового запису",
+    "exportMyData": "Експортувати мої дані"
+  },
+  "requests": {
+    "title": "Запит на роботу",
+    "new": "Новий запит",
+    "newBroadcast": "Нова розсилка",
+    "acceptedWorkers": "Прийняті працівники",
+    "noneAccepted": "Жоден працівник ще не прийняв цю розсилку.",
+    "notAcceptingNew": "Не приймає нових запитів на роботу"
+  },
+  "onboarding": {
+    "managerReview": "Перевірка менеджером",
+    "applicationRejected": "Заявку відхилено",
+    "documentsUploaded": "Документи завантажено",
+    "documentsOnFile": "Документи у справі",
+    "submittedDocuments": "Подані документи",
+    "documentsRequired": "Документи, потрібні перед поданням:",
+    "loadingRecord": "Завантаження вашого запису адаптації…",
+    "loadRecordFailed": "Не вдалося завантажити запис адаптації.",
+    "loadingRequirements": "Завантаження вимог до документів…"
+  },
+  "analytics": {
+    "myPerformance": "Моя результативність",
+    "avgRating": "Середня оцінка",
+    "recentRatings": "Останні оцінки"
   }
 }
