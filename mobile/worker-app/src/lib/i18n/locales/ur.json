@@ -71,7 +71,8 @@
     "pageNotFound": "صفحہ نہیں ملا",
     "today": "آج",
     "file": "فائل",
-    "download": "ڈاؤن لوڈ کریں"
+    "download": "ڈاؤن لوڈ کریں",
+    "prev": "پچھلا"
   },
   "fields": {
     "name": "نام",
@@ -520,7 +521,10 @@
     "absencesLoadFailed": "آپ کی غیر حاضریاں لوڈ نہیں ہو سکیں۔",
     "reasonRequiredVacation": "چھٹی کی غیر حاضری کے لیے وجہ درکار ہے۔",
     "roomsWholeNumber": "کمروں کی مکمل تعداد درج کریں (0 یا زیادہ)۔",
-    "dateRequired": "تاریخ درکار ہے۔"
+    "dateRequired": "تاریخ درکار ہے۔",
+    "viewDay": "دن",
+    "viewWeek": "ہفتہ",
+    "viewMonth": "مہینہ"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",

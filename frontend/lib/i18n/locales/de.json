@@ -70,7 +70,8 @@
     "pageNotFound": "Seite nicht gefunden",
     "today": "Heute",
     "file": "Datei",
-    "download": "Herunterladen"
+    "download": "Herunterladen",
+    "prev": "Zurück"
   },
   "fields": {
     "name": "Name",
@@ -519,7 +520,10 @@
     "absencesLoadFailed": "Ihre Abwesenheiten konnten nicht geladen werden.",
     "reasonRequiredVacation": "Für eine Urlaubsabwesenheit ist ein Grund erforderlich.",
     "roomsWholeNumber": "Geben Sie eine ganze Zahl von Zimmern ein (0 oder mehr).",
-    "dateRequired": "Datum ist erforderlich."
+    "dateRequired": "Datum ist erforderlich.",
+    "viewDay": "Tag",
+    "viewWeek": "Woche",
+    "viewMonth": "Monat"
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",

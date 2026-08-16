@@ -70,7 +70,8 @@
     "pageNotFound": "Сторінку не знайдено",
     "today": "Сьогодні",
     "file": "Файл",
-    "download": "Завантажити"
+    "download": "Завантажити",
+    "prev": "Назад"
   },
   "fields": {
     "name": "Ім'я",
@@ -519,7 +520,10 @@
     "absencesLoadFailed": "Не вдалося завантажити ваші відсутності.",
     "reasonRequiredVacation": "Для відпустки причина є обов'язковою.",
     "roomsWholeNumber": "Введіть ціле число номерів (0 або більше).",
-    "dateRequired": "Дата є обов'язковою."
+    "dateRequired": "Дата є обов'язковою.",
+    "viewDay": "День",
+    "viewWeek": "Тиждень",
+    "viewMonth": "Місяць"
   },
   "hotels": {
     "inThisGroup": "Готелі цієї групи",

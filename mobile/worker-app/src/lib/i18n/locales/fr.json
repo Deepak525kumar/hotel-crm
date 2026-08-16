@@ -70,7 +70,8 @@
     "pageNotFound": "Page introuvable",
     "today": "Aujourd'hui",
     "file": "Fichier",
-    "download": "Télécharger"
+    "download": "Télécharger",
+    "prev": "Préc."
   },
   "fields": {
     "name": "Nom",
@@ -519,7 +520,10 @@
     "absencesLoadFailed": "Impossible de charger vos absences.",
     "reasonRequiredVacation": "Un motif est requis pour une absence pour congé.",
     "roomsWholeNumber": "Saisissez un nombre entier de chambres (0 ou plus).",
-    "dateRequired": "La date est requise."
+    "dateRequired": "La date est requise.",
+    "viewDay": "Jour",
+    "viewWeek": "Semaine",
+    "viewMonth": "Mois"
   },
   "hotels": {
     "inThisGroup": "Hôtels de ce groupe",

@@ -71,7 +71,8 @@
     "pageNotFound": "الصفحة غير موجودة",
     "today": "اليوم",
     "file": "الملف",
-    "download": "تنزيل"
+    "download": "تنزيل",
+    "prev": "السابق"
   },
   "fields": {
     "name": "الاسم",
@@ -520,7 +521,10 @@
     "absencesLoadFailed": "تعذر تحميل حالات غيابك.",
     "reasonRequiredVacation": "السبب مطلوب لغياب الإجازة.",
     "roomsWholeNumber": "أدخل عدداً صحيحاً من الغرف (0 أو أكثر).",
-    "dateRequired": "التاريخ مطلوب."
+    "dateRequired": "التاريخ مطلوب.",
+    "viewDay": "يوم",
+    "viewWeek": "أسبوع",
+    "viewMonth": "شهر"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
