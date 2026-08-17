@@ -2,7 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { statusAction, statusDescription, statusLabel } from '@/lib/consent-status';
+import { statusAction, statusDescription, statusLabelKey } from '@/lib/consent-status';
 import type { ConsentStatus } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
@@ -61,11 +61,11 @@ export function ConsentStatusCard({
       <ThemedView style={styles.row} type="backgroundElement">
         <ThemedView style={styles.info} type="backgroundElement">
           <ThemedText type="smallBold" style={{ color: STATUS_COLOR[status.status] }}>
-            {statusLabel(status)}
+            {t(statusLabelKey(status))}
           </ThemedText>
           {description && (
             <ThemedText type="small" themeColor="textSecondary">
-              {description}
+              {t(description.key, description.values)}
             </ThemedText>
           )}
         </ThemedView>

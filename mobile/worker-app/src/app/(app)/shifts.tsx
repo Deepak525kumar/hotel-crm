@@ -19,13 +19,14 @@ const STATUS_COLOR: Record<AssignmentStatus, string> = {
 };
 
 function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => void }) {
+  const { t } = useTranslation();
   const color = STATUS_COLOR[item.status] ?? '#718096';
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedView style={styles.cardRow} type="backgroundElement">
           <ThemedText type="smallBold" style={styles.flex}>
-            {item.work_request?.position ?? 'Shift'}
+            {item.work_request?.position ?? t('common.shift')}
           </ThemedText>
           <View style={[styles.badge, { backgroundColor: color }]}>
             <ThemedText type="small" style={styles.badgeText}>

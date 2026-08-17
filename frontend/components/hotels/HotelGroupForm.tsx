@@ -79,7 +79,7 @@ export function HotelGroupForm({
             required
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="e.g. Northern Region"
+            placeholder={t("fields.groupNamePlaceholder")}
           />
 
           <Textarea

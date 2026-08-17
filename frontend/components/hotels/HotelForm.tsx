@@ -154,7 +154,7 @@ export function HotelForm({
             required
             value={form.name}
             onChange={(e) => set("name", e.target.value)}
-            placeholder="e.g. Grand Central Hotel"
+            placeholder={t("fields.hotelNamePlaceholder")}
           />
 
           <Input

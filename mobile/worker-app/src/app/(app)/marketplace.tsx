@@ -10,11 +10,14 @@ import { useTheme } from '@/hooks/use-theme';
 import type { WorkRequest, Broadcast } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
-const SKILL_LABELS: Record<string, string> = {
-  CLEANER: 'Cleaner',
-  PUBLIC_SERVICE: 'Public service',
-  KITCHEN_DISHWASHER: 'Kitchen dishwasher',
-  WAITER: 'Waiter',
+// Keys, resolved at render. The same four labels already live in the web
+// app's lib/skills.ts under these exact keys -- the drift that module was
+// written to stop had reached the mobile apps too.
+const SKILL_LABEL_KEY: Record<string, string> = {
+  CLEANER: 'skills.CLEANER',
+  PUBLIC_SERVICE: 'skills.PUBLIC_SERVICE',
+  KITCHEN_DISHWASHER: 'skills.KITCHEN_DISHWASHER',
+  WAITER: 'skills.WAITER',
 };
 
 function JobCard({ item, onPress }: { item: WorkRequest; onPress: () => void }) {
@@ -68,7 +71,7 @@ function OfferCard({ item, onPress }: { item: Broadcast; onPress: () => void }) 
         )}
         {(item.skill_slots ?? []).map((slot) => (
           <ThemedText key={slot.id} type="small" themeColor="textSecondary">
-            {SKILL_LABELS[slot.skill] ?? slot.skill}: {slot.confirmed_count}/{slot.headcount}
+            {SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}: {slot.confirmed_count}/{slot.headcount}
           </ThemedText>
         ))}
       </ThemedView>
@@ -141,9 +144,7 @@ export default function MarketplaceScreen() {
             ListHeaderComponent={
               openOffers.length > 0 ? (
                 <>
-                  <ThemedText type="smallBold" style={styles.sectionLabel}>
-                    Offers for you
-                  </ThemedText>
+                  <ThemedText type="smallBold" style={styles.sectionLabel}>{t("jobs.offersForYou")}</ThemedText>
                   {openOffers.map((offer) => (
                     <OfferCard
                       key={offer.id}
@@ -151,9 +152,7 @@ export default function MarketplaceScreen() {
                       onPress={() => router.push(`/offer/${offer.id}`)}
                     />
                   ))}
-                  <ThemedText type="smallBold" style={styles.sectionLabel}>
-                    Open jobs
-                  </ThemedText>
+                  <ThemedText type="smallBold" style={styles.sectionLabel}>{t("jobs.open")}</ThemedText>
                 </>
               ) : null
             }

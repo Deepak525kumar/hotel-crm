@@ -27,12 +27,8 @@ export function ContractStatusCard({
   if (!contract) {
     return (
       <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="smallBold" style={styles.emptyTitle}>
-          No Active Contract
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>
-          You do not have a contract in the system yet.
-        </ThemedText>
+        <ThemedText type="smallBold" style={styles.emptyTitle}>{t("hr.noActiveContract")}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>{t("hr.noContractYet")}</ThemedText>
       </ThemedView>
     );
   }

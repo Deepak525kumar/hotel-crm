@@ -1,22 +1,46 @@
 import type { ConsentStatus } from '@/types/api';
 
-export function statusLabel(status: ConsentStatus): string {
+/**
+ * These functions return translation KEYS (and, for the description, the
+ * values to interpolate) rather than finished English sentences.
+ *
+ * The alternative -- calling `i18n.t` in here -- would pull react-i18next into
+ * a module that this package's tests import under `testEnvironment: node`, and
+ * would make the returned string depend on init order. Returning a key keeps
+ * the module pure and directly testable, and leaves resolution to the one
+ * component that renders it, where `t()` already re-runs on a language change.
+ */
+export function statusLabelKey(status: ConsentStatus): string {
   switch (status.status) {
     case 'granted':
-      return 'Granted';
+      return 'consent.statusGranted';
     case 'declined':
-      return 'Declined';
+      return 'consent.statusDeclined';
     case 'absent':
-      return 'Not yet decided';
+      return 'consent.statusUndecided';
   }
 }
 
-export function statusDescription(status: ConsentStatus): string | null {
+export interface ConsentDescription {
+  key: string;
+  values: Record<string, string>;
+}
+
+export function statusDescription(status: ConsentStatus): ConsentDescription | null {
   switch (status.status) {
     case 'granted':
-      return `Decided ${new Date(status.decided_at).toLocaleString()} · notice ${status.notice_version}`;
+      return {
+        key: 'consent.decidedAt',
+        values: {
+          when: new Date(status.decided_at).toLocaleString(),
+          version: status.notice_version,
+        },
+      };
     case 'declined':
-      return `You previously declined this notice on ${new Date(status.decided_at).toLocaleString()}. You can review it again below.`;
+      return {
+        key: 'consent.declinedPreviously',
+        values: { when: new Date(status.decided_at).toLocaleString() },
+      };
     case 'absent':
       return null;
   }

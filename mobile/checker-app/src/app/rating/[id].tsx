@@ -12,10 +12,20 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
-const SCORE_LABELS = ['', 'Poor', 'Fair', 'Good', 'Very Good', 'Excellent'];
+// 1-indexed to match the star value; index 0 is unused. Keys, not nouns.
+const SCORE_LABEL_KEY = [
+  '',
+  'ratings.score1',
+  'ratings.score2',
+  'ratings.score3',
+  'ratings.score4',
+  'ratings.score5',
+];
 
 export default function RatingScreen() {
+  const { t } = useTranslation();
   const { id, worker_id } = useLocalSearchParams<{ id: string; worker_id: string }>();
   const theme = useTheme();
   const router = useRouter();
@@ -25,7 +35,7 @@ export default function RatingScreen() {
 
   const handleSubmit = async () => {
     if (!worker_id) {
-      Alert.alert('Error', 'Worker ID missing from URL');
+      Alert.alert(t("errors.title"), t('ratings.workerIdMissing'));
       return;
     }
     setSaving(true);
@@ -36,11 +46,11 @@ export default function RatingScreen() {
         score: score * 20, // scale 1-5 to 0-100
         comment: comment || undefined,
       });
-      Alert.alert('Submitted', 'Rating recorded.', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t("common.submitted"), t('ratings.recorded'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Failed to submit');
+      Alert.alert(t("errors.title"), e.message ?? t('ratings.submitFailed'));
     } finally {
       setSaving(false);
     }
@@ -87,10 +97,10 @@ export default function RatingScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Rate Worker', headerShown: true }} />
+      <Stack.Screen options={{ title: t('nav.rateWorker'), headerShown: true }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Rating (1–5 stars)</Text>
+          <Text style={styles.sectionTitle}>{t('ratings.stars1to5')}</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((s) => (
               <TouchableOpacity key={s} onPress={() => setScore(s)} activeOpacity={0.7}>
@@ -98,14 +108,14 @@ export default function RatingScreen() {
               </TouchableOpacity>
             ))}
           </View>
-          <Text style={styles.scoreLabel}>{SCORE_LABELS[score]}</Text>
+          <Text style={styles.scoreLabel}>{t(SCORE_LABEL_KEY[score])}</Text>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Comment</Text>
+          <Text style={styles.sectionTitle}>{t("ratings.comment")}</Text>
           <TextInput
             style={styles.notesInput}
-            placeholder="Write your feedback..."
+            placeholder={t("ratings.feedbackPlaceholder")}
             placeholderTextColor={theme.textSecondary}
             value={comment}
             onChangeText={setComment}
@@ -121,7 +131,7 @@ export default function RatingScreen() {
           {saving ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Submit Rating</Text>
+            <Text style={styles.buttonText}>{t("ratings.submit")}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

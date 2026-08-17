@@ -48,6 +48,7 @@ import { useTranslation } from "react-i18next";
 export default function CalendarGridPage() {
   const { t } = useTranslation();
   const forwardArrow = useDirectionalArrow("forward");
+  const backArrow = useDirectionalArrow("back");
   const { user } = useAuth();
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -322,12 +323,12 @@ export default function CalendarGridPage() {
                   aria-pressed={view === opt.value}
                   className={`px-3 py-1.5 text-sm font-medium ${view === opt.value ? "bg-blue-600 text-white" : "bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:hover:bg-gray-800"}`}
                 >
-                  {opt.label}
+                  {t(opt.labelKey)}
                 </button>
               ))}
             </div>
             <Button variant="outline" size="sm" onClick={goPrev}>
-              ← Prev
+              {backArrow} {t("common.prev")}
             </Button>
             {/* Today toggle: solid/active whenever today's date is already
                 inside the visible grid (and inert, since jumping to the

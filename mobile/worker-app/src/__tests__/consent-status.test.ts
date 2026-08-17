@@ -1,4 +1,4 @@
-import { statusAction, statusDescription, statusLabel } from '@/lib/consent-status';
+import { statusAction, statusDescription, statusLabelKey } from '@/lib/consent-status';
 import type { ConsentStatus } from '@/types/api';
 
 /**
@@ -32,11 +32,14 @@ describe('statusAction', () => {
   });
 });
 
-describe('statusLabel', () => {
-  it('labels each status distinctly', () => {
-    expect(statusLabel({ status: 'absent' })).toBe('Not yet decided');
-    expect(statusLabel({ status: 'granted', notice_version: 'v1', decided_at: '2026-08-01T00:00:00.000Z' })).toBe('Granted');
-    expect(statusLabel({ status: 'declined', notice_version: 'v1', decided_at: '2026-08-01T00:00:00.000Z' })).toBe('Declined');
+describe('statusLabelKey', () => {
+  // Keys, not sentences: the copy itself is pinned by the catalogue-parity
+  // test, so asserting English here would only duplicate that and would break
+  // the moment a translator rewords the German source.
+  it('maps each status to a distinct key', () => {
+    expect(statusLabelKey({ status: 'absent' })).toBe('consent.statusUndecided');
+    expect(statusLabelKey({ status: 'granted', notice_version: 'v1', decided_at: '2026-08-01T00:00:00.000Z' })).toBe('consent.statusGranted');
+    expect(statusLabelKey({ status: 'declined', notice_version: 'v1', decided_at: '2026-08-01T00:00:00.000Z' })).toBe('consent.statusDeclined');
   });
 });
 
@@ -51,6 +54,9 @@ describe('statusDescription', () => {
       notice_version: 'v1',
       decided_at: '2026-08-01T00:00:00.000Z',
     });
-    expect(description).toContain('v1');
+    expect(description).toEqual({
+      key: 'consent.decidedAt',
+      values: { when: expect.any(String), version: 'v1' },
+    });
   });
 });

@@ -5,13 +5,15 @@ import { Spacing } from '@/constants/theme';
 import { formatBytes, formatExpiry } from '@/lib/document-formatting';
 import { openDocument } from './open-document';
 import type { WorkerDocument, DocumentCategory } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
-const CATEGORY_LABEL: Record<DocumentCategory, string> = {
-  GENERAL: 'General',
-  WORK_PERMIT: 'Work permit',
+const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
+  GENERAL: 'documents.categoryGENERAL',
+  WORK_PERMIT: 'documents.categoryWORK_PERMIT',
 };
 
 export function DocumentItem({ document }: { document: WorkerDocument }) {
+  const { t } = useTranslation();
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.row} type="backgroundElement">
@@ -20,18 +22,16 @@ export function DocumentItem({ document }: { document: WorkerDocument }) {
             {document.original_filename}
           </ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
-            {formatBytes(document.file_size_bytes)} · {CATEGORY_LABEL[document.category]}
+            {formatBytes(document.file_size_bytes)} · {t(CATEGORY_LABEL_KEY[document.category])}
             {document.expires_at && ` · Expires ${formatExpiry(document.expires_at)}`}
           </ThemedText>
         </ThemedView>
         {document.presigned_url ? (
           <Pressable onPress={() => openDocument(document)}>
-            <ThemedText type="linkPrimary">View</ThemedText>
+            <ThemedText type="linkPrimary">{t("documents.view")}</ThemedText>
           </Pressable>
         ) : (
-          <ThemedText type="small" themeColor="textSecondary">
-            Unavailable
-          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
         )}
       </ThemedView>
     </ThemedView>

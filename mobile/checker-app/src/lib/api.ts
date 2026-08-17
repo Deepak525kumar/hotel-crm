@@ -12,7 +12,18 @@ import type {
   CalendarAbsenceKind,
   PushApp,
 } from '@/types/api';
+import type { UiLocale } from '@/lib/locales';
 
+// KNOWN GAP -- the user-facing error strings in this module (rate limit,
+// session revoked, session expired, token-refresh failure, generic request
+// failure) are still English in every locale. They surface verbatim in Alert dialogs via `ApiError.message`.
+//
+// They are NOT translated because importing '@/lib/i18n' here breaks this
+// package's jest suites: the tests run under `testEnvironment: node` and
+// react-i18next ships untransformed ESM, so five suites fail to parse. Fixing
+// it properly means giving ApiError a stable machine-readable code and
+// translating at the display sites -- a change to the error contract that is
+// out of scope for an extraction pass. Tracked as SIR-I18N-013.
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 let _accessToken: string | null = null;
@@ -266,6 +277,14 @@ export const api = {
       }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     me: () => request<User>('/auth/me'),
+    // `preferred_language: null` is meaningful and distinct from omitting the
+    // key -- null clears the stored choice and returns the checker to
+    // device-locale negotiation. Same contract as the worker app.
+    updateProfile: (input: { preferred_language?: UiLocale | null }) =>
+      request<User>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(input),
+      }),
   },
 
   attendance: {

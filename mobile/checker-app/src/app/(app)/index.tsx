@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 function statusColor(status: string): string {
   switch (status) {
@@ -28,6 +29,7 @@ function formatTime(iso: string | null): string {
 }
 
 export default function QueueScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -43,12 +45,12 @@ export default function QueueScreen() {
       const data = result.data ?? [];
       setRecords(data.filter((r) => r.status !== 'EXPECTED'));
     } catch (e: any) {
-      setError(e.message ?? 'Failed to load');
+      setError(e.message ?? t('common.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -115,22 +117,22 @@ export default function QueueScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Attendance Queue</Text>
+        <Text style={styles.headerTitle}>{t("attendance.queueTitle")}</Text>
         <Text style={styles.headerSubtitle}>{records.length} pending verification</Text>
       </View>
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statNum}>{records.filter((r) => r.status === 'PRESENT').length}</Text>
-          <Text style={styles.statLabel}>Present</Text>
+          <Text style={styles.statLabel}>{t("status.present")}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNum}>{records.filter((r) => r.status === 'LATE').length}</Text>
-          <Text style={styles.statLabel}>Late</Text>
+          <Text style={styles.statLabel}>{t("status.late")}</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statNum}>{records.filter((r) => r.status === 'ABSENT').length}</Text>
-          <Text style={styles.statLabel}>Absent</Text>
+          <Text style={styles.statLabel}>{t("status.absent")}</Text>
         </View>
       </View>
 

@@ -3,8 +3,10 @@ import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
+import { useTranslation } from 'react-i18next';
 
 export default function AppLayout() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
 
@@ -48,7 +50,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Queue',
+          title: t('nav.queue'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'list.bullet.clipboard', android: 'assignment', web: 'assignment' }}
@@ -61,7 +63,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="leaderboard"
         options={{
-          title: 'Leaderboard',
+          title: t('nav.leaderboard'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'trophy', android: 'emoji_events', web: 'emoji_events' }}
@@ -74,7 +76,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="absences"
         options={{
-          title: 'Sick / Vacation',
+          title: t('nav.sickVacation'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'calendar.badge.exclamationmark', android: 'event_busy', web: 'event_busy' }}
@@ -87,7 +89,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Alerts',
+          title: t('nav.alerts'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
@@ -100,7 +102,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('nav.profile'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}

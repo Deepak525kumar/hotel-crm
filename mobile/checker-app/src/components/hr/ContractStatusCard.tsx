@@ -4,6 +4,7 @@ import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import type { ContractDto } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 export function ContractStatusCard({
   contract,
@@ -12,6 +13,7 @@ export function ContractStatusCard({
   contract: ContractDto | null;
   loading: boolean;
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (loading) {
@@ -25,12 +27,8 @@ export function ContractStatusCard({
   if (!contract) {
     return (
       <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedText type="smallBold" style={styles.emptyTitle}>
-          No Active Contract
-        </ThemedText>
-        <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>
-          You do not have a contract in the system yet.
-        </ThemedText>
+        <ThemedText type="smallBold" style={styles.emptyTitle}>{t("hr.noActiveContract")}</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>{t("hr.noContractYet")}</ThemedText>
       </ThemedView>
     );
   }
@@ -38,7 +36,7 @@ export function ContractStatusCard({
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.row}>
-        <ThemedText type="small" themeColor="textSecondary">Status</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t("fields.status")}</ThemedText>
         <ThemedText type="smallBold" style={{ textTransform: 'capitalize' }}>
           {contract.status.toLowerCase()}
         </ThemedText>
@@ -46,13 +44,13 @@ export function ContractStatusCard({
       <ThemedView style={styles.divider} type="backgroundSelected" />
       
       <ThemedView style={styles.row}>
-        <ThemedText type="small" themeColor="textSecondary">Position</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t("jobs.position")}</ThemedText>
         <ThemedText type="smallBold">{contract.position}</ThemedText>
       </ThemedView>
       <ThemedView style={styles.divider} type="backgroundSelected" />
 
       <ThemedView style={styles.row}>
-        <ThemedText type="small" themeColor="textSecondary">Start Date</ThemedText>
+        <ThemedText type="small" themeColor="textSecondary">{t("fields.startDate")}</ThemedText>
         <ThemedText type="small">{contract.start_date}</ThemedText>
       </ThemedView>
       
@@ -60,7 +58,7 @@ export function ContractStatusCard({
         <>
           <ThemedView style={styles.divider} type="backgroundSelected" />
           <ThemedView style={styles.row}>
-            <ThemedText type="small" themeColor="textSecondary">End Date</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">{t("fields.endDate")}</ThemedText>
             <ThemedText type="small">{contract.end_date}</ThemedText>
           </ThemedView>
         </>

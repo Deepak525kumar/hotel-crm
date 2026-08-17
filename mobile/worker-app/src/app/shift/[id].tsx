@@ -9,6 +9,7 @@ import { api, ApiError } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkerAssignment, Attendance } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -139,9 +140,7 @@ export default function ShiftDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
-        </Pressable>
+        <BackLink />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText type="subtitle" style={styles.title}>
             {wr?.position ?? t('shifts.detailsTitle')}
@@ -164,9 +163,7 @@ export default function ShiftDetailScreen() {
             <InfoRow label={t('fields.status')} value={shift.status.replace(/_/g, ' ')} />
           </ThemedView>
 
-          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-            Attendance
-          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("nav.attendance")}</ThemedText>
           <ThemedView type="backgroundElement" style={styles.section}>
             <InfoRow
               label={t('shifts.checkIn')}

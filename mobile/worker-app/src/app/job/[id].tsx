@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkRequest } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -49,9 +50,7 @@ export default function JobDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
-        </Pressable>
+        <BackLink />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText type="subtitle" style={styles.title}>{job.position}</ThemedText>
           {job.hotel && (
@@ -79,9 +78,7 @@ export default function JobDetailScreen() {
 
           {job.description ? (
             <>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Description
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("fields.description")}</ThemedText>
               <ThemedView type="backgroundElement" style={styles.descCard}>
                 <ThemedText type="small">{job.description}</ThemedText>
               </ThemedView>
@@ -90,9 +87,7 @@ export default function JobDetailScreen() {
 
           {job.status !== 'OPEN' && job.status !== 'PARTIALLY_FILLED' && (
             <ThemedView type="backgroundElement" style={styles.closedBanner}>
-              <ThemedText type="small" themeColor="textSecondary">
-                This job is no longer open.
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("jobs.noLongerOpen")}</ThemedText>
             </ThemedView>
           )}
         </ScrollView>

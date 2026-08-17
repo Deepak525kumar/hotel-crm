@@ -10,8 +10,11 @@ import { api, ApiError } from '@/lib/api';
 import { UploadDocumentCard } from '@/components/documents/UploadDocumentCard';
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import type { WorkerDocument } from '@/types/api';
+import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 export default function DocumentsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
   const [documents, setDocuments] = useState<WorkerDocument[]>([]);
@@ -26,7 +29,7 @@ export default function DocumentsScreen() {
       const res = await api.documents.list(user.id);
       setDocuments(Array.isArray(res) ? res : []);
     } catch (error) {
-      setLoadError(error instanceof ApiError ? error.message : 'Could not load documents.');
+      setLoadError(error instanceof ApiError ? error.message : t('documents.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -51,14 +54,8 @@ export default function DocumentsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">
-            ← Back
-          </ThemedText>
-        </Pressable>
-        <ThemedText type="subtitle" style={styles.header}>
-          Documents
-        </ThemedText>
+        <BackLink />
+        <ThemedText type="subtitle" style={styles.header}>{t("documents.title")}</ThemedText>
 
         <UploadDocumentCard workerId={user.id} onUploaded={onUploaded} />
 

@@ -1,4 +1,4 @@
-import { StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -32,31 +32,28 @@ export default function ProfileScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>
-          Profile
-        </ThemedText>
+        {/* Scrollable: the language picker adds six rows plus two lines of
+            explanatory copy to a screen that already carried a details card
+            and five buttons. Without this the sign-out button sits below the
+            fold on a small phone with no way to reach it. */}
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ThemedText type="subtitle" style={styles.header}>{t("profile.title")}</ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">
-              Name
-            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">{t("fields.name")}</ThemedText>
             <ThemedText type="small">
               {user.first_name} {user.last_name}
             </ThemedText>
           </ThemedView>
           <ThemedView style={styles.divider} type="backgroundSelected" />
           <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">
-              Email
-            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">{t("auth.email")}</ThemedText>
             <ThemedText type="small">{user.email}</ThemedText>
           </ThemedView>
           <ThemedView style={styles.divider} type="backgroundSelected" />
           <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">
-              Role
-            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">{t("fields.role")}</ThemedText>
             <ThemedText type="small" style={styles.roleText}>
               {user.role}
             </ThemedText>
@@ -66,9 +63,7 @@ export default function ProfileScreen() {
             <>
               <ThemedView style={styles.divider} type="backgroundSelected" />
               <ThemedView style={styles.row} type="backgroundElement">
-                <ThemedText type="small" themeColor="textSecondary">
-                  Created By
-                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t("requests.createdBy")}</ThemedText>
                 <ThemedText type="small">{user.creator_name}</ThemedText>
               </ThemedView>
             </>
@@ -78,9 +73,7 @@ export default function ProfileScreen() {
             <>
               <ThemedView style={styles.divider} type="backgroundSelected" />
               <ThemedView style={styles.row} type="backgroundElement">
-                <ThemedText type="small" themeColor="textSecondary">
-                  Direct Manager
-                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t("profile.directManager")}</ThemedText>
                 <ThemedText type="small">{user.manager_name}</ThemedText>
               </ThemedView>
             </>
@@ -140,6 +133,7 @@ export default function ProfileScreen() {
             )}
           </ThemedView>
         </Pressable>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -151,8 +145,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
   header: {

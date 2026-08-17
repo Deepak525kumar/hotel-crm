@@ -66,12 +66,8 @@ export function PayslipRequestsList({
         )}
         ListEmptyComponent={
           <ThemedView type="backgroundElement" style={styles.empty}>
-            <ThemedText type="smallBold" style={styles.emptyTitle}>
-              No Requests
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>
-              You have not requested any payslips yet.
-            </ThemedText>
+            <ThemedText type="smallBold" style={styles.emptyTitle}>{t("hr.noRequests")}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>{t("hr.noPayslipsRequestedYet")}</ThemedText>
           </ThemedView>
         }
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

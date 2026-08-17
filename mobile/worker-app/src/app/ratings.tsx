@@ -8,6 +8,7 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { LeaderboardEntry } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 const MEDAL = ['🥇', '🥈', '🥉'];
 
@@ -27,9 +28,7 @@ export default function RatingsScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
-        </Pressable>
+        <BackLink />
         <ThemedText type="subtitle" style={styles.header}>{t('nav.leaderboard')}</ThemedText>
         {loading ? (
           <ActivityIndicator style={styles.loader} />

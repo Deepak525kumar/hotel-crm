@@ -12,6 +12,7 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 type VerificationStatus = 'PASSED' | 'NEEDS_REWORK' | 'FAILED';
 
@@ -21,10 +22,13 @@ const STATUS_COLORS: Record<VerificationStatus, string> = {
   FAILED: '#ef4444',
 };
 
-const STATUS_LABELS: Record<VerificationStatus, string> = {
-  PASSED: 'PASSED',
-  NEEDS_REWORK: 'NEEDS REWORK',
-  FAILED: 'FAILED',
+// Keys rather than nouns, resolved at render. The uppercase presentation is
+// part of each translation rather than a .toUpperCase() call: casing rules are
+// not universal, and Arabic and Urdu have no case at all.
+const STATUS_LABEL_KEY: Record<VerificationStatus, string> = {
+  PASSED: 'quality.outcomePASSED',
+  NEEDS_REWORK: 'quality.outcomeNEEDS_REWORK',
+  FAILED: 'quality.outcomeFAILED',
 };
 
 function deriveStatus(score: number): VerificationStatus {
@@ -34,6 +38,7 @@ function deriveStatus(score: number): VerificationStatus {
 }
 
 export default function QualityVerificationScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const router = useRouter();
@@ -51,11 +56,11 @@ export default function QualityVerificationScreen() {
         score,
         notes: notes || undefined,
       });
-      Alert.alert('Submitted', 'Quality verification recorded.', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t("common.submitted"), t('quality.recorded'), [
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Failed to submit');
+      Alert.alert(t("errors.title"), e.message ?? t('quality.submitFailed'));
     } finally {
       setSaving(false);
     }
@@ -116,10 +121,10 @@ export default function QualityVerificationScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Quality Check', headerShown: true }} />
+      <Stack.Screen options={{ title: t('nav.qualityCheck'), headerShown: true }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Score (0–100)</Text>
+          <Text style={styles.sectionTitle}>{t('fields.score0to100')}</Text>
           <View style={styles.scoreRow}>
             <Text style={styles.scoreDisplay}>{score}</Text>
             <View style={styles.adjustCol}>
@@ -144,7 +149,7 @@ export default function QualityVerificationScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Outcome</Text>
+          <Text style={styles.sectionTitle}>{t("quality.outcome")}</Text>
           <View style={styles.outcomeRow}>
             <View
               style={[
@@ -156,18 +161,18 @@ export default function QualityVerificationScreen() {
               ]}
             >
               <Text style={[styles.outcomeBadgeText, { color: STATUS_COLORS[derivedStatus] }]}>
-                {STATUS_LABELS[derivedStatus]}
+                {t(STATUS_LABEL_KEY[derivedStatus])}
               </Text>
             </View>
-            <Text style={styles.outcomeHint}>Determined by score</Text>
+            <Text style={styles.outcomeHint}>{t("quality.determinedByScore")}</Text>
           </View>
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Notes</Text>
+          <Text style={styles.sectionTitle}>{t("fields.notes")}</Text>
           <TextInput
             style={styles.notesInput}
-            placeholder="Describe findings..."
+            placeholder={t("quality.describeFindingsPlaceholder")}
             placeholderTextColor={theme.textSecondary}
             value={notes}
             onChangeText={setNotes}
@@ -183,7 +188,7 @@ export default function QualityVerificationScreen() {
           {saving ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Submit Verification</Text>
+            <Text style={styles.buttonText}>{t("quality.submitVerification")}</Text>
           )}
         </TouchableOpacity>
       </ScrollView>

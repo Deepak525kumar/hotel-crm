@@ -70,7 +70,16 @@
     "pageNotFound": "Page not found",
     "today": "Today",
     "file": "File",
-    "download": "Download"
+    "download": "Download",
+    "prev": "Prev",
+    "submitted": "Submitted",
+    "ok": "OK",
+    "done": "Done",
+    "request": "Request",
+    "keep": "Keep",
+    "shift": "Shift",
+    "loadFailed": "Failed to load",
+    "tomorrow": "Tomorrow"
   },
   "fields": {
     "name": "Name",
@@ -156,7 +165,10 @@
     "score0to100": "Score (0–100)",
     "punctuality0to100": "Punctuality (0–100)",
     "quality0to100": "Quality (0–100)",
-    "attitude0to100": "Attitude (0–100)"
+    "attitude0to100": "Attitude (0–100)",
+    "hotelNamePlaceholder": "e.g. Grand Central Hotel",
+    "groupNamePlaceholder": "e.g. Northern Region",
+    "jobTitlePlaceholder": "e.g. Housekeeper"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -183,7 +195,14 @@
     "myOnboarding": "My Onboarding",
     "reviewQueue": "Review Queue",
     "docs": "Docs",
-    "explore": "Explore"
+    "explore": "Explore",
+    "jobs": "Jobs",
+    "sickVacation": "Sick / Vacation",
+    "alerts": "Alerts",
+    "queue": "Queue",
+    "attendanceDetail": "Attendance Detail",
+    "qualityCheck": "Quality Check",
+    "rateWorker": "Rate Worker"
   },
   "roles": {
     "admin": "Admin",
@@ -220,7 +239,9 @@
     "notYetLogged": "Not yet logged.",
     "awaitingSignature": "Awaiting signature",
     "alreadyFilled": "Already filled",
-    "inProgress": "In progress"
+    "inProgress": "In progress",
+    "present": "Present",
+    "late": "Late"
   },
   "assignments": {
     "shiftDetails": "Shift details",
@@ -345,7 +366,14 @@
     "network": "Could not reach the server. Check your connection.",
     "notFound": "Not found.",
     "forbidden": "You do not have access to this.",
-    "title": "Error"
+    "title": "Error",
+    "unexpectedRecovery": "An unexpected error occurred. You can try again, or head back to the dashboard.",
+    "pageNotFound": "Page not found",
+    "pageNotFoundDescription": "The page you're looking for doesn't exist or has moved.",
+    "tooManyRequests": "Too many requests. Please wait before trying again.",
+    "sessionRevoked": "Your session was revoked. Please log in again.",
+    "sessionExpired": "Session expired. Please log in again.",
+    "requestFailed": "Request failed"
   },
   "shifts": {
     "checkIn": "Check In",
@@ -364,7 +392,10 @@
     "roomsCompleted": "Rooms Completed",
     "offer": "Shift offer",
     "offerNotFound": "Offer not found.",
-    "detailsTitle": "Shift Details"
+    "detailsTitle": "Shift Details",
+    "upcomingTitle": "Upcoming Shifts",
+    "offerNoLongerOpen": "This offer is no longer open.",
+    "alreadyFilledByAnother": "This shift was already filled by another worker."
   },
   "jobs": {
     "none": "No open jobs found.",
@@ -379,7 +410,8 @@
     "filled": "Filled",
     "position": "Position",
     "pay": "Pay",
-    "offerBadge": "OFFER"
+    "offerBadge": "OFFER",
+    "noLongerOpen": "This job is no longer open."
   },
   "documents": {
     "title": "Documents",
@@ -402,7 +434,11 @@
     "loadFailed": "Failed to load documents.",
     "deleteAction": "Delete",
     "uploadAction": "Upload",
-    "fileTooLarge": "File exceeds 10MB limit."
+    "fileTooLarge": "File exceeds 10MB limit.",
+    "uploadFirstHint": "Upload your first document to get started.",
+    "uploadFailed": "Upload failed. Please try again.",
+    "unsupportedType": "Unsupported file type. Allowed: PDF, JPEG, PNG, WEBP.",
+    "exceedsMaxSize": "File exceeds the maximum size of 10 MB."
   },
   "hr": {
     "title": "HR & Payroll",
@@ -437,7 +473,12 @@
     "bothDatesRequired": "Both period dates are required.",
     "periodEndAfterStart": "Period end must be on or after period start.",
     "templateStartRequired": "Template, position, and start date are required.",
-    "endDateAfterStart": "End date must be on or after start date."
+    "endDateAfterStart": "End date must be on or after start date.",
+    "requestPayslip": "Request Payslip",
+    "noContractYet": "You do not have a contract in the system yet.",
+    "noPayslipsRequestedYet": "You have not requested any payslips yet.",
+    "dataLoadFailed": "Could not load HR data.",
+    "payslipConfirm": "Would you like to request your payslip for {{period}}?"
   },
   "consent": {
     "title": "Data-protection consent",
@@ -450,7 +491,16 @@
     "loadFailed": "Failed to load your consent status.",
     "history": "Consent history",
     "auditTrail": "Audit trail",
-    "loadOneFailed": "Failed to load your consent status."
+    "loadOneFailed": "Failed to load your consent status.",
+    "couldNotLoadStatus": "Could not load consent status.",
+    "couldNotLoadNotice": "Could not load the notice.",
+    "couldNotRecordDecision": "Could not record your decision.",
+    "couldNotWithdraw": "Could not withdraw consent.",
+    "statusGranted": "Granted",
+    "statusDeclined": "Declined",
+    "statusUndecided": "Not yet decided",
+    "decidedAt": "Decided {{when}} · notice {{version}}",
+    "declinedPreviously": "You previously declined this notice on {{when}}. You can review it again below."
   },
   "notifications": {
     "title": "Notifications",
@@ -464,11 +514,14 @@
     "loadFailed": "Failed to load notifications. Please try again.",
     "viewAllAction": "View all notifications",
     "markReadHint": "Mark this notification as read once you’ve seen it.",
-    "allCaughtUp": "You’re all caught up."
+    "allCaughtUp": "You’re all caught up.",
+    "tapToMarkRead": "Tap to mark as read",
+    "noneYet": "No notifications yet."
   },
   "leaderboard": {
     "none": "No leaderboard data yet.",
-    "view": "View Leaderboard"
+    "view": "View Leaderboard",
+    "topPerformers": "Top performers ranked by average rating"
   },
   "profile": {
     "title": "Profile",
@@ -519,7 +572,12 @@
     "absencesLoadFailed": "Failed to load your absences.",
     "reasonRequiredVacation": "Reason is required for a vacation absence.",
     "roomsWholeNumber": "Enter a whole number of rooms (0 or more).",
-    "dateRequired": "Date is required."
+    "dateRequired": "Date is required.",
+    "viewDay": "Day",
+    "viewWeek": "Week",
+    "viewMonth": "Month",
+    "sickOrVacation": "Sick / Vacation",
+    "yourMarkedDays": "Your marked days"
   },
   "hotels": {
     "inThisGroup": "Hotels in this group",
@@ -578,7 +636,8 @@
     "sendResetLink": "Send reset link",
     "revokeSessionsAction": "Revoke sessions",
     "deactivateAction": "Deactivate",
-    "employeeManagement": "Employee Management"
+    "employeeManagement": "Employee Management",
+    "revokeAccessFor": "This revokes access for <name>{{name}}</name>. You can reactivate the account from the edit screen."
   },
   "requests": {
     "title": "Work request",
@@ -675,7 +734,9 @@
     "noPermissionCreateUsers": "You do not have permission to create users.",
     "noContractYet": "No contract has been issued for you yet. Contact your manager.",
     "downloadContract": "Download contract",
-    "completeOnboardingAction": "Complete your onboarding"
+    "completeOnboardingAction": "Complete your onboarding",
+    "contractExpiredNotice": "Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.",
+    "rejectionReasonPlaceholder": "e.g. Invalid document uploaded"
   },
   "analytics": {
     "myPerformance": "My performance",
@@ -740,7 +801,14 @@
     "noneFound": "No attendance records found",
     "viewAssignment": "View assignment",
     "saveReview": "Save review",
-    "loadFailed": "Failed to load attendance. Please try again."
+    "loadFailed": "Failed to load attendance. Please try again.",
+    "checkedInUseAssignment": "You are checked in. Use the <assignmentLink>assignment page</assignmentLink> to check out and complete your shift.",
+    "queueTitle": "Attendance Queue",
+    "verifyTitleAction": "Verify Attendance",
+    "verificationNotesPlaceholder": "Verification notes (optional)...",
+    "verifiedMark": "Verified ✓",
+    "verifiedBody": "Attendance has been verified.",
+    "verifyFailed": "Failed to verify"
   },
   "employees": {
     "noBlocked": "No blocked employees",
@@ -769,7 +837,9 @@
     "deleteAction": "Delete",
     "reasonRequired": "A reason is required.",
     "idAndReasonRequired": "Employee ID and reason are both required.",
-    "signedContractReceived": "Signed contract received — approving will confirm it."
+    "signedContractReceived": "Signed contract received — approving will confirm it.",
+    "editSkillsHint": "Select the skills this worker is qualified for. Broadcasts are matched against these skills.",
+    "deletionReasonPlaceholder": "e.g. Resigned, contract ended"
   },
   "compliance": {
     "exportDescription": "Generates a copy of your documents, consent history, and account audit trail.",
@@ -777,5 +847,62 @@
   },
   "archive": {
     "description": "Hotels and hotel groups removed from operations. History is preserved — restoring makes an entity available again immediately."
+  },
+  "lifecycle": {
+    "hotel": {
+      "deleted": "Deleted hotel",
+      "deactivate": "Deactivate hotel",
+      "reactivate": "Reactivate hotel",
+      "pauseHint": "Temporarily pauses this hotel. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.",
+      "pausedHint": "This hotel is paused. Reactivating makes it available again immediately.",
+      "deleteTitle": "Delete hotel",
+      "updateFailed": "Could not update this hotel. Please try again.",
+      "deleteHint": "This removes the hotel from operations entirely: it will no longer appear anywhere and cannot be staffed."
+    },
+    "hotelGroup": {
+      "deleted": "Deleted hotel group",
+      "deactivate": "Deactivate hotel group",
+      "reactivate": "Reactivate hotel group",
+      "pauseHint": "Temporarily pauses this hotel group. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.",
+      "pausedHint": "This hotel group is paused. Reactivating makes it available again immediately.",
+      "deleteTitle": "Delete hotel group",
+      "updateFailed": "Could not update this hotel group. Please try again.",
+      "deleteHint": "This removes the hotel group from operations entirely: it will no longer appear anywhere and cannot be staffed."
+    },
+    "nothingErased": "Nothing is erased. History is preserved and an admin can restore it from the archived view."
+  },
+  "quality": {
+    "outcome": "Outcome",
+    "determinedByScore": "Determined by score",
+    "submitVerification": "Submit Verification",
+    "describeFindingsPlaceholder": "Describe findings...",
+    "outcomePASSED": "PASSED",
+    "outcomeNEEDS_REWORK": "NEEDS REWORK",
+    "outcomeFAILED": "FAILED",
+    "recorded": "Quality verification recorded.",
+    "submitFailed": "Failed to submit"
+  },
+  "ratings": {
+    "comment": "Comment",
+    "submit": "Submit Rating",
+    "feedbackPlaceholder": "Write your feedback...",
+    "stars1to5": "Rating (1–5 stars)",
+    "score1": "Poor",
+    "score2": "Fair",
+    "score3": "Good",
+    "score4": "Very Good",
+    "score5": "Excellent",
+    "recorded": "Rating recorded.",
+    "submitFailed": "Failed to submit",
+    "workerIdMissing": "Worker ID missing from URL"
+  },
+  "absences": {
+    "kindSICK": "Sick",
+    "kindVACATION": "Vacation",
+    "withdrawTitle": "Withdraw {{kind}}?",
+    "withdrawBody": "{{day}} will no longer be marked {{kind}}. A shift cancelled for this day is not automatically restored.",
+    "withdrawA11y": "Withdraw {{kind}} on {{day}}",
+    "markFailed": "Could not mark absence.",
+    "withdrawFailed": "Could not withdraw absence."
   }
 }

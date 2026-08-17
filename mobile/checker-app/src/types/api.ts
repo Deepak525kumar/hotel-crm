@@ -12,6 +12,13 @@ export interface User {
   role: UserRole;
   creator_name?: string | null;
   manager_name?: string | null;
+  /**
+   * The checker's chosen UI language, or null when they have never chosen
+   * one. Null is meaningful: it means negotiate from the device's own
+   * locales rather than assume the platform default. Mirrors the worker
+   * app's identical field and the backend's `User.preferred_language`.
+   */
+  preferred_language?: string | null;
 }
 
 export interface AuthResponse {

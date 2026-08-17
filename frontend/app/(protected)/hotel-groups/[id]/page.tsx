@@ -200,7 +200,7 @@ export default function HotelGroupDetailPage() {
               silently detached every member hotel. */}
           <RoleGate allow={["admin"]}>
             <LifecycleCard
-              label="hotel group"
+              entity="hotelGroup"
               isActive={group.is_active}
               deletedAt={group.deleted_at ?? null}
               onDeactivate={() => runLifecycle(() => hotelGroupsApi.deactivate(id))}

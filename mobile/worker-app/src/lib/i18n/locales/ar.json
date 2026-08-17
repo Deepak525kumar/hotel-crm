@@ -71,7 +71,16 @@
     "pageNotFound": "الصفحة غير موجودة",
     "today": "اليوم",
     "file": "الملف",
-    "download": "تنزيل"
+    "download": "تنزيل",
+    "prev": "السابق",
+    "submitted": "تم الإرسال",
+    "ok": "حسناً",
+    "done": "تم",
+    "request": "طلب",
+    "keep": "إبقاء",
+    "shift": "وردية",
+    "loadFailed": "فشل التحميل",
+    "tomorrow": "غدًا"
   },
   "fields": {
     "name": "الاسم",
@@ -157,7 +166,10 @@
     "score0to100": "النتيجة (0–100)",
     "punctuality0to100": "الالتزام بالمواعيد (0–100)",
     "quality0to100": "الجودة (0–100)",
-    "attitude0to100": "السلوك (0–100)"
+    "attitude0to100": "السلوك (0–100)",
+    "hotelNamePlaceholder": "مثال: Grand Central Hotel",
+    "groupNamePlaceholder": "مثال: المنطقة الشمالية",
+    "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -184,7 +196,14 @@
     "myOnboarding": "انضمامي",
     "reviewQueue": "قائمة المراجعة",
     "docs": "المستندات",
-    "explore": "استكشاف"
+    "explore": "استكشاف",
+    "jobs": "الوظائف",
+    "sickVacation": "مرض / إجازة",
+    "alerts": "التنبيهات",
+    "queue": "قائمة الانتظار",
+    "attendanceDetail": "تفاصيل الحضور",
+    "qualityCheck": "فحص الجودة",
+    "rateWorker": "تقييم العامل"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -221,7 +240,9 @@
     "notYetLogged": "لم يُسجَّل بعد.",
     "awaitingSignature": "بانتظار التوقيع",
     "alreadyFilled": "مكتمل بالفعل",
-    "inProgress": "قيد التنفيذ"
+    "inProgress": "قيد التنفيذ",
+    "present": "حاضر",
+    "late": "متأخر"
   },
   "assignments": {
     "shiftDetails": "تفاصيل الوردية",
@@ -346,7 +367,14 @@
     "network": "تعذر الوصول إلى الخادم. تحقق من اتصالك.",
     "notFound": "غير موجود.",
     "forbidden": "ليس لديك صلاحية الوصول إلى هذا.",
-    "title": "خطأ"
+    "title": "خطأ",
+    "unexpectedRecovery": "حدث خطأ غير متوقع. يمكنك المحاولة مرة أخرى أو العودة إلى لوحة التحكم.",
+    "pageNotFound": "الصفحة غير موجودة",
+    "pageNotFoundDescription": "الصفحة التي تبحث عنها غير موجودة أو تم نقلها.",
+    "tooManyRequests": "طلبات كثيرة جدًا. يرجى الانتظار قبل المحاولة مرة أخرى.",
+    "sessionRevoked": "تم إلغاء جلستك. يرجى تسجيل الدخول مرة أخرى.",
+    "sessionExpired": "انتهت الجلسة. يرجى تسجيل الدخول مرة أخرى.",
+    "requestFailed": "فشل الطلب"
   },
   "shifts": {
     "checkIn": "تسجيل الحضور",
@@ -365,7 +393,10 @@
     "roomsCompleted": "الغرف المنجزة",
     "offer": "عرض وردية",
     "offerNotFound": "لم يتم العثور على العرض.",
-    "detailsTitle": "تفاصيل الوردية"
+    "detailsTitle": "تفاصيل الوردية",
+    "upcomingTitle": "الورديات القادمة",
+    "offerNoLongerOpen": "لم يعد هذا العرض متاحاً.",
+    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر."
   },
   "jobs": {
     "none": "لم يتم العثور على وظائف متاحة.",
@@ -380,7 +411,8 @@
     "filled": "مكتمل",
     "position": "المنصب",
     "pay": "الأجر",
-    "offerBadge": "عرض"
+    "offerBadge": "عرض",
+    "noLongerOpen": "لم تعد هذه الوظيفة متاحة."
   },
   "documents": {
     "title": "المستندات",
@@ -403,7 +435,11 @@
     "loadFailed": "تعذر تحميل المستندات.",
     "deleteAction": "حذف",
     "uploadAction": "رفع",
-    "fileTooLarge": "يتجاوز الملف حد 10 ميجابايت."
+    "fileTooLarge": "يتجاوز الملف حد 10 ميجابايت.",
+    "uploadFirstHint": "ارفع مستندك الأول للبدء.",
+    "uploadFailed": "فشل التحميل. يرجى المحاولة مرة أخرى.",
+    "unsupportedType": "نوع ملف غير مدعوم. المسموح: PDF، JPEG، PNG، WEBP.",
+    "exceedsMaxSize": "يتجاوز الملف الحجم الأقصى 10 ميغابايت."
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -438,7 +474,12 @@
     "bothDatesRequired": "كلا تاريخي الفترة مطلوبان.",
     "periodEndAfterStart": "يجب أن تكون نهاية الفترة في تاريخ بداية الفترة أو بعده.",
     "templateStartRequired": "القالب والمنصب وتاريخ البدء مطلوبة.",
-    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده."
+    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده.",
+    "requestPayslip": "طلب كشف راتب",
+    "noContractYet": "ليس لديك عقد في النظام بعد.",
+    "noPayslipsRequestedYet": "لم تطلب أي كشوف رواتب بعد.",
+    "dataLoadFailed": "لم يتمكن من تحميل بيانات الموارد البشرية.",
+    "payslipConfirm": "هل ترغب في طلب قسيمة راتبك لـ {{period}}؟"
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -451,7 +492,16 @@
     "loadFailed": "تعذر تحميل حالة موافقتك.",
     "history": "سجل الموافقات",
     "auditTrail": "سجل التدقيق",
-    "loadOneFailed": "تعذر تحميل حالة موافقتك."
+    "loadOneFailed": "تعذر تحميل حالة موافقتك.",
+    "couldNotLoadStatus": "لم يتمكن من تحميل حالة الموافقة.",
+    "couldNotLoadNotice": "لم يتمكن من تحميل الإشعار.",
+    "couldNotRecordDecision": "لم يتمكن من تسجيل قرارك.",
+    "couldNotWithdraw": "لم يتمكن من سحب الموافقة.",
+    "statusGranted": "ممنوح",
+    "statusDeclined": "مرفوض",
+    "statusUndecided": "لم يُحدَّد بعد",
+    "decidedAt": "تم القرار {{when}} · إشعار {{version}}",
+    "declinedPreviously": "لقد رفضت هذا الإشعار في {{when}}. يمكنك مراجعته أدناه مرة أخرى."
   },
   "notifications": {
     "title": "الإشعارات",
@@ -465,11 +515,14 @@
     "loadFailed": "تعذر تحميل الإشعارات. يرجى المحاولة مرة أخرى.",
     "viewAllAction": "عرض جميع الإشعارات",
     "markReadHint": "ضع علامة مقروء على هذا الإشعار بمجرد اطلاعك عليه.",
-    "allCaughtUp": "لقد اطلعت على كل شيء."
+    "allCaughtUp": "لقد اطلعت على كل شيء.",
+    "tapToMarkRead": "اضغط للوضع كمقروء",
+    "noneYet": "لا توجد إشعارات بعد."
   },
   "leaderboard": {
     "none": "لا توجد بيانات لوحة الصدارة بعد.",
-    "view": "عرض لوحة الصدارة"
+    "view": "عرض لوحة الصدارة",
+    "topPerformers": "الأفضل أداءً مرتبين حسب متوسط التقييم"
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -520,7 +573,12 @@
     "absencesLoadFailed": "تعذر تحميل حالات غيابك.",
     "reasonRequiredVacation": "السبب مطلوب لغياب الإجازة.",
     "roomsWholeNumber": "أدخل عدداً صحيحاً من الغرف (0 أو أكثر).",
-    "dateRequired": "التاريخ مطلوب."
+    "dateRequired": "التاريخ مطلوب.",
+    "viewDay": "يوم",
+    "viewWeek": "أسبوع",
+    "viewMonth": "شهر",
+    "sickOrVacation": "مرض / إجازة",
+    "yourMarkedDays": "أيامك المسجَّلة"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
@@ -579,7 +637,8 @@
     "sendResetLink": "إرسال رابط إعادة التعيين",
     "revokeSessionsAction": "إلغاء الجلسات",
     "deactivateAction": "إلغاء التفعيل",
-    "employeeManagement": "إدارة الموظفين"
+    "employeeManagement": "إدارة الموظفين",
+    "revokeAccessFor": "يؤدي هذا إلى إلغاء وصول <name>{{name}}</name>. يمكنك إعادة تفعيل الحساب من شاشة التعديل."
   },
   "requests": {
     "title": "طلب عمل",
@@ -676,7 +735,9 @@
     "noPermissionCreateUsers": "ليس لديك إذن لإنشاء مستخدمين.",
     "noContractYet": "لم يُصدر لك عقد بعد. تواصل مع مديرك.",
     "downloadContract": "تنزيل العقد",
-    "completeOnboardingAction": "أكمل انضمامك"
+    "completeOnboardingAction": "أكمل انضمامك",
+    "contractExpiredNotice": "انتهت صلاحية عقدك. يرجى بدء عملية إعادة الانضمام لاستلام عقد جديد ورفعه.",
+    "rejectionReasonPlaceholder": "مثال: تم رفع مستند غير صالح"
   },
   "analytics": {
     "myPerformance": "أدائي",
@@ -741,7 +802,14 @@
     "noneFound": "لم يتم العثور على سجلات حضور",
     "viewAssignment": "عرض المهمة",
     "saveReview": "حفظ المراجعة",
-    "loadFailed": "تعذر تحميل الحضور. يرجى المحاولة مرة أخرى."
+    "loadFailed": "تعذر تحميل الحضور. يرجى المحاولة مرة أخرى.",
+    "checkedInUseAssignment": "تم تسجيل حضورك. استخدم <assignmentLink>صفحة المهمة</assignmentLink> لتسجيل الانصراف وإنهاء ورديتك.",
+    "queueTitle": "قائمة الحضور",
+    "verifyTitleAction": "التحقق من الحضور",
+    "verificationNotesPlaceholder": "ملاحظات التحقق (اختياري)…",
+    "verifiedMark": "تم التحقق ✓",
+    "verifiedBody": "تم التحقق من الحضور.",
+    "verifyFailed": "فشل التحقق"
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",
@@ -770,7 +838,9 @@
     "deleteAction": "حذف",
     "reasonRequired": "السبب مطلوب.",
     "idAndReasonRequired": "معرّف الموظف والسبب مطلوبان كلاهما.",
-    "signedContractReceived": "تم استلام العقد الموقع — ستؤكده الموافقة."
+    "signedContractReceived": "تم استلام العقد الموقع — ستؤكده الموافقة.",
+    "editSkillsHint": "حدد المهارات المؤهل لها هذا الموظف. تتم مطابقة عمليات البث بناءً على هذه المهارات.",
+    "deletionReasonPlaceholder": "مثال: استقال، انتهى العقد"
   },
   "compliance": {
     "exportDescription": "ينشئ نسخة من مستنداتك وسجل موافقاتك وسجل تدقيق حسابك.",
@@ -778,5 +848,62 @@
   },
   "archive": {
     "description": "الفنادق ومجموعات الفنادق التي أُزيلت من التشغيل. يُحتفظ بالسجل — الاستعادة تجعل الكيان متاحاً فوراً."
+  },
+  "lifecycle": {
+    "hotel": {
+      "deleted": "فندق محذوف",
+      "deactivate": "إلغاء تفعيل الفندق",
+      "reactivate": "إعادة تفعيل الفندق",
+      "pauseHint": "يوقف هذا الفندق مؤقتاً. يتوقف ظهوره للموظفين ويُغلق أمام التوظيف الجديد، ويمكن إعادة تفعيله في أي وقت.",
+      "pausedHint": "هذا الفندق متوقف مؤقتاً. إعادة التفعيل تجعله متاحاً على الفور.",
+      "deleteTitle": "حذف الفندق",
+      "updateFailed": "تعذر تحديث هذا الفندق. يرجى المحاولة مرة أخرى.",
+      "deleteHint": "يزيل هذا الفندق من العمليات بالكامل: لن يظهر في أي مكان ولا يمكن توظيفه."
+    },
+    "hotelGroup": {
+      "deleted": "مجموعة فنادق محذوفة",
+      "deactivate": "إلغاء تفعيل مجموعة الفنادق",
+      "reactivate": "إعادة تفعيل مجموعة الفنادق",
+      "pauseHint": "يوقف مجموعة الفنادق هذه مؤقتاً. تتوقف عن الظهور للموظفين وتُغلق أمام التوظيف الجديد، ويمكن إعادة تفعيلها في أي وقت.",
+      "pausedHint": "مجموعة الفنادق هذه متوقفة مؤقتاً. إعادة التفعيل تجعلها متاحة على الفور.",
+      "deleteTitle": "حذف مجموعة الفنادق",
+      "updateFailed": "تعذر تحديث مجموعة الفنادق هذه. يرجى المحاولة مرة أخرى.",
+      "deleteHint": "يزيل هذا مجموعة الفنادق من العمليات بالكامل: لن تظهر في أي مكان ولا يمكن توظيفها."
+    },
+    "nothingErased": "لا يتم محو أي شيء. يتم الحفاظ على السجل ويمكن للمسؤول استعادته من عرض الأرشيف."
+  },
+  "quality": {
+    "outcome": "النتيجة",
+    "determinedByScore": "يُحدَّد بناءً على الدرجة",
+    "submitVerification": "إرسال التحقق",
+    "describeFindingsPlaceholder": "صف النتائج…",
+    "outcomePASSED": "ناجح",
+    "outcomeNEEDS_REWORK": "يحتاج إعادة عمل",
+    "outcomeFAILED": "فاشل",
+    "recorded": "تم تسجيل فحص الجودة.",
+    "submitFailed": "فشل الإرسال"
+  },
+  "ratings": {
+    "comment": "تعليق",
+    "submit": "إرسال التقييم",
+    "feedbackPlaceholder": "اكتب ملاحظاتك…",
+    "stars1to5": "التقييم (١–٥ نجوم)",
+    "score1": "ضعيف",
+    "score2": "مقبول",
+    "score3": "جيد",
+    "score4": "جيد جدًا",
+    "score5": "ممتاز",
+    "recorded": "تم تسجيل التقييم.",
+    "submitFailed": "فشل الإرسال",
+    "workerIdMissing": "معرّف العامل مفقود من الرابط"
+  },
+  "absences": {
+    "kindSICK": "مرض",
+    "kindVACATION": "إجازة",
+    "withdrawTitle": "إلغاء {{kind}}؟",
+    "withdrawBody": "لن يعد {{day}} مُعلَّمًا {{kind}}. الوردية الملغاة لهذا اليوم لا تُستعاد تلقائيًا.",
+    "withdrawA11y": "إلغاء {{kind}} في {{day}}",
+    "markFailed": "لم يتمكن من تسجيل الغياب.",
+    "withdrawFailed": "لم يتمكن من إلغاء الغياب."
   }
 }

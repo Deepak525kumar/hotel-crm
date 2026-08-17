@@ -170,7 +170,7 @@ function NewWorkRequestForm() {
               required
               value={form.position}
               onChange={(e) => set("position", e.target.value)}
-              placeholder="e.g. Housekeeper"
+              placeholder={t("fields.jobTitlePlaceholder")}
             />
 
             <div className="grid gap-4 sm:grid-cols-2">

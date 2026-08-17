@@ -34,9 +34,7 @@ export function DocumentItem({ document }: { document: WorkerDocument }) {
             <ThemedText type="linkPrimary">{t('documents.view')}</ThemedText>
           </Pressable>
         ) : (
-          <ThemedText type="small" themeColor="textSecondary">
-            Unavailable
-          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
         )}
       </ThemedView>
     </ThemedView>

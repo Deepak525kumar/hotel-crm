@@ -8,10 +8,15 @@ import { api, ApiError } from '@/lib/api';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
 import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
-const KIND_LABEL: Record<CalendarAbsenceKind, string> = {
-  SICK: 'Sick',
-  VACATION: 'Vacation',
+// Keys, not nouns: the label is resolved with t() at the point of render so a
+// language change repaints it. Both the badge and the confirm dialog read from
+// here, which is why the dialog interpolates the resolved label rather than
+// composing an English sentence out of fragments.
+const KIND_LABEL_KEY: Record<CalendarAbsenceKind, string> = {
+  SICK: 'absences.kindSICK',
+  VACATION: 'absences.kindVACATION',
 };
 
 const KIND_COLOR: Record<CalendarAbsenceKind, string> = {
@@ -28,6 +33,7 @@ function AbsenceCard({
   onWithdraw: (item: CalendarAbsence) => void;
   withdrawing: boolean;
 }) {
+  const { t } = useTranslation();
   const color = KIND_COLOR[item.kind];
   // The backend refuses to delete a past absence, so offering the action on
   // one would only ever produce an error. Same rule the web app applies.
@@ -39,14 +45,17 @@ function AbsenceCard({
         <ThemedText type="smallBold">{formatDay(item.day)}</ThemedText>
         <ThemedView style={[styles.badge, { backgroundColor: color }]} type="backgroundElement">
           <ThemedText type="small" style={styles.badgeText}>
-            {KIND_LABEL[item.kind]}
+            {t(KIND_LABEL_KEY[item.kind])}
           </ThemedText>
         </ThemedView>
       </ThemedView>
       {!isPast && (
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={`Withdraw ${KIND_LABEL[item.kind].toLowerCase()} on ${formatDay(item.day)}`}
+          accessibilityLabel={t('absences.withdrawA11y', {
+            kind: t(KIND_LABEL_KEY[item.kind]).toLowerCase(),
+            day: formatDay(item.day),
+          })}
           onPress={() => onWithdraw(item)}
           disabled={withdrawing}
           style={({ pressed }) => [styles.withdrawButton, { opacity: pressed || withdrawing ? 0.6 : 1 }]}
@@ -54,9 +63,7 @@ function AbsenceCard({
           {withdrawing ? (
             <ActivityIndicator size="small" />
           ) : (
-            <ThemedText type="small" style={styles.withdrawText}>
-              Withdraw
-            </ThemedText>
+            <ThemedText type="small" style={styles.withdrawText}>{t("consent.withdraw")}</ThemedText>
           )}
         </Pressable>
       )}
@@ -65,6 +72,7 @@ function AbsenceCard({
 }
 
 export default function AbsencesScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [items, setItems] = useState<CalendarAbsence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,12 +114,12 @@ export default function AbsencesScreen() {
         await api.calendar.markAbsence({ day, kind });
         await load();
       } catch (error) {
-        setErrorMessage(error instanceof ApiError ? error.message : 'Could not mark absence.');
+        setErrorMessage(error instanceof ApiError ? error.message : t('absences.markFailed'));
       } finally {
         setMarking(null);
       }
     },
-    [load]
+    [load, t]
   );
 
   // Confirmed before firing: withdrawing does NOT restore a shift that was
@@ -120,12 +128,15 @@ export default function AbsencesScreen() {
   const handleWithdraw = useCallback(
     (item: CalendarAbsence) => {
       Alert.alert(
-        `Withdraw ${KIND_LABEL[item.kind].toLowerCase()}?`,
-        `${formatDay(item.day)} will no longer be marked ${KIND_LABEL[item.kind].toLowerCase()}. A shift cancelled for this day is not automatically restored.`,
+        t('absences.withdrawTitle', { kind: t(KIND_LABEL_KEY[item.kind]).toLowerCase() }),
+        t('absences.withdrawBody', {
+          day: formatDay(item.day),
+          kind: t(KIND_LABEL_KEY[item.kind]).toLowerCase(),
+        }),
         [
-          { text: 'Keep', style: 'cancel' },
+          { text: t('common.keep'), style: 'cancel' },
           {
-            text: 'Withdraw',
+            text: t('consent.withdraw'),
             style: 'destructive',
             onPress: async () => {
               setErrorMessage(null);
@@ -135,7 +146,7 @@ export default function AbsencesScreen() {
                 await load();
               } catch (error) {
                 setErrorMessage(
-                  error instanceof ApiError ? error.message : 'Could not withdraw absence.'
+                  error instanceof ApiError ? error.message : t('absences.withdrawFailed')
                 );
               } finally {
                 setWithdrawingId(null);
@@ -145,7 +156,7 @@ export default function AbsencesScreen() {
         ]
       );
     },
-    [load]
+    [load, t]
   );
 
   const isMarking = (daysFromToday: 0 | 1, kind: CalendarAbsenceKind) =>
@@ -154,15 +165,13 @@ export default function AbsencesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>
-          Sick / Vacation
-        </ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t("calendar.sickOrVacation")}</ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.actionsCard}>
           {([0, 1] as const).map((daysFromToday) => (
             <ThemedView key={daysFromToday} style={styles.actionRow} type="backgroundElement">
               <ThemedText type="small" style={styles.flex}>
-                {daysFromToday === 0 ? 'Today' : 'Tomorrow'}
+                {daysFromToday === 0 ? t('common.today') : t('common.tomorrow')}
               </ThemedText>
               {(['SICK', 'VACATION'] as const).map((kind) => (
                 <Pressable
@@ -178,7 +187,7 @@ export default function AbsencesScreen() {
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <ThemedText type="small" style={styles.actionButtonText}>
-                      {KIND_LABEL[kind]}
+                      {t(KIND_LABEL_KEY[kind])}
                     </ThemedText>
                   )}
                 </Pressable>
@@ -193,9 +202,7 @@ export default function AbsencesScreen() {
           </ThemedText>
         )}
 
-        <ThemedText type="small" themeColor="textSecondary" style={styles.listHeader}>
-          Your marked days
-        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.listHeader}>{t("calendar.yourMarkedDays")}</ThemedText>
 
         {loading ? (
           <ActivityIndicator style={styles.loader} color={theme.text} />
@@ -212,9 +219,7 @@ export default function AbsencesScreen() {
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  No sick or vacation days marked.
-                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t("profile.noAbsences")}</ThemedText>
               </ThemedView>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -250,11 +255,16 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.two, padding: Spacing.three },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   badge: { borderRadius: Spacing.one, paddingHorizontal: Spacing.two, paddingVertical: 2 },
+  // `Spacing.xs` / `Spacing.sm` do not exist on this app's scale (it is
+  // half/one/two/three/...), so these three values were `undefined` and the
+  // button rendered with no spacing at all. The syntax error above masked the
+  // type errors that would have caught it -- tsc stopped at the parse failure
+  // and never checked the rest of the file. Mapped to the nearest real steps.
   withdrawButton: {
     alignSelf: 'flex-start',
-    marginTop: Spacing.xs,
-    paddingVertical: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
+    marginTop: Spacing.one,
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
   },
   withdrawText: {
     textDecorationLine: 'underline',

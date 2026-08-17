@@ -9,10 +9,16 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export type CalendarView = "day" | "week" | "month";
 
-export const VIEW_OPTIONS: { value: CalendarView; label: string }[] = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
+/**
+ * `labelKey` is an i18n key, not copy -- resolve it with `t()` at the point of
+ * render. Holding literal English here is what left the calendar's day/week/
+ * month toggle in English in every locale, the same defect class already fixed
+ * in `lib/skills.ts` and `useMyOnboarding`.
+ */
+export const VIEW_OPTIONS: { value: CalendarView; labelKey: string }[] = [
+  { value: "day", labelKey: "calendar.viewDay" },
+  { value: "week", labelKey: "calendar.viewWeek" },
+  { value: "month", labelKey: "calendar.viewMonth" },
 ];
 
 /** YYYY-MM-DD in the local timezone (matches the backend's date-only day field). */

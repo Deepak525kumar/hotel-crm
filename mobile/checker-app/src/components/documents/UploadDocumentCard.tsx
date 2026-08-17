@@ -6,10 +6,11 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
-const CATEGORY_LABEL: Record<DocumentCategory, string> = {
-  GENERAL: 'General',
-  WORK_PERMIT: 'Work permit',
+const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
+  GENERAL: 'documents.categoryGENERAL',
+  WORK_PERMIT: 'documents.categoryWORK_PERMIT',
 };
 
 export function UploadDocumentCard({
@@ -19,6 +20,7 @@ export function UploadDocumentCard({
   workerId: string;
   onUploaded: (doc: WorkerDocument) => void;
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [category, setCategory] = useState<DocumentCategory>('GENERAL');
   const [isWorkPermit, setIsWorkPermit] = useState(false);
@@ -49,15 +51,11 @@ export function UploadDocumentCard({
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold" style={styles.header}>
-        Upload document
-      </ThemedText>
+      <ThemedText type="smallBold" style={styles.header}>{t("documents.uploadTitle")}</ThemedText>
 
       {!pending ? (
         <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, { opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText type="small" style={styles.pickButtonText}>
-            Choose file
-          </ThemedText>
+          <ThemedText type="small" style={styles.pickButtonText}>{t("documents.chooseFile")}</ThemedText>
         </Pressable>
       ) : (
         <>
@@ -66,9 +64,7 @@ export function UploadDocumentCard({
               {pending.name}
             </ThemedText>
             <Pressable onPress={clearPending} disabled={uploading}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Remove
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("common.remove")}</ThemedText>
             </Pressable>
           </ThemedView>
 
@@ -90,7 +86,7 @@ export function UploadDocumentCard({
                   type="small"
                   style={category === c ? { color: theme.background } : undefined}
                 >
-                  {CATEGORY_LABEL[c]}
+                  {t(CATEGORY_LABEL_KEY[c])}
                 </ThemedText>
               </Pressable>
             ))}
@@ -102,7 +98,7 @@ export function UploadDocumentCard({
               disabled={uploading}
               style={styles.row}
             >
-              <ThemedText type="small">Non-EU/EEA/Swiss work-permit document</ThemedText>
+              <ThemedText type="small">{t("documents.nonEuWorkPermit")}</ThemedText>
               <ThemedText type="small" themeColor={isWorkPermit ? 'text' : 'textSecondary'}>
                 {isWorkPermit ? '✓' : ''}
               </ThemedText>
@@ -112,7 +108,7 @@ export function UploadDocumentCard({
           <TextInput
             value={expiresAt}
             onChangeText={setExpiresAt}
-            placeholder="Expiry date (optional, YYYY-MM-DD)"
+            placeholder={t('documents.expiryPlaceholder')}
             placeholderTextColor={theme.textSecondary}
             editable={!uploading}
             style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -135,7 +131,7 @@ export function UploadDocumentCard({
               <ActivityIndicator color={theme.background} size="small" />
             ) : (
               <ThemedText type="small" style={{ color: theme.background }}>
-                {error ? 'Retry upload' : 'Upload'}
+                {error ? t('documents.retryUpload') : t('documents.upload')}
               </ThemedText>
             )}
           </Pressable>

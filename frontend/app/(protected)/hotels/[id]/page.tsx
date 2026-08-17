@@ -189,7 +189,7 @@ export default function HotelDetailPage() {
 
           <HotelWriteGate>
             <LifecycleCard
-              label="hotel"
+              entity="hotel"
               isActive={hotel.is_active}
               deletedAt={hotel.deleted_at ?? null}
               onDeactivate={() => runLifecycle(() => hotelsApi.deactivate(id))}

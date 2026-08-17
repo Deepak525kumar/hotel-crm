@@ -31,7 +31,7 @@ import {
 } from "@/components/ui";
 import { BackLink } from "@/components/ui/BackLink";
 import type { AttendanceReviewStatus } from "@/lib/types";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 
 const REVIEW_STATUSES = [
   { value: "PRESENT", label: "Present" },
@@ -205,11 +205,16 @@ export default function AttendanceDetailPage() {
         <Card>
           <CardContent className="flex items-center justify-between gap-4">
             <div className="text-sm text-gray-600 dark:text-gray-300">
-              You are checked in. Use the{" "}
-              <TextLink href={`/assignments/${record.assignment_id}`}>
-                assignment page
-              </TextLink>{" "}
-              to check out and complete your shift.
+              {/* <Trans> rather than t(): the sentence wraps a link, and the
+                  link's position within it differs by language. Splitting it
+                  into "prefix" + "link text" + "suffix" keys would force every
+                  locale into English word order. */}
+              <Trans
+                i18nKey="attendance.checkedInUseAssignment"
+                components={{
+                  assignmentLink: <TextLink href={`/assignments/${record.assignment_id}`} />,
+                }}
+              />
             </div>
           </CardContent>
         </Card>
