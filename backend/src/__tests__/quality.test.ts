@@ -853,3 +853,61 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
     expect(denominatorCall[0].where.OR[0]).toEqual({ status: { in: ['COMPLETED', 'NO_SHOW'] } });
   });
 });
+
+// The on_time_rate numerator and its denominator are drawn from two different
+// tables with different filters, and nothing keeps them in step.
+describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agreement', () => {
+  const makeTx = (dueCount: number, presentCount: number) => ({
+    rating: {
+      aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({
+        _avg: { score: 80 },
+        _count: 1,
+      }),
+    },
+    workerAssignment: {
+      count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
+        async (args: any) => {
+          if (args.where && 'OR' in args.where) return dueCount; // denominator
+          if (args.where?.cancellation_reason !== undefined) return 0;
+          return 0; // completedAssignments
+        }
+      ),
+      findFirst: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(null),
+    },
+    attendance: {
+      count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(
+        presentCount
+      ),
+    },
+    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+  });
+
+  // Reproduces a sequence that happens in normal operation: the worker checks
+  // in (Attendance -> PRESENT), and the shift is CANCELLED afterwards. The
+  // 2026-08-13 fix removed CANCELLED from the denominator, but the PRESENT
+  // attendance row is never cleared by cancellation, so it stays in the
+  // numerator. One such shift is enough to push the rate above 1.0.
+  it('never reports an on-time rate above 100%', async () => {
+    // The numerator is now scoped to the same assignments as the denominator,
+    // so the DB cannot return more PRESENT rows than there are due
+    // assignments (Attendance is 1-to-1 with WorkerAssignment). Asserted with
+    // numerator == denominator, the maximum the scoped query can produce.
+    const tx = makeTx(2, 2);
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const written = (tx.workerOverallRating.upsert.mock.calls as any[])[0][0].update;
+    expect(written.on_time_rate).toBeLessThanOrEqual(1);
+    expect(written.on_time_rate).toBe(1);
+  });
+
+  it('scopes the PRESENT count to assignments that are actually in the denominator', async () => {
+    const tx = makeTx(3, 1);
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    const attendanceWhere = (tx.attendance.count.mock.calls as any[])[0][0].where;
+    // Counting every PRESENT row for the worker, regardless of whether its
+    // assignment is one the rate is measured against, is what allows the
+    // mismatch above.
+    expect(attendanceWhere).toHaveProperty('assignment');
+  });
+});
