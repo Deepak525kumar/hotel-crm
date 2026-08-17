@@ -31,6 +31,11 @@ const CODE_KEYS: Record<string, string> = {
   TOKEN_REVOKED: 'errors.sessionRevoked',
   REFRESH_FAILED: 'errors.refreshFailed',
   UNKNOWN: 'errors.requestFailed',
+  // RULE-CONSENT-01: the daily consent gate refused this call. The client
+  // gate normally renders before any gated request is made, so this string
+  // is the fallback for a 403 arriving mid-session (a day rollover, or a
+  // notice-version bump, while the app is open).
+  CONSENT_REQUIRED: 'errors.consentRequired',
 };
 
 export function translateApiError(

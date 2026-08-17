@@ -374,7 +374,8 @@
     "sessionRevoked": "Ihre Sitzung wurde widerrufen. Bitte melden Sie sich erneut an.",
     "sessionExpired": "Sitzung abgelaufen. Bitte melden Sie sich erneut an.",
     "requestFailed": "Anfrage fehlgeschlagen",
-    "refreshFailed": "Token-Aktualisierung fehlgeschlagen"
+    "refreshFailed": "Token-Aktualisierung fehlgeschlagen",
+    "consentRequired": "Vor dem Fortfahren ist die tägliche Einwilligung erforderlich."
   },
   "shifts": {
     "checkIn": "Einchecken",
@@ -501,7 +502,14 @@
     "statusDeclined": "Abgelehnt",
     "statusUndecided": "Noch nicht entschieden",
     "decidedAt": "Entschieden {{when}} · Hinweis {{version}}",
-    "declinedPreviously": "Sie haben diesen Hinweis am {{when}} abgelehnt. Sie können ihn unten erneut prüfen."
+    "declinedPreviously": "Sie haben diesen Hinweis am {{when}} abgelehnt. Sie können ihn unten erneut prüfen.",
+    "gateTitle": "Tägliche Datenschutzinformation",
+    "gateBody": "Bitte lesen und akzeptieren Sie die heutige Datenschutzinformation, um fortzufahren. Dies ist einmal täglich erforderlich.",
+    "lockedTitle": "Zugriff für heute pausiert",
+    "lockedBody": "Sie haben die heutige Datenschutzinformation abgelehnt und können die App heute nicht nutzen. Ihre Führungskraft wurde benachrichtigt. Sie können unten weiterhin zustimmen, um wieder Zugriff zu erhalten.",
+    "lockedAccept": "Lesen und akzeptieren",
+    "gateLoadFailed": "Die Datenschutzinformation konnte nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+    "gateRetry": "Erneut versuchen"
   },
   "notifications": {
     "title": "Benachrichtigungen",
