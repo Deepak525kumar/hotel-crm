@@ -180,6 +180,38 @@ const envSchema = z.object({
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
   FEATURE_EMPLOYMENT_RECORD: strictBooleanFlag(false),
 
+  // RULE-CONSENT-01 daily-access-gate enforcement. Blocks every non-admin API
+  // call until that user has granted today's consent.
+  //
+  // Default ON (owner decision, 2026-08-18): this ships as part of the first
+  // version, so there is no older, gate-unaware client already in the field to
+  // strand on a 403 it cannot act on -- the concern that would otherwise force
+  // a staged rollout. Every client in this release renders the notice.
+  //
+  // Set FEATURE_CONSENT_GATE=false to disable; CONSENT_GATE_ROLES narrows it
+  // without disabling. See docs/04-implementation/CONSENT_GATE_ROLLOUT.md.
+  //
+  // strictBooleanFlag, not z.coerce.boolean(), is load-bearing here -- that
+  // helper exists because coercion turned the string "false" into true, and
+  // for this flag specifically that bug would mean being unable to turn the
+  // gate off during an incident.
+  FEATURE_CONSENT_GATE: strictBooleanFlag(true),
+
+  // Narrower kill switch than the flag itself: the roles the gate applies to.
+  // Lets an operator drop `manager,regional_manager` under fire, keeping the
+  // worker-facing GDPR obligation live while unblocking the people who
+  // administer the system. `admin` is never gated regardless of this value --
+  // an unrecoverable platform needs someone left who can fix it.
+  CONSENT_GATE_ROLES: z
+    .string()
+    .default('worker,checker,manager,regional_manager')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((r) => r.trim().toLowerCase())
+        .filter((r) => r.length > 0 && r !== 'admin')
+    ),
+
   // Regional Manager role cutover flag (ADR-030 §6 PR-2, D-6).
   // Defaults FALSE: the REGIONAL_MANAGER enum value exists (M-1, additive and
   // irreversible) but M-3's promotion of existing group-associated managers

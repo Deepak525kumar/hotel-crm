@@ -53,8 +53,11 @@ replace them.
 | 06 | `scenarios/06-edge-cases-ambiguity.md` | Deactivation, reassignment, stale state, feature flags |
 | 07 | `scenarios/07-frontend-ui-playwright.md` | Browser-driven UI walkthrough (Playwright) |
 | 08 | `scenarios/08-known-gaps-and-next.md` | Open defects, untested areas, what to cover next time |
+| 09 | `scenarios/09-retention-sweep.md` | Retention sweep job |
+| 10 | `scenarios/10-calendar-shift-summary.md` | Calendar / daily shift summary |
+| 11 | `scenarios/11-daily-consent-gate.md` | Daily consent gate: enforcement, escape hatches, day rollover |
 
-**Start with 00. Then 01-07 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07 and 09-11 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
 ---

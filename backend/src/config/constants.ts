@@ -61,6 +61,11 @@ export const ERROR_CODES = {
 
   // Forbidden (403)
   FORBIDDEN: 'FORBIDDEN',
+  // RULE-CONSENT-01: the daily GDPR access gate is not satisfied. A 403
+  // distinct from FORBIDDEN because it is not a permissions failure and the
+  // remedy is different -- the caller must present the notice and record a
+  // decision, not request access. Clients key their consent wall on this.
+  CONSENT_REQUIRED: 'CONSENT_REQUIRED',
   NOT_FOUND: 'NOT_FOUND',
   CONFLICT: 'CONFLICT',
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',

@@ -1,6 +1,7 @@
 import { ConsentDecision, OutboxSourceModule, OutboxTransport, Prisma } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ForbiddenError, ValidationError } from '../../lib/errors.js';
+import { invalidateConsentCache } from '../../lib/consent-gate-cache.js';
 import { logger } from '../../lib/logger.js';
 import { notificationService } from '../notifications/service.js';
 import {
@@ -186,6 +187,13 @@ export class ConsentService extends BaseService {
       decision: input.decision,
     });
 
+    // Drop any cached grant so the gate re-reads the real state on the very
+    // next request. Belt-and-braces: only grants are cached, so a DECLINED
+    // could not have been cached anyway -- but this keeps the "accepted and
+    // still locked" class of bug impossible by construction rather than by
+    // reasoning about what the cache happens to hold.
+    invalidateConsentCache(workerId);
+
     return this.toDto(record);
   }
 
@@ -221,6 +229,9 @@ export class ConsentService extends BaseService {
     );
 
     logger.info('consent_withdrawn', { recordId: record.id, workerId, consentInstance });
+
+    // A withdrawal must take effect immediately, not after the cache TTL.
+    invalidateConsentCache(workerId);
 
     return this.toDto(record);
   }
@@ -338,6 +349,22 @@ export class ConsentService extends BaseService {
 // as calendar/service.ts's todayInCalendarTimezone(), applied to an
 // arbitrary Date rather than always "now".
 const CONSENT_TIMEZONE = 'Europe/Berlin';
+
+// Exported so the consent-gate middleware's cache can key on the same
+// Berlin calendar date this module uses to decide "today". A second,
+// independently-written Intl.DateTimeFormat in the middleware would be
+// exactly the kind of duplicate that drifts -- and a drift here means the
+// gate and the status query disagree about what day it is.
+export function consentCalendarDate(d: Date): string {
+  return calendarDateInZone(d);
+}
+
+// The current daily-access-gate notice version, exported for the same
+// reason: the gate's cache must invalidate when a version bump supersedes
+// an existing grant (RULE-CONSENT-02).
+export function currentNoticeVersion(): string {
+  return CURRENT_NOTICE_VERSION;
+}
 
 function calendarDateInZone(d: Date): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: CONSENT_TIMEZONE }).format(d);

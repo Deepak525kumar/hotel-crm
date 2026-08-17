@@ -374,7 +374,8 @@
     "sessionRevoked": "Your session was revoked. Please log in again.",
     "sessionExpired": "Session expired. Please log in again.",
     "requestFailed": "Request failed",
-    "refreshFailed": "Token refresh failed"
+    "refreshFailed": "Token refresh failed",
+    "consentRequired": "Daily consent is required before you can continue."
   },
   "shifts": {
     "checkIn": "Check In",
@@ -501,7 +502,14 @@
     "statusDeclined": "Declined",
     "statusUndecided": "Not yet decided",
     "decidedAt": "Decided {{when}} · notice {{version}}",
-    "declinedPreviously": "You previously declined this notice on {{when}}. You can review it again below."
+    "declinedPreviously": "You previously declined this notice on {{when}}. You can review it again below.",
+    "gateTitle": "Daily data-protection notice",
+    "gateBody": "Please review and accept today’s data-protection notice to continue. This is required once each day.",
+    "lockedTitle": "Access paused for today",
+    "lockedBody": "You declined today’s data-protection notice, so you cannot use the app today. Your manager has been notified. You can still accept below to regain access.",
+    "lockedAccept": "Review and accept",
+    "gateLoadFailed": "Could not load the data-protection notice. Please check your connection and try again.",
+    "gateRetry": "Try again"
   },
   "notifications": {
     "title": "Notifications",

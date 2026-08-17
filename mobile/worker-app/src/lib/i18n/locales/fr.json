@@ -374,7 +374,8 @@
     "sessionRevoked": "Votre session a été révoquée. Veuillez vous reconnecter.",
     "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
     "requestFailed": "Requête échouée",
-    "refreshFailed": "Échec du renouvellement du jeton"
+    "refreshFailed": "Échec du renouvellement du jeton",
+    "consentRequired": "Le consentement quotidien est requis avant de continuer."
   },
   "shifts": {
     "checkIn": "Pointer l'arrivée",
@@ -501,7 +502,14 @@
     "statusDeclined": "Refusé",
     "statusUndecided": "Pas encore décidé",
     "decidedAt": "Décidé {{when}} · avis {{version}}",
-    "declinedPreviously": "Vous avez refusé cet avis le {{when}}. Vous pouvez le consulter à nouveau ci-dessous."
+    "declinedPreviously": "Vous avez refusé cet avis le {{when}}. Vous pouvez le consulter à nouveau ci-dessous.",
+    "gateTitle": "Avis quotidien de protection des données",
+    "gateBody": "Veuillez lire et accepter l’avis de protection des données d’aujourd’hui pour continuer. Cela est requis une fois par jour.",
+    "lockedTitle": "Accès suspendu pour aujourd’hui",
+    "lockedBody": "Vous avez refusé l’avis de protection des données d’aujourd’hui et ne pouvez donc pas utiliser l’application aujourd’hui. Votre responsable a été informé. Vous pouvez toujours accepter ci-dessous pour retrouver l’accès.",
+    "lockedAccept": "Lire et accepter",
+    "gateLoadFailed": "Impossible de charger l’avis de protection des données. Vérifiez votre connexion et réessayez.",
+    "gateRetry": "Réessayer"
   },
   "notifications": {
     "title": "Notifications",

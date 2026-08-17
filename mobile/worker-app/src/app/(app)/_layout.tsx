@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
 import { useTranslation } from 'react-i18next';
+import { ConsentGate } from '@/components/consent/ConsentGate';
 
 export default function AppLayout() {
   const { t } = useTranslation();
@@ -35,93 +36,99 @@ export default function AppLayout() {
     return subscribeToPushNotifications(router);
   }, [router]);
 
+  // RULE-CONSENT-01: the daily notice must be accepted before the worker
+  // can use the system. Wrapping the (app) tree rather than the root layout
+  // for the same reason the push effects live here -- this tree only renders
+  // for a signed-in user, and the consent endpoints are authenticated.
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: { backgroundColor: theme.background },
-        tabBarActiveTintColor: theme.text,
-        tabBarInactiveTintColor: theme.textSecondary,
-      }}
-    >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: t('nav.dashboard'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'house.fill', android: 'home', web: 'home' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
+    <ConsentGate>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: { backgroundColor: theme.background },
+          tabBarActiveTintColor: theme.text,
+          tabBarInactiveTintColor: theme.textSecondary,
         }}
-      />
-      <Tabs.Screen
-        name="marketplace"
-        options={{
-          title: t('nav.jobs'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'briefcase.fill', android: 'work', web: 'work' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="shifts"
-        options={{
-          title: t('nav.myShifts'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="absences"
-        options={{
-          title: t('nav.sickVacation'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'cross.case.fill', android: 'medical_services', web: 'medical_services' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          title: t('nav.alerts'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: t('nav.profile'),
-          tabBarIcon: ({ color, size }) => (
-            <SymbolView
-              name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}
-              tintColor={color}
-              size={size}
-            />
-          ),
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: t('nav.dashboard'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'house.fill', android: 'home', web: 'home' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="marketplace"
+          options={{
+            title: t('nav.jobs'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'briefcase.fill', android: 'work', web: 'work' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="shifts"
+          options={{
+            title: t('nav.myShifts'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="absences"
+          options={{
+            title: t('nav.sickVacation'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'cross.case.fill', android: 'medical_services', web: 'medical_services' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="notifications"
+          options={{
+            title: t('nav.alerts'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: t('nav.profile'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+      </Tabs>
+    </ConsentGate>
   );
 }

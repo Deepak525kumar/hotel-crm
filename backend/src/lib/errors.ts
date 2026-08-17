@@ -45,6 +45,19 @@ export class ForbiddenError extends AppError {
   }
 }
 
+/**
+ * RULE-CONSENT-01 -- today's daily-access-gate consent is absent, declined,
+ * or against a superseded notice version. 403 rather than 401: the caller is
+ * authenticated and known; it is the consent precondition that is unmet.
+ */
+export class ConsentRequiredError extends AppError {
+  constructor(message: string = 'Daily consent is required before using the system') {
+    super(ERROR_CODES.CONSENT_REQUIRED, HTTP_STATUS.FORBIDDEN, message);
+    this.name = 'ConsentRequiredError';
+    Object.setPrototypeOf(this, ConsentRequiredError.prototype);
+  }
+}
+
 export class NotFoundError extends AppError {
   constructor(message: string = 'Resource not found') {
     super(ERROR_CODES.NOT_FOUND, HTTP_STATUS.NOT_FOUND, message);
