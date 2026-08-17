@@ -97,8 +97,26 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       tx.workerAssignment.count({
         where: { worker_id, status: AssignmentStatus.COMPLETED },
       }),
+      // 2026-08-18 fix: scoped to the SAME assignments as the denominator.
+      // This counted every PRESENT row for the worker, while the denominator
+      // (dueAssignmentWhere) excludes CANCELLED/REASSIGNED and future
+      // CONFIRMED shifts -- two different filters over two different tables,
+      // with nothing keeping them in step.
+      //
+      // Cancelling an assignment never clears its Attendance row, so the
+      // normal sequence "worker checks in -> PRESENT -> shift is cancelled"
+      // left the attendance in the numerator while removing the assignment
+      // from the denominator. One such shift is enough to report an on-time
+      // rate above 100%; several make it arbitrarily large. It reads as a
+      // data-integrity bug on the worker's own record, and it inflates their
+      // leaderboard standing rather than harming them, which is why it can
+      // sit unnoticed.
       tx.attendance.count({
-        where: { worker_id, status: AttendanceStatus.PRESENT },
+        where: {
+          worker_id,
+          status: AttendanceStatus.PRESENT,
+          assignment: dueAssignmentWhere,
+        },
       }),
       tx.workerAssignment.findFirst({
         where: {

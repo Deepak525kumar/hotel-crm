@@ -100,6 +100,13 @@ export const NAV: NavItem[] = [
   // last remaining place a manager/RM had no way to browse or open their
   // own group's workers by name/email, despite the API already serving it.
   { href: "/users", label: "Users", labelKey: "nav.users", icon: UsersIcon, roles: ["admin", "manager", "regional_manager"] },
+  // Same class of gap as /users above: /analytics has existed (with the
+  // worker leaderboard and platform stats) with no nav entry pointing at it,
+  // so it was reachable only by typing the URL. Roles match the backend gate
+  // exactly -- GET /analytics/leaderboard and /analytics/stats are
+  // requireRole(['admin','manager','regional_manager']) + analytics:read, so
+  // showing it to a worker or checker would render a page of 403s.
+  { href: "/analytics", label: "Analytics", labelKey: "nav.analytics", icon: BarChart3, roles: ["admin", "manager", "regional_manager"] },
   // Notifications moved to a navbar bell icon (AppShell) -- no longer a
   // sidebar entry.
   // Deliberately last and deliberately unrestricted: settings is per-user
