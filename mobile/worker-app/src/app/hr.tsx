@@ -6,12 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { ContractStatusCard } from '@/components/hr/ContractStatusCard';
 import { PayslipRequestsList } from '@/components/hr/PayslipRequestsList';
 import type { ContractDto, PayslipRequestDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
+import { translateApiError } from '../lib/api-error-i18n';
 
 export default function HRScreen() {
   const { t, i18n } = useTranslation();
@@ -36,7 +37,7 @@ export default function HRScreen() {
       setContract(contractData);
       setRequests(Array.isArray(requestsData) ? requestsData : []);
     } catch (error) {
-      setLoadError(error instanceof ApiError ? error.message : t('hr.dataLoadFailed'));
+      setLoadError(translateApiError(error, t, 'hr.dataLoadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -82,7 +83,7 @@ export default function HRScreen() {
               });
               load(); // Reload to show the new request
             } catch (error) {
-              Alert.alert(t("errors.title"), error instanceof ApiError ? error.message : t('hr.payslipRequestFailed'));
+              Alert.alert(t("errors.title"), translateApiError(error, t, 'hr.payslipRequestFailed'));
             }
           }
         }

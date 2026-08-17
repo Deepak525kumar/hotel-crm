@@ -77,6 +77,14 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly status: number,
+    // SIR-GLOB-022: true when `message` is one of this file's own English
+    // literals rather than text the server sent. The transport layer runs
+    // outside React and has no `t()`, so it cannot translate at throw time —
+    // instead it flags the message as a fallback, and the display layer
+    // (lib/api-error-i18n.ts `translateApiError`) substitutes a translated
+    // string keyed on `code`. A server-supplied message is already localized
+    // server-side and must be shown as-is, so it is never flagged.
+    public readonly isFallbackMessage: boolean = false,
     // ADR-031 D-6/PR-4a: seconds to wait, parsed from the edge's
     // (Nginx/Cloudflare) Retry-After header on a 429. undefined when absent
     // or unparseable — the edge is the sole source of rate limiting (no
@@ -151,6 +159,7 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
         'RATE_LIMITED',
         'Too many requests. Please wait before trying again.',
         429,
+        true,
         parseRetryAfter(res),
       );
     }
@@ -158,6 +167,7 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
       body.error?.code ?? 'REFRESH_FAILED',
       body.error?.message ?? 'Token refresh failed',
       res.status,
+      body.error?.message == null,
     );
   }
   const body = await res.json();
@@ -200,6 +210,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         'RATE_LIMITED',
         'Too many requests. Please wait before trying again.',
         429,
+        true,
         parseRetryAfter(res),
       );
     }
@@ -213,6 +224,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         TOKEN_REVOKED_CODE,
         body.error?.message ?? 'Your session was revoked. Please log in again.',
         401,
+        body.error?.message == null,
       );
     }
 
@@ -230,7 +242,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       } catch {
         // Server rejected the refresh token — genuine session expiry.
         await _onAuthFailure?.();
-        throw new ApiError('SESSION_EXPIRED', 'Session expired. Please log in again.', 401);
+        throw new ApiError('SESSION_EXPIRED', 'Session expired. Please log in again.', 401, true);
       }
 
       // Refresh succeeded — update in-memory tokens before any await.
@@ -257,6 +269,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             'RATE_LIMITED',
             'Too many requests. Please wait before trying again.',
             429,
+            true,
             parseRetryAfter(retryRes),
           );
         }
@@ -270,12 +283,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             TOKEN_REVOKED_CODE,
             retryBody.error?.message ?? 'Your session was revoked. Please log in again.',
             401,
+            retryBody.error?.message == null,
           );
         }
         throw new ApiError(
           retryBody.error?.code ?? 'UNKNOWN',
           retryBody.error?.message ?? 'Request failed',
           retryRes.status,
+          retryBody.error?.message == null,
         );
       }
       const retryBody = await retryRes.json();
@@ -286,6 +301,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       body.error?.code ?? 'UNKNOWN',
       body.error?.message ?? 'Request failed',
       res.status,
+      body.error?.message == null,
     );
   }
 

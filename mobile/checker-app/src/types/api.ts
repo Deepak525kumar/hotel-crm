@@ -164,3 +164,95 @@ export interface CalendarAbsence {
   created_at: string;
   updated_at: string;
 }
+
+
+// --- Ported from worker-app (2026-08-18): the consent/documents/hr screens
+// in this app imported these types, which had never existed here. They were
+// invisible because tsconfig.test.json never included src/app/** — see the
+// CI include fix in the same change.
+export const DAILY_ACCESS_GATE_INSTANCE = 'daily-access-gate';
+
+export interface ConsentNotice {
+  consent_instance: string;
+  notice_version: string;
+  notice_content: string;
+  language: string;
+  rtl: boolean;
+}
+
+export type ConsentStatus =
+  | { status: 'granted'; notice_version: string; decided_at: string }
+  | { status: 'declined'; notice_version: string; decided_at: string }
+  | { status: 'absent' };
+
+export interface WorkerDocument {
+  id: string;
+  worker_id: string;
+  uploaded_by_id: string;
+  category: DocumentCategory;
+  // null when URL generation is deferred/unavailable in this environment.
+  presigned_url: string | null;
+  original_filename: string;
+  mime_type: string;
+  file_size_bytes: number;
+  expires_at: string | null;
+  is_work_permit: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT';
+
+export interface ContractDto {
+  id: string;
+  worker_id: string;
+  template_id: string;
+  position: string;
+  start_date: string;
+  end_date: string | null;
+  status: ContractStatusType;
+  scanned_document_id: string | null;
+  confirmed_by_id: string | null;
+  confirmed_at: string | null;
+  expires_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PayslipRequestStatusType = 'REQUESTED' | 'FULFILLED';
+
+export interface PayslipRequestDto {
+  id: string;
+  worker_id: string;
+  period_start: string;
+  period_end: string;
+  status: PayslipRequestStatusType;
+  fulfilled_by_id: string | null;
+  fulfilled_at: string | null;
+  escalated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ContractStatusType = 'PENDING' | 'ACTIVE' | 'EXTENDED' | 'PERMANENT';
+
+
+export interface ConsentRecord {
+  id: string;
+  worker_id: string;
+  consent_instance: string;
+  notice_version: string;
+  decision: 'GRANTED' | 'DECLINED' | 'WITHDRAWN' | 'RENEWED';
+  decided_at: string;
+}
+
+export interface RecordConsentDecisionInput {
+  consent_instance: string;
+  decision: 'GRANTED' | 'DECLINED';
+  notice_version: string;
+}
+
+export interface CreatePayslipRequestRequest {
+  period_start: string;
+  period_end: string;
+}

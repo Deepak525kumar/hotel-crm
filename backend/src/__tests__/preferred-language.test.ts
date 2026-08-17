@@ -26,13 +26,14 @@ describe('UI locale contract', () => {
     expect(rtl).toEqual(['ur', 'ar']);
   });
 
-  // Guards the divergence recorded in lib/locales.ts: `uk` is a UI locale but
-  // deliberately NOT in the frozen consent list (SPEC-CONSENT-001, CRR §32).
-  // If someone later adds it to the consent contract, this test should be
-  // updated as part of that spec amendment — not silently deleted.
-  it('documents that Ukrainian is a UI locale without a consent notice', () => {
-    expect(UI_LOCALES).toContain('uk');
-    expect(SUPPORTED_LANGUAGES as readonly string[]).not.toContain('uk');
+  // ADR-068 closed the divergence this test previously guarded: `uk` was a UI
+  // locale with no consent notice, so Ukrainian-speaking workers fell back to
+  // German. It is now in both lists, and every UI locale must stay noticeable
+  // — a worker receives the notice in the language they selected.
+  it('every UI locale has a consent notice (ADR-068 / SIR-CONSENT-012)', () => {
+    for (const locale of UI_LOCALES) {
+      expect(SUPPORTED_LANGUAGES as readonly string[]).toContain(locale);
+    }
   });
 
   it('rejects unsupported and malformed values', () => {

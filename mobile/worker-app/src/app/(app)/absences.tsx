@@ -4,11 +4,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
 import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { translateApiError } from '../../lib/api-error-i18n';
 
 // Keys, not nouns: the label is resolved with t() at the point of render so a
 // language change repaints it. Both the badge and the confirm dialog read from
@@ -114,7 +115,7 @@ export default function AbsencesScreen() {
         await api.calendar.markAbsence({ day, kind });
         await load();
       } catch (error) {
-        setErrorMessage(error instanceof ApiError ? error.message : t('absences.markFailed'));
+        setErrorMessage(translateApiError(error, t, 'absences.markFailed'));
       } finally {
         setMarking(null);
       }
@@ -146,7 +147,7 @@ export default function AbsencesScreen() {
                 await load();
               } catch (error) {
                 setErrorMessage(
-                  error instanceof ApiError ? error.message : t('absences.withdrawFailed')
+                  translateApiError(error, t, 'absences.withdrawFailed')
                 );
               } finally {
                 setWithdrawingId(null);

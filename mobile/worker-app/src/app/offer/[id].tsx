@@ -4,12 +4,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useCallback } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { resolveMySlots } from '@/lib/broadcast-eligibility';
 import { Spacing } from '@/constants/theme';
 import type { Broadcast, BroadcastEligibility, SkillTag } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
+import { translateApiError } from '../../lib/api-error-i18n';
 
 // Keys, resolved at render. The same four labels already live in the web
 // app's lib/skills.ts under these exact keys -- the drift that module was
@@ -76,7 +77,7 @@ export default function OfferDetailScreen() {
       setFulfilledSkill(skill);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : t('errors.generic'));
+      setError(translateApiError(err, t, 'errors.generic'));
     } finally {
       setAccepting(null);
     }

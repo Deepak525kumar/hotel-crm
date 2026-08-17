@@ -287,7 +287,14 @@ jobs:
         run: npm ci
         working-directory: mobile/${{ matrix.app }}
 
-      - name: Typecheck tests
+      # Covers src/** including screens and components, not just tests and
+      # lib. tsconfig.test.json's include previously listed only
+      # __tests__/__mocks__/lib/stores/types and no .tsx pattern at all, so
+      # no screen was ever typechecked here — a screen that could not compile
+      # passed CI for a full PR cycle. Verified before the fix: an injected
+      # type error in src/app/documents.tsx was invisible to the old include
+      # and is caught by the current one.
+      - name: Typecheck
         run: npm run typecheck
         working-directory: mobile/${{ matrix.app }}
 

@@ -61,6 +61,17 @@ export default function RootLayout() {
           name="rating/[id]"
           options={{ title: t('nav.rateWorker'), headerShown: true }}
         />
+        {/*
+          These three render their own <BackLink /> and title inside a
+          SafeAreaView (the same chrome worker-app's copies use), so the
+          native header is suppressed rather than given a nav.* title —
+          two stacked headers otherwise. They existed as files here but
+          were unreachable: unregistered and unlinked, and invisible to
+          tsc because tsconfig.test.json never included src/app/**.
+        */}
+        <Stack.Screen name="documents" options={{ headerShown: false }} />
+        <Stack.Screen name="consent" options={{ headerShown: false }} />
+        <Stack.Screen name="hr" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

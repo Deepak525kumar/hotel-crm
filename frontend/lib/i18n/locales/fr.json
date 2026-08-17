@@ -373,7 +373,8 @@
     "tooManyRequests": "Trop de requêtes. Veuillez attendre avant de réessayer.",
     "sessionRevoked": "Votre session a été révoquée. Veuillez vous reconnecter.",
     "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
-    "requestFailed": "Requête échouée"
+    "requestFailed": "Requête échouée",
+    "refreshFailed": "Échec du renouvellement du jeton"
   },
   "shifts": {
     "checkIn": "Pointer l'arrivée",

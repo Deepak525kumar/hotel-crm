@@ -14,10 +14,18 @@ export const CONSENT_INSTANCE = {
   CHATBOT_DATA_PROCESSING: 'chatbot-data-processing',
 } as const;
 
-// CRR §32 (line 379): the platform's 12 supported languages. RTL for Arabic
+// CRR §32 (line 379): the platform's supported languages. RTL for Arabic
 // and Urdu (line 381). This module owns notice content/version, not
 // client-side rendering (RULE-CONSENT-04) -- RTL is a rendering flag the
 // notice-content response carries, not something this module executes.
+//
+// ADR-068 (2026-08-18): `uk` (Ukrainian) appended to CRR §32's original 12,
+// making 13. Owner decision: a worker must receive the consent notice in the
+// language they selected, whatever it is -- and `uk` is a shippable UI locale
+// (lib/locales.ts UI_LOCALES), so leaving it out meant Ukrainian-speaking
+// workers silently got a German notice via the DEFAULT_LANGUAGE fallback.
+// This is an amendment to frozen SPEC-CONSENT-001@0.2.0, authorized by the
+// owner and recorded in ADR-068; it resolves SIR-CONSENT-012.
 export const SUPPORTED_LANGUAGES = [
   'de',
   'en',
@@ -31,6 +39,7 @@ export const SUPPORTED_LANGUAGES = [
   'es',
   'da',
   'hsb',
+  'uk',
 ] as const;
 export type SupportedLanguage = (typeof SUPPORTED_LANGUAGES)[number];
 export const RTL_LANGUAGES: readonly SupportedLanguage[] = ['ar', 'ur'];

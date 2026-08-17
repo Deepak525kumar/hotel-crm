@@ -2,23 +2,21 @@
 // render themselves in, and the persisted per-user preference behind that
 // choice.
 //
-// Deliberately NOT the same list as consent's SUPPORTED_LANGUAGES
-// (modules/consent/types.ts). That constant is frozen spec (SPEC-CONSENT-001
-// @0.2.0, CRR §32) describing the 12 languages *legal notice content* exists
-// in; this one describes the languages the app's own chrome is translated
-// into. The two lists answer different questions and are allowed to diverge:
-// a language can be legally noticed but not yet UI-translated, and — as with
-// Ukrainian below — vice versa.
+// Not the same list as consent's SUPPORTED_LANGUAGES
+// (modules/consent/types.ts). That constant is spec (SPEC-CONSENT-001@0.2.0,
+// CRR §32, as amended by ADR-068) describing the 13 languages *legal notice
+// content* exists in; this one describes the languages the app's own chrome
+// is translated into. The two answer different questions, and a language can
+// be legally noticed but not yet UI-translated (`ru`, `it`, `pl`, …).
 //
-// Owner decision (2026-08-16): ship UI translations for de, en, ur, ar, fr,
-// uk. Note `uk` (Ukrainian) is NOT in CRR §32's list, which carries `ru` but
-// no `uk`. Adding it to the consent contract would amend a frozen
-// specification, which this change is not authorized to do — so a user whose
-// UI language is `uk` still receives consent notices under
-// DEFAULT_LANGUAGE ('de') via the existing fallback in
-// ConsentService.getNoticeContent. That divergence is intentional and
-// recorded here rather than silently papered over; lifting it requires a
-// spec amendment to SPEC-CONSENT-001.
+// The reverse no longer holds: UI_LOCALES must remain a SUBSET of consent's
+// SUPPORTED_LANGUAGES, so a worker always receives the notice in the language
+// they selected. `uk` was the one exception — a UI locale with no notice,
+// silently falling back to German — until ADR-068 added it to the consent
+// contract (SIR-CONSENT-012). Adding a UI locale therefore means adding it to
+// SUPPORTED_LANGUAGES too; preferred-language.test.ts enforces this.
+//
+// Owner decision (2026-08-16): ship UI translations for de, en, ur, ar, fr, uk.
 export const UI_LOCALES = ['de', 'en', 'ur', 'ar', 'fr', 'uk'] as const;
 export type UiLocale = (typeof UI_LOCALES)[number];
 

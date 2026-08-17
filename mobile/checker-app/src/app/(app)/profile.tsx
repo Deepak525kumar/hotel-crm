@@ -79,6 +79,33 @@ export default function ProfileScreen() {
           )}
         </ThemedView>
 
+        <Pressable
+          onPress={() => router.push('/documents')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
+            <ThemedText type="smallBold">{t('documents.view')}</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/consent')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
+            <ThemedText type="smallBold">{t('consent.view')}</ThemedText>
+          </ThemedView>
+        </Pressable>
+
+        <Pressable
+          onPress={() => router.push('/hr')}
+          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+        >
+          <ThemedView type="backgroundElement" style={styles.actionButton}>
+            <ThemedText type="smallBold">{t('hr.view')}</ThemedText>
+          </ThemedView>
+        </Pressable>
+
         <LanguagePicker />
 
         <Pressable
@@ -133,6 +160,12 @@ const styles = StyleSheet.create({
   },
   roleText: {
     textTransform: 'capitalize',
+  },
+  actionButton: {
+    height: 48,
+    borderRadius: Spacing.two,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   logoutButton: {
     height: 48,

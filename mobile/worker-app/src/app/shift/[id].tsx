@@ -5,11 +5,12 @@ import { useEffect, useState } from 'react';
 import * as Location from 'expo-location';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkerAssignment, Attendance } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
+import { translateApiError } from '../../lib/api-error-i18n';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -85,7 +86,7 @@ export default function ShiftDetailScreen() {
       await reload();
       Alert.alert(t('shifts.checkedIn'), t('shifts.checkInSuccess'));
     } catch (err) {
-      Alert.alert(t('errors.title'), err instanceof ApiError ? err.message : t('shifts.checkInFailed'));
+      Alert.alert(t('errors.title'), translateApiError(err, t, 'shifts.checkInFailed'));
     } finally {
       setActing(false);
     }
@@ -111,7 +112,7 @@ export default function ShiftDetailScreen() {
       await reload();
       Alert.alert(t('shifts.checkedOut'), t('shifts.checkOutSuccess'));
     } catch (err) {
-      Alert.alert(t('errors.title'), err instanceof ApiError ? err.message : t('shifts.checkOutFailed'));
+      Alert.alert(t('errors.title'), translateApiError(err, t, 'shifts.checkOutFailed'));
     } finally {
       setActing(false);
     }

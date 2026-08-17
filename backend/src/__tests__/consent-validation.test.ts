@@ -104,11 +104,13 @@ describe('GetAuditHistoryQuerySchema — bounded/paginated (G4 Performance Revie
 });
 
 describe('constants', () => {
-  it('SUPPORTED_LANGUAGES matches CRR §32 (12 supported languages)', () => {
-    expect(SUPPORTED_LANGUAGES).toHaveLength(12);
+  // CRR §32's original 12, plus `uk` added by ADR-068 (SIR-CONSENT-012).
+  it('SUPPORTED_LANGUAGES matches CRR §32 + ADR-068 (13 supported languages)', () => {
+    expect(SUPPORTED_LANGUAGES).toHaveLength(13);
     expect(SUPPORTED_LANGUAGES).toContain('de');
     expect(SUPPORTED_LANGUAGES).toContain('ar');
     expect(SUPPORTED_LANGUAGES).toContain('ur');
+    expect(SUPPORTED_LANGUAGES).toContain('uk');
   });
 
   it('RTL_LANGUAGES is exactly Arabic and Urdu (CRR §32 line 381)', () => {

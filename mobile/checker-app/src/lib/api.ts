@@ -11,6 +11,15 @@ import type {
   CalendarAbsence,
   CalendarAbsenceKind,
   PushApp,
+  WorkerDocument,
+  DocumentCategory,
+  ConsentStatus,
+  ConsentNotice,
+  ConsentRecord,
+  RecordConsentDecisionInput,
+  ContractDto,
+  PayslipRequestDto,
+  CreatePayslipRequestRequest,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
 
@@ -62,6 +71,14 @@ export class ApiError extends Error {
     public readonly code: string,
     message: string,
     public readonly status: number,
+    // SIR-GLOB-022: true when `message` is one of this file's own English
+    // literals rather than text the server sent. The transport layer runs
+    // outside React and has no `t()`, so it cannot translate at throw time —
+    // instead it flags the message as a fallback, and the display layer
+    // (lib/api-error-i18n.ts `translateApiError`) substitutes a translated
+    // string keyed on `code`. A server-supplied message is already localized
+    // server-side and must be shown as-is, so it is never flagged.
+    public readonly isFallbackMessage: boolean = false,
     // ADR-031 D-6/PR-4a: seconds to wait, parsed from the edge's
     // (Nginx/Cloudflare) Retry-After header on a 429. undefined when absent
     // or unparseable — the edge is the sole source of rate limiting (no
@@ -136,6 +153,7 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
         'RATE_LIMITED',
         'Too many requests. Please wait before trying again.',
         429,
+        true,
         parseRetryAfter(res),
       );
     }
@@ -143,6 +161,7 @@ async function executeRefresh(): Promise<{ access_token: string; refresh_token: 
       body.error?.code ?? 'REFRESH_FAILED',
       body.error?.message ?? 'Token refresh failed',
       res.status,
+      body.error?.message == null,
     );
   }
   const body = await res.json();
@@ -170,6 +189,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         'RATE_LIMITED',
         'Too many requests. Please wait before trying again.',
         429,
+        true,
         parseRetryAfter(res),
       );
     }
@@ -183,6 +203,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         TOKEN_REVOKED_CODE,
         body.error?.message ?? 'Your session was revoked. Please log in again.',
         401,
+        body.error?.message == null,
       );
     }
 
@@ -200,7 +221,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       } catch {
         // Server rejected the refresh token — genuine session expiry.
         await _onAuthFailure?.();
-        throw new ApiError('SESSION_EXPIRED', 'Session expired. Please log in again.', 401);
+        throw new ApiError('SESSION_EXPIRED', 'Session expired. Please log in again.', 401, true);
       }
 
       // Refresh succeeded — update in-memory tokens before any await.
@@ -227,6 +248,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             'RATE_LIMITED',
             'Too many requests. Please wait before trying again.',
             429,
+            true,
             parseRetryAfter(retryRes),
           );
         }
@@ -240,12 +262,14 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             TOKEN_REVOKED_CODE,
             retryBody.error?.message ?? 'Your session was revoked. Please log in again.',
             401,
+            retryBody.error?.message == null,
           );
         }
         throw new ApiError(
           retryBody.error?.code ?? 'UNKNOWN',
           retryBody.error?.message ?? 'Request failed',
           retryRes.status,
+          retryBody.error?.message == null,
         );
       }
       const retryBody = await retryRes.json();
@@ -256,6 +280,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       body.error?.code ?? 'UNKNOWN',
       body.error?.message ?? 'Request failed',
       res.status,
+      body.error?.message == null,
     );
   }
 
@@ -363,5 +388,108 @@ export const api = {
       }),
     deleteAbsence: (absenceId: string) =>
       request<void>(`/calendar/absences/${absenceId}`, { method: 'DELETE' }),
+  },
+
+  // --- Ported from worker-app (2026-08-18) ---
+  // The consent/documents/hr screens in this app called these namespaces,
+  // which had never existed here. Invisible until src/app/** entered tsc.
+  documents: {
+    // SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16): worker self-upload/list.
+    // worker_id is always the authenticated caller — self-scope is the
+    // authorization, enforced server-side (documents/routes.ts
+    // scopeWorkerRoute()). Only list/upload are ported here — this worker-app
+    // screen has no use for completeness()/get()/export() (all exist on
+    // frontend/lib/api.ts's documentsApi); add whichever is needed when a
+    // screen actually consumes it, rather than porting the full contract
+    // speculatively.
+    list: (workerId: string, category?: DocumentCategory) =>
+      request<WorkerDocument[]>(
+        `/documents/workers/${workerId}/documents${category ? `?category=${category}` : ''}`
+      ),
+    // Takes the raw picker-asset shape (uri/name/mimeType, as returned by
+    // expo-document-picker; `size` deliberately not accepted here — the
+    // backend derives file_size_bytes server-side from the parsed file,
+    // never a client field, RULE-DOC-09) rather than a pre-built FormData —
+    // multipart construction is this module's own concern, not the caller's.
+    // RN's FormData file-part contract is {uri, name, type} (note: `type`,
+    // not `mimeType` — a documented divergence from the picker's own field
+    // name).
+    //
+    // KNOWN BACKEND LIMITATION (pre-existing, shared with frontend/lib/api.ts's
+    // identical documentsApi.upload — not introduced here): multipart form
+    // fields arrive as strings while uploadDocumentSchema
+    // (documents/validation.ts) expects is_work_permit as a real boolean.
+    // Sending is_work_permit=true here likely 422s until the backend schema
+    // is fixed (e.g. z.preprocess or z.enum(['true','false']).transform(...)).
+    // Not fixed in this PR — backend scope, affects web identically.
+    upload: (
+      workerId: string,
+      asset: { uri: string; name: string; mimeType?: string },
+      input: {
+        category: DocumentCategory;
+        is_work_permit?: boolean;
+        expires_at?: string;
+      }
+    ) => {
+      const form = new FormData();
+      form.append('file', {
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType ?? 'application/octet-stream',
+      } as unknown as Blob);
+      form.append('category', input.category);
+      form.append('original_filename', asset.name);
+      form.append('mime_type', asset.mimeType ?? 'application/octet-stream');
+      if (input.is_work_permit !== undefined) {
+        form.append('is_work_permit', String(input.is_work_permit));
+      }
+      if (input.expires_at) form.append('expires_at', input.expires_at);
+
+      return request<WorkerDocument>(`/documents/workers/${workerId}/documents`, {
+        method: 'POST',
+        body: form,
+      });
+    },
+  },
+  consent: {
+    // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is
+    // self-scoped — worker_id is always the authenticated caller, enforced
+    // server-side, never a client-supplied field.
+    getStatus: (consentInstance: string) =>
+      request<ConsentStatus>(`/consent/status?consent_instance=${encodeURIComponent(consentInstance)}`),
+
+    // Fetches the current notice to present before a decision — does not
+    // itself record a decision.
+    requestNotice: (consentInstance: string, language?: string) =>
+      request<ConsentNotice>('/consent/request', {
+        method: 'POST',
+        body: JSON.stringify({ consent_instance: consentInstance, ...(language ? { language } : {}) }),
+      }),
+
+    recordDecision: (input: RecordConsentDecisionInput) =>
+      request<ConsentRecord>('/consent/decisions', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+
+    // Immediately supersedes today's grant — the next status check reads as `absent`.
+    withdraw: (consentInstance: string) =>
+      request<ConsentRecord>('/consent/withdraw', {
+        method: 'POST',
+        body: JSON.stringify({ consent_instance: consentInstance }),
+      }),
+  },
+  hr: {
+    getContractStatus: (workerId: string) =>
+      request<ContractDto | null>(`/hr/workers/${encodeURIComponent(workerId)}/contract-status`),
+
+    listPayroll: () =>
+      request<PayslipRequestDto[]>('/hr/payroll'),
+
+    requestPayslip: (input: CreatePayslipRequestRequest) =>
+      request<PayslipRequestDto>('/hr/payslip-requests', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
   },
 };

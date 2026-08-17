@@ -17,6 +17,7 @@ import { APP_NAME, ALLOWED_ROLES } from '@/constants/app-config';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import * as WebBrowser from 'expo-web-browser';
+import { translateApiError } from '../../lib/api-error-i18n';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -41,7 +42,7 @@ export default function LoginScreen() {
         setError(t('auth.noAppAccess'));
         return;
       }
-      router.replace('/(app)/');
+      router.replace('/(app)');
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
         setError(
@@ -50,7 +51,7 @@ export default function LoginScreen() {
             : t('auth.tooManyAttempts'),
         );
       } else if (err instanceof ApiError) {
-        setError(err.message);
+        setError(translateApiError(err, t));
       } else {
         setError(t('auth.loginFailed'));
       }

@@ -373,7 +373,8 @@
     "tooManyRequests": "Zu viele Anfragen. Bitte warten Sie, bevor Sie es erneut versuchen.",
     "sessionRevoked": "Ihre Sitzung wurde widerrufen. Bitte melden Sie sich erneut an.",
     "sessionExpired": "Sitzung abgelaufen. Bitte melden Sie sich erneut an.",
-    "requestFailed": "Anfrage fehlgeschlagen"
+    "requestFailed": "Anfrage fehlgeschlagen",
+    "refreshFailed": "Token-Aktualisierung fehlgeschlagen"
   },
   "shifts": {
     "checkIn": "Einchecken",

@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { ALLOWED_MIME_TYPES, validatePickedAsset } from '@/lib/document-validation';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
+import { translateApiError } from '../lib/api-error-i18n';
 
 export interface PendingUpload {
   uri: string;
@@ -60,7 +61,7 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         onUploaded(doc);
         setPending(null);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : t('documents.uploadFailed'));
+        setError(translateApiError(err, t, 'documents.uploadFailed'));
       } finally {
         setUploading(false);
       }
