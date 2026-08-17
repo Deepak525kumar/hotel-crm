@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 import { consentApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { useConsentStatus } from "@/hooks/useConsent";
+import { Button } from "@/components/ui/Button";
 import type { ConsentNotice } from "@/lib/types";
 
 const DAILY_ACCESS_GATE = "daily-access-gate";
@@ -90,19 +91,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
         {declined ? t("consent.lockedTitle") : t("consent.gateTitle")}
       </h1>
 
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-gray-600 dark:text-gray-400">
         {declined ? t("consent.lockedBody") : t("consent.gateBody")}
       </p>
 
       {error ? (
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
         </p>
       ) : null}
 
       {notice ? (
-        <div className="rounded-lg border p-4">
-          <p className="mb-2 text-xs text-muted-foreground">
+        <div className="rounded-md border border-gray-200 p-4 dark:border-gray-800">
+          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
             {notice.notice_version}
           </p>
           {/* notice_content is plain text server-side, rendered verbatim.
@@ -111,23 +112,27 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
             {notice.notice_content}
           </p>
 
+          {/* The shared Button, not raw Tailwind: the design system owns the
+              variants, and hand-rolled classes rendered the primary action
+              unstyled while the secondary one kept its border -- making
+              "Decline" look like the emphasised choice on a GDPR consent
+              screen. Caught by screenshotting the real page. */}
           <div className="mt-4 flex gap-3">
-            <button
-              type="button"
+            <Button
               onClick={() => void decide("GRANTED")}
+              loading={deciding === "GRANTED"}
               disabled={deciding !== null}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
             >
               {t("consent.grant")}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => void decide("DECLINED")}
+              loading={deciding === "DECLINED"}
               disabled={deciding !== null}
-              className="rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-60"
             >
               {t("consent.decline")}
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

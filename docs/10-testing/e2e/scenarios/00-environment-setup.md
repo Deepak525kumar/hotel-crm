@@ -9,6 +9,8 @@ data from §4 exists.
   and wait; containers can also disappear entirely after a Docker restart, in which case
   recreate them with `docker compose up -d` rather than `docker start`).
 - Node deps installed in both `backend/` and `frontend/`.
+- For scenario 07: `@playwright/test` must be installed (`npm install --no-save @playwright/test`
+  from `frontend/` if `npx playwright test` reports `MODULE_NOT_FOUND`).
 - Ports free: **3001** (backend), **3000** (frontend), **5432** (Postgres), **6379** (Redis).
 
 ## 1. Database and cache
@@ -131,7 +133,29 @@ curl -s -X PATCH http://localhost:3001/api/v1/crm/hotels/$H -H "Authorization: B
 Create a **second** group+hotel the same way — scenario 03's isolation tests need a
 cross-boundary target.
 
-### Users to create (via `POST /api/v1/users` as Admin)
+### Users to create (via `POST /api/v1/users`)
+
+> **Corrected 2026-08-17** (consent-gate run). Two things here were stale and cost four failed
+> requests to rediscover:
+>
+> **1. `POST /api/v1/users` requires more than email/password/name/role.** All four of
+> `phone`, `job_title`, `start_date`, `employment_type` (`FULL_TIME`|`PART_TIME`) are
+> required — each surfaces as a separate 422, one at a time. A working call:
+>
+> ```bash
+> curl -s -X POST http://localhost:3001/api/v1/users -H "Authorization: Bearer $T" \
+>   -H "Content-Type: application/json" -d '{"email":"e2e-rm@test.local",
+>   "password":"E2EPass123!","first_name":"RM","last_name":"E2E","phone":"+4915100000001",
+>   "role":"regional_manager","job_title":"E2E rm","start_date":"2026-01-01",
+>   "employment_type":"FULL_TIME"}'
+> ```
+>
+> **2. An Admin may only create `regional_manager`.** The table below implies Admin creates all
+> six users directly; it cannot — `ADR-065`'s hierarchy refuses with *"A admin may only create
+> users with role: regional_manager (attempted: manager)"*. Managers come from an RM,
+> workers/checkers from a manager. Every created user starts `PENDING` with no
+> `hotel_group_id`, so anything depending on resolved scope (or on the decline→manager
+> notification, which needs an **ACTIVE** record with a group) requires the lifecycle first.
 
 | Purpose | Email | Role |
 |---|---|---|
