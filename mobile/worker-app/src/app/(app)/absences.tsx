@@ -8,6 +8,7 @@ import { api, ApiError } from '@/lib/api';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
 import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 const KIND_LABEL: Record<CalendarAbsenceKind, string> = {
   SICK: 'Sick',
@@ -20,6 +21,7 @@ const KIND_COLOR: Record<CalendarAbsenceKind, string> = {
 };
 
 function AbsenceCard({
+  const { t } = useTranslation();
   item,
   onWithdraw,
   withdrawing,
@@ -54,9 +56,7 @@ function AbsenceCard({
           {withdrawing ? (
             <ActivityIndicator size="small" />
           ) : (
-            <ThemedText type="small" style={styles.withdrawText}>
-              Withdraw
-            </ThemedText>
+            <ThemedText type="small" style={styles.withdrawText}>{t("consent.withdraw")}</ThemedText>
           )}
         </Pressable>
       )}
@@ -65,6 +65,7 @@ function AbsenceCard({
 }
 
 export default function AbsencesScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [items, setItems] = useState<CalendarAbsence[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,9 +155,7 @@ export default function AbsencesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>
-          Sick / Vacation
-        </ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t("calendar.sickOrVacation")}</ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.actionsCard}>
           {([0, 1] as const).map((daysFromToday) => (
@@ -193,9 +192,7 @@ export default function AbsencesScreen() {
           </ThemedText>
         )}
 
-        <ThemedText type="small" themeColor="textSecondary" style={styles.listHeader}>
-          Your marked days
-        </ThemedText>
+        <ThemedText type="small" themeColor="textSecondary" style={styles.listHeader}>{t("calendar.yourMarkedDays")}</ThemedText>
 
         {loading ? (
           <ActivityIndicator style={styles.loader} color={theme.text} />
@@ -212,9 +209,7 @@ export default function AbsencesScreen() {
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">
-                  No sick or vacation days marked.
-                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">{t("profile.noAbsences")}</ThemedText>
               </ThemedView>
             }
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

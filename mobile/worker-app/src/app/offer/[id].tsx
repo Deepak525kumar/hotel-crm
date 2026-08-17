@@ -130,18 +130,14 @@ export default function OfferDetailScreen() {
 
           {offer.description ? (
             <>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Description
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("fields.description")}</ThemedText>
               <ThemedView type="backgroundElement" style={styles.descCard}>
                 <ThemedText type="small">{offer.description}</ThemedText>
               </ThemedView>
             </>
           ) : null}
 
-          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-            Skills needed
-          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("requests.skillsNeeded")}</ThemedText>
           {offer.skill_slots.map((slot) => {
             const filled = slot.confirmed_count >= slot.headcount;
             const canAccept = !closed && mySlots.some((s) => s.skill === slot.skill);
@@ -173,17 +169,13 @@ export default function OfferDetailScreen() {
 
           {fulfilledSkill && (
             <ThemedView type="backgroundElement" style={styles.noticeCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                This shift was already filled by another worker.
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("shifts.alreadyFilledByAnother")}</ThemedText>
             </ThemedView>
           )}
 
           {closed && (
             <ThemedView type="backgroundElement" style={styles.noticeCard}>
-              <ThemedText type="small" themeColor="textSecondary">
-                This offer is no longer open.
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("shifts.offerNoLongerOpen")}</ThemedText>
             </ThemedView>
           )}
 

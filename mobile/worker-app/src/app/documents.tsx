@@ -10,8 +10,10 @@ import { api, ApiError } from '@/lib/api';
 import { UploadDocumentCard } from '@/components/documents/UploadDocumentCard';
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import type { WorkerDocument } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 export default function DocumentsScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
   const [documents, setDocuments] = useState<WorkerDocument[]>([]);
@@ -56,9 +58,7 @@ export default function DocumentsScreen() {
             ← Back
           </ThemedText>
         </Pressable>
-        <ThemedText type="subtitle" style={styles.header}>
-          Documents
-        </ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t("documents.title")}</ThemedText>
 
         <UploadDocumentCard workerId={user.id} onUploaded={onUploaded} />
 

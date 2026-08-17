@@ -54,15 +54,11 @@ export function UploadDocumentCard({
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold" style={styles.header}>
-        Upload document
-      </ThemedText>
+      <ThemedText type="smallBold" style={styles.header}>{t("documents.uploadTitle")}</ThemedText>
 
       {!pending ? (
         <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, { opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText type="small" style={styles.pickButtonText}>
-            Choose file
-          </ThemedText>
+          <ThemedText type="small" style={styles.pickButtonText}>{t("documents.chooseFile")}</ThemedText>
         </Pressable>
       ) : (
         <>
@@ -71,9 +67,7 @@ export function UploadDocumentCard({
               {pending.name}
             </ThemedText>
             <Pressable onPress={clearPending} disabled={uploading}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Remove
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("common.remove")}</ThemedText>
             </Pressable>
           </ThemedView>
 
@@ -107,7 +101,7 @@ export function UploadDocumentCard({
               disabled={uploading}
               style={styles.row}
             >
-              <ThemedText type="small">Non-EU/EEA/Swiss work-permit document</ThemedText>
+              <ThemedText type="small">{t("documents.nonEuWorkPermit")}</ThemedText>
               <ThemedText type="small" themeColor={isWorkPermit ? 'text' : 'textSecondary'}>
                 {isWorkPermit ? '✓' : ''}
               </ThemedText>

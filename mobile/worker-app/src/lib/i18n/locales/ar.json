@@ -372,7 +372,10 @@
     "roomsCompleted": "الغرف المنجزة",
     "offer": "عرض وردية",
     "offerNotFound": "لم يتم العثور على العرض.",
-    "detailsTitle": "تفاصيل الوردية"
+    "detailsTitle": "تفاصيل الوردية",
+    "upcomingTitle": "الورديات القادمة",
+    "offerNoLongerOpen": "لم يعد هذا العرض متاحاً.",
+    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر."
   },
   "jobs": {
     "none": "لم يتم العثور على وظائف متاحة.",
@@ -387,7 +390,8 @@
     "filled": "مكتمل",
     "position": "المنصب",
     "pay": "الأجر",
-    "offerBadge": "عرض"
+    "offerBadge": "عرض",
+    "noLongerOpen": "لم تعد هذه الوظيفة متاحة."
   },
   "documents": {
     "title": "المستندات",
@@ -410,7 +414,8 @@
     "loadFailed": "تعذر تحميل المستندات.",
     "deleteAction": "حذف",
     "uploadAction": "رفع",
-    "fileTooLarge": "يتجاوز الملف حد 10 ميجابايت."
+    "fileTooLarge": "يتجاوز الملف حد 10 ميجابايت.",
+    "uploadFirstHint": "ارفع مستندك الأول للبدء."
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -445,7 +450,10 @@
     "bothDatesRequired": "كلا تاريخي الفترة مطلوبان.",
     "periodEndAfterStart": "يجب أن تكون نهاية الفترة في تاريخ بداية الفترة أو بعده.",
     "templateStartRequired": "القالب والمنصب وتاريخ البدء مطلوبة.",
-    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده."
+    "endDateAfterStart": "يجب أن يكون تاريخ الانتهاء في تاريخ البدء أو بعده.",
+    "requestPayslip": "طلب كشف راتب",
+    "noContractYet": "ليس لديك عقد في النظام بعد.",
+    "noPayslipsRequestedYet": "لم تطلب أي كشوف رواتب بعد."
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -530,7 +538,9 @@
     "dateRequired": "التاريخ مطلوب.",
     "viewDay": "يوم",
     "viewWeek": "أسبوع",
-    "viewMonth": "شهر"
+    "viewMonth": "شهر",
+    "sickOrVacation": "مرض / إجازة",
+    "yourMarkedDays": "أيامك المسجَّلة"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",

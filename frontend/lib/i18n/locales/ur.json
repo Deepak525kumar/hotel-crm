@@ -372,7 +372,10 @@
     "roomsCompleted": "مکمل کمرے",
     "offer": "شفٹ کی پیشکش",
     "offerNotFound": "پیشکش نہیں ملی۔",
-    "detailsTitle": "شفٹ کی تفصیلات"
+    "detailsTitle": "شفٹ کی تفصیلات",
+    "upcomingTitle": "آنے والی شفٹیں",
+    "offerNoLongerOpen": "یہ پیشکش اب کھلی نہیں ہے۔",
+    "alreadyFilledByAnother": "یہ شفٹ پہلے ہی کسی اور کارکن نے لے لی ہے۔"
   },
   "jobs": {
     "none": "کوئی کھلی نوکری نہیں ملی۔",
@@ -387,7 +390,8 @@
     "filled": "بھر گیا",
     "position": "عہدہ",
     "pay": "اجرت",
-    "offerBadge": "پیشکش"
+    "offerBadge": "پیشکش",
+    "noLongerOpen": "یہ نوکری اب کھلی نہیں ہے۔"
   },
   "documents": {
     "title": "دستاویزات",
@@ -410,7 +414,8 @@
     "loadFailed": "دستاویزات لوڈ نہیں ہو سکیں۔",
     "deleteAction": "حذف کریں",
     "uploadAction": "اپ لوڈ کریں",
-    "fileTooLarge": "فائل 10MB حد سے تجاوز کرتی ہے۔"
+    "fileTooLarge": "فائل 10MB حد سے تجاوز کرتی ہے۔",
+    "uploadFirstHint": "شروع کرنے کے لیے اپنی پہلی دستاویز اپ لوڈ کریں۔"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -445,7 +450,10 @@
     "bothDatesRequired": "دونوں مدت کی تاریخیں درکار ہیں۔",
     "periodEndAfterStart": "مدت کا اختتام آغاز کے برابر یا بعد میں ہونا چاہیے۔",
     "templateStartRequired": "ٹیمپلیٹ، عہدہ اور آغاز کی تاریخ درکار ہیں۔",
-    "endDateAfterStart": "اختتامی تاریخ آغاز کی تاریخ کے برابر یا بعد میں ہونی چاہیے۔"
+    "endDateAfterStart": "اختتامی تاریخ آغاز کی تاریخ کے برابر یا بعد میں ہونی چاہیے۔",
+    "requestPayslip": "تنخواہ سلپ کی درخواست",
+    "noContractYet": "سسٹم میں ابھی آپ کا کوئی معاہدہ نہیں ہے۔",
+    "noPayslipsRequestedYet": "آپ نے ابھی تک کوئی تنخواہ سلپ نہیں مانگی۔"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -530,7 +538,9 @@
     "dateRequired": "تاریخ درکار ہے۔",
     "viewDay": "دن",
     "viewWeek": "ہفتہ",
-    "viewMonth": "مہینہ"
+    "viewMonth": "مہینہ",
+    "sickOrVacation": "بیماری / چھٹی",
+    "yourMarkedDays": "آپ کے نشان زد دن"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",

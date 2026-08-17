@@ -5,6 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import { DocumentItem } from './DocumentItem';
 import type { WorkerDocument } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 export function DocumentsList({
   documents,
@@ -17,6 +18,7 @@ export function DocumentsList({
   refreshing: boolean;
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const theme = useTheme();
 
   if (loading) {
@@ -30,12 +32,8 @@ export function DocumentsList({
       renderItem={({ item }) => <DocumentItem document={item} />}
       ListEmptyComponent={
         <ThemedView type="backgroundElement" style={styles.empty}>
-          <ThemedText type="smallBold" style={styles.emptyTitle}>
-            No documents uploaded yet
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>
-            Upload your first document to get started.
-          </ThemedText>
+          <ThemedText type="smallBold" style={styles.emptyTitle}>{t("documents.none")}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.emptyDescription}>{t("documents.uploadFirstHint")}</ThemedText>
         </ThemedView>
       }
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}

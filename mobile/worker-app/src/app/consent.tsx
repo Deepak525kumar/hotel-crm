@@ -10,6 +10,7 @@ import { ConsentStatusCard } from '@/components/consent/ConsentStatusCard';
 import { ConsentNoticeCard } from '@/components/consent/ConsentNoticeCard';
 import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
 import type { ConsentNotice, ConsentStatus } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Self-service record/decision surface, not an access-blocking wall — no
@@ -23,6 +24,7 @@ import type { ConsentNotice, ConsentStatus } from '@/types/api';
  * drift from what the server actually recorded.
  */
 export default function ConsentScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const [status, setStatus] = useState<ConsentStatus | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
@@ -118,9 +120,7 @@ export default function ConsentScreen() {
             ← Back
           </ThemedText>
         </Pressable>
-        <ThemedText type="subtitle" style={styles.header}>
-          Data-protection consent
-        </ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t("consent.title")}</ThemedText>
 
         <ConsentStatusCard
           status={status}

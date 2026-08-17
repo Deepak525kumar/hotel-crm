@@ -71,9 +71,7 @@ export default function DashboardScreen() {
             <ActivityIndicator style={styles.loader} />
           ) : (
             <>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Overview
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("profile.overview")}</ThemedText>
               <ThemedView style={styles.statsGrid}>
                 <StatCard label={t('shifts.upcoming')} value={upcoming.length} accent={theme.text} />
                 <StatCard label={t('status.completed')} value={stats?.completed_assignments ?? 0} />
@@ -84,14 +82,10 @@ export default function DashboardScreen() {
                 />
               </ThemedView>
 
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Upcoming Shifts
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("shifts.upcomingTitle")}</ThemedText>
               {upcoming.length === 0 ? (
                 <ThemedView type="backgroundElement" style={styles.emptyCard}>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>
-                    No upcoming shifts. Browse the job marketplace!
-                  </ThemedText>
+                  <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>{t("shifts.noneUpcoming")}</ThemedText>
                 </ThemedView>
               ) : (
                 upcoming.map((shift) => (

@@ -371,7 +371,10 @@
     "roomsCompleted": "Chambres terminées",
     "offer": "Offre de service",
     "offerNotFound": "Offre introuvable.",
-    "detailsTitle": "Détails du service"
+    "detailsTitle": "Détails du service",
+    "upcomingTitle": "Services à venir",
+    "offerNoLongerOpen": "Cette offre n'est plus ouverte.",
+    "alreadyFilledByAnother": "Ce service a déjà été pourvu par un autre employé."
   },
   "jobs": {
     "none": "Aucune offre disponible.",
@@ -386,7 +389,8 @@
     "filled": "Pourvu",
     "position": "Poste",
     "pay": "Rémunération",
-    "offerBadge": "OFFRE"
+    "offerBadge": "OFFRE",
+    "noLongerOpen": "Cette offre n'est plus ouverte."
   },
   "documents": {
     "title": "Documents",
@@ -409,7 +413,8 @@
     "loadFailed": "Impossible de charger les documents.",
     "deleteAction": "Supprimer",
     "uploadAction": "Téléverser",
-    "fileTooLarge": "Le fichier dépasse la limite de 10 Mo."
+    "fileTooLarge": "Le fichier dépasse la limite de 10 Mo.",
+    "uploadFirstHint": "Téléversez votre premier document pour commencer."
   },
   "hr": {
     "title": "RH et paie",
@@ -444,7 +449,10 @@
     "bothDatesRequired": "Les deux dates de période sont requises.",
     "periodEndAfterStart": "La fin de la période doit être postérieure ou égale au début.",
     "templateStartRequired": "Le modèle, le poste et la date de début sont requis.",
-    "endDateAfterStart": "La date de fin doit être postérieure ou égale à la date de début."
+    "endDateAfterStart": "La date de fin doit être postérieure ou égale à la date de début.",
+    "requestPayslip": "Demander un bulletin de paie",
+    "noContractYet": "Vous n'avez pas encore de contrat dans le système.",
+    "noPayslipsRequestedYet": "Vous n'avez encore demandé aucun bulletin de paie."
   },
   "consent": {
     "title": "Consentement à la protection des données",
@@ -529,7 +537,9 @@
     "dateRequired": "La date est requise.",
     "viewDay": "Jour",
     "viewWeek": "Semaine",
-    "viewMonth": "Mois"
+    "viewMonth": "Mois",
+    "sickOrVacation": "Maladie / Congé",
+    "yourMarkedDays": "Vos jours signalés"
   },
   "hotels": {
     "inThisGroup": "Hôtels de ce groupe",

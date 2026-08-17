@@ -164,9 +164,7 @@ export default function ShiftDetailScreen() {
             <InfoRow label={t('fields.status')} value={shift.status.replace(/_/g, ' ')} />
           </ThemedView>
 
-          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-            Attendance
-          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("nav.attendance")}</ThemedText>
           <ThemedView type="backgroundElement" style={styles.section}>
             <InfoRow
               label={t('shifts.checkIn')}

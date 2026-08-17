@@ -10,8 +10,10 @@ import { api, ApiError } from '@/lib/api';
 import { ContractStatusCard } from '@/components/hr/ContractStatusCard';
 import { PayslipRequestsList } from '@/components/hr/PayslipRequestsList';
 import type { ContractDto, PayslipRequestDto } from '@/types/api';
+import { useTranslation } from 'react-i18next';
 
 export default function HRScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
 
@@ -60,8 +62,7 @@ export default function HRScreen() {
     const start = firstDay.toISOString().split('T')[0];
     const end = lastDay.toISOString().split('T')[0];
 
-    Alert.alert(
-      'Request Payslip',
+    Alert.alert(t("hr.requestPayslip"),
       `Would you like to request your payslip for ${firstDay.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -75,7 +76,7 @@ export default function HRScreen() {
               });
               load(); // Reload to show the new request
             } catch (error) {
-              Alert.alert('Error', error instanceof ApiError ? error.message : 'Failed to request payslip');
+              Alert.alert(t("errors.title"), error instanceof ApiError ? error.message : 'Failed to request payslip');
             }
           }
         }
@@ -94,9 +95,7 @@ export default function HRScreen() {
           </ThemedText>
         </Pressable>
 
-        <ThemedText type="subtitle" style={styles.header}>
-          HR & Payroll
-        </ThemedText>
+        <ThemedText type="subtitle" style={styles.header}>{t("hr.title")}</ThemedText>
 
         {loadError && (
           <ThemedText type="small" style={styles.errorText}>
@@ -104,9 +103,7 @@ export default function HRScreen() {
           </ThemedText>
         )}
 
-        <ThemedText type="smallBold" style={styles.sectionTitle}>
-          Contract Status
-        </ThemedText>
+        <ThemedText type="smallBold" style={styles.sectionTitle}>{t("hr.contractStatus")}</ThemedText>
         <ContractStatusCard contract={contract} loading={loading} />
 
         <PayslipRequestsList

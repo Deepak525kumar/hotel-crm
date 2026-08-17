@@ -79,9 +79,7 @@ export default function JobDetailScreen() {
 
           {job.description ? (
             <>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>
-                Description
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("fields.description")}</ThemedText>
               <ThemedView type="backgroundElement" style={styles.descCard}>
                 <ThemedText type="small">{job.description}</ThemedText>
               </ThemedView>
@@ -90,9 +88,7 @@ export default function JobDetailScreen() {
 
           {job.status !== 'OPEN' && job.status !== 'PARTIALLY_FILLED' && (
             <ThemedView type="backgroundElement" style={styles.closedBanner}>
-              <ThemedText type="small" themeColor="textSecondary">
-                This job is no longer open.
-              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary">{t("jobs.noLongerOpen")}</ThemedText>
             </ThemedView>
           )}
         </ScrollView>

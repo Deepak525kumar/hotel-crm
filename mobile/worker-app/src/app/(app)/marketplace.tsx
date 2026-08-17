@@ -141,9 +141,7 @@ export default function MarketplaceScreen() {
             ListHeaderComponent={
               openOffers.length > 0 ? (
                 <>
-                  <ThemedText type="smallBold" style={styles.sectionLabel}>
-                    Offers for you
-                  </ThemedText>
+                  <ThemedText type="smallBold" style={styles.sectionLabel}>{t("jobs.offersForYou")}</ThemedText>
                   {openOffers.map((offer) => (
                     <OfferCard
                       key={offer.id}
@@ -151,9 +149,7 @@ export default function MarketplaceScreen() {
                       onPress={() => router.push(`/offer/${offer.id}`)}
                     />
                   ))}
-                  <ThemedText type="smallBold" style={styles.sectionLabel}>
-                    Open jobs
-                  </ThemedText>
+                  <ThemedText type="smallBold" style={styles.sectionLabel}>{t("jobs.open")}</ThemedText>
                 </>
               ) : null
             }

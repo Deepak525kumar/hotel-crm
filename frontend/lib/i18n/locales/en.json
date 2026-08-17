@@ -371,7 +371,10 @@
     "roomsCompleted": "Rooms Completed",
     "offer": "Shift offer",
     "offerNotFound": "Offer not found.",
-    "detailsTitle": "Shift Details"
+    "detailsTitle": "Shift Details",
+    "upcomingTitle": "Upcoming Shifts",
+    "offerNoLongerOpen": "This offer is no longer open.",
+    "alreadyFilledByAnother": "This shift was already filled by another worker."
   },
   "jobs": {
     "none": "No open jobs found.",
@@ -386,7 +389,8 @@
     "filled": "Filled",
     "position": "Position",
     "pay": "Pay",
-    "offerBadge": "OFFER"
+    "offerBadge": "OFFER",
+    "noLongerOpen": "This job is no longer open."
   },
   "documents": {
     "title": "Documents",
@@ -409,7 +413,8 @@
     "loadFailed": "Failed to load documents.",
     "deleteAction": "Delete",
     "uploadAction": "Upload",
-    "fileTooLarge": "File exceeds 10MB limit."
+    "fileTooLarge": "File exceeds 10MB limit.",
+    "uploadFirstHint": "Upload your first document to get started."
   },
   "hr": {
     "title": "HR & Payroll",
@@ -444,7 +449,10 @@
     "bothDatesRequired": "Both period dates are required.",
     "periodEndAfterStart": "Period end must be on or after period start.",
     "templateStartRequired": "Template, position, and start date are required.",
-    "endDateAfterStart": "End date must be on or after start date."
+    "endDateAfterStart": "End date must be on or after start date.",
+    "requestPayslip": "Request Payslip",
+    "noContractYet": "You do not have a contract in the system yet.",
+    "noPayslipsRequestedYet": "You have not requested any payslips yet."
   },
   "consent": {
     "title": "Data-protection consent",
@@ -529,7 +537,9 @@
     "dateRequired": "Date is required.",
     "viewDay": "Day",
     "viewWeek": "Week",
-    "viewMonth": "Month"
+    "viewMonth": "Month",
+    "sickOrVacation": "Sick / Vacation",
+    "yourMarkedDays": "Your marked days"
   },
   "hotels": {
     "inThisGroup": "Hotels in this group",

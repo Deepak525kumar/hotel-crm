@@ -371,7 +371,10 @@
     "roomsCompleted": "Завершені номери",
     "offer": "Пропозиція зміни",
     "offerNotFound": "Пропозицію не знайдено.",
-    "detailsTitle": "Деталі зміни"
+    "detailsTitle": "Деталі зміни",
+    "upcomingTitle": "Майбутні зміни",
+    "offerNoLongerOpen": "Ця пропозиція більше не відкрита.",
+    "alreadyFilledByAnother": "Цю зміну вже зайняв інший працівник."
   },
   "jobs": {
     "none": "Відкритих вакансій не знайдено.",
@@ -386,7 +389,8 @@
     "filled": "Заповнено",
     "position": "Посада",
     "pay": "Оплата",
-    "offerBadge": "ПРОПОЗИЦІЯ"
+    "offerBadge": "ПРОПОЗИЦІЯ",
+    "noLongerOpen": "Ця вакансія більше не відкрита."
   },
   "documents": {
     "title": "Документи",
@@ -409,7 +413,8 @@
     "loadFailed": "Не вдалося завантажити документи.",
     "deleteAction": "Видалити",
     "uploadAction": "Завантажити",
-    "fileTooLarge": "Файл перевищує обмеження в 10 МБ."
+    "fileTooLarge": "Файл перевищує обмеження в 10 МБ.",
+    "uploadFirstHint": "Завантажте свій перший документ, щоб почати."
   },
   "hr": {
     "title": "Кадри та зарплата",
@@ -444,7 +449,10 @@
     "bothDatesRequired": "Обидві дати періоду є обов'язковими.",
     "periodEndAfterStart": "Кінець періоду має бути не раніше початку періоду.",
     "templateStartRequired": "Шаблон, посада та дата початку є обов'язковими.",
-    "endDateAfterStart": "Дата завершення має бути не раніше дати початку."
+    "endDateAfterStart": "Дата завершення має бути не раніше дати початку.",
+    "requestPayslip": "Запитати розрахунковий лист",
+    "noContractYet": "У вас ще немає договору в системі.",
+    "noPayslipsRequestedYet": "Ви ще не запитували розрахункових листів."
   },
   "consent": {
     "title": "Згода на захист даних",
@@ -529,7 +537,9 @@
     "dateRequired": "Дата є обов'язковою.",
     "viewDay": "День",
     "viewWeek": "Тиждень",
-    "viewMonth": "Місяць"
+    "viewMonth": "Місяць",
+    "sickOrVacation": "Хвороба / Відпустка",
+    "yourMarkedDays": "Ваші позначені дні"
   },
   "hotels": {
     "inThisGroup": "Готелі цієї групи",

@@ -371,7 +371,10 @@
     "roomsCompleted": "Fertige Zimmer",
     "offer": "Schichtangebot",
     "offerNotFound": "Angebot nicht gefunden.",
-    "detailsTitle": "Schichtdetails"
+    "detailsTitle": "Schichtdetails",
+    "upcomingTitle": "Kommende Schichten",
+    "offerNoLongerOpen": "Dieses Angebot ist nicht mehr offen.",
+    "alreadyFilledByAnother": "Diese Schicht wurde bereits von einem anderen Mitarbeiter besetzt."
   },
   "jobs": {
     "none": "Keine offenen Jobs gefunden.",
@@ -386,7 +389,8 @@
     "filled": "Besetzt",
     "position": "Position",
     "pay": "Vergütung",
-    "offerBadge": "ANGEBOT"
+    "offerBadge": "ANGEBOT",
+    "noLongerOpen": "Diese Stelle ist nicht mehr offen."
   },
   "documents": {
     "title": "Dokumente",
@@ -409,7 +413,8 @@
     "loadFailed": "Dokumente konnten nicht geladen werden.",
     "deleteAction": "Löschen",
     "uploadAction": "Hochladen",
-    "fileTooLarge": "Datei überschreitet das Limit von 10 MB."
+    "fileTooLarge": "Datei überschreitet das Limit von 10 MB.",
+    "uploadFirstHint": "Laden Sie Ihr erstes Dokument hoch, um zu beginnen."
   },
   "hr": {
     "title": "Personal & Lohn",
@@ -444,7 +449,10 @@
     "bothDatesRequired": "Beide Zeitraumdaten sind erforderlich.",
     "periodEndAfterStart": "Das Ende des Zeitraums muss am oder nach dem Beginn liegen.",
     "templateStartRequired": "Vorlage, Position und Startdatum sind erforderlich.",
-    "endDateAfterStart": "Das Enddatum muss am oder nach dem Startdatum liegen."
+    "endDateAfterStart": "Das Enddatum muss am oder nach dem Startdatum liegen.",
+    "requestPayslip": "Gehaltsabrechnung anfordern",
+    "noContractYet": "Sie haben noch keinen Vertrag im System.",
+    "noPayslipsRequestedYet": "Sie haben noch keine Gehaltsabrechnungen angefordert."
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",
@@ -529,7 +537,9 @@
     "dateRequired": "Datum ist erforderlich.",
     "viewDay": "Tag",
     "viewWeek": "Woche",
-    "viewMonth": "Monat"
+    "viewMonth": "Monat",
+    "sickOrVacation": "Krank / Urlaub",
+    "yourMarkedDays": "Ihre markierten Tage"
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",
