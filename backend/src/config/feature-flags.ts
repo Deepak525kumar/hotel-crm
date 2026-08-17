@@ -93,3 +93,25 @@ export function isJobDispatchPhase1Enabled(): boolean {
 export function isJobDispatchPhase2Enabled(): boolean {
   return getEnv().FEATURE_JOBDISPATCH_PHASE2;
 }
+
+/**
+ * Daily GDPR consent-gate enforcement (RULE-CONSENT-01, REQ-CONSENT-001).
+ * When disabled (default), no request is gated and the middleware does not
+ * even query consent state -- "both-off = current behavior", the same posture
+ * ADR-024 D3 established for the employment-record cutover.
+ *
+ * Read per-request, never captured at module load: the kill switch must be an
+ * env change plus a restart, not a code change.
+ */
+export function isConsentGateEnabled(): boolean {
+  return getEnv().FEATURE_CONSENT_GATE;
+}
+
+/**
+ * The roles the consent gate applies to. `admin` is excluded at parse time
+ * (env.ts) and again at the gate, deliberately twice: an admin must always
+ * retain access to fix a consent problem that is locking everyone else out.
+ */
+export function getConsentGateRoles(): readonly string[] {
+  return getEnv().CONSENT_GATE_ROLES;
+}

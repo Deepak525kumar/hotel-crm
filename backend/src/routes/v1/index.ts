@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { optionalAuthMiddleware } from '../../middleware/auth.js';
+import { consentGateMiddleware } from '../../middleware/consentGate.js';
 import { checkReadiness } from '../../lib/health.js';
 import { HTTP_STATUS } from '../../config/constants.js';
 import { isEmploymentRecordEnabled } from '../../config/feature-flags.js';
@@ -25,6 +26,13 @@ import employeeManagementRoutes from '../../modules/employee-management/routes.j
 const router = Router();
 
 router.use(optionalAuthMiddleware);
+
+// RULE-CONSENT-01 daily access gate. Mounted here, before every module, so a
+// newly added module is gated by default rather than by remembering to opt
+// in. No-op unless FEATURE_CONSENT_GATE is on. Runs before each module's own
+// authMiddleware, and passes through when identity is unresolved, so a 401
+// still wins over a 403 for a revoked or expired token.
+router.use(consentGateMiddleware);
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
