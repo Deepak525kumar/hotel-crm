@@ -534,3 +534,47 @@ describe('workRequests.list — is_broadcast', () => {
     expect(url).not.toContain('is_broadcast');
   });
 });
+
+// ---------------------------------------------------------------------------
+// SIR-GLOB-022: isFallbackMessage — set by the transport layer, consumed by
+// lib/api-error-i18n.ts. These assert the flag against real thrown errors
+// rather than hand-built ones, so the throw sites stay honest.
+// ---------------------------------------------------------------------------
+
+describe('isFallbackMessage', () => {
+  it('flags the 429 message, which the edge never supplies', async () => {
+    mockFetch.mockResolvedValueOnce(nonJsonRes(429, { 'Retry-After': '30' }));
+    const error = (await api.auth.me().catch((e: unknown) => e)) as ApiError;
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.isFallbackMessage).toBe(true);
+    expect(error.retryAfterSeconds).toBe(30);
+  });
+
+  it('flags a failure where the server sent no message', async () => {
+    mockFetch.mockResolvedValueOnce(res(500, { error: { code: 'BOOM' } }));
+    const error = (await api.auth.me().catch((e: unknown) => e)) as ApiError;
+    expect(error.message).toBe('Request failed');
+    expect(error.isFallbackMessage).toBe(true);
+  });
+
+  it('does NOT flag a message the server supplied', async () => {
+    // The server localizes its own copy; re-translating would discard detail.
+    mockFetch.mockResolvedValueOnce(
+      res(409, { error: { code: 'CONFLICT', message: 'Already checked in at 09:03' } }),
+    );
+    const error = (await api.auth.me().catch((e: unknown) => e)) as ApiError;
+    expect(error.message).toBe('Already checked in at 09:03');
+    expect(error.isFallbackMessage).toBe(false);
+  });
+
+  it('flags SESSION_EXPIRED, thrown entirely client-side', async () => {
+    setAccessToken('a');
+    setRefreshToken('r');
+    mockFetch
+      .mockResolvedValueOnce(res(401, { error: { code: 'UNAUTHORIZED' } }))
+      .mockResolvedValueOnce(res(401, { error: { code: 'INVALID_REFRESH' } }));
+    const error = (await api.auth.me().catch((e: unknown) => e)) as ApiError;
+    expect(error.code).toBe('SESSION_EXPIRED');
+    expect(error.isFallbackMessage).toBe(true);
+  });
+});

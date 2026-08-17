@@ -373,7 +373,8 @@
     "tooManyRequests": "Too many requests. Please wait before trying again.",
     "sessionRevoked": "Your session was revoked. Please log in again.",
     "sessionExpired": "Session expired. Please log in again.",
-    "requestFailed": "Request failed"
+    "requestFailed": "Request failed",
+    "refreshFailed": "Token refresh failed"
   },
   "shifts": {
     "checkIn": "Check In",

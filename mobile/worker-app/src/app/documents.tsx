@@ -6,12 +6,13 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
-import { api, ApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import { UploadDocumentCard } from '@/components/documents/UploadDocumentCard';
 import { DocumentsList } from '@/components/documents/DocumentsList';
 import type { WorkerDocument } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
+import { translateApiError } from '../lib/api-error-i18n';
 
 export default function DocumentsScreen() {
   const { t } = useTranslation();
@@ -29,7 +30,7 @@ export default function DocumentsScreen() {
       const res = await api.documents.list(user.id);
       setDocuments(Array.isArray(res) ? res : []);
     } catch (error) {
-      setLoadError(error instanceof ApiError ? error.message : t('documents.loadFailed'));
+      setLoadError(translateApiError(error, t, 'documents.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
