@@ -180,13 +180,22 @@ const envSchema = z.object({
   // enabled, per ADR-024 D3's "both-off = current behavior" posture.
   FEATURE_EMPLOYMENT_RECORD: strictBooleanFlag(false),
 
-  // RULE-CONSENT-01 daily-access-gate enforcement. Default OFF: enabling it
-  // blocks every non-admin API call until that user has granted today's
-  // consent, so it must not flip before the gate-aware clients have shipped
-  // and been adopted (an older build receives a 403 it cannot act on).
-  // strictBooleanFlag, not z.coerce.boolean(), is load-bearing here -- for
-  // this flag the coercion bug would mean locking out the entire workforce.
-  FEATURE_CONSENT_GATE: strictBooleanFlag(false),
+  // RULE-CONSENT-01 daily-access-gate enforcement. Blocks every non-admin API
+  // call until that user has granted today's consent.
+  //
+  // Default ON (owner decision, 2026-08-18): this ships as part of the first
+  // version, so there is no older, gate-unaware client already in the field to
+  // strand on a 403 it cannot act on -- the concern that would otherwise force
+  // a staged rollout. Every client in this release renders the notice.
+  //
+  // Set FEATURE_CONSENT_GATE=false to disable; CONSENT_GATE_ROLES narrows it
+  // without disabling. See docs/04-implementation/CONSENT_GATE_ROLLOUT.md.
+  //
+  // strictBooleanFlag, not z.coerce.boolean(), is load-bearing here -- that
+  // helper exists because coercion turned the string "false" into true, and
+  // for this flag specifically that bug would mean being unable to turn the
+  // gate off during an incident.
+  FEATURE_CONSENT_GATE: strictBooleanFlag(true),
 
   // Narrower kill switch than the flag itself: the roles the gate applies to.
   // Lets an operator drop `manager,regional_manager` under fire, keeping the

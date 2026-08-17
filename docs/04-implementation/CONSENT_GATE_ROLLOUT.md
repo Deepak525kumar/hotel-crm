@@ -2,8 +2,8 @@
 
 Operational runbook for `FEATURE_CONSENT_GATE` (RULE-CONSENT-01, REQ-CONSENT-001/003).
 
-This control can lock **every non-admin user out of the entire platform**. Read the kill
-switch section before enabling it anywhere.
+This control can lock **every non-admin user out of the entire platform**, and it is **ON by
+default** from the first version. Read the kill switch below before deploying anywhere.
 
 ---
 
@@ -33,38 +33,31 @@ misfires, someone must remain able to log in and turn it off.
 
 ---
 
-## Rollout order
+## Rollout: enabled by default in the first version
 
-The ordering constraint is hard, not advisory.
+**`FEATURE_CONSENT_GATE` defaults to `true`** (owner decision, 2026-08-18). It is on wherever
+the env var is unset.
 
-1. **Backend, flag off.** Deploy. No behaviour change — the middleware does not even query
-   consent state while disabled.
-2. **Ship the clients** (web + both mobile apps) and **wait for real adoption.** The client
-   gates read `/consent/status` directly and work with the flag off, so they are safe to
-   ship early.
-3. **Enable in staging.** Run the manual matrix below in full.
-4. **Enable in production with `CONSENT_GATE_ROLES=worker`**, mid-afternoon, monitored.
-5. **Widen to the remaining roles** once step 4 has survived a full morning.
+This deliberately skips the staged rollout an earlier draft of this document prescribed. That
+staging existed for one reason: an older, gate-unaware mobile build receiving a `403
+CONSENT_REQUIRED` it has no handler for, stranding the user with no path to consent. **That
+risk does not exist here** — the gate ships as part of the first version, so there is no
+older client already in the field. Every client in this release renders the notice.
 
-### Why step 2 must precede step 4
+The staged approach becomes necessary again the moment there *are* deployed clients predating
+a gate change. If this flag is ever turned off and later back on against a live fleet, restore
+the ordering: ship gate-aware clients first, wait for adoption, then flip.
 
-Mobile clients update asynchronously. If the flag flips before an old build is replaced,
-that build receives a `403 CONSENT_REQUIRED` it has no handler for and shows a generic
-error with **no path to consent** — total lockout for every un-updated device.
+### Still true regardless of the default
 
-An old build is not completely stranded: the pre-existing self-service consent screen
-(`consent.tsx`, reachable from Profile) still works, so support can talk a user through
-accepting manually. Budget for those calls, or delay step 4 until adoption telemetry is
-convincing.
+- **Enable it in staging first and run the manual matrix below.** Default-on removes the
+  adoption risk; it does not remove the configuration risk.
+- **Prefer a mid-afternoon flip over a morning one** on any environment with real users. The
+  workforce logs in inside a ~90-minute window, so an afternoon change gives you 16 hours to
+  watch before the first large exposure.
+- **`CONSENT_GATE_ROLES` still narrows without disabling** — see the kill switch above.
 
-### Why mid-afternoon, not morning
-
-The whole workforce logs in inside a ~90-minute window. Enabling mid-afternoon means the
-first *large* exposure is a morning you have already had 16 hours to watch.
-
----
-
-## Manual test matrix (before production enable)
+## Manual test matrix (before shipping to a real environment)
 
 Automated tests cannot cover these. Run every row.
 
@@ -77,7 +70,7 @@ Automated tests cannot cover these. Run every row.
 | 5 | **Sit on the locked screen >15 minutes, then accept** | Works. This is the `/auth/refresh` exemption — access tokens expire in 15m and this is the only way to catch it |
 | 6 | Change language on the gate, re-read the notice | Renders in the new language; RTL flips for `ar`/`ur` |
 | 7 | Hold a session across midnight Berlin time | Re-gated on the next request |
-| 8 | Install the **pre-gate** mobile build, enable the flag | Observe exactly what the user sees; decide if it is survivable |
+| 8 | *(n/a for v1 — no pre-gate client exists. Reinstate if the flag is ever re-enabled against a live fleet: install the older build, flip the flag, observe what the user sees.)* | — |
 | 9 | Stop the database, hit a gated route as a worker | Request succeeds (fail-open), `consent_gate_check_failed` logged |
 
 ---
@@ -118,7 +111,14 @@ reviewed change.
 ## Not covered by this gate
 
 Notice content is still a structural placeholder in all 13 languages — no locale, German
-included, serves legally-reviewed copy. Enabling this gate makes workers accept a
-**placeholder** daily. That is a product decision to take deliberately, not a side effect
-to discover: the gate enforces the *act* of consent, and real DPO-authored copy remains
-outstanding.
+included, serves legally-reviewed copy. With the gate on by default, workers accept a
+**placeholder** daily from the first version onward.
+
+This is a known and accepted state for v1 (owner decision, 2026-08-18: "we will change the
+notice later"), not an oversight. What the gate delivers now is the *mechanism* — the daily
+prompt, the block, the immutable record, the manager notification on decline. What it does
+not deliver is legally-reviewed text, and the consent records written before real copy ships
+attest to a placeholder rather than to the eventual notice. Whether those pre-copy records
+need re-consenting once real text lands is a DPO question; `notice_version` is the lever
+(bumping it re-gates everyone, by design), which is why RULE-CONSENT-02 ties a grant to a
+specific version.

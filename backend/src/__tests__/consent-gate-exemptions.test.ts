@@ -9,6 +9,8 @@
 // `isConsentExempt` is a pure function precisely so both directions can be
 // tested without booting Express.
 
+import { readFileSync } from 'node:fs';
+
 import {
   CONSENT_GATE_EXEMPT_PATHS,
   isConsentExempt,
@@ -115,5 +117,30 @@ describe('consent gate — the exemption list itself', () => {
 
   it('is frozen', () => {
     expect(Object.isFrozen(CONSENT_GATE_EXEMPT_PATHS)).toBe(true);
+  });
+});
+
+describe('the flag default', () => {
+  // The default is a deliberate, owner-approved decision (2026-08-18), not an
+  // incidental value: the gate ships ON in the first version because there is
+  // no older, gate-unaware client in the field to strand on a 403. Flipping it
+  // either way changes whether every non-admin is blocked, so it must be a
+  // conscious test change rather than a silent edit.
+  //
+  // Asserted against the source rather than getEnv(), which validates the
+  // whole environment and cannot be constructed in isolation here. The value
+  // is verified end-to-end against a live stack in
+  // docs/10-testing/e2e/scenarios/11-daily-consent-gate.md.
+  it('FEATURE_CONSENT_GATE is declared with a default of true', () => {
+    const src = readFileSync('src/config/env.ts', 'utf8');
+    expect(src).toContain('FEATURE_CONSENT_GATE: strictBooleanFlag(true)');
+  });
+
+  it('CONSENT_GATE_ROLES excludes admin at parse time', () => {
+    // admin is filtered in env.ts AND checked again in the middleware. Two
+    // layers deliberately: an unrecoverable platform needs someone left who
+    // can turn the gate off.
+    const src = readFileSync('src/config/env.ts', 'utf8');
+    expect(src).toContain("r !== 'admin'");
   });
 });
