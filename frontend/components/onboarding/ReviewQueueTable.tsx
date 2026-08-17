@@ -429,7 +429,7 @@ export function ReviewQueueTable() {
             label={t("onboarding.rejectionReason")}
             value={rejectReason}
             onChange={(e) => setRejectReason(e.target.value)}
-            placeholder="e.g. Invalid document uploaded"
+            placeholder={t("onboarding.rejectionReasonPlaceholder")}
             disabled={rejectAction.pending}
           />
           <FormError>{rejectAction.error}</FormError>

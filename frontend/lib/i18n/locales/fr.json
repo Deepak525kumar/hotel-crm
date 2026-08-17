@@ -157,7 +157,10 @@
     "score0to100": "Score (0–100)",
     "punctuality0to100": "Ponctualité (0–100)",
     "quality0to100": "Qualité (0–100)",
-    "attitude0to100": "Attitude (0–100)"
+    "attitude0to100": "Attitude (0–100)",
+    "hotelNamePlaceholder": "p. ex. Grand Central Hotel",
+    "groupNamePlaceholder": "p. ex. Région Nord",
+    "jobTitlePlaceholder": "p. ex. Femme de chambre"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -346,7 +349,10 @@
     "network": "Impossible de joindre le serveur. Vérifiez votre connexion.",
     "notFound": "Introuvable.",
     "forbidden": "Vous n'avez pas accès à cet élément.",
-    "title": "Erreur"
+    "title": "Erreur",
+    "unexpectedRecovery": "Une erreur inattendue s'est produite. Vous pouvez réessayer ou revenir au tableau de bord.",
+    "pageNotFound": "Page introuvable",
+    "pageNotFoundDescription": "La page que vous recherchez n'existe pas ou a été déplacée."
   },
   "shifts": {
     "checkIn": "Pointer l'arrivée",
@@ -582,7 +588,8 @@
     "sendResetLink": "Envoyer le lien de réinitialisation",
     "revokeSessionsAction": "Révoquer les sessions",
     "deactivateAction": "Désactiver",
-    "employeeManagement": "Gestion des employés"
+    "employeeManagement": "Gestion des employés",
+    "revokeAccessFor": "Cela révoque l'accès de <name>{{name}}</name>. Vous pouvez réactiver le compte depuis l'écran de modification."
   },
   "requests": {
     "title": "Demande de travail",
@@ -679,7 +686,9 @@
     "noPermissionCreateUsers": "Vous n'êtes pas autorisé à créer des utilisateurs.",
     "noContractYet": "Aucun contrat ne vous a encore été délivré. Contactez votre responsable.",
     "downloadContract": "Télécharger le contrat",
-    "completeOnboardingAction": "Terminez votre intégration"
+    "completeOnboardingAction": "Terminez votre intégration",
+    "contractExpiredNotice": "Votre contrat a expiré. Veuillez démarrer le processus de réintégration pour recevoir et téléverser un nouveau contrat.",
+    "rejectionReasonPlaceholder": "p. ex. Document non valide téléversé"
   },
   "analytics": {
     "myPerformance": "Mes performances",
@@ -744,7 +753,8 @@
     "noneFound": "Aucun registre de présence trouvé",
     "viewAssignment": "Voir l'affectation",
     "saveReview": "Enregistrer la vérification",
-    "loadFailed": "Impossible de charger la présence. Veuillez réessayer."
+    "loadFailed": "Impossible de charger la présence. Veuillez réessayer.",
+    "checkedInUseAssignment": "Votre arrivée est pointée. Utilisez la <assignmentLink>page d'affectation</assignmentLink> pour pointer votre départ et terminer votre service."
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
@@ -773,7 +783,9 @@
     "deleteAction": "Supprimer",
     "reasonRequired": "Un motif est requis.",
     "idAndReasonRequired": "L'identifiant employé et le motif sont tous deux requis.",
-    "signedContractReceived": "Contrat signé reçu — l’approbation le confirmera."
+    "signedContractReceived": "Contrat signé reçu — l’approbation le confirmera.",
+    "editSkillsHint": "Sélectionnez les compétences pour lesquelles cet employé est qualifié. Les diffusions sont mises en correspondance avec ces compétences.",
+    "deletionReasonPlaceholder": "p. ex. Démission, fin de contrat"
   },
   "compliance": {
     "exportDescription": "Génère une copie de vos documents, de votre historique de consentement et du journal d'audit de votre compte.",
@@ -781,5 +793,28 @@
   },
   "archive": {
     "description": "Hôtels et groupes hôteliers retirés de l'exploitation. L'historique est conservé — la restauration rend une entité immédiatement disponible."
+  },
+  "lifecycle": {
+    "hotel": {
+      "deleted": "Hôtel supprimé",
+      "deactivate": "Désactiver l'hôtel",
+      "reactivate": "Réactiver l'hôtel",
+      "pauseHint": "Met temporairement cet hôtel en pause. Il n'apparaît plus aux employés et se ferme à toute nouvelle dotation ; il peut être réactivé à tout moment.",
+      "pausedHint": "Cet hôtel est en pause. Le réactiver le rend immédiatement disponible.",
+      "deleteTitle": "Supprimer l'hôtel",
+      "updateFailed": "Impossible de mettre à jour cet hôtel. Veuillez réessayer.",
+      "deleteHint": "Cela retire complètement l'hôtel des opérations : il n'apparaîtra plus nulle part et ne pourra pas être doté en personnel."
+    },
+    "hotelGroup": {
+      "deleted": "Groupe hôtelier supprimé",
+      "deactivate": "Désactiver le groupe hôtelier",
+      "reactivate": "Réactiver le groupe hôtelier",
+      "pauseHint": "Met temporairement ce groupe hôtelier en pause. Il n'apparaît plus aux employés et se ferme à toute nouvelle dotation ; il peut être réactivé à tout moment.",
+      "pausedHint": "Ce groupe hôtelier est en pause. Le réactiver le rend immédiatement disponible.",
+      "deleteTitle": "Supprimer le groupe hôtelier",
+      "updateFailed": "Impossible de mettre à jour ce groupe hôtelier. Veuillez réessayer.",
+      "deleteHint": "Cela retire complètement le groupe hôtelier des opérations : il n'apparaîtra plus nulle part et ne pourra pas être doté en personnel."
+    },
+    "nothingErased": "Rien n'est effacé. L'historique est conservé et un administrateur peut le restaurer depuis la vue archivée."
   }
 }

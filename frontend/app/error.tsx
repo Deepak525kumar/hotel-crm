@@ -29,8 +29,7 @@ export default function Error({
           {t("common.somethingWentWrong")}
         </h1>
         <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-          An unexpected error occurred. You can try again, or head back to the
-          dashboard.
+          {t("errors.unexpectedRecovery")}
         </p>
         <div className="mt-6 flex justify-center gap-3">
           <button

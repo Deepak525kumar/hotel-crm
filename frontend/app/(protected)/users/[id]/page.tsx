@@ -25,7 +25,7 @@ import { AssignmentCard } from "@/components/users/AssignmentCard";
 import { AvailabilityBadge } from "@/components/calendar/AvailabilityBadge";
 import { formatDateTime } from "@/lib/format";
 import { EMPLOYMENT_STATUS_TONE, EMPLOYMENT_STATUS_LABEL } from "@/lib/employmentStatus";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import {
   ActiveBadge,
   Badge,
@@ -348,11 +348,13 @@ function UserDetail() {
         }
       >
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          This revokes access for{" "}
-          <span className="font-medium">
-            {user?.first_name} {user?.last_name}
-          </span>
-          . You can reactivate the account from the edit screen.
+          {/* <Trans> rather than t(): the name is emphasised mid-sentence, and
+              where that emphasis falls varies by language. */}
+          <Trans
+            i18nKey="users.revokeAccessFor"
+            values={{ name: `${user?.first_name ?? ""} ${user?.last_name ?? ""}`.trim() }}
+            components={{ name: <span className="font-medium" /> }}
+          />
         </p>
         <FormError className="mt-3">{deactivate.error}</FormError>
       </Modal>

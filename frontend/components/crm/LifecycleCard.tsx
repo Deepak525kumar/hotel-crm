@@ -35,7 +35,7 @@ import { useTranslation } from "react-i18next";
  * belongs in a separate purge operation with stronger authentication.
  */
 export function LifecycleCard({
-  label,
+  entity,
   isActive,
   deletedAt,
   onDeactivate,
@@ -43,8 +43,21 @@ export function LifecycleCard({
   onDelete,
   onRestore,
 }: {
-  /** Lowercase noun for prose, e.g. "hotel" or "hotel group". */
-  label: string;
+  /**
+   * Which entity this card governs, used as an i18n key prefix
+   * (`lifecycle.<entity>.*`).
+   *
+   * Was previously a lowercase English noun interpolated into sentence
+   * templates -- `Deactivate ${label}`, `This ${label} is paused.` That
+   * cannot be translated correctly: German needs a different article per
+   * gender ("Dieses Hotel" vs "Diese Hotelgruppe"), and Arabic, Ukrainian and
+   * Urdu inflect the noun by grammatical case. Each locale therefore writes
+   * whole sentences per entity instead of receiving a noun to slot in.
+   *
+   * Adding an entity means adding its `lifecycle.<entity>.*` block to every
+   * catalogue; the locale parity test fails loudly if one is missed.
+   */
+  entity: "hotel" | "hotelGroup";
   isActive: boolean;
   deletedAt: string | null;
   onDeactivate: () => Promise<unknown>;
@@ -60,7 +73,7 @@ export function LifecycleCard({
     action.run(fn, {
       key,
       onSuccess: () => setConfirmDelete(false),
-      errorMessage: `Could not update this ${label}. Please try again.`,
+      errorMessage: t(`lifecycle.${entity}.updateFailed`),
     });
 
   // Deleted is terminal until restored: showing deactivate/reactivate here
@@ -71,7 +84,9 @@ export function LifecycleCard({
       <Card>
         <CardContent className="flex items-center justify-between gap-4">
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Deleted {label}</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              {t(`lifecycle.${entity}.deleted`)}
+            </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               Removed from operations on {formatDateTime(deletedAt)}. History is
               preserved and it can be restored.
@@ -96,12 +111,14 @@ export function LifecycleCard({
         <CardContent className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-              {isActive ? `Deactivate ${label}` : `Reactivate ${label}`}
+              {isActive
+                ? t(`lifecycle.${entity}.deactivate`)
+                : t(`lifecycle.${entity}.reactivate`)}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {isActive
-                ? `Temporarily pauses this ${label}. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.`
-                : `This ${label} is paused. Reactivating makes it available again immediately.`}
+                ? t(`lifecycle.${entity}.pauseHint`)
+                : t(`lifecycle.${entity}.pausedHint`)}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -132,7 +149,7 @@ export function LifecycleCard({
       <Modal
         open={confirmDelete}
         onClose={() => !action.pending && setConfirmDelete(false)}
-        title={`Delete ${label}`}
+        title={t(`lifecycle.${entity}.deleteTitle`)}
         footer={
           <>
             <Button
@@ -153,17 +170,11 @@ export function LifecycleCard({
         }
       >
         <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
-          <p>
-            This removes the {label} from operations entirely: it will no longer
-            appear in lists, pickers or assignment flows.
-          </p>
+          <p>{t(`lifecycle.${entity}.deleteHint`)}</p>
           {/* Stated explicitly so delete does not read as destructive, which
               is what makes it distinct from deactivate rather than a scarier
               synonym for it. */}
-          <p>
-            Nothing is erased. History is preserved and an admin can restore it
-            from the archived view.
-          </p>
+          <p>{t("lifecycle.nothingErased")}</p>
           <FormError>{action.error}</FormError>
         </div>
       </Modal>

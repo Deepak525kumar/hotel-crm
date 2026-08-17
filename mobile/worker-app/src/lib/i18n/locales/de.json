@@ -157,7 +157,10 @@
     "score0to100": "Punktzahl (0–100)",
     "punctuality0to100": "Pünktlichkeit (0–100)",
     "quality0to100": "Qualität (0–100)",
-    "attitude0to100": "Einstellung (0–100)"
+    "attitude0to100": "Einstellung (0–100)",
+    "hotelNamePlaceholder": "z. B. Grand Central Hotel",
+    "groupNamePlaceholder": "z. B. Region Nord",
+    "jobTitlePlaceholder": "z. B. Zimmermädchen"
   },
   "nav": {
     "dashboard": "Übersicht",
@@ -346,7 +349,10 @@
     "network": "Der Server ist nicht erreichbar. Bitte prüfen Sie Ihre Verbindung.",
     "notFound": "Nicht gefunden.",
     "forbidden": "Sie haben keinen Zugriff darauf.",
-    "title": "Fehler"
+    "title": "Fehler",
+    "unexpectedRecovery": "Ein unerwarteter Fehler ist aufgetreten. Sie können es erneut versuchen oder zur Übersicht zurückkehren.",
+    "pageNotFound": "Seite nicht gefunden",
+    "pageNotFoundDescription": "Die gesuchte Seite existiert nicht oder wurde verschoben."
   },
   "shifts": {
     "checkIn": "Einchecken",
@@ -582,7 +588,8 @@
     "sendResetLink": "Zurücksetzungslink senden",
     "revokeSessionsAction": "Sitzungen widerrufen",
     "deactivateAction": "Deaktivieren",
-    "employeeManagement": "Mitarbeiterverwaltung"
+    "employeeManagement": "Mitarbeiterverwaltung",
+    "revokeAccessFor": "Dies entzieht <name>{{name}}</name> den Zugriff. Sie können das Konto über den Bearbeitungsbildschirm wieder aktivieren."
   },
   "requests": {
     "title": "Arbeitsanfrage",
@@ -679,7 +686,9 @@
     "noPermissionCreateUsers": "Sie haben keine Berechtigung, Benutzer zu erstellen.",
     "noContractYet": "Für Sie wurde noch kein Vertrag ausgestellt. Wenden Sie sich an Ihren Manager.",
     "downloadContract": "Vertrag herunterladen",
-    "completeOnboardingAction": "Schließen Sie Ihre Einarbeitung ab"
+    "completeOnboardingAction": "Schließen Sie Ihre Einarbeitung ab",
+    "contractExpiredNotice": "Ihr Vertrag ist abgelaufen. Bitte starten Sie den erneuten Onboarding-Prozess, um einen neuen Vertrag zu erhalten und hochzuladen.",
+    "rejectionReasonPlaceholder": "z. B. Ungültiges Dokument hochgeladen"
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
@@ -744,7 +753,8 @@
     "noneFound": "Keine Anwesenheitsaufzeichnungen gefunden",
     "viewAssignment": "Einsatz ansehen",
     "saveReview": "Prüfung speichern",
-    "loadFailed": "Anwesenheit konnte nicht geladen werden. Bitte versuchen Sie es erneut."
+    "loadFailed": "Anwesenheit konnte nicht geladen werden. Bitte versuchen Sie es erneut.",
+    "checkedInUseAssignment": "Sie sind eingecheckt. Nutzen Sie die <assignmentLink>Einsatzseite</assignmentLink>, um auszuchecken und Ihre Schicht abzuschließen."
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",
@@ -773,7 +783,9 @@
     "deleteAction": "Löschen",
     "reasonRequired": "Ein Grund ist erforderlich.",
     "idAndReasonRequired": "Mitarbeiter-ID und Grund sind beide erforderlich.",
-    "signedContractReceived": "Unterschriebener Vertrag erhalten — mit der Genehmigung wird er bestätigt."
+    "signedContractReceived": "Unterschriebener Vertrag erhalten — mit der Genehmigung wird er bestätigt.",
+    "editSkillsHint": "Wählen Sie die Qualifikationen aus, für die dieser Mitarbeiter geeignet ist. Rundmeldungen werden anhand dieser Qualifikationen zugeordnet.",
+    "deletionReasonPlaceholder": "z. B. Gekündigt, Vertrag beendet"
   },
   "compliance": {
     "exportDescription": "Erstellt eine Kopie Ihrer Dokumente, Ihres Zustimmungsverlaufs und Ihres Konto-Prüfprotokolls.",
@@ -781,5 +793,28 @@
   },
   "archive": {
     "description": "Aus dem Betrieb genommene Hotels und Hotelgruppen. Die Historie bleibt erhalten — eine Wiederherstellung macht einen Eintrag sofort wieder verfügbar."
+  },
+  "lifecycle": {
+    "hotel": {
+      "deleted": "Gelöschtes Hotel",
+      "deactivate": "Hotel deaktivieren",
+      "reactivate": "Hotel reaktivieren",
+      "pauseHint": "Pausiert dieses Hotel vorübergehend. Es wird Mitarbeitern nicht mehr angezeigt und für neue Personalplanung geschlossen; es kann jederzeit reaktiviert werden.",
+      "pausedHint": "Dieses Hotel ist pausiert. Durch Reaktivieren ist es sofort wieder verfügbar.",
+      "deleteTitle": "Hotel löschen",
+      "updateFailed": "Dieses Hotel konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
+      "deleteHint": "Dies entfernt das Hotel vollständig aus dem Betrieb: Es erscheint nirgendwo mehr und kann nicht besetzt werden."
+    },
+    "hotelGroup": {
+      "deleted": "Gelöschte Hotelgruppe",
+      "deactivate": "Hotelgruppe deaktivieren",
+      "reactivate": "Hotelgruppe reaktivieren",
+      "pauseHint": "Pausiert diese Hotelgruppe vorübergehend. Sie wird Mitarbeitern nicht mehr angezeigt und für neue Personalplanung geschlossen; sie kann jederzeit reaktiviert werden.",
+      "pausedHint": "Diese Hotelgruppe ist pausiert. Durch Reaktivieren ist sie sofort wieder verfügbar.",
+      "deleteTitle": "Hotelgruppe löschen",
+      "updateFailed": "Diese Hotelgruppe konnte nicht aktualisiert werden. Bitte versuchen Sie es erneut.",
+      "deleteHint": "Dies entfernt die Hotelgruppe vollständig aus dem Betrieb: Sie erscheint nirgendwo mehr und kann nicht besetzt werden."
+    },
+    "nothingErased": "Nichts wird gelöscht. Der Verlauf bleibt erhalten und ein Administrator kann den Eintrag aus der Archivansicht wiederherstellen."
   }
 }

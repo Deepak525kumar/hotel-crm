@@ -168,7 +168,7 @@ export default function MyOnboardingPage() {
                   <AlertCircle className="w-5 h-5 shrink-0" />
                   <div>
                     <span className="font-semibold block">{t("hr.contractExpired")}</span>
-                    Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.
+                    {t("onboarding.contractExpiredNotice")}
                   </div>
                 </div>
               )}

@@ -672,7 +672,7 @@ function DeleteModal({
           label={t("fields.reason")}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="e.g. Resigned, contract ended"
+          placeholder={t("employees.deletionReasonPlaceholder")}
         />
         <FormError>{fieldError ?? deleteAction.error}</FormError>
       </div>
@@ -759,7 +759,7 @@ function EditSkillsModal({
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Select the skills this worker is qualified for. Broadcasts are matched against these skills.
+          {t("employees.editSkillsHint")}
         </p>
         <div className="grid grid-cols-2 gap-2 mt-4">
           {SKILL_OPTIONS.map((opt) => (

@@ -157,7 +157,10 @@
     "score0to100": "Score (0–100)",
     "punctuality0to100": "Punctuality (0–100)",
     "quality0to100": "Quality (0–100)",
-    "attitude0to100": "Attitude (0–100)"
+    "attitude0to100": "Attitude (0–100)",
+    "hotelNamePlaceholder": "e.g. Grand Central Hotel",
+    "groupNamePlaceholder": "e.g. Northern Region",
+    "jobTitlePlaceholder": "e.g. Housekeeper"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -346,7 +349,10 @@
     "network": "Could not reach the server. Check your connection.",
     "notFound": "Not found.",
     "forbidden": "You do not have access to this.",
-    "title": "Error"
+    "title": "Error",
+    "unexpectedRecovery": "An unexpected error occurred. You can try again, or head back to the dashboard.",
+    "pageNotFound": "Page not found",
+    "pageNotFoundDescription": "The page you're looking for doesn't exist or has moved."
   },
   "shifts": {
     "checkIn": "Check In",
@@ -582,7 +588,8 @@
     "sendResetLink": "Send reset link",
     "revokeSessionsAction": "Revoke sessions",
     "deactivateAction": "Deactivate",
-    "employeeManagement": "Employee Management"
+    "employeeManagement": "Employee Management",
+    "revokeAccessFor": "This revokes access for <name>{{name}}</name>. You can reactivate the account from the edit screen."
   },
   "requests": {
     "title": "Work request",
@@ -679,7 +686,9 @@
     "noPermissionCreateUsers": "You do not have permission to create users.",
     "noContractYet": "No contract has been issued for you yet. Contact your manager.",
     "downloadContract": "Download contract",
-    "completeOnboardingAction": "Complete your onboarding"
+    "completeOnboardingAction": "Complete your onboarding",
+    "contractExpiredNotice": "Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.",
+    "rejectionReasonPlaceholder": "e.g. Invalid document uploaded"
   },
   "analytics": {
     "myPerformance": "My performance",
@@ -744,7 +753,8 @@
     "noneFound": "No attendance records found",
     "viewAssignment": "View assignment",
     "saveReview": "Save review",
-    "loadFailed": "Failed to load attendance. Please try again."
+    "loadFailed": "Failed to load attendance. Please try again.",
+    "checkedInUseAssignment": "You are checked in. Use the <assignmentLink>assignment page</assignmentLink> to check out and complete your shift."
   },
   "employees": {
     "noBlocked": "No blocked employees",
@@ -773,7 +783,9 @@
     "deleteAction": "Delete",
     "reasonRequired": "A reason is required.",
     "idAndReasonRequired": "Employee ID and reason are both required.",
-    "signedContractReceived": "Signed contract received — approving will confirm it."
+    "signedContractReceived": "Signed contract received — approving will confirm it.",
+    "editSkillsHint": "Select the skills this worker is qualified for. Broadcasts are matched against these skills.",
+    "deletionReasonPlaceholder": "e.g. Resigned, contract ended"
   },
   "compliance": {
     "exportDescription": "Generates a copy of your documents, consent history, and account audit trail.",
@@ -781,5 +793,28 @@
   },
   "archive": {
     "description": "Hotels and hotel groups removed from operations. History is preserved — restoring makes an entity available again immediately."
+  },
+  "lifecycle": {
+    "hotel": {
+      "deleted": "Deleted hotel",
+      "deactivate": "Deactivate hotel",
+      "reactivate": "Reactivate hotel",
+      "pauseHint": "Temporarily pauses this hotel. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.",
+      "pausedHint": "This hotel is paused. Reactivating makes it available again immediately.",
+      "deleteTitle": "Delete hotel",
+      "updateFailed": "Could not update this hotel. Please try again.",
+      "deleteHint": "This removes the hotel from operations entirely: it will no longer appear anywhere and cannot be staffed."
+    },
+    "hotelGroup": {
+      "deleted": "Deleted hotel group",
+      "deactivate": "Deactivate hotel group",
+      "reactivate": "Reactivate hotel group",
+      "pauseHint": "Temporarily pauses this hotel group. It stops appearing to workers and closes to new staffing, and can be reactivated at any time.",
+      "pausedHint": "This hotel group is paused. Reactivating makes it available again immediately.",
+      "deleteTitle": "Delete hotel group",
+      "updateFailed": "Could not update this hotel group. Please try again.",
+      "deleteHint": "This removes the hotel group from operations entirely: it will no longer appear anywhere and cannot be staffed."
+    },
+    "nothingErased": "Nothing is erased. History is preserved and an admin can restore it from the archived view."
   }
 }
