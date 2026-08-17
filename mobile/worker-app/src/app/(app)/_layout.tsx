@@ -3,8 +3,10 @@ import { Tabs, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
+import { useTranslation } from 'react-i18next';
 
 export default function AppLayout() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
 
@@ -45,7 +47,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Dashboard',
+          title: t('nav.dashboard'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'house.fill', android: 'home', web: 'home' }}
@@ -58,7 +60,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="marketplace"
         options={{
-          title: 'Jobs',
+          title: t('nav.jobs'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'briefcase.fill', android: 'work', web: 'work' }}
@@ -71,7 +73,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="shifts"
         options={{
-          title: 'My Shifts',
+          title: t('nav.myShifts'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'calendar', android: 'calendar_today', web: 'calendar_today' }}
@@ -84,7 +86,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="absences"
         options={{
-          title: 'Sick/Vacation',
+          title: t('nav.sickVacation'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'cross.case.fill', android: 'medical_services', web: 'medical_services' }}
@@ -97,7 +99,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'Alerts',
+          title: t('nav.alerts'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'bell.fill', android: 'notifications', web: 'notifications' }}
@@ -110,7 +112,7 @@ export default function AppLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t('nav.profile'),
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'person.circle', android: 'account_circle', web: 'account_circle' }}

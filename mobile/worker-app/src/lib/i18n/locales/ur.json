@@ -72,7 +72,15 @@
     "today": "آج",
     "file": "فائل",
     "download": "ڈاؤن لوڈ کریں",
-    "prev": "پچھلا"
+    "prev": "پچھلا",
+    "submitted": "جمع کرایا",
+    "ok": "ٹھیک ہے",
+    "done": "مکمل",
+    "request": "درخواست",
+    "keep": "رکھیں",
+    "shift": "شفٹ",
+    "loadFailed": "لوڈ ناکام",
+    "tomorrow": "کل"
   },
   "fields": {
     "name": "نام",
@@ -188,7 +196,14 @@
     "myOnboarding": "میری شمولیت",
     "reviewQueue": "جائزہ قطار",
     "docs": "دستاویزات",
-    "explore": "دریافت کریں"
+    "explore": "دریافت کریں",
+    "jobs": "ملازمتیں",
+    "sickVacation": "بیماری / چھٹی",
+    "alerts": "اطلاعات",
+    "queue": "قطار",
+    "attendanceDetail": "حاضری کی تفصیل",
+    "qualityCheck": "معیار کی جانچ",
+    "rateWorker": "ورکر کی درجہ بندی"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -225,7 +240,9 @@
     "notYetLogged": "ابھی درج نہیں۔",
     "awaitingSignature": "دستخط کا انتظار",
     "alreadyFilled": "پہلے سے بھرا ہوا",
-    "inProgress": "جاری"
+    "inProgress": "جاری",
+    "present": "حاضر",
+    "late": "دیر سے"
   },
   "assignments": {
     "shiftDetails": "شفٹ کی تفصیلات",
@@ -353,7 +370,11 @@
     "title": "خرابی",
     "unexpectedRecovery": "ایک غیر متوقع خرابی پیش آئی۔ آپ دوبارہ کوشش کر سکتے ہیں یا ڈیش بورڈ پر واپس جا سکتے ہیں۔",
     "pageNotFound": "صفحہ نہیں ملا",
-    "pageNotFoundDescription": "آپ جو صفحہ تلاش کر رہے ہیں وہ موجود نہیں یا منتقل ہو چکا ہے۔"
+    "pageNotFoundDescription": "آپ جو صفحہ تلاش کر رہے ہیں وہ موجود نہیں یا منتقل ہو چکا ہے۔",
+    "tooManyRequests": "بہت زیادہ درخواستیں۔ دوبارہ کوشش کرنے سے پہلے انتظار کریں۔",
+    "sessionRevoked": "آپ کا سیشن منسوخ کر دیا گیا۔ دوبارہ لاگ ان کریں۔",
+    "sessionExpired": "سیشن ختم ہو گیا۔ دوبارہ لاگ ان کریں۔",
+    "requestFailed": "درخواست ناکام"
   },
   "shifts": {
     "checkIn": "چیک اِن",
@@ -415,7 +436,10 @@
     "deleteAction": "حذف کریں",
     "uploadAction": "اپ لوڈ کریں",
     "fileTooLarge": "فائل 10MB حد سے تجاوز کرتی ہے۔",
-    "uploadFirstHint": "شروع کرنے کے لیے اپنی پہلی دستاویز اپ لوڈ کریں۔"
+    "uploadFirstHint": "شروع کرنے کے لیے اپنی پہلی دستاویز اپ لوڈ کریں۔",
+    "uploadFailed": "اپ لوڈ ناکام۔ دوبارہ کوشش کریں۔",
+    "unsupportedType": "غیر معاون فائل قسم۔ اجازت: PDF, JPEG, PNG, WEBP۔",
+    "exceedsMaxSize": "فائل 10 ایم بی کی حد سے زیادہ ہے۔"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -453,7 +477,9 @@
     "endDateAfterStart": "اختتامی تاریخ آغاز کی تاریخ کے برابر یا بعد میں ہونی چاہیے۔",
     "requestPayslip": "تنخواہ سلپ کی درخواست",
     "noContractYet": "سسٹم میں ابھی آپ کا کوئی معاہدہ نہیں ہے۔",
-    "noPayslipsRequestedYet": "آپ نے ابھی تک کوئی تنخواہ سلپ نہیں مانگی۔"
+    "noPayslipsRequestedYet": "آپ نے ابھی تک کوئی تنخواہ سلپ نہیں مانگی۔",
+    "dataLoadFailed": "ایچ آر ڈیٹا لوڈ نہیں ہو سکا۔",
+    "payslipConfirm": "کیا آپ {{period}} کے لیے اپنی تنخواہ کی پرچی طلب کرنا چاہتے ہیں؟"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -466,7 +492,16 @@
     "loadFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔",
     "history": "رضامندی کی تاریخ",
     "auditTrail": "آڈٹ ٹریل",
-    "loadOneFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔"
+    "loadOneFailed": "آپ کی رضامندی کی حالت لوڈ نہیں ہو سکی۔",
+    "couldNotLoadStatus": "رضامندی کی حالت لوڈ نہیں ہو سکی۔",
+    "couldNotLoadNotice": "نوٹس لوڈ نہیں ہو سکا۔",
+    "couldNotRecordDecision": "آپ کا فیصلہ درج نہیں ہو سکا۔",
+    "couldNotWithdraw": "رضامندی واپس نہیں لی جا سکی۔",
+    "statusGranted": "دی گئی",
+    "statusDeclined": "انکار",
+    "statusUndecided": "ابھی فیصلہ نہیں",
+    "decidedAt": "فیصلہ {{when}} · نوٹس {{version}}",
+    "declinedPreviously": "آپ نے یہ نوٹس {{when}} کو مسترد کیا تھا۔ آپ اسے نیچے دوبارہ دیکھ سکتے ہیں۔"
   },
   "notifications": {
     "title": "اطلاعات",
@@ -480,11 +515,14 @@
     "loadFailed": "اطلاعات لوڈ نہیں ہو سکیں۔ دوبارہ کوشش کریں۔",
     "viewAllAction": "تمام اطلاعات دیکھیں",
     "markReadHint": "اس اطلاع کو دیکھنے کے بعد پڑھا گیا نشان زد کریں۔",
-    "allCaughtUp": "آپ سب کچھ دیکھ چکے ہیں۔"
+    "allCaughtUp": "آپ سب کچھ دیکھ چکے ہیں۔",
+    "tapToMarkRead": "پڑھا ہوا نشان زد کرنے کے لیے تھپتھپائیں",
+    "noneYet": "ابھی کوئی اطلاع نہیں۔"
   },
   "leaderboard": {
     "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
-    "view": "لیڈر بورڈ دیکھیں"
+    "view": "لیڈر بورڈ دیکھیں",
+    "topPerformers": "اوسط درجہ بندی کے مطابق بہترین کارکردگی"
   },
   "profile": {
     "title": "پروفائل",
@@ -765,7 +803,13 @@
     "viewAssignment": "تفویض دیکھیں",
     "saveReview": "جائزہ محفوظ کریں",
     "loadFailed": "حاضری لوڈ نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
-    "checkedInUseAssignment": "آپ کا چیک اِن ہو چکا ہے۔ چیک آؤٹ کرنے اور اپنی شفٹ مکمل کرنے کے لیے <assignmentLink>تفویض کا صفحہ</assignmentLink> استعمال کریں۔"
+    "checkedInUseAssignment": "آپ کا چیک اِن ہو چکا ہے۔ چیک آؤٹ کرنے اور اپنی شفٹ مکمل کرنے کے لیے <assignmentLink>تفویض کا صفحہ</assignmentLink> استعمال کریں۔",
+    "queueTitle": "حاضری قطار",
+    "verifyTitleAction": "حاضری کی تصدیق کریں",
+    "verificationNotesPlaceholder": "تصدیقی نوٹس (اختیاری)…",
+    "verifiedMark": "تصدیق شدہ ✓",
+    "verifiedBody": "حاضری کی تصدیق ہو گئی۔",
+    "verifyFailed": "تصدیق ناکام"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
@@ -827,5 +871,39 @@
       "deleteHint": "یہ ہوٹل گروپ کو مکمل طور پر آپریشنز سے ہٹا دیتا ہے: یہ کہیں ظاہر نہیں ہوگا اور اس پر عملہ تعینات نہیں ہو سکے گا۔"
     },
     "nothingErased": "کچھ بھی مٹایا نہیں جاتا۔ تاریخ محفوظ رہتی ہے اور ایڈمن اسے آرکائیو ویو سے بحال کر سکتا ہے۔"
+  },
+  "quality": {
+    "outcome": "نتیجہ",
+    "determinedByScore": "اسکور سے طے شدہ",
+    "submitVerification": "تصدیق جمع کریں",
+    "describeFindingsPlaceholder": "نتائج بیان کریں…",
+    "outcomePASSED": "کامیاب",
+    "outcomeNEEDS_REWORK": "دوبارہ کام درکار",
+    "outcomeFAILED": "ناکام",
+    "recorded": "معیار کی جانچ درج ہو گئی۔",
+    "submitFailed": "جمع کرانا ناکام"
+  },
+  "ratings": {
+    "comment": "تبصرہ",
+    "submit": "درجہ بندی جمع کریں",
+    "feedbackPlaceholder": "اپنی رائے لکھیں…",
+    "stars1to5": "درجہ بندی (۱–۵ ستارے)",
+    "score1": "خراب",
+    "score2": "ٹھیک",
+    "score3": "اچھا",
+    "score4": "بہت اچھا",
+    "score5": "بہترین",
+    "recorded": "درجہ بندی درج ہو گئی۔",
+    "submitFailed": "جمع کرانا ناکام",
+    "workerIdMissing": "یو آر ایل میں ورکر آئی ڈی موجود نہیں"
+  },
+  "absences": {
+    "kindSICK": "بیمار",
+    "kindVACATION": "چھٹی",
+    "withdrawTitle": "{{kind}} واپس لیں؟",
+    "withdrawBody": "{{day}} کو مزید {{kind}} کے طور پر نشان زد نہیں کیا جائے گا۔ اس دن کے لیے منسوخ شدہ شفٹ خود بحال نہیں ہوتی۔",
+    "withdrawA11y": "{{day}} کو {{kind}} واپس لیں",
+    "markFailed": "غیر حاضری درج نہیں ہو سکی۔",
+    "withdrawFailed": "غیر حاضری واپس نہیں لی جا سکی۔"
   }
 }

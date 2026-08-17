@@ -11,6 +11,7 @@ import { ConsentNoticeCard } from '@/components/consent/ConsentNoticeCard';
 import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
 import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 /**
  * Self-service record/decision surface, not an access-blocking wall — no
@@ -43,7 +44,7 @@ export default function ConsentScreen() {
       const result = await api.consent.getStatus(DAILY_ACCESS_GATE_INSTANCE);
       setStatus(result);
     } catch (error) {
-      setStatusError(error instanceof ApiError ? error.message : 'Could not load consent status.');
+      setStatusError(error instanceof ApiError ? error.message : t('consent.couldNotLoadStatus'));
     } finally {
       setStatusLoading(false);
     }
@@ -60,7 +61,7 @@ export default function ConsentScreen() {
       const result = await api.consent.requestNotice(DAILY_ACCESS_GATE_INSTANCE);
       setNotice(result);
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : 'Could not load the notice.');
+      setActionError(error instanceof ApiError ? error.message : t('consent.couldNotLoadNotice'));
     } finally {
       setFetchingNotice(false);
     }
@@ -84,7 +85,7 @@ export default function ConsentScreen() {
             : { status: 'declined', notice_version: record.notice_version, decided_at: record.decided_at }
         );
       } catch (error) {
-        setActionError(error instanceof ApiError ? error.message : 'Could not record your decision.');
+        setActionError(error instanceof ApiError ? error.message : t('consent.couldNotRecordDecision'));
       } finally {
         setDeciding(null);
       }
@@ -106,7 +107,7 @@ export default function ConsentScreen() {
       await api.consent.withdraw(DAILY_ACCESS_GATE_INSTANCE);
       setStatus({ status: 'absent' });
     } catch (error) {
-      setActionError(error instanceof ApiError ? error.message : 'Could not withdraw consent.');
+      setActionError(error instanceof ApiError ? error.message : t('consent.couldNotWithdraw'));
     } finally {
       setWithdrawing(false);
     }
@@ -115,11 +116,7 @@ export default function ConsentScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">
-            ← Back
-          </ThemedText>
-        </Pressable>
+        <BackLink />
         <ThemedText type="subtitle" style={styles.header}>{t("consent.title")}</ThemedText>
 
         <ConsentStatusCard

@@ -71,7 +71,15 @@
     "today": "Aujourd'hui",
     "file": "Fichier",
     "download": "Télécharger",
-    "prev": "Préc."
+    "prev": "Préc.",
+    "submitted": "Envoyé",
+    "ok": "OK",
+    "done": "Terminé",
+    "request": "Demander",
+    "keep": "Conserver",
+    "shift": "Service",
+    "loadFailed": "Échec du chargement",
+    "tomorrow": "Demain"
   },
   "fields": {
     "name": "Nom",
@@ -187,7 +195,14 @@
     "myOnboarding": "Mon intégration",
     "reviewQueue": "File de validation",
     "docs": "Documents",
-    "explore": "Explorer"
+    "explore": "Explorer",
+    "jobs": "Emplois",
+    "sickVacation": "Maladie / Congés",
+    "alerts": "Alertes",
+    "queue": "File d'attente",
+    "attendanceDetail": "Détail de présence",
+    "qualityCheck": "Contrôle qualité",
+    "rateWorker": "Évaluer l'employé"
   },
   "roles": {
     "admin": "Administrateur",
@@ -224,7 +239,9 @@
     "notYetLogged": "Pas encore enregistré.",
     "awaitingSignature": "En attente de signature",
     "alreadyFilled": "Déjà pourvu",
-    "inProgress": "En cours"
+    "inProgress": "En cours",
+    "present": "Présent",
+    "late": "En retard"
   },
   "assignments": {
     "shiftDetails": "Détails du service",
@@ -352,7 +369,11 @@
     "title": "Erreur",
     "unexpectedRecovery": "Une erreur inattendue s'est produite. Vous pouvez réessayer ou revenir au tableau de bord.",
     "pageNotFound": "Page introuvable",
-    "pageNotFoundDescription": "La page que vous recherchez n'existe pas ou a été déplacée."
+    "pageNotFoundDescription": "La page que vous recherchez n'existe pas ou a été déplacée.",
+    "tooManyRequests": "Trop de requêtes. Veuillez attendre avant de réessayer.",
+    "sessionRevoked": "Votre session a été révoquée. Veuillez vous reconnecter.",
+    "sessionExpired": "Session expirée. Veuillez vous reconnecter.",
+    "requestFailed": "Requête échouée"
   },
   "shifts": {
     "checkIn": "Pointer l'arrivée",
@@ -414,7 +435,10 @@
     "deleteAction": "Supprimer",
     "uploadAction": "Téléverser",
     "fileTooLarge": "Le fichier dépasse la limite de 10 Mo.",
-    "uploadFirstHint": "Téléversez votre premier document pour commencer."
+    "uploadFirstHint": "Téléversez votre premier document pour commencer.",
+    "uploadFailed": "Échec du téléversement. Veuillez réessayer.",
+    "unsupportedType": "Type de fichier non pris en charge. Autorisés : PDF, JPEG, PNG, WEBP.",
+    "exceedsMaxSize": "Le fichier dépasse la taille maximale de 10 Mo."
   },
   "hr": {
     "title": "RH et paie",
@@ -452,7 +476,9 @@
     "endDateAfterStart": "La date de fin doit être postérieure ou égale à la date de début.",
     "requestPayslip": "Demander un bulletin de paie",
     "noContractYet": "Vous n'avez pas encore de contrat dans le système.",
-    "noPayslipsRequestedYet": "Vous n'avez encore demandé aucun bulletin de paie."
+    "noPayslipsRequestedYet": "Vous n'avez encore demandé aucun bulletin de paie.",
+    "dataLoadFailed": "Impossible de charger les données RH.",
+    "payslipConfirm": "Souhaitez-vous demander votre bulletin de paie pour {{period}} ?"
   },
   "consent": {
     "title": "Consentement à la protection des données",
@@ -465,7 +491,16 @@
     "loadFailed": "Impossible de charger votre statut de consentement.",
     "history": "Historique des consentements",
     "auditTrail": "Piste d'audit",
-    "loadOneFailed": "Impossible de charger votre statut de consentement."
+    "loadOneFailed": "Impossible de charger votre statut de consentement.",
+    "couldNotLoadStatus": "Impossible de charger l’état du consentement.",
+    "couldNotLoadNotice": "Impossible de charger l’avis.",
+    "couldNotRecordDecision": "Impossible d’enregistrer votre décision.",
+    "couldNotWithdraw": "Impossible de retirer le consentement.",
+    "statusGranted": "Accordé",
+    "statusDeclined": "Refusé",
+    "statusUndecided": "Pas encore décidé",
+    "decidedAt": "Décidé {{when}} · avis {{version}}",
+    "declinedPreviously": "Vous avez refusé cet avis le {{when}}. Vous pouvez le consulter à nouveau ci-dessous."
   },
   "notifications": {
     "title": "Notifications",
@@ -479,11 +514,14 @@
     "loadFailed": "Impossible de charger les notifications. Veuillez réessayer.",
     "viewAllAction": "Voir toutes les notifications",
     "markReadHint": "Marquez cette notification comme lue une fois que vous l’avez vue.",
-    "allCaughtUp": "Vous êtes à jour."
+    "allCaughtUp": "Vous êtes à jour.",
+    "tapToMarkRead": "Appuyez pour marquer comme lu",
+    "noneYet": "Aucune notification pour le moment."
   },
   "leaderboard": {
     "none": "Aucune donnée de classement.",
-    "view": "Voir le classement"
+    "view": "Voir le classement",
+    "topPerformers": "Meilleurs éléments classés par note moyenne"
   },
   "profile": {
     "title": "Profil",
@@ -764,7 +802,13 @@
     "viewAssignment": "Voir l'affectation",
     "saveReview": "Enregistrer la vérification",
     "loadFailed": "Impossible de charger la présence. Veuillez réessayer.",
-    "checkedInUseAssignment": "Votre arrivée est pointée. Utilisez la <assignmentLink>page d'affectation</assignmentLink> pour pointer votre départ et terminer votre service."
+    "checkedInUseAssignment": "Votre arrivée est pointée. Utilisez la <assignmentLink>page d'affectation</assignmentLink> pour pointer votre départ et terminer votre service.",
+    "queueTitle": "File de présence",
+    "verifyTitleAction": "Vérifier la présence",
+    "verificationNotesPlaceholder": "Notes de vérification (facultatif)…",
+    "verifiedMark": "Vérifié ✓",
+    "verifiedBody": "La présence a été vérifiée.",
+    "verifyFailed": "Échec de la vérification"
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
@@ -826,5 +870,39 @@
       "deleteHint": "Cela retire complètement le groupe hôtelier des opérations : il n'apparaîtra plus nulle part et ne pourra pas être doté en personnel."
     },
     "nothingErased": "Rien n'est effacé. L'historique est conservé et un administrateur peut le restaurer depuis la vue archivée."
+  },
+  "quality": {
+    "outcome": "Résultat",
+    "determinedByScore": "Déterminé par le score",
+    "submitVerification": "Envoyer la vérification",
+    "describeFindingsPlaceholder": "Décrivez les constats…",
+    "outcomePASSED": "RÉUSSI",
+    "outcomeNEEDS_REWORK": "À REFAIRE",
+    "outcomeFAILED": "ÉCHOUÉ",
+    "recorded": "Contrôle qualité enregistré.",
+    "submitFailed": "Échec de l’envoi"
+  },
+  "ratings": {
+    "comment": "Commentaire",
+    "submit": "Envoyer l'évaluation",
+    "feedbackPlaceholder": "Rédigez votre retour…",
+    "stars1to5": "Note (1–5 étoiles)",
+    "score1": "Faible",
+    "score2": "Passable",
+    "score3": "Bien",
+    "score4": "Très bien",
+    "score5": "Excellent",
+    "recorded": "Évaluation enregistrée.",
+    "submitFailed": "Échec de l’envoi",
+    "workerIdMissing": "Identifiant de l’employé absent de l’URL"
+  },
+  "absences": {
+    "kindSICK": "Maladie",
+    "kindVACATION": "Congés",
+    "withdrawTitle": "Retirer {{kind}} ?",
+    "withdrawBody": "{{day}} ne sera plus marqué {{kind}}. Un service annulé pour ce jour n’est pas rétabli automatiquement.",
+    "withdrawA11y": "Retirer {{kind}} le {{day}}",
+    "markFailed": "Impossible d’enregistrer l’absence.",
+    "withdrawFailed": "Impossible de retirer l’absence."
   }
 }

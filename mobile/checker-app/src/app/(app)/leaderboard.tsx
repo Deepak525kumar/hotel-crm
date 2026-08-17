@@ -10,10 +10,12 @@ import {
 import { api } from '@/lib/api';
 import type { LeaderboardEntry } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function LeaderboardScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,12 +29,12 @@ export default function LeaderboardScreen() {
       const data = await api.quality.leaderboard();
       setEntries(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      setError(e.message ?? 'Failed to load');
+      setError(e.message ?? t('common.loadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -99,7 +101,7 @@ export default function LeaderboardScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerSub}>Top performers ranked by average rating</Text>
+        <Text style={styles.headerSub}>{t("leaderboard.topPerformers")}</Text>
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
@@ -116,7 +118,7 @@ export default function LeaderboardScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>No leaderboard data yet.</Text>
+            <Text style={styles.emptyText}>{t("leaderboard.none")}</Text>
           </View>
         }
       />

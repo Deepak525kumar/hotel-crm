@@ -11,9 +11,10 @@ import { ContractStatusCard } from '@/components/hr/ContractStatusCard';
 import { PayslipRequestsList } from '@/components/hr/PayslipRequestsList';
 import type { ContractDto, PayslipRequestDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
 export default function HRScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
 
@@ -35,7 +36,7 @@ export default function HRScreen() {
       setContract(contractData);
       setRequests(Array.isArray(requestsData) ? requestsData : []);
     } catch (error) {
-      setLoadError(error instanceof ApiError ? error.message : 'Could not load HR data.');
+      setLoadError(error instanceof ApiError ? error.message : t('hr.dataLoadFailed'));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -63,11 +64,16 @@ export default function HRScreen() {
     const end = lastDay.toISOString().split('T')[0];
 
     Alert.alert(t("hr.requestPayslip"),
-      `Would you like to request your payslip for ${firstDay.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}?`,
+      // Month name follows the CHOSEN ui language, not the device locale:
+      // passing `undefined` here rendered a German month inside an Arabic
+      // sentence for anyone whose phone and app language disagree.
+      t('hr.payslipConfirm', {
+        period: firstDay.toLocaleDateString(i18n.language, { month: 'long', year: 'numeric' }),
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Request',
+          text: t('common.request'),
           onPress: async () => {
             try {
               await api.hr.requestPayslip({
@@ -76,7 +82,7 @@ export default function HRScreen() {
               });
               load(); // Reload to show the new request
             } catch (error) {
-              Alert.alert(t("errors.title"), error instanceof ApiError ? error.message : 'Failed to request payslip');
+              Alert.alert(t("errors.title"), error instanceof ApiError ? error.message : t('hr.payslipRequestFailed'));
             }
           }
         }
@@ -89,11 +95,7 @@ export default function HRScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">
-            ← Back
-          </ThemedText>
-        </Pressable>
+        <BackLink />
 
         <ThemedText type="subtitle" style={styles.header}>{t("hr.title")}</ThemedText>
 

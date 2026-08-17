@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '--';
@@ -20,6 +21,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 function InfoRow({ label, value, color }: { label: string; value: string; color?: string }) {
+  const { t } = useTranslation();
   const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
@@ -38,6 +40,7 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function AttendanceDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const router = useRouter();
@@ -55,15 +58,15 @@ export default function AttendanceDetailScreen() {
     try {
       const updated = await api.attendance.verify(id, notes || undefined);
       setRecord(updated);
-      Alert.alert('Verified ✓', 'Attendance has been verified.', [
+      Alert.alert(t("attendance.verifiedMark"), t('attendance.verifiedBody'), [
         {
-          text: 'Quality Check',
+          text: t('nav.qualityCheck'),
           onPress: () => router.push(`/quality/${record!.assignment_id}`),
         },
-        { text: 'Done', style: 'cancel' },
+        { text: t('common.done'), style: 'cancel' },
       ]);
     } catch (e: any) {
-      Alert.alert('Error', e.message ?? 'Failed to verify');
+      Alert.alert(t("errors.title"), e.message ?? t('attendance.verifyFailed'));
     } finally {
       setVerifying(false);
     }
@@ -131,27 +134,27 @@ export default function AttendanceDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Attendance Detail', headerShown: true }} />
+      <Stack.Screen options={{ title: t('nav.attendanceDetail'), headerShown: true }} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Status</Text>
+          <Text style={styles.sectionTitle}>{t("fields.status")}</Text>
           <View style={[styles.badge, { backgroundColor: STATUS_COLORS[record.status] ?? '#94a3b8' }]}>
             <Text style={styles.badgeText}>{record.status}</Text>
           </View>
           <View style={styles.divider} />
-          <InfoRow label="Check In" value={formatDateTime(record.check_in_at)} />
-          <InfoRow label="Check Out" value={formatDateTime(record.check_out_at)} />
-          <InfoRow label="Expected Start" value={formatDateTime(record.expected_start)} />
-          <InfoRow label="Expected End" value={formatDateTime(record.expected_end)} />
+          <InfoRow label={t("shifts.checkIn")} value={formatDateTime(record.check_in_at)} />
+          <InfoRow label={t("shifts.checkOut")} value={formatDateTime(record.check_out_at)} />
+          <InfoRow label={t("attendance.expectedStart")} value={formatDateTime(record.expected_start)} />
+          <InfoRow label={t("attendance.expectedEnd")} value={formatDateTime(record.expected_end)} />
           {record.minutes_late !== null && (
             <InfoRow
-              label="Minutes Late"
+              label={t("attendance.minutesLate")}
               value={`${record.minutes_late}m`}
               color={record.minutes_late > 0 ? '#f59e0b' : '#22c55e'}
             />
           )}
           {record.minutes_worked !== null && (
-            <InfoRow label="Minutes Worked" value={`${record.minutes_worked}m`} />
+            <InfoRow label={t("attendance.minutesWorked")} value={`${record.minutes_worked}m`} />
           )}
         </View>
 
@@ -161,10 +164,10 @@ export default function AttendanceDetailScreen() {
           </View>
         ) : (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Verify Attendance</Text>
+            <Text style={styles.sectionTitle}>{t("attendance.verifyTitleAction")}</Text>
             <TextInput
               style={styles.notesInput}
-              placeholder="Verification notes (optional)..."
+              placeholder={t("attendance.verificationNotesPlaceholder")}
               placeholderTextColor={theme.textSecondary}
               value={notes}
               onChangeText={setNotes}
@@ -178,7 +181,7 @@ export default function AttendanceDetailScreen() {
               {verifying ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buttonText}>Verify Attendance</Text>
+                <Text style={styles.buttonText}>{t("attendance.verifyTitleAction")}</Text>
               )}
             </TouchableOpacity>
           </View>

@@ -9,12 +9,16 @@ import { resolveMySlots } from '@/lib/broadcast-eligibility';
 import { Spacing } from '@/constants/theme';
 import type { Broadcast, BroadcastEligibility, SkillTag } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { BackLink } from '@/components/BackLink';
 
-const SKILL_LABELS: Record<string, string> = {
-  CLEANER: 'Cleaner',
-  PUBLIC_SERVICE: 'Public service',
-  KITCHEN_DISHWASHER: 'Kitchen dishwasher',
-  WAITER: 'Waiter',
+// Keys, resolved at render. The same four labels already live in the web
+// app's lib/skills.ts under these exact keys -- the drift that module was
+// written to stop had reached the mobile apps too.
+const SKILL_LABEL_KEY: Record<string, string> = {
+  CLEANER: 'skills.CLEANER',
+  PUBLIC_SERVICE: 'skills.PUBLIC_SERVICE',
+  KITCHEN_DISHWASHER: 'skills.KITCHEN_DISHWASHER',
+  WAITER: 'skills.WAITER',
 };
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -100,9 +104,7 @@ export default function OfferDetailScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <ThemedText type="small" themeColor="textSecondary">← Back</ThemedText>
-        </Pressable>
+        <BackLink />
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           <ThemedText type="subtitle" style={styles.title}>{t('shifts.offer')}</ThemedText>
           {offer.hotel && (
@@ -144,7 +146,7 @@ export default function OfferDetailScreen() {
             return (
               <ThemedView key={slot.id} type="backgroundElement" style={styles.slotRow}>
                 <View style={styles.flex}>
-                  <ThemedText type="smallBold">{SKILL_LABELS[slot.skill] ?? slot.skill}</ThemedText>
+                  <ThemedText type="smallBold">{SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}</ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {slot.confirmed_count}/{slot.headcount} confirmed
                   </ThemedText>

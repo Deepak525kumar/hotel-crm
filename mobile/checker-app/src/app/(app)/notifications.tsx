@@ -11,8 +11,10 @@ import {
 import { api } from '@/lib/api';
 import type { Notification } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
+import { useTranslation } from 'react-i18next';
 
 export default function NotificationsScreen() {
+  const { t } = useTranslation();
   const theme = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +31,7 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -98,7 +100,7 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerSub}>Tap to mark as read</Text>
+        <Text style={styles.headerSub}>{t("notifications.tapToMarkRead")}</Text>
       </View>
       <FlatList
         data={notifications}
@@ -114,7 +116,7 @@ export default function NotificationsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Text style={styles.emptyText}>No notifications yet.</Text>
+            <Text style={styles.emptyText}>{t("notifications.noneYet")}</Text>
           </View>
         }
       />

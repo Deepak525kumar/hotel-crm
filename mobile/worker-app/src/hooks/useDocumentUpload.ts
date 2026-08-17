@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
 import { api, ApiError } from '@/lib/api';
 import { ALLOWED_MIME_TYPES, validatePickedAsset } from '@/lib/document-validation';
@@ -17,6 +18,7 @@ export interface PendingUpload {
  * render only — no picker/validation/upload logic lives in the component.
  */
 export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocument) => void) {
+  const { t } = useTranslation();
   const [pending, setPending] = useState<PendingUpload | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,12 +37,13 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
 
     const validationError = validatePickedAsset(asset);
     if (validationError) {
-      setError(validationError);
+      // validatePickedAsset returns a key, not a sentence.
+      setError(t(validationError));
       return;
     }
 
     setPending({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
-  }, []);
+  }, [t]);
 
   const clearPending = useCallback(() => {
     setPending(null);
@@ -57,12 +60,12 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         onUploaded(doc);
         setPending(null);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Upload failed. Please try again.');
+        setError(err instanceof ApiError ? err.message : t('documents.uploadFailed'));
       } finally {
         setUploading(false);
       }
     },
-    [pending, workerId, onUploaded]
+    [pending, workerId, onUploaded, t]
   );
 
   return { pending, uploading, error, pickFile, clearPending, upload };

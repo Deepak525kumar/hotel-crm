@@ -1,4 +1,4 @@
-import { StyleSheet, Pressable, ActivityIndicator } from 'react-native';
+import { StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
@@ -32,6 +32,11 @@ export default function ProfileScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        {/* Scrollable: the language picker adds six rows plus two lines of
+            explanatory copy to a screen that already carried a details card
+            and five buttons. Without this the sign-out button sits below the
+            fold on a small phone with no way to reach it. */}
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ThemedText type="subtitle" style={styles.header}>{t("profile.title")}</ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.card}>
@@ -128,6 +133,7 @@ export default function ProfileScreen() {
             )}
           </ThemedView>
         </Pressable>
+        </ScrollView>
       </SafeAreaView>
     </ThemedView>
   );
@@ -139,8 +145,11 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
+  },
+  content: {
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.four,
+    paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
   header: {

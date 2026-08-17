@@ -13,13 +13,13 @@ describe('validatePickedAsset', () => {
   });
 
   it('rejects a disallowed MIME type', () => {
-    expect(validatePickedAsset({ mimeType: 'application/zip', size: 1024 })).toMatch(/unsupported file type/i);
+    expect(validatePickedAsset({ mimeType: 'application/zip', size: 1024 })).toBe('documents.unsupportedType');
   });
 
   it('rejects a file over the 10 MB limit', () => {
     expect(
       validatePickedAsset({ mimeType: 'application/pdf', size: 10 * 1024 * 1024 + 1 }),
-    ).toMatch(/maximum size/i);
+    ).toBe('documents.exceedsMaxSize');
   });
 
   it('accepts a file exactly at the 10 MB limit', () => {

@@ -91,7 +91,7 @@ export default function DashboardScreen() {
                 upcoming.map((shift) => (
                   <ThemedView key={shift.id} type="backgroundElement" style={styles.shiftCard}>
                     <ThemedText type="smallBold">
-                      {shift.work_request?.position ?? 'Shift'}
+                      {shift.work_request?.position ?? t('common.shift')}
                     </ThemedText>
                     <ThemedText type="small" themeColor="textSecondary">
                       {shift.work_request?.shift_date
