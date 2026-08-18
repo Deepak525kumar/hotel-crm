@@ -31,7 +31,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const { data: status, isLoading, mutate } = useConsentStatus(DAILY_ACCESS_GATE);
+  const { data: status, error: statusError, isLoading, mutate } = useConsentStatus(DAILY_ACCESS_GATE);
 
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
   const [deciding, setDeciding] = useState<"GRANTED" | "DECLINED" | null>(null);
@@ -80,10 +80,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
     [notice, mutate, t],
   );
 
-  // Fail open while resolving, and for admins. Matching useOnboardingLockout's
-  // posture: never blank the app on an unresolved read. The server still
-  // refuses every gated call, so this is not a bypass.
-  if (isAdmin || isLoading || granted) return <>{children}</>;
+  // Fail open for admins, while resolving, AND when the status read itself
+  // failed. Matching useOnboardingLockout's posture: never blank the app on an
+  // unresolved read. The server is the real gate and still refuses every gated
+  // call, so this is not a bypass.
+  //
+  // `statusError` is the case this previously got wrong: on a failed read
+  // SWR leaves `data` undefined and `isLoading` false, so it fell through to
+  // the wall. That also silently defeated the documented kill switch -- with
+  // FEATURE_CONSENT_GATE off the API stops gating at once, but a client that
+  // walls on its own consent read keeps every non-admin in front of a notice
+  // they no longer need, and if the consent endpoints are what broke, that
+  // wall cannot be dismissed.
+  if (isAdmin || isLoading || granted || statusError) return <>{children}</>;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6" role="alertdialog" aria-modal="true">

@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
+import { shouldBypassConsentGate } from '@/lib/consent-gate-decision';
 import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -39,6 +40,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusUnknown, setStatusUnknown] = useState(false);
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
 
   const isAdmin = user?.role === 'admin';
@@ -46,6 +48,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setStatusUnknown(false);
     try {
       const s = await api.consent.getStatus(DAILY_ACCESS_GATE_INSTANCE);
       setStatus(s);
@@ -53,9 +56,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
       // worker lands directly on readable text rather than an extra tap. The
       // server serves it in their preferred language (ADR-068).
       if (s.status !== 'granted') {
-        setNotice(await api.consent.requestNotice(DAILY_ACCESS_GATE_INSTANCE));
+        try {
+          setNotice(await api.consent.requestNotice(DAILY_ACCESS_GATE_INSTANCE));
+        } catch (e) {
+          // Status IS known and says we are gated -- only the notice text
+          // failed. Keep the wall (with a retry) rather than failing open:
+          // this is not uncertainty about consent, it is a missing document.
+          setError(translateApiError(e, t, 'consent.gateLoadFailed'));
+        }
       }
     } catch (e) {
+      // The STATUS call itself failed, so consent state is unknown. Fail open
+      // -- see the render branch below for why.
+      setStatusUnknown(true);
       setError(translateApiError(e, t, 'consent.gateLoadFailed'));
     } finally {
       setLoading(false);
@@ -94,12 +107,25 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   );
 
   // Admin, or consent already granted today -> the app proceeds untouched.
-  if (isAdmin || status?.status === 'granted') return <>{children}</>;
+  //
+  // `statusUnknown` fails OPEN, and the distinction matters: it is set only
+  // when the /consent/status call itself failed, so the client has no idea
+  // whether consent is required. Blocking on a guess is the wrong default
+  // here for two reasons. The server is the real gate and still refuses every
+  // gated call, so this is not a bypass -- it degrades to the pre-gate
+  // experience (visible request failures) rather than a wall. And it is the
+  // only thing that lets the documented kill switch reach the UI: when
+  // FEATURE_CONSENT_GATE is turned off during an incident, the API stops
+  // gating immediately, but a client that walls on its own consent read would
+  // keep every non-admin staring at a notice they no longer need to accept --
+  // and if the consent endpoints are what broke (the likely reason for
+  // pulling the switch), that wall cannot be dismissed at all.
+  //
+  // This block previously claimed to fail open and did not: on an error
+  // `status` stayed null and `loading` went false, so it fell through to the
+  // wall below.
+  if (shouldBypassConsentGate({ isAdmin, status, statusUnknown })) return <>{children}</>;
 
-  // Fail open on a load error rather than trapping the worker behind a wall
-  // they cannot dismiss. The server still refuses every gated call, so this
-  // is not a bypass -- it degrades to the pre-gate experience (failed
-  // requests) instead of an inescapable screen with no retry.
   if (loading) {
     return (
       <SafeAreaView style={[styles.centre, { backgroundColor: theme.background }]}>
