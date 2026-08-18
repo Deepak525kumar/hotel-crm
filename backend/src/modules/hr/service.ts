@@ -991,11 +991,20 @@ export class HrService extends BaseService {
     const joiningDate = new Date(workerRecord.start_date);
     joiningDate.setUTCHours(0, 0, 0, 0);
 
+    if (periodEnd < periodStart) {
+      throw new ValidationError('Payslip request period end cannot be before period start');
+    }
+
     if (periodStart < joiningDate) {
       throw new ValidationError('Payslip request cannot start before the worker joining date');
     }
 
-    if (periodEnd > new Date()) {
+    // Add a 24-hour buffer to 'today' to accommodate workers in timezones ahead of UTC
+    // who might legitimately request a payslip for their 'today' which is 'tomorrow' in UTC.
+    const maxAllowedEnd = new Date();
+    maxAllowedEnd.setUTCHours(maxAllowedEnd.getUTCHours() + 24);
+
+    if (periodEnd > maxAllowedEnd) {
       throw new ValidationError('Payslip request cannot end in the future');
     }
 

@@ -110,7 +110,7 @@ export default function PayslipsPage() {
   const columns = 5;
 
   return (
-    <RoleGate roles={["admin", "manager", "regional_manager"]}>
+    <RoleGate allow={["admin", "manager", "regional_manager"]}>
       <div className="space-y-6">
         <PageHeader
           title={t("hr.payslipRequests")}
