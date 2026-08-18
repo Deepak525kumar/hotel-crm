@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { consentService } from './service.js';
+import { getConsentGateRoles, isConsentGateEnabled } from '../../config/feature-flags.js';
 import {
   RecordDecisionSchema,
   WithdrawConsentSchema,
@@ -192,6 +193,41 @@ export class ConsentController {
           has_next: parsed.data.page * parsed.data.per_page < result.total,
           has_prev: parsed.data.page > 1,
         },
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Gate state -- "does the daily consent gate apply to ME, right now?"
+  // ---------------------------------------------------------------------------
+  // Deliberately NOT part of IF-CONSENT-CheckStatus: that interface's response
+  // shape is frozen spec (SPEC-CONSENT-001, granted/declined/absent), and
+  // widening it would need a spec amendment. This is a separate operational
+  // question -- whether enforcement is switched on -- not a consent decision.
+  //
+  // It exists so the documented kill switch actually reaches the UI. Turning
+  // FEATURE_CONSENT_GATE off stops the API gating instantly, but a client that
+  // decides purely from its own /consent/status read keeps every non-admin in
+  // front of a notice they no longer need to accept.
+  //
+  // Returns ONE resolved boolean rather than the raw flag plus the role list,
+  // so role logic stays server-side and cannot drift between three clients.
+  // `enforced: false` means "do not show the gate" for THIS caller -- it is
+  // already false for an admin, and for any role outside CONSENT_GATE_ROLES.
+  async getGateState(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError();
+
+      const role = String(req.auth.role ?? '').toLowerCase();
+      const enforced =
+        isConsentGateEnabled() && role !== 'admin' && getConsentGateRoles().includes(role);
+
+      res.status(200).json({
+        status: 'success',
+        data: { enforced },
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
       });
     } catch (error) {

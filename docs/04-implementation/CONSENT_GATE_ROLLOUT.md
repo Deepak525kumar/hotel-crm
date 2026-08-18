@@ -18,6 +18,24 @@ pm2 restart hotel-crm-backend
 Recovery is one env edit plus a restart — seconds, not a deploy. The flag is read
 per-request, so nothing is captured at module load.
 
+**What the kill switch reaches.** It stops the API gating immediately, and the clients
+stop prompting with it: web and both mobile apps read `GET /consent/gate-state`, which
+returns `{enforced: false}` once the flag is off (or for any caller the gate does not
+apply to, including every admin). So pulling the switch removes both the 403s and the
+consent screen.
+
+Two failure modes are deliberately asymmetric:
+
+- If `/consent/gate-state` cannot be read, the clients assume **enforced** and still show
+  the gate. Consent keeps working; nothing is bypassed on a failed lookup.
+- If `/consent/status` cannot be read, the clients **fail open** and render the app. The
+  server is the real gate and still refuses every gated call, so this degrades to visible
+  request failures rather than a wall the user cannot dismiss — which is what would
+  otherwise happen at exactly the moment you pull the switch because consent endpoints
+  are broken. Verified by `frontend/__tests__/ConsentGateFailOpen.test.tsx` and each
+  app's `consent-gate-decision.test.ts`; before 2026-08-18 all three claimed this in a
+  comment while actually falling through to the wall.
+
 **Narrower lever**, when the gate is working but a role must be unblocked:
 
 ```bash

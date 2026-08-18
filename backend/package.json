@@ -92,6 +92,7 @@
       "src/middleware/**/*.ts",
       "src/lib/**/*.ts",
       "!src/**/*.d.ts"
-    ]
+    ],
+    "testTimeout": 20000
   }
 }

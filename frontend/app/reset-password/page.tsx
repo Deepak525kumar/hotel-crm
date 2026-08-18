@@ -19,23 +19,24 @@ import {
 function ResetPasswordForm() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
-  const urlToken = searchParams.get("token");
-  
-  // We must handle the case where searchParams is empty on initial SSR/hydration,
-  // then populates, and ALSO handle the fact that we scrub the URL (which might
-  // cause searchParams to become empty again). State is the only safe place.
-  const [token, setToken] = useState<string | null>(urlToken);
+  // Captured ONCE, on mount. Two things make `searchParams` stop reporting the
+  // token, and either one leaves the form in the "link is invalid" state --
+  // the bug this file has now hit twice:
+  //   1. the effect below deliberately scrubs it out of the URL;
+  //   2. a render pass without the query string reports nothing.
+  // A lazy initializer latches it before either can happen, with no ref read
+  // during render (react-compiler forbids it) and no setState inside an effect
+  // (react-hooks/set-state-in-effect forbids it, and it costs a render pass).
+  const [token] = useState<string | null>(() => searchParams.get("token"));
 
+  // Security Review FINDING: remove the token from the URL to prevent referer
+  // leakage. In an effect, never during render -- mutating history while
+  // rendering is what stripped the token before it could be read.
   useEffect(() => {
-    if (urlToken && !token) {
-      setToken(urlToken);
-    }
-    
-    // Security Review FINDING: Remove token from URL to prevent referer leakage
-    if (urlToken && typeof window !== "undefined") {
+    if (token && typeof window !== "undefined") {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [urlToken, token]);
+  }, [token]);
 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
