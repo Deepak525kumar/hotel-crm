@@ -103,7 +103,7 @@ export class CrmService extends BaseService {
         select: {
           id: true, name: true, city: true, country: true,
           address: true, timezone: true, is_active: true,
-          hotel_group_id: true, manager_user_id: true,
+          accepting_jobs: true, hotel_group_id: true, manager_user_id: true,
           created_at: true, updated_at: true,
         },
       }),
