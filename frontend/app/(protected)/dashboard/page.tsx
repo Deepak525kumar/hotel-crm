@@ -1,13 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
 import { RoleGate, StaffingWriteGate } from "@/components/auth/RoleGate";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
 import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { OnboardingCallout } from "@/components/onboarding/OnboardingCallout";
-import { RoleBadge } from "@/components/users/RoleBadge";
+import { ManagerActionRequired } from "@/components/dashboard/ManagerActionRequired";
+import { ManagerRecentActivity } from "@/components/dashboard/ManagerRecentActivity";
+import { WorkerUpcomingSchedule } from "@/components/dashboard/WorkerUpcomingSchedule";
+import { WorkerAlerts } from "@/components/dashboard/WorkerAlerts";
 import { formatPercent, formatScore } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import {
@@ -22,13 +24,7 @@ import {
 } from "@/components/ui";
 import { useDirectionalArrow } from "@/components/ui/BackLink";
 
-/** Quick links surfaced to every user. */
-const QUICK_LINKS = [
-  { href: "/requests", label: "Work requests" },
-  { href: "/assignments", label: "My assignments" },
-  { href: "/attendance", label: "Attendance" },
-  { href: "/notifications", label: "Notifications" },
-];
+
 
 function ManagerOverview() {
   const { t } = useTranslation();
@@ -123,46 +119,13 @@ export default function DashboardPage() {
           employee or an Admin no vertical space. */}
       <OnboardingCallout />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("users.yourAccount")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-            <p>{user?.email}</p>
-            {user && <RoleBadge role={user.role} />}
-            <p>
-              <TextLink
-                href="/profile"
-              >
-                {t("profile.viewProfile")} {forwardArrow}
-              </TextLink>
-            </p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("common.quickLinks")}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="grid grid-cols-2 gap-2 text-sm">
-              {QUICK_LINKS.map((l) => (
-                <li key={l.href}>
-                  <Link
-                    href={l.href}
-                    className="block rounded-md border border-gray-200 px-3 py-2 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-800"
-                  >
-                    {l.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      </div>
 
       <StaffingWriteGate>
+        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+          <ManagerActionRequired />
+          <ManagerRecentActivity />
+        </div>
         <ManagerOverview />
       </StaffingWriteGate>
 
@@ -170,6 +133,10 @@ export default function DashboardPage() {
           — no leaderboard, no other worker's data (see MyStatsCard's own
           comment). Previously only reachable from /profile. */}
       <RoleGate allow={["worker"]}>
+        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+          <WorkerUpcomingSchedule />
+          <WorkerAlerts />
+        </div>
         <MyStatsCard />
       </RoleGate>
     </div>
