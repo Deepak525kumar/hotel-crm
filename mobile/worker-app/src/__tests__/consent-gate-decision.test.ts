@@ -6,7 +6,7 @@ const declined = { status: 'declined' } as ConsentStatus;
 const absent = { status: 'absent' } as ConsentStatus;
 
 const call = (o: Partial<Parameters<typeof shouldBypassConsentGate>[0]>) =>
-  shouldBypassConsentGate({ isAdmin: false, status: null, statusUnknown: false, ...o });
+  shouldBypassConsentGate({ isAdmin: false, status: null, statusUnknown: false, enforced: true, ...o });
 
 describe('consent gate decision', () => {
   describe('blocks when consent state is KNOWN and not granted', () => {
@@ -43,5 +43,19 @@ describe('consent gate decision', () => {
     // bypass. Null-with-no-error is "still resolving", which the component
     // renders as a spinner, not as the app.
     expect(call({ status: null, statusUnknown: false })).toBe(false);
+  });
+
+  describe('kill switch: server says the gate is not enforced', () => {
+    // FEATURE_CONSENT_GATE=false stops the API gating instantly. Without this
+    // branch the client kept prompting from its own /consent/status read, so
+    // the switch never reached the UI.
+    it('proceeds even with no consent at all', () =>
+      expect(call({ enforced: false, status: absent })).toBe(true));
+
+    it('proceeds even after a decline', () =>
+      expect(call({ enforced: false, status: declined })).toBe(true));
+
+    it('still blocks when enforced is true and consent is absent', () =>
+      expect(call({ enforced: true, status: absent })).toBe(false));
   });
 });

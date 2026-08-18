@@ -1084,6 +1084,14 @@ export const employeesApi = {
  * always the authenticated caller, never a client-supplied field.
  */
 export const consentApi = {
+  /**
+   * Whether the daily gate is enforced for THIS caller. Separate from
+   * getStatus because it answers an operational question (is enforcement on?)
+   * rather than a consent one, and so the FEATURE_CONSENT_GATE kill switch
+   * reaches this screen and not just the API.
+   */
+  getGateState: () => apiFetch<{ enforced: boolean }>("/consent/gate-state"),
+
   getStatus: (consentInstance: string) =>
     apiFetch<ConsentStatus>(`/consent/status${toQuery({ consent_instance: consentInstance })}`),
 

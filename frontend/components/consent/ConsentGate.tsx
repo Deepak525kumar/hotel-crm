@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 
 import { consentApi } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
-import { useConsentStatus } from "@/hooks/useConsent";
+import { useConsentGateState, useConsentStatus } from "@/hooks/useConsent";
 import { Button } from "@/components/ui/Button";
 import type { ConsentNotice } from "@/lib/types";
 
@@ -32,6 +32,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const isAdmin = user?.role === "admin";
 
   const { data: status, error: statusError, isLoading, mutate } = useConsentStatus(DAILY_ACCESS_GATE);
+  // Whether the server is enforcing at all. Undefined while loading or on
+  // error -- treated as "enforced" so a failed lookup still shows the gate.
+  const { data: gate } = useConsentGateState();
+  const notEnforced = gate?.enforced === false;
 
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
   const [deciding, setDeciding] = useState<"GRANTED" | "DECLINED" | null>(null);
@@ -39,7 +43,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
 
   const granted = status?.status === "granted";
   const declined = status?.status === "declined";
-  const needsNotice = !isAdmin && !isLoading && !granted;
+  const needsNotice = !isAdmin && !notEnforced && !isLoading && !granted;
 
   useEffect(() => {
     if (!needsNotice || notice) return;
@@ -92,7 +96,12 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   // walls on its own consent read keeps every non-admin in front of a notice
   // they no longer need, and if the consent endpoints are what broke, that
   // wall cannot be dismissed.
-  if (isAdmin || isLoading || granted || statusError) return <>{children}</>;
+  //
+  // `notEnforced` is what makes the kill switch reach this screen: with
+  // FEATURE_CONSENT_GATE off the API stops gating at once, and continuing to
+  // prompt from our own /consent/status read would leave every non-admin in
+  // front of a notice they no longer need to accept.
+  if (isAdmin || notEnforced || isLoading || granted || statusError) return <>{children}</>;
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-4 p-6" role="alertdialog" aria-modal="true">

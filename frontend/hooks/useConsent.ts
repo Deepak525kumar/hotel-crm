@@ -9,3 +9,8 @@ export function useConsentStatus(consentInstance: string) {
     consentApi.getStatus(instance),
   );
 }
+
+/** Whether the daily consent gate is enforced for the current caller. */
+export function useConsentGateState() {
+  return useSWR(["consent-gate-state"], () => consentApi.getGateState());
+}

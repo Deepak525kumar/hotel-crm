@@ -28,6 +28,19 @@ export function shouldBypassConsentGate(args: {
   isAdmin: boolean;
   status: ConsentStatus | null;
   statusUnknown: boolean;
+  /**
+   * Whether the server says the gate is enforced for this caller
+   * (GET /consent/gate-state). False when FEATURE_CONSENT_GATE is off, or the
+   * caller's role is not gated -- in which case the API is already letting
+   * them through and this screen must not keep prompting. Defaults to true at
+   * the call site so a failed lookup still shows the gate.
+   */
+  enforced: boolean;
 }): boolean {
-  return args.isAdmin || args.status?.status === 'granted' || args.statusUnknown;
+  return (
+    args.isAdmin ||
+    !args.enforced ||
+    args.status?.status === 'granted' ||
+    args.statusUnknown
+  );
 }

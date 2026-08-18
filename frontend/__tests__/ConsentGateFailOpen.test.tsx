@@ -15,10 +15,12 @@ import { render, screen } from "@testing-library/react";
 // own comment claimed it failed open.
 
 const mockUseConsentStatus = jest.fn();
+const mockUseGateState = jest.fn();
 const mockUseAuth = jest.fn();
 
 jest.mock("@/hooks/useConsent", () => ({
   useConsentStatus: () => mockUseConsentStatus(),
+  useConsentGateState: () => mockUseGateState(),
 }));
 jest.mock("@/hooks/useAuth", () => ({ useAuth: () => mockUseAuth() }));
 jest.mock("@/lib/api", () => ({
@@ -48,6 +50,8 @@ const renderGate = () =>
 beforeEach(() => {
   jest.clearAllMocks();
   mockUseAuth.mockReturnValue({ user: { role: "worker" } });
+  // Default: the server IS enforcing. Individual tests override.
+  mockUseGateState.mockReturnValue({ data: { enforced: true } });
 });
 
 describe("ConsentGate — fail open", () => {
@@ -113,5 +117,36 @@ describe("ConsentGate — still blocks when consent state IS known", () => {
     });
     renderGate();
     expect(screen.getByText(CHILD)).toBeInTheDocument();
+  });
+});
+
+describe("ConsentGate — kill switch", () => {
+  it("renders children when the server says the gate is NOT enforced", () => {
+    // FEATURE_CONSENT_GATE=false stops the API gating instantly. Before
+    // /consent/gate-state existed, this screen kept prompting from its own
+    // consent read, so the switch never reached the UI.
+    mockUseGateState.mockReturnValue({ data: { enforced: false } });
+    mockUseConsentStatus.mockReturnValue({
+      data: { status: "absent" },
+      error: undefined,
+      isLoading: false,
+      mutate: jest.fn(),
+    });
+    renderGate();
+    expect(screen.getByText(CHILD)).toBeInTheDocument();
+  });
+
+  it("still blocks when the gate-state lookup itself fails", () => {
+    // Unknown enforcement must not become a bypass: consent state is known
+    // and says not-granted, so the wall belongs.
+    mockUseGateState.mockReturnValue({ data: undefined });
+    mockUseConsentStatus.mockReturnValue({
+      data: { status: "absent" },
+      error: undefined,
+      isLoading: false,
+      mutate: jest.fn(),
+    });
+    renderGate();
+    expect(screen.queryByText(CHILD)).not.toBeInTheDocument();
   });
 });

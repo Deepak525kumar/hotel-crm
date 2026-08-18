@@ -41,6 +41,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusUnknown, setStatusUnknown] = useState(false);
+  const [enforced, setEnforced] = useState(true);
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
 
   const isAdmin = user?.role === 'admin';
@@ -50,6 +51,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
     setError(null);
     setStatusUnknown(false);
     try {
+      // Ask whether the gate is enforced for this caller BEFORE deciding to
+      // block. If FEATURE_CONSENT_GATE was turned off, the API has already
+      // stopped gating and this screen must not keep prompting.
+      // Best-effort: a failure here leaves `enforced` at its safe default of
+      // true, so the gate still shows and consent still works.
+      try {
+        const g = await api.consent.getGateState();
+        setEnforced(g.enforced);
+        if (!g.enforced) return;
+      } catch {
+        // keep the default
+      }
+
       const s = await api.consent.getStatus(DAILY_ACCESS_GATE_INSTANCE);
       setStatus(s);
       // Pre-fetch the notice whenever consent is not already granted, so the
@@ -124,7 +138,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   // This block previously claimed to fail open and did not: on an error
   // `status` stayed null and `loading` went false, so it fell through to the
   // wall below.
-  if (shouldBypassConsentGate({ isAdmin, status, statusUnknown })) return <>{children}</>;
+  if (shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced })) return <>{children}</>;
 
   if (loading) {
     return (
