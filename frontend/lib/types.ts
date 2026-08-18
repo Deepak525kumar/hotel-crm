@@ -301,10 +301,13 @@ export interface Hotel {
   /** GD-05: per-hotel "pause new jobs" toggle, distinct from is_active. */
   accepting_jobs: boolean;
   hotel_group_id: string | null;
+  hotel_group_name?: string | null;
   manager_user_id: string | null;
+  manager_name?: string | null;
   manager_assigned_at: string | null;
   manager_vacated_at: string | null;
   manager_vacancy_reason: ManagerVacancyReason | null;
+  regional_manager_name?: string | null;
   /** GD-14/OD-GEO-001 (SPEC-GEO-001): hotel-coordinate source of truth for
    * backend-geo's distance-check. Null until an admin sets it (OD-GEO-004). */
   latitude: number | null;

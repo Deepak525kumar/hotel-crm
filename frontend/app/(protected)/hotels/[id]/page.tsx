@@ -118,7 +118,7 @@ export default function HotelDetailPage() {
                   value={
                     hotel.hotel_group_id ? (
                       isWorker ? (
-                        <span>{group?.name ?? "View group"}</span>
+                        <span>{hotel.hotel_group_name ?? "View group"}</span>
                       ) : (
                         <TextLink
                           href={`/hotel-groups/${hotel.hotel_group_id}`}
@@ -136,7 +136,7 @@ export default function HotelDetailPage() {
                   value={
                     hotel.manager_user_id ? (
                       isWorker ? (
-                        <span>{manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}</span>
+                        <span>{hotel.manager_name ?? "View manager"}</span>
                       ) : (
                         <TextLink href={`/users/${hotel.manager_user_id}`}>
                           {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
@@ -156,20 +156,16 @@ export default function HotelDetailPage() {
                 <DataRow
                   label={t("roles.regionalManager")}
                   value={
-                    group?.regional_manager_user_id ? (
+                    hotel.hotel_group_id && hotel.regional_manager_name ? (
                       isWorker ? (
-                        <span>
-                          {regionalManager
-                            ? `${regionalManager.first_name} ${regionalManager.last_name}`
-                            : "View regional manager"}
-                        </span>
-                      ) : (
+                        <span>{hotel.regional_manager_name}</span>
+                      ) : group?.regional_manager_user_id ? (
                         <TextLink href={`/users/${group.regional_manager_user_id}`}>
                           {regionalManager
                             ? `${regionalManager.first_name} ${regionalManager.last_name}`
                             : "View regional manager"}
                         </TextLink>
-                      )
+                      ) : null
                     ) : hotel.hotel_group_id ? (
                       <span className="text-gray-500 dark:text-gray-400">
                         Vacant
