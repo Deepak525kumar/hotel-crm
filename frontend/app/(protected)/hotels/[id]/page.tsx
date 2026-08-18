@@ -10,6 +10,7 @@ import { HotelWriteGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
 import { formatDateTime } from "@/lib/format";
 import { useTranslation } from "react-i18next";
+import { useAuthStore } from "@/stores/auth";
 import {
   ActiveBadge,
   Badge,
@@ -31,6 +32,8 @@ export default function HotelDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
+  const currentUser = useAuthStore((s) => s.user);
+  const isWorker = currentUser?.role === "worker";
 
   const { data: hotel, isLoading, error } = useHotel(id);
   const { data: group } = useHotelGroup(hotel?.hotel_group_id);
@@ -114,11 +117,15 @@ export default function HotelDetailPage() {
                   label={t("fields.hotelGroup")}
                   value={
                     hotel.hotel_group_id ? (
-                      <TextLink
-                        href={`/hotel-groups/${hotel.hotel_group_id}`}
-                      >
-                        {group?.name ?? "View group"}
-                      </TextLink>
+                      isWorker ? (
+                        <span>{group?.name ?? "View group"}</span>
+                      ) : (
+                        <TextLink
+                          href={`/hotel-groups/${hotel.hotel_group_id}`}
+                        >
+                          {group?.name ?? "View group"}
+                        </TextLink>
+                      )
                     ) : (
                       <span className="text-gray-500 dark:text-gray-400">{t("status.unassigned")}</span>
                     )
@@ -128,9 +135,13 @@ export default function HotelDetailPage() {
                   label={t("roles.manager")}
                   value={
                     hotel.manager_user_id ? (
-                      <TextLink href={`/users/${hotel.manager_user_id}`}>
-                        {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
-                      </TextLink>
+                      isWorker ? (
+                        <span>{manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}</span>
+                      ) : (
+                        <TextLink href={`/users/${hotel.manager_user_id}`}>
+                          {manager ? `${manager.first_name} ${manager.last_name}` : "View manager"}
+                        </TextLink>
+                      )
                     ) : (
                       <span className="text-gray-500 dark:text-gray-400">
                         Vacant
@@ -146,11 +157,19 @@ export default function HotelDetailPage() {
                   label={t("roles.regionalManager")}
                   value={
                     group?.regional_manager_user_id ? (
-                      <TextLink href={`/users/${group.regional_manager_user_id}`}>
-                        {regionalManager
-                          ? `${regionalManager.first_name} ${regionalManager.last_name}`
-                          : "View regional manager"}
-                      </TextLink>
+                      isWorker ? (
+                        <span>
+                          {regionalManager
+                            ? `${regionalManager.first_name} ${regionalManager.last_name}`
+                            : "View regional manager"}
+                        </span>
+                      ) : (
+                        <TextLink href={`/users/${group.regional_manager_user_id}`}>
+                          {regionalManager
+                            ? `${regionalManager.first_name} ${regionalManager.last_name}`
+                            : "View regional manager"}
+                        </TextLink>
+                      )
                     ) : hotel.hotel_group_id ? (
                       <span className="text-gray-500 dark:text-gray-400">
                         Vacant
@@ -184,6 +203,36 @@ export default function HotelDetailPage() {
               </DataList>
             </CardContent>
           </Card>
+
+          {hotel.latitude != null && hotel.longitude != null && (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t("hotels.locationMap") || "Location & Directions"}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="overflow-hidden rounded-md border border-gray-200 dark:border-gray-800">
+                  <iframe
+                    width="100%"
+                    height="300"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    src={`https://maps.google.com/maps?q=${hotel.latitude},${hotel.longitude}&z=15&output=embed`}
+                  ></iframe>
+                </div>
+                <div className="flex justify-end">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${hotel.latitude},${hotel.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  >
+                    {t("common.getDirections") || "Get Directions"}
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           <BlocklistCard hotelId={id} />
 
