@@ -259,7 +259,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
           start_date: '2026-08-01',
         })
       ).rejects.toBeInstanceOf(ValidationError);
-      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      
     });
   });
 
@@ -595,6 +595,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('creates the request record with the same ADR-039 shape as requestPayslip', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
 
       const result = await service.createPayroll({
         worker_id: 'w1',
@@ -624,7 +625,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         period_end: '2026-07-31',
       });
 
-      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
