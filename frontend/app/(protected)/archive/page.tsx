@@ -39,19 +39,20 @@ import {
  */
 function ArchiveContent() {
   const { t } = useTranslation();
-  // include_deleted returns BOTH live and deleted rows, so filter to the
-  // deleted ones here — this page is the archive, not a superset listing.
+  // only_deleted: "true" returns exclusively deleted rows from the backend,
+  // avoiding pagination cutoffs where a deleted hotel might fall on page 2
+  // of a combined active+deleted list and get dropped.
   const { hotels, isLoading: hotelsLoading, error: hotelsError } = useHotels({
-    include_deleted: "true",
+    only_deleted: "true",
     limit: 100,
   });
   const { groups, isLoading: groupsLoading, error: groupsError } = useHotelGroups({
-    include_deleted: "true",
+    only_deleted: "true",
     limit: 100,
   });
 
-  const deletedHotels = hotels.filter((h) => h.deleted_at);
-  const deletedGroups = groups.filter((g) => g.deleted_at);
+  const deletedHotels = hotels;
+  const deletedGroups = groups;
 
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const action = useAsyncAction();

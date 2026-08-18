@@ -64,6 +64,7 @@ export const ListHotelsQuerySchema = z.object({
   // additionally requires actorRole === 'admin', so a non-admin passing this
   // cannot widen their own visibility.
   include_deleted: z.enum(['true', 'false']).optional(),
+  only_deleted: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
   search: z.string().optional(),
@@ -110,6 +111,7 @@ export const ListHotelGroupsQuerySchema = z.object({
   // additionally requires actorRole === 'admin', so a non-admin passing this
   // cannot widen their own visibility.
   include_deleted: z.enum(['true', 'false']).optional(),
+  only_deleted: z.enum(['true', 'false']).optional(),
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
 });

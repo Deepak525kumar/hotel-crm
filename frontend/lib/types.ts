@@ -349,6 +349,8 @@ export interface UpdateHotelInput {
 export interface ListHotelsQuery {
   /** Admin-only archived view. Deleted hotels are excluded from every other read. */
   include_deleted?: "true" | "false";
+  /** Admin-only archived view. Returns exclusively deleted entities. */
+  only_deleted?: "true" | "false";
   search?: string;
   is_active?: "true" | "false";
   country?: string;
@@ -406,6 +408,8 @@ export interface UpdateHotelGroupInput {
 export interface ListHotelGroupsQuery {
   /** Admin-only archived view. Deleted groups are excluded from every other read. */
   include_deleted?: "true" | "false";
+  /** Admin-only archived view. Returns exclusively deleted entities. */
+  only_deleted?: "true" | "false";
   page?: number;
   limit?: number;
 }

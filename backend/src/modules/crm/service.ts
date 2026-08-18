@@ -23,7 +23,7 @@ export class CrmService extends BaseService {
     actorId?: string,
     actorScope?: UserScope | null
   ) {
-    const { page, limit, search, is_active, country, hotel_group_id, include_deleted } = query;
+    const { page, limit, search, is_active, country, hotel_group_id, include_deleted, only_deleted } = query;
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
@@ -35,7 +35,13 @@ export class CrmService extends BaseService {
     // Admin-only opt-in, for the archived/restore view. A non-admin cannot
     // widen their own visibility by passing the flag.
     const includeDeleted = include_deleted === 'true' && actorRole === 'admin';
-    if (!includeDeleted) where['deleted_at'] = null;
+    const onlyDeleted = only_deleted === 'true' && actorRole === 'admin';
+    
+    if (onlyDeleted) {
+      where['deleted_at'] = { not: null };
+    } else if (!includeDeleted) {
+      where['deleted_at'] = null;
+    }
     if (is_active !== undefined) where['is_active'] = is_active === 'true';
     if (country) where['country'] = { equals: country, mode: 'insensitive' };
     if (hotel_group_id) where['hotel_group_id'] = hotel_group_id;
@@ -438,14 +444,20 @@ export class CrmService extends BaseService {
   // other role reaching this method is scope-resolved, not implicitly
   // trusted. See the matching note in users/service.ts listUsers.
   async listHotelGroups(query: ListHotelGroupsQuery, actor: { role: string; scope: UserScope | null }) {
-    const { page, limit, include_deleted } = query;
+    const { page, limit, include_deleted, only_deleted } = query;
     const skip = (page - 1) * limit;
 
     const where: Record<string, unknown> = {};
     // See listHotels(): deleted groups are invisible to operational reads,
     // with an admin-only opt-in for the archived view.
     const includeDeleted = include_deleted === 'true' && actor.role === 'admin';
-    if (!includeDeleted) where['deleted_at'] = null;
+    const onlyDeleted = only_deleted === 'true' && actor.role === 'admin';
+
+    if (onlyDeleted) {
+      where['deleted_at'] = { not: null };
+    } else if (!includeDeleted) {
+      where['deleted_at'] = null;
+    }
     if (actor.role !== 'admin') {
       const scopeFilter = await resolveNonAdminScopeFilter(actor.role, actor.scope);
       if (scopeFilter.kind === 'deny') {

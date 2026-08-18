@@ -182,6 +182,16 @@ describe('CrmService - Hotel Groups', () => {
       expect(result.pagination.total).toBe(1);
     });
 
+    it('returns exclusively deleted hotel groups for admin when only_deleted is passed', async () => {
+      mockPrisma.hotelGroup.findMany.mockResolvedValue([]);
+      mockPrisma.hotelGroup.count.mockResolvedValue(0);
+
+      await service.listHotelGroups({ page: 1, limit: 20, only_deleted: 'true' }, { role: 'admin', scope: null });
+
+      const findManyCall = (mockPrisma.hotelGroup.findMany as jest.Mock).mock.calls[0] as Array<{ where: { deleted_at?: unknown } }>;
+      expect(findManyCall[0]?.where.deleted_at).toEqual({ not: null });
+    });
+
     // ADR-030 PR-4 (D-7, C-08): previously unscoped — any manager listed
     // every hotel group. Filters, does not deny.
     describe('scope filtering (ADR-030 PR-4)', () => {
