@@ -20,6 +20,7 @@ import {
   THead,
   TR,
   TextLink,
+  ActiveBadge,
 } from "@/components/ui";
 
 const PER_PAGE = 20;
@@ -40,7 +41,7 @@ export default function HotelGroupsPage() {
     return (id: string | null) => (id ? map.get(id) ?? "—" : "Vacant");
   }, [managers]);
 
-  const columns = 2;
+  const columns = 3;
 
   return (
     <div className="space-y-6">
@@ -68,6 +69,7 @@ export default function HotelGroupsPage() {
                 <tr>
                   <TH>{t("fields.name")}</TH>
                   <TH>{t("roles.regionalManager")}</TH>
+                  <TH>{t("fields.status")}</TH>
                 </tr>
               </THead>
               {isLoading ? (
@@ -96,6 +98,9 @@ export default function HotelGroupsPage() {
                         </TextLink>
                       </TD>
                       <TD>{managerName(g.regional_manager_user_id)}</TD>
+                      <TD>
+                        <ActiveBadge active={g.is_active} />
+                      </TD>
                     </TR>
                   ))}
                 </TBody>
