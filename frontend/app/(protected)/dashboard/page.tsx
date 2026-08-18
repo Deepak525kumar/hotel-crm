@@ -6,6 +6,10 @@ import { RoleGate, StaffingWriteGate } from "@/components/auth/RoleGate";
 import { LeaderboardTable } from "@/components/analytics/LeaderboardTable";
 import { MyStatsCard } from "@/components/analytics/MyStatsCard";
 import { OnboardingCallout } from "@/components/onboarding/OnboardingCallout";
+import { ManagerActionRequired } from "@/components/dashboard/ManagerActionRequired";
+import { ManagerRecentActivity } from "@/components/dashboard/ManagerRecentActivity";
+import { WorkerUpcomingSchedule } from "@/components/dashboard/WorkerUpcomingSchedule";
+import { WorkerAlerts } from "@/components/dashboard/WorkerAlerts";
 import { formatPercent, formatScore } from "@/lib/format";
 import { useTranslation } from "react-i18next";
 import {
@@ -118,6 +122,10 @@ export default function DashboardPage() {
 
 
       <StaffingWriteGate>
+        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+          <ManagerActionRequired />
+          <ManagerRecentActivity />
+        </div>
         <ManagerOverview />
       </StaffingWriteGate>
 
@@ -125,6 +133,10 @@ export default function DashboardPage() {
           — no leaderboard, no other worker's data (see MyStatsCard's own
           comment). Previously only reachable from /profile. */}
       <RoleGate allow={["worker"]}>
+        <div className="grid gap-4 sm:grid-cols-2 mb-6">
+          <WorkerUpcomingSchedule />
+          <WorkerAlerts />
+        </div>
         <MyStatsCard />
       </RoleGate>
     </div>
