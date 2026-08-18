@@ -3,6 +3,7 @@ import { connectDb, disconnectDb, getPrisma } from './lib/db.js';
 import { logger } from './lib/logger.js';
 import { captureException } from './lib/error-tracker.js';
 import { Scheduler } from './lib/scheduler.js';
+import { ReworkEscalationJob } from './modules/quality/rework-escalation-job.js';
 import { OutboxRepository } from './modules/notifications/outbox-repository.js';
 import { OutboxWorker } from './modules/notifications/outbox-worker.js';
 import {
@@ -94,6 +95,12 @@ async function main() {
           intervalMs: env.SESSION_SWEEP_INTERVAL_MS,
           batchSize: env.SESSION_SWEEP_BATCH_SIZE,
           maxBatchesPerRun: env.SESSION_SWEEP_MAX_BATCHES_PER_RUN,
+        })
+      )
+      .register(
+        new ReworkEscalationJob(prisma, {
+          intervalMs: env.REWORK_ESCALATION_INTERVAL_MS,
+          batchSize: env.REWORK_ESCALATION_BATCH_SIZE,
         })
       )
       .register(
