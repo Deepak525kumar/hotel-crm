@@ -17,6 +17,12 @@ router.use(authMiddleware);
 // always req.auth.userId, enforced in controller.ts/service.ts).
 router.get('/status', (req, res, next) => consentController.checkStatus(req, res, next));
 
+// Whether the daily gate is enforced FOR THIS CALLER. Not part of
+// IF-CONSENT-CheckStatus (whose shape is frozen spec) -- this answers an
+// operational question so the FEATURE_CONSENT_GATE kill switch reaches the
+// clients' own consent screens, not just the API.
+router.get('/gate-state', (req, res, next) => consentController.getGateState(req, res, next));
+
 // IF-CONSENT-RequestConsent: any authenticated role -- the caller is always
 // the worker's own session (worker-facing consent-notice presentation);
 // in-process consumers (Onboarding/Chatbot) invoke ConsentService directly

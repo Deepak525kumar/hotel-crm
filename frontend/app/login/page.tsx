@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
 import { APP_NAME } from "@/lib/config";
@@ -72,14 +73,21 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <Input
-              label={t("auth.password")}
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <div className="flex flex-col gap-1">
+              <Input
+                label={t("auth.password")}
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div className="flex justify-end">
+                <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                  {t("auth.forgotPassword")}
+                </Link>
+              </div>
+            </div>
             <FormError>{error}</FormError>
             <Button type="submit" loading={submitting} className="w-full">
               {t("auth.login")}

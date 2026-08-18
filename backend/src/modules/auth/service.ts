@@ -656,8 +656,16 @@ export class AuthService extends BaseService {
     const password_hash = await bcrypt.hash(data.new_password, BCRYPT_ROUNDS);
 
     await this.prisma.$transaction(async (tx) => {
+      // Prevent TOCTOU race conditions by checking used_at is still null atomically
+      const tokenUpdate = await tx.passwordResetToken.updateMany({
+        where: { id: resetToken.id, used_at: null },
+        data: { used_at: new Date() }
+      });
+      if (tokenUpdate.count === 0) {
+        throw new UnauthorizedError('Invalid or expired reset token');
+      }
+      
       await tx.user.update({ where: { id: user.id }, data: { password_hash } });
-      await tx.passwordResetToken.update({ where: { id: resetToken.id }, data: { used_at: new Date() } });
       await tx.session.deleteMany({ where: { user_id: user.id } });
       // ADR-031 D-4: post-compromise lockout extends to already-issued access
       // tokens, not just Session rows, which this path already deleted above.

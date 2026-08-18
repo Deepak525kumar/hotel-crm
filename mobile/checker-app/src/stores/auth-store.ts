@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import * as SecureStore from 'expo-secure-store';
+import { deleteItem, getItem, setItem } from '@/lib/persistent-storage';
 import { router } from 'expo-router';
 import { api, setAccessToken, setRefreshToken, setOnTokenRefreshed, setOnAuthFailure, getAccessToken, getRefreshToken } from '@/lib/api';
 import type { User } from '@/types/api';
@@ -29,8 +29,8 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   initialize: async () => {
     try {
-      const accessToken = await SecureStore.getItemAsync(KEYS.ACCESS_TOKEN);
-      const refreshToken = await SecureStore.getItemAsync(KEYS.REFRESH_TOKEN);
+      const accessToken = await getItem(KEYS.ACCESS_TOKEN);
+      const refreshToken = await getItem(KEYS.REFRESH_TOKEN);
 
       if (accessToken) {
         setAccessToken(accessToken);
@@ -45,8 +45,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         } catch {
           setAccessToken(null);
           setRefreshToken(null);
-          await SecureStore.deleteItemAsync(KEYS.ACCESS_TOKEN);
-          await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
+          await deleteItem(KEYS.ACCESS_TOKEN);
+          await deleteItem(KEYS.REFRESH_TOKEN);
         }
       }
     } catch {
@@ -61,8 +61,8 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await api.auth.login(email, password);
       setAccessToken(response.access_token);
       setRefreshToken(response.refresh_token);
-      await SecureStore.setItemAsync(KEYS.ACCESS_TOKEN, response.access_token);
-      await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, response.refresh_token);
+      await setItem(KEYS.ACCESS_TOKEN, response.access_token);
+      await setItem(KEYS.REFRESH_TOKEN, response.refresh_token);
       set({
         user: response.user,
         accessToken: response.access_token,
@@ -83,8 +83,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
     setAccessToken(null);
     setRefreshToken(null);
-    await SecureStore.deleteItemAsync(KEYS.ACCESS_TOKEN);
-    await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
+    await deleteItem(KEYS.ACCESS_TOKEN);
+    await deleteItem(KEYS.REFRESH_TOKEN);
     set({ user: null, accessToken: null, refreshToken: null });
   },
 }));
@@ -93,16 +93,16 @@ export const useAuthStore = create<AuthState>((set) => ({
 // These persist for the lifetime of the app process.
 
 setOnTokenRefreshed(async (access: string, refresh: string) => {
-  await SecureStore.setItemAsync(KEYS.ACCESS_TOKEN, access);
-  await SecureStore.setItemAsync(KEYS.REFRESH_TOKEN, refresh);
+  await setItem(KEYS.ACCESS_TOKEN, access);
+  await setItem(KEYS.REFRESH_TOKEN, refresh);
   useAuthStore.setState({ accessToken: access, refreshToken: refresh });
 });
 
 setOnAuthFailure(async () => {
   setAccessToken(null);
   setRefreshToken(null);
-  await SecureStore.deleteItemAsync(KEYS.ACCESS_TOKEN);
-  await SecureStore.deleteItemAsync(KEYS.REFRESH_TOKEN);
+  await deleteItem(KEYS.ACCESS_TOKEN);
+  await deleteItem(KEYS.REFRESH_TOKEN);
   useAuthStore.setState({ user: null, accessToken: null, refreshToken: null });
   router.replace('/(auth)/login');
 });

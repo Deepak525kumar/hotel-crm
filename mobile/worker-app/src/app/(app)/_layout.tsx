@@ -1,47 +1,27 @@
-import { useEffect } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
-import { registerForPushNotificationsAsync, subscribeToPushNotifications } from '@/lib/push-notifications';
 import { useTranslation } from 'react-i18next';
 import { ConsentGate } from '@/components/consent/ConsentGate';
+import { PushRegistration } from '@/components/PushRegistration';
 
 export default function AppLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
-  const router = useRouter();
 
-  // Register this device for push once per app launch (Epic 7 PR 7.7).
-  // Placed in the (app) layout rather than the root layout because this tree
-  // only renders for a signed-in user (app/index.tsx redirects otherwise), and
-  // the backend endpoint is authenticated. Running on every launch is
-  // intentional: device tokens rotate, and the backend upsert is keyed by
-  // token, so re-registration is idempotent and reassigns ownership if a
-  // different user has since signed in on this device.
+  // RULE-CONSENT-01: the daily notice must be accepted before the worker can
+  // use the system. Wrapping the (app) tree rather than the root layout
+  // because this tree only renders for a signed-in user and the consent
+  // endpoints are authenticated.
   //
-  // This effect does NOT re-fire on tab navigation: this component is the
-  // Tabs navigator itself, which React Navigation mounts once per (app)-group
-  // entry and keeps alive across tab switches (no `key` prop forces a
-  // remount, and this app does not use StrictMode, so there's no dev-only
-  // double-invoke either). The one real remount path is logout -> login,
-  // which is the intended re-registration case above, not a bug.
-  useEffect(() => {
-    void registerForPushNotificationsAsync();
-  }, []);
-
-  // Foreground banner + tap-to-Alerts-tab routing for incoming push. Same
-  // once-per-(app)-mount lifecycle reasoning as the registration effect
-  // above; the listener is removed on unmount rather than left dangling.
-  useEffect(() => {
-    return subscribeToPushNotifications(router);
-  }, [router]);
-
-  // RULE-CONSENT-01: the daily notice must be accepted before the worker
-  // can use the system. Wrapping the (app) tree rather than the root layout
-  // for the same reason the push effects live here -- this tree only renders
-  // for a signed-in user, and the consent endpoints are authenticated.
+  // <PushRegistration /> sits INSIDE the gate deliberately. It used to be two
+  // useEffects on this component, which React runs on mount whatever the
+  // component renders -- so with the gate live they fired against a gated
+  // /notifications route, took a swallowed 403, and never retried that
+  // session. As a child of the gate, mount implies consent.
   return (
     <ConsentGate>
+      <PushRegistration />
       <Tabs
         screenOptions={{
           headerShown: false,

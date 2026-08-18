@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { I18nManager } from 'react-native';
-import * as SecureStore from 'expo-secure-store';
+import { getItem, setItem } from '@/lib/persistent-storage';
 import i18n, { deviceLocale } from '@/lib/i18n';
 import { isRtlLocale, isUiLocale, type UiLocale } from '@/lib/locales';
 import { api } from '@/lib/api';
@@ -12,7 +12,8 @@ import { api } from '@/lib/api';
 // Stored via expo-secure-store, which this app already depends on for
 // tokens, rather than adding AsyncStorage for one non-secret string. A
 // language choice needs no encryption, but it does need to survive a
-// restart, and SecureStore is the persistence this app already has.
+// restart, and persistent-storage is the persistence this app already has
+// (SecureStore on device, localStorage on web -- see that module).
 const STORAGE_KEY = 'fhm.locale';
 
 interface LocaleState {
@@ -55,7 +56,7 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
 
   hydrate: async () => {
     try {
-      const stored = await SecureStore.getItemAsync(STORAGE_KEY);
+      const stored = await getItem(STORAGE_KEY);
       if (isUiLocale(stored)) {
         await applyLocale(stored);
         set({ locale: stored, needsRestartForRtl: directionMismatch(stored) });
@@ -71,7 +72,7 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
     await applyLocale(locale);
     set({ locale, needsRestartForRtl: directionMismatch(locale) });
     try {
-      await SecureStore.setItemAsync(STORAGE_KEY, locale);
+      await setItem(STORAGE_KEY, locale);
     } catch {
       /* non-fatal: the choice still applies to this session */
     }
@@ -84,7 +85,7 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
       await applyLocale(previous);
       set({ locale: previous, needsRestartForRtl: directionMismatch(previous) });
       try {
-        await SecureStore.setItemAsync(STORAGE_KEY, previous);
+        await setItem(STORAGE_KEY, previous);
       } catch {
         /* non-fatal */
       }
@@ -97,7 +98,7 @@ export const useLocaleStore = create<LocaleState>((set, get) => ({
       await applyLocale(preferred);
       set({ locale: preferred, needsRestartForRtl: directionMismatch(preferred) });
       try {
-        await SecureStore.setItemAsync(STORAGE_KEY, preferred);
+        await setItem(STORAGE_KEY, preferred);
       } catch {
         /* non-fatal */
       }

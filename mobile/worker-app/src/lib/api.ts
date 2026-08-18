@@ -518,6 +518,12 @@ export const api = {
     // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is
     // self-scoped — worker_id is always the authenticated caller, enforced
     // server-side, never a client-supplied field.
+    // Whether the daily gate is enforced for THIS caller. Separate from
+    // getStatus because it answers an operational question (is enforcement
+    // on?) rather than a consent one, and so the FEATURE_CONSENT_GATE kill
+    // switch reaches this screen and not just the API.
+    getGateState: () => request<{ enforced: boolean }>('/consent/gate-state'),
+
     getStatus: (consentInstance: string) =>
       request<ConsentStatus>(`/consent/status?consent_instance=${encodeURIComponent(consentInstance)}`),
 
