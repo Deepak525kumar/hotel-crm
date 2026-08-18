@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { mutate } from "swr";
 import { useWorkerPayslipRequests } from "@/hooks/usePayslipRequests";
+import { useEmploymentRecord } from "@/hooks/useEmployment";
 import { useAsyncAction } from "@/hooks/useAsyncAction";
 import { useAuth } from "@/hooks/useAuth";
 import { hrApi } from "@/lib/api";
-import { formatDate, formatDateTime } from "@/lib/format";
+import { formatDate, formatDateTime, localToday } from "@/lib/format";
 import {
   Badge,
   Button,
@@ -175,6 +176,7 @@ function CreatePayslipRequestModal({
   const [periodEnd, setPeriodEnd] = useState("");
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
+  const { data: employmentRecord } = useEmploymentRecord(workerId);
 
   const reset = () => {
     setPeriodStart("");
@@ -218,6 +220,9 @@ function CreatePayslipRequestModal({
     );
   };
 
+  const minDate = employmentRecord?.start_date ? employmentRecord.start_date.substring(0, 10) : undefined;
+  const maxDate = localToday();
+
   return (
     <Modal
       open={open}
@@ -240,12 +245,16 @@ function CreatePayslipRequestModal({
           type="date"
           value={periodStart}
           onChange={(e) => setPeriodStart(e.target.value)}
+          min={minDate}
+          max={maxDate}
         />
         <Input
           label={t("fields.periodEnd")}
           type="date"
           value={periodEnd}
           onChange={(e) => setPeriodEnd(e.target.value)}
+          min={minDate}
+          max={maxDate}
         />
         <FormError>{fieldError ?? create.error}</FormError>
       </div>

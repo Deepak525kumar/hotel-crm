@@ -89,7 +89,7 @@ export const NAV: NavItem[] = [
   // Geo check-ins is no longer a standalone tab: geofence-verification
   // events now render inline on the attendance detail page
   // (GeoVerificationCard, gated by the same GeoCheckinsGate roles).
-
+  { href: "/payslips", label: "Payslips", labelKey: "hr.payslipRequests", icon: ClipboardList, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotels", label: "Hotels", labelKey: "nav.hotels", icon: Building2, roles: ["manager", "regional_manager", "admin"] },
   { href: "/hotel-groups", label: "Hotel groups", labelKey: "nav.hotelGroups", icon: Building, roles: ["manager", "regional_manager", "admin"] },
   // Deleted entities are invisible everywhere else by design, so the archive
