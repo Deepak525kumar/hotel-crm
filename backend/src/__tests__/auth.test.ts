@@ -53,6 +53,7 @@ const mockPrisma = {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 1 }),
     deleteMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   },
   auditLog: {
@@ -764,15 +765,21 @@ describe('AuthService', () => {
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.passwordResetToken.update.mockResolvedValue({});
       mockPrisma.session.deleteMany.mockResolvedValue({ count: 2 });
+      mockPrisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
       await service.confirmPasswordReset({ token: validRawToken, new_password: 'NewPassw0rd' });
 
+      // Check token used
+      expect(mockPrisma.passwordResetToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: validTokenRecord.id, used_at: null }, })
+      );
       expect(mockPrisma.user.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: activeUser.id } })
       );
-      expect(mockPrisma.passwordResetToken.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: validTokenRecord.id }, data: expect.objectContaining({ used_at: expect.any(Date) }) })
+      expect(mockPrisma.passwordResetToken.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: validTokenRecord.id, used_at: null }, data: expect.objectContaining({ used_at: expect.any(Date) }) })
       );
       expect(mockPrisma.session.deleteMany).toHaveBeenCalledWith({ where: { user_id: activeUser.id } });
     });
@@ -783,7 +790,7 @@ describe('AuthService', () => {
       mockPrisma.passwordResetToken.findUnique.mockResolvedValue(validTokenRecord);
       mockPrisma.user.findUnique.mockResolvedValue(activeUser);
       mockPrisma.user.update.mockResolvedValue({});
-      mockPrisma.passwordResetToken.update.mockResolvedValue({});
+      mockPrisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.session.deleteMany.mockResolvedValue({ count: 2 });
       mockPrisma.auditLog.create.mockResolvedValue({});
 
