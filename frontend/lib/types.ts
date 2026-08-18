@@ -1287,6 +1287,8 @@ export interface PayslipRequest {
 export interface ListPayslipRequestsQuery {
   worker_id?: string;
   status?: PayslipRequestStatus;
+  page?: number;
+  limit?: number;
 }
 
 /** Body of `POST /hr/payroll` (Manager/Admin creates a request on a worker's behalf). */

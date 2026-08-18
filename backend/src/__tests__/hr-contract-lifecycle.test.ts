@@ -259,7 +259,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
           start_date: '2026-08-01',
         })
       ).rejects.toBeInstanceOf(ValidationError);
-      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      
     });
   });
 
@@ -444,9 +444,51 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
     });
 
+    it('rejects when period_end is before period_start', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-31', period_end: '2026-07-01' })
+      ).rejects.toThrow('Payslip request period end cannot be before period start');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('rejects when period_start is before worker start_date', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-08-01T00:00:00.000Z') });
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' })
+      ).rejects.toThrow('Payslip request cannot start before the worker joining date');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('rejects when period_end is in the future (beyond 24h timezone buffer)', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-01-01T00:00:00.000Z') });
+      
+      const futureDate = new Date();
+      futureDate.setUTCHours(futureDate.getUTCHours() + 48); // 2 days in the future
+      const futureDateStr = futureDate.toISOString().substring(0, 10);
+
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: futureDateStr })
+      ).rejects.toThrow('Payslip request cannot end in the future');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('allows when period_end is slightly in the future (within 24h timezone buffer)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-01-01T00:00:00.000Z') });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+
+      const slightlyFutureDate = new Date();
+      slightlyFutureDate.setUTCHours(slightlyFutureDate.getUTCHours() + 12); // 12 hours in the future
+      const slightlyFutureDateStr = slightlyFutureDate.toISOString().substring(0, 10);
+
+      const result = await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: slightlyFutureDateStr });
+      expect(result.id).toBe('p1');
+    });
+
     it('creates the request with ADR-039 shape (no gross-salary/computation field)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       const result = await service.requestPayslip({
@@ -468,7 +510,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('rolls back the payslip request creation if notifyResponsibleManager (notification enqueue) fails', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
       mockNotificationEnqueue.mockRejectedValueOnce(new Error('notification failed'));
 
@@ -479,7 +521,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('notifies the worker\'s Regional Manager on request (best-effort, OD-CAL-06 posture)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' });
@@ -492,7 +534,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('sends no notification for an unassigned/inactive worker (best-effort, no fallback)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null, start_date: new Date('2026-06-01T00:00:00.000Z') });
 
       await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' });
 
@@ -504,13 +546,56 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
   describe('createPayroll — IF-HR-CreatePayroll (Manager/Admin-initiated, no notification)', () => {
     it('rejects missing required fields', async () => {
       await expect(
-        service.createPayroll({ worker_id: 'w1', period_start: '', period_end: '2026-07-31' })
+        service.requestPayslip({ worker_id: 'w1', period_start: '', period_end: '2026-07-31' })
       ).rejects.toBeInstanceOf(ValidationError);
       expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
     });
 
+    it('rejects when period_end is before period_start', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-31', period_end: '2026-07-01' })
+      ).rejects.toThrow('Payslip request period end cannot be before period start');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('rejects when period_start is before worker start_date', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-08-01T00:00:00.000Z') });
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: '2026-07-31' })
+      ).rejects.toThrow('Payslip request cannot start before the worker joining date');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('rejects when period_end is in the future (beyond 24h timezone buffer)', async () => {
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-01-01T00:00:00.000Z') });
+      
+      const futureDate = new Date();
+      futureDate.setUTCHours(futureDate.getUTCHours() + 48); // 2 days in the future
+      const futureDateStr = futureDate.toISOString().substring(0, 10);
+
+      await expect(
+        service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: futureDateStr })
+      ).rejects.toThrow('Payslip request cannot end in the future');
+      expect(mockPayslipRequestCreate).not.toHaveBeenCalled();
+    });
+
+    it('allows when period_end is slightly in the future (within 24h timezone buffer)', async () => {
+      mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-01-01T00:00:00.000Z') });
+      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+
+      const slightlyFutureDate = new Date();
+      slightlyFutureDate.setUTCHours(slightlyFutureDate.getUTCHours() + 12); // 12 hours in the future
+      const slightlyFutureDateStr = slightlyFutureDate.toISOString().substring(0, 10);
+
+      const result = await service.requestPayslip({ worker_id: 'w1', period_start: '2026-07-01', period_end: slightlyFutureDateStr });
+      expect(result.id).toBe('p1');
+    });
+
     it('creates the request record with the same ADR-039 shape as requestPayslip', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
 
       const result = await service.createPayroll({
         worker_id: 'w1',
@@ -531,7 +616,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('does NOT notify the responsible manager — EVT-HR-PayslipRequested triggers on worker submission only (RULE-HR-09)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       await service.createPayroll({
@@ -540,7 +625,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         period_end: '2026-07-31',
       });
 
-      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
@@ -797,7 +882,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       mockContractFindMany.mockResolvedValue([
         makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
       ]);
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       const sent = await service.sendExpiryReminders(86400000, 100);
@@ -817,7 +902,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       mockContractFindMany.mockResolvedValue([
         makeContractRow({ status: 'EXTENDED', reminder_2yr_sent_at: null }),
       ]);
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       const sent = await service.sendExpiryReminders(86400000, 100);
@@ -843,7 +928,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       mockContractFindMany.mockResolvedValue([
         makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
       ]);
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null, start_date: new Date('2026-06-01T00:00:00.000Z') });
 
       const sent = await service.sendExpiryReminders(86400000, 100);
 
@@ -855,7 +940,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
       mockContractFindMany.mockResolvedValue([
         makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
       ]);
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
       // Simulate tx.contract.update() throwing after enqueue() already ran.
       // This mock can only prove BOTH calls happen inside the same

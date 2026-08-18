@@ -975,11 +975,44 @@ export class HrService extends BaseService {
     }
 
     const client = tx || this.prisma;
+    
+    const workerRecord = await client.employmentRecord.findUnique({
+      where: { user_id: data.worker_id },
+      select: { start_date: true },
+    });
+    if (!workerRecord) {
+      throw new ValidationError('No employment record found for this worker');
+    }
+
+    const periodStart = new Date(`${data.period_start}T00:00:00.000Z`);
+    const periodEnd = new Date(`${data.period_end}T00:00:00.000Z`);
+    
+    // Normalize joining date to midnight UTC for comparison
+    const joiningDate = new Date(workerRecord.start_date);
+    joiningDate.setUTCHours(0, 0, 0, 0);
+
+    if (periodEnd < periodStart) {
+      throw new ValidationError('Payslip request period end cannot be before period start');
+    }
+
+    if (periodStart < joiningDate) {
+      throw new ValidationError('Payslip request cannot start before the worker joining date');
+    }
+
+    // Add a 24-hour buffer to 'today' to accommodate workers in timezones ahead of UTC
+    // who might legitimately request a payslip for their 'today' which is 'tomorrow' in UTC.
+    const maxAllowedEnd = new Date();
+    maxAllowedEnd.setUTCHours(maxAllowedEnd.getUTCHours() + 24);
+
+    if (periodEnd > maxAllowedEnd) {
+      throw new ValidationError('Payslip request cannot end in the future');
+    }
+
     return client.payslipRequest.create({
       data: {
         worker_id: data.worker_id,
-        period_start: new Date(`${data.period_start}T00:00:00.000Z`),
-        period_end: new Date(`${data.period_end}T00:00:00.000Z`),
+        period_start: periodStart,
+        period_end: periodEnd,
         status: PayslipRequestStatus.REQUESTED,
       },
     });
