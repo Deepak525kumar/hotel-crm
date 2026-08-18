@@ -49,7 +49,12 @@
           "locationWhenInUsePermission": "Used only when you press Verify Location, to check whether you're at the hotel."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      "expo-font",
+      "expo-image",
+      "expo-secure-store",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
