@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/lib/api";
@@ -19,12 +19,17 @@ import {
 function ResetPasswordForm() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
-  const token = searchParams.get("token");
+  const rawToken = searchParams.get("token");
+  const [token] = useState(rawToken);
 
   // Security Review FINDING: Remove token from URL to prevent referer leakage
-  if (typeof window !== "undefined" && token) {
-    window.history.replaceState({}, document.title, window.location.pathname);
-  }
+  // We use useEffect to run this purely as a side effect and avoid mutating
+  // the DOM/history during React's render phase.
+  useEffect(() => {
+    if (typeof window !== "undefined" && token) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [token]);
 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
