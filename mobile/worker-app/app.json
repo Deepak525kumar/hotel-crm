@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "worker-app",
+    "name": "Hotel CRM Worker",
     "slug": "worker-app",
     "version": "1.0.0",
     "runtimeVersion": {
