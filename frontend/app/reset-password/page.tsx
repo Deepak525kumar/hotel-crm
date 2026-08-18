@@ -19,17 +19,23 @@ import {
 function ResetPasswordForm() {
   const { t } = useTranslation();
   const searchParams = useSearchParams();
-  const rawToken = searchParams.get("token");
-  const [token] = useState(rawToken);
+  const urlToken = searchParams.get("token");
+  
+  // We must handle the case where searchParams is empty on initial SSR/hydration,
+  // then populates, and ALSO handle the fact that we scrub the URL (which might
+  // cause searchParams to become empty again). State is the only safe place.
+  const [token, setToken] = useState<string | null>(urlToken);
 
-  // Security Review FINDING: Remove token from URL to prevent referer leakage
-  // We use useEffect to run this purely as a side effect and avoid mutating
-  // the DOM/history during React's render phase.
   useEffect(() => {
-    if (typeof window !== "undefined" && token) {
+    if (urlToken && !token) {
+      setToken(urlToken);
+    }
+    
+    // Security Review FINDING: Remove token from URL to prevent referer leakage
+    if (urlToken && typeof window !== "undefined") {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [token]);
+  }, [urlToken, token]);
 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
