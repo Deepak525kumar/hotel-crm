@@ -129,6 +129,16 @@ describe('CrmService - Hotels', () => {
       expect(result.pagination.page).toBe(1);
     });
 
+    it('returns exclusively deleted hotels for admin when only_deleted is passed', async () => {
+      mockPrisma.hotel.findMany.mockResolvedValue([]);
+      mockPrisma.hotel.count.mockResolvedValue(0);
+
+      await service.listHotels({ page: 1, limit: 20, only_deleted: 'true' }, 'admin');
+
+      const findManyCall = (mockPrisma.hotel.findMany as jest.Mock).mock.calls[0] as Array<{ where: { deleted_at?: unknown } }>;
+      expect(findManyCall[0]?.where.deleted_at).toEqual({ not: null });
+    });
+
     it('only shows active hotels for workers', async () => {
       mockPrisma.hotel.findMany.mockResolvedValue([]);
       mockPrisma.hotel.count.mockResolvedValue(0);
