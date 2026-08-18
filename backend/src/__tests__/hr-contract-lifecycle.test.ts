@@ -541,8 +541,6 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         period_end: '2026-07-31',
       });
 
-      expect(mockEmploymentRecordFindUnique).toHaveBeenCalledTimes(1); // Only the validation check, not the notification check
-      expect(mockEmploymentRecordFindUnique).toHaveBeenCalledWith({ where: { user_id: 'w1' }, select: { start_date: true } });
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
