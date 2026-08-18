@@ -511,6 +511,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('creates the request record with the same ADR-039 shape as requestPayslip', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
+      mockEmploymentRecordFindUnique.mockResolvedValue({ start_date: new Date('2026-06-01T00:00:00.000Z') });
 
       const result = await service.createPayroll({
         worker_id: 'w1',
@@ -531,7 +532,7 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
 
     it('does NOT notify the responsible manager — EVT-HR-PayslipRequested triggers on worker submission only (RULE-HR-09)', async () => {
       mockPayslipRequestCreate.mockResolvedValue(makePayslipRequestRow());
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
       await service.createPayroll({
@@ -540,7 +541,8 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
         period_end: '2026-07-31',
       });
 
-      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
+      expect(mockEmploymentRecordFindUnique).toHaveBeenCalledTimes(1); // Only the validation check, not the notification check
+      expect(mockEmploymentRecordFindUnique).toHaveBeenCalledWith({ where: { user_id: 'w1' }, select: { start_date: true } });
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
   });
