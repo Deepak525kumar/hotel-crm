@@ -770,7 +770,8 @@
     "statsLoadFailed": "Failed to load your stats.",
     "platformOverview": "Platform overview",
     "viewAnalytics": "View analytics",
-    "statsLoadFailedShort": "Couldn’t load platform stats."
+    "statsLoadFailedShort": "Couldn’t load platform stats.",
+    "tier": "Tier"
   },
   "hotelGroups": {
     "noDeleted": "No deleted hotel groups",
@@ -920,5 +921,13 @@
     "withdrawA11y": "Withdraw {{kind}} on {{day}}",
     "markFailed": "Could not mark absence.",
     "withdrawFailed": "Could not withdraw absence."
+  },
+  "ratingTier": {
+    "ELITE": "Elite",
+    "HIGH": "High",
+    "STANDARD": "Standard",
+    "LOW": "Low",
+    "PROBATION": "Probation",
+    "unrated": "Not yet rated"
   }
 }

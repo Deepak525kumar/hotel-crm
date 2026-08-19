@@ -1,3 +1,4 @@
+import { RatingTierBadge } from '@/components/RatingTierBadge';
 import { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -82,6 +83,7 @@ export default function LeaderboardScreen() {
         </View>
         <View style={styles.scoreCol}>
           <Text style={styles.scoreNum}>{item.average_score.toFixed(1)}</Text>
+          <RatingTierBadge tier={item.rating_tier} />
           <Text style={styles.stars}>
             {'★'.repeat(roundedScore)}{'☆'.repeat(Math.max(0, 5 - roundedScore))}
           </Text>

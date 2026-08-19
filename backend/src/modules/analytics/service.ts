@@ -6,10 +6,12 @@ import {
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { DashboardStats, HotelSummary, LeaderboardEntry, WorkerStats } from './types.js';
+import { deriveRatingTier } from '../quality/rating-tiers.js';
 
 interface OverallRatingRow {
   worker_id: string;
   average_score: number;
+  total_ratings: number;
   total_assignments: number;
   completion_rate: number;
   worker: { first_name: string; last_name: string };
@@ -66,6 +68,11 @@ export class AnalyticsService extends BaseService {
         total_tasks: total,
         completed_tasks: Math.round(row.completion_rate * total),
         average_rating: Math.round(row.average_score * 100) / 100,
+        // TREQ-003: the tier is derived, never stored -- see rating-tiers.ts.
+        // Passing total_ratings is what keeps an unrated worker out of
+        // PROBATION: their average_score is 0, which would otherwise read as
+        // the worst possible standing on their first day.
+        rating_tier: deriveRatingTier(row.average_score, row.total_ratings),
         position: idx + 1,
       };
     });
@@ -258,7 +265,7 @@ export class AnalyticsService extends BaseService {
       }),
       this.prisma.workerOverallRating.findUnique({
         where: { worker_id: workerId },
-        select: { average_score: true },
+        select: { average_score: true, total_ratings: true },
       }),
       this.prisma.attendance.groupBy({
         by: ['status'],
@@ -311,6 +318,9 @@ export class AnalyticsService extends BaseService {
         (roomsCompletedAgg as { _sum: { rooms_completed: number | null } })._sum
           .rooms_completed ?? 0,
       average_rating: overallRating?.average_score ?? null,
+      rating_tier: overallRating
+        ? deriveRatingTier(overallRating.average_score, overallRating.total_ratings)
+        : null,
       attendance: {
         total: totalAttendance,
         present,

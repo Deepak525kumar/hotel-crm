@@ -9,6 +9,11 @@ import {
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
+import { deriveRatingTier } from './rating-tiers';
+import {
+  RECENCY_WINDOW,
+  blendRecencyWeightedScore,
+} from './recency-weighting';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -106,6 +111,7 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
 
   const [
     agg,
+    recentRatings,
     totalAssignments,
     completedAssignments,
     onTimeAttendance,
@@ -118,6 +124,21 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         _avg: { score: true },
         _count: true,
       }),
+      // TREQ-004 (CONFIRMED §15): the last 10 jobs must weigh most. Read as a
+      // bounded LIMIT 10 rather than pulling the worker's whole rating history
+      // into the app and slicing it there -- OQ-08's performance note
+      // (FIND-PERF-002) calls out that a full-history rescan makes per-write
+      // cost grow O(n) with a worker's cumulative rating count, uncapped, and
+      // asks whoever implements this to prefer a bounded design. The lifetime
+      // half of the blend stays an aggregate, computed DB-side above.
+      typeof tx.rating?.findMany === 'function'
+        ? tx.rating.findMany({
+            where: { worker_id },
+            orderBy: { created_at: 'desc' },
+            take: RECENCY_WINDOW,
+            select: { score: true },
+          })
+        : Promise.resolve([] as { score: number }[]),
       tx.workerAssignment.count({ where: dueAssignmentWhere }),
       // ADR-069 §3: MUST carry the same rework exclusion as the denominator.
       // Without it this is the on_time_rate bug of 2026-08-18 all over again,
@@ -178,7 +199,11 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       }),
     ]);
 
-  const averageScore = agg._avg.score ?? 0;
+  const averageScore = blendRecencyWeightedScore(
+    recentRatings.map((r) => r.score),
+    agg._avg.score,
+    agg._count
+  );
   const completionRate = totalAssignments > 0 ? completedAssignments / totalAssignments : 0;
   const onTimeRate = totalAssignments > 0 ? onTimeAttendance / totalAssignments : 0;
 
@@ -902,8 +927,17 @@ export class QualityService extends BaseService {
         }))
       : leaderboard;
 
+    // TREQ-003: the tier travels with the row rather than being re-derived in
+    // each client. Three clients read this board (checker app, worker app, web)
+    // and a threshold re-implemented three times is a threshold that will
+    // disagree with itself. Derived, never stored -- see rating-tiers.ts.
+    const tieredLeaderboard = visibleLeaderboard.map((row) => ({
+      ...row,
+      rating_tier: deriveRatingTier(row.average_score, row.total_ratings),
+    }));
+
     return {
-      leaderboard: visibleLeaderboard,
+      leaderboard: tieredLeaderboard,
       pagination: {
         page, per_page: perPage, total,
         total_pages: Math.ceil(total / perPage),

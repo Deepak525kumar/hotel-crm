@@ -1,3 +1,4 @@
+import { RatingTierBadge } from '@/components/RatingTierBadge';
 import { StyleSheet, FlatList, ActivityIndicator, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
@@ -42,6 +43,7 @@ export default function RatingsScreen() {
                   <ThemedText type="smallBold" style={styles.rank}>
                     {index < 3 ? MEDAL[index] : `#${index + 1}`}
                   </ThemedText>
+                  <RatingTierBadge tier={item.rating_tier} />
                 </View>
                 <View style={styles.info}>
                   <ThemedText type="smallBold">
