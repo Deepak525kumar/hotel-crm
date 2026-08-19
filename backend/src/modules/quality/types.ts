@@ -2,7 +2,17 @@ import { z } from 'zod';
 
 export const CreateQualityVerificationSchema = z.object({
   assignment_id: z.string().min(1),
-  score: z.number().int().min(0).max(100),
+  // z.coerce, not z.number: this endpoint accepts multipart (CRR §15 puts a
+  // photo WITH the rating), and every multipart field arrives as a STRING.
+  // A plain z.number() rejected "50" with "Expected number, received string",
+  // so the endpoint was broken for every real client -- including this repo's
+  // own web form, which sends String(score). Unit tests missed it entirely
+  // because they call the service directly with a number; only a real
+  // multipart request reaches this.
+  //
+  // Coercion is safe for the JSON callers too: z.coerce.number() passes a
+  // number through unchanged, and .int() still rejects "50.5" or "abc".
+  score: z.coerce.number().int().min(0).max(100),
   notes: z.string().optional(),
 });
 

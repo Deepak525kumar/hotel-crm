@@ -1,5 +1,6 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { readFileSync } from 'node:fs';
+import { CreateQualityVerificationSchema } from '../modules/quality/types.js';
 
 // CRR §14 rework loop + ADR-069 (rework is a NEW linked assignment).
 //
@@ -183,5 +184,37 @@ describe('rework exclusion is applied to BOTH numerators, not just the denominat
   it('the denominator itself excludes rework', () => {
     const body = src().slice(src().indexOf('const dueAssignmentWhere'));
     expect(body.slice(0, 900)).toContain('rework_of_assignment_id: null');
+  });
+});
+
+// Found only by a real multipart request. Every multipart field arrives as a
+// STRING, so a plain z.number() rejected score="50" with "Expected number,
+// received string" -- the endpoint was broken for every real client,
+// including this repo's own web form, which sends String(score). The unit
+// tests all passed because they call the service directly with a number.
+describe('verification score accepts a multipart string', () => {
+  it('coerces "50" the way a multipart body sends it', () => {
+    const parsed = CreateQualityVerificationSchema.safeParse({
+      assignment_id: 'a1',
+      score: '50',
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.score).toBe(50);
+  });
+
+  it('still accepts a plain number from a JSON caller', () => {
+    const parsed = CreateQualityVerificationSchema.safeParse({
+      assignment_id: 'a1',
+      score: 50,
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it.each(['abc', '50.5', '-1', '101'])('still rejects %s', (score) => {
+    // Coercion must not become "accept anything": .int() and the bounds still
+    // apply after the string is converted.
+    expect(
+      CreateQualityVerificationSchema.safeParse({ assignment_id: 'a1', score }).success
+    ).toBe(false);
   });
 });
