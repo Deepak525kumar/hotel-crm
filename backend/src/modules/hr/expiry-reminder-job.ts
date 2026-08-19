@@ -28,9 +28,8 @@ export class HrContractExpiryReminderJob implements ScheduledJob {
   }
 
   async run(): Promise<void> {
-    // Looks 24h ahead of "now" so a daily sweep (the default interval)
-    // reliably catches a mark before it passes, rather than only after.
-    const withinMs = 24 * 60 * 60 * 1000;
+    // Looks 7 days ahead of "now" to catch contracts entering the warning window
+    const withinMs = 7 * 24 * 60 * 60 * 1000;
     const sent = await hrService.sendExpiryReminders(withinMs, this.batchSize);
     logger.info('HR contract expiry reminder sweep completed', { reminders_sent: sent });
   }

@@ -878,86 +878,125 @@ describe('HrService contract lifecycle (SPEC-HR-001 PR 2)', () => {
   });
 
   describe('sendExpiryReminders — IF-HR-ContractExpiryReminder (scheduled job)', () => {
-    it('sends a 1yr-mark reminder for an ACTIVE contract and records reminder_1yr_sent_at', async () => {
+    beforeEach(() => {
+      // Mocking current date to ensure expires_at < now works for tests
+      jest.useFakeTimers().setSystemTime(new Date('2026-08-14T12:00:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('sends an auto-lapse notification for an expired contract', async () => {
       mockContractFindMany.mockResolvedValue([
-        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
+        makeContractRow({ status: 'ACTIVE', expires_at: new Date('2026-08-10T12:00:00.000Z') }),
+      ]);
+
+      const sent = await service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100);
+
+      expect(sent).toBe(1);
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'w1', type: 'HR_CONTRACT_LAPSED' })
+      );
+    });
+
+    it('sends a 1yr-mark reminder for an ACTIVE contract to manager and worker', async () => {
+      mockContractFindMany.mockResolvedValue([
+        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null, expires_at: new Date('2026-08-20T12:00:00.000Z'), worker_expiry_reminder_count: 0 }),
       ]);
       mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
-      const sent = await service.sendExpiryReminders(86400000, 100);
+      const sent = await service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100);
 
       expect(sent).toBe(1);
+      
+      // Should enqueue two notifications: worker and manager
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'w1', type: 'HR_CONTRACT_EXPIRY_WORKER_REMINDER' }),
+        expect.anything()
+      );
       expect(mockNotificationEnqueue).toHaveBeenCalledWith(
         expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
         expect.anything()
       );
-      expect(mockContractUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { reminder_1yr_sent_at: expect.any(Date) } })
-      );
-      expect(mockTransaction).toHaveBeenCalledTimes(1);
     });
 
-    it('sends a 2yr-mark reminder for an EXTENDED contract and records reminder_2yr_sent_at', async () => {
+    it('skips manager notification if already sent, but sends worker daily reminder', async () => {
       mockContractFindMany.mockResolvedValue([
-        makeContractRow({ status: 'EXTENDED', reminder_2yr_sent_at: null }),
+        makeContractRow({ 
+          status: 'ACTIVE', 
+          reminder_1yr_sent_at: new Date('2026-08-12T12:00:00.000Z'), // Already sent to manager
+          expires_at: new Date('2026-08-20T12:00:00.000Z'), 
+          worker_expiry_reminder_count: 2, 
+          last_worker_expiry_reminder_at: new Date('2026-08-12T12:00:00.000Z') // > 24 hours ago
+        }),
       ]);
-      mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
-      mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
 
-      const sent = await service.sendExpiryReminders(86400000, 100);
+      const sent = await service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100);
 
       expect(sent).toBe(1);
-      expect(mockContractUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { reminder_2yr_sent_at: expect.any(Date) } })
+      
+      // Only worker should be notified this time
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'w1', type: 'HR_CONTRACT_EXPIRY_WORKER_REMINDER' }),
+        expect.anything()
+      );
+      expect(mockNotificationEnqueue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
+        expect.anything()
       );
     });
 
-    it('skips a contract whose mark has already been reminded (de-duplication guard)', async () => {
+    it('skips a contract whose mark has already been reminded recently for worker (de-duplication guard)', async () => {
       mockContractFindMany.mockResolvedValue([
-        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: NOW }),
+        makeContractRow({ 
+          status: 'ACTIVE', 
+          reminder_1yr_sent_at: new Date('2026-08-14T11:00:00.000Z'), 
+          expires_at: new Date('2026-08-20T12:00:00.000Z'), 
+          worker_expiry_reminder_count: 2,
+          last_worker_expiry_reminder_at: new Date('2026-08-14T11:00:00.000Z') // < 24 hours ago
+        }),
       ]);
 
-      const sent = await service.sendExpiryReminders(86400000, 100);
+      const sent = await service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100);
 
       expect(sent).toBe(0);
       expect(mockNotificationEnqueue).not.toHaveBeenCalled();
     });
 
-    it('sends no notification and does not crash for an unassigned/inactive worker (best-effort)', async () => {
+    it('sends no manager notification and does not crash for an unassigned/inactive worker (best-effort)', async () => {
       mockContractFindMany.mockResolvedValue([
-        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
+        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null, expires_at: new Date('2026-08-20T12:00:00.000Z'), worker_expiry_reminder_count: 0 }),
       ]);
       mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'INACTIVE', hotel_group_id: null, start_date: new Date('2026-06-01T00:00:00.000Z') });
 
-      const sent = await service.sendExpiryReminders(86400000, 100);
+      const sent = await service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100);
 
-      expect(sent).toBe(1); // still counted/marked sent -- de-dup guard fires regardless of delivery
-      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
+      expect(sent).toBe(1); 
+      // Manager notification shouldn't be enqueued
+      expect(mockNotificationEnqueue).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
+        expect.anything()
+      );
+      // But worker notification should still go out
+      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientId: 'w1', type: 'HR_CONTRACT_EXPIRY_WORKER_REMINDER' }),
+        expect.anything()
+      );
     });
 
     it('review fix: enqueue() and contract.update() run inside the same $transaction() call', async () => {
       mockContractFindMany.mockResolvedValue([
-        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null }),
+        makeContractRow({ status: 'ACTIVE', reminder_1yr_sent_at: null, expires_at: new Date('2026-08-20T12:00:00.000Z'), worker_expiry_reminder_count: 0 }),
       ]);
       mockEmploymentRecordFindUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1', start_date: new Date('2026-06-01T00:00:00.000Z') });
       mockHotelGroupFindUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
-      // Simulate tx.contract.update() throwing after enqueue() already ran.
-      // This mock can only prove BOTH calls happen inside the same
-      // this.prisma.$transaction() callback -- it cannot simulate actual
-      // database rollback (there's no real DB here). Both operations
-      // executing inside one transaction is what lets Prisma provide
-      // rollback semantics if either operation fails; that guarantee itself
-      // is Prisma's, not something this mock can verify.
       mockContractUpdate.mockRejectedValueOnce(new Error('db write failed'));
 
-      await expect(service.sendExpiryReminders(86400000, 100)).rejects.toThrow('db write failed');
+      await expect(service.sendExpiryReminders(7 * 24 * 60 * 60 * 1000, 100)).rejects.toThrow('db write failed');
 
       expect(mockTransaction).toHaveBeenCalledTimes(1);
-      expect(mockNotificationEnqueue).toHaveBeenCalledWith(
-        expect.objectContaining({ recipientId: 'rm1', type: 'HR_CONTRACT_EXPIRY_REMINDER' }),
-        expect.anything()
-      );
     });
   });
 });

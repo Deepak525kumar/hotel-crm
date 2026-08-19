@@ -40,6 +40,7 @@ const mockOutboxEvent = {
 };
 const mockWorkerOverallRating = {
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -65,6 +66,7 @@ const mockPrisma = {
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  $executeRawUnsafe: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
 
@@ -759,6 +761,7 @@ describe('Quality getLeaderboard — pagination (ADR-035)', () => {
 // independent of QualityService's own request-handling tests above.
 describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-13 fix)', () => {
   const makeTx = () => ({
+    $executeRawUnsafe: jest.fn(),
     rating: { aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
     workerAssignment: {
       count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
@@ -772,7 +775,11 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
       findFirst: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
     },
     attendance: { count: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
-    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any>, findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    notification: { create: (jest.fn() as any).mockResolvedValue({ id: 'notif-1' }) },
+    employmentRecord: { findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    hotelGroup: { findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    outboxEvent: { create: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
   });
 
   it('excludes CANCELLED and REASSIGNED from the denominator, at any day', async () => {
@@ -858,6 +865,7 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
 // tables with different filters, and nothing keeps them in step.
 describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agreement', () => {
   const makeTx = (dueCount: number, presentCount: number) => ({
+    $executeRawUnsafe: jest.fn(),
     rating: {
       aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({
         _avg: { score: 80 },
@@ -879,7 +887,11 @@ describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agre
         presentCount
       ),
     },
-    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    workerOverallRating: { upsert: jest.fn() as jest.MockedFunction<(...a: any[]) => any>, findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    notification: { create: (jest.fn() as any).mockResolvedValue({ id: 'notif-1' }) },
+    employmentRecord: { findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    hotelGroup: { findUnique: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    outboxEvent: { create: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
   });
 
   // Reproduces a sequence that happens in normal operation: the worker checks
@@ -909,5 +921,22 @@ describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agre
     // assignment is one the rate is measured against, is what allows the
     // mismatch above.
     expect(attendanceWhere).toHaveProperty('assignment');
+  });
+
+  it('does not trigger a warning if the worker has 0 ratings, avoiding a default 0 score from firing alerts', async () => {
+    const tx = makeTx(1, 1);
+    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 }); // 0 ratings
+
+    await refreshWorkerOverallRating(tx as any, 'w1');
+
+    // Make sure no notifications were created
+    expect(tx.notification.create).not.toHaveBeenCalled();
+    expect(tx.outboxEvent.create).not.toHaveBeenCalled();
+    
+    const written = (tx.workerOverallRating.upsert.mock.calls as any[])[0][0].update;
+    // Score should be stored as 0, but warnings should NOT be triggered
+    expect(written.average_score).toBe(0);
+    expect(written.warning_70_sent_at).toBeNull();
+    expect(written.warning_50_sent_at).toBeNull();
   });
 });
