@@ -889,7 +889,13 @@
     "outcomeNEEDS_REWORK": "À REFAIRE",
     "outcomeFAILED": "ÉCHOUÉ",
     "recorded": "Contrôle qualité enregistré.",
-    "submitFailed": "Échec de l’envoi"
+    "submitFailed": "Échec de l’envoi",
+    "cameraDenied": "L’autorisation d’accès à la caméra est nécessaire pour prendre une photo.",
+    "takePhoto": "Prendre une photo",
+    "chooseFromLibrary": "Choisir dans la galerie",
+    "markDone": "Marquer comme terminé",
+    "reworkPhotoRequired": "Ajoutez au moins une photo avant de marquer ceci comme terminé.",
+    "reworkTitle": "Reprise requise"
   },
   "ratings": {
     "comment": "Commentaire",

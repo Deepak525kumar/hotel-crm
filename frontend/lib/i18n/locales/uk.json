@@ -889,7 +889,13 @@
     "outcomeNEEDS_REWORK": "ПОТРІБНЕ ДОРОБЛЕННЯ",
     "outcomeFAILED": "НЕ ПРОЙДЕНО",
     "recorded": "Перевірку якості зафіксовано.",
-    "submitFailed": "Не вдалося надіслати"
+    "submitFailed": "Не вдалося надіслати",
+    "cameraDenied": "Щоб зробити фото, потрібен дозвіл на камеру.",
+    "takePhoto": "Зробити фото",
+    "chooseFromLibrary": "Вибрати з галереї",
+    "markDone": "Позначити як виконано",
+    "reworkPhotoRequired": "Додайте хоча б одне фото, перш ніж позначати це як виконане.",
+    "reworkTitle": "Потрібна переробка"
   },
   "ratings": {
     "comment": "Коментар",

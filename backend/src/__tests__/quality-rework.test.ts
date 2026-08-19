@@ -1,4 +1,5 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
+import { readFileSync } from 'node:fs';
 
 // CRR §14 rework loop + ADR-069 (rework is a NEW linked assignment).
 //
@@ -114,5 +115,42 @@ describe('ReworkEscalationJob', () => {
     // v2 still got its notifications after v1 threw.
     const ids = mockEnqueue.mock.calls.map((c: any[]) => c[0].data.verification_id);
     expect(ids).toContain('v2');
+  });
+});
+
+// The two check-then-act races in the service. Both were real: the read that
+// guards them happens outside the transaction, so two concurrent callers can
+// both observe the "not yet" state. Both are now compare-and-swap claims, the
+// same pattern the password-reset fix uses.
+describe('rework claims are compare-and-swap, not check-then-act', () => {
+  it('assignRework claims on rework_required === false', () => {
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async assignRework('), src.indexOf('async completeRework('));
+    // The WHERE must constrain the prior state; a bare id would let both
+    // concurrent callers win and create two rework rows -- and therefore two
+    // 20-minute escalation timers for one failure.
+    expect(body).toContain('rework_required: false');
+    expect(body).toContain('updateMany');
+    expect(body).toContain('claimed.count === 0');
+  });
+
+  it('completeRework claims on rework_completed_at === null', () => {
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async completeRework('));
+    // Without this a double-tap on "mark done" notifies the checker twice and
+    // appends the photos twice.
+    expect(body).toContain('rework_completed_at: null');
+    expect(body).toContain('updateMany');
+    expect(body).toContain('claimed.count === 0');
+  });
+
+  it('the rework notification carries the notes the mobile deep link reads', () => {
+    // The worker taps the push and lands on /rework/:id?notes=... -- the note
+    // IS the instruction, so it must be in the payload or the screen opens
+    // blank and the worker has to go hunting with a 20-minute clock running.
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    const body = src.slice(src.indexOf('async assignRework('), src.indexOf('async completeRework('));
+    expect(body).toContain('rework_assignment_id: reworkAssignment.id');
+    expect(body).toContain('notes: input.notes');
   });
 });
