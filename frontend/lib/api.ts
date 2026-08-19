@@ -556,11 +556,27 @@ export const assignmentsApi = {
  * client. One entry per assignment for each endpoint — a second POST 409s.
  */
 export const qualityApi = {
-  createVerification: (input: CreateVerificationInput) =>
-    apiFetch<QualityVerification>("/quality/verifications", {
+  /**
+   * CRR §15: the checker uploads a photo WITH the rating, so this always
+   * sends multipart -- even with no files. One code path: the backend route
+   * parses multipart either way, and a JSON body would need a second parser
+   * for the no-photo case.
+   */
+  createVerification: (input: CreateVerificationInput, photos: File[] = []) => {
+    const form = new FormData();
+    form.append("assignment_id", input.assignment_id);
+    form.append("score", String(input.score));
+    if (input.notes) form.append("notes", input.notes);
+    for (const photo of photos) form.append("photos", photo);
+    return apiFetch<QualityVerification>("/quality/verifications", {
       method: "POST",
-      body: input,
-    }),
+      body: form,
+    });
+  },
+
+  /** CRR §14: assign rework for a failed inspection to the same worker. */
+  assignRework: (input: { verification_id: string; notes: string }) =>
+    apiFetch<WorkerAssignment>("/quality/rework", { method: "POST", body: input }),
 
   createRating: (input: CreateRatingInput) =>
     apiFetch<Rating>("/quality/ratings", { method: "POST", body: input }),
