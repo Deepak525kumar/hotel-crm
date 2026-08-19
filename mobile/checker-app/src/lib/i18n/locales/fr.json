@@ -895,7 +895,8 @@
     "chooseFromLibrary": "Choisir dans la galerie",
     "markDone": "Marquer comme terminé",
     "reworkPhotoRequired": "Ajoutez au moins une photo avant de marquer ceci comme terminé.",
-    "reworkTitle": "Reprise requise"
+    "reworkTitle": "Reprise requise",
+    "photoUnavailable": "Image indisponible"
   },
   "ratings": {
     "comment": "Commentaire",

@@ -895,7 +895,8 @@
     "chooseFromLibrary": "Aus Galerie wählen",
     "markDone": "Als erledigt markieren",
     "reworkPhotoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie dies als erledigt markieren.",
-    "reworkTitle": "Nacharbeit erforderlich"
+    "reworkTitle": "Nacharbeit erforderlich",
+    "photoUnavailable": "Bild nicht verfügbar"
   },
   "ratings": {
     "comment": "Kommentar",

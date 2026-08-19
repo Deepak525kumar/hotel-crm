@@ -620,6 +620,66 @@ export class QualityService extends BaseService {
     return rating;
   }
 
+  /**
+   * Presigned URLs for one inspection's photo evidence (CRR §14/§15).
+   *
+   * Keys are useless to a client on their own -- the bucket is private -- so
+   * this is the only way the checker can actually SEE what CRR §14 says they
+   * are "notified with". Without it the photos are write-only.
+   *
+   * URLs are minted per request and expire in 15 minutes; they are never
+   * persisted, which is why the column stores keys.
+   */
+  async getVerificationPhotos(verificationId: string, actor: Actor) {
+    const verification = await this.prisma.qualityVerification.findUnique({
+      where: { id: verificationId },
+      include: { assignment: { select: { worker_id: true } } },
+    });
+    if (!verification) throw new NotFoundError('Verification not found');
+
+    // Who may look at room evidence:
+    //  - the checker who recorded it, and any admin (quality:read gates the
+    //    route itself);
+    //  - a scope-bound manager/RM, only for hotels in their scope;
+    //  - the WORKER the inspection is about -- they uploaded the rework photo
+    //    and the inspection is a record about their own work. Withholding it
+    //    would mean a worker cannot see the evidence used to judge them.
+    // Deny by default. quality:read alone is NOT sufficient: ADR-067 granted
+    // WORKER that token so a worker can see their own hotel group's
+    // leaderboard, so gating on the permission alone would let any worker read
+    // any other worker's room evidence by id -- an IDOR, and on
+    // special-category-adjacent data.
+    const isSubject = verification.assignment?.worker_id === actor.userId;
+    const role = actor.role.toLowerCase();
+
+    if (isSubject) {
+      // The worker the inspection is about. They uploaded the rework photo and
+      // the record is about their own work; withholding it would mean they
+      // cannot see the evidence used to judge them.
+    } else if (role === 'admin') {
+      // Unscoped by design, matching every other admin read.
+    } else if (isScopedManagerRole(role) || role === 'checker') {
+      const inScope = await isHotelInScope(actor.scope ?? null, verification.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
+    } else {
+      // Any other role, including a WORKER who is not the subject.
+      throw new ForbiddenError('Cannot view evidence for this inspection');
+    }
+
+    const storage = await getStorageClient();
+    const photos = await Promise.all(
+      verification.photo_urls.map(async (key) => ({
+        key,
+        // null when storage is unconfigured (the stub). Surfaced rather than
+        // hidden so a broken bucket shows as a missing image, not as an
+        // inspection that never had evidence.
+        url: await storage.getPresignedUrl(key),
+      }))
+    );
+
+    return { verification_id: verification.id, photos };
+  }
+
   async getLeaderboard(
     hotelId: string,
     page = 1,

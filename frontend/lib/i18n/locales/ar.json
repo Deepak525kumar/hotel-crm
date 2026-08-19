@@ -896,7 +896,8 @@
     "chooseFromLibrary": "الاختيار من المعرض",
     "markDone": "وضع علامة كمنجز",
     "reworkPhotoRequired": "أضف صورة واحدة على الأقل قبل وضع علامة الإنجاز.",
-    "reworkTitle": "إعادة العمل مطلوبة"
+    "reworkTitle": "إعادة العمل مطلوبة",
+    "photoUnavailable": "الصورة غير متاحة"
   },
   "ratings": {
     "comment": "تعليق",

@@ -162,6 +162,21 @@ export async function getStorageClient(): Promise<StorageClient> {
   const region = process.env['AWS_REGION'] ?? 'eu-central-1';
 
   if (!bucket) {
+    // The stub is a TEST convenience, and it is dangerous anywhere else: its
+    // upload() logs a warning and returns, so the caller still commits storage
+    // keys and still answers 200 while the bytes were never written. A worker
+    // photographs a room, the record claims evidence exists, and the object
+    // does not. That is the "a 200 has repeatedly meant nothing was written"
+    // failure this repo's E2E suite calls out by name.
+    //
+    // A misconfigured deployment must therefore fail loudly rather than
+    // silently discard evidence. Only test/development may fall back.
+    const env = process.env['NODE_ENV'] ?? 'development';
+    if (env === 'production' || env === 'staging') {
+      throw new StorageError(
+        'S3_BUCKET is not configured. Refusing to accept uploads that would be silently discarded.'
+      );
+    }
     return stubStorageClient;
   }
 

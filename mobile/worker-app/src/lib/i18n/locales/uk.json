@@ -895,7 +895,8 @@
     "chooseFromLibrary": "Вибрати з галереї",
     "markDone": "Позначити як виконано",
     "reworkPhotoRequired": "Додайте хоча б одне фото, перш ніж позначати це як виконане.",
-    "reworkTitle": "Потрібна переробка"
+    "reworkTitle": "Потрібна переробка",
+    "photoUnavailable": "Зображення недоступне"
   },
   "ratings": {
     "comment": "Коментар",

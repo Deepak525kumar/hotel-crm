@@ -87,6 +87,28 @@ export class QualityController {
     }
   }
 
+  // CRR §14/§15: serve the evidence so the checker can actually see what they
+  // were notified with. Keys alone are useless -- the bucket is private.
+  async getVerificationPhotos(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.verification_id;
+      if (!id) throw new ValidationError('verification_id is required');
+      const result = await qualityService.getVerificationPhotos(id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async createRating(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');

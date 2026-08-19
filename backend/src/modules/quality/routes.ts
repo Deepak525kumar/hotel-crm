@@ -38,6 +38,15 @@ router.post(
   (req, res, next) => qualityController.createVerification(req, res, next)
 );
 
+// CRR §14/§15: presigned URLs for one inspection's evidence. quality:read
+// rather than quality:write -- managers and RMs hold read and must be able to
+// see what an inspection recorded. The worker the inspection is ABOUT is
+// admitted in the service, which is the layer that knows whose assignment it
+// is.
+router.get('/verifications/:verification_id/photos', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.getVerificationPhotos(req, res, next)
+);
+
 // CRR §14: checker assigns rework to a specific worker.
 router.post('/rework', requirePermission('quality:write'), (req, res, next) =>
   qualityController.assignRework(req, res, next)

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
@@ -462,6 +462,12 @@ export default function AssignmentDetailPage() {
             )}
           </CardContent>
 
+          {loggedVerification && (
+            <CardContent className="border-t pt-4">
+              <VerificationEvidence verificationId={loggedVerification.id} />
+            </CardContent>
+          )}
+
           {/* CRR §14: rework is assigned to a specific worker after a failed
               inspection. Only offered once a verification exists and it did
               NOT pass -- the backend rejects rework on a PASSED inspection,
@@ -801,6 +807,76 @@ function LogRoomsCompletedModal({
  * (assignRework uses them as the notification body), so an empty note would
  * push "Rework required" with no indication of what to redo.
  */
+/**
+ * CRR §14/§15: the photo evidence attached to an inspection.
+ *
+ * Fetched on demand, not with the verification: presigned URLs expire in 15
+ * minutes, so anything cached alongside the record would be dead by the time
+ * it was rendered. Without this the photos were write-only -- uploaded,
+ * stored, and impossible to look at.
+ */
+function VerificationEvidence({ verificationId }: { verificationId: string }) {
+  const { t } = useTranslation();
+  const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void qualityApi
+      .verificationPhotos(verificationId)
+      .then((r) => {
+        if (!cancelled) setPhotos(r.photos);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [verificationId]);
+
+  // An inspection with no photos is normal (they are optional), so render
+  // nothing rather than an empty state that implies something is missing.
+  if (failed || !photos || photos.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+        {t("quality.evidence")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((photo) =>
+          photo.url ? (
+            // Opens full size in a new tab: these are room photos a checker
+            // needs to actually inspect, not decoration.
+            <a key={photo.key} href={photo.url} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element -- the src
+                  is a short-lived presigned S3 URL, not a static asset, so
+                  next/image's optimiser cannot help and would only add a
+                  server round-trip against an expiring URL. */}
+              <img
+                src={photo.url}
+                alt={t("quality.evidence")}
+                className="h-20 w-20 rounded-md border border-gray-200 object-cover dark:border-gray-800"
+              />
+            </a>
+          ) : (
+            // url === null means storage is unconfigured. Shown as a broken
+            // tile rather than hidden, so a misconfigured bucket does not look
+            // like an inspection that never had evidence.
+            <div
+              key={photo.key}
+              className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-gray-300 text-center text-[10px] text-gray-400 dark:border-gray-700"
+            >
+              {t("quality.photoUnavailable")}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AssignReworkModal({
   verificationId,
   open,

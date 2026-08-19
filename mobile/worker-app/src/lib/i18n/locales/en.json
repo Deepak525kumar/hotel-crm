@@ -895,7 +895,8 @@
     "chooseFromLibrary": "Choose from library",
     "markDone": "Mark as done",
     "reworkTitle": "Rework required",
-    "reworkPhotoRequired": "Add at least one photo before marking this done."
+    "reworkPhotoRequired": "Add at least one photo before marking this done.",
+    "photoUnavailable": "Image unavailable"
   },
   "ratings": {
     "comment": "Comment",

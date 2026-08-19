@@ -574,6 +574,18 @@ export const qualityApi = {
     });
   },
 
+  /**
+   * CRR §14/§15: presigned URLs for one inspection's evidence.
+   *
+   * Fetched on demand rather than embedded in the verification: the URLs
+   * expire in 15 minutes, so a value cached with the verification would be
+   * dead by the time anyone looked at it.
+   */
+  verificationPhotos: (verificationId: string) =>
+    apiFetch<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
+      `/quality/verifications/${verificationId}/photos`,
+    ),
+
   /** CRR §14: assign rework for a failed inspection to the same worker. */
   assignRework: (input: { verification_id: string; notes: string }) =>
     apiFetch<Assignment>("/quality/rework", { method: "POST", body: input }),

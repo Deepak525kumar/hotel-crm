@@ -109,7 +109,19 @@ export function subscribeToPushNotifications(router: Router): () => void {
   // deep link: the backend's NotificationType/data payload isn't yet rich
   // enough to route to every producer's specific detail screen, and
   // guessing at that shape now would be a speculative abstraction.
-  const responseSub = Notifications.addNotificationResponseReceivedListener(() => {
+  const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {
+    // CRR §14: a completed rework opens the evidence the worker just
+    // uploaded, because "notified with the photo" is the requirement -- the
+    // notifications list shows the message but not the images. Every other
+    // type keeps the existing list behaviour: the payloads are not rich
+    // enough to route them, and guessing would be speculative.
+    const data = response?.notification?.request?.content?.data as
+      | Record<string, unknown>
+      | undefined;
+    if (data?.type === 'REWORK_COMPLETED' && typeof data.verification_id === 'string') {
+      router.push(`/verification/${data.verification_id}`);
+      return;
+    }
     router.push('/notifications');
   });
 

@@ -369,6 +369,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(data),
       }),
+    /**
+     * CRR §14/§15: presigned URLs for one inspection's evidence. Fetched on
+     * demand -- the URLs expire in 15 minutes, so caching them with the
+     * verification would store values that are already dead.
+     */
+    verificationPhotos: (verificationId: string) =>
+      request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
+        `/quality/verifications/${encodeURIComponent(verificationId)}/photos`
+      ),
+
     leaderboard: (hotel_id?: string) =>
       request<LeaderboardEntry[]>(
         hotel_id ? `/quality/leaderboard/by-hotel/${hotel_id}` : '/quality/leaderboard'
