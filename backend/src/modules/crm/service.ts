@@ -136,6 +136,15 @@ export class CrmService extends BaseService {
   ) {
     const hotel = await this.prisma.hotel.findUnique({
       where: { id: hotelId },
+      include: {
+        hotel_group: {
+          select: {
+            name: true,
+            regional_manager: { select: { first_name: true, last_name: true } },
+          },
+        },
+        manager: { select: { first_name: true, last_name: true } },
+      },
     });
     if (!hotel) throw new NotFoundError('Hotel not found');
     // A deleted hotel reads as absent to everyone except an admin explicitly
@@ -146,7 +155,19 @@ export class CrmService extends BaseService {
     }
 
     await this.logAudit(actorId, actorRole, 'VIEW', 'HOTEL', hotelId, {}, ip);
-    return hotel;
+    
+    // Flatten related names for the frontend so it doesn't need to fetch
+    // restricted endpoints to render display names.
+    return {
+      ...hotel,
+      hotel_group_name: hotel.hotel_group?.name ?? null,
+      regional_manager_name: hotel.hotel_group?.regional_manager
+        ? `${hotel.hotel_group.regional_manager.first_name} ${hotel.hotel_group.regional_manager.last_name}`
+        : null,
+      manager_name: hotel.manager
+        ? `${hotel.manager.first_name} ${hotel.manager.last_name}`
+        : null,
+    };
   }
 
   async createHotel(data: CreateHotelRequest, actorId: string, actorRole: string, ip?: string) {
