@@ -63,7 +63,16 @@ export class ReworkEscalationJob implements ScheduledJob {
           // escalated it will have moved rework_escalated_at, so this update
           // matches nothing and we skip -- rather than double-notifying.
           const claimed = await tx.qualityVerification.updateMany({
-            where: { id: v.id, rework_escalated_at: null },
+            // `rework_completed_at: null` is re-checked HERE, not just in the
+            // findMany above, and that is the whole point of re-stating it.
+            // The select and this claim are separated by the batch loop -- up
+            // to `batchSize` rows, one transaction each -- so a worker can
+            // finish their rework in between. Claiming on
+            // rework_escalated_at alone would then succeed and notify the
+            // manager AND checker that work is overdue seconds after it was
+            // actually completed. A false 20-minute alarm is exactly the kind
+            // of thing that teaches people to ignore the real ones.
+            where: { id: v.id, rework_escalated_at: null, rework_completed_at: null },
             data: { rework_escalated_at: new Date() },
           });
           if (claimed.count === 0) return;

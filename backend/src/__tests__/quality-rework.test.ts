@@ -68,11 +68,34 @@ describe('ReworkEscalationJob', () => {
     const { prisma, updateMany } = makePrisma([overdueRow]);
     await new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run();
 
-    // The claim is a conditional update on rework_escalated_at still being
-    // null -- a compare-and-swap, not a blind write.
+    // The claim is a conditional update -- a compare-and-swap, not a blind
+    // write -- and it re-checks BOTH conditions, not just the escalation
+    // marker.
+    //
+    // rework_completed_at is deliberately re-stated here even though the
+    // findMany already filtered on it: the select and this claim are
+    // separated by the batch loop (up to batchSize rows, one transaction
+    // each), so a worker can finish their rework in between. Claiming on
+    // rework_escalated_at alone would still succeed and tell the manager AND
+    // checker that work is overdue seconds after it was completed -- a false
+    // 20-minute alarm, which is how people learn to ignore the real ones.
     const where = updateMany.mock.calls[0][0].where;
-    expect(where).toEqual({ id: 'v1', rework_escalated_at: null });
+    expect(where).toEqual({
+      id: 'v1',
+      rework_escalated_at: null,
+      rework_completed_at: null,
+    });
     expect(updateMany.mock.calls[0][0].data.rework_escalated_at).toBeInstanceOf(Date);
+  });
+
+  it('sends nothing when the worker completed between the select and the claim', async () => {
+    // The race itself, not just the query shape: findMany saw an incomplete
+    // rework, the worker finished it, and the conditional claim now matches
+    // zero rows -- so no overdue notification is sent.
+    const { prisma, updateMany } = makePrisma([overdueRow]);
+    updateMany.mockResolvedValue({ count: 0 });
+    await new ReworkEscalationJob(prisma, { intervalMs: 1000 }).run();
+    expect(mockEnqueue).not.toHaveBeenCalled();
   });
 
   it('sends NOTHING when another process already claimed the row', async () => {
