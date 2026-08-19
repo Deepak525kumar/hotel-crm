@@ -106,7 +106,7 @@ import { readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { BaseService } from '../../lib/base-service.js';
-import type { DatabaseTransaction } from '../../lib/db.js';
+
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { logger } from '../../lib/logger.js';
 import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scope.js';
@@ -859,71 +859,116 @@ export class HrService extends BaseService {
   // scheduler run would re-send a duplicate reminder for the same mark.
   async sendExpiryReminders(withinMs: number, batchSize: number): Promise<number> {
     const cutoff = new Date(Date.now() + withinMs);
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
     const contracts = await this.prisma.contract.findMany({
       where: {
         status: { in: [ContractStatus.ACTIVE, ContractStatus.EXTENDED] },
         expires_at: { lte: cutoff, not: null },
-        OR: [{ reminder_1yr_sent_at: null }, { reminder_2yr_sent_at: null }],
       },
       take: batchSize,
     });
 
-    let sent = 0;
+    let processed = 0;
     for (const contract of contracts) {
-      // ACTIVE -> approaching the 1yr mark; EXTENDED -> approaching the 2yr
-      // (permanence) mark. Each fires at most once per mark (the
-      // reminder_*_sent_at columns are the de-duplication guard).
+      const isExpired = contract.expires_at! <= now;
       const isFirstMark = contract.status === ContractStatus.ACTIVE;
-      if (isFirstMark && contract.reminder_1yr_sent_at) continue;
-      if (!isFirstMark && contract.reminder_2yr_sent_at) continue;
+
+      if (isExpired) {
+        // Contract has actually expired! PATH (b) Auto-lapse
+        await employeeManagementService.deactivateForContractLapse(contract.worker_id, 'contract_lapse_auto');
+
+        await notificationService.enqueue({
+          recipientId: contract.worker_id,
+          type: 'HR_CONTRACT_LAPSED',
+          title: 'Contract expired',
+          message: 'Your contract has expired. Contact your manager for details.',
+          data: { contract_id: contract.id },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.HR,
+          producerService: 'HrService',
+        });
+        
+        logger.info('hr_contract_lapsed_auto', { contractId: contract.id, workerId: contract.worker_id });
+        processed++;
+        continue;
+      }
+
+      // Not expired yet, it's in the warning window
+      let needsManagerReminder = false;
+      if (isFirstMark && !contract.reminder_1yr_sent_at) needsManagerReminder = true;
+      if (!isFirstMark && !contract.reminder_2yr_sent_at) needsManagerReminder = true;
+
+      const needsWorkerReminder = 
+        contract.worker_expiry_reminder_count < 7 &&
+        (!contract.last_worker_expiry_reminder_at || contract.last_worker_expiry_reminder_at <= twentyFourHoursAgo);
+
+      if (!needsManagerReminder && !needsWorkerReminder) continue;
 
       await this.prisma.$transaction(async (tx) => {
-        await this.notifyResponsibleManagerOfExpiry(contract.worker_id, contract.id, isFirstMark, tx);
+        if (needsWorkerReminder) {
+          await notificationService.enqueue(
+            {
+              recipientId: contract.worker_id,
+              type: 'HR_CONTRACT_EXPIRY_WORKER_REMINDER',
+              title: isFirstMark ? 'Your contract is approaching its 1-year mark' : 'Your contract is approaching its 2-year mark',
+              message: 'Your contract is about to expire. Please speak with your manager about renewing it soon.',
+              data: { worker_id: contract.worker_id, contract_id: contract.id },
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.HR,
+              producerService: 'HrService',
+            },
+            tx
+          );
+          await tx.contract.update({
+            where: { id: contract.id },
+            data: { 
+              last_worker_expiry_reminder_at: new Date(),
+              worker_expiry_reminder_count: contract.worker_expiry_reminder_count + 1,
+            },
+          });
+        }
 
-        await tx.contract.update({
-          where: { id: contract.id },
-          data: isFirstMark ? { reminder_1yr_sent_at: new Date() } : { reminder_2yr_sent_at: new Date() },
-        });
+        if (needsManagerReminder) {
+          const record = await tx.employmentRecord.findUnique({
+            where: { user_id: contract.worker_id },
+            select: { status: true, hotel_group_id: true },
+          });
+          if (record && record.status === EmploymentStatus.ACTIVE && record.hotel_group_id) {
+            const group = await tx.hotelGroup.findUnique({
+              where: { id: record.hotel_group_id },
+              select: { regional_manager_user_id: true },
+            });
+            if (group?.regional_manager_user_id) {
+              await notificationService.enqueue(
+                {
+                  recipientId: group.regional_manager_user_id,
+                  type: 'HR_CONTRACT_EXPIRY_REMINDER',
+                  title: isFirstMark ? 'Contract approaching 1-year mark' : 'Contract approaching 2-year mark',
+                  message: isFirstMark
+                    ? 'A contract is approaching its 1-year expiry -- confirm extension or lapse.'
+                    : 'A contract is approaching its 2-year mark -- confirm permanence or lapse.',
+                  data: { worker_id: contract.worker_id, contract_id: contract.id },
+                  transports: [OutboxTransport.PUSH],
+                  sourceModule: OutboxSourceModule.HR,
+                  producerService: 'HrService',
+                },
+                tx
+              );
+            }
+          }
+          
+          await tx.contract.update({
+            where: { id: contract.id },
+            data: isFirstMark ? { reminder_1yr_sent_at: new Date() } : { reminder_2yr_sent_at: new Date() },
+          });
+        }
       });
-      sent++;
+      processed++;
     }
 
-    return sent;
-  }
-
-  private async notifyResponsibleManagerOfExpiry(
-    workerId: string,
-    contractId: string,
-    isFirstMark: boolean,
-    tx: DatabaseTransaction
-  ): Promise<void> {
-    const record = await tx.employmentRecord.findUnique({
-      where: { user_id: workerId },
-      select: { status: true, hotel_group_id: true },
-    });
-    if (!record || record.status !== EmploymentStatus.ACTIVE || !record.hotel_group_id) return;
-
-    const group = await tx.hotelGroup.findUnique({
-      where: { id: record.hotel_group_id },
-      select: { regional_manager_user_id: true },
-    });
-    if (!group?.regional_manager_user_id) return;
-
-    await notificationService.enqueue(
-      {
-        recipientId: group.regional_manager_user_id,
-        type: 'HR_CONTRACT_EXPIRY_REMINDER',
-        title: isFirstMark ? 'Contract approaching 1-year mark' : 'Contract approaching 2-year mark',
-        message: isFirstMark
-          ? 'A contract is approaching its 1-year expiry -- confirm extension or lapse.'
-          : 'A contract is approaching its 2-year mark -- confirm permanence or lapse.',
-        data: { worker_id: workerId, contract_id: contractId },
-        transports: [OutboxTransport.PUSH],
-        sourceModule: OutboxSourceModule.HR,
-        producerService: 'HrService',
-      },
-      tx
-    );
+    return processed;
   }
 
   // ---------------------------------------------------------------------------

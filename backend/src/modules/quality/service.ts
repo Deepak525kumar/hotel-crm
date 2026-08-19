@@ -1,6 +1,7 @@
 import {
   AssignmentStatus,
   AttendanceStatus,
+  EmploymentStatus,
   OutboxSourceModule,
   OutboxTransport,
   Prisma,
@@ -34,6 +35,10 @@ type RatingAggregateTx = Prisma.TransactionClient;
 // inside the same transaction, or the aggregate silently goes stale — see
 // assignments/service.ts's call from AssignmentService.update().
 export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_id: string) {
+  // Serialize concurrent rating/assignment updates for this worker to prevent
+  // double-triggering threshold warnings or overwriting intermediate state.
+  await tx.$executeRawUnsafe('SELECT 1 FROM "User" WHERE id = $1 FOR UPDATE', worker_id);
+
   // 2026-08-13 fix (E2E integration audit -- "leaderboard sabotage"): this
   // denominator used to be a raw count of EVERY WorkerAssignment row
   // regardless of status, with zero filtering. completion_rate/on_time_rate
@@ -146,6 +151,75 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
   const completionRate = totalAssignments > 0 ? completedAssignments / totalAssignments : 0;
   const onTimeRate = totalAssignments > 0 ? onTimeAttendance / totalAssignments : 0;
 
+  const existingRating = await tx.workerOverallRating.findUnique({ where: { worker_id } });
+  let warning_70_sent_at = existingRating?.warning_70_sent_at ?? null;
+  let warning_50_sent_at = existingRating?.warning_50_sent_at ?? null;
+
+  if (totalAssignments > 0 && agg._count > 0) { // Only evaluate warnings if they have actually done shifts AND have at least one rating
+    if (averageScore < 50) {
+      if (!warning_50_sent_at) {
+        warning_50_sent_at = new Date();
+        warning_70_sent_at = new Date(); // If they dropped straight to <50, mark 70 as sent too
+
+        await notificationService.enqueue({
+          recipientId: worker_id,
+          type: 'QUALITY_RATING_WARNING_50',
+          title: 'Rating Alert',
+          message: 'Your overall rating has dropped below 50. Please contact your manager immediately.',
+          data: { average_score: averageScore },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        }, tx);
+
+        const record = await tx.employmentRecord.findUnique({
+          where: { user_id: worker_id },
+          select: { status: true, hotel_group_id: true },
+        });
+
+        if (record && record.status === EmploymentStatus.ACTIVE && record.hotel_group_id) {
+          const group = await tx.hotelGroup.findUnique({
+            where: { id: record.hotel_group_id },
+            select: { regional_manager_user_id: true },
+          });
+
+          if (group?.regional_manager_user_id) {
+            await notificationService.enqueue({
+              recipientId: group.regional_manager_user_id,
+              type: 'QUALITY_RATING_WARNING_50',
+              title: 'Worker Rating Alert',
+              message: `A worker's rating has dropped below 50.`,
+              data: { worker_id, average_score: averageScore },
+              transports: [OutboxTransport.PUSH],
+              sourceModule: OutboxSourceModule.QUALITY,
+              producerService: 'QualityService',
+            }, tx);
+          }
+        }
+      }
+    } else if (averageScore < 70) {
+      if (!warning_70_sent_at) {
+        warning_70_sent_at = new Date();
+        await notificationService.enqueue({
+          recipientId: worker_id,
+          type: 'QUALITY_RATING_WARNING_70',
+          title: 'Rating Warning',
+          message: 'Your overall rating has dropped below 70. Please review your recent feedback.',
+          data: { average_score: averageScore },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        }, tx);
+      }
+      if (warning_50_sent_at) {
+        warning_50_sent_at = null; // Reset 50 warning since they improved
+      }
+    } else {
+      warning_70_sent_at = null;
+      warning_50_sent_at = null;
+    }
+  }
+
   const aggregateData = {
     average_score: averageScore,
     total_ratings: agg._count,
@@ -154,6 +228,8 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
     on_time_rate: onTimeRate,
     last_worked_at: lastWorked?.completed_at ?? null,
     worker_cancellations: workerCancellations,
+    warning_70_sent_at,
+    warning_50_sent_at,
   };
 
   await tx.workerOverallRating.upsert({
