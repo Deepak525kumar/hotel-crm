@@ -33,6 +33,26 @@ export function generateStorageKey(
   return `documents/${workerId}/${category.toLowerCase()}/${uuid}/${safeName}`;
 }
 
+/**
+ * Storage key for quality-inspection evidence (ADR-069, CRR §14/§15).
+ *
+ * A sibling of generateStorageKey rather than a parameter on it: the
+ * `documents/` prefix is part of the Documents module's contract
+ * (RULE-DOC-09), and quality photos are a different retention and access
+ * class -- room evidence, not worker identity documents.
+ *
+ * Pattern: quality/{assignmentId}/{kind}/{uuid4}/{sanitised-filename}
+ */
+export function generateQualityPhotoKey(
+  assignmentId: string,
+  kind: 'inspection' | 'rework',
+  originalFilename: string
+): string {
+  const uuid = crypto.randomUUID();
+  const safeName = originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 100);
+  return `quality/${assignmentId}/${kind}/${uuid}/${safeName}`;
+}
+
 // Presigned URL TTL: 15 minutes. Documents are retrieved on-demand; a short
 // TTL limits the exposure window if a URL leaks from a trusted caller.
 const PRESIGNED_URL_TTL_SECONDS = 15 * 60;
