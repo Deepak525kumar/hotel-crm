@@ -58,6 +58,13 @@ explicit yes/no:
   actually delivered for onboarding events.
 - **`document-instances`** (fillable forms / digital signature) interaction with onboarding.
 - **Production-like data volumes** — every test has run with a handful of records.
+- **Concurrent transactions against the merged rating path** — PR #498 added a
+  `SELECT … FOR UPDATE` on `User` inside `refreshWorkerOverallRating()`, and PR #495's
+  `completeRework()` now takes that lock inside its own transaction. The absence of a
+  deadlock was established by reading lock order across all six callsites, **not** by
+  running concurrent transactions. Worth one real test before this path carries load.
+- **Presigned-URL expiry** — the 15-minute TTL on evidence/document URLs is never allowed
+  to elapse in any scenario, so a clock-skew or TTL regression would pass everywhere.
 
 ## 4. Prioritised list for the next run
 
@@ -211,6 +218,10 @@ authorization widening (revert the code).
 
 | Defect | Fixed in |
 |---|---|
+| Multipart `score` rejected as a string — every photo-bearing quality rating failed validation, invisible to JSON-bodied unit tests | `87c565c` (#495) — `quality/types.ts`, `z.coerce.number()` |
+| IDOR: any worker could read any other worker's quality evidence photos (workers hold `quality:read` per ADR-067, so manager-scoped authorization was not a gate) | `87c565c` (#495) — `getVerificationPhotos`, deny-by-default |
+| `completion_rate` / `on_time_rate` could exceed 100% — rework rows counted in the numerator but not the denominator (recurred twice in one PR: fixing one metric reintroduced it in its sibling) | `87c565c` (#495) — ADR-069 `rework_of_assignment_id: null` on both sides |
+| Rework escalation reported a worker overdue to their Manager and Checker even when they completed between the job's SELECT and its CLAIM | `87c565c` (#495) — claim re-checks `rework_completed_at` |
 | Calendar shift-summary panel invisible to Admin/RM (gated on `scopeHotelId`, always null for those roles) | uncommitted, 2026-08-12 session — `frontend/app/(protected)/calendar/page.tsx` |
 | Calendar shift-summary GET/PUT responses skip the standard `{status,data,meta}` envelope, breaking the read for every role (not just Admin/RM) with a silent `undefined` and a console `TypeError` | uncommitted, 2026-08-12 session — `backend/src/modules/calendar/shift-summary/routes.ts` |
 | Manager blocked from creating Worker/Checker records | `981229b` |
