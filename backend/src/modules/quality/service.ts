@@ -112,8 +112,19 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         _count: true,
       }),
       tx.workerAssignment.count({ where: dueAssignmentWhere }),
+      // ADR-069 §3: MUST carry the same rework exclusion as the denominator.
+      // Without it this is the on_time_rate bug of 2026-08-18 all over again,
+      // one metric to the left: a completed rework row increments the
+      // numerator while the denominator excludes it, so a worker who does one
+      // rework reports completion_rate above 100%. Spelling the filter out
+      // rather than spreading dueAssignmentWhere, because the status
+      // constraint here is COMPLETED specifically, not "due".
       tx.workerAssignment.count({
-        where: { worker_id, status: AssignmentStatus.COMPLETED },
+        where: {
+          worker_id,
+          status: AssignmentStatus.COMPLETED,
+          rework_of_assignment_id: null,
+        },
       }),
       // 2026-08-18 fix: scoped to the SAME assignments as the denominator.
       // This counted every PRESENT row for the worker, while the denominator

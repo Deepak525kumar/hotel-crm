@@ -154,3 +154,34 @@ describe('rework claims are compare-and-swap, not check-then-act', () => {
     expect(body).toContain('notes: input.notes');
   });
 });
+
+// ADR-069 §3 applied consistently. Both ratio numerators must carry the same
+// rework exclusion as the shared denominator, or completing a rework moves a
+// numerator that the denominator does not -- which is exactly how on_time_rate
+// came to exceed 100% before the 2026-08-18 fix.
+describe('rework exclusion is applied to BOTH numerators, not just the denominator', () => {
+  const src = () => readFileSync('src/modules/quality/service.ts', 'utf8');
+
+  it('the completion_rate numerator excludes rework', () => {
+    // Scenario this guards: worker completes an assignment (1/1 = 100%), fails
+    // inspection, completes the rework. Rework is out of the denominator, so
+    // an unfiltered numerator gives 2/1 = 200%.
+    const body = src().slice(
+      src().indexOf('const dueAssignmentWhere'),
+      src().indexOf('const averageScore')
+    );
+    const completedCount = body.slice(body.indexOf('status: AssignmentStatus.COMPLETED'));
+    expect(completedCount.slice(0, 200)).toContain('rework_of_assignment_id: null');
+  });
+
+  it('the on_time_rate numerator inherits the exclusion via dueAssignmentWhere', () => {
+    const body = src();
+    const attendance = body.slice(body.indexOf('tx.attendance.count('));
+    expect(attendance.slice(0, 300)).toContain('assignment: dueAssignmentWhere');
+  });
+
+  it('the denominator itself excludes rework', () => {
+    const body = src().slice(src().indexOf('const dueAssignmentWhere'));
+    expect(body.slice(0, 900)).toContain('rework_of_assignment_id: null');
+  });
+});

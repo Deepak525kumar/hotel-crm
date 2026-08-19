@@ -21,12 +21,15 @@ const STATUS_COLOR: Record<AssignmentStatus, string> = {
 function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => void }) {
   const { t } = useTranslation();
   const color = STATUS_COLOR[item.status] ?? '#718096';
+  const isRework = Boolean(item.rework_of_assignment_id);
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
       <ThemedView type="backgroundElement" style={styles.card}>
         <ThemedView style={styles.cardRow} type="backgroundElement">
           <ThemedText type="smallBold" style={styles.flex}>
-            {item.work_request?.position ?? t('common.shift')}
+            {isRework
+              ? t('quality.reworkTitle')
+              : (item.work_request?.position ?? t('common.shift'))}
           </ThemedText>
           <View style={[styles.badge, { backgroundColor: color }]}>
             <ThemedText type="small" style={styles.badgeText}>
@@ -87,7 +90,23 @@ export default function ShiftsScreen() {
             data={items}
             keyExtractor={(i) => i.id}
             renderItem={({ item }) => (
-              <ShiftCard item={item} onPress={() => router.push(`/shift/${item.id}`)} />
+              <ShiftCard
+                item={item}
+                onPress={() => {
+                  // A rework row has no shift detail to show -- no work
+                  // request, no scheduled start. Its only action is "upload a
+                  // photo and mark done", which is the rework screen.
+                  //
+                  // Two separate calls rather than a ternary inside push():
+                  // expo-router types each route as a literal, and the union
+                  // of two template literals is not assignable to Href.
+                  if (item.rework_of_assignment_id) {
+                    router.push(`/rework/${item.id}`);
+                    return;
+                  }
+                  router.push(`/shift/${item.id}`);
+                }}
+              />
             )}
             ListEmptyComponent={
               <ThemedView type="backgroundElement" style={styles.empty}>

@@ -221,6 +221,7 @@ export class AssignmentService extends BaseService {
       id: a.id,
       work_request_id: a.work_request_id,
       job_request_id: a.job_request_id,
+      rework_of_assignment_id: a.rework_of_assignment_id,
       worker_id: a.worker_id,
       hotel_id: a.hotel_id,
       assigned_by_id: a.assigned_by_id,
