@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useDashboardStats, useLeaderboard } from "@/hooks/useAnalytics";
 import { useHotels } from "@/hooks/useHotels";
 import { RoleGate } from "@/components/auth/RoleGate";
@@ -221,7 +222,13 @@ function AnalyticsDashboard() {
             entries={entries}
             isLoading={leaderboardLoading}
             error={leaderboardError}
+            limit={5}
           />
+          <div className="border-t border-gray-200 bg-gray-50 p-4 text-center dark:border-gray-800 dark:bg-gray-900/50">
+            <Link href="/leaderboard" className="text-sm font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400">
+              View full leaderboard &rarr;
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

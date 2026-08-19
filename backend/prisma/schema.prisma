@@ -117,6 +117,8 @@ enum NotificationType {
   // Quality & Rating events
   QUALITY_VERIFICATION_SUBMITTED
   RATING_RECEIVED
+  QUALITY_RATING_WARNING_70 // to worker: score fell below 70
+  QUALITY_RATING_WARNING_50 // to worker and manager: score fell below 50
   REWORK_REQUIRED // to worker: verification failed, rework needed
   // ADR-069 / CRR §14: the two remaining legs of the rework loop.
   REWORK_COMPLETED // to checker: worker uploaded evidence and marked it done
@@ -137,6 +139,7 @@ enum NotificationType {
   HR_PAYSLIP_FULFILLED // to the requesting worker: their payslip request was marked emailed
   // HR implementation PR 5 (IF-HR-ContractExpiryReminder, ADR-041 escalation)
   HR_CONTRACT_EXPIRY_REMINDER // to the responsible manager: a contract nears its 1yr/2yr mark
+  HR_CONTRACT_EXPIRY_WORKER_REMINDER // to the worker: their contract nears its 1yr/2yr mark
   HR_PAYSLIP_REQUEST_ESCALATED // to the responsible manager's own manager (or Admin fallback): an unfulfilled payslip request has passed the 3-business-day window (ADR-041)
   HR_CONTRACT_LAPSED // to the requesting worker: their contract lapsed and offboarding was triggered (ADR-040/ADR-045)
   // Consent implementation (SPEC-CONSENT-001 REQ-CONSENT-003/RULE-CONSENT-03, ADR-015/ADR-037)
@@ -1205,6 +1208,11 @@ model WorkerOverallRating {
   // still see a pattern without it being silently priced into the leaderboard.
   worker_cancellations Int       @default(0)
   last_worked_at       DateTime?
+  
+  // TRULE-005 Rating Threshold Tracking
+  warning_70_sent_at   DateTime?
+  warning_50_sent_at   DateTime?
+
   updated_at           DateTime  @updatedAt
 
   @@index([average_score])
@@ -1588,6 +1596,12 @@ model Contract {
   expires_at           DateTime?
   reminder_1yr_sent_at DateTime?
   reminder_2yr_sent_at DateTime?
+  
+  // 7-day worker expiry reminder tracking
+  last_worker_expiry_reminder_at DateTime?
+  worker_expiry_reminder_count   Int             @default(0)
+
+  contract_pdf_s3_key  String?
   created_at           DateTime        @default(now())
   updated_at           DateTime        @updatedAt
 

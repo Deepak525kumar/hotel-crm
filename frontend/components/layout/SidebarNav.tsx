@@ -16,6 +16,7 @@ import {
   Settings,
   ClipboardList,
   ListChecks,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -107,6 +108,7 @@ export const NAV: NavItem[] = [
   // requireRole(['admin','manager','regional_manager']) + analytics:read, so
   // showing it to a worker or checker would render a page of 403s.
   { href: "/analytics", label: "Analytics", labelKey: "nav.analytics", icon: BarChart3, roles: ["admin", "manager", "regional_manager"] },
+  { href: "/leaderboard", label: "Leaderboard", labelKey: "nav.leaderboard", icon: Trophy, roles: ["admin", "manager", "regional_manager", "worker", "checker"] },
   // Notifications moved to a navbar bell icon (AppShell) -- no longer a
   // sidebar entry.
   // Deliberately last and deliberately unrestricted: settings is per-user
