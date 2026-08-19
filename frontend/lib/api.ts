@@ -576,7 +576,7 @@ export const qualityApi = {
 
   /** CRR §14: assign rework for a failed inspection to the same worker. */
   assignRework: (input: { verification_id: string; notes: string }) =>
-    apiFetch<WorkerAssignment>("/quality/rework", { method: "POST", body: input }),
+    apiFetch<Assignment>("/quality/rework", { method: "POST", body: input }),
 
   createRating: (input: CreateRatingInput) =>
     apiFetch<Rating>("/quality/ratings", { method: "POST", body: input }),
