@@ -207,6 +207,14 @@ jobs:
       - name: Lint
         run: npm run lint --workspace frontend
 
+      - name: Next.js Cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('frontend/src/**', 'frontend/app/**', 'frontend/components/**', 'frontend/lib/**', 'frontend/hooks/**') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
       # Runs BEFORE the build: a failing assertion should stop the job at the
       # cheap step, not after a full Next production build.
       - name: Test
@@ -246,8 +254,33 @@ jobs:
       - name: Install deps (workspaces)
         run: npm ci
 
+      - name: Get Playwright version
+        id: playwright-version
+        run: echo "version=$(node -e "console.log(require(require.resolve('@playwright/test/package.json')).version)")" >> $GITHUB_OUTPUT
+
+      - name: Cache Playwright browser
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: ubuntu-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright's browser
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx --workspace frontend playwright install --with-deps chromium
+        timeout-minutes: 6
+
+      - name: Install Playwright system deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx --workspace frontend playwright install-deps chromium
+
+      - name: Next.js Cache
+        uses: actions/cache@v4
+        with:
+          path: frontend/.next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('frontend/src/**', 'frontend/app/**', 'frontend/components/**', 'frontend/lib/**', 'frontend/hooks/**') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
 
       - name: Build
         run: npm run build --workspace frontend
