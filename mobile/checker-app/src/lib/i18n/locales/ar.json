@@ -890,7 +890,13 @@
     "outcomeNEEDS_REWORK": "يحتاج إعادة عمل",
     "outcomeFAILED": "فاشل",
     "recorded": "تم تسجيل فحص الجودة.",
-    "submitFailed": "فشل الإرسال"
+    "submitFailed": "فشل الإرسال",
+    "cameraDenied": "إذن الكاميرا مطلوب لالتقاط صورة.",
+    "takePhoto": "التقاط صورة",
+    "chooseFromLibrary": "الاختيار من المعرض",
+    "markDone": "وضع علامة كمنجز",
+    "reworkPhotoRequired": "أضف صورة واحدة على الأقل قبل وضع علامة الإنجاز.",
+    "reworkTitle": "إعادة العمل مطلوبة"
   },
   "ratings": {
     "comment": "تعليق",

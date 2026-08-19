@@ -889,7 +889,13 @@
     "outcomeNEEDS_REWORK": "NACHARBEIT NÖTIG",
     "outcomeFAILED": "NICHT BESTANDEN",
     "recorded": "Qualitätsprüfung erfasst.",
-    "submitFailed": "Senden fehlgeschlagen"
+    "submitFailed": "Senden fehlgeschlagen",
+    "cameraDenied": "Für die Aufnahme eines Fotos wird die Kameraberechtigung benötigt.",
+    "takePhoto": "Foto aufnehmen",
+    "chooseFromLibrary": "Aus Galerie wählen",
+    "markDone": "Als erledigt markieren",
+    "reworkPhotoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie dies als erledigt markieren.",
+    "reworkTitle": "Nacharbeit erforderlich"
   },
   "ratings": {
     "comment": "Kommentar",

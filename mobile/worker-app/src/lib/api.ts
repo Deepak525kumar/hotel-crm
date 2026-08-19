@@ -427,6 +427,25 @@ export const api = {
     // platform-wide board. /quality/leaderboard scopes server-side to the
     // caller's own hotel group, and is the same endpoint the checker app uses.
     leaderboard: () => request<LeaderboardEntry[]>('/quality/leaderboard'),
+
+    /**
+     * CRR §14: the worker uploads a photo and marks the rework done.
+     *
+     * multipart, because the photo IS the payload -- it is what the checker is
+     * notified with. React Native's FormData takes {uri,name,type} rather than
+     * a Blob; the runtime reads the file off disk when the request is sent, so
+     * the image is never loaded into JS memory.
+     */
+    completeRework: (assignmentId: string, photos: { uri: string; name: string; type: string }[]) => {
+      const form = new FormData();
+      for (const photo of photos) {
+        form.append('photos', photo as unknown as Blob);
+      }
+      return request<unknown>(
+        `/quality/rework/${encodeURIComponent(assignmentId)}/complete`,
+        { method: 'POST', body: form }
+      );
+    },
   },
   calendar: {
     // GD-18 narrow slice: self-scoped to the authenticated worker (server-side,

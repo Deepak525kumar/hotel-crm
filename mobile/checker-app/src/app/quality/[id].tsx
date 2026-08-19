@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { api } from '@/lib/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { usePhotoPicker } from '@/hooks/usePhotoPicker';
 
 type VerificationStatus = 'PASSED' | 'NEEDS_REWORK' | 'FAILED';
 
@@ -45,17 +46,18 @@ export default function QualityVerificationScreen() {
   const [score, setScore] = useState(80);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  // CRR §15: the checker uploads a photo WITH the rating.
+  const picker = usePhotoPicker();
 
   const derivedStatus = deriveStatus(score);
 
   const handleSubmit = async () => {
     setSaving(true);
     try {
-      await api.quality.createVerification({
-        assignment_id: id,
-        score,
-        notes: notes || undefined,
-      });
+      await api.quality.createVerification(
+        { assignment_id: id, score, notes: notes || undefined },
+        picker.photos
+      );
       Alert.alert(t("common.submitted"), t('quality.recorded'), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
@@ -99,6 +101,26 @@ export default function QualityVerificationScreen() {
     },
     outcomeBadgeText: { fontSize: 13, fontWeight: '700' },
     outcomeHint: { fontSize: 12, color: theme.textSecondary, flex: 1 },
+    photoActions: { flexDirection: 'row', gap: 8 },
+    photoButton: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.textSecondary,
+      alignItems: 'center',
+    },
+    photoButtonText: { color: theme.text, fontWeight: '600', fontSize: 13 },
+    photoError: { color: '#E53E3E', fontSize: 12, marginTop: 8 },
+    photoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginTop: 10,
+    },
+    photoName: { color: theme.textSecondary, fontSize: 12, flexShrink: 1 },
+    photoRemove: { color: '#E53E3E', fontSize: 12, fontWeight: '600' },
     notesInput: {
       backgroundColor: theme.background,
       borderRadius: 10,
@@ -178,6 +200,33 @@ export default function QualityVerificationScreen() {
             onChangeText={setNotes}
             multiline
           />
+        </View>
+
+        {/* CRR §15: photo evidence accompanies the rating. Camera first --
+            the checker is standing in the room they are inspecting -- with
+            the library as the fallback for an already-taken shot or a denied
+            camera permission. */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('quality.photos')}</Text>
+          <View style={styles.photoActions}>
+            <TouchableOpacity style={styles.photoButton} onPress={picker.takePhoto}>
+              <Text style={styles.photoButtonText}>{t('quality.takePhoto')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.photoButton} onPress={picker.pickFromLibrary}>
+              <Text style={styles.photoButtonText}>{t('quality.chooseFromLibrary')}</Text>
+            </TouchableOpacity>
+          </View>
+          {picker.error ? <Text style={styles.photoError}>{picker.error}</Text> : null}
+          {picker.photos.map((photo, i) => (
+            <View key={`${photo.uri}-${i}`} style={styles.photoRow}>
+              <Text style={styles.photoName} numberOfLines={1}>
+                {photo.name}
+              </Text>
+              <TouchableOpacity onPress={() => picker.removeAt(i)}>
+                <Text style={styles.photoRemove}>{t('common.remove')}</Text>
+              </TouchableOpacity>
+            </View>
+          ))}
         </View>
 
         <TouchableOpacity

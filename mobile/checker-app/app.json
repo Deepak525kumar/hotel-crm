@@ -48,7 +48,14 @@
       "expo-localization",
       "expo-secure-store",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used only when you attach photo evidence to a room inspection.",
+          "cameraPermission": "Used only when you photograph a room during an inspection."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

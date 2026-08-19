@@ -337,15 +337,28 @@ export const api = {
   },
 
   quality: {
-    createVerification: (data: {
-      assignment_id: string;
-      score: number;
-      notes?: string;
-    }) =>
-      request<QualityVerification>('/quality/verifications', {
+    /**
+     * CRR §15: the checker uploads a photo WITH the rating.
+     *
+     * Always multipart, even with no photos, so there is one code path -- the
+     * route parses multipart either way. React Native's FormData takes
+     * {uri,name,type} rather than a Blob; the runtime streams the file off
+     * disk when the request is sent, so images never sit in JS memory.
+     */
+    createVerification: (
+      data: { assignment_id: string; score: number; notes?: string },
+      photos: { uri: string; name: string; type: string }[] = []
+    ) => {
+      const form = new FormData();
+      form.append('assignment_id', data.assignment_id);
+      form.append('score', String(data.score));
+      if (data.notes) form.append('notes', data.notes);
+      for (const photo of photos) form.append('photos', photo as unknown as Blob);
+      return request<QualityVerification>('/quality/verifications', {
         method: 'POST',
-        body: JSON.stringify(data),
-      }),
+        body: form,
+      });
+    },
     createRating: (data: {
       assignment_id: string;
       worker_id: string;

@@ -889,7 +889,13 @@
     "outcomeNEEDS_REWORK": "NEEDS REWORK",
     "outcomeFAILED": "FAILED",
     "recorded": "Quality verification recorded.",
-    "submitFailed": "Failed to submit"
+    "submitFailed": "Failed to submit",
+    "cameraDenied": "Camera permission is needed to take a photo.",
+    "takePhoto": "Take photo",
+    "chooseFromLibrary": "Choose from library",
+    "markDone": "Mark as done",
+    "reworkTitle": "Rework required",
+    "reworkPhotoRequired": "Add at least one photo before marking this done."
   },
   "ratings": {
     "comment": "Comment",
