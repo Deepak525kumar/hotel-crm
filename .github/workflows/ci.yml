@@ -246,8 +246,46 @@ jobs:
       - name: Install deps (workspaces)
         run: npm ci
 
+      # Cache the browser binary. `playwright install` downloads ~150MB from
+      # Microsoft's CDN, and that download is what makes this job's cost
+      # unpredictable: it normally finishes in well under a minute, but a slow
+      # or stalled CDN connection has taken 27+ minutes here, with no timeout
+      # to stop it. On a cache hit the download is skipped entirely.
+      #
+      # Keyed on the resolved Playwright version, so a version bump misses the
+      # cache and re-downloads rather than running an old browser.
+      - name: Resolve Playwright version
+        id: pw
+        # require.resolve, not a hard-coded path: @playwright/test is a
+        # frontend devDependency but npm workspaces HOISTS it to the root
+        # node_modules, so ./frontend/node_modules/... does not exist. Let
+        # Node resolve it wherever it actually landed.
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browser
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.pw.outputs.version }}
+
+      # `timeout-minutes` is the point of this step, not an optimisation: with
+      # no timeout a stalled download runs to GitHub's 6-hour job default,
+      # holding a runner and hiding the cause behind a "still running" job.
+      # Six minutes is ~4x the observed healthy time (1m42s end-to-end for the
+      # whole job), so a genuine slow-but-working download still succeeds while
+      # a stall fails fast and legibly.
       - name: Install Playwright's browser
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        timeout-minutes: 6
         run: npx --workspace frontend playwright install --with-deps chromium
+
+      # System libraries are apt packages, not part of the cached browser
+      # directory, so they must still be installed on a cache hit.
+      - name: Install Playwright system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        timeout-minutes: 6
+        run: npx --workspace frontend playwright install-deps chromium
 
       - name: Build
         run: npm run build --workspace frontend
