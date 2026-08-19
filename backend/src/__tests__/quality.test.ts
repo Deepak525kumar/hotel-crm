@@ -795,6 +795,13 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
     );
     expect(denominatorCall[0].where).toEqual({
       worker_id: 'w1',
+      // ADR-069 §3: rework assignments are excluded from every ratio. A rework
+      // row is a SECOND row for work already counted once via the original
+      // COMPLETED assignment, so counting it would halve completion_rate for a
+      // single failed inspection and then restore it -- compounding a penalty
+      // on top of the 0-100 quality score, which is the mechanism the platform
+      // actually uses to record poor work.
+      rework_of_assignment_id: null,
       OR: [
         { status: { in: ['COMPLETED', 'NO_SHOW'] } },
         { status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, day: { lte: new Date('2026-08-13T00:00:00.000Z') } },

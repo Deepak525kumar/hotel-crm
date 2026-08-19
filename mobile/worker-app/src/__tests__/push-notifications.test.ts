@@ -210,3 +210,28 @@ describe('subscribeToPushNotifications', () => {
     expect(mockRemove).toHaveBeenCalledTimes(1);
   });
 });
+
+// CRR §14: the rework push must open the screen where the worker uploads
+// evidence, not the generic notifications list -- a worker has 20 minutes
+// before the escalation fires, so an extra hop to find the task is not free.
+describe('resolvePushTapRoute — rework (CRR §14)', () => {
+  it('routes to the rework screen and carries the note', () => {
+    const route = resolvePushTapRoute({
+      type: 'REWORK_REQUIRED',
+      rework_assignment_id: 'a1',
+      notes: 'Bathroom mirror',
+    });
+    expect(route).toBe('/rework/a1?notes=Bathroom%20mirror');
+  });
+
+  it('still routes when the note is absent', () => {
+    const route = resolvePushTapRoute({ type: 'REWORK_REQUIRED', rework_assignment_id: 'a1' });
+    expect(route).toBe('/rework/a1?notes=');
+  });
+
+  it('falls back to the list when the assignment id is missing', () => {
+    // An older backend, or a payload shape this app version predates, must not
+    // navigate to /rework/undefined.
+    expect(resolvePushTapRoute({ type: 'REWORK_REQUIRED' })).toBe('/notifications');
+  });
+});

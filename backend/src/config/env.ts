@@ -309,6 +309,14 @@ const envSchema = z.object({
   // over months, not hours, so a tighter poll than SESSION_SWEEP's hourly
   // default isn't warranted).
   GEO_RETENTION_SWEEP_INTERVAL_MS: z.coerce.number().int().positive().default(86400000),
+
+  // ADR-069 / CRR §14: how often the 20-minute rework escalation is checked.
+  // 60s, not 20 minutes: the deadline is 20 minutes, so polling at the same
+  // period would make the actual escalation land anywhere from 20 to 40
+  // minutes late. A one-minute tick bounds the overshoot to a minute, and the
+  // query is a single indexed lookup that usually matches nothing.
+  REWORK_ESCALATION_INTERVAL_MS: z.coerce.number().int().positive().default(60000),
+  REWORK_ESCALATION_BATCH_SIZE: z.coerce.number().int().positive().default(50),
   GEO_RETENTION_SWEEP_BATCH_SIZE: z.coerce.number().int().positive().default(500),
   GEO_RETENTION_SWEEP_MAX_BATCHES_PER_RUN: z.coerce.number().int().positive().default(50),
 

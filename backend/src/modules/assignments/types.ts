@@ -102,6 +102,11 @@ export interface AssignmentDto {
   // null (job_request_id is the FK populated for those creation paths).
   work_request_id: string | null;
   job_request_id: string | null;
+  // ADR-069: set when this assignment is corrective rework for another one.
+  // Exposed because BOTH FKs above are null on a rework row, so without it a
+  // client cannot tell a rework task from an ordinary shift with no work
+  // request -- the worker would see an unexplained extra assignment for today.
+  rework_of_assignment_id: string | null;
   worker_id: string;
   hotel_id: string;
   assigned_by_id: string;

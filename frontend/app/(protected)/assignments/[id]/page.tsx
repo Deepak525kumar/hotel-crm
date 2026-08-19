@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserRef } from "@/components/users/UserRef";
 import { useParams } from "next/navigation";
 import { useAssignment } from "@/hooks/useAssignments";
@@ -34,6 +34,14 @@ import { BackLink } from "@/components/ui/BackLink";
 import type { QualityVerification, Rating, RoomsCompletedEntry } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
+
+// CRR §15: the checker uploads a photo WITH the rating. Mirrors the server's
+// own limits (quality/types.ts) so an upload that would be rejected is caught
+// before it leaves a hotel wifi connection. The server stays authoritative.
+const MAX_VERIFICATION_PHOTOS = 6;
+const MAX_VERIFICATION_PHOTO_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_PHOTO_TYPES = "image/jpeg,image/png,image/heic,image/webp";
+
 export default function AssignmentDetailPage() {
   const { t } = useTranslation();
   const params = useParams<{ id: string }>();
@@ -61,6 +69,7 @@ export default function AssignmentDetailPage() {
   // (quality/routes.ts has no read route beyond the leaderboard), so both
   // are session-local only, not re-fetchable on reload.
   const [verificationOpen, setVerificationOpen] = useState(false);
+  const [reworkOpen, setReworkOpen] = useState(false);
   const [loggedVerification, setLoggedVerification] = useState<QualityVerification | null>(null);
   const [ratingOpen, setRatingOpen] = useState(false);
   const [loggedRating, setLoggedRating] = useState<Rating | null>(null);
@@ -452,6 +461,39 @@ export default function AssignmentDetailPage() {
               </Button>
             )}
           </CardContent>
+
+          {loggedVerification && (
+            <CardContent className="border-t pt-4">
+              <VerificationEvidence verificationId={loggedVerification.id} />
+            </CardContent>
+          )}
+
+          {/* CRR §14: rework is assigned to a specific worker after a failed
+              inspection. Only offered once a verification exists and it did
+              NOT pass -- the backend rejects rework on a PASSED inspection,
+              so offering it would be a button that always errors. */}
+          {loggedVerification && loggedVerification.status !== "PASSED" && (
+            <CardContent className="flex items-center justify-between gap-4 border-t pt-4">
+              <div className="text-sm text-gray-600 dark:text-gray-300">
+                {loggedVerification.rework_completed_at
+                  ? t("quality.reworkDone", {
+                      when: formatDateTime(loggedVerification.rework_completed_at),
+                    })
+                  : loggedVerification.rework_required
+                    ? t("quality.reworkPending")
+                    : t("quality.reworkNotes")}
+              </div>
+              {!loggedVerification.rework_required && (
+                <Button
+                  variant="outline"
+                  onClick={() => setReworkOpen(true)}
+                  className="shrink-0"
+                >
+                  {t("quality.assignRework")}
+                </Button>
+              )}
+            </CardContent>
+          )}
         </Card>
 
         <Card>
@@ -531,6 +573,20 @@ export default function AssignmentDetailPage() {
         onClose={() => setVerificationOpen(false)}
         onCreated={setLoggedVerification}
       />
+
+      {loggedVerification && (
+        <AssignReworkModal
+          verificationId={loggedVerification.id}
+          open={reworkOpen}
+          onClose={() => setReworkOpen(false)}
+          onAssigned={() =>
+            // Reflect the new state locally rather than refetching: the only
+            // field the card reads is rework_required, and the server has
+            // already committed it.
+            setLoggedVerification((v) => (v ? { ...v, rework_required: true } : v))
+          }
+        />
+      )}
 
       <CreateRatingModal
         assignmentId={id}
@@ -744,6 +800,155 @@ function LogRoomsCompletedModal({
   );
 }
 
+/**
+ * CRR §14: the checker assigns rework to the worker who did the room.
+ *
+ * Notes are mandatory -- they are the message the worker actually receives
+ * (assignRework uses them as the notification body), so an empty note would
+ * push "Rework required" with no indication of what to redo.
+ */
+/**
+ * CRR §14/§15: the photo evidence attached to an inspection.
+ *
+ * Fetched on demand, not with the verification: presigned URLs expire in 15
+ * minutes, so anything cached alongside the record would be dead by the time
+ * it was rendered. Without this the photos were write-only -- uploaded,
+ * stored, and impossible to look at.
+ */
+function VerificationEvidence({ verificationId }: { verificationId: string }) {
+  const { t } = useTranslation();
+  const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void qualityApi
+      .verificationPhotos(verificationId)
+      .then((r) => {
+        if (!cancelled) setPhotos(r.photos);
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [verificationId]);
+
+  // An inspection with no photos is normal (they are optional), so render
+  // nothing rather than an empty state that implies something is missing.
+  if (failed || !photos || photos.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
+        {t("quality.evidence")}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {photos.map((photo) =>
+          photo.url ? (
+            // Opens full size in a new tab: these are room photos a checker
+            // needs to actually inspect, not decoration.
+            <a key={photo.key} href={photo.url} target="_blank" rel="noreferrer">
+              {/* eslint-disable-next-line @next/next/no-img-element -- the src
+                  is a short-lived presigned S3 URL, not a static asset, so
+                  next/image's optimiser cannot help and would only add a
+                  server round-trip against an expiring URL. */}
+              <img
+                src={photo.url}
+                alt={t("quality.evidence")}
+                className="h-20 w-20 rounded-md border border-gray-200 object-cover dark:border-gray-800"
+              />
+            </a>
+          ) : (
+            // url === null means storage is unconfigured. Shown as a broken
+            // tile rather than hidden, so a misconfigured bucket does not look
+            // like an inspection that never had evidence.
+            <div
+              key={photo.key}
+              className="flex h-20 w-20 items-center justify-center rounded-md border border-dashed border-gray-300 text-center text-[10px] text-gray-400 dark:border-gray-700"
+            >
+              {t("quality.photoUnavailable")}
+            </div>
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AssignReworkModal({
+  verificationId,
+  open,
+  onClose,
+  onAssigned,
+}: {
+  verificationId: string;
+  open: boolean;
+  onClose: () => void;
+  onAssigned: () => void;
+}) {
+  const { t } = useTranslation();
+  const [notes, setNotes] = useState("");
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const assign = useAsyncAction();
+
+  const handleClose = () => {
+    if (assign.pending) return;
+    setNotes("");
+    setFieldError(null);
+    onClose();
+  };
+
+  const onSubmit = () => {
+    setFieldError(null);
+    if (!notes.trim()) {
+      setFieldError(t("quality.reworkNotesRequired"));
+      return;
+    }
+    assign.run(
+      () => qualityApi.assignRework({ verification_id: verificationId, notes: notes.trim() }),
+      {
+        onSuccess: () => {
+          onAssigned();
+          setNotes("");
+          onClose();
+        },
+      },
+    );
+  };
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={t("quality.assignRework")}
+      footer={
+        <>
+          <Button variant="outline" onClick={handleClose} disabled={assign.pending}>
+            {t("common.cancel")}
+          </Button>
+          <Button onClick={onSubmit} loading={assign.pending}>
+            {t("quality.assignRework")}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Textarea
+          label={t("quality.reworkNotes")}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+        {fieldError && (
+          <p className="text-sm text-red-600 dark:text-red-400">{fieldError}</p>
+        )}
+        <FormError>{assign.error}</FormError>
+      </div>
+    </Modal>
+  );
+}
+
 function CreateVerificationModal({
   assignmentId,
   open,
@@ -758,13 +963,39 @@ function CreateVerificationModal({
   const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [notes, setNotes] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
 
   const reset = () => {
     setScore("");
     setNotes("");
+    setPhotos([]);
     setFieldError(null);
+  };
+
+  // Validated here as well as server-side. The server is authoritative, but a
+  // 10 MB upload that is going to be rejected should not be sent at all --
+  // checkers are on hotel wifi and phone cameras produce large files.
+  const onPickPhotos = (picked: FileList | null) => {
+    if (!picked) return;
+    setFieldError(null);
+    const next = [...photos, ...Array.from(picked)];
+    if (next.length > MAX_VERIFICATION_PHOTOS) {
+      setFieldError(t("quality.tooManyPhotos", { max: MAX_VERIFICATION_PHOTOS }));
+      return;
+    }
+    const tooBig = next.find((f) => f.size > MAX_VERIFICATION_PHOTO_BYTES);
+    if (tooBig) {
+      setFieldError(
+        t("quality.photoTooLarge", {
+          name: tooBig.name,
+          mb: Math.floor(MAX_VERIFICATION_PHOTO_BYTES / (1024 * 1024)),
+        }),
+      );
+      return;
+    }
+    setPhotos(next);
   };
 
   const handleClose = () => {
@@ -783,11 +1014,14 @@ function CreateVerificationModal({
 
     create.run(
       () =>
-        qualityApi.createVerification({
-          assignment_id: assignmentId,
-          score: parsed,
-          notes: notes.trim() || undefined,
-        }),
+        qualityApi.createVerification(
+          {
+            assignment_id: assignmentId,
+            score: parsed,
+            notes: notes.trim() || undefined,
+          },
+          photos,
+        ),
       {
         onSuccess: (verification) => {
           onCreated(verification);
@@ -827,6 +1061,42 @@ function CreateVerificationModal({
         <p className="text-xs text-gray-500 dark:text-gray-400">
           {t("assignments.scoreDerivedHint")}
         </p>
+
+        {/* CRR §15: photo evidence accompanies the rating. Optional at the
+            transport layer, so a checker without a photo is not blocked. */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">{t("quality.photos")}</label>
+          <input
+            type="file"
+            accept={ACCEPTED_PHOTO_TYPES}
+            multiple
+            // `capture` is honoured on mobile browsers and ignored on desktop,
+            // so the same control opens the camera in a corridor and a file
+            // picker at a desk.
+            capture="environment"
+            onChange={(e) => onPickPhotos(e.target.files)}
+            className="block w-full text-sm"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t("quality.photosHint", { max: MAX_VERIFICATION_PHOTOS })}
+          </p>
+          {photos.length > 0 && (
+            <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+              {photos.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
+                    className="shrink-0 text-red-600 hover:underline dark:text-red-400"
+                  >
+                    {t("common.remove")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <Textarea
           label={t("fields.notesOptional")}
           value={notes}

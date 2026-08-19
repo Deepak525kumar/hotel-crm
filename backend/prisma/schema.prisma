@@ -120,6 +120,9 @@ enum NotificationType {
   QUALITY_RATING_WARNING_70 // to worker: score fell below 70
   QUALITY_RATING_WARNING_50 // to worker and manager: score fell below 50
   REWORK_REQUIRED // to worker: verification failed, rework needed
+  // ADR-069 / CRR §14: the two remaining legs of the rework loop.
+  REWORK_COMPLETED // to checker: worker uploaded evidence and marked it done
+  REWORK_OVERDUE // to manager AND checker: not completed within 20 minutes
   // Calendar events (SPEC-CALENDAR-001, RULE-CAL-06)
   CALENDAR_ABSENCE_MARKED // to manager: worker marked sick/vacation
   // Calendar drag/reason feature (2026-08-08): the reverse direction --
@@ -1009,8 +1012,27 @@ model WorkerAssignment {
   // calendar-placed assignments (absent for broadcast-accept rows, PR 9.9).
   calendar_entry        CalendarEntry?
 
+  // ADR-069: rework is a NEW assignment linked to the one that failed
+  // inspection, rather than a mutation of it -- the original keeps its
+  // COMPLETED status and its history. Null on every ordinary assignment, and
+  // `rework_of_assignment_id IS NULL` is the predicate that keeps rework out
+  // of the performance-ratio denominators (ADR-069 §3) and out of the
+  // day-exclusivity index (see below).
+  rework_of_assignment_id String?
+  rework_of_assignment    WorkerAssignment?    @relation("AssignmentRework", fields: [rework_of_assignment_id], references: [id], onDelete: SetNull)
+  rework_children         WorkerAssignment[]   @relation("AssignmentRework")
+  rework_verification_id  String?
+  rework_verification     QualityVerification? @relation("VerificationRework", fields: [rework_verification_id], references: [id], onDelete: SetNull)
+
   // SP-5: full unique constraint removed. Active-slot double-booking is enforced
   // by the partial unique index in the migration (status IN CONFIRMED, IN_PROGRESS).
+  //
+  // ADR-069: that index now also excludes rework rows. It exists to stop a
+  // worker being double-BOOKED into two scheduled shifts on one day; a rework
+  // task is corrective work on a shift already done, and CRR §14 expects it to
+  // be actionable within 20 minutes -- i.e. the same day. Without the
+  // exclusion the constraint would reject rework for any worker who already
+  // holds an active assignment that day.
   // Epic 9 PR 9.6: re-keyed from (work_request_id, worker_id) to (worker_id,
   // day) -- see WorkerAssignment_active_slot_unique in
   // 20260729030000_add_worker_assignment_day_exclusivity/migration.sql.
@@ -1021,6 +1043,7 @@ model WorkerAssignment {
   @@index([status])
   @@index([confirmed_at])
   @@index([day])
+  @@index([rework_of_assignment_id])
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03): per-worker per-day
@@ -1122,6 +1145,14 @@ model QualityVerification {
   rework_required     Boolean            @default(false)
   rework_notes        String?
   rework_completed_at DateTime?
+  // ADR-069 / CRR §14: set when the 20-minute escalation has fired, so it
+  // fires at most ONCE. The scheduler re-runs every tick; without this marker
+  // an open rework would re-notify the manager and checker forever. It is also
+  // the claim target -- the job sets it in the same transaction as the
+  // notifications, so two worker processes cannot both escalate one row.
+  rework_escalated_at DateTime?
+  // ADR-069: the rework assignment(s) this inspection produced.
+  rework_assignments  WorkerAssignment[] @relation("VerificationRework")
   created_at          DateTime           @default(now())
   updated_at          DateTime           @updatedAt
 
@@ -1129,6 +1160,10 @@ model QualityVerification {
   @@index([verified_by_id])
   @@index([status])
   @@index([score])
+  // ADR-069 / CRR §14: supports the 20-minute escalation job's predicate
+  // (rework_required AND not completed AND not escalated) so it does not scan
+  // the whole verification table on every scheduler tick.
+  @@index([rework_required, rework_completed_at, rework_escalated_at], map: "QualityVerification_rework_pending_idx")
 }
 
 model Rating {

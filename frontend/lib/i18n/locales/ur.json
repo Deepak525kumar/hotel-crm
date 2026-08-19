@@ -890,7 +890,14 @@
     "outcomeNEEDS_REWORK": "دوبارہ کام درکار",
     "outcomeFAILED": "ناکام",
     "recorded": "معیار کی جانچ درج ہو گئی۔",
-    "submitFailed": "جمع کرانا ناکام"
+    "submitFailed": "جمع کرانا ناکام",
+    "cameraDenied": "تصویر لینے کے لیے کیمرے کی اجازت درکار ہے۔",
+    "takePhoto": "تصویر لیں",
+    "chooseFromLibrary": "گیلری سے منتخب کریں",
+    "markDone": "مکمل نشان زد کریں",
+    "reworkPhotoRequired": "مکمل نشان زد کرنے سے پہلے کم از کم ایک تصویر شامل کریں۔",
+    "reworkTitle": "دوبارہ کام درکار ہے",
+    "photoUnavailable": "تصویر دستیاب نہیں"
   },
   "ratings": {
     "comment": "تبصرہ",

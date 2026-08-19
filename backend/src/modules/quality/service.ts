@@ -15,7 +15,18 @@ import { isHotelInScope } from '../../middleware/permissions.js';
 // pure predicates, so suites mocking the permissions middleware need not stub them.
 import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
-import type { CreateQualityVerificationRequest, CreateRatingRequest } from './types.js';
+import type {
+  AssignReworkRequest,
+  CreateQualityVerificationRequest,
+  CreateRatingRequest,
+  UploadedPhoto,
+} from './types.js';
+import {
+  ALLOWED_PHOTO_MIME_TYPES,
+  MAX_PHOTOS_PER_VERIFICATION,
+  MAX_PHOTO_BYTES,
+} from './types.js';
+import { generateQualityPhotoKey, getStorageClient } from '../documents/storage.js';
 import { ACTIVE_ASSIGNMENT_STATUSES } from '../assignments/service.js';
 import { ABSENCE_CANCEL_REASON_SELF } from '../../config/constants.js';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
@@ -71,6 +82,13 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
   const today = new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`);
   const dueAssignmentWhere: Prisma.WorkerAssignmentWhereInput = {
     worker_id,
+    // ADR-069 §3: rework assignments are excluded from every ratio here. A
+    // rework row is a SECOND row for work already counted once via the
+    // original COMPLETED assignment, so counting it would halve
+    // completion_rate for one failed inspection and then restore it --
+    // compounding a penalty on top of the 0-100 quality score, which is the
+    // mechanism the platform already uses to record poor work.
+    rework_of_assignment_id: null,
     OR: [
       { status: { in: [AssignmentStatus.COMPLETED, AssignmentStatus.NO_SHOW] } },
       {
@@ -101,8 +119,19 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
         _count: true,
       }),
       tx.workerAssignment.count({ where: dueAssignmentWhere }),
+      // ADR-069 §3: MUST carry the same rework exclusion as the denominator.
+      // Without it this is the on_time_rate bug of 2026-08-18 all over again,
+      // one metric to the left: a completed rework row increments the
+      // numerator while the denominator excludes it, so a worker who does one
+      // rework reports completion_rate above 100%. Spelling the filter out
+      // rather than spreading dueAssignmentWhere, because the status
+      // constraint here is COMPLETED specifically, not "due".
       tx.workerAssignment.count({
-        where: { worker_id, status: AssignmentStatus.COMPLETED },
+        where: {
+          worker_id,
+          status: AssignmentStatus.COMPLETED,
+          rework_of_assignment_id: null,
+        },
       }),
       // 2026-08-18 fix: scoped to the SAME assignments as the denominator.
       // This counted every PRESENT row for the worker, while the denominator
@@ -254,9 +283,210 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
 }
 
 export class QualityService extends BaseService {
+  /**
+   * Upload inspection/rework evidence and return the STORAGE KEYS.
+   *
+   * Keys, never URLs: a presigned URL lives 15 minutes, so persisting one
+   * would store a value that is dead almost immediately. The column is named
+   * `photo_urls` from an earlier design; it holds keys.
+   */
+  private async uploadPhotos(
+    photos: UploadedPhoto[],
+    assignmentId: string,
+    kind: 'inspection' | 'rework'
+  ): Promise<string[]> {
+    if (photos.length === 0) return [];
+    if (photos.length > MAX_PHOTOS_PER_VERIFICATION) {
+      throw new ValidationError(`At most ${MAX_PHOTOS_PER_VERIFICATION} photos may be attached`);
+    }
+
+    const storage = await getStorageClient();
+    const keys: string[] = [];
+    try {
+      for (const photo of photos) {
+        if (!(ALLOWED_PHOTO_MIME_TYPES as readonly string[]).includes(photo.mimeType)) {
+          throw new ValidationError(`Unsupported image type: ${photo.mimeType}`);
+        }
+        if (photo.buffer.byteLength > MAX_PHOTO_BYTES) {
+          throw new ValidationError('Image exceeds the maximum size');
+        }
+        const key = generateQualityPhotoKey(assignmentId, kind, photo.originalName);
+        await storage.upload(key, photo.buffer, photo.mimeType);
+        keys.push(key);
+      }
+    } catch (err) {
+      // Roll back what THIS call uploaded. Without it a rejected 4th photo
+      // leaves three orphans on every retry -- and retrying a bad upload is
+      // the common case.
+      await Promise.all(keys.map((k) => storage.delete(k).catch(() => {})));
+      throw err;
+    }
+    return keys;
+  }
+
+  // ---------------------------------------------------------------------------
+  // CRR §14 rework loop: checker assigns -> worker notified (inbox + push) ->
+  // worker uploads photo and marks done -> checker notified.
+  // ---------------------------------------------------------------------------
+
+  /** Assign rework for a failed inspection (ADR-069). */
+  async assignRework(input: AssignReworkRequest, actor: Actor) {
+    const verification = await this.prisma.qualityVerification.findUnique({
+      where: { id: input.verification_id },
+      include: { assignment: true },
+    });
+    if (!verification) throw new NotFoundError('Verification not found');
+    const original = verification.assignment;
+    if (!original) throw new NotFoundError('Assignment not found');
+
+    // Same authorization surface as creating the verification: rework is an
+    // outcome of the inspection, not a separate capability.
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, original.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot assign rework for this hotel');
+    }
+    if (verification.status === VerificationStatus.PASSED) {
+      throw new ValidationError('Cannot assign rework for a passed inspection');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // CLAIM FIRST, then act. The read above is a check-then-act window: two
+      // concurrent assignRework calls could both see rework_required false and
+      // both proceed, giving the worker two rework rows and TWO 20-minute
+      // escalation timers for one failure. This conditional update is a
+      // compare-and-swap -- whoever flips false->true wins, the loser matches
+      // zero rows and gets the same 409 a sequential duplicate would.
+      const claimed = await tx.qualityVerification.updateMany({
+        where: { id: verification.id, rework_required: false },
+        data: { rework_required: true, rework_notes: input.notes },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError('Rework has already been assigned for this verification');
+      }
+
+      const reworkAssignment = await tx.workerAssignment.create({
+        data: {
+          worker_id: original.worker_id,
+          hotel_id: original.hotel_id,
+          assigned_by_id: actor.userId,
+          // Dated today, not the original's day: CRR §14 expects rework to be
+          // actionable now, and the 20-minute clock starts here.
+          day: new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`),
+          status: AssignmentStatus.CONFIRMED,
+          rework_of_assignment_id: original.id,
+          rework_verification_id: verification.id,
+        },
+      });
+
+      // CRR §14 requires BOTH a stored, readable inbox entry AND a push --
+      // "not one instead of the other". enqueue() writes the Notification row
+      // (the inbox) and dispatches PUSH, so one call satisfies both. CRR §18's
+      // push-only rule is about external channels (no SMS), not about
+      // skipping the in-app record.
+      await notificationService.enqueue(
+        {
+          recipientId: original.worker_id,
+          type: 'REWORK_REQUIRED',
+          title: 'Rework required',
+          message: input.notes,
+          data: {
+            verification_id: verification.id,
+            original_assignment_id: original.id,
+            rework_assignment_id: reworkAssignment.id,
+            notes: input.notes,
+          },
+          hotelId: original.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        },
+        tx
+      );
+
+      return reworkAssignment;
+    });
+  }
+
+  /**
+   * Worker uploads evidence and marks the rework done (CRR §14).
+   * The photo is mandatory: it is what the checker is notified WITH.
+   */
+  async completeRework(assignmentId: string, photos: UploadedPhoto[], actor: Actor) {
+    const reworkAssignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignmentId },
+      include: { rework_verification: true },
+    });
+    if (!reworkAssignment) throw new NotFoundError('Assignment not found');
+    if (!reworkAssignment.rework_of_assignment_id) {
+      throw new ValidationError('This assignment is not a rework task');
+    }
+    // Self-scoped: a worker completes their own rework and nobody else's.
+    if (reworkAssignment.worker_id !== actor.userId) {
+      throw new ForbiddenError('Cannot complete rework for another worker');
+    }
+    if (photos.length === 0) {
+      throw new ValidationError('A photo is required to mark rework as done');
+    }
+
+    const verification = reworkAssignment.rework_verification;
+    if (!verification) throw new NotFoundError('Originating verification not found');
+
+    const photoKeys = await this.uploadPhotos(photos, assignmentId, 'rework');
+
+    return this.prisma.$transaction(async (tx) => {
+      // Same compare-and-swap as assignRework, for the same reason: a
+      // double-tap on "mark done" would otherwise notify the checker twice
+      // and append the photos twice.
+      const claimed = await tx.qualityVerification.updateMany({
+        where: { id: verification.id, rework_completed_at: null },
+        data: {
+          rework_completed_at: new Date(),
+          // Appended, not replaced: the checker needs the before/after pair,
+          // so inspection and rework evidence both stay on the record.
+          photo_urls: { push: photoKeys },
+        },
+      });
+      if (claimed.count === 0) {
+        throw new ConflictError('This rework has already been completed');
+      }
+
+      await tx.workerAssignment.update({
+        where: { id: assignmentId },
+        data: { status: AssignmentStatus.COMPLETED, completed_at: new Date() },
+      });
+
+      // CRR §14: "Checker is notified with the photo + details."
+      await notificationService.enqueue(
+        {
+          recipientId: verification.verified_by_id,
+          type: 'REWORK_COMPLETED',
+          title: 'Rework completed',
+          message: 'The worker uploaded evidence and marked the rework done.',
+          data: {
+            verification_id: verification.id,
+            rework_assignment_id: assignmentId,
+            photo_keys: photoKeys,
+          },
+          hotelId: reworkAssignment.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        },
+        tx
+      );
+
+      await refreshWorkerOverallRating(tx, reworkAssignment.worker_id);
+
+      return tx.qualityVerification.findUnique({ where: { id: verification.id } });
+    });
+  }
+
+
   async createVerification(
     data: CreateQualityVerificationRequest,
-    actor: Actor
+    actor: Actor,
+    // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
+    photos: UploadedPhoto[] = []
   ) {
     const { assignment_id, score, notes } = data;
 
@@ -309,6 +539,12 @@ export class QualityService extends BaseService {
     const isPassed = derivedStatus === 'PASSED';
     const isNeedsRework = derivedStatus === 'NEEDS_REWORK';
 
+    // Uploaded BEFORE the transaction opens: an S3 round-trip per file inside
+    // it would hold row locks for the duration of a network upload. The cost
+    // is orphaned objects if the commit then fails -- cheap and invisible --
+    // against lock contention on a hot table.
+    const photoKeys = await this.uploadPhotos(photos, assignment_id, 'inspection');
+
     // ADR-029 (GD-01, Epic 7 PR 7.3): single commit for the verification
     // write and its notification enqueue.
     const verification = await this.prisma.$transaction(async (tx) => {
@@ -322,6 +558,7 @@ export class QualityService extends BaseService {
             score: numScore,
             status: derivedStatus,
             notes: notes ?? null,
+            photo_urls: photoKeys,
           },
         });
       } catch (err) {
@@ -471,6 +708,66 @@ export class QualityService extends BaseService {
     });
 
     return rating;
+  }
+
+  /**
+   * Presigned URLs for one inspection's photo evidence (CRR §14/§15).
+   *
+   * Keys are useless to a client on their own -- the bucket is private -- so
+   * this is the only way the checker can actually SEE what CRR §14 says they
+   * are "notified with". Without it the photos are write-only.
+   *
+   * URLs are minted per request and expire in 15 minutes; they are never
+   * persisted, which is why the column stores keys.
+   */
+  async getVerificationPhotos(verificationId: string, actor: Actor) {
+    const verification = await this.prisma.qualityVerification.findUnique({
+      where: { id: verificationId },
+      include: { assignment: { select: { worker_id: true } } },
+    });
+    if (!verification) throw new NotFoundError('Verification not found');
+
+    // Who may look at room evidence:
+    //  - the checker who recorded it, and any admin (quality:read gates the
+    //    route itself);
+    //  - a scope-bound manager/RM, only for hotels in their scope;
+    //  - the WORKER the inspection is about -- they uploaded the rework photo
+    //    and the inspection is a record about their own work. Withholding it
+    //    would mean a worker cannot see the evidence used to judge them.
+    // Deny by default. quality:read alone is NOT sufficient: ADR-067 granted
+    // WORKER that token so a worker can see their own hotel group's
+    // leaderboard, so gating on the permission alone would let any worker read
+    // any other worker's room evidence by id -- an IDOR, and on
+    // special-category-adjacent data.
+    const isSubject = verification.assignment?.worker_id === actor.userId;
+    const role = actor.role.toLowerCase();
+
+    if (isSubject) {
+      // The worker the inspection is about. They uploaded the rework photo and
+      // the record is about their own work; withholding it would mean they
+      // cannot see the evidence used to judge them.
+    } else if (role === 'admin') {
+      // Unscoped by design, matching every other admin read.
+    } else if (isScopedManagerRole(role) || role === 'checker') {
+      const inScope = await isHotelInScope(actor.scope ?? null, verification.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
+    } else {
+      // Any other role, including a WORKER who is not the subject.
+      throw new ForbiddenError('Cannot view evidence for this inspection');
+    }
+
+    const storage = await getStorageClient();
+    const photos = await Promise.all(
+      verification.photo_urls.map(async (key) => ({
+        key,
+        // null when storage is unconfigured (the stub). Surfaced rather than
+        // hidden so a broken bucket shows as a missing image, not as an
+        // inspection that never had evidence.
+        url: await storage.getPresignedUrl(key),
+      }))
+    );
+
+    return { verification_id: verification.id, photos };
   }
 
   async getLeaderboard(

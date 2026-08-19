@@ -56,6 +56,11 @@ export interface WorkRequest {
 export interface WorkerAssignment {
   id: string;
   work_request_id: string;
+  // ADR-069: set when this assignment is corrective rework for another one.
+  // Both request FKs are null on a rework row, so without this the shift list
+  // renders it as a generic "Shift" -- indistinguishable from real work, with
+  // a 20-minute escalation clock the worker cannot see running.
+  rework_of_assignment_id?: string | null;
   worker_id: string;
   status: AssignmentStatus;
   created_at: string;

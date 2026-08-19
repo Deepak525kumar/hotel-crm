@@ -232,10 +232,26 @@ export class AnalyticsService extends BaseService {
       monthRatingAgg,
       recentRatings,
     ] = await Promise.all([
+      // ADR-069 §3: rework assignments are excluded from a worker's OWN
+      // counts, for the same reason they are excluded from
+      // completion_rate/on_time_rate -- a rework row is a second row for work
+      // already counted once, so including it reports two completed
+      // assignments for one room.
+      //
+      // Consistency is the sharper argument here than double-counting: this
+      // same response also returns `average_score` from WorkerOverallRating,
+      // which DOES exclude rework. Counting it in one field and not the other
+      // would have this endpoint contradict itself in a single payload.
       this.prisma.workerAssignment.count({
-        where: { worker_id: workerId, status: AssignmentStatus.COMPLETED },
+        where: {
+          worker_id: workerId,
+          status: AssignmentStatus.COMPLETED,
+          rework_of_assignment_id: null,
+        },
       }),
-      this.prisma.workerAssignment.count({ where: { worker_id: workerId } }),
+      this.prisma.workerAssignment.count({
+        where: { worker_id: workerId, rework_of_assignment_id: null },
+      }),
       this.prisma.roomsCompletedEntry.aggregate({
         where: { worker_id: workerId },
         _sum: { rooms_completed: true },
@@ -254,10 +270,19 @@ export class AnalyticsService extends BaseService {
       // closest analog (set once at creation, @default(now()), never
       // updated afterward) for "assignment created this month."
       this.prisma.workerAssignment.count({
-        where: { worker_id: workerId, confirmed_at: { gte: monthStart } },
+        where: {
+          worker_id: workerId,
+          confirmed_at: { gte: monthStart },
+          rework_of_assignment_id: null,
+        },
       }),
       this.prisma.workerAssignment.count({
-        where: { worker_id: workerId, status: AssignmentStatus.COMPLETED, confirmed_at: { gte: monthStart } },
+        where: {
+          worker_id: workerId,
+          status: AssignmentStatus.COMPLETED,
+          confirmed_at: { gte: monthStart },
+          rework_of_assignment_id: null,
+        },
       }),
       this.prisma.rating.aggregate({
         where: { worker_id: workerId, created_at: { gte: monthStart } },

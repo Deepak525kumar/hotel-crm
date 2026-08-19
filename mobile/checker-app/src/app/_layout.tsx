@@ -69,6 +69,7 @@ export default function RootLayout() {
           were unreachable: unregistered and unlinked, and invisible to
           tsc because tsconfig.test.json never included src/app/**.
         */}
+        <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="documents" options={{ headerShown: false }} />
         <Stack.Screen name="consent" options={{ headerShown: false }} />
         <Stack.Screen name="hr" options={{ headerShown: false }} />

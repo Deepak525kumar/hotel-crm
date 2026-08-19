@@ -54,7 +54,14 @@
       "expo-image",
       "expo-secure-store",
       "expo-status-bar",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Used only when you attach a photo to show that rework is done.",
+          "cameraPermission": "Used only when you take a photo to show that rework is done."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

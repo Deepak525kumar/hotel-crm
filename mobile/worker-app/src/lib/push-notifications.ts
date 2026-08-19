@@ -83,6 +83,14 @@ export function resolvePushTapRoute(data: Record<string, unknown> | undefined | 
   if (data?.type === 'JOB_REQUEST_BROADCAST' && typeof data.work_request_id === 'string') {
     return `/offer/${data.work_request_id}`;
   }
+  // CRR §14: tapping the rework push opens the screen where the worker
+  // uploads evidence and marks it done. The checker's note rides along in the
+  // query string so the instruction is on screen without a second fetch --
+  // the worker is standing in the room and the note IS the task.
+  if (data?.type === 'REWORK_REQUIRED' && typeof data.rework_assignment_id === 'string') {
+    const notes = typeof data.notes === 'string' ? data.notes : '';
+    return `/rework/${data.rework_assignment_id}?notes=${encodeURIComponent(notes)}`;
+  }
   return '/notifications';
 }
 
