@@ -31,7 +31,13 @@ import {
   TextLink,
 } from "@/components/ui";
 import { BackLink } from "@/components/ui/BackLink";
-import type { QualityVerification, Rating, RoomsCompletedEntry } from "@/lib/types";
+import type {
+  InspectionChecklistItem,
+  QualityVerification,
+  Rating,
+  RoomsCompletedEntry,
+} from "@/lib/types";
+import { INSPECTION_CHECKLIST_ITEMS } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
 
@@ -1126,18 +1132,18 @@ function CreateRatingModal({
   const { t } = useTranslation();
   const [score, setScore] = useState("");
   const [comment, setComment] = useState("");
-  const [punctuality, setPunctuality] = useState("");
-  const [quality, setQuality] = useState("");
-  const [attitude, setAttitude] = useState("");
+  // TREQ-005: one entry per confirmed checklist item, driven off the shared
+  // constant rather than three hand-declared useState hooks -- adding or
+  // removing an item is then a one-line change in lib/types.ts and cannot
+  // leave the form and the API disagreeing about the set.
+  const [criteria, setCriteria] = useState<Partial<Record<InspectionChecklistItem, string>>>({});
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
 
   const reset = () => {
     setScore("");
     setComment("");
-    setPunctuality("");
-    setQuality("");
-    setAttitude("");
+    setCriteria({});
     setFieldError(null);
   };
 
@@ -1155,10 +1161,20 @@ function CreateRatingModal({
       return;
     }
 
-    const criteriaScores: { punctuality?: number; quality?: number; attitude?: number } = {};
-    if (punctuality !== "") criteriaScores.punctuality = Number(punctuality);
-    if (quality !== "") criteriaScores.quality = Number(quality);
-    if (attitude !== "") criteriaScores.attitude = Number(attitude);
+    const criteriaScores: Partial<Record<InspectionChecklistItem, number>> = {};
+    for (const item of INSPECTION_CHECKLIST_ITEMS) {
+      const raw = criteria[item];
+      if (raw === undefined || raw === "") continue;
+      const value = Number(raw);
+      // Mirrors the API's own bounds (0-100 integers). Submitting an
+      // out-of-range item used to 400 with a message naming a field the
+      // checker cannot see, after they had filled the whole form in.
+      if (!Number.isInteger(value) || value < 0 || value > 100) {
+        setFieldError(t("assignments.checklistItemRange"));
+        return;
+      }
+      criteriaScores[item] = value;
+    }
 
     create.run(
       () =>
@@ -1205,31 +1221,21 @@ function CreateRatingModal({
           value={score}
           onChange={(e) => setScore(e.target.value)}
         />
-        <div className="grid grid-cols-3 gap-3">
-          <Input
-            label={t("fields.punctuality0to100")}
-            type="number"
-            min={0}
-            max={100}
-            value={punctuality}
-            onChange={(e) => setPunctuality(e.target.value)}
-          />
-          <Input
-            label={t("fields.quality0to100")}
-            type="number"
-            min={0}
-            max={100}
-            value={quality}
-            onChange={(e) => setQuality(e.target.value)}
-          />
-          <Input
-            label={t("fields.attitude0to100")}
-            type="number"
-            min={0}
-            max={100}
-            value={attitude}
-            onChange={(e) => setAttitude(e.target.value)}
-          />
+        <div className="grid grid-cols-2 gap-3">
+          {INSPECTION_CHECKLIST_ITEMS.map((item) => (
+            <Input
+              key={item}
+              label={t(`checklist.${item}`)}
+              type="number"
+              min={0}
+              max={100}
+              step={1}
+              value={criteria[item] ?? ""}
+              onChange={(e) =>
+                setCriteria((prev) => ({ ...prev, [item]: e.target.value }))
+              }
+            />
+          ))}
         </div>
         <Textarea
           label={t("fields.commentOptional")}

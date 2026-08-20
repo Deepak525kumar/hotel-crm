@@ -164,9 +164,6 @@
     "requiresWorkPermit": "ورک پرمٹ درکار ہے (غیر EU/EEA/سوئس)",
     "activeCanSignIn": "فعال (پلیٹ فارم میں سائن اِن کر سکتا ہے)",
     "score0to100": "سکور (0–100)",
-    "punctuality0to100": "وقت کی پابندی (0–100)",
-    "quality0to100": "معیار (0–100)",
-    "attitude0to100": "رویہ (0–100)",
     "hotelNamePlaceholder": "مثلاً Grand Central Hotel",
     "groupNamePlaceholder": "مثلاً شمالی علاقہ",
     "jobTitlePlaceholder": "مثلاً ہاؤس کیپر"
@@ -301,7 +298,8 @@
     "placeOnCalendarDescription": "کارکن کو ہوٹل اور دن کے لیے براہ راست تصدیق کریں — کوئی اعلان نہیں، کوئی قبولیت مرحلہ نہیں۔",
     "calendarPlacementsDescription": "ہوٹل کے کیلنڈر پر براہ راست تعینات کارکن — کوئی اعلان نہیں، کوئی قبولیت مرحلہ نہیں۔",
     "calendarPlacementsLink": "کیلنڈر تعیناتیاں",
-    "scoreDerivedHint": "حالت سکور سے اخذ کی جاتی ہے: 70+ کامیاب، 40–69 دوبارہ کام درکار، 40 سے کم ناکام۔"
+    "scoreDerivedHint": "حالت سکور سے اخذ کی جاتی ہے: 70+ کامیاب، 40–69 دوبارہ کام درکار، 40 سے کم ناکام۔",
+    "checklistItemRange": "چیک لسٹ کی اشیاء 0 سے 100 کے درمیان مکمل اعداد ہونی چاہئیں۔"
   },
   "settings": {
     "language": {
@@ -922,6 +920,16 @@
     "withdrawA11y": "{{day}} کو {{kind}} واپس لیں",
     "markFailed": "غیر حاضری درج نہیں ہو سکی۔",
     "withdrawFailed": "غیر حاضری واپس نہیں لی جا سکی۔"
+  },
+  "checklist": {
+    "dust": "گرد",
+    "bathroom": "غسل خانہ",
+    "bed_linen": "بستر کی چادریں",
+    "mirror": "آئینہ",
+    "floor": "فرش",
+    "minibar_restocking": "منی بار / دوبارہ بھرنا",
+    "fragrance_amenities": "خوشبو / سہولیات",
+    "other": "دیگر"
   },
   "ratingTier": {
     "ELITE": "اعلیٰ ترین",

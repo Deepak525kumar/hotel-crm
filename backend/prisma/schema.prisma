@@ -1178,7 +1178,12 @@ model Rating {
   rated_by        User             @relation("rater", fields: [rated_by_id], references: [id], onDelete: Restrict)
   score           Int // 0–100; rescaled from 1–5 stars by ADR-026; CHECK constraint in migration
   comment         String?
-  // Structured sub-scores; schema: { punctuality: Int, quality: Int, attitude: Int }
+  // TREQ-005 (CONFIRMED §15) inspection checklist, each 0-100 and optional:
+  //   dust, bathroom, bed_linen, mirror, floor, minibar_restocking,
+  //   fragrance_amenities, other
+  // Rows written before 2026-08-20 instead carry the pre-pivot
+  // { punctuality, quality, attitude } -- readable, never written again.
+  // Validated in quality/types.ts, not by the database: this is Json.
   criteria_scores Json?
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt

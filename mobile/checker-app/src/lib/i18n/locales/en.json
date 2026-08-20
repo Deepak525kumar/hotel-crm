@@ -163,9 +163,6 @@
     "requiresWorkPermit": "Requires a work permit (non-EU/EEA/Swiss)",
     "activeCanSignIn": "Active (can sign in to the platform)",
     "score0to100": "Score (0–100)",
-    "punctuality0to100": "Punctuality (0–100)",
-    "quality0to100": "Quality (0–100)",
-    "attitude0to100": "Attitude (0–100)",
     "hotelNamePlaceholder": "e.g. Grand Central Hotel",
     "groupNamePlaceholder": "e.g. Northern Region",
     "jobTitlePlaceholder": "e.g. Housekeeper"
@@ -300,7 +297,8 @@
     "placeOnCalendarDescription": "Directly confirm a worker for a hotel and day — no broadcast, no accept step.",
     "calendarPlacementsDescription": "Workers placed directly on a hotel's calendar — no broadcast, no accept step.",
     "calendarPlacementsLink": "Calendar placements",
-    "scoreDerivedHint": "Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails."
+    "scoreDerivedHint": "Status is derived from the score: 70+ passes, 40–69 needs rework, below 40 fails.",
+    "checklistItemRange": "Checklist items must be whole numbers between 0 and 100."
   },
   "settings": {
     "language": {
@@ -921,6 +919,16 @@
     "withdrawA11y": "Withdraw {{kind}} on {{day}}",
     "markFailed": "Could not mark absence.",
     "withdrawFailed": "Could not withdraw absence."
+  },
+  "checklist": {
+    "dust": "Dust",
+    "bathroom": "Bathroom",
+    "bed_linen": "Bed linen",
+    "mirror": "Mirror",
+    "floor": "Floor",
+    "minibar_restocking": "Minibar / restocking",
+    "fragrance_amenities": "Fragrance / amenities",
+    "other": "Other"
   },
   "ratingTier": {
     "ELITE": "Elite",

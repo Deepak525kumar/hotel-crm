@@ -164,9 +164,6 @@
     "requiresWorkPermit": "يتطلب تصريح عمل (لغير مواطني الاتحاد الأوروبي/المنطقة الاقتصادية الأوروبية/سويسرا)",
     "activeCanSignIn": "نشط (يمكنه تسجيل الدخول إلى المنصة)",
     "score0to100": "النتيجة (0–100)",
-    "punctuality0to100": "الالتزام بالمواعيد (0–100)",
-    "quality0to100": "الجودة (0–100)",
-    "attitude0to100": "السلوك (0–100)",
     "hotelNamePlaceholder": "مثال: Grand Central Hotel",
     "groupNamePlaceholder": "مثال: المنطقة الشمالية",
     "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف"
@@ -301,7 +298,8 @@
     "placeOnCalendarDescription": "أكّد موظفاً مباشرة لفندق ويوم — بدون بث وبدون خطوة قبول.",
     "calendarPlacementsDescription": "الموظفون المُنسَّبون مباشرة في تقويم الفندق — بدون بث وبدون خطوة قبول.",
     "calendarPlacementsLink": "التنسيبات في التقويم",
-    "scoreDerivedHint": "تُشتق الحالة من النتيجة: 70 فأكثر ناجح، 40–69 يحتاج إعادة عمل، أقل من 40 راسب."
+    "scoreDerivedHint": "تُشتق الحالة من النتيجة: 70 فأكثر ناجح، 40–69 يحتاج إعادة عمل، أقل من 40 راسب.",
+    "checklistItemRange": "يجب أن تكون عناصر قائمة التحقق أعدادًا صحيحة بين 0 و100."
   },
   "settings": {
     "language": {
@@ -922,6 +920,16 @@
     "withdrawA11y": "إلغاء {{kind}} في {{day}}",
     "markFailed": "لم يتمكن من تسجيل الغياب.",
     "withdrawFailed": "لم يتمكن من إلغاء الغياب."
+  },
+  "checklist": {
+    "dust": "الغبار",
+    "bathroom": "الحمام",
+    "bed_linen": "مفارش السرير",
+    "mirror": "المرآة",
+    "floor": "الأرضية",
+    "minibar_restocking": "الميني بار / إعادة التزويد",
+    "fragrance_amenities": "العطر / المستلزمات",
+    "other": "أخرى"
   },
   "ratingTier": {
     "ELITE": "نخبة",

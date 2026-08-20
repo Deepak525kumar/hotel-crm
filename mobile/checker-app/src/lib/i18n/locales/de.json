@@ -163,9 +163,6 @@
     "requiresWorkPermit": "Erfordert eine Arbeitserlaubnis (Nicht-EU/EWR/Schweiz)",
     "activeCanSignIn": "Aktiv (kann sich auf der Plattform anmelden)",
     "score0to100": "Punktzahl (0–100)",
-    "punctuality0to100": "Pünktlichkeit (0–100)",
-    "quality0to100": "Qualität (0–100)",
-    "attitude0to100": "Einstellung (0–100)",
     "hotelNamePlaceholder": "z. B. Grand Central Hotel",
     "groupNamePlaceholder": "z. B. Region Nord",
     "jobTitlePlaceholder": "z. B. Zimmermädchen"
@@ -300,7 +297,8 @@
     "placeOnCalendarDescription": "Bestätigen Sie einen Mitarbeiter direkt für ein Hotel und einen Tag — ohne Rundmeldung, ohne Annahmeschritt.",
     "calendarPlacementsDescription": "Mitarbeiter, die direkt im Kalender eines Hotels platziert wurden — ohne Rundmeldung, ohne Annahmeschritt.",
     "calendarPlacementsLink": "Kalenderplatzierungen",
-    "scoreDerivedHint": "Der Status ergibt sich aus der Punktzahl: ab 70 bestanden, 40–69 Nacharbeit nötig, unter 40 nicht bestanden."
+    "scoreDerivedHint": "Der Status ergibt sich aus der Punktzahl: ab 70 bestanden, 40–69 Nacharbeit nötig, unter 40 nicht bestanden.",
+    "checklistItemRange": "Checklistenpunkte müssen ganze Zahlen zwischen 0 und 100 sein."
   },
   "settings": {
     "language": {
@@ -921,6 +919,16 @@
     "withdrawA11y": "{{kind}} am {{day}} zurückziehen",
     "markFailed": "Abwesenheit konnte nicht eingetragen werden.",
     "withdrawFailed": "Abwesenheit konnte nicht zurückgezogen werden."
+  },
+  "checklist": {
+    "dust": "Staub",
+    "bathroom": "Badezimmer",
+    "bed_linen": "Bettwäsche",
+    "mirror": "Spiegel",
+    "floor": "Boden",
+    "minibar_restocking": "Minibar / Auffüllen",
+    "fragrance_amenities": "Duft / Ausstattung",
+    "other": "Sonstiges"
   },
   "ratingTier": {
     "ELITE": "Elite",
