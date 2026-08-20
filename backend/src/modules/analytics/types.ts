@@ -1,9 +1,13 @@
+import type { RatingTier } from '../quality/rating-tiers.js';
+
 export interface LeaderboardEntry {
   worker_id: string;
   name: string;
   total_tasks: number;
   completed_tasks: number;
   average_rating: number;
+  /** TREQ-003 tier label derived from average_rating; null when unrated. */
+  rating_tier: RatingTier | null;
   position: number;
 }
 
@@ -57,6 +61,8 @@ export interface WorkerStats {
   completed_assignments: number;
   rooms_completed: number;
   average_rating: number | null;
+  /** TREQ-003 tier label derived from average_rating; null when unrated. */
+  rating_tier: RatingTier | null;
   attendance: {
     total: number;
     present: number;

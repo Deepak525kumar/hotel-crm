@@ -116,10 +116,17 @@ export interface PushToken {
   updated_at: string;
 }
 
+/**
+ * TREQ-003 tier label, derived server-side from the 0-100 score and never
+ * stored. null when the worker has no ratings yet -- unrated is not a tier.
+ */
+export type RatingTier = 'ELITE' | 'HIGH' | 'STANDARD' | 'LOW' | 'PROBATION';
+
 export interface LeaderboardEntry {
   id: string;
   worker_id: string;
   average_score: number;
+  rating_tier: RatingTier | null;
   total_ratings: number;
   total_assignments: number;
   completion_rate: number;

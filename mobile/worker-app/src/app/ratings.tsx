@@ -1,3 +1,4 @@
+import { RatingTierBadge } from '@/components/RatingTierBadge';
 import { StyleSheet, FlatList, ActivityIndicator, Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
@@ -42,6 +43,7 @@ export default function RatingsScreen() {
                   <ThemedText type="smallBold" style={styles.rank}>
                     {index < 3 ? MEDAL[index] : `#${index + 1}`}
                   </ThemedText>
+                  <RatingTierBadge tier={item.rating_tier} />
                 </View>
                 <View style={styles.info}>
                   <ThemedText type="smallBold">
@@ -50,7 +52,7 @@ export default function RatingsScreen() {
                       : item.worker_id}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {item.average_score.toFixed(1)} ★ · {item.total_assignments} shifts
+                    {item.average_score.toFixed(1)}/100 · {item.total_assignments} shifts
                     {item.worker.employment_record?.primary_hotel
                       ? ` · ${item.worker.employment_record.primary_hotel.name}`
                       : ''}

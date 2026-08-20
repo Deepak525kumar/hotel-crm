@@ -113,7 +113,7 @@ describe('Analytics getWorkerStats (GD-06)', () => {
     service = new AnalyticsService();
     mockAssignmentCounts(7, 10, 2, 1);
     mockRoomsCompletedEntry.aggregate.mockResolvedValue({ _sum: { rooms_completed: 42 } });
-    mockWorkerOverallRating.findUnique.mockResolvedValue({ average_score: 88.5 });
+    mockWorkerOverallRating.findUnique.mockResolvedValue({ average_score: 88.5, total_ratings: 12 });
     mockAttendance.groupBy.mockResolvedValue([
       { status: 'PRESENT', _count: { id: 5 } },
       { status: 'LATE', _count: { id: 1 } },
@@ -149,6 +149,9 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       completed_assignments: 7,
       rooms_completed: 42,
       average_rating: 88.5,
+      // TREQ-003: derived from average_rating, not stored. 88.5 sits in the
+      // 70-89 band.
+      rating_tier: 'HIGH',
       attendance: { total: 8, present: 5, late: 1, absent: 2 },
       total_assignments: 10,
       attendance_rate: 75, // (5 present + 1 late) / 8 total = 75%
@@ -175,6 +178,8 @@ describe('Analytics getWorkerStats (GD-06)', () => {
       completed_assignments: 0,
       rooms_completed: 0,
       average_rating: null,
+      // No WorkerOverallRating row at all -- unrated is not a tier.
+      rating_tier: null,
       attendance: { total: 0, present: 0, late: 0, absent: 0 },
       total_assignments: 0,
       attendance_rate: null,

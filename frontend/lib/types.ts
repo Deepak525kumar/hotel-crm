@@ -422,12 +422,21 @@ export interface ListHotelGroupsQuery {
 /* -------------------------------------------------------------------------- */
 
 /** A worker leaderboard row from `GET /analytics/leaderboard`. */
+/**
+ * TREQ-003 tier label, derived server-side from the 0-100 score and never
+ * stored -- see backend/src/modules/quality/rating-tiers.ts for the thresholds
+ * and why they match RULE-004's PASSED/FAILED boundaries.
+ */
+export type RatingTier = "ELITE" | "HIGH" | "STANDARD" | "LOW" | "PROBATION";
+
 export interface LeaderboardEntry {
   worker_id: string;
   name: string;
   total_tasks: number;
   completed_tasks: number;
   average_rating: number;
+  /** null when the worker has no ratings yet -- unrated is not a tier. */
+  rating_tier: RatingTier | null;
   position: number;
 }
 
@@ -484,6 +493,8 @@ export interface WorkerStats {
   completed_assignments: number;
   rooms_completed: number;
   average_rating: number | null;
+  /** null when the worker has no ratings yet -- unrated is not a tier. */
+  rating_tier: RatingTier | null;
   attendance: {
     total: number;
     present: number;

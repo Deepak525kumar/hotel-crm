@@ -770,7 +770,8 @@
     "statsLoadFailed": "Impossible de charger vos statistiques.",
     "platformOverview": "Aperçu de la plateforme",
     "viewAnalytics": "Voir les statistiques",
-    "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme."
+    "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme.",
+    "tier": "Niveau"
   },
   "hotelGroups": {
     "noDeleted": "Aucun groupe hôtelier supprimé",
@@ -920,5 +921,13 @@
     "withdrawA11y": "Retirer {{kind}} le {{day}}",
     "markFailed": "Impossible d’enregistrer l’absence.",
     "withdrawFailed": "Impossible de retirer l’absence."
+  },
+  "ratingTier": {
+    "ELITE": "Élite",
+    "HIGH": "Élevé",
+    "STANDARD": "Standard",
+    "LOW": "Faible",
+    "PROBATION": "Probation",
+    "unrated": "Pas encore évalué"
   }
 }

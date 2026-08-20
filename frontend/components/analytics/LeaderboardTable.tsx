@@ -17,6 +17,7 @@ import {
 import { formatScore } from "@/lib/format";
 import type { LeaderboardEntry } from "@/lib/types";
 import { useTranslation } from "react-i18next";
+import { RatingTierBadge } from "@/components/analytics/RatingTierBadge";
 
 export interface LeaderboardTableProps {
   entries: LeaderboardEntry[];
@@ -35,7 +36,7 @@ export function LeaderboardTable({
 }: LeaderboardTableProps) {
   const { t } = useTranslation();
   const rows = limit ? entries.slice(0, limit) : entries;
-  const columns = 5;
+  const columns = 6;
 
   if (error) {
     return (
@@ -54,6 +55,7 @@ export function LeaderboardTable({
           <TH className="text-end">{t("status.completed")}</TH>
           <TH className="text-end">{t("common.total")}</TH>
           <TH className="text-end">{t("analytics.avgRating")}</TH>
+          <TH>{t("analytics.tier")}</TH>
         </tr>
       </THead>
       {isLoading ? (
@@ -78,6 +80,9 @@ export function LeaderboardTable({
               <TD className="text-end">{e.completed_tasks}</TD>
               <TD className="text-end">{e.total_tasks}</TD>
               <TD className="text-end">{formatScore(e.average_rating, 2)}</TD>
+              <TD>
+                <RatingTierBadge tier={e.rating_tier} />
+              </TD>
             </TR>
           ))}
         </TBody>

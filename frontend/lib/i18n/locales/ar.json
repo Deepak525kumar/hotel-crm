@@ -771,7 +771,8 @@
     "statsLoadFailed": "تعذر تحميل إحصاءاتك.",
     "platformOverview": "نظرة عامة على المنصة",
     "viewAnalytics": "عرض التحليلات",
-    "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة."
+    "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة.",
+    "tier": "الفئة"
   },
   "hotelGroups": {
     "noDeleted": "لا توجد مجموعات فنادق محذوفة",
@@ -921,5 +922,13 @@
     "withdrawA11y": "إلغاء {{kind}} في {{day}}",
     "markFailed": "لم يتمكن من تسجيل الغياب.",
     "withdrawFailed": "لم يتمكن من إلغاء الغياب."
+  },
+  "ratingTier": {
+    "ELITE": "نخبة",
+    "HIGH": "مرتفع",
+    "STANDARD": "قياسي",
+    "LOW": "منخفض",
+    "PROBATION": "تحت المراقبة",
+    "unrated": "لم يتم التقييم بعد"
   }
 }

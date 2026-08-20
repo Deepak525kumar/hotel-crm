@@ -770,7 +770,8 @@
     "statsLoadFailed": "Ihre Statistiken konnten nicht geladen werden.",
     "platformOverview": "Plattformübersicht",
     "viewAnalytics": "Statistiken ansehen",
-    "statsLoadFailedShort": "Plattformstatistiken konnten nicht geladen werden."
+    "statsLoadFailedShort": "Plattformstatistiken konnten nicht geladen werden.",
+    "tier": "Stufe"
   },
   "hotelGroups": {
     "noDeleted": "Keine gelöschten Hotelgruppen",
@@ -920,5 +921,13 @@
     "withdrawA11y": "{{kind}} am {{day}} zurückziehen",
     "markFailed": "Abwesenheit konnte nicht eingetragen werden.",
     "withdrawFailed": "Abwesenheit konnte nicht zurückgezogen werden."
+  },
+  "ratingTier": {
+    "ELITE": "Elite",
+    "HIGH": "Hoch",
+    "STANDARD": "Standard",
+    "LOW": "Niedrig",
+    "PROBATION": "Bewährung",
+    "unrated": "Noch nicht bewertet"
   }
 }
