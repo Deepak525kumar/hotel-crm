@@ -24,9 +24,15 @@
 -- Separate statements, one value each: PostgreSQL 11 and earlier cannot add
 -- more than one enum value in a single migration, and this repo's own
 -- 20260818130000_add_rework_notification_types set that precedent.
-ALTER TYPE "NotificationType" ADD VALUE 'QUALITY_RATING_WARNING_70';
-ALTER TYPE "NotificationType" ADD VALUE 'QUALITY_RATING_WARNING_50';
-ALTER TYPE "NotificationType" ADD VALUE 'HR_CONTRACT_EXPIRY_WORKER_REMINDER';
+-- IF NOT EXISTS is required, not cosmetic. The migration harness rolls the
+-- newest migration back and then re-applies it, and down.sql cannot remove an
+-- enum label (PostgreSQL has no ALTER TYPE ... DROP VALUE) without rebuilding
+-- the whole type. Without the guard the re-apply fails with 42710
+-- "enum label already exists" -- which is exactly how CI caught this.
+-- Matches the precedent in 20260818130000_add_rework_notification_types.
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'QUALITY_RATING_WARNING_70';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'QUALITY_RATING_WARNING_50';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'HR_CONTRACT_EXPIRY_WORKER_REMINDER';
 
 -- AlterTable
 ALTER TABLE "Contract" ADD COLUMN     "contract_pdf_s3_key" TEXT,
