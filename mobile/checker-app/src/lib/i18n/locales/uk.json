@@ -768,7 +768,8 @@
     "statsLoadFailed": "Не вдалося завантажити вашу статистику.",
     "platformOverview": "Огляд платформи",
     "viewAnalytics": "Переглянути аналітику",
-    "statsLoadFailedShort": "Не вдалося завантажити статистику платформи."
+    "statsLoadFailedShort": "Не вдалося завантажити статистику платформи.",
+    "tier": "Рівень"
   },
   "hotelGroups": {
     "noDeleted": "Немає видалених груп готелів",
@@ -928,5 +929,13 @@
     "minibar_restocking": "Мінібар / поповнення",
     "fragrance_amenities": "Аромат / приладдя",
     "other": "Інше"
+  },
+  "ratingTier": {
+    "ELITE": "Еліта",
+    "HIGH": "Високий",
+    "STANDARD": "Стандартний",
+    "LOW": "Низький",
+    "PROBATION": "Випробувальний термін",
+    "unrated": "Ще не оцінено"
   }
 }

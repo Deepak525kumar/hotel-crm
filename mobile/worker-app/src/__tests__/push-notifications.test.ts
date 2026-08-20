@@ -175,6 +175,36 @@ describe('subscribeToPushNotifications', () => {
     mockNotifications.addNotificationResponseReceivedListener.mockReturnValue({ remove: mockRemove });
   });
 
+  // Web guard. expo-notifications has no working foreground handler on web,
+  // and calling setNotificationHandler there can throw -- which would take out
+  // the whole component tree, since this runs from PushRegistration on mount.
+  // registerForPushNotificationsAsync already bailed out on web the same way
+  // (see its own 'web' case above); this makes the sibling consistent.
+  describe('on web', () => {
+    afterEach(() => setPlatform('ios'));
+
+    it('does not touch expo-notifications at all', () => {
+      setPlatform('web');
+      subscribeToPushNotifications(mockRouter);
+
+      expect(mockNotifications.setNotificationHandler).not.toHaveBeenCalled();
+      expect(
+        mockNotifications.addNotificationResponseReceivedListener,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('still returns a callable unsubscribe, so cleanup does not crash', () => {
+      setPlatform('web');
+      const unsubscribe = subscribeToPushNotifications(mockRouter);
+
+      // The caller unconditionally invokes this in a useEffect teardown; a
+      // guard that returned undefined would turn "push is unavailable" into
+      // a crash on unmount.
+      expect(typeof unsubscribe).toBe('function');
+      expect(() => unsubscribe()).not.toThrow();
+    });
+  });
+
   it('registers a foreground handler that shows the banner/sound/badge/list', () => {
     subscribeToPushNotifications(mockRouter);
 

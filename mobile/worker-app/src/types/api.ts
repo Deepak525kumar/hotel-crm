@@ -114,10 +114,17 @@ export interface PushToken {
 // scoping, so this app never had access to it. `email` is deliberately absent:
 // the backend strips it for worker and checker callers, who are looking at
 // colleagues rather than reports.
+/**
+ * TREQ-003 tier label, derived server-side from the 0-100 score and never
+ * stored. null when the worker has no ratings yet -- unrated is not a tier.
+ */
+export type RatingTier = 'ELITE' | 'HIGH' | 'STANDARD' | 'LOW' | 'PROBATION';
+
 export interface LeaderboardEntry {
   id: string;
   worker_id: string;
   average_score: number;
+  rating_tier: RatingTier | null;
   total_ratings: number;
   total_assignments: number;
   completion_rate: number;

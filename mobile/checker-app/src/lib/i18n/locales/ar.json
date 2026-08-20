@@ -769,7 +769,8 @@
     "statsLoadFailed": "تعذر تحميل إحصاءاتك.",
     "platformOverview": "نظرة عامة على المنصة",
     "viewAnalytics": "عرض التحليلات",
-    "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة."
+    "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة.",
+    "tier": "الفئة"
   },
   "hotelGroups": {
     "noDeleted": "لا توجد مجموعات فنادق محذوفة",
@@ -929,5 +930,13 @@
     "minibar_restocking": "الميني بار / إعادة التزويد",
     "fragrance_amenities": "العطر / المستلزمات",
     "other": "أخرى"
+  },
+  "ratingTier": {
+    "ELITE": "نخبة",
+    "HIGH": "مرتفع",
+    "STANDARD": "قياسي",
+    "LOW": "منخفض",
+    "PROBATION": "تحت المراقبة",
+    "unrated": "لم يتم التقييم بعد"
   }
 }

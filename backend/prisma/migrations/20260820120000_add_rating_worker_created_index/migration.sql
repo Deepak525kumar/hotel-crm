@@ -1,0 +1,18 @@
+-- Supports TREQ-004's recency window:
+--   SELECT score FROM "Rating" WHERE worker_id = $1 ORDER BY created_at DESC LIMIT 10
+-- which runs inside refreshWorkerOverallRating()'s transaction on every rating
+-- write and every assignment status change.
+--
+-- Without it the planner scans the created_at index backwards and filters on
+-- worker_id, which walks the whole table for any worker whose ratings are not
+-- among the newest rows. Measured on 210k rows: 27.3ms vs 0.063ms (~430x), and
+-- the cost grows with TOTAL table size rather than with the worker's own
+-- rating count. It is paid while holding the FOR UPDATE lock on the worker's
+-- User row.
+--
+-- Deliberately NOT CONCURRENTLY: Prisma wraps each migration in a transaction
+-- and CREATE INDEX CONCURRENTLY cannot run inside one. Rating is small enough
+-- at current scale that the brief write lock is acceptable; if this table ever
+-- becomes large enough for that to matter, build the index out-of-band and
+-- mark the migration applied rather than relaxing this file.
+CREATE INDEX "Rating_worker_id_created_at_idx" ON "Rating"("worker_id", "created_at");

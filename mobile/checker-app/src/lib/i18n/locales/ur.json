@@ -769,7 +769,8 @@
     "statsLoadFailed": "آپ کے اعداد و شمار لوڈ نہیں ہو سکے۔",
     "platformOverview": "پلیٹ فارم کا جائزہ",
     "viewAnalytics": "تجزیات دیکھیں",
-    "statsLoadFailedShort": "پلیٹ فارم کے اعداد و شمار لوڈ نہیں ہو سکے۔"
+    "statsLoadFailedShort": "پلیٹ فارم کے اعداد و شمار لوڈ نہیں ہو سکے۔",
+    "tier": "درجہ"
   },
   "hotelGroups": {
     "noDeleted": "کوئی حذف شدہ ہوٹل گروپ نہیں",
@@ -929,5 +930,13 @@
     "minibar_restocking": "منی بار / دوبارہ بھرنا",
     "fragrance_amenities": "خوشبو / سہولیات",
     "other": "دیگر"
+  },
+  "ratingTier": {
+    "ELITE": "اعلیٰ ترین",
+    "HIGH": "بلند",
+    "STANDARD": "معیاری",
+    "LOW": "کم",
+    "PROBATION": "زیرِ نگرانی",
+    "unrated": "ابھی درجہ بندی نہیں ہوئی"
   }
 }

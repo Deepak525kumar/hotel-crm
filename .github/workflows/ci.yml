@@ -165,6 +165,32 @@ jobs:
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/hotelcrm_test
 
+      # Schema-drift gate. Added 2026-08-20 after PR #498 shipped three schema
+      # changes -- two WorkerOverallRating columns, three Contract columns and
+      # three NotificationType enum values -- with NO migration for any of
+      # them, and this workflow went green anyway.
+      #
+      # Nothing here could have caught it. `migrate deploy` succeeds happily
+      # against an incomplete history (there is simply nothing pending), and
+      # the backend suite mocks Prisma on the affected paths, so the columns
+      # are never actually selected. The drift only surfaces on a database
+      # built from the migration history -- i.e. staging and production, where
+      # refreshWorkerOverallRating() raises P2022 on every rating write.
+      #
+      # This compares the migration history against schema.prisma directly and
+      # fails when they disagree. --exit-code makes a non-empty diff exit 2.
+      - name: Migration drift check (schema.prisma vs migration history)
+        working-directory: backend
+        env:
+          PGPASSWORD: test
+        run: |
+          psql -h localhost -U test -d postgres -c 'CREATE DATABASE drift_shadow;'
+          npx prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema-datamodel prisma/schema.prisma \
+            --shadow-database-url postgresql://test:test@localhost:5432/drift_shadow \
+            --exit-code
+
       - name: Tests
         run: npm test
         working-directory: backend

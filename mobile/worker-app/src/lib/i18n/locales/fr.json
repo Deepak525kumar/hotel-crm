@@ -768,7 +768,8 @@
     "statsLoadFailed": "Impossible de charger vos statistiques.",
     "platformOverview": "Aperçu de la plateforme",
     "viewAnalytics": "Voir les statistiques",
-    "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme."
+    "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme.",
+    "tier": "Niveau"
   },
   "hotelGroups": {
     "noDeleted": "Aucun groupe hôtelier supprimé",
@@ -928,5 +929,13 @@
     "minibar_restocking": "Minibar / réapprovisionnement",
     "fragrance_amenities": "Parfum / articles",
     "other": "Autre"
+  },
+  "ratingTier": {
+    "ELITE": "Élite",
+    "HIGH": "Élevé",
+    "STANDARD": "Standard",
+    "LOW": "Faible",
+    "PROBATION": "Probation",
+    "unrated": "Pas encore évalué"
   }
 }

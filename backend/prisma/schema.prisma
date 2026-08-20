@@ -1193,6 +1193,22 @@ model Rating {
   @@index([rated_by_id])
   @@index([score])
   @@index([created_at])
+  // TREQ-004's recency window: `WHERE worker_id = ? ORDER BY created_at DESC
+  // LIMIT 10`, run inside refreshWorkerOverallRating()'s transaction on every
+  // rating write AND every assignment status change.
+  //
+  // The separate worker_id and created_at indexes are NOT enough, and the
+  // planner picks badly rather than merely suboptimally: for a worker whose
+  // ratings are not the newest rows in the table, it scans `created_at`
+  // backwards filtering on worker_id, walking the whole table to find ten
+  // rows. Measured on 210k rows -- 27.3ms vs 0.063ms with this index, a ~430x
+  // difference, and it degrades with TOTAL table size rather than with the
+  // worker's own rating count. The planner's own cost estimate (17) does not
+  // reflect it, so it will not correct itself as data grows.
+  //
+  // That cost is paid while holding the FOR UPDATE lock on the worker's User
+  // row, so it is lock-hold time, not just query time.
+  @@index([worker_id, created_at])
 }
 
 // Materialised aggregate — updated by DB trigger after each Rating write.
