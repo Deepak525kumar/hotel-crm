@@ -772,7 +772,9 @@
     "platformOverview": "نظرة عامة على المنصة",
     "viewAnalytics": "عرض التحليلات",
     "statsLoadFailedShort": "تعذر تحميل إحصاءات المنصة.",
-    "tier": "الفئة"
+    "tier": "الفئة",
+    "completionRate": "معدل الإنجاز",
+    "peerLeaderboardDescription": "قارن مكانتك مع زملائك في مجموعة فندقك"
   },
   "hotelGroups": {
     "noDeleted": "لا توجد مجموعات فنادق محذوفة",

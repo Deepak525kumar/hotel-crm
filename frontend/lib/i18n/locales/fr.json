@@ -771,7 +771,9 @@
     "platformOverview": "Aperçu de la plateforme",
     "viewAnalytics": "Voir les statistiques",
     "statsLoadFailedShort": "Impossible de charger les statistiques de la plateforme.",
-    "tier": "Niveau"
+    "tier": "Niveau",
+    "completionRate": "Taux d'achèvement",
+    "peerLeaderboardDescription": "Comparez votre position avec vos collègues de votre groupe hôtelier"
   },
   "hotelGroups": {
     "noDeleted": "Aucun groupe hôtelier supprimé",

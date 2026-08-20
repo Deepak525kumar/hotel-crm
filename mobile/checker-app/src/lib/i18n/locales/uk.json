@@ -771,7 +771,9 @@
     "platformOverview": "Огляд платформи",
     "viewAnalytics": "Переглянути аналітику",
     "statsLoadFailedShort": "Не вдалося завантажити статистику платформи.",
-    "tier": "Рівень"
+    "tier": "Рівень",
+    "completionRate": "Рівень виконання",
+    "peerLeaderboardDescription": "Порівняйте свій рейтинг із колегами вашої групи готелів"
   },
   "hotelGroups": {
     "noDeleted": "Немає видалених груп готелів",

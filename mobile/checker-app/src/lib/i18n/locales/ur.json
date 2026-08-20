@@ -772,7 +772,9 @@
     "platformOverview": "پلیٹ فارم کا جائزہ",
     "viewAnalytics": "تجزیات دیکھیں",
     "statsLoadFailedShort": "پلیٹ فارم کے اعداد و شمار لوڈ نہیں ہو سکے۔",
-    "tier": "درجہ"
+    "tier": "درجہ",
+    "completionRate": "تکمیل کی شرح",
+    "peerLeaderboardDescription": "اپنے ہوٹل گروپ کے ساتھیوں کے ساتھ اپنی درجہ بندی کا موازنہ کریں"
   },
   "hotelGroups": {
     "noDeleted": "کوئی حذف شدہ ہوٹل گروپ نہیں",

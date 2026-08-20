@@ -42,6 +42,7 @@ import type {
   DashboardStats,
   HotelAnalyticsSummary,
   LeaderboardEntry,
+  QualityLeaderboardEntry,
   GeoCheckin,
   Hotel,
   HotelGroup,
@@ -592,6 +593,15 @@ export const qualityApi = {
 
   createRating: (input: CreateRatingInput) =>
     apiFetch<Rating>("/quality/ratings", { method: "POST", body: input }),
+
+  /**
+   * ADR-067: the group-scoped peer leaderboard. NOT the same endpoint as
+   * analyticsApi.leaderboard() (/analytics/leaderboard, manager/admin-only,
+   * unscoped) -- this is what a worker or checker calls; scope is resolved
+   * server-side from the caller and cannot be widened by a query param.
+   * Mirrors mobile's api.quality.leaderboard() exactly.
+   */
+  leaderboard: () => apiFetch<QualityLeaderboardEntry[]>("/quality/leaderboard"),
 };
 
 /** Attendance API matching the backend `/attendance/*` routes. */
