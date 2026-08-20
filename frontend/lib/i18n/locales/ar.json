@@ -80,7 +80,8 @@
     "keep": "إبقاء",
     "shift": "وردية",
     "loadFailed": "فشل التحميل",
-    "tomorrow": "غدًا"
+    "tomorrow": "غدًا",
+    "getDirections": "الحصول على الاتجاهات"
   },
   "fields": {
     "name": "الاسم",
@@ -614,7 +615,8 @@
     "useCurrentLocation": "استخدام الموقع الحالي",
     "loadArchivedFailed": "تعذر تحميل الفنادق المؤرشفة.",
     "restoreAction": "استعادة",
-    "geofenceNotSet": "غير محدد — تسجيل حضور الموظف غير متاح"
+    "geofenceNotSet": "غير محدد — تسجيل حضور الموظف غير متاح",
+    "locationMap": "الموقع والاتجاهات"
   },
   "users": {
     "new": "مستخدم جديد",

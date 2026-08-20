@@ -79,7 +79,8 @@
     "keep": "Keep",
     "shift": "Shift",
     "loadFailed": "Failed to load",
-    "tomorrow": "Tomorrow"
+    "tomorrow": "Tomorrow",
+    "getDirections": "Get Directions"
   },
   "fields": {
     "name": "Name",
@@ -613,7 +614,8 @@
     "useCurrentLocation": "Use current location",
     "loadArchivedFailed": "Failed to load archived hotels.",
     "restoreAction": "Restore",
-    "geofenceNotSet": "Not set — worker check-in unavailable"
+    "geofenceNotSet": "Not set — worker check-in unavailable",
+    "locationMap": "Location & Directions"
   },
   "users": {
     "new": "New user",

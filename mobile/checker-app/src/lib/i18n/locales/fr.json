@@ -79,7 +79,8 @@
     "keep": "Conserver",
     "shift": "Service",
     "loadFailed": "Échec du chargement",
-    "tomorrow": "Demain"
+    "tomorrow": "Demain",
+    "getDirections": "Obtenir l'itinéraire"
   },
   "fields": {
     "name": "Nom",
@@ -613,7 +614,8 @@
     "useCurrentLocation": "Utiliser la position actuelle",
     "loadArchivedFailed": "Impossible de charger les hôtels archivés.",
     "restoreAction": "Restaurer",
-    "geofenceNotSet": "Non défini — pointage employé indisponible"
+    "geofenceNotSet": "Non défini — pointage employé indisponible",
+    "locationMap": "Emplacement et itinéraire"
   },
   "users": {
     "new": "Nouvel utilisateur",
