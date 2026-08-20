@@ -79,7 +79,8 @@
     "keep": "Behalten",
     "shift": "Schicht",
     "loadFailed": "Laden fehlgeschlagen",
-    "tomorrow": "Morgen"
+    "tomorrow": "Morgen",
+    "getDirections": "Route anzeigen"
   },
   "fields": {
     "name": "Name",
@@ -611,7 +612,8 @@
     "useCurrentLocation": "Aktuellen Standort verwenden",
     "loadArchivedFailed": "Archivierte Hotels konnten nicht geladen werden.",
     "restoreAction": "Wiederherstellen",
-    "geofenceNotSet": "Nicht festgelegt — Mitarbeiter-Check-in nicht verfügbar"
+    "geofenceNotSet": "Nicht festgelegt — Mitarbeiter-Check-in nicht verfügbar",
+    "locationMap": "Standort & Wegbeschreibung"
   },
   "users": {
     "new": "Neuer Benutzer",

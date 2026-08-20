@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { mutate as globalMutate } from "swr";
 import { useHotel, useHotelGroup, useUsersByIds } from "@/hooks/useHotels";
 import { hotelsApi } from "@/lib/api";
-import { HotelWriteGate } from "@/components/auth/RoleGate";
+import { HotelWriteGate, BlocklistReadGate } from "@/components/auth/RoleGate";
 import { BlocklistCard } from "@/components/employees/BlocklistCard";
 import { formatDateTime } from "@/lib/format";
 import { useTranslation } from "react-i18next";
@@ -203,7 +203,7 @@ export default function HotelDetailPage() {
           {hotel.latitude != null && hotel.longitude != null && (
             <Card>
               <CardHeader>
-                <CardTitle>{t("hotels.locationMap") || "Location & Directions"}</CardTitle>
+                <CardTitle>{t("hotels.locationMap")}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="overflow-hidden rounded-md border border-gray-200 dark:border-gray-800">
@@ -223,14 +223,16 @@ export default function HotelDetailPage() {
                     rel="noopener noreferrer"
                     className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-blue-600 px-4 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                   >
-                    {t("common.getDirections") || "Get Directions"}
+                    {t("common.getDirections")}
                   </a>
                 </div>
               </CardContent>
             </Card>
           )}
 
-          <BlocklistCard hotelId={id} />
+          <BlocklistReadGate>
+            <BlocklistCard hotelId={id} />
+          </BlocklistReadGate>
 
           <HotelWriteGate>
             <LifecycleCard

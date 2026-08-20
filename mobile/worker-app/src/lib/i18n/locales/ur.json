@@ -80,7 +80,8 @@
     "keep": "رکھیں",
     "shift": "شفٹ",
     "loadFailed": "لوڈ ناکام",
-    "tomorrow": "کل"
+    "tomorrow": "کل",
+    "getDirections": "راستہ حاصل کریں"
   },
   "fields": {
     "name": "نام",
@@ -612,7 +613,8 @@
     "useCurrentLocation": "موجودہ مقام استعمال کریں",
     "loadArchivedFailed": "آرکائیو شدہ ہوٹل لوڈ نہیں ہو سکے۔",
     "restoreAction": "بحال کریں",
-    "geofenceNotSet": "مقرر نہیں — کارکن چیک اِن دستیاب نہیں"
+    "geofenceNotSet": "مقرر نہیں — کارکن چیک اِن دستیاب نہیں",
+    "locationMap": "مقام اور راستہ"
   },
   "users": {
     "new": "نیا صارف",

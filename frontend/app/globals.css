@@ -12,6 +12,36 @@
  */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Table header alignment fix (2026-08-20). <th> has a browser UA-stylesheet
+ * default of `text-align: center` (`-webkit-match-parent` resolving to
+ * center absent an author style) while <td> defaults to `inherit`. Table.tsx
+ * sets `text-align: start` on the <table> element itself, which every <td>
+ * correctly inherits -- but a <th>'s own element-level UA default wins over
+ * that inheritance, so every plain column header in every table using the
+ * shared Table/TH components rendered CENTERED while its column's data
+ * rendered left-aligned. Most visible on wide headers over short values
+ * (hotel-groups' "Regional Manager" column), which read as a bug specific to
+ * that page when it was actually systemic across the whole app.
+ *
+ * Placed in `@layer base` deliberately, matching Tailwind's own preflight --
+ * NOT as a plain unlayered rule, which would have HIGHER priority than any
+ * utility class (per the CSS Cascade Layers spec, unlayered styles always
+ * beat layered ones regardless of source order) and would have forced every
+ * <th> to inherit, silently flipping the columns that are deliberately
+ * right-aligned today (LeaderboardTable's numeric columns, ReviewQueueTable
+ * and the payslips page's Actions column, both using `text-end`/`text-right`)
+ * back to the left. Verified empirically with the Tailwind v4 CLI against a
+ * probe file: a bare `@layer base { th { text-align: inherit } }` here loses
+ * to `.text-end`/`.text-right` (both `@layer utilities`) as intended, and
+ * only takes effect where no alignment utility is present.
+ */
+@layer base {
+  th {
+    text-align: inherit;
+  }
+}
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

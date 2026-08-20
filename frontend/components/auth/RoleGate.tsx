@@ -180,10 +180,38 @@ export function GeoCheckinsGate({
  * hotel. Matches `employee-management/routes.ts`'s POST blocklist route,
  * which now includes `regional_manager` (ADR-030 §3 C-22 — `employees:write`
  * grants RM `✓ᶜ`, and `checkHotelAccess()` is already group-aware for it).
- * Reading the blocklist is far broader (`employees:read`, held by every role)
- * and is intentionally NOT gated — only the write action needs this.
+ * Reading the blocklist is authorized far more broadly server-side
+ * (`employees:read`, held by every role) and stays that way — this gate
+ * does not touch the backend. See BlocklistReadGate below for the
+ * product-requested frontend visibility restriction.
  */
 export function BlocklistWriteGate({
+  fallback = null,
+  children,
+}: {
+  fallback?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <RoleGate allow={["admin", "manager", "regional_manager"]} fallback={fallback}>
+      {children}
+    </RoleGate>
+  );
+}
+
+/**
+ * Hides a hotel's employee blocklist section from workers and checkers.
+ *
+ * The backend read endpoint is intentionally unrestricted (`employees:read`,
+ * held by every role) and is NOT changed here — RoleGate is documented as
+ * a UX affordance only, and that stays true. This narrows what a worker or
+ * checker SEES on their own hotel's page: which colleagues are blocked and
+ * why is an HR/staffing concern, and it was rendering for anyone who could
+ * reach the hotel detail page, which every role can. Admin/manager/
+ * regional_manager keep the same visibility as the write gate above, by
+ * design — whoever can change the blocklist should also be able to see it.
+ */
+export function BlocklistReadGate({
   fallback = null,
   children,
 }: {
