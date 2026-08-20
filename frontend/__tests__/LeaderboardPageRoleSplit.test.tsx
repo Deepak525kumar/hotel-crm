@@ -81,6 +81,51 @@ describe("LeaderboardPage role split", () => {
     },
   );
 
+  // Review finding: an active worker with logged shifts but zero ratings is
+  // a real, reachable row (agg._avg.score ?? 0 defaults average_score to 0
+  // for total_ratings === 0), and a bare "0.00" reads as a failing score
+  // rather than "not yet rated" -- the exact ambiguity deriveRatingTier
+  // already resolves for the tier badge by showing nothing.
+  it("shows an em dash, not 0.00, for an active worker who has never been rated", () => {
+    useAuthStore.setState({ user: userOf("checker"), status: "authenticated" });
+    mockPeerLeaderboard.mockReturnValue({
+      entries: [
+        {
+          id: "r2",
+          worker_id: "w2",
+          average_score: 0,
+          rating_tier: null,
+          total_ratings: 0,
+          total_assignments: 4,
+          completion_rate: 0.75,
+          on_time_rate: 1,
+          worker_cancellations: 0,
+          worker: {
+            id: "w2",
+            first_name: "New",
+            last_name: "Starter",
+            employment_record: { primary_hotel: { id: "h2", name: "Seaside Inn" } },
+          },
+        },
+      ],
+      isLoading: false,
+      error: undefined,
+    });
+    render(<LeaderboardPage />);
+
+    expect(screen.getByText("New Starter")).toBeInTheDocument();
+    // Scoped to the score column specifically -- the hotel column has its
+    // own unrelated "â" fallback for a null primary_hotel, and this test
+    // gives the worker a real hotel precisely so that case can't collide
+    // with the one being asserted here.
+    expect(screen.getByText("Seaside Inn")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.queryByText("0.00")).not.toBeInTheDocument();
+    // completion_rate is a real, ratings-independent number for this worker
+    // and must still render normally.
+    expect(screen.getByText("75%")).toBeInTheDocument();
+  });
+
   it("renders the peer table's own columns for a worker, proving it is the quality-shaped view", () => {
     useAuthStore.setState({ user: userOf("worker"), status: "authenticated" });
     mockPeerLeaderboard.mockReturnValue({
@@ -113,5 +158,16 @@ describe("LeaderboardPage role split", () => {
     // completion_rate is a 0-1 fraction from the API -- this is the exact
     // value formatPercent() must scale by 100, not display as "0.9%".
     expect(screen.getByText("90%")).toBeInTheDocument();
+  });
+
+  it("shows the load-failure message for a worker, not a blank or crashed table", () => {
+    useAuthStore.setState({ user: userOf("worker"), status: "authenticated" });
+    mockPeerLeaderboard.mockReturnValue({
+      entries: [],
+      isLoading: false,
+      error: new Error("network error"),
+    });
+    render(<LeaderboardPage />);
+    expect(screen.getByText("Failed to load the leaderboard.")).toBeInTheDocument();
   });
 });

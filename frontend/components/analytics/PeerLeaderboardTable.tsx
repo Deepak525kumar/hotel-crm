@@ -85,7 +85,16 @@ export function PeerLeaderboardTable({
               <TD className="text-gray-500 dark:text-gray-400">
                 {e.worker.employment_record?.primary_hotel?.name ?? "—"}
               </TD>
-              <TD className="text-end">{formatScore(e.average_score, 2)}</TD>
+              <TD className="text-end">
+                {/* total_ratings === 0 is a real, reachable state: an active
+                    worker with shifts logged but no rating yet has
+                    average_score 0 from the aggregate's own default
+                    (agg._avg.score ?? 0), which reads as a failing score
+                    rather than "not yet rated". deriveRatingTier already
+                    treats this as "no tier" (renders no badge); the score
+                    column needs the same treatment for the same reason. */}
+                {e.total_ratings > 0 ? formatScore(e.average_score, 2) : "—"}
+              </TD>
               <TD className="text-end">{formatPercent(e.completion_rate * 100)}</TD>
               <TD>
                 <RatingTierBadge tier={e.rating_tier} />
