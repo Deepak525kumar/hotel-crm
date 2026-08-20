@@ -9,11 +9,11 @@ import {
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
-import { deriveRatingTier } from './rating-tiers';
+import { deriveRatingTier } from './rating-tiers.js';
 import {
   RECENCY_WINDOW,
   blendRecencyWeightedScore,
-} from './recency-weighting';
+} from './recency-weighting.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
