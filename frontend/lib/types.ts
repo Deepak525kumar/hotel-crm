@@ -941,11 +941,33 @@ export interface CreateVerificationInput {
 }
 
 /** Sub-scores schema per the backend's own `Rating.criteria_scores` comment (Prisma model). */
-export interface RatingCriteriaScores {
-  punctuality?: number;
-  quality?: number;
-  attitude?: number;
-}
+export const INSPECTION_CHECKLIST_ITEMS = [
+  "dust",
+  "bathroom",
+  "bed_linen",
+  "mirror",
+  "floor",
+  "minibar_restocking",
+  "fragrance_amenities",
+  "other",
+] as const;
+
+export type InspectionChecklistItem = (typeof INSPECTION_CHECKLIST_ITEMS)[number];
+
+/**
+ * TREQ-005 (CONFIRMED §15) inspection checklist. Each item is 0-100 and
+ * optional.
+ *
+ * The three legacy keys describe the WORKER rather than the ROOM and are a
+ * pre-pivot leftover (MIG-GAP-07). They are still declared because ratings
+ * written before 2026-08-20 carry them and must stay readable -- the API
+ * rejects them on write.
+ */
+export type RatingCriteriaScores = Partial<Record<InspectionChecklistItem, number>> & {
+  /** @deprecated legacy, read-only */ punctuality?: number;
+  /** @deprecated legacy, read-only */ quality?: number;
+  /** @deprecated legacy, read-only */ attitude?: number;
+};
 
 /**
  * Matches backend `Rating` (Prisma model) exactly, returned raw. `score` is
