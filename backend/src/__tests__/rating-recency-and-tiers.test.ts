@@ -100,3 +100,49 @@ describe('rating tiers (TREQ-003, OQ-08 thresholds)', () => {
     expect(TIER_THRESHOLD_LOW).toBe(40); // RULE-004 FAILED
   });
 });
+
+describe('interaction with #498 threshold warnings (volatility)', () => {
+  // Not a defect in either feature on its own, but a real consequence of
+  // combining them, recorded so it is a known property rather than a surprise.
+  //
+  // #498 sends QUALITY_RATING_WARNING_70 when the score crosses below 70 and
+  // CLEARS the flag once it recovers, so the warning re-arms. Under the old
+  // plain lifetime average that crossing was nearly unreachable twice -- the
+  // score moved glacially once a worker had any history. Recency weighting
+  // makes it genuinely volatile: 70% of the score is the last ten jobs, so
+  // one replaced rating moves it by 0.07 x delta.
+  it('one swapped rating moves the score ~7% of the delta, so 70 can be recrossed', () => {
+    const lifetime = 70;
+    const good = Array(10).fill(72);
+    const withOneBad = [22, ...Array(9).fill(72)];
+
+    const before = blendRecencyWeightedScore(good, lifetime, 40);
+    const after = blendRecencyWeightedScore(withOneBad, lifetime, 40);
+
+    // 0.7 * (50/10) = 3.5 points from a single check.
+    expect(before - after).toBeCloseTo(3.5, 6);
+
+    // And that is enough to cross the warning threshold in one step.
+    expect(before).toBeGreaterThanOrEqual(70);
+    expect(after).toBeLessThan(70);
+  });
+
+  it('a worker hovering near the threshold can cross it repeatedly', () => {
+    // Sequence: recover above 70, dip below, recover, dip. Each downward
+    // crossing re-sends the warning, because #498 clears the flag on recovery.
+    // For the <50 band that notification also goes to the Regional Manager.
+    const lifetime = 70;
+    const scores = [
+      blendRecencyWeightedScore(Array(10).fill(75), lifetime, 40),
+      blendRecencyWeightedScore([20, ...Array(9).fill(75)], lifetime, 40),
+      blendRecencyWeightedScore(Array(10).fill(75), lifetime, 40),
+      blendRecencyWeightedScore([20, ...Array(9).fill(75)], lifetime, 40),
+    ];
+
+    const crossings = scores.filter(
+      (s, i) => i > 0 && scores[i - 1] >= 70 && s < 70
+    ).length;
+
+    expect(crossings).toBe(2);
+  });
+});

@@ -62,17 +62,27 @@ export class AnalyticsService extends BaseService {
 
     return rows.map((row, idx): LeaderboardEntry => {
       const total = row.total_assignments;
+      const displayScore = Math.round(row.average_score * 100) / 100;
       return {
         worker_id: row.worker_id,
         name: `${row.worker.first_name} ${row.worker.last_name}`,
         total_tasks: total,
         completed_tasks: Math.round(row.completion_rate * total),
-        average_rating: Math.round(row.average_score * 100) / 100,
+        average_rating: displayScore,
         // TREQ-003: the tier is derived, never stored -- see rating-tiers.ts.
+        //
+        // Derived from the SAME rounded value that is returned, not from the
+        // raw one. Deriving from the raw score let a single response say
+        // `average_rating: 90.00` and `rating_tier: "HIGH"` at the same time:
+        // 89.9955 rounds up across the ELITE boundary for display while the
+        // tier is still computed on the pre-rounded number. Every boundary has
+        // that 0.005-wide window, and the leaderboard shows both fields side
+        // by side, so it reads as the badge being broken.
+        //
         // Passing total_ratings is what keeps an unrated worker out of
         // PROBATION: their average_score is 0, which would otherwise read as
         // the worst possible standing on their first day.
-        rating_tier: deriveRatingTier(row.average_score, row.total_ratings),
+        rating_tier: deriveRatingTier(displayScore, row.total_ratings),
         position: idx + 1,
       };
     });

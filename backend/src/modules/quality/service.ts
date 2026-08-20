@@ -134,7 +134,13 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       typeof tx.rating?.findMany === 'function'
         ? tx.rating.findMany({
             where: { worker_id },
-            orderBy: { created_at: 'desc' },
+            // id is a tiebreak, not decoration. created_at ties are
+            // possible (several ratings written in one transaction share a
+            // now()), and with a tie straddling the 10th position the window
+            // -- and so the stored average_score -- would differ between two
+            // calls over identical data. Ordering-dependent output that only
+            // appears under duplicate timestamps never reproduces on demand.
+            orderBy: [{ created_at: 'desc' }, { id: 'desc' }],
             take: RECENCY_WINDOW,
             select: { score: true },
           })
@@ -931,6 +937,11 @@ export class QualityService extends BaseService {
     // each client. Three clients read this board (checker app, worker app, web)
     // and a threshold re-implemented three times is a threshold that will
     // disagree with itself. Derived, never stored -- see rating-tiers.ts.
+    // Applied AFTER the peer allow-list above, so it lands on every row
+    // including a worker's or checker's view of their colleagues. Deliberate,
+    // and not a new disclosure: rating_tier is a pure function of
+    // average_score and total_ratings, both already present in the rows a peer
+    // receives. It reveals nothing they could not compute themselves.
     const tieredLeaderboard = visibleLeaderboard.map((row) => ({
       ...row,
       rating_tier: deriveRatingTier(row.average_score, row.total_ratings),
