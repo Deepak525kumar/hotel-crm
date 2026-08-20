@@ -1,7 +1,7 @@
 import {
   INSPECTION_CHECKLIST_ITEMS,
   type InspectionChecklistItem,
-} from './inspection-checklist';
+} from './inspection-checklist.js';
 import { z } from 'zod';
 
 export const CreateQualityVerificationSchema = z.object({
