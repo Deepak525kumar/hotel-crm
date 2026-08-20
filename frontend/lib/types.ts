@@ -441,6 +441,41 @@ export interface LeaderboardEntry {
 }
 
 /**
+ * A row from `GET /quality/leaderboard` (ADR-067), NOT the same endpoint or
+ * shape as `LeaderboardEntry` above (`GET /analytics/leaderboard`).
+ *
+ * `analytics/leaderboard` is `requireRole(['admin','manager','regional_manager'])`
+ * -- a worker or checker gets a flat 403 from it, unscoped by design (it
+ * exists for the platform-wide/manager view). `quality/leaderboard` is what
+ * ADR-067 grants worker/checker access to: scoped server-side to the
+ * caller's own hotel group, and missing the manager-facing `email` field on
+ * `worker` entirely (an allow-list projection, not merely hidden) -- do not
+ * add `email` here without re-reading ADR-067 §2.4 first. Mobile's worker
+ * and checker apps already read this same endpoint; this is the web app
+ * catching up to match.
+ */
+export interface QualityLeaderboardEntry {
+  id: string;
+  worker_id: string;
+  average_score: number;
+  rating_tier: RatingTier | null;
+  total_ratings: number;
+  total_assignments: number;
+  completion_rate: number;
+  on_time_rate: number;
+  /** Shifts the worker stood themselves down from -- a count, not a rate. */
+  worker_cancellations: number;
+  worker: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    employment_record: {
+      primary_hotel: { id: string; name: string } | null;
+    } | null;
+  };
+}
+
+/**
  * Aggregate platform (or per-hotel) statistics from `GET /analytics/stats`.
  * Mirrors the backend `DashboardStats` shape exactly.
  */

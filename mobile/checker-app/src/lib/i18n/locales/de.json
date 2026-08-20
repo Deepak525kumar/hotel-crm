@@ -771,7 +771,9 @@
     "platformOverview": "Plattformübersicht",
     "viewAnalytics": "Statistiken ansehen",
     "statsLoadFailedShort": "Plattformstatistiken konnten nicht geladen werden.",
-    "tier": "Stufe"
+    "tier": "Stufe",
+    "completionRate": "Abschlussquote",
+    "peerLeaderboardDescription": "Vergleichen Sie Ihre Position mit Kollegen Ihrer Hotelgruppe"
   },
   "hotelGroups": {
     "noDeleted": "Keine gelöschten Hotelgruppen",

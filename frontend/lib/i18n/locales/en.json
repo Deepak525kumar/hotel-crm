@@ -771,7 +771,9 @@
     "platformOverview": "Platform overview",
     "viewAnalytics": "View analytics",
     "statsLoadFailedShort": "Couldn’t load platform stats.",
-    "tier": "Tier"
+    "tier": "Tier",
+    "completionRate": "Completion rate",
+    "peerLeaderboardDescription": "Compare your standing with colleagues at your own hotel group"
   },
   "hotelGroups": {
     "noDeleted": "No deleted hotel groups",
