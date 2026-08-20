@@ -1,3 +1,4 @@
+import { starString } from '@/lib/stars';
 import { RatingTierBadge } from '@/components/RatingTierBadge';
 import { useEffect, useState, useCallback } from 'react';
 import {
@@ -66,7 +67,6 @@ export default function LeaderboardScreen() {
   });
 
   const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => {
-    const roundedScore = Math.round(item.average_score);
     return (
       <View style={styles.card}>
         <Text style={styles.rank}>{index < 3 ? MEDALS[index] : `${index + 1}`}</Text>
@@ -84,9 +84,7 @@ export default function LeaderboardScreen() {
         <View style={styles.scoreCol}>
           <Text style={styles.scoreNum}>{item.average_score.toFixed(1)}</Text>
           <RatingTierBadge tier={item.rating_tier} />
-          <Text style={styles.stars}>
-            {'★'.repeat(roundedScore)}{'☆'.repeat(Math.max(0, 5 - roundedScore))}
-          </Text>
+          <Text style={styles.stars}>{starString(item.average_score)}</Text>
         </View>
       </View>
     );

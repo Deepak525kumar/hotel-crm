@@ -118,6 +118,12 @@ export function resolvePushTapRoute(data: Record<string, unknown> | undefined | 
  * broadcast/offer concept and is deliberately NOT updated by this change.
  */
 export function subscribeToPushNotifications(router: Router): () => void {
+  // Web does not support foreground push handlers in the same way, and calling
+  // setNotificationHandler on web can throw or cause issues.
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    return () => {};
+  }
+
   // Foreground behavior: show the OS banner/sound/badge even while the app
   // is open, rather than the SDK default of suppressing it. `notifications`
   // is the app's only channel (Alerts tab lists the same rows), so there is

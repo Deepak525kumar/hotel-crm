@@ -52,7 +52,7 @@ export default function RatingsScreen() {
                       : item.worker_id}
                   </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
-                    {item.average_score.toFixed(1)} ★ · {item.total_assignments} shifts
+                    {item.average_score.toFixed(1)}/100 · {item.total_assignments} shifts
                     {item.worker.employment_record?.primary_hotel
                       ? ` · ${item.worker.employment_record.primary_hotel.name}`
                       : ''}
