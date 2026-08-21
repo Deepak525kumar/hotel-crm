@@ -32,11 +32,11 @@ whole E2E suite).
 The following are **documented, deliberate** positions — not bugs — but were flagged as worth an
 explicit yes/no:
 
-1. **`retention`'s deletion audit log is readable by any authenticated user** (including a plain
-   worker) — `retention/service.ts` `getDeletionAuditLog` takes no actor. Knowingly-taken posture
-   per `SIR-RETENTION-003` (OPEN), but the practical exposure (a worker enumerating the platform's
-   whole deletion history) may exceed what "trusted backend context only" anticipated. **Widest
-   exposure of the three.**
+1. ~~**`retention`'s deletion audit log is readable by any authenticated user**~~ — **FIXED
+   2026-08-21**: `GET /retention/audit-log` is now gated `requireRole('admin')`
+   (`retention/routes.ts:15`), closing the `OD-RETENTION-05` half of `SIR-RETENTION-003`. The
+   `OD-RETENTION-10` half (this module's own internal authorization to call into each consuming
+   module's delete mechanism during the sweep) remains genuinely OPEN, unaffected by this fix.
 2. ~~**`document-templates` returns all templates platform-wide**~~ — **MOOT, 2026-08-13**: the
    Document Templates / Document Instances module was removed entirely (product decision — see
    `runs/2026-08-13-contract-feature-and-review-routing.md`), superseded by the HR Contract
