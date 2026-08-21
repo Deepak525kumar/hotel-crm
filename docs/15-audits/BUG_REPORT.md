@@ -306,53 +306,25 @@ Ordered punch-list, synthesized from all sections above. Items struck through ha
 
 ---
 
-## 12. Document Templates Module — Bug Audit (2026-08-09) — **MOOT: module removed 2026-08-13**
+## 12. Document Templates Module — removed
 
-> **Update (2026-08-21 audit):** The entire `document-templates` module (`backend/src/modules/document-templates/`) was removed from the codebase by product decision on 2026-08-13, superseded by the HR Contract feature (see `docs/10-testing/e2e/scenarios/08-known-gaps-and-next.md`). BUG-DT-001 through BUG-DT-009 and BUG-PAG-01 below described code that no longer exists and cannot be fixed, verified, or re-opened. Section retained for historical record only; all findings in it are closed as moot, not resolved-in-place. No action is required or possible against this section.
+The `document-templates` module (`backend/src/modules/document-templates/`) that §12/§13 previously audited was deleted from the codebase on 2026-08-13 by product decision, superseded by the HR Contract feature (see `docs/10-testing/e2e/scenarios/08-known-gaps-and-next.md`). Its Prisma tables were dropped in migration `20260813000000_contracts_and_review_routing`, and its module spec (`docs/03-modules/document-templates/MODULE_SPEC.md`) and Chromium runbook (`docs/11-deployment/monitoring/DOCUMENT_TEMPLATES_CHROMIUM_RUNBOOK.md`) have been removed alongside it (2026-08-21 cleanup). Their bug findings (formerly BUG-DT-001 through BUG-DT-009, BUG-PAG-01) described code that no longer exists in any form and have been removed from this report — there is nothing left to fix, verify, or track. The workspace-root PII/private-key file that BUG-DT-006 flagged is also confirmed gone, including from git history.
 
-<details>
-<summary>Original findings (moot — module deleted, kept for history)</summary>
-
-**Branch:** `feat/document-templates` (uncommitted changes on top of `main`)
-**Scope:** New `backend/src/modules/document-templates/` module (5 files: `service.ts`, `controller.ts`, `routes.ts`, `pdf-renderer.ts`, `types.ts`) plus schema migration and route/permission wiring.
-**Health gates at time of audit:** Backend typecheck clean, frontend typecheck clean, backend lint clean, frontend lint clean, 2577/2577 tests passing (105 suites). No test failures — but no tests exist for this module (see BUG-DT-007).
-
-- BUG-DT-001 (High, Broken feature) — `listSignatures` and all instance DTOs always returned `null` signature image URLs.
-- BUG-DT-002 (High, Authorization) — Hotel-scoped managers got zero results from `listInstances`.
-- BUG-DT-003 (Medium, Data integrity) — `content_hash_at_signing` was non-reproducible on re-render.
-- BUG-DT-004 (Low, Convention) — Route mounted at `/` instead of a scoped prefix.
-- BUG-DT-005 (High, Performance/DoS) — Unbounded concurrent Chromium launches per PDF render.
-- BUG-DT-006 (Critical, Security) — PII contract PDF and RSA private key were present in workspace root.
-- BUG-DT-007 (Medium, Test coverage) — Zero automated tests for ~1,800 lines of module code.
-- BUG-DT-008 (High, Security/Architecture) — Proxy-fill constraint was entirely unenforced for template fields.
-- BUG-DT-009 (High, Logic/Flow) — Workers (SUBJECT role) could not fetch template schemas to fill them.
-- BUG-PAG-01 (Medium, Performance) — Missing pagination in `document-templates` (`listTemplates`).
-
-</details>
-
-### BUG-DT-006 follow-up (Security / Compliance) — verify independently of the module deletion
-
-The sensitive-files finding (a PII PDF and an RSA private key in the workspace root) was reported against the repository root, not against module code, so it is **not** automatically closed by the module's removal. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.** Confirm with `git status`/`ls` at the repo root and remediate (move to a secrets manager, purge from git history if committed) before treating this as closed.
+If a document/e-signature workflow is needed again, it lives in the HR Contract feature now and would need its own independent bug audit — it has not inherited or fixed these findings, since it isn't the same code.
 
 ## 13. Re-Audit (2026-08-09) — Additional Findings
 
-During a secondary deep dive of the codebase, several new architectural and implementation bugs were discovered, primarily affecting pagination (DoS risks) and the (now-removed) `document-templates` module.
+During a secondary deep dive of the codebase, several new pagination-related bugs were discovered, unrelated to the (now-removed) `document-templates` module.
 
 ### 13.1 Missing Pagination (DoS / Memory Exhaustion Risk)
 Several list endpoints use `.findMany()` queries without `skip` and `take` boundaries. While volume may be low initially, unbounded queries are a known performance/DoS vulnerability as data scales.
-- ~~`listTemplates` (`document-templates/service.ts:64`)~~ — **moot**, module removed 2026-08-13 (see §12).
 - **`listContracts`** (`backend/src/modules/hr/service.ts:223`): Returns all contracts without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
 - **`listPayroll`** (`backend/src/modules/hr/service.ts:678`): Returns all payslip requests without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
 - **`getBlocklist`** (`backend/src/modules/employee-management/service.ts:203`): Returns all blocklist entries without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
-
-### 13.2 Document Templates — Architectural and Authorization Bugs — **moot, module removed 2026-08-13 (see §12)**
 
 ### Updated Summary Table (New Findings)
 
 | ID | Severity | Category | One-line summary | Status |
 |---|---|---|---|---|
-| ~~BUG-PAG-01~~ | Medium | Performance | ~~Missing pagination in `document-templates` (`listTemplates`)~~ | **Moot — module removed** |
 | BUG-PAG-02 | Medium | Performance | Missing pagination in `hr` (`listContracts`, `listPayroll`) | Not re-verified 2026-08-21 — carried forward OPEN/UNKNOWN |
 | BUG-PAG-03 | Medium | Performance | Missing pagination in `employee-management` (`getBlocklist`) | Not re-verified 2026-08-21 — carried forward OPEN/UNKNOWN |
-| ~~BUG-DT-008~~ | High | Security/Architecture | ~~Proxy-fill constraint is entirely unenforced for template fields~~ | **Moot — module removed** |
-| ~~BUG-DT-009~~ | High | Logic/Flow | ~~Workers (SUBJECT role) cannot fetch template schemas to fill them~~ | **Moot — module removed** |

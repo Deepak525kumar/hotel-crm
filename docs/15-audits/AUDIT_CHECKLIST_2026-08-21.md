@@ -5,8 +5,15 @@ Source: audit of `docs/15-audits/BUG_REPORT.md` and `.claude/governance/SPECIFIC
 ## Confirmed still open (verified against code this pass)
 - [ ] **Documents module — S3 upload hard-fails with bare 500** when credentials/config are missing. `backend/src/modules/documents/storage.ts:157-171` routes to the real S3 client whenever `S3_BUCKET` is set, with no degraded/stub fallback or clearer error surface.
 
+## Resolved since last update (2026-08-21 cleanup pass)
+- [x] **BUG-DT-006** — sensitive files in workspace root. Confirmed gone from disk and from `git log --all` (not just untracked) — closed, not just moot.
+- [x] `docs/03-modules/document-templates/MODULE_SPEC.md` and `docs/11-deployment/monitoring/DOCUMENT_TEMPLATES_CHROMIUM_RUNBOOK.md` deleted (module they described no longer exists).
+- [x] All BUG-DT-* / BUG-PAG-01 entries removed from `BUG_REPORT.md` §12/§13 (previously marked moot, now fully removed per owner request).
+- [x] `.claude/knowledge/MODULE_REGISTRY.yaml` and `SPECIFICATION_INDEX.yaml` `backend-document-templates` entries updated to `implementation_status: removed`.
+- [x] Stale in-code comment in `backend/src/modules/documents/service.ts` referencing `document-templates/service.ts` as a live caller — corrected.
+- [x] `docs/10-testing/e2e/REMAINING_WORK.md` "Remove the Document Template feature" TODO checked off as already done.
+
 ## Needs re-verification (not independently re-checked this pass; treat as open until confirmed)
-- [ ] **BUG-DT-006 follow-up** — sensitive files in workspace root. Spot-checked this pass: no `*.pdf`/`*.pem` currently sitting untracked at repo root. Still confirm nothing sensitive is committed in git history, and close the row formally in `BUG_REPORT.md` §12 once confirmed.
 - [ ] **BUG-PAG-02** — `hr` module `listContracts` (`service.ts:223`) and `listPayroll` (`service.ts:678`) use unbounded `.findMany()`.
 - [ ] **BUG-PAG-03** — `employee-management` `getBlocklist` (`service.ts:203`) uses unbounded `.findMany()`.
 - [ ] Release-blocker list in `BUG_REPORT.md` §8 (re-verify each against current code):

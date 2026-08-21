@@ -152,15 +152,11 @@ to the owner before silently re-adding content, rather than assuming it was inte
       (a) remove the UI entry point only, keeping the backend capability for internal/API use, or
       (b) remove the capability entirely, including what happens to hotels already archived under
       the old behavior.
-- [ ] **Remove the Document Template feature.** Owner's own words (2026-08-12): "remove document
-      template feature." Note: document-templates is an existing module with its own service,
-      routes, and tests (`backend/src/modules/document-templates/`), and this session's earlier
-      transaction-atomicity fix touched it directly (see the consent/geo/attendance/document-
-      templates fix in `08-known-gaps-and-next.md`). Removing it is a real deletion of working,
-      tested functionality — before removing, check what else depends on it (document-instances /
-      fillable-forms interaction was flagged as "never tested" earlier — does removing templates
-      break that path, or was it already unused?). Confirm scope with owner: remove the UI only,
-      or the whole module including its routes/schema.
+- [x] **Remove the Document Template feature.** Owner's own words (2026-08-12): "remove document
+      template feature." **Done 2026-08-13** — the whole module (routes, service, schema/tables)
+      was removed, superseded by backend-hr's Contract feature (see `08-known-gaps-and-next.md`).
+      **Follow-up done 2026-08-21:** its now-orphaned module spec and Chromium runbook docs were
+      deleted, and knowledge-registry/bug-report references were synced to reflect the removal.
 - [ ] **New feature — leaderboard system.** Owner's own words (2026-08-12): "add leaderboard
       system." **Needs scoping before implementation** — none of the following is specified yet,
       don't guess:
