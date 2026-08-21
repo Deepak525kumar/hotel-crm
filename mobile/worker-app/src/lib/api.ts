@@ -85,10 +85,12 @@ export class ApiError extends Error {
     // string keyed on `code`. A server-supplied message is already localized
     // server-side and must be shown as-is, so it is never flagged.
     public readonly isFallbackMessage: boolean = false,
-    // ADR-031 D-6/PR-4a: seconds to wait, parsed from the edge's
-    // (Nginx/Cloudflare) Retry-After header on a 429. undefined when absent
-    // or unparseable — the edge is the sole source of rate limiting (no
-    // app-layer limiter per TREQ-AUTH-008), so this is passed through only.
+    // ADR-031 D-6/PR-4a: seconds to wait, parsed from the Retry-After
+    // header on a 429. undefined when absent or unparseable. Originally the
+    // edge (Nginx/Cloudflare) was the sole source of a 429 (no app-layer
+    // limiter, TREQ-AUTH-008); ADR-070 (2026-08-21) narrowed that for
+    // /auth/login only, which now also sets its own Retry-After on an
+    // app-layer per-account throttle — parsed identically here either way.
     public readonly retryAfterSeconds?: number,
   ) {
     super(message);
@@ -118,10 +120,11 @@ function parseRetryAfter(res: Response): number | undefined {
   return undefined;
 }
 
-// ADR-031 D-6: a 429 is produced by the Nginx/Cloudflare edge, not the
-// application (no app-layer rate limiter — TREQ-AUTH-008), so its body is
-// not guaranteed to be JSON. Every response-body parse in this file must
-// tolerate that rather than throwing on `.json()`.
+// ADR-031 D-6: a 429 from the Nginx/Cloudflare edge is not guaranteed to be
+// JSON. Every response-body parse in this file must tolerate that rather
+// than throwing on `.json()`. /auth/login's own app-layer 429 (ADR-070)
+// does return real JSON, but every 429 is handled identically below rather
+// than special-cased — see the `request()` 429 branch.
 interface ErrorBody {
   error?: { code?: string; message?: string };
 }
@@ -202,9 +205,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
-    // ADR-031 D-6/PR-4a: a 429 comes from the edge, not the app (no
-    // app-layer limiter — TREQ-AUTH-008); its body may not be JSON, so this
-    // is checked before any body parse and carries Retry-After through.
+    // ADR-031 D-6/PR-4a: a 429 may not carry a JSON body (the edge's
+    // doesn't; ADR-070's own app-layer /auth/login throttle does, but is
+    // handled the same way here rather than special-cased), so this is
+    // checked before any body parse and carries Retry-After through.
     if (res.status === 429) {
       throw new ApiError(
         'RATE_LIMITED',

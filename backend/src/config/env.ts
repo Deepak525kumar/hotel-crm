@@ -390,6 +390,21 @@ const envSchema = z.object({
   // (TRULE-AUTH-002: "notify and never block"). Crossing it must not affect
   // whether a subsequent login is accepted.
   AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: z.coerce.number().int().positive().default(5),
+
+  // ADR-070 (2026-08-21): per-account login throttle, defense-in-depth
+  // alongside the Nginx edge's IP-keyed rate limiting (which a distributed,
+  // many-IPs-one-account attacker bypasses). Deliberately set above
+  // AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD so the manager notification always
+  // fires first, unaffected -- throttling only engages if the attack
+  // continues past that point. UNLIKE the notify threshold, crossing this
+  // one DOES temporarily block further attempts (see ADR-070 §3 for why
+  // this is throttling, not the lockout TREQ-AUTH-007 rules out).
+  AUTH_LOGIN_THROTTLE_THRESHOLD: z.coerce.number().int().positive().default(10),
+  // Fixed window, not exponential backoff (ADR-070 §5 Non-goals) -- 15
+  // minutes is long enough to make sustained guessing impractical and short
+  // enough that a legitimate user who forgot their password isn't locked
+  // out for an unreasonable stretch.
+  AUTH_LOGIN_THROTTLE_DURATION_MS: z.coerce.number().int().positive().default(900000),
 })
   // ---------------------------------------------------------------------------
   // Fail-closed guard: a deployed environment must have real object storage.
@@ -425,6 +440,27 @@ const envSchema = z.object({
           'uploads silently no-op (stub storage) while still writing the DB row, so ' +
           'documents would appear uploaded but never reach the bucket. Set S3_BUCKET, ' +
           'or run with NODE_ENV=development if you intend to use stub storage.',
+      });
+    }
+
+    // ADR-070: AUTH_LOGIN_THROTTLE_THRESHOLD must stay above
+    // AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD so the manager-notify path
+    // (TREQ-AUTH-007) always fires before throttling engages, exactly as
+    // ADR-070 §2 specifies. Both are independently-configurable env vars
+    // with no natural ordering enforced by their types, so a typo'd or
+    // reversed override (e.g. an ops change that lowers the throttle
+    // threshold without noticing the notify one) would silently invert the
+    // intended sequence -- fail the boot instead, the same posture as the
+    // S3_BUCKET guard above.
+    if (env.AUTH_LOGIN_THROTTLE_THRESHOLD <= env.AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTH_LOGIN_THROTTLE_THRESHOLD'],
+        message:
+          `AUTH_LOGIN_THROTTLE_THRESHOLD (${env.AUTH_LOGIN_THROTTLE_THRESHOLD}) must be ` +
+          `greater than AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD (${env.AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD}): ` +
+          'ADR-070 requires the manager-notify alert to always fire before login ' +
+          'throttling engages.',
       });
     }
   });

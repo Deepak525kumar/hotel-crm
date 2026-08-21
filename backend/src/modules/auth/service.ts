@@ -8,6 +8,7 @@ import {
   UnauthorizedError,
   NotFoundError,
   ForbiddenError,
+  TooManyRequestsError,
 } from '../../lib/errors.js';
 import { ROLE_PERMISSIONS, BCRYPT_ROUNDS, PASSWORD_RESET_TOKEN_TTL_MINUTES } from '../../config/constants.js';
 import { getEnv } from '../../config/env.js';
@@ -49,11 +50,15 @@ export class AuthService extends BaseService {
    * against a KNOWN account and escalates by notification once the
    * consecutive-failure threshold is crossed.
    *
-   * This never blocks. TRULE-AUTH-002's confirmed pattern is "notify and
-   * never block": no caller reads failed_login_count to deny a login, the
-   * account is never locked, and no application-layer throttle is added
-   * (TREQ-AUTH-008 keeps rate limiting at the Nginx/Cloudflare edge). The
-   * counter exists solely to decide when to raise the alert.
+   * The notify path never blocks (TRULE-AUTH-002: "notify and never block")
+   * -- crossing AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD only decides when to
+   * raise the alert, exactly as before. ADR-070 (2026-08-21) adds a SECOND,
+   * higher threshold (AUTH_LOGIN_THROTTLE_THRESHOLD, default 10, always
+   * above the notify threshold so the alert fires first): crossing it DOES
+   * set login_locked_until, which login() reads to reject further attempts
+   * for a bounded window. See ADR-070 §3 for why this is throttling, not
+   * the lockout TREQ-AUTH-007 rules out -- it is time-bounded and
+   * self-clearing, never a manual/admin action.
    *
    * Fires EXACTLY at the threshold (`=== threshold`, not `>=`), so a
    * sustained attack produces one notification per streak rather than one
@@ -106,6 +111,22 @@ export class AuthService extends BaseService {
       reason,
       consecutive_failures: nextCount,
     }, ip);
+
+    // ADR-070: fires once per streak (`=== throttleThreshold`, mirroring the
+    // notify check below), not on every attempt past it -- continuing to
+    // hammer an already-throttled account does not keep pushing the window
+    // out; only a fresh streak (after a successful login resets the count)
+    // can re-trigger it. A separate update, not folded into the `increment`
+    // write above, for the same reason the notify path below is separate:
+    // this only needs to run once, on the single attempt that crosses the
+    // threshold, not be part of every attempt's atomic increment.
+    const throttleThreshold = getEnv().AUTH_LOGIN_THROTTLE_THRESHOLD;
+    if (nextCount === throttleThreshold) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { login_locked_until: new Date(Date.now() + getEnv().AUTH_LOGIN_THROTTLE_DURATION_MS) },
+      });
+    }
 
     const threshold = getEnv().AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD;
     if (nextCount !== threshold) return;
@@ -370,6 +391,41 @@ export class AuthService extends BaseService {
       throw new ForbiddenError('Account is disabled');
     }
 
+    // ADR-070: checked before the password comparison, not after, so a
+    // throttled account doesn't pay the bcrypt cost (or leak comparative
+    // timing) on every attempt during the window. Does not call
+    // recordFailedLogin -- the streak that caused the throttle already
+    // recorded its own audit entries; re-recording every rejected attempt
+    // during the window would inflate the count past what actually happened
+    // and could itself become a cheap way to keep re-arming the window.
+    //
+    // KNOWN, DISCLOSED tradeoff (ADR-070 §5): this 429 is distinguishable
+    // from the generic 401 above, which narrowly reopens the account-
+    // existence oracle that 401's own byte-identical-response comment
+    // exists to prevent -- but only after ~10 attempts against one email,
+    // bounded by the Nginx edge to ~1/sec, making enumeration impractical.
+    // Accepted, not silently dropped; see the ADR before changing this.
+    if (user.login_locked_until && user.login_locked_until > new Date()) {
+      // `Math.max(1, ...)`: the entry check above and this computation read
+      // the clock twice, microseconds apart — in the narrow window where
+      // login_locked_until sits between those two reads, a naive
+      // subtraction can go to zero or negative, which is not a valid
+      // Retry-After delay-seconds value (RFC 7231 §7.1.3) and would show a
+      // client "-1s" instead of "try again shortly".
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((user.login_locked_until.getTime() - Date.now()) / 1000)
+      );
+      await this.logAudit(user.id, user.role, 'LOGIN_THROTTLED', 'USER', user.id, {
+        email: user.email,
+        retry_after_seconds: retryAfterSeconds,
+      }, ip);
+      throw new TooManyRequestsError(
+        'Too many failed login attempts. Please try again later.',
+        retryAfterSeconds
+      );
+    }
+
     const valid = await bcrypt.compare(data.password, user.password_hash);
     if (!valid) {
       await this.recordFailedLogin(user, 'invalid_password', ip);
@@ -396,11 +452,16 @@ export class AuthService extends BaseService {
     });
 
     // TREQ-AUTH-007: a successful login ends the streak. Conditional so the
-    // common case (counter already 0) issues no write at all.
-    if (user.failed_login_count > 0) {
+    // common case (counter already 0) issues no write at all. Also clears
+    // login_locked_until (ADR-070) -- reachable here only in the narrow
+    // window between the throttle expiring and a fresh failed attempt
+    // re-arming it, since the guard above already rejects while it's live,
+    // but cleared defensively so no stale future timestamp can ever survive
+    // a successful login.
+    if (user.failed_login_count > 0 || user.login_locked_until) {
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { failed_login_count: 0, failed_login_since: null },
+        data: { failed_login_count: 0, failed_login_since: null, login_locked_until: null },
       });
     }
 

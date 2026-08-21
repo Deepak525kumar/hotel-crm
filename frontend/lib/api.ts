@@ -103,10 +103,13 @@ export class ApiError extends Error {
   readonly details?: unknown;
   /**
    * ADR-031 D-6/PR-4a: seconds to wait before retrying, parsed from the
-   * edge's (Nginx/Cloudflare) `Retry-After` header on a 429. `undefined`
-   * when absent or unparseable — the edge is the sole source of rate
-   * limiting (no app-layer limiter per TREQ-AUTH-008), so this is passed
-   * through, never computed.
+   * `Retry-After` header on a 429. `undefined` when absent or unparseable.
+   * Originally the edge (Nginx/Cloudflare) was the sole source of a 429 (no
+   * app-layer limiter, TREQ-AUTH-008); `ADR-070` (2026-08-21) narrowed that
+   * for `/auth/login` only, which now also computes and sets its own
+   * `Retry-After` on an app-layer per-account throttle. Either source's
+   * header is parsed identically here — this field is always passed
+   * through from the header, never computed client-side.
    */
   readonly retryAfterSeconds?: number;
 
@@ -299,11 +302,13 @@ export async function apiFetch<T>(
     }
   }
 
-  // ADR-031 D-6/PR-4a: a 429 is produced by the Nginx/Cloudflare edge, not
-  // the application (no app-layer rate limiter — TREQ-AUTH-008), so its
-  // body is not guaranteed to be the app's JSON envelope. Handle it before
-  // attempting to parse as an envelope, carrying Retry-After through
-  // unconditionally.
+  // ADR-031 D-6/PR-4a: a 429 from the Nginx/Cloudflare edge is not
+  // guaranteed to carry the app's JSON envelope, so it is handled before
+  // attempting to parse one, carrying Retry-After through unconditionally.
+  // `/auth/login`'s own app-layer 429 (`ADR-070`) DOES return a real JSON
+  // envelope, but is handled identically here rather than special-cased —
+  // this generic message and Retry-After-only handling is correct for it
+  // too, and treating every 429 the same avoids two divergent code paths.
   if (res.status === 429) {
     throw new ApiError(
       res.status,

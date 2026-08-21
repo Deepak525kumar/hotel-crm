@@ -5,6 +5,7 @@ import {
   ConflictError,
   InvalidRequestError,
   NotFoundError,
+  TooManyRequestsError,
   ValidationError,
   isAppError,
 } from '../lib/errors.js';
@@ -78,6 +79,11 @@ export function errorHandler(
 
   // Format error response per API_STANDARDS.md
   if (isAppError(error)) {
+    // ADR-070: mirrors the Nginx edge zone's own Retry-After convention on
+    // the one application-layer 429 this backend throws.
+    if (error instanceof TooManyRequestsError && error.retryAfterSeconds !== undefined) {
+      res.setHeader('Retry-After', String(error.retryAfterSeconds));
+    }
     res.status(error.statusCode).json({
       status: 'error',
       error: {

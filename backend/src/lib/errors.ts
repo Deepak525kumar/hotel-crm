@@ -106,6 +106,17 @@ export class ServiceUnavailableError extends AppError {
   }
 }
 
+// ADR-070: per-account login throttle (application-layer, distinct from the
+// Nginx edge's IP-keyed 429s). `retryAfterSeconds` lets the caller surface a
+// `Retry-After` header the same way the edge zone already does.
+export class TooManyRequestsError extends AppError {
+  constructor(message: string = 'Too many requests', public retryAfterSeconds?: number) {
+    super(ERROR_CODES.RATE_LIMIT_EXCEEDED, HTTP_STATUS.TOO_MANY_REQUESTS, message);
+    this.name = 'TooManyRequestsError';
+    Object.setPrototypeOf(this, TooManyRequestsError.prototype);
+  }
+}
+
 export function isAppError(error: unknown): error is AppError {
   return error instanceof AppError;
 }

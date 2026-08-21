@@ -116,3 +116,64 @@ describe('S3_BUCKET startup guard (fail-closed for deployed environments)', () =
     });
   }
 });
+
+/**
+ * ADR-070 fail-closed startup guard: AUTH_LOGIN_THROTTLE_THRESHOLD must stay
+ * strictly greater than AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD.
+ *
+ * WHY: the manager-notify alert (TREQ-AUTH-007) is meant to always fire
+ * before the per-account login throttle engages (ADR-070 §2). Both are
+ * independently-set env vars with no natural ordering enforced by their
+ * types alone, so a reversed or equal override would silently invert that
+ * sequence -- an attack could throttle (and alert the attacker via a visibly
+ * different response) before the responsible manager is ever notified.
+ * Fail the boot instead of allowing that drift, same posture as the
+ * S3_BUCKET guard above.
+ */
+describe('AUTH_LOGIN_THROTTLE_THRESHOLD ordering guard (ADR-070)', () => {
+  beforeEach(() => {
+    process.env = {
+      ...ORIGINAL_ENV,
+      NODE_ENV: 'test',
+      DATABASE_URL: 'postgresql://u:p@localhost:5432/db?schema=public',
+      REDIS_URL: 'redis://localhost:6379',
+      JWT_SECRET: 'a'.repeat(64),
+      JWT_REFRESH_SECRET: 'b'.repeat(64),
+    };
+    jest.resetModules();
+  });
+
+  afterAll(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('refuses to boot when the throttle threshold equals the notify threshold', async () => {
+    process.env['AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD'] = '5';
+    process.env['AUTH_LOGIN_THROTTLE_THRESHOLD'] = '5';
+
+    await expect(loadEnvFresh()).rejects.toThrow(/AUTH_LOGIN_THROTTLE_THRESHOLD/);
+  });
+
+  it('refuses to boot when the throttle threshold is below the notify threshold', async () => {
+    process.env['AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD'] = '10';
+    process.env['AUTH_LOGIN_THROTTLE_THRESHOLD'] = '5';
+
+    await expect(loadEnvFresh()).rejects.toThrow(/AUTH_LOGIN_THROTTLE_THRESHOLD/);
+  });
+
+  it('boots when the throttle threshold is above the notify threshold', async () => {
+    process.env['AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD'] = '5';
+    process.env['AUTH_LOGIN_THROTTLE_THRESHOLD'] = '10';
+
+    const env = await loadEnvFresh();
+    expect(env.AUTH_LOGIN_THROTTLE_THRESHOLD).toBe(10);
+  });
+
+  it('boots on defaults with no override (10 > 5)', async () => {
+    delete process.env['AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD'];
+    delete process.env['AUTH_LOGIN_THROTTLE_THRESHOLD'];
+
+    const env = await loadEnvFresh();
+    expect(env.AUTH_LOGIN_THROTTLE_THRESHOLD).toBeGreaterThan(env.AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD);
+  });
+});
