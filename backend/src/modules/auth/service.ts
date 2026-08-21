@@ -398,8 +398,24 @@ export class AuthService extends BaseService {
     // recorded its own audit entries; re-recording every rejected attempt
     // during the window would inflate the count past what actually happened
     // and could itself become a cheap way to keep re-arming the window.
+    //
+    // KNOWN, DISCLOSED tradeoff (ADR-070 §5): this 429 is distinguishable
+    // from the generic 401 above, which narrowly reopens the account-
+    // existence oracle that 401's own byte-identical-response comment
+    // exists to prevent -- but only after ~10 attempts against one email,
+    // bounded by the Nginx edge to ~1/sec, making enumeration impractical.
+    // Accepted, not silently dropped; see the ADR before changing this.
     if (user.login_locked_until && user.login_locked_until > new Date()) {
-      const retryAfterSeconds = Math.ceil((user.login_locked_until.getTime() - Date.now()) / 1000);
+      // `Math.max(1, ...)`: the entry check above and this computation read
+      // the clock twice, microseconds apart — in the narrow window where
+      // login_locked_until sits between those two reads, a naive
+      // subtraction can go to zero or negative, which is not a valid
+      // Retry-After delay-seconds value (RFC 7231 §7.1.3) and would show a
+      // client "-1s" instead of "try again shortly".
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((user.login_locked_until.getTime() - Date.now()) / 1000)
+      );
       await this.logAudit(user.id, user.role, 'LOGIN_THROTTLED', 'USER', user.id, {
         email: user.email,
         retry_after_seconds: retryAfterSeconds,

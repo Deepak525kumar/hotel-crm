@@ -88,7 +88,30 @@ The two requirements now compose: notify (at 5) always fires first and never blo
   429 rather than 401, matching the edge zone's own `limit_req_status 429` convention, with a
   `Retry-After` header computed from the remaining throttle window.
 
-## 5. Non-goals
+## 5. Disclosed risk: this reopens a narrow account-existence oracle
+
+`AuthService.login`'s not-found and wrong-password branches deliberately return a
+byte-identical `401 UNAUTHORIZED`/`'Invalid credentials'` so that probing an email address
+cannot confirm an account exists (see the code's own comment on that symmetry, predating this
+ADR). This decision's `429` response breaks that symmetry for one narrow case: an attacker who
+sends `AUTH_LOGIN_THROTTLE_THRESHOLD` (10) wrong-password attempts against one email and then
+receives `429` instead of `401` has thereby confirmed the account exists (a nonexistent email
+always short-circuits at the `findUnique` check and never reaches `recordFailedLogin`, so it can
+never accumulate a streak or throttle).
+
+This is accepted, not fixed, for two reasons: first, the Nginx edge zone (§1) already bounds the
+attacker to roughly one request/second on this path, so confirming one candidate email costs on
+the order of 10+ seconds — enumerating any meaningful list is impractical, unlike a synchronous,
+unthrottled oracle; second, collapsing the `429` back into the generic `401` would defeat the
+actual purpose of this decision (`Retry-After`-driven client backoff — already consumed by
+`frontend/lib/api.ts`, `mobile/{worker,checker}-app/src/lib/api.ts`'s existing 429 handling)
+without closing the oracle either, since response *timing* alone (the throttle check short-circuits
+before the `bcrypt.compare` cost) would still leak the same one bit. If this residual gap becomes
+unacceptable, the fix is a rate-limited, generic-response CAPTCHA challenge at the threshold
+rather than a distinguishable status code — a larger change, deliberately out of this decision's
+scope.
+
+## 6. Non-goals
 
 - No per-account throttling on `signup`, `refresh`, or `password-reset` (request/confirm) — the
   audit's stated concern was login/password-reset guessing; password-reset request is already

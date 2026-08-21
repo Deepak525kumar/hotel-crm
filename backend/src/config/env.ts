@@ -442,6 +442,27 @@ const envSchema = z.object({
           'or run with NODE_ENV=development if you intend to use stub storage.',
       });
     }
+
+    // ADR-070: AUTH_LOGIN_THROTTLE_THRESHOLD must stay above
+    // AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD so the manager-notify path
+    // (TREQ-AUTH-007) always fires before throttling engages, exactly as
+    // ADR-070 §2 specifies. Both are independently-configurable env vars
+    // with no natural ordering enforced by their types, so a typo'd or
+    // reversed override (e.g. an ops change that lowers the throttle
+    // threshold without noticing the notify one) would silently invert the
+    // intended sequence -- fail the boot instead, the same posture as the
+    // S3_BUCKET guard above.
+    if (env.AUTH_LOGIN_THROTTLE_THRESHOLD <= env.AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AUTH_LOGIN_THROTTLE_THRESHOLD'],
+        message:
+          `AUTH_LOGIN_THROTTLE_THRESHOLD (${env.AUTH_LOGIN_THROTTLE_THRESHOLD}) must be ` +
+          `greater than AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD (${env.AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD}): ` +
+          'ADR-070 requires the manager-notify alert to always fire before login ' +
+          'throttling engages.',
+      });
+    }
   });
 
 type Env = z.infer<typeof envSchema>;

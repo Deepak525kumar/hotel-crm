@@ -356,7 +356,9 @@ describe('AuthService', () => {
         expect(mockPrisma.user.update).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: 'u1' },
-            data: { failed_login_count: 0, failed_login_since: null },
+            // ADR-070: also clears login_locked_until, which this call now
+            // always includes alongside the pre-existing counter reset.
+            data: { failed_login_count: 0, failed_login_since: null, login_locked_until: null },
           })
         );
       });
@@ -598,6 +600,28 @@ describe('AuthService', () => {
 
         expect(error.retryAfterSeconds).toBeGreaterThan(0);
         expect(error.retryAfterSeconds).toBeLessThanOrEqual(120);
+      });
+
+      // The entry check (`login_locked_until > new Date()`) and the
+      // Retry-After computation (`... - Date.now()`) read the clock twice,
+      // microseconds apart. For a lock expiring almost immediately, a naive
+      // subtraction could land at exactly 0 (or, in the narrow window where
+      // the second read crosses the boundary, negative) -- never a valid
+      // Retry-After delay-seconds value. Asserts the `Math.max(1, ...)`
+      // clamp rather than the literal race (which is not deterministically
+      // reproducible in a test).
+      it('never returns a zero or negative Retry-After for an almost-expired lock', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({ login_locked_until: new Date(Date.now() + 1) })
+        );
+
+        const error = await service
+          .login({ email: 'user@test.com', password: 'anything' })
+          .catch((e) => e);
+
+        expect(error.name).toBe('TooManyRequestsError');
+        expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+        expect(Number.isInteger(error.retryAfterSeconds)).toBe(true);
       });
 
       it('allows login once login_locked_until has passed', async () => {
