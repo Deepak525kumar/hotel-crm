@@ -11,16 +11,15 @@ function zodDetails(error: import('zod').ZodError) {
 // query interfaces (GetDeletionAuditLog, CheckEligibility) are routed --
 // RegisterCategory/TagRecord remain in-process-only by design (spec's own
 // Trust boundaries/authorization section: invoked by a consuming module's
-// own trusted backend logic, never an end-user-facing caller). Both routed
-// endpoints require only authentication (any authenticated role), not a
-// specific role/permission -- OD-RETENTION-05 (Admin RBAC scope for
-// GetDeletionAuditLog) is explicitly OPEN, so no Admin-only gate is added
-// here; CheckEligibility's own spec row names no "Admin" caller class at
-// all. module_id/category_id/record_ref are always taken from the query
-// string, never derived from req.auth, since -- unlike Consent's worker-
-// scoped interfaces -- these values identify a consuming MODULE's own
-// category/record, not the calling user's own data; there is no "self"
-// concept to enforce here.
+// own trusted backend logic, never an end-user-facing caller).
+// GetDeletionAuditLog is Admin-gated at the route level (requireRole('admin')
+// in routes.ts) per OD-RETENTION-05, now resolved. CheckEligibility requires
+// only authentication (any authenticated role), matching its spec row, which
+// names no "Admin" caller class. module_id/category_id/record_ref are always
+// taken from the query string, never derived from req.auth, since -- unlike
+// Consent's worker-scoped interfaces -- these values identify a consuming
+// MODULE's own category/record, not the calling user's own data; there is
+// no "self" concept to enforce here.
 export class RetentionController {
   async getDeletionAuditLog(req: Request, res: Response, next: NextFunction) {
     try {
