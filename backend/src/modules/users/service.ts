@@ -391,17 +391,40 @@ export class UserService extends BaseService {
     // creation, unlike the EmploymentRecord failure above, which does --
     // losing a welcome email is recoverable (resend, or the admin relays the
     // password directly); losing onboarding eligibility is not.
+    //
+    // Review finding (2026-08-22): the password must NEVER land in `message`
+    // or `data`. GET /notifications and the notification-detail page (which
+    // dumps every key of `data` as a labeled row -- see
+    // frontend/app/(protected)/notifications/[id]/page.tsx) both return a
+    // Notification row's full content to its owner, forever. Unlike a
+    // password-reset token (single-use, TTL'd), this password does not
+    // expire on its own, so either field would leave it durably queryable
+    // via the recipient's own notification history for as long as the row
+    // exists. `message` is the in-app-safe summary; `emailText` (below) is
+    // written to the EMAIL OutboxEvent's own `payload` column instead --
+    // never returned by any self-service endpoint -- and is what
+    // EmailTransportHandler actually sends.
     try {
+      // getEnv() belongs INSIDE this try, not above it: this whole block is
+      // best-effort by design (see the comment above), and getEnv() throwing
+      // -- e.g. a caller/test environment that never called loadEnv() -- must
+      // be swallowed exactly like a failed enqueue() call, not propagate and
+      // fail account creation. Caught by create-hierarchy-authz.test.ts
+      // during review: that suite exercises createUser()'s ALLOW paths
+      // without mocking config/env.js at all, which a getEnv() call sitting
+      // above this try block would have broken.
+      const loginUrl = `${getEnv().FRONTEND_URL || 'http://localhost:3000'}/login`;
       await notificationService.enqueue({
         recipientId: user.id,
         type: NotificationType.ACCOUNT_CREATED,
         title: 'Your account has been created',
-        message:
+        message: `An account has been created for you on ${data.email}. Check your email for your login password.`,
+        emailText:
           `An account has been created for you on ${data.email}. ` +
           `Temporary password: ${data.password}
 
 ` +
-          `Log in at ${getEnv().FRONTEND_URL || 'http://localhost:3000'}/login and change this password soon.`,
+          `Log in at ${loginUrl} and change this password soon.`,
         transports: [OutboxTransport.EMAIL],
         sourceModule: OutboxSourceModule.USERS,
         producerService: 'UserService',

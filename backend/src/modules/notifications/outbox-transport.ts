@@ -150,11 +150,25 @@ export class EmailTransportHandler implements TransportHandler {
       return;
     }
 
+    // `event.payload.email_text` overrides the outgoing body in place of
+    // `notification.message`, when a producer supplied one (see
+    // EnqueueNotificationInput.emailText's own comment for why this lives on
+    // OutboxEvent rather than Notification: OutboxEvent is never returned by
+    // any self-service endpoint, unlike Notification.message/.data, which
+    // GET /notifications and the notification-detail page both surface to
+    // the recipient indefinitely). Reads `event`, already this method's own
+    // argument -- no extra query. Every existing producer leaves this unset,
+    // so this is purely additive: `notification.message` is exactly what
+    // gets emailed for every notification type that came before it.
+    const payload = event.payload as Record<string, unknown> | null;
+    const emailText =
+      payload && typeof payload.email_text === 'string' ? payload.email_text : notification.message;
+
     await this.providerClient.send({
       to: notification.user.email,
       from: this.fromAddress,
       subject: notification.title,
-      text: notification.message,
+      text: emailText,
     });
   }
 }

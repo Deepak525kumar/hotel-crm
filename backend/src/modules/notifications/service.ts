@@ -4,6 +4,7 @@ import {
   OutboxAggregateType,
   OutboxEvent,
   OutboxEventType,
+  OutboxTransport,
   Prisma,
   PushApp,
   PushPlatform,
@@ -75,7 +76,17 @@ export class NotificationService extends BaseService {
           // Domain body only — metadata (event_id, correlation_id,
           // aggregate_*, etc.) is column-sourced, never duplicated here
           // (ADR-029 §9). aggregate_id already IS the Notification.id.
-          payload: {} as Prisma.InputJsonValue,
+          //
+          // The one deliberate exception: emailText, when supplied AND this
+          // row's own transport is EMAIL. It lives here rather than on the
+          // Notification precisely because THIS column is never returned by
+          // any self-service endpoint (see EnqueueNotificationInput's own
+          // comment) — a PUSH row for the same enqueue() call gets `{}`,
+          // same as before, so an email-only override can never leak into a
+          // push payload for the same event.
+          payload: (transport === OutboxTransport.EMAIL && input.emailText
+            ? { email_text: input.emailText }
+            : {}) as Prisma.InputJsonValue,
           payload_version: 1,
           scheduled_for: scheduledFor,
           next_attempt_at: scheduledFor,

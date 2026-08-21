@@ -147,6 +147,37 @@ describe('NotificationService', () => {
       expect(data.payload_version).toBe(1);
     });
 
+    // Review finding (2026-08-22): createUser()'s welcome email needed the
+    // outgoing email body to carry the account's password without that
+    // password ever landing on the Notification row (GET /notifications and
+    // the notification-detail page both return Notification.message/.data to
+    // the recipient forever). OutboxEvent.payload is never returned by any
+    // self-service endpoint, so emailText writing there -- and ONLY there --
+    // is the actual fix.
+    it('writes emailText into the EMAIL OutboxEvent payload as { email_text } when supplied', async () => {
+      await service.enqueue({ ...baseInput, transports: [OutboxTransport.EMAIL], emailText: 'the real secret body' });
+
+      const data = mockOutboxEvent.create.mock.calls[0][0].data;
+      expect(data.payload).toEqual({ email_text: 'the real secret body' });
+    });
+
+    // The password must never reach a transport OTHER than email either --
+    // a PUSH row for the same enqueue() call gets the ordinary empty
+    // payload, same as if emailText had never been supplied.
+    it('does not leak emailText into a PUSH row from the same enqueue() call', async () => {
+      await service.enqueue({
+        ...baseInput,
+        transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
+        emailText: 'the real secret body',
+      });
+
+      const [emailCall, pushCall] = mockOutboxEvent.create.mock.calls as any[];
+      expect(emailCall[0].data.transport).toBe('EMAIL');
+      expect(emailCall[0].data.payload).toEqual({ email_text: 'the real secret body' });
+      expect(pushCall[0].data.transport).toBe('PUSH');
+      expect(pushCall[0].data.payload).toEqual({});
+    });
+
     it('shares one correlation_id across every OutboxEvent row from the same enqueue() call, with distinct transports', async () => {
       await service.enqueue({ ...baseInput, transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH] });
 

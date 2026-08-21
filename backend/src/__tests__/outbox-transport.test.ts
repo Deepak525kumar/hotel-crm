@@ -101,6 +101,58 @@ describe('EmailTransportHandler (Epic 7 PR 7.4, ADR-029 §4)', () => {
     });
   });
 
+  // Review finding (2026-08-22, corrected twice): createUser()'s welcome
+  // email needed the emailed text to differ from what GET /notifications and
+  // the notification-detail page return to the recipient forever. The first
+  // fix put the override on Notification.data -- which turned out to be
+  // EQUALLY exposed (both endpoints return `data` too). The actual fix reads
+  // event.payload instead: OutboxEvent is never returned by any self-service
+  // endpoint, so this is genuinely private. Reads `event`, this method's own
+  // argument -- no schema change, no extra query.
+  it('prefers event.payload.email_text over message when present', async () => {
+    mockNotificationFindUnique.mockResolvedValue({
+      id: 'notif1',
+      title: 'Your account has been created',
+      message: 'An account has been created for you. Check your email for your login password.',
+      user: { email: 'worker@example.com' },
+    });
+    const handler = new EmailTransportHandler(mockPrisma, mockProviderClient, 'no-reply@hotelcrm.app');
+    const event = {
+      ...makeEvent(OutboxTransport.EMAIL),
+      payload: { email_text: 'Temporary password: hunter2\n\nLog in at https://app.test/login' },
+    };
+
+    await handler.deliver(event);
+
+    expect(mockProviderClient.send).toHaveBeenCalledWith({
+      to: 'worker@example.com',
+      from: 'no-reply@hotelcrm.app',
+      subject: 'Your account has been created',
+      text: 'Temporary password: hunter2\n\nLog in at https://app.test/login',
+    });
+  });
+
+  // Every existing producer leaves payload as `{}` (service.ts's
+  // enqueueWithin default) -- this must stay purely additive, so every
+  // notification type that predates emailText keeps emailing `.message`
+  // unchanged.
+  it('still falls back to message when payload has no email_text key', async () => {
+    mockNotificationFindUnique.mockResolvedValue({
+      id: 'notif1',
+      title: 'Rating received',
+      message: 'You received a rating of 90 out of 100.',
+      user: { email: 'worker@example.com' },
+    });
+    const handler = new EmailTransportHandler(mockPrisma, mockProviderClient, 'no-reply@hotelcrm.app');
+    const event = { ...makeEvent(OutboxTransport.EMAIL), payload: {} };
+
+    await handler.deliver(event);
+
+    expect(mockProviderClient.send).toHaveBeenCalledWith(
+      expect.objectContaining({ text: 'You received a rating of 90 out of 100.' })
+    );
+  });
+
   it('is a benign no-op when the referenced Notification no longer exists', async () => {
     mockNotificationFindUnique.mockResolvedValue(null);
     const handler = new EmailTransportHandler(mockPrisma, mockProviderClient, 'no-reply@hotelcrm.app');

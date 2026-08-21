@@ -608,12 +608,26 @@ describe('UserService', () => {
       expect(mockNotificationEnqueue).toHaveBeenCalledTimes(1);
       const call = mockNotificationEnqueue.mock.calls[0][0] as {
         recipientId: string; type: string; message: string; transports: string[];
+        data?: Record<string, unknown>; emailText?: string;
       };
       expect(call.recipientId).toBe('u_worker2');
       expect(call.type).toBe('ACCOUNT_CREATED');
       expect(call.transports).toEqual(['EMAIL']);
+      // The password must reach the email body (emailText, written to the
+      // EMAIL OutboxEvent's own payload -- never returned by any
+      // self-service endpoint) ...
+      expect(call.emailText).toContain('newworker@test.com');
+      expect(call.emailText).toContain('ChosenPw123!');
+      // ... and must NEVER appear in `message` or `data` -- both are part of
+      // the Notification row GET /notifications and the notification-detail
+      // page return to the recipient forever. Regression guard for the exact
+      // issue a review pass found twice: first the password was interpolated
+      // directly into `message`; the first fix moved it to `data.email_text`,
+      // which is EQUALLY exposed (GET /notifications returns `data` too, and
+      // the detail page renders every `data` key as a labeled row).
+      expect(call.message).not.toContain('ChosenPw123!');
       expect(call.message).toContain('newworker@test.com');
-      expect(call.message).toContain('ChosenPw123!');
+      expect(call.data).toBeUndefined();
     });
 
     // Mirrors the EmploymentRecord-failure test's OPPOSITE property: that one
