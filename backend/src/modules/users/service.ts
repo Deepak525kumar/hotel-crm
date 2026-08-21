@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { EmploymentStatus } from '@prisma/client';
+import { EmploymentStatus, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
@@ -21,6 +21,8 @@ import type { AuthContext } from '../../lib/types.js';
 // cycle risk -- employee-management/service.ts imports hr/service.ts, but
 // neither imports users/service.ts.
 import { employeeManagementService } from '../employee-management/service.js';
+import { notificationService } from '../notifications/service.js';
+import { getEnv } from '../../config/env.js';
 
 export class UserService extends BaseService {
   // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
@@ -377,6 +379,61 @@ export class UserService extends BaseService {
           'Account could not be created: setting up the onboarding record failed. Please try again.',
         );
       }
+    }
+
+    // Welcome email: the caller (admin/manager/RM) chose this password in
+    // the creation form above -- see this function's own CreateUserSchema
+    // comment; there is no server-generated temp password or forced-change
+    // flow (a deliberate, narrower choice than the industry-standard pattern,
+    // made explicitly to avoid the larger surface a forced-first-login-change
+    // screen would need across web + both mobile apps). Best-effort: a
+    // notification failure must not undo an otherwise-successful account
+    // creation, unlike the EmploymentRecord failure above, which does --
+    // losing a welcome email is recoverable (resend, or the admin relays the
+    // password directly); losing onboarding eligibility is not.
+    //
+    // Review finding (2026-08-22): the password must NEVER land in `message`
+    // or `data`. GET /notifications and the notification-detail page (which
+    // dumps every key of `data` as a labeled row -- see
+    // frontend/app/(protected)/notifications/[id]/page.tsx) both return a
+    // Notification row's full content to its owner, forever. Unlike a
+    // password-reset token (single-use, TTL'd), this password does not
+    // expire on its own, so either field would leave it durably queryable
+    // via the recipient's own notification history for as long as the row
+    // exists. `message` is the in-app-safe summary; `emailText` (below) is
+    // written to the EMAIL OutboxEvent's own `payload` column instead --
+    // never returned by any self-service endpoint -- and is what
+    // EmailTransportHandler actually sends.
+    try {
+      // getEnv() belongs INSIDE this try, not above it: this whole block is
+      // best-effort by design (see the comment above), and getEnv() throwing
+      // -- e.g. a caller/test environment that never called loadEnv() -- must
+      // be swallowed exactly like a failed enqueue() call, not propagate and
+      // fail account creation. Caught by create-hierarchy-authz.test.ts
+      // during review: that suite exercises createUser()'s ALLOW paths
+      // without mocking config/env.js at all, which a getEnv() call sitting
+      // above this try block would have broken.
+      const loginUrl = `${getEnv().FRONTEND_URL || 'http://localhost:3000'}/login`;
+      await notificationService.enqueue({
+        recipientId: user.id,
+        type: NotificationType.ACCOUNT_CREATED,
+        title: 'Your account has been created',
+        message: `An account has been created for you on ${data.email}. Check your email for your login password.`,
+        emailText:
+          `An account has been created for you on ${data.email}. ` +
+          `Temporary password: ${data.password}
+
+` +
+          `Log in at ${loginUrl} and change this password soon.`,
+        transports: [OutboxTransport.EMAIL],
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      });
+    } catch (error) {
+      logger.error('user_create_welcome_email_enqueue_failed', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a

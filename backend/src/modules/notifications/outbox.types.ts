@@ -61,4 +61,18 @@ export interface EnqueueNotificationInput {
    * that supplies it yet.
    */
   scheduledFor?: Date;
+  /**
+   * Overrides the EMAIL transport's outgoing body, in place of `message`.
+   * Written to the EMAIL OutboxEvent's own `payload` column, NOT the
+   * Notification row -- unlike `message`/`data`, OutboxEvent is never
+   * returned by any self-service endpoint (GET /notifications, mark-as-read)
+   * or rendered by the notification-detail page's generic `data` dump; only
+   * an admin reviewing a DEAD_LETTERed event can see it, and only after every
+   * delivery attempt has already failed. Exists for content that must reach
+   * the recipient's inbox but must never be durably, routinely queryable by
+   * the recipient themselves -- e.g. createUser()'s welcome-email password.
+   * Applies only when EMAIL is among `transports`; ignored for every other
+   * transport's OutboxEvent row.
+   */
+  emailText?: string;
 }

@@ -22,6 +22,7 @@ const TYPES: Record<NotificationType, { tone: Tone; label: string }> = {
   QUALITY_VERIFICATION_SUBMITTED: { tone: "info", label: "Quality submitted" },
   RATING_RECEIVED: { tone: "info", label: "Rating received" },
   REWORK_REQUIRED: { tone: "warning", label: "Rework required" },
+  ACCOUNT_CREATED: { tone: "success", label: "Account created" },
 };
 
 /** Human-readable label for a notification type (falls back to the raw value). */

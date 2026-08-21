@@ -28,6 +28,9 @@ const mockPrisma = {
     create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     update: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
     count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // createUser()'s EmploymentRecord-failure rollback path calls this;
+    // most tests never exercise that path, so it defaults to resolving.
+    delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),
   },
   hotel: mockHotel,
   hotelGroup: mockHotelGroup,
@@ -89,8 +92,18 @@ jest.mock('../config/env.js', () => ({
     JWT_ACCESS_EXPIRY: '1h',
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
+    FRONTEND_URL: 'https://app.test',
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+}));
+
+// Welcome-email-on-creation: mocked the same way consent-service.test.ts and
+// hr-contract-lifecycle.test.ts mock this module -- one shared jest.fn(),
+// asserted on directly rather than through a real enqueue/outbox path (that
+// path already has its own coverage in the notifications module's own tests).
+const mockNotificationEnqueue = jest.fn() as jest.MockedFunction<(...args: any[]) => any>;
+jest.mock('../modules/notifications/service.js', () => ({
+  notificationService: { enqueue: mockNotificationEnqueue },
 }));
 
 import { employeeManagementService } from '../modules/employee-management/service.js';
@@ -103,6 +116,7 @@ describe('UserService', () => {
   let service: UserService;
 
   beforeEach(() => {
+    mockNotificationEnqueue.mockReset().mockResolvedValue({ notification: {}, outboxEvents: [] });
     jest.clearAllMocks();
     // The single-posting invariant reads Hotel/HotelGroup back AFTER the
     // vacate+assign writes, so these mocks must reflect those writes the way
@@ -571,6 +585,72 @@ describe('UserService', () => {
       const createCall = (mockPrisma.user.create as jest.Mock).mock.calls[0] as Array<{ data: { role: string } }>;
       expect(createCall[0]?.data.role).toBe('WORKER');
       expect(createCall[0]?.data).not.toHaveProperty('permissions');
+    });
+
+    // The feature under test: a new user gets emailed the login credentials
+    // the admin/manager just chose for them, so they have a way to actually
+    // log in. This is the ADMIN-chosen-password design (confirmed choice,
+    // 2026-08-22) -- not a server-generated temp password -- so the exact
+    // plaintext password from the request is what must reach the email body.
+    it('enqueues an ACCOUNT_CREATED welcome email with the login email and chosen password', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'u_worker2', email: 'newworker@test.com', first_name: 'New', last_name: 'Worker',
+        phone: null, role: 'WORKER', is_active: true, created_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+
+      await service.createUser(
+        { email: 'newworker@test.com', password: 'ChosenPw123!', first_name: 'New', last_name: 'Worker', role: 'worker', phone: '+1234567890' },
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+      );
+
+      expect(mockNotificationEnqueue).toHaveBeenCalledTimes(1);
+      const call = mockNotificationEnqueue.mock.calls[0][0] as {
+        recipientId: string; type: string; message: string; transports: string[];
+        data?: Record<string, unknown>; emailText?: string;
+      };
+      expect(call.recipientId).toBe('u_worker2');
+      expect(call.type).toBe('ACCOUNT_CREATED');
+      expect(call.transports).toEqual(['EMAIL']);
+      // The password must reach the email body (emailText, written to the
+      // EMAIL OutboxEvent's own payload -- never returned by any
+      // self-service endpoint) ...
+      expect(call.emailText).toContain('newworker@test.com');
+      expect(call.emailText).toContain('ChosenPw123!');
+      // ... and must NEVER appear in `message` or `data` -- both are part of
+      // the Notification row GET /notifications and the notification-detail
+      // page return to the recipient forever. Regression guard for the exact
+      // issue a review pass found twice: first the password was interpolated
+      // directly into `message`; the first fix moved it to `data.email_text`,
+      // which is EQUALLY exposed (GET /notifications returns `data` too, and
+      // the detail page renders every `data` key as a labeled row).
+      expect(call.message).not.toContain('ChosenPw123!');
+      expect(call.message).toContain('newworker@test.com');
+      expect(call.data).toBeUndefined();
+    });
+
+    // Mirrors the EmploymentRecord-failure test's OPPOSITE property: that one
+    // (below, deleteUser suite context aside) proves a failed prerequisite
+    // rolls the account back; this proves a failed welcome email must NOT --
+    // losing the email is recoverable, losing the account is not. Enqueue is
+    // wrapped in its own try/catch specifically so this holds.
+    it('still returns the created account when the welcome-email enqueue fails', async () => {
+      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.create.mockResolvedValue({
+        id: 'u_worker3', email: 'resilient@test.com', first_name: 'Res', last_name: 'Ilient',
+        phone: null, role: 'WORKER', is_active: true, created_at: new Date(),
+      });
+      mockPrisma.auditLog.create.mockResolvedValue({});
+      mockNotificationEnqueue.mockRejectedValueOnce(new Error('resend down'));
+
+      const result = await service.createUser(
+        { email: 'resilient@test.com', password: 'pw12345678', first_name: 'Res', last_name: 'Ilient', role: 'worker', phone: '+1234567890' },
+        { userId: 'manager_actor', email: 'manager@test.com', role: 'manager', permissions: [] }
+      );
+
+      expect(result.id).toBe('u_worker3');
+      expect(mockPrisma.user.delete).not.toHaveBeenCalled();
     });
   });
 
