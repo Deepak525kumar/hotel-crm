@@ -390,6 +390,21 @@ const envSchema = z.object({
   // (TRULE-AUTH-002: "notify and never block"). Crossing it must not affect
   // whether a subsequent login is accepted.
   AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: z.coerce.number().int().positive().default(5),
+
+  // ADR-070 (2026-08-21): per-account login throttle, defense-in-depth
+  // alongside the Nginx edge's IP-keyed rate limiting (which a distributed,
+  // many-IPs-one-account attacker bypasses). Deliberately set above
+  // AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD so the manager notification always
+  // fires first, unaffected -- throttling only engages if the attack
+  // continues past that point. UNLIKE the notify threshold, crossing this
+  // one DOES temporarily block further attempts (see ADR-070 §3 for why
+  // this is throttling, not the lockout TREQ-AUTH-007 rules out).
+  AUTH_LOGIN_THROTTLE_THRESHOLD: z.coerce.number().int().positive().default(10),
+  // Fixed window, not exponential backoff (ADR-070 §5 Non-goals) -- 15
+  // minutes is long enough to make sustained guessing impractical and short
+  // enough that a legitimate user who forgot their password isn't locked
+  // out for an unreasonable stretch.
+  AUTH_LOGIN_THROTTLE_DURATION_MS: z.coerce.number().int().positive().default(900000),
 })
   // ---------------------------------------------------------------------------
   // Fail-closed guard: a deployed environment must have real object storage.

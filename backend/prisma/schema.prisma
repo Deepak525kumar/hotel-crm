@@ -339,6 +339,13 @@ model User {
   // notification can say "N attempts since <time>" rather than just a bare
   // count, and so a future retention sweep can age out stale streaks.
   failed_login_since DateTime?
+  // ADR-070 (2026-08-21): bounded per-account login throttle, defense-in-depth
+  // alongside IP-keyed edge rate limiting (ADR-031 D-6). UNLIKE
+  // failed_login_count above, this IS read by login() to reject an attempt --
+  // but only until this timestamp passes, then it clears automatically. Not
+  // a lockout in TREQ-AUTH-007's sense (see ADR-070 §3): no manual/admin
+  // action ever clears it, only time or a successful login.
+  login_locked_until DateTime?
   deleted_at         DateTime? // GDPR soft delete — keep row, null PII via separate job
   // ADR-031 M-1/D-3/D-4 (PR-2, enforced unconditionally as of PR-7): monotonic
   // revocation counter, mirrored into the access token's `token_generation`

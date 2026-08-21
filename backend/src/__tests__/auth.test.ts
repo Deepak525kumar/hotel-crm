@@ -103,6 +103,8 @@ jest.mock('../config/env.js', () => ({
     JWT_REFRESH_EXPIRY: '7d',
     NODE_ENV: 'test',
     AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD: 5,
+    AUTH_LOGIN_THROTTLE_THRESHOLD: 10,
+    AUTH_LOGIN_THROTTLE_DURATION_MS: 900000,
   }),
   loadEnv: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 }));
@@ -262,11 +264,14 @@ describe('AuthService', () => {
     });
 
     // SPEC-AUTH-001 TREQ-AUTH-007 / TRULE-AUTH-002 (2026-08-08): repeated
-    // failed logins escalate by NOTIFYING the responsible manager, never by
-    // locking the account or throttling further attempts. Before this, a
-    // failed login produced no audit entry, no counter and no notification
-    // at all -- the compensating control for the deliberate absence of
-    // app-layer rate limiting (TREQ-AUTH-008) simply did not exist.
+    // failed logins escalate by NOTIFYING the responsible manager -- this
+    // half never locks the account or throttles further attempts. Before
+    // this, a failed login produced no audit entry, no counter and no
+    // notification at all. ADR-070 (2026-08-21) later added a SEPARATE,
+    // higher threshold that DOES temporarily throttle (see the dedicated
+    // 'per-account login throttle (ADR-070)' suite below) -- the two
+    // thresholds are independent and this suite's assertions about the
+    // notify threshold are unaffected by that addition.
     describe('failed-login monitoring (TREQ-AUTH-007)', () => {
       const failingUser = (overrides: Record<string, unknown> = {}) => ({
         id: 'u1',
@@ -515,6 +520,132 @@ describe('AuthService', () => {
         expect(audit).toBeDefined();
         expect(audit![0].data.actor_id).toBeNull();
         expect(audit![0].data.details).toMatchObject({ reason: 'user_not_found' });
+        expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      });
+    });
+
+    // ADR-070 (2026-08-21): per-account throttle, distinct from and above
+    // TREQ-AUTH-007's notify threshold (5) -- see that ADR for why this is
+    // bounded throttling, not the lockout TREQ-AUTH-007 rules out.
+    describe('per-account login throttle (ADR-070)', () => {
+      const throttleUser = (overrides: Record<string, unknown> = {}) => ({
+        id: 'u1',
+        email: 'user@test.com',
+        password_hash: '$2a$12$notthehashofwrongpassword111111111111',
+        is_active: true,
+        deleted_at: null,
+        role: 'WORKER',
+        permissions: [],
+        failed_login_count: 0,
+        failed_login_since: null,
+        login_locked_until: null,
+        created_at: new Date('2026-01-01T00:00:00Z'),
+        updated_at: new Date('2026-01-01T00:00:00Z'),
+        token_generation: 0,
+        ...overrides,
+      });
+
+      it('sets login_locked_until on the attempt that crosses the throttle threshold (10), not before', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(throttleUser({ failed_login_count: 9 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'u1' },
+            data: expect.objectContaining({ login_locked_until: expect.any(Date) }),
+          })
+        );
+      });
+
+      it('does not set login_locked_until below the threshold', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(throttleUser({ failed_login_count: 6 }));
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'wrongpassword' })
+        ).rejects.toMatchObject({ name: 'UnauthorizedError' });
+
+        const lockCalls = mockPrisma.user.update.mock.calls.filter(
+          (c: any) => c[0]?.data && 'login_locked_until' in c[0].data
+        );
+        expect(lockCalls).toHaveLength(0);
+      });
+
+      it('rejects with TooManyRequestsError while login_locked_until is in the future, without checking the password', async () => {
+        const compareSpy = jest.spyOn(bcrypt, 'compare');
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({ login_locked_until: new Date(Date.now() + 60_000) })
+        );
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'anything' })
+        ).rejects.toMatchObject({ name: 'TooManyRequestsError', statusCode: 429 });
+
+        expect(compareSpy).not.toHaveBeenCalled();
+        compareSpy.mockRestore();
+      });
+
+      it('computes a positive Retry-After from the remaining window', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({ login_locked_until: new Date(Date.now() + 120_000) })
+        );
+
+        const error = await service
+          .login({ email: 'user@test.com', password: 'anything' })
+          .catch((e) => e);
+
+        expect(error.retryAfterSeconds).toBeGreaterThan(0);
+        expect(error.retryAfterSeconds).toBeLessThanOrEqual(120);
+      });
+
+      it('allows login once login_locked_until has passed', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({
+            password_hash: hash,
+            failed_login_count: 10,
+            login_locked_until: new Date(Date.now() - 1000), // already expired
+          })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'correctpassword' })
+        ).resolves.toMatchObject({ user: expect.objectContaining({ id: 'u1' }) });
+      });
+
+      it('clears login_locked_until alongside the counter on a successful login', async () => {
+        const hash = await bcrypt.hash('correctpassword', 4);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({
+            password_hash: hash,
+            failed_login_count: 10,
+            login_locked_until: new Date(Date.now() - 1000),
+          })
+        );
+        mockPrisma.session.create.mockResolvedValue({ id: 's1' });
+
+        await service.login({ email: 'user@test.com', password: 'correctpassword' });
+
+        expect(mockPrisma.user.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: 'u1' },
+            data: { failed_login_count: 0, failed_login_since: null, login_locked_until: null },
+          })
+        );
+      });
+
+      it('does not record a failed-login attempt while throttled (the streak is not re-inflated)', async () => {
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({ login_locked_until: new Date(Date.now() + 60_000) })
+        );
+
+        await expect(
+          service.login({ email: 'user@test.com', password: 'anything' })
+        ).rejects.toMatchObject({ name: 'TooManyRequestsError' });
+
         expect(mockPrisma.user.update).not.toHaveBeenCalled();
       });
     });
