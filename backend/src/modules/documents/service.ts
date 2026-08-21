@@ -88,13 +88,15 @@ export class DocumentService extends BaseService {
     //     produced by the counterparty after the applicant already onboarded.
     //   - hr/service.ts uploadDocument      — same contract-scan mechanism
     //     (ADR-044 / MIG-GAP-DOC-001 delegation).
-    //   - document-templates/service.ts     — a server-RENDERED PDF of a
-    //     finalized, fully-signed template instance; the bytes are generated
-    //     by renderInstanceToPdf, never supplied by the actor.
+    //
+    // (A third caller, document-templates/service.ts, existed 2026-08-09
+    // through 2026-08-13 -- removed by product decision, superseded by
+    // backend-hr's Contract feature. Its authorization pattern, noted here
+    // for history: assertInstanceFillAccess before delegating.)
     //
     // Each of those callers performs its OWN authorization before delegating
-    // (contract ownership / assertInstanceFillAccess). Do not add a fourth
-    // caller without an equivalent check, and never plumb this flag to a
+    // (contract ownership check). Do not add another caller without an
+    // equivalent check, and never plumb this flag to a
     // request-controlled value — it would reopen the exact bypass above.
     if (!opts.systemGenerated && input.actor_id !== input.worker_id) {
       throw new ForbiddenError(
@@ -114,9 +116,8 @@ export class DocumentService extends BaseService {
     // The seam is imported from backend-hr rather than relocated to lib/:
     // hr/malware-scan.ts is a leaf module with no imports of its own, so this
     // introduces no import cycle despite the pre-existing hr -> documents
-    // module direction, and backend-document-templates already consumes it the
-    // same way (document-templates/service.ts). See ADR-066 §5's implementation
-    // note for why relocation was considered and deliberately deferred.
+    // module direction. See ADR-066 §5's implementation note for why
+    // relocation was considered and deliberately deferred.
     //
     // NOTE: the default scanner is a PASS-THROUGH NO-OP (hr/malware-scan.ts's
     // noOpScanner) -- no vendor/library has been selected by ADR-044 or
