@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { EmploymentStatus } from '@prisma/client';
+import { EmploymentStatus, OutboxTransport, NotificationType, OutboxSourceModule } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { NotFoundError, ConflictError, ForbiddenError, ValidationError } from '../../lib/errors.js';
 import { BCRYPT_ROUNDS, ROLE_PERMISSIONS } from '../../config/constants.js';
@@ -21,6 +21,8 @@ import type { AuthContext } from '../../lib/types.js';
 // cycle risk -- employee-management/service.ts imports hr/service.ts, but
 // neither imports users/service.ts.
 import { employeeManagementService } from '../employee-management/service.js';
+import { notificationService } from '../notifications/service.js';
+import { getEnv } from '../../config/env.js';
 
 export class UserService extends BaseService {
   // ADR-030 PR-4 (D-7, C-14): GET /users was previously unscoped for
@@ -377,6 +379,38 @@ export class UserService extends BaseService {
           'Account could not be created: setting up the onboarding record failed. Please try again.',
         );
       }
+    }
+
+    // Welcome email: the caller (admin/manager/RM) chose this password in
+    // the creation form above -- see this function's own CreateUserSchema
+    // comment; there is no server-generated temp password or forced-change
+    // flow (a deliberate, narrower choice than the industry-standard pattern,
+    // made explicitly to avoid the larger surface a forced-first-login-change
+    // screen would need across web + both mobile apps). Best-effort: a
+    // notification failure must not undo an otherwise-successful account
+    // creation, unlike the EmploymentRecord failure above, which does --
+    // losing a welcome email is recoverable (resend, or the admin relays the
+    // password directly); losing onboarding eligibility is not.
+    try {
+      await notificationService.enqueue({
+        recipientId: user.id,
+        type: NotificationType.ACCOUNT_CREATED,
+        title: 'Your account has been created',
+        message:
+          `An account has been created for you on ${data.email}. ` +
+          `Temporary password: ${data.password}
+
+` +
+          `Log in at ${getEnv().FRONTEND_URL || 'http://localhost:3000'}/login and change this password soon.`,
+        transports: [OutboxTransport.EMAIL],
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      });
+    } catch (error) {
+      logger.error('user_create_welcome_email_enqueue_failed', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a

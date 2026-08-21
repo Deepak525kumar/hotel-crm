@@ -162,6 +162,8 @@ enum NotificationType {
   // Hotel status events
   HOTEL_DEACTIVATED
   HOTEL_ACTIVATED
+  // to a new user: their account was created, with login credentials
+  ACCOUNT_CREATED
 }
 
 // ADR-029 (2026-07-23, GD-01): Transactional Outbox enums. OutboxEvent is the
@@ -208,6 +210,8 @@ enum OutboxSourceModule {
   // job-application events, not employment-onboarding ones.
   EMPLOYEE_MANAGEMENT
   CRM
+  // Account-creation welcome email (users/service.ts createUser())
+  USERS
 }
 
 // Delivery lifecycle. PENDING -> PROCESSING is the Platform Worker's atomic claim

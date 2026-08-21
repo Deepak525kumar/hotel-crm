@@ -1221,7 +1221,8 @@ export type NotificationType =
   | "WORKER_NO_SHOW"
   | "QUALITY_VERIFICATION_SUBMITTED"
   | "RATING_RECEIVED"
-  | "REWORK_REQUIRED";
+  | "REWORK_REQUIRED"
+  | "ACCOUNT_CREATED";
 
 /** Delivery channel. Mirrors the backend `NotificationChannel` enum. */
 export type NotificationChannel = "IN_APP" | "EMAIL" | "PUSH" | "SMS";
