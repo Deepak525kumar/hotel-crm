@@ -199,13 +199,13 @@ Additionally:
 | ~~OQ-USERS-05 / SIR-USERS-005~~ | ~~users~~ | ~~`getUser` has no hotel/group scope check — cross-hotel PII read by any Admin/Manager.~~ | **FIXED** — `getUser` now enforces `isWorkerInGroupScope` for scoped-manager roles with self-read exemption (`service.ts:139-145`). |
 | ~~SIR-CRM-008 / OD-CRM-08~~ | ~~crm~~ | ~~`per_page` vs `limit` param mismatch silently truncates hotel/hotel-group lists past 20 rows.~~ | **FIXED** — `ListHotelsQuerySchema` uses `limit` consistently; service destructures and paginates with the same `limit` value. No mismatch. |
 | OQ-02 / SIR-QUAL-002 | quality | `WorkerOverallRating.average_score` redefinition is a BREAKING cross-consumer contract change, register-flagged. | **Still OPEN** |
-| OQ-07 / SIR-QUAL-007 | quality | Leaderboard pagination is an authorized MUST (ADR-035) not yet implemented in code. | **Still OPEN** — `take: 50` hardcoded, no pagination params. |
+| ~~OQ-07 / SIR-QUAL-007~~ | ~~quality~~ | ~~Leaderboard pagination is an authorized MUST (ADR-035) not yet implemented in code.~~ | **FIXED** — `getLeaderboard` now derives `skip`/`take` from `page`/`perPage` query params (`service.ts:885-908`); no hardcoded `take: 50` remains. (Re-verified 2026-08-21.) |
 | SIR-HR-007 / OD-HR-15 | hr | Auth's 4 open High security findings require a formal human Risk Assessment before hr can be considered production-safe. | **Still OPEN** |
 | SIR-HR-017 / OD-HR-11 | hr | No GDPR retention tier assigned to the contract document/PDF/scan itself. | **Still OPEN** |
 | ~~Security FIND-002~~ | ~~employee-management~~ | ~~Special-category field access-gating disposition reads as "disclosed, not implemented".~~ | **FIXED** — `getSpecialCategory()` enforces admin-only with audit logging on both deny and allow branches (`service.ts:274-297`). |
 | SIR-DOC-001 / OD-DOC-001 | documents | No GDPR retention tier registered for `WorkerDocument` despite backend-retention now being live. | **Still OPEN** |
 | SIR-DOC-016 / OD-DOC-016 | documents | No malware/content scanning on identity/work-permit document uploads, despite HR having a ready ADR-044 precedent to reuse. | **Still OPEN** |
-| OD-RETENTION-05 / SIR-RETENTION-003 (RBAC half) | retention | `GetDeletionAuditLog` route has no RBAC scope — open to any authenticated role. | **Still OPEN** — route still has no `requireRole`/`requirePermission` gate. |
+| ~~OD-RETENTION-05 / SIR-RETENTION-003 (RBAC half)~~ | ~~retention~~ | ~~`GetDeletionAuditLog` route has no RBAC scope — open to any authenticated role.~~ | **FIXED** — route now wrapped in `requireRole('admin')` (`retention/routes.ts:13-15`); controller header comment updated to match. (Re-verified 2026-08-21.) |
 | OQ-NOTIF-05 / SIR-NOTIF-005 | notifications | No cross-module authorization check on notification targeting — more exploitable now that HR and Consent are live producers. | **Still OPEN** |
 | SIR-CHAT-020 (OD-CHAT-022) | chatbot | Synchronous blocking Claude API call with no timeout/backpressure policy — flagged release-blocking if/when the module is ever activated. | **Still OPEN** (module still unbuilt) |
 
@@ -306,137 +306,53 @@ Ordered punch-list, synthesized from all sections above. Items struck through ha
 
 ---
 
-## 12. Document Templates Module — Bug Audit (2026-08-09)
+## 12. Document Templates Module — Bug Audit (2026-08-09) — **MOOT: module removed 2026-08-13**
+
+> **Update (2026-08-21 audit):** The entire `document-templates` module (`backend/src/modules/document-templates/`) was removed from the codebase by product decision on 2026-08-13, superseded by the HR Contract feature (see `docs/10-testing/e2e/scenarios/08-known-gaps-and-next.md`). BUG-DT-001 through BUG-DT-009 and BUG-PAG-01 below described code that no longer exists and cannot be fixed, verified, or re-opened. Section retained for historical record only; all findings in it are closed as moot, not resolved-in-place. No action is required or possible against this section.
+
+<details>
+<summary>Original findings (moot — module deleted, kept for history)</summary>
 
 **Branch:** `feat/document-templates` (uncommitted changes on top of `main`)
 **Scope:** New `backend/src/modules/document-templates/` module (5 files: `service.ts`, `controller.ts`, `routes.ts`, `pdf-renderer.ts`, `types.ts`) plus schema migration and route/permission wiring.
 **Health gates at time of audit:** Backend typecheck clean, frontend typecheck clean, backend lint clean, frontend lint clean, 2577/2577 tests passing (105 suites). No test failures — but no tests exist for this module (see BUG-DT-007).
 
-### BUG-DT-001 — `listSignatures` API always returns `null` signature URLs (Broken Feature)
+- BUG-DT-001 (High, Broken feature) — `listSignatures` and all instance DTOs always returned `null` signature image URLs.
+- BUG-DT-002 (High, Authorization) — Hotel-scoped managers got zero results from `listInstances`.
+- BUG-DT-003 (Medium, Data integrity) — `content_hash_at_signing` was non-reproducible on re-render.
+- BUG-DT-004 (Low, Convention) — Route mounted at `/` instead of a scoped prefix.
+- BUG-DT-005 (High, Performance/DoS) — Unbounded concurrent Chromium launches per PDF render.
+- BUG-DT-006 (Critical, Security) — PII contract PDF and RSA private key were present in workspace root.
+- BUG-DT-007 (Medium, Test coverage) — Zero automated tests for ~1,800 lines of module code.
+- BUG-DT-008 (High, Security/Architecture) — Proxy-fill constraint was entirely unenforced for template fields.
+- BUG-DT-009 (High, Logic/Flow) — Workers (SUBJECT role) could not fetch template schemas to fill them.
+- BUG-PAG-01 (Medium, Performance) — Missing pagination in `document-templates` (`listTemplates`).
 
-| Field | Value |
-|---|---|
-| Severity | **High** |
-| File | `backend/src/modules/document-templates/service.ts:632-636, 770-781` |
-| Route | `GET /document-instances/:id/signatures` |
+</details>
 
-`listSignatures()` delegates to `this.toInstanceDto(instance).signatures`. In `toInstanceDto()`, `signature_image_url` is hardcoded to `null` (line 778) with a comment claiming the URL is "resolved lazily" by `listSignatures` callers. However, `listSignatures` itself never calls `getStorageClient()` or generates presigned S3 URLs — it returns `toInstanceDto()`'s output directly. Every signature in the response will have `signature_image_url: null`, making it impossible for any client to display captured signature images.
+### BUG-DT-006 follow-up (Security / Compliance) — verify independently of the module deletion
 
-The same issue affects `getInstance()` (line 407-410) — any endpoint returning an instance DTO will have null signature URLs.
-
-### BUG-DT-002 — Hotel Managers get zero results from `listInstances` (Authorization Scope Bug)
-
-| Field | Value |
-|---|---|
-| Severity | **High** |
-| File | `backend/src/modules/document-templates/service.ts:425-440` |
-| Route | `GET /document-instances` |
-
-When a hotel-scoped manager (`scope.type === 'hotel'`) calls `listInstances()` without an explicit `worker_id` query parameter, the service immediately returns `{ data: [], total: 0 }`:
-
-```typescript
-if (!scope || scope.type === 'hotel') {
-  return { data: [], total: 0 };
-}
-```
-
-This is inconsistent with the rest of the codebase. `isWorkerInGroupScope()` (`lib/scope.ts:130-134`) and `resolveNonAdminScopeFilter()` both resolve a hotel-scoped manager to their hotel's `hotel_group_id` and filter accordingly. The document-templates module should do the same — resolve the hotel to its group and filter instances by workers in that group — rather than returning empty results.
-
-### BUG-DT-003 — Content hash verification will always fail on re-render (Signing Integrity Bug)
-
-| Field | Value |
-|---|---|
-| Severity | **Medium** |
-| File | `backend/src/modules/document-templates/service.ts:586-590`, `pdf-renderer.ts:96-114` |
-
-In `signBlock()`, the `content_hash_at_signing` is computed by calling `renderSectionHtml(section, instance)` *before* the signature record is persisted. At render time, the current block is unsigned — so the rendered HTML contains `<div class="signature-line">&nbsp;</div>` for the block about to be signed. After the signature is saved, any subsequent re-render of the same section for audit/verification will include the `<img class="signature-image" .../>` tag instead, producing a different SHA-256 hash. This makes the stored `content_hash_at_signing` non-reproducible by design, defeating its stated purpose ("so a later 'what did they actually see' question is answerable").
-
-### BUG-DT-004 — Route mounting at `/` breaks modular encapsulation
-
-| Field | Value |
-|---|---|
-| Severity | **Low** |
-| File | `backend/src/routes/v1/index.ts:42` |
-
-`documentTemplateRoutes` is mounted at root `/`:
-```typescript
-router.use('/', documentTemplateRoutes);
-```
-
-Every other domain module is mounted on a scoped path (`/notifications`, `/analytics`, `/calendar`, `/documents`, `/geo`, `/retention`, etc.). While the routes internally use `/document-templates` and `/document-instances` prefixes, mounting at `/` is inconsistent with the established convention and creates a precedent for namespace collisions. Should be mounted at `/document-templates` with internal route paths adjusted.
-
-### BUG-DT-005 — Unbounded Playwright browser launches (Performance / DoS Risk)
-
-| Field | Value |
-|---|---|
-| Severity | **High** |
-| File | `backend/src/modules/document-templates/pdf-renderer.ts:160-168` |
-
-Every call to `renderInstanceToPdf()` — triggered by both `GET /document-instances/:id/preview` and `POST /document-instances/:id/finalize` — spawns a new headless Chromium process via `chromium.launch()` and tears it down in a `finally` block. There is no browser pool, no concurrency limit, and no reuse of browser instances.
-
-Under concurrent usage (e.g. multiple managers previewing documents simultaneously), this will spawn N Chromium processes in parallel. Each Chromium instance consumes ~100-300 MB of RAM. With no upper bound, this is a straightforward server resource exhaustion / denial-of-service vector — a single burst of preview requests could OOM the backend process.
-
-### BUG-DT-006 — Sensitive files in workspace root (Security / Compliance)
-
-| Field | Value |
-|---|---|
-| Severity | **Critical** |
-| Files | `Arbeitsvertrag_Alona_Likhoto_final.pdf` (130 KB, untracked), `hotelcrm-key1.pem` (1.6 KB, tracked) |
-
-Two sensitive files are present in the project root:
-
-1. **`Arbeitsvertrag_Alona_Likhoto_final.pdf`** — an untracked real employment contract containing personally identifiable information (PII). While `.gitignore` includes `*.pem`, it does not exclude PDF files. If accidentally committed, this would expose employee PII in the repository history.
-
-2. **`hotelcrm-key1.pem`** — a 1,678-byte RSA private key file. Despite `*.pem` being in `.gitignore`, this file is listed by `git status` as tracked content. This key should be stored in a secrets manager (e.g. AWS Secrets Manager per the project's own AGENTS.md guidance), not in the repository directory.
-
-### BUG-DT-007 — Zero test coverage for the new module
-
-| Field | Value |
-|---|---|
-| Severity | **Medium** |
-| File | `backend/src/__tests__/` (no `document-templates*.test.ts` exists) |
-
-The `document-templates` module adds ~1,800 lines of new code across 5 files (`service.ts` at 796 lines, `controller.ts` at 279, `routes.ts` at 216, `pdf-renderer.ts` at 170, `types.ts` at 213) including complex authorization logic (4 separate scope-check paths), template fork-on-edit, shared-key propagation, signature capture with content hashing, and PDF generation. None of this is covered by any automated test. The existing 2577 tests (105 suites) all pass but none exercise this module.
-
-This is inconsistent with the project's established pattern — every other module with comparable complexity has dedicated integration tests (e.g. `documents-upload.test.ts`, `documents-authz.test.ts`, `hr-authz.test.ts`, `hr-contract-lifecycle.test.ts`, `consent-authz.test.ts`).
-
-### Summary
-
-| ID | Severity | Category | One-line summary |
-|---|---|---|---|
-| BUG-DT-001 | High | Broken feature | `listSignatures` and all instance DTOs always return `null` signature image URLs |
-| BUG-DT-002 | High | Authorization | Hotel-scoped managers get zero results from `listInstances` |
-| BUG-DT-003 | Medium | Data integrity | `content_hash_at_signing` is non-reproducible on re-render |
-| BUG-DT-004 | Low | Convention | Route mounted at `/` instead of a scoped prefix |
-| BUG-DT-005 | High | Performance/DoS | Unbounded concurrent Chromium launches per PDF render |
-| BUG-DT-006 | Critical | Security | PII contract PDF and RSA private key in workspace root |
-| BUG-DT-007 | Medium | Test coverage | Zero automated tests for ~1,800 lines of new code |
+The sensitive-files finding (a PII PDF and an RSA private key in the workspace root) was reported against the repository root, not against module code, so it is **not** automatically closed by the module's removal. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.** Confirm with `git status`/`ls` at the repo root and remediate (move to a secrets manager, purge from git history if committed) before treating this as closed.
 
 ## 13. Re-Audit (2026-08-09) — Additional Findings
 
-During a secondary deep dive of the codebase, several new architectural and implementation bugs were discovered, primarily affecting pagination (DoS risks) and the `document-templates` module.
+During a secondary deep dive of the codebase, several new architectural and implementation bugs were discovered, primarily affecting pagination (DoS risks) and the (now-removed) `document-templates` module.
 
 ### 13.1 Missing Pagination (DoS / Memory Exhaustion Risk)
 Several list endpoints use `.findMany()` queries without `skip` and `take` boundaries. While volume may be low initially, unbounded queries are a known performance/DoS vulnerability as data scales.
-- **`listTemplates`** (`backend/src/modules/document-templates/service.ts:64`): Returns all document templates without limit.
-- **`listContracts`** (`backend/src/modules/hr/service.ts:223`): Returns all contracts without limit.
-- **`listPayroll`** (`backend/src/modules/hr/service.ts:678`): Returns all payslip requests without limit.
-- **`getBlocklist`** (`backend/src/modules/employee-management/service.ts:203`): Returns all blocklist entries without limit.
+- ~~`listTemplates` (`document-templates/service.ts:64`)~~ — **moot**, module removed 2026-08-13 (see §12).
+- **`listContracts`** (`backend/src/modules/hr/service.ts:223`): Returns all contracts without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
+- **`listPayroll`** (`backend/src/modules/hr/service.ts:678`): Returns all payslip requests without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
+- **`getBlocklist`** (`backend/src/modules/employee-management/service.ts:203`): Returns all blocklist entries without limit. **Status: not re-verified in the 2026-08-21 audit pass — carried forward as OPEN/UNKNOWN.**
 
-### 13.2 Document Templates — Architectural and Authorization Bugs
-- **BUG-DT-008: Proxy-fill constraint is unenforced (and unenforceable)**
-  - *Context*: A product decision specifically mandates "No proxy-fill: a worker fills only their own (SUBJECT-role) fields, and a manager fills only COUNTERSIGNER-role blocks".
-  - *Bug*: While `SignatureBlock` correctly carries a `signer_role`, the `DocumentTemplateField` model in Prisma has NO `signer_role` column. `upsertFieldValues` only validates that the actor has global fill-access to the instance. As a result, any actor with fill access can overwrite *any* field in the document, completely breaking the proxy-fill restriction.
-- **BUG-DT-009: Workers cannot read template schemas to fill them**
-  - *Context*: Workers need to know what fields to fill in an instance.
-  - *Bug*: `GET /document-templates/:id` is strictly limited to `['admin', 'manager', 'regional_manager']`. `getInstance` returns `DocumentInstanceDto`, which includes filled values and signature status, but NOT the empty schema/fields. This leaves workers entirely unable to load the template structure required to render a UI for filling in fields.
+### 13.2 Document Templates — Architectural and Authorization Bugs — **moot, module removed 2026-08-13 (see §12)**
 
 ### Updated Summary Table (New Findings)
 
-| ID | Severity | Category | One-line summary |
-|---|---|---|---|
-| BUG-PAG-01 | Medium | Performance | Missing pagination in `document-templates` (`listTemplates`) |
-| BUG-PAG-02 | Medium | Performance | Missing pagination in `hr` (`listContracts`, `listPayroll`) |
-| BUG-PAG-03 | Medium | Performance | Missing pagination in `employee-management` (`getBlocklist`) |
-| BUG-DT-008 | High | Security/Architecture | Proxy-fill constraint is entirely unenforced for template fields |
-| BUG-DT-009 | High | Logic/Flow | Workers (SUBJECT role) cannot fetch template schemas to fill them |
+| ID | Severity | Category | One-line summary | Status |
+|---|---|---|---|---|
+| ~~BUG-PAG-01~~ | Medium | Performance | ~~Missing pagination in `document-templates` (`listTemplates`)~~ | **Moot — module removed** |
+| BUG-PAG-02 | Medium | Performance | Missing pagination in `hr` (`listContracts`, `listPayroll`) | Not re-verified 2026-08-21 — carried forward OPEN/UNKNOWN |
+| BUG-PAG-03 | Medium | Performance | Missing pagination in `employee-management` (`getBlocklist`) | Not re-verified 2026-08-21 — carried forward OPEN/UNKNOWN |
+| ~~BUG-DT-008~~ | High | Security/Architecture | ~~Proxy-fill constraint is entirely unenforced for template fields~~ | **Moot — module removed** |
+| ~~BUG-DT-009~~ | High | Logic/Flow | ~~Workers (SUBJECT role) cannot fetch template schemas to fill them~~ | **Moot — module removed** |
