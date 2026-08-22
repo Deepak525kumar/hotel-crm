@@ -14,8 +14,8 @@
 ## 1. Stack
 
 Expo SDK 57, React Native 0.86, `expo-router` 57, TypeScript. Both apps are built with EAS.
-`mobile/hotel-crm-app/` — a single combined app — no longer exists; the two-app split is the
-current architecture.
+A single combined app (formerly at `mobile/hotel-crm-app`) was retired; the two-app split is the
+current architecture. That path no longer exists and citations to it elsewhere are historical.
 
 ## 2. Authentication — and how it differs from web
 

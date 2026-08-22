@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-checked_at: "2026-08-22"
+checked_at: "2026-08-23"
 baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound by SYNC-055, 2026-07-28; see cache_state block for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
@@ -40,6 +40,62 @@ indexes:
     source: .claude/VERSION.yaml
 
 known_drift:
+  - id: SYNC-074
+    type: documentation-authoring
+    status: partially-resolved
+    description: >-
+      Documentation authoring pass, 2026-08-23, following SYNC-073's corrections.
+      SYNC-073 recorded four things as "not fixed -- authoring, not repair". This
+      pass closed three of them.
+
+      RESOLVED. (1) The ADR-053 blocker: six specifications defined zero IF-*
+      interfaces -- job-dispatch, attendance, quality, notifications, analytics,
+      onboarding -- and they were exactly the worker-facing capabilities a
+      chatbot must reach, so the tool registry had nothing to bind to. 50
+      as-built contracts are now named, reverse-specified from routes.ts and
+      service.ts with per-row file:line citations, each carrying its ADR-053 risk
+      tier (19 read-only, 8 low-risk write, 21 high-risk write, 2
+      not-tool-eligible). Every table states that recording a tier is NOT
+      approval to expose the interface as a tool (ADR-053 principle 4).
+      (2) New .claude/knowledge/INTERFACE_INDEX.yaml indexes all 123 IF-* ids
+      with owner, defining spec, build status and tier; 73 pre-existing ids are
+      marked target/unassigned because tiering an unbuilt interface would mean
+      inventing behaviour, and 2 are marked suspect (extracted from prose, not
+      contract rows). (3) Six shipped-but-undocumented features are now
+      documented: internationalization as SPEC-I18N-001 (cross-cutting), the
+      dual-transport auth model as ADR-071 (filed Proposed -- ratification is
+      reserved human authority and is not claimed), dark mode and the settings
+      surface in SPEC-FRONTEND-001, re-onboarding as an addendum to SPEC-EMP-001,
+      and quality threshold warnings as an addendum to SPEC-QUAL-001.
+      (4) The three clients no longer read specification: UNKNOWN --
+      SPEC-FRONTEND-001 and SPEC-MOBILE-001 exist and are indexed. (5) Two empty
+      documentation sections are filled from code: docs/05-api/API_REFERENCE.md
+      (131 endpoints, 17 mounts) and docs/06-database/SCHEMA_REFERENCE.md (34
+      models, 26 enums, 65 migrations). (6) 24 .gitkeep-only directories and the
+      placeholder root architecture/ tree were deleted, each verified
+      unreferenced first, and docs/README.md was authored as the map that did not
+      exist -- including where each deleted section's subject matter actually
+      lives.
+
+      NOT RESOLVED, and deliberately not attempted. ADR-053's reserved
+      knowledge-providers-vs-action-tools decision is a forward architecture
+      decision requiring human authority; authoring it would have been inventing
+      product policy. GD-19 remains DEFERRED -- POST-MVP; flipping it is an
+      explicit human decision. DEPENDENCY_GRAPH.yaml, BOUNDARY_INDEX.yaml and
+      CONTRACT_INDEX.yaml remain unrebound from SYNC-073 for the same reason
+      given there -- restamping without re-deriving would misrepresent them as
+      verified.
+
+      DISCLOSED. Every specification authored in this pass is REVIEW, not FROZEN:
+      each was authored after implementation and none has had a G4 independent
+      review round or a G2 freeze. SPEC-I18N-001 discloses that four of the six
+      translation catalogues (ar, fr, uk, ur) are machine-translated and have
+      never been read by a speaker of the language, and that catalogue content
+      has no cross-client drift guard. The API and schema references state that
+      they are derived and that code wins on any disagreement.
+    authority_needed: human ratification for ADR-071; human authority for the
+      ADR-053 knowledge-provider decision and for resuming GD-19; a Repository
+      Synchronization Workflow run for the three unrebound indexes
   - id: SYNC-073
     type: documentation-synchronization
     status: partially-resolved

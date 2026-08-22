@@ -658,9 +658,20 @@ modelled as a **new `WorkerAssignment` linked to the original**, not as a state 
 | Worker-facing rework surface | **BUILT** | `mobile/worker-app/src/app/rework/[id].tsx`; web UI in the assignments surface |
 | Worker view of own hotel group's leaderboard | **BUILT** | `backend/src/modules/quality/routes.ts:69` — `GET /quality/leaderboard/by-hotel/:hotel_id`, governed by `ADR-067` |
 
+**Also built since, added 2026-08-23.** The **two-step warning thresholds are built** (PR #498) and
+should no longer be read as target:
+
+| Behaviour | Evidence |
+|---|---|
+| First warning when the overall score falls below **70** — worker only | `NotificationType.QUALITY_RATING_WARNING_70` (`schema.prisma:120`); `quality/service.ts:219-231` |
+| Second warning below **50** — worker **and** manager | `NotificationType.QUALITY_RATING_WARNING_50` (`schema.prisma:121`) |
+| Each warning fires at most once | `WorkerOverallRating.warning_70_sent_at` / `warning_50_sent_at` (`schema.prisma:1245-1246`) — nullable timestamps, set on first send |
+| A drop straight past both thresholds marks 70 as sent too, so the worker gets one notification rather than two | `quality/service.ts:226` |
+| Warnings are evaluated only once a worker actually has rated assignments | `quality/service.ts:222` — guards against firing on an empty denominator |
+
 **Still target, not built** (unchanged by the above): the 0–100-only rating model with no 5-star
-system, rating tiers (Elite/High/Standard/Low/Probation), recency-weighted averaging over the last
-10 jobs, and the two-step warning thresholds (first <70, second <50 → manager). The dormant
+system, rating tiers (Elite/High/Standard/Low/Probation), and recency-weighted averaging over the
+last 10 jobs. The dormant
 `photo_urls`/`rework_*` schema columns noted in the original text are no longer dormant.
 
 **Governing records added since freeze:** `ADR-067` (worker leaderboard visibility — own hotel

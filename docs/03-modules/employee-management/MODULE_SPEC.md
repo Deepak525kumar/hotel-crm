@@ -408,6 +408,46 @@ This module is part of the marketplace → Workforce Operations Platform forward
 - **`DECISION_INDEX.md`:** register the open architecture decisions OD-EMP-04, OD-EMP-07, OD-EMP-10, OD-EMP-12, OD-EMP-16 (new, G4 Performance PERF-EMP-001) as pending decision records. `OD-EMP-05` is RESOLVED (`ADR-023`) and `OD-EMP-09` is RESOLVED (`ADR-032`, 2026-07-28) — both move out of the pending list.
 - **`SYNC_STATE.yaml`:** record this spec as `REVIEW` pending G4 independent reviews and G2 human approval; owner assignment remains blocked (SYNC-001).
 
+
+## Status Addendum — Re-onboarding (2026-08-23, recorded not versioned)
+
+Recorded per the append-only correction convention. The re-onboarding path shipped in PRs #468/#469
+(2026-08-16) with no specification coverage; no requirement, rule, or open-decision id is renumbered
+or restated here.
+
+**What it is.** A worker who was deactivated (a *pause*, not a termination — `EmploymentStatus` is
+permanent and non-terminal since the 2026-08-06 lifecycle rework) can be brought back without
+repeating the full onboarding document gate, provided their contract situation warrants it.
+
+**The mechanism is `employment_cycle`, and it is load-bearing.** Both return paths bump it:
+
+| Transition | Path |
+|---|---|
+| `DELETED → PENDING` | full rehire, via `restore()` |
+| `DEACTIVATED → PENDING` | re-onboarding after a pause whose contract no longer stands, via `triggerReonboarding()` |
+
+`employment_cycle > 1` is what drives **both** `submitForReview()`'s document-gate skip and the
+review queue's "reonboarding" labelling — a `PENDING` row's `employment_cycle` marks the start of
+that cycle.
+
+**RULE-EMP-REONB-01.** Every transition into `PENDING` from either return path MUST increment
+`employment_cycle`. An earlier implementation omitted `DEACTIVATED → PENDING` from the increment,
+which silently forced re-onboarding workers back through the very document-completeness gate the
+feature exists to skip — `isReonboarding` read `employment_cycle === 1` for them. The defect was
+invisible from the outside: the flow worked, it was merely wrong.
+
+Evidence: `employee-management/service.ts:528-546` (the `isNewCycle` guard and its rationale);
+`hr/service.ts:183-192` (the single definition of "this contract still stands", exported so the
+approve/rehire gate and the re-onboarding path cannot drift), `hr/service.ts:300` (a returning
+worker is issued a **new** default contract).
+
+**Related, not owned here.** Contract standing is `backend-hr`'s (`ADR-012`); the nav lockout and
+capability pin that accompany re-onboarding are client behaviour (`SPEC-FRONTEND-001`,
+`SPEC-MOBILE-001`). The hierarchical approval that gates the return is `ADR-065`.
+
+**Open.** No E2E scenario covers re-onboarding — recorded as a gap in
+`docs/10-testing/e2e/README.md`.
+
 ## Review and Change Log
 
 | Version | Date | Change | Findings resolved | Approver |
@@ -426,3 +466,4 @@ This module is part of the marketplace → Workforce Operations Platform forward
 | 0.2.6 | 2026-07-28 | **`GD-15` sub-decision 10 of 10 (FINAL), per `ADR-048`** (Job Title & skill-tag governance, Decided via the Governance Resolution workflow, Option (a) for both, with an explicit retire-not-delete requirement). `OD-EMP-13` and `OD-EMP-14` both resolved with the identical pattern: Admin-managed lookup table (not a hard-coded enum) for each field; Admin may add or retire values without a deployment; an existing value referenced by any record is never deleted — retirement is via an `is_active` (or equivalent) flag, preserving historical-record integrity while excluding the retired value from future assignment. **`GD-15` (HR & Employee-Management module build scope) is now fully resolved — all ten sub-decisions closed:** `OD-HR-02` (`ADR-039`), `OD-HR-03`/`07` (`ADR-040`), `OD-HR-09` (`ADR-041`), `OD-HR-10` (`ADR-042`), `OD-HR-13` (`ADR-043`), `OD-HR-14` (`ADR-044`), `OD-EMP-04` (`ADR-045`), `OD-EMP-06` (`ADR-046`), `OD-EMP-08` (`ADR-047`), `OD-EMP-13`/`14` (`ADR-048`). No code changes. | `OD-EMP-13`, `OD-EMP-14` RESOLVED (`ADR-048`); `GD-15` fully resolved | Commissioning human (2026-07-28, Governance Resolution workflow, `GD-15` sub-decision 10/10, FINAL) |
 | 0.2.7 | 2026-07-29 | **`GD-03` org-chart/reporting-model half, per `ADR-060`** (Decided via the Governance Resolution workflow, ratifying the commissioning human's explicit verbatim disposition). `OD-EMP-12` resolved: flat, hotel-scoped — no explicit `reports_to_user_id` FK or reporting-tree data model is introduced. Org-chart visibility (RM+Admin, already confirmed by `REQ-EMP-013`) is derived implicitly from existing hotel/hotel-group scope membership, reusing `ADR-023`/`ADR-030`'s already-established discriminated JWT `scope` claim rather than introducing a new authorization primitive. Job Dispatch's manager-assignment routing is built against hotel/hotel-group membership, not an org-chart tree. Explicit reporting chains/approval hierarchies/escalations remain deferred until a confirmed business requirement needs one — not invented here (Constitution §12). `PERF-EMP-004` resolves at the design level: query complexity is bounded by hotel/hotel-group cardinality, the same basis as every other scope-filtered query (`ADR-035`); no separate performance decision required. **`GD-03` (5-role model & Regional-Manager authority) is now fully resolved** — its permission-set half was already decided by `ADR-030` D-5 (2026-07-25); this record closes the data-model half `ADR-030` §7/§8 explicitly left open. This is also the named architectural eligibility gate `ADR-058` set for Job-Dispatch (`GD-20`/Epic 9): Job-Dispatch implementation is now architecturally eligible (scheduling/planning remains a distinct future pass, per `ADR-058` §4, not authorized here). `SPEC-AUTH-001`'s `OQ-AUTH-08` data-model half resolves identically (same underlying fact, not a separate decision). No code changes. | `OD-EMP-12` RESOLVED (`ADR-060`); `GD-03` fully resolved | Commissioning human (2026-07-29, Governance Resolution workflow) |
 | 0.2.8 | 2026-08-07 | **Amended (Additive), person-centric assignment redesign.** Adds `EmploymentRecord.primary_hotel_id` (nullable FK to `Hotel`, `ON DELETE SET NULL`; migration `20260807000000_employment_primary_hotel`) — a worker's/checker's primary/home hotel, assigned from that person's own page via `PUT /users/:id/role`. **This is display and default-selection ONLY and is explicitly NOT an eligibility field.** `REQ-EMP-012` ("assignable only within their Hotel Group") is UNCHANGED and remains the sole eligibility rule: scheduling, roster, and blocklist decisions continue to resolve group-grain through `EmploymentRecord.hotel_group_id` via `lib/roster-scope.ts`, which must never read `primary_hotel_id`. A worker may still be scheduled at any hotel in their group regardless of this value — the two concepts are deliberately separate: **hotel group determines where a worker may work; primary hotel records where they normally belong.** Additive and nullable, so every pre-existing row is valid unchanged (`NULL` = no primary hotel selected). | Backend suite 103/103 suites, 2253/2253 tests; `tsc --noEmit` clean; `eslint` clean; `next build` succeeds | — (additive implementation change; `REQ-EMP-012` untouched, so no re-freeze required) |
+| 0.2.8 (forward-note, recorded not versioned) | 2026-08-23 | **Status Addendum — Re-onboarding.** Records the re-onboarding path shipped in PRs #468/#469 with no specification coverage: the employment_cycle mechanism, both transitions that must increment it, and RULE-EMP-REONB-01 with the defect that motivated it (omitting DEACTIVATED -> PENDING silently forced re-onboarding workers back through the document gate the feature exists to skip). Documentation-accuracy addition only. | — (no findings) | — (recorded, not a versioned amendment) |

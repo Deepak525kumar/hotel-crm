@@ -33,7 +33,7 @@ separately from the backend.
 cookies set by the backend (`ADR-071`); the client cannot read them and does not try.
 
 This is enforced mechanically, not by review: `npm run test:no-localstorage-tokens` runs
-`scripts/check-no-localstorage-tokens.mjs`. **A regression here silently reopens the XSS
+`frontend/scripts/check-no-localstorage-tokens.mjs`. **A regression here silently reopens the XSS
 token-theft exposure the cookie migration existed to close**, which is why it is a build-time check
 rather than a convention.
 
@@ -82,5 +82,5 @@ resolves.
 ## 6. Evidence
 
 `frontend/package.json` (stack, scripts), `frontend/lib/api.ts`, `frontend/lib/locales.ts`,
-`frontend/app/layout.tsx`, `frontend/stores/`, `scripts/check-no-localstorage-tokens.mjs`,
+`frontend/app/layout.tsx`, `frontend/stores/`, `frontend/scripts/check-no-localstorage-tokens.mjs`,
 `.claude/knowledge/MODULE_REGISTRY.yaml` (`frontend-web`).
