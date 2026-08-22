@@ -121,6 +121,10 @@ specifications:
     frozen_at: "never frozen; module deleted before G2 was sought"
     release_prerequisites: none — module removed, superseded by backend-hr's Contract feature
     note: "Module built 2026-08-09 (PR #398), deleted 2026-08-13 by product decision (docs/10-testing/e2e/scenarios/08-known-gaps-and-next.md). See MODULE_REGISTRY.yaml's backend-document-templates entry."
+  - module: cross-cutting-i18n  # NOT a code module -- internationalization is owned by no single module; it spans frontend, both mobile apps, and one column on User. Recorded here so the specification is discoverable from the index rather than only from docs/README.md.
+    spec: SPEC-I18N-001@0.1.0
+    status: REVIEW  # Added 2026-08-23. Authored after implementation (PRs #471-#484, 2026-08-16..18), describing as-built behaviour. NOT frozen: no G4 round, no G2 freeze. Six open decisions recorded, three of which block SPEC-CHATBOT-001 (which language the chatbot answers in, RTL in conversational surfaces, which language list bounds notice content). Discloses that four of the six translation catalogues are machine-translated and have never been read by a speaker of the language.
+    path: docs/02-architecture/system/INTERNATIONALIZATION.md
   - module: backend-onboarding
     spec: SPEC-ONBOARDING-001@1.1.0
     status: REVIEW  # Added 2026-08-22 (documentation synchronization pass). The specification existed and was cited as a governing specification by ADR-030, ADR-065, and the E2E suite, but had neither a Document Control block of its own nor a row in this index or MODULE_REGISTRY.yaml. NOT frozen: no G4 independent-review round and no G2 Specification Freeze has ever been run for it. No code module -- backend-onboarding was never built (ADR-030 note 3); the lifecycle transitions live in backend/src/modules/employee-management behind assertLifecycleAuthority(). Outstanding: ADR-030's change table asks that this spec's section 1/6.6/6.7 ownership claims be reconciled against ADR-030 at its next revision.
