@@ -5,7 +5,8 @@
 > `[CURRENT STATE]` — already-implemented quality-verification / rating / leaderboard behavior,
 > reverse-specified at code revision `6e404ab`; `[TARGET STATE]` — the confirmed 0–100 (no-5-star)
 > quality model with rating tiers, recency-weighted averaging, warnings, and a rework loop with
-> 20-minute escalation that is authoritative but largely unbuilt; `[MIGRATION GAP]` marks the delta;
+> 20-minute escalation that was authoritative but largely unbuilt **at authoring time**; `[MIGRATION
+> GAP]` marks the delta;
 > `[OPEN DECISION]` marks genuine human-authority items. Current-state claims cite `path:line
 > @6e404ab`. Target-state claims cite `CONFIRMED_REQUIREMENTS_REGISTER.md` (CONFIRMED §x) and
 > `PIVOT_DESIGN_DOCUMENT.md` (PIVOT §x). This document records behavior and confirmed contract; it
@@ -53,8 +54,9 @@ rating, and worker-standing lifecycle of a worker against a confirmed assignment
 - Data contract for the Prisma `QualityVerification`, `Rating`, and `WorkerOverallRating` models
   (`schema.prisma:395-459`) and the `VerificationStatus` enum (`schema.prisma:74-78`).
 - `[TARGET]` 0–100-only rating, photo-with-rating, rating tiers, recency-weighted average, warnings,
-  and the rework loop with 20-minute escalation — all UNBUILT; specified only to the extent the
-  confirmed authorities settle them.
+  and the rework loop with 20-minute escalation — UNBUILT at `6e404ab`; specified only to the extent
+  the confirmed authorities settle them. **The rework loop, its photo evidence, and the 20-minute
+  escalation have since been BUILT — see the Status Addendum (2026-08-22) below.**
 
 **Out of scope:**
 - Assignment lifecycle (`backend-assignments`), attendance (`backend-quality` reads assignment +
@@ -63,7 +65,8 @@ rating, and worker-standing lifecycle of a worker against a confirmed assignment
   work-applications apply-time rating snapshot (`backend-work-applications` — a downstream CONSUMER).
   Referenced only as consumed state, delivery sink, boundary, or consumer.
 - Object-storage / S3 photo wiring (PIVOT infra ~line 164) and the scheduled-job runtime for the
-  20-minute rework timer (PIVOT infra ~line 165,190) — target infrastructure, UNBUILT.
+  20-minute rework timer (PIVOT infra ~line 165,190) — target infrastructure, UNBUILT at `6e404ab`.
+  **Both have since been BUILT — see the Status Addendum (2026-08-22) below.**
 
 **Non-goals:** Requirements discovery, product-policy invention, code planning, independent review,
 or resolving any open decision below.
@@ -602,6 +605,38 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 - **SYNC_STATE.yaml:** none proposed by the author; the synchronization owner records spec issuance
   if/when this candidate advances.
 
+## Status Addendum — 2026-08-22 (recorded, not versioned)
+
+**Purpose.** This specification is `FROZEN` and its `[CURRENT STATE]` claims cite `path:line
+@6e404ab` (2026-07-07). Per this repository's append-only correction convention (see `ADR-060`'s
+own 2026-08-05 addendum), the original text above is left intact and this section records what has
+been built since, so a reader is not left believing the rework loop is still a target. **No
+requirement, rule, open-decision, or migration-gap id is renumbered or restated here.**
+
+Between 2026-08-18 and 2026-08-20 the rework loop moved from `[TARGET STATE]` to built, governed by
+`ADR-069` (Accepted 2026-08-18 — *Rework Is a New Assignment Linked to the Original*). Rework is
+modelled as a **new `WorkerAssignment` linked to the original**, not as a state on the original.
+
+| Target-state item | Status at 2026-08-22 | Evidence |
+|---|---|---|
+| Rework loop (checker → worker → checker) | **BUILT** | `backend/src/modules/quality/routes.ts:51` — `POST /quality/rework`; service in `backend/src/modules/quality/service.ts` |
+| 20-minute auto-escalation to Manager + Checker | **BUILT** | `backend/src/modules/quality/rework-escalation-job.ts`, registered on the Platform Worker scheduler (`backend/src/worker.ts`); migration `20260818140000_add_rework_escalated_at` |
+| Rework ↔ original assignment link | **BUILT** | migration `20260818120000_add_rework_assignment_link` |
+| Rework notification legs | **BUILT** | migration `20260818130000_add_rework_notification_types`; `NotificationType.REWORK_REQUIRED` and siblings (`schema.prisma:122-123`) |
+| Photo evidence with the rating | **BUILT** | `backend/src/modules/quality/routes.ts:46` — `GET /quality/verifications/:verification_id/photos`; multipart upload on the verification path; S3-backed, fails closed when unconfigured |
+| Worker-facing rework surface | **BUILT** | `mobile/worker-app/src/app/rework/[id].tsx`; web UI in the assignments surface |
+| Worker view of own hotel group's leaderboard | **BUILT** | `backend/src/modules/quality/routes.ts:69` — `GET /quality/leaderboard/by-hotel/:hotel_id`, governed by `ADR-067` |
+
+**Still target, not built** (unchanged by the above): the 0–100-only rating model with no 5-star
+system, rating tiers (Elite/High/Standard/Low/Probation), recency-weighted averaging over the last
+10 jobs, and the two-step warning thresholds (first <70, second <50 → manager). The dormant
+`photo_urls`/`rework_*` schema columns noted in the original text are no longer dormant.
+
+**Governing records added since freeze:** `ADR-067` (worker leaderboard visibility — own hotel
+group, non-contact fields; amends `ADR-030` §3 row `C-28`) and `ADR-069` (rework as a linked
+assignment). Neither amends a frozen clause of this specification; both are recorded here and in
+`.claude/knowledge/DECISION_INDEX.md`.
+
 ## Review and Change Log
 
 | Version | Date | Change | Findings resolved | Approver |
@@ -612,3 +647,5 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 | 0.2.0 | 2026-07-20 | **G2 Specification Freeze,** preceded by a documentation-accuracy correction: the Proposed Knowledge Deltas' `edge-quality-reads-attendance` delta (recorded as REQUIRED at v0.1.1) and the Ownership-and-Boundaries `state-attendance` read note were both stale — the edge and the `backend-quality` reader entry were already applied to `DEPENDENCY_GRAPH.yaml` by an earlier repository-synchronization pass, not previously reflected back into this document; corrected to state the delta is already applied (`DEPENDENCY_GRAPH.yaml:211-217,503`), not merely proposed. No requirement/rule/decision content changed by this correction. Frozen at G2 by the commissioning human (standing session authorization), reusing the existing G4 evidence without reopening any of the five dimensions — all were `PASS_WITH_ACTIONS` with zero Critical/High across v0.1.0-0.1.2. Open decisions `OQ-01..09` and owner assignment (`OQ-06`/`SYNC-001`) are implementation/release prerequisites reviewed by G8, not freeze blockers; `OQ-03`/`OQ-09` (Medium, cross-tenant) are routed to a Risk Assessment for human acceptance, matching the established precedent. Knowledge synchronized in the same pass: `MODULE_REGISTRY.yaml`/`SPECIFICATION_INDEX.yaml` (→ `SPEC-QUAL-001@0.2.0 (FROZEN)`), `MODULE_MEMORY.yaml` (`ART-MEM-backend-quality` produced), `SYNC_STATE.yaml`, and the Specification Issues Register. | G2 freeze — no new findings; documentation-accuracy correction only | Commissioning human (2026-07-20, G2) |
 | 0.2.0 (forward-note, recorded not versioned) | 2026-07-22 | **Forward-note per `ADR-026`** (Accepted, corrected same session, `claude/epic-5-verification-next-u5tet9`) — the headline open decision `OQ-01`/`MIG-GAP-01`/`TRULE-001` is now resolved: the shipped 1–5 `Rating.score` model is **rescaled to 0–100**, matching `CONFIRMED_REQUIREMENTS_REGISTER.md` §15/`TRULE-001` exactly (implementation of already-confirmed authority, not an override of it — an earlier, briefly-committed version of `ADR-026` had wrongly recorded the opposite outcome as a human-authorized override; corrected in place before merge, see `ADR-026`'s own Status section). `RULE-006`'s `score` bound moves from int 1..5 to int 0..100 (`quality/service.ts`, `quality/types.ts`); the `Rating_score_range` DB CHECK moves from `[1,5]` to `[0,100]`; existing rows are migrated ×20 by a real SQL migration (`prisma/migrations/20260722180000_rescale_rating_score_to_0_100`); `WorkerOverallRating.average_score`'s DB-trigger-maintained `AVG(Rating.score)` requires no trigger-function change since it hardcodes no 1–5 assumption. No requirement/rule/migration-gap id is renumbered by this note; `OQ-01`'s disposition and `MIG-GAP-01`'s classification are corrected in place at the referencing rows (RULE-006, TRULE-001, MIG-GAP-01, OQ-01 below) rather than left showing "1–5 retained" or "OPEN". No version bump — nonsemantic forward-note (`LOOP_CONTROL.md` §7 exemption), mirroring the `SPEC-ATT-001`/`ADR-022` forward-note precedent. | None — forward-note only, records a decision + its already-landed implementation. | — (nonsemantic annotation; no approver action required; G2 freeze status unaffected). |
 | 0.2.0 (forward-note, recorded not versioned) | 2026-08-02 | **Forward-note per `ADR-035`/`SIR-QUAL-007`** (RESOLVED `GD-11`, 2026-07-28; implemented `claude/quality-leaderboard-pagination`, PR #306, commit `8baad9e`) — the leaderboard's SLO/pagination half of `OQ-07` is now implemented: `getLeaderboard(hotelId, page, perPage)` (`service.ts:263-296`) is paginated (default 25, max 100 per page, matching `ADR-035` exactly), replacing the prior unpaginated `take 50`; response envelope gains a top-level `pagination` object (`page,per_page,total,total_pages,has_next,has_prev`). REQ-016/017/018, RULE-001, RULE-008, the Interfaces table rows, the Performance-budgets narrative, FIND-PERF-003, and OQ-07's lead sentence are corrected in place to describe paginated (not unpaginated/"top 50") behavior and current `service.ts` line numbers; OQ-07 itself remains OPEN for its distinct, unresolved compound-`HotelWorker(hotel_id,status)`-index measurement item only. No requirement/rule id is renumbered by this note; implementation of an already-confirmed authority (`ADR-035`), not a new decision — no version bump, nonsemantic forward-note (`LOOP_CONTROL.md` §7 exemption), mirroring the `ADR-026` forward-note precedent directly above. | None — forward-note only, records already-authorized `ADR-035` + its now-landed implementation. | — (nonsemantic annotation; no approver action required; G2 freeze status unaffected). |
+| 0.2.0 (forward-note, recorded not versioned) | 2026-08-22 | **Forward-note per `ADR-069`** (Accepted 2026-08-18) — the rework loop, its photo evidence, and the 20-minute auto-escalation moved from `[TARGET STATE]` to built (2026-08-18..20). Recorded in the Status Addendum (2026-08-22) above rather than by rewriting the frozen `[TARGET STATE]` text, per the append-only correction convention. No requirement, rule, open-decision, or migration-gap id renumbered or restated. | — (documentation-accuracy correction; no findings) | — (recorded, not a versioned amendment; G2 freeze is reserved human authority) |
+| 0.2.0 (forward-note, recorded not versioned) | 2026-08-22 | **Forward-note per `ADR-067`** (Accepted 2026-08-14) — a Worker may view their own hotel group's leaderboard, non-contact fields only; `GET /quality/leaderboard/by-hotel/:hotel_id` shipped. Amends `ADR-030` §3 row `C-28` (WORKER cell), not this specification. Recorded for traceability. | — (documentation-accuracy correction; no findings) | — (recorded, not a versioned amendment) |
