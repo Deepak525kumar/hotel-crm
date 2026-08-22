@@ -274,6 +274,35 @@ analytics remains read-only, no owned state, per its own scope. The remaining th
 not specified beyond the confirmed metric list (PIVOT §14 Appendix, line 490); will be authored at
 milestone M5 (Platform, PIVOT §12, line 456), which depends on M2-M4.
 
+
+### Named interface contracts (added 2026-08-23, recorded not versioned)
+
+**Why this table exists.** This specification described its HTTP envelope and error mapping but
+declared no named `IF-*` contracts, so nothing could reference this module's capabilities by
+identifier. `ADR-053` requires every chatbot tool to invoke an **existing** `IF-*` interface owned by
+another module, and forbids creating backend capability for the chatbot's benefit — which made a
+module with zero named interfaces unreachable by design.
+
+These are **as-built**, reverse-specified from the code cited in each row at `8626256`. They name what
+already exists; **no new capability is introduced, and no behaviour changes.** Contracts remain
+**unversioned** in code, so each carries `v0` and a compatibility posture of baseline/UNKNOWN,
+matching this document's existing vocabulary.
+
+The **Risk tier** column is `ADR-053`'s classification, recorded here so a future tool registry does
+not have to re-derive it: *read-only* executes immediately; *low-risk write* takes confirmation per
+tool at registration; *high-risk write* takes **mandatory** confirmation enforced by the
+orchestration layer regardless of registration preference. Assigning a tier here is **not** approval
+to expose any of these as a tool — `ADR-053` principle 4 requires each tool integration to be its
+own explicit approval.
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-ANALYTICS-GetLeaderboard / v0` | Inbound (query) | optional hotel id / hotel group id | `LeaderboardEntry[]` | Read-only | `requireRole(['admin','manager','regional_manager'])` + `analytics:read` | `analytics/routes.ts:16` → `service.ts:34` |
+| `IF-ANALYTICS-GetHotelLeaderboard / v0` | Inbound (query) | hotel id | `LeaderboardEntry[]` | Read-only | as above + `checkHotelAccess()` | `analytics/routes.ts:22` |
+| `IF-ANALYTICS-GetDashboardStats / v0` | Inbound (query) | optional hotel / hotel group scope | `DashboardStats` | Read-only | as above | `analytics/routes.ts:29` → `service.ts:93` |
+| `IF-ANALYTICS-GetMyStats / v0` | Inbound (query) | *none* — derived from the authenticated caller | `WorkerStats` (totals, attendance rate, month view, recent ratings) | Read-only | **Self-only, any authenticated role.** Deliberately does not ride `/stats`' role guard (`GD-06`) | `analytics/routes.ts:37` → `service.ts:235` |
+| `IF-ANALYTICS-GetHotelSummary / v0` | Inbound (query) | hotel id | `HotelSummary` | Read-only | role guard + `analytics:read` + `checkHotelAccess()` | `analytics/routes.ts:41` → `service.ts:359` |
+
 ## Events
 
 No event bus exists (`MODULE_REGISTRY.yaml` — no `published_events`/`consumed_events` entries other

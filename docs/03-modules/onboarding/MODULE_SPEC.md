@@ -716,3 +716,37 @@ The runtime event exchange is **bidirectional**: Employee Management publishes `
 **Last updated:** 2026-07-15  
 **Authority:** CONFIRMED_REQUIREMENTS_REGISTER.md, PIVOT_DESIGN_DOCUMENT.md, `ADR-013`, `ADR-015`  
 **Status:** Foundational specification — ready for downstream module specifications to reference as authority on Onboarding boundary.
+
+---
+
+## Interfaces and Contracts
+
+Added 2026-08-23. This document previously declared no named contracts at all — consistent with its
+being a business specification, but it left the onboarding capability unreachable by identifier.
+`ADR-053` requires every chatbot tool to invoke an existing `IF-*` interface owned by another module.
+
+**Important ownership note.** There is no `backend-onboarding` module (`ADR-030` note ³). Every
+contract below is **implemented inside `backend/src/modules/employee-management/`**, behind that
+module's single `assertLifecycleAuthority()` seam — a split owner would make its append-only
+`EmploymentStatusHistory` invariant unenforceable across module boundaries. These are named here
+because this document specifies the *capability*; `SPEC-EMP-001` remains the specification of the
+*module* that implements them. Neither document gains ownership of the other's scope by this table.
+
+These are **as-built**, reverse-specified at `8626256`. No new capability is introduced. Contracts
+are unversioned in code, hence `v0` and a baseline/UNKNOWN compatibility posture. The **Risk tier**
+column is `ADR-053`'s classification; recording a tier is **not** approval to expose a contract as a
+tool (`ADR-053` principle 4 — each integration is its own explicit approval).
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-ONB-SubmitForReview / v0` | Inbound (command) | employee id, actor | Application moved to `UNDER_REVIEW`; `submitted_for_review_at` stamped | **High-risk write** — hands the application to a reviewer and closes the self-edit window | **Self-service is universal** (`ADR-065` §5): a Worker, Checker, Manager or Regional Manager may submit their own. Managers may also submit within scope. Admin is exempt from onboarding | `employee-management/routes.ts:92` → `service.ts:604`; self-trigger allowance at `service.ts:1237` |
+| `IF-ONB-Approve / v0` | Inbound (command) | employee id, actor | Activation; organizational scope assigned **only now**, never at account creation (`ADR-065`) | **High-risk write** — grants platform access and operational scope | Hierarchical: reviewer must outrank the applicant. Enforced by `assertLifecycleAuthority()` | `employee-management/service.ts:771` |
+| `IF-ONB-Reject / v0` | Inbound (command) | employee id, actor, optional reason | Application rejected; applicant notified | **High-risk write** | Hierarchical, as above | `employee-management/service.ts:1056` |
+| `IF-ONB-Deactivate / v0` | Inbound (command) | employee id, actor, `DeactivationReason` | Employment paused (non-terminal); sessions ended | **High-risk write** — revokes access and ends live sessions | Hierarchical, as above | `employee-management/service.ts:1111` |
+| `IF-ONB-Reactivate / v0` | Inbound (command) | employee id, actor | Employment resumed within the same cycle | **High-risk write** — restores access | Hierarchical, as above | `employee-management/service.ts:1276` |
+| `IF-ONB-Rehire / v0` | Inbound (command) | employee id, actor | New employment cycle opened; `employment_cycle` incremented | **High-risk write** | Hierarchical, as above | `employee-management/service.ts:1331` |
+| `IF-ONB-DeactivateForContractLapse / v0` | **Internal (scheduled job)** | user id, reason | Employment deactivated, actor recorded as system-driven | Not tool-eligible | Platform Worker only; no HTTP surface and no human actor | `employee-management/service.ts:1566` |
+
+**Not specified here, deliberately.** Document upload and completeness reads belong to
+`SPEC-DOCUMENTS-001` (`IF-DOC-*`), and the document-collection *conversation* belongs to
+`SPEC-CHATBOT-001` (`ADR-013`). This module triggers and reacts; it does not own either.

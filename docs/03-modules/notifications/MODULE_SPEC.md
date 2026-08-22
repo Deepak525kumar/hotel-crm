@@ -337,6 +337,39 @@ here beyond the confirmed behavior in Requirements/Rules; they will be authored 
 corresponding milestone begins (PIVOT §12: M1 for auth/failed-login and envelope work, M2 for
 broadcast, M3 for rework/warnings, M4 for consent/contract-expiry).
 
+
+### Named interface contracts (added 2026-08-23, recorded not versioned)
+
+**Why this table exists.** This specification described its HTTP envelope and error mapping but
+declared no named `IF-*` contracts, so nothing could reference this module's capabilities by
+identifier. `ADR-053` requires every chatbot tool to invoke an **existing** `IF-*` interface owned by
+another module, and forbids creating backend capability for the chatbot's benefit — which made a
+module with zero named interfaces unreachable by design.
+
+These are **as-built**, reverse-specified from the code cited in each row at `8626256`. They name what
+already exists; **no new capability is introduced, and no behaviour changes.** Contracts remain
+**unversioned** in code, so each carries `v0` and a compatibility posture of baseline/UNKNOWN,
+matching this document's existing vocabulary.
+
+The **Risk tier** column is `ADR-053`'s classification, recorded here so a future tool registry does
+not have to re-derive it: *read-only* executes immediately; *low-risk write* takes confirmation per
+tool at registration; *high-risk write* takes **mandatory** confirmation enforced by the
+orchestration layer regardless of registration preference. Assigning a tier here is **not** approval
+to expose any of these as a tool — `ADR-053` principle 4 requires each tool integration to be its
+own explicit approval.
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-NOTIF-Enqueue / v0` | **Inbound (in-process only)** | notification payload, transaction handle | Row written to the transactional outbox inside the caller's transaction (`ADR-029`) | Low-risk write | **Not HTTP-reachable.** Module-to-module call only; the single-commit outbox guarantee depends on sharing the caller's transaction | `notifications/service.ts:34` |
+| `IF-NOTIF-SendNotification / v0` | Inbound (in-process) | user id, `NotificationPayload` | Delivery enqueued | Low-risk write | Not HTTP-reachable | `notifications/service.ts:101` |
+| `IF-NOTIF-GetNotifications / v0` | Inbound (query) | *none* — derived from the authenticated caller | `Notification[]` for that user | Read-only | Authenticated, self-scoped | `notifications/routes.ts:25` → `service.ts:113` |
+| `IF-NOTIF-MarkAsRead / v0` | Inbound (command) | notification id | Updated `Notification` | Low-risk write — reversible, self-scoped, affects no other party | Authenticated, self-scoped | `notifications/routes.ts:26` → `service.ts:121` |
+| `IF-NOTIF-RegisterPushToken / v0` | Inbound (command) | device push token | Stored `PushToken` | Low-risk write | Authenticated, self-scoped | `notifications/routes.ts:29` → `service.ts:143` |
+| `IF-NOTIF-GetOutboxMetrics / v0` | Inbound (query, operational) | *none* | Outbox depth / failure counts | Read-only | `requireRole('admin')` | `notifications/routes.ts:20` |
+| `IF-NOTIF-ListDeadLetters / v0` | Inbound (query, operational) | *none* | Dead-lettered outbox events | Read-only | `requireRole('admin')` | `notifications/routes.ts:21` |
+| `IF-NOTIF-RequeueDeadLetter / v0` | Inbound (command, operational) | outbox id | Event requeued | **High-risk write** — re-delivers a side effect that already failed; not idempotent from the recipient's view | `requireRole('admin')` | `notifications/routes.ts:22` |
+| `IF-NOTIF-DiscardDeadLetter / v0` | Inbound (command, operational) | outbox id | Event discarded | **High-risk write** — irreversible; permanently drops a pending side effect | `requireRole('admin')` | `notifications/routes.ts:23` |
+
 ## Events
 
 No event bus exists (`MODULE_REGISTRY.yaml:150-151`: `published_events: none-observed`,
