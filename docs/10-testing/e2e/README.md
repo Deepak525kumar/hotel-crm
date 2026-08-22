@@ -61,6 +61,25 @@ replace them.
 **Start with 00. Then 01-07 and 09-12 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
+### Known coverage gaps (recorded 2026-08-22)
+
+Three shipped features have no scenario. Listed here rather than left to be rediscovered, per this
+suite's own rule that a gap found but not written down gets found again from scratch. **These are
+outstanding work, not passed checks.**
+
+| Missing scenario | Feature | Shipped | Governing record |
+|---|---|---|---|
+| `13-language-and-rtl.md` | Six UI locales (`de en fr ar uk ur`), two right-to-left, persisted on `User.preferred_language`, across web and both mobile apps | PRs #471–#484 | **none — undocumented, no specification** |
+| `14-payslip-requests.md` | Payslip request intake, manager fulfilment, date validation | PRs #487–#491 | `ADR-014`, `SPEC-HR-001` |
+| `15-re-onboarding.md` | Re-onboarding of inactive/deactivated workers, nav lockout, capability pin | PRs #468, #469 | `ADR-065` (partially) |
+
+The language one matters most and is the least testable as things stand: there is no specification
+saying which language any surface should render in, so a scenario would have to invent its own pass
+criteria. Writing the specification comes first.
+
+Login throttling (`ADR-070`, PR #509) and the welcome-email-on-account-creation path (PR #508) also
+landed after the newest run log and are not yet exercised by any scenario.
+
 ---
 
 ## Governing specifications
@@ -77,6 +96,10 @@ These scenarios verify behaviour defined by:
 - `ADR-036` — optimistic concurrency as the platform standard
 - `ADR-029` — single-commit outbox / transactional side-effects
 - `ADR-044` — the HR contract-scan malware hook (sibling precedent to ADR-066)
+- `ADR-067` — worker visibility of the quality leaderboard (own hotel group, non-contact fields)
+- `ADR-068` — Ukrainian added to the consent notice languages; the notice follows the selected language
+- `ADR-069` — rework is a new assignment linked to the original, with 20-minute escalation (scenario 12)
+- `ADR-070` — bounded per-account login throttle (defense-in-depth alongside edge rate limiting)
 
 When a scenario's expected result contradicts one of these, **the specification wins** and the
 scenario is the thing to correct — unless investigation shows the spec itself is wrong, in which
