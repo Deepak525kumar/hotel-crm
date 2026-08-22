@@ -3,7 +3,8 @@
   "description": "Configuration for repository-integrity-check.js. Repository-specific knobs only; check logic itself lives in the script (Knowledge Separation, ../CLAUDE.md).",
   "ignoreDirNames": [
     "node_modules", ".git", "dist", "build", ".next", "coverage",
-    ".antigravity", "out", ".turbo", "android", "ios"
+    ".antigravity", "out", ".turbo", "android", "ios",
+    "worktrees"
   ],
   "ignoreFilePatterns": [
     "package-lock.json", "*.drawio"
