@@ -30,39 +30,54 @@ We are building a **modular monolith** — a single Express.js + TypeScript appl
 hotel-crm/
 ├── backend/                    # Single Express.js + TypeScript monolith
 │   ├── src/
-│   │   ├── server.ts          # Single entry point
+│   │   ├── server.ts          # HTTP entry point
+│   │   ├── worker.ts          # Platform Worker entry point (outbox drain + scheduled jobs, ADR-029)
+│   │   ├── app.ts             # Express app assembly
 │   │   ├── config/            # Environment & service configuration
-│   │   ├── middleware/        # Shared middleware (auth, validation, errors)
-│   │   ├── modules/           # Business logic modules (each future microservice)
-│   │   │   ├── auth/          # Authentication
-│   │   │   ├── crm/           # Hotels, Rooms, Tasks
-│   │   │   ├── hr/            # HR & Payroll
-│   │   │   ├── quality/       # Quality Verification
-│   │   │   ├── calendar/      # Availability & Scheduling
-│   │   │   ├── staffing/      # Worker Assignment
-│   │   │   ├── notifications/ # Push/Email/In-app
-│   │   │   └── analytics/     # Metrics & Reporting
-│   │   ├── shared/            # Common utilities (db, cache, logger, errors)
-│   │   └── types/             # Shared TypeScript definitions
-│   ├── prisma/                # Prisma ORM schema & migrations
-│   ├── tests/                 # Test suite
+│   │   ├── lib/               # Shared utilities (db, jwt, cookies, storage, errors, health)
+│   │   ├── middleware/        # Shared middleware (auth, permissions, validation, errors)
+│   │   ├── routes/v1/         # Versioned route mounting
+│   │   ├── scripts/           # Operational scripts
+│   │   ├── __tests__/         # Test suite
+│   │   └── modules/           # Business logic modules (each a future microservice)
+│   │       ├── auth/                  # Authentication, sessions, login throttle
+│   │       ├── users/                 # User accounts and profiles
+│   │       ├── crm/                   # Hotels and hotel groups
+│   │       ├── employee-management/   # Employment records and lifecycle
+│   │       ├── hr/                    # Contracts and payslip requests
+│   │       ├── job-requests/          # Job requests and broadcasts
+│   │       ├── assignments/           # Worker assignments
+│   │       ├── calendar/              # Availability, absences, shift summaries
+│   │       ├── attendance/            # Check-in / check-out
+│   │       ├── geo/                   # Geofencing and location verification
+│   │       ├── quality/               # Quality verification, ratings, rework loop
+│   │       ├── documents/             # Worker documents (S3)
+│   │       ├── consent/               # GDPR consent lifecycle and daily gate
+│   │       ├── compliance/            # Governance, reporting, audit consumption
+│   │       ├── retention/             # Retention tiers and sweep jobs
+│   │       ├── notifications/         # Push / in-app, transactional outbox
+│   │       ├── analytics/             # Metrics, reporting, leaderboards
+│   │       └── chatbot/               # AI capability — SPECIFIED, NOT BUILT (.placeholder only)
+│   ├── prisma/                # Prisma schema & migrations
 │   ├── package.json
 │   └── tsconfig.json
 │
-├── frontend/                   # Next.js dashboard
-│   ├── app/                   # App Router structure
-│   └── public/
+├── frontend/                   # Next.js dashboard (App Router), deployed on Vercel
+│   ├── app/                   # Routes
+│   ├── components/            # UI components
+│   ├── lib/                   # API client, i18n (de/en/fr/ar/uk/ur), types
+│   └── e2e/                   # Playwright browser tests
 │
-├── mobile/                    # React Native apps
+├── mobile/                    # Expo / React Native apps
 │   ├── worker-app/            # Worker/Staff app
 │   └── checker-app/           # Quality Checker app
 │
-├── docs/                      # Architecture & API documentation
+├── docs/                      # Specifications, ADRs, testing, audits — see docs/ below
+├── .claude/                   # AI engineering platform: constitution, workflows, knowledge indexes
+├── deploy/                    # Release checklists and deployment guides
+├── deploy.sh                  # Manual SSH deploy path (independent of GitHub Actions)
+├── ecosystem.config.js        # PM2 process definitions (hotel-crm-api, hotel-crm-worker)
 ├── docker-compose.yml         # Local development services
-├── _legacy/                   # Archived files from old architecture
-│   ├── backend-microservices/ # Old microservice code
-│   ├── docker/                # Old Docker configs
-│   └── k8s/                   # Old Kubernetes configs
 │
 └── README.md                  # This file
 ```
@@ -82,14 +97,38 @@ module/
 
 ### Modules
 
-- **auth**: User authentication, JWT tokens, permissions
-- **crm**: Hotels, rooms, workers, task management
-- **hr**: Employee records, contracts, payroll
-- **quality**: Quality verification, rating system
-- **calendar**: Availability tracking, scheduling
-- **staffing**: Worker assignment, optimization
-- **notifications**: Push, email, in-app messaging
-- **analytics**: Metrics, reporting, leaderboards
+Eighteen module directories exist under `backend/src/modules/`; seventeen are route-mounted under
+`/api/v1` (`backend/src/routes/v1/index.ts`). Each has a specification under
+[`docs/03-modules/`](docs/03-modules/) and a registry entry in
+[`.claude/knowledge/MODULE_REGISTRY.yaml`](.claude/knowledge/MODULE_REGISTRY.yaml), which is the
+authority for ownership and implementation status — this list summarizes it.
+
+- **auth**: authentication, JWT, sessions, password reset, login throttle (`ADR-070`)
+- **users**: user accounts and profiles
+- **crm**: hotels and hotel groups (`ADR-011`, `ADR-023`)
+- **employee-management**: employment records and the permanent, non-terminal lifecycle
+- **hr**: contracts and payslip requests (`ADR-012`, `ADR-014`)
+- **job-requests**: job requests and broadcasts (directory renamed from `work-requests`; the
+  `/work-requests` route mount was deliberately kept)
+- **assignments**: worker assignments, person-centric write path
+- **calendar**: availability, absences, daily shift summaries (`ADR-021`)
+- **attendance**: check-in / check-out
+- **geo**: geofencing and location verification
+- **quality**: verification, ratings, leaderboard, rework loop (`ADR-067`, `ADR-069`)
+- **documents**: worker documents, S3-backed
+- **consent**: GDPR consent lifecycle and the daily access gate (`ADR-015`, `ADR-037`)
+- **compliance**: governance, reporting, audit-log consumption (read-only, `ADR-016`)
+- **retention**: retention tiers and sweep jobs (`ADR-033`)
+- **notifications**: push / in-app delivery over a transactional outbox (`ADR-029`)
+- **analytics**: metrics, reporting, leaderboards
+- **chatbot**: **specified but not built** — holds only `.placeholder`, is not route-mounted, and
+  has no LLM SDK dependency. Governed by `ADR-013` and `ADR-053`; `GD-19` is DEFERRED — POST-MVP.
+
+Retired: **hotel-workers** (`ADR-022`), **work-applications** (`ADR-058`, folded into assignments),
+**document-templates** (removed 2026-08-13, superseded by the HR contract flow).
+There is no `staffing` module; that capability is `job-requests` + `assignments`.
+There is no `backend-onboarding` module — the onboarding lifecycle transitions live in
+`employee-management` behind a single authorization seam (`ADR-030` note ³).
 
 ## Technology Stack
 

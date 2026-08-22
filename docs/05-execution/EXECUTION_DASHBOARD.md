@@ -1,5 +1,8 @@
 # Execution Dashboard
 
+> ⚠️ **Staleness notice (added 2026-08-22).** The "last verified" date below is 2026-08-04 — roughly ~250 commits behind `main`. This document was **not** re-verified during the 2026-08-22 documentation synchronization pass, which was scoped to specification and knowledge-index drift (see `SYNC-073` in [`.claude/knowledge/SYNC_STATE.yaml`](../../.claude/knowledge/SYNC_STATE.yaml)). Treat the status below as of its stated date, not as current. Features that have shipped since and are not reflected here include the quality rework loop (`ADR-069`), the worker leaderboard (`ADR-067`), the daily consent gate, payslip-request UI, re-onboarding, login throttling (`ADR-070`), and internationalization across all three clients.
+
+
 | Field | Value |
 |---|---|
 | Purpose | The single operational status view: current milestone, per-module implementation state, completed vs. remaining modules, active work, upcoming work, and open blockers to that work |

@@ -1,5 +1,10 @@
 # Hotel CRM — Handoff
 
+> ⚠️ **Staleness notice (added 2026-08-22).** This file's own header says it is current to 2026-08-09 and that §1–§8 are a historical snapshot. It has since fallen roughly 250 commits behind `main` and **§0 is no longer maintained either** — treat the whole file as historical.
+>
+> For current state use: [`docs/05-execution/EXECUTION_DASHBOARD.md`](docs/05-execution/EXECUTION_DASHBOARD.md) (where work is), [`.claude/knowledge/MODULE_REGISTRY.yaml`](.claude/knowledge/MODULE_REGISTRY.yaml) (per-module status and specification versions), and `git log origin/main` (what actually merged — advice this file gives about itself in its own PR #392 incident note, and which still applies).
+
+
 Last updated: 2026-08-09 (#394 and #395 both merged to `main`; feature-scoping decisions recorded
 for dark mode, document templates, language switcher, contract-type workflow, and Leave & Sickness
 OCR — see §0.3. #396, this doc-sync PR, still open).
