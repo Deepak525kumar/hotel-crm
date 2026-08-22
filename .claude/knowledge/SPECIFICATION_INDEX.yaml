@@ -144,13 +144,22 @@ specifications:
     spec: SPEC-COMPLIANCE-001@0.1.0
     status: REVIEW  # NOT FROZEN -- G2 blocked on reserved human authority (owner assignment/SYNC-001; OD-COMPLIANCE-002/003/006/009/010/011/012). Implemented 2026-08-02 (PR 1-3). Added 2026-08-02 (SYNC-075, backend-compliance PR 4 governance-sync pass) -- backend-compliance had no row in this index at all prior to this pass (it was zero-code) -- see MODULE_REGISTRY.yaml's backend-compliance entry for the full evidence trail.
   - module: frontend-web
-    spec: none
+    spec: SPEC-FRONTEND-001
+    version: 0.1.0
+    status: REVIEW  # Added 2026-08-23. Authored after implementation; NOT frozen (no G4 round, no G2 freeze). Records RULE-FE-01 (no auth tokens in localStorage, enforced by scripts/check-no-localstorage-tokens.mjs at build time) and RULE-FE-02 (role gates must not be exact-match -- regional_manager breaks silently against a manager-only test).
+    path: docs/08-frontend/FRONTEND_SPEC.md
     status: UNKNOWN
   - module: mobile-worker
-    spec: none
+    spec: SPEC-MOBILE-001
+    version: 0.1.0
+    status: REVIEW  # Added 2026-08-23. Authored after implementation; NOT frozen (no G4 round, no G2 freeze). One document covers both apps: shared stack, auth model and infrastructure; screen sets differ and are tabulated separately.
+    path: docs/09-mobile/MOBILE_SPEC.md
     status: UNKNOWN
   - module: mobile-checker
-    spec: none
+    spec: SPEC-MOBILE-001
+    version: 0.1.0
+    status: REVIEW  # Added 2026-08-23. Authored after implementation; NOT frozen (no G4 round, no G2 freeze). See mobile-worker entry -- same document.
+    path: docs/09-mobile/MOBILE_SPEC.md
     status: UNKNOWN
   - module: operations
     spec: none
