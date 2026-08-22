@@ -7,6 +7,30 @@
 
 ---
 
+## Document Control
+
+Added 2026-08-22 during the documentation synchronization pass. This was the only one of the
+nineteen module specifications with no Document Control block, so it had no spec id, version,
+status, or baseline revision of its own — while two ratified Decision Records (`ADR-030` §5/note ³
+and `ADR-065`) already referred to it as `SPEC-ONBOARDING-001`, and the E2E suite names it as a
+governing specification. This block claims the identifier those records already use; **it does not
+change any behaviour statement in this document, and it does not assert a review or freeze that
+never happened.**
+
+| Field | Value |
+|---|---|
+| Spec ID / version | `SPEC-ONBOARDING-001 / 1.1.0` — the `1.1` this document has been cited as since the `SYNC-028` governance pass that applied `ADR-013`'s boundary to it; formalized here, not newly assigned. |
+| Status | `REVIEW` — **not frozen.** No G4 independent-review round and no G2 Specification Freeze has ever been run for this document. Recorded as an open item, not as a defect. |
+| Owner | `unassigned` — reserved human authority (`SYNC-001`). No `CODEOWNERS` file exists. |
+| Authors / reviewers | Author: Module Author (documentation workflow). No independent review round has been executed. |
+| Code module | **None.** `backend-onboarding` was specified but never built (`ADR-030` note ³). The onboarding lifecycle transitions this document describes — `submitForReview`, `approve`, `reject`, `deactivate`, `reactivate`, `rehire` — are implemented inside `backend/src/modules/employee-management/` behind the single `assertLifecycleAuthority()` seam, because a split owner would have made that module's append-only history invariant unenforceable. |
+| Repository revision | Not anchored. This is a business specification containing no `path:line` code citations, so it carries no baseline revision and does not go stale against code movement the way the reverse-specified module documents do. |
+| Approved by / at | — (G2 Specification Freeze requires a named human approver; not sought or granted) |
+| Supersedes | None. |
+| Known reconciliation debt | `ADR-030`'s own change table records that this document's §1/§6.6/§6.7 ownership claims over pool/claim review, approve/reject, and probation-suitability decisioning "should be reconciled against this at that spec's next revision." That reconciliation is **still outstanding** and is not performed here. |
+
+---
+
 ## Source of Truth & Provenance
 
 This specification is derived **exclusively** from the two authoritative documents:

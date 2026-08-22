@@ -295,3 +295,25 @@ This record settles the capability set, ownership boundaries, migration plan, an
 **Known deferred dependencies (outside this ADR's scope):** 
 - `SPEC-EMP-001` declares `EVT-EMP-ProfileUpdated` with status `[OPEN]` (§8), awaiting a producing interface that does not exist — it depends on the field-level employee-edit capability this ADR defers to GD-15. The event is correctly flagged open; no producer interface may be added without first resolving GD-15 and defining which employment fields a scoped role may edit.
 - `HotelWorker` model dormancy (ADR-022-retired entity; `status=INVITED`, `invited_at` column): the `invited_at` column is written by zero code paths and "invite worker" capability is not introduced by this ADR (Q3, §7 and OQ-030-C). Cleanup of the dormant enum value and column is explicitly deferred to its own PR under ADR-024 scope, not stacked into this sequence.
+
+## 11. Amendment Addendum — records that amend this one (2026-08-22)
+
+Appended per this repository's append-only correction convention (see note ³ in §3 and `ADR-060`'s
+own 2026-08-05 addendum). This record's original text above is unchanged. Amendments to this ADR
+are made by **later ADRs**, never by editing the matrices in place; this section exists so a reader
+of §3 or §4 can find them without a repository-wide search.
+
+| Amending record | Effect on this ADR |
+|---|---|
+| `ADR-065` — Hierarchical Onboarding Gate (Accepted 2026-08-11) | Amends this record (together with `ADR-022`/`ADR-023`/`ADR-025`) to establish that **role assignment does not immediately confer operational scope** — activation precedes scope assignment for every non-Admin role. Its §5 further establishes that **self-service document upload is universal** (Worker, Checker, Manager, Regional Manager may upload their own compliance documents and move their own application to `UNDER_REVIEW`); Admin remains exempt from onboarding. The per-role UI mapping lives natively in `SPEC-ONBOARDING-001` §6.9. |
+| `ADR-067` — Worker Visibility of the Quality Leaderboard (Accepted 2026-08-14) | Amends §3 row `C-28`, **WORKER cell only** — a Worker may view their own hotel group's leaderboard, non-contact fields only. Already reflected inline in the `C-28` row. |
+
+**Disposition of the former `ADR-030-AMENDMENT-TASK.md`.** A follow-up task recorded during the
+`ADR-065` implementation asked for two things: (1) that §3 be amended to clarify worker/checker
+self-service write permission for document upload and the move to `UNDER_REVIEW`, and (2) that the
+implementation be reconciled so a worker can submit their own profile for review. Both are
+satisfied — (1) by `ADR-065` §5, recorded in the table above, and (2) in code, where
+`submitForReview()` explicitly permits self-triggering for workers alongside scoped authority for
+managers (`backend/src/modules/employee-management/service.ts:1237`, route at
+`employee-management/routes.ts:92`). The task file has been removed; this section is its record.
+

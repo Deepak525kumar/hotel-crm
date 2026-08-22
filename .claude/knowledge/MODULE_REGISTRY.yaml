@@ -234,6 +234,18 @@ modules:
     consumed_events: none-observed
     specification: none — SPEC-DOCUMENT-TEMPLATES-001 removed alongside the module (was DRAFT, never frozen)
 
+  - id: backend-onboarding
+    type: backend-module
+    path: backend/src/modules/onboarding  # NEVER CREATED -- recorded for traceability, not as an existing path
+    owner: unassigned
+    lifecycle: declared-never-built  # Specified but never implemented (ADR-030 note 3). The onboarding lifecycle transitions -- submitForReview, approve, reject, deactivate, reactivate, rehire -- are delivered inside backend/src/modules/employee-management behind its single assertLifecycleAuthority() seam. ADR-030 D-4c originally deferred three of them to this module and to backend-hr; the employment-lifecycle rework (2026-08-06, PR #354) superseded that split because a single applyTransition() seam must own every EmploymentRecord.status/employment_cycle write for the append-only EmploymentStatusHistory log to stay correct.
+    implementation_status: unimplemented -- capability delivered by employee-management (lifecycle transitions) and users (account/activation gate)
+    dependencies: []
+    published_events: none-observed
+    consumed_events: none-observed
+    specification: SPEC-ONBOARDING-001@1.1.0 (REVIEW)  # docs/03-modules/onboarding/MODULE_SPEC.md. Added to this registry 2026-08-22 -- the spec existed and was cited as a governing specification by ADR-030, ADR-065, and the E2E suite, but had no registry row at all. NOT frozen: no G4 round and no G2 freeze has ever been run. Outstanding reconciliation debt recorded by ADR-030's change table: this spec's section 1/6.6/6.7 ownership claims over pool/claim review, approve/reject, and probation-suitability decisioning await reconciliation at its next revision.
+    evidence: docs/03-modules/onboarding/MODULE_SPEC.md; ADR-065; ADR-030 note 3; backend/src/modules/employee-management/service.ts (submitForReview at :604, self-trigger allowance at :1237)
+
   - id: backend-chatbot
     type: backend-module
     path: backend/src/modules/chatbot
