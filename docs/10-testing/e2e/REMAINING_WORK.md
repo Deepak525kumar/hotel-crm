@@ -58,7 +58,7 @@ to the owner before silently re-adding content, rather than assuming it was inte
         can create an `admin` account any more** (admin included), and **admin can no longer
         create a worker/checker employment record** (admin → RM only), which also makes
         Admin-only `bulkImport` RM-only.
-- [ ] Get Docker running so the concurrency script (`scripts/05-concurrency.mjs`) and any live-DB
+- [ ] Get Docker running so the concurrency script (`docs/10-testing/e2e/scripts/05-concurrency.mjs`) and any live-DB
       verification can actually execute — currently blocking items #5/#7 from
       `08-known-gaps-and-next.md` (race conditions, assign-vs-deactivate) and item #6 (UI coverage
       gaps) from being verified rather than just claimed.
@@ -215,7 +215,7 @@ to the owner before silently re-adding content, rather than assuming it was inte
       Needs investigation: (1) when a Manager/Admin marks a worker absent, does the code even
       attempt to update the corresponding assignment/shift record, or is there no linkage at all
       between the two, (2) check `backend/src/modules/attendance/service.ts` and
-      `backend/src/modules/work-requests/` or wherever shift assignment lives for where these two
+      `backend/src/modules/job-requests/` or wherever shift assignment lives for where these two
       states are (or should be) reconciled, (3) this is very likely the SAME root cause investigation
       as the "worker not seeing absence in calendar" item directly above and the "cancel sick leave"
       feature request — all three point at the same underlying gap (absence/attendance state and

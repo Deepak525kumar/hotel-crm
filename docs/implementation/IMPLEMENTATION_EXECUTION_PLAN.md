@@ -111,7 +111,7 @@ independently found stale on one row — see note under Epic 1).
 Re-verified against `main` @ `4079a0f` (merge of PR #208, Epic 7 PR 7.7 — mobile push-token
 registration), the last commit in the Epic 7 chain. Method: `git log --oneline` cross-checked
 against every Epic 7 PR (7.1–7.8) named in §2 below, plus a direct read of the corresponding
-`backend/src/modules/notifications/`, `backend/worker/`, `mobile/*/src/` code and each PR's test
+`backend/src/modules/notifications/`, `backend/src/worker.ts`, `mobile/*/src/` code and each PR's test
 suite — not the register's own prior "awaiting implementation authorization" status, which this
 pass found stale and corrects.
 
@@ -322,7 +322,7 @@ Deferred / not sequenced here (blocked on human authority, correctly excluded):
 ### Epic 2 — Auth self-contained High findings
 - **PR 2.1** — OQ-AUTH-04: remove JWT refresh-secret fallback (fail closed if the dedicated
   refresh secret is unset). Files: `backend/src/modules/auth/*` (token issuance/verify),
-  `backend/src/config/env.js`. Test: `auth-refresh-secret.test.ts` (assert startup/verify
+  `backend/src/config/env.ts`. Test: `auth-refresh-secret.test.ts` (assert startup/verify
   rejects when refresh secret absent; no fallback to access secret).
 - **PR 2.2** — OQ-AUTH-15: hash `Session.refresh_token` at rest (store digest, compare on
   refresh). Files: `backend/src/modules/auth/service.ts`, `schema.prisma` (if a column
@@ -460,7 +460,7 @@ retained for its sequencing/scope record, not as an open work list.
 | PR | Title | Scope | DB | Depends on |
 |----|-------|-------|----|-----------|
 | **7.1** | Outbox data model + transactional enqueue | `OutboxEvent` model + `OutboxStatus`/`OutboxTransport` enums (Prisma) + migration, including `payload_version` (starts `1`) and `processed_at`; `notification-service.enqueue()` persisting `Notification` + `OutboxEvent` in one transaction; `event_id` (UUID) idempotency key. Ownership is exclusive to `backend-notifications` — no other module writes `state-outbox` directly. **Defines the `OutboxEvent.payload` contract explicitly in this PR** (e.g. `{event_type, aggregate_type, aggregate_id, payload}`) — every producer from 7.3 onward uses this one shape; no producer invents its own. No delivery yet — events accumulate `PENDING`. | +1 migration (outbox table + 2 enums) | — |
-| **7.2** | Platform Worker runtime | Dedicated `backend/worker` entrypoint (shared monolith codebase/Prisma) — the canonical **Platform Worker** (`ADR-029`); poll loop (configuration-driven, initial deployment default 5s); atomic claim (`PENDING→PROCESSING` via `FOR UPDATE SKIP LOCKED`); `DELIVERED`/`FAILED`/`DEAD_LETTER` lifecycle; configurable exponential backoff (1m/5m/15m/1h); transport-handler dispatch interface (no-op/log handler only — future handlers must be idempotent, `event_id` as provider-side key where supported); scheduled-job registration mechanism (no domain job yet); deploy topology (ecosystem/compose worker process). | — | 7.1 |
+| **7.2** | Platform Worker runtime | Dedicated `backend/src/worker.ts` entrypoint (shared monolith codebase/Prisma) — the canonical **Platform Worker** (`ADR-029`); poll loop (configuration-driven, initial deployment default 5s); atomic claim (`PENDING→PROCESSING` via `FOR UPDATE SKIP LOCKED`); `DELIVERED`/`FAILED`/`DEAD_LETTER` lifecycle; configurable exponential backoff (1m/5m/15m/1h); transport-handler dispatch interface (no-op/log handler only — future handlers must be idempotent, `event_id` as provider-side key where supported); scheduled-job registration mechanism (no domain job yet); deploy topology (ecosystem/compose worker process). | — | 7.1 |
 | **7.3** | Migrate existing producers to the outbox | Convert the four current producers (`work-requests`, `work-applications`, `attendance`, `quality`) from `.catch(() => {})` fire-and-forget to transactional `enqueue`, exclusively through `notificationService.enqueue()`; delivery is a no-op/log handler at this point (from 7.2) but failures are already durable/observable via `OutboxEvent.status`. Closes `OQ-NOTIF-04`/`OQ-NOTIF-09` in code. Per-producer tests. **Moved ahead of the transport PRs** so the whole application is on the outbox as soon as the runtime exists — email/push become pluggable handlers on an already-adopted pipeline, not a precondition for adopting it. | — | 7.1, 7.2 |
 | **7.4** | EMAIL transport | SMTP client behind the `EMAIL` transport handler; env-driven config with explicit secret-storage/rotation/least-privilege (carries `MIG-GAP-11`); mocked-SMTP tests. Unblocks auth email-reset / failed-login delivery (wiring auth is a follow-on producer change, tracked with `SIR-AUTH-005`). | — | 7.2 (7.3 for live end-to-end coverage) |
 | **7.5** | PUSH transport (backend only) | `PushToken` schema + migration; push-token registration endpoint; APNs/FCM clients behind the `PUSH` transport handler; mocked-provider tests. **No mobile/Expo changes in this PR** — deliberately backend-only so backend reviewers aren't reviewing client code, mobile can be reviewed independently, and either side can roll back without the other. | +1 migration (push-token table) | 7.2 (7.3 for live end-to-end coverage) |
@@ -491,10 +491,11 @@ can create, patch, approve, or reject requests/applications belonging to hotel B
 - **PR 8.1** — Mirror the exact pattern Epic 5 PR 5.5 already established for `backend-quality`
   and `backend-attendance` (in-service check, not route middleware, since the target hotel_id is
   either in the create body or must be looked up from the existing record before a PATCH):
-  - Files: `backend/src/modules/work-requests/service.ts` (`create()`, `update()`),
-    `backend/src/modules/work-requests/controller.ts` (thread `req.auth.scope` through),
-    `backend/src/modules/work-applications/service.ts` (`update()`/`approve()`),
-    `backend/src/modules/work-applications/controller.ts` (thread `req.auth.scope` through).
+  - Files: `backend/src/modules/job-requests/service.ts` (`create()`, `update()`),
+    `backend/src/modules/job-requests/controller.ts` (thread `req.auth.scope` through),
+    `backend/src/modules/assignments/service.ts`, `backend/src/modules/assignments/controller.ts`.
+    (Paths updated 2026-08-22: `work-requests/` was renamed `job-requests/` by Epic 9 PR 9.4, and
+    `work-applications/` was removed by `ADR-058`/PR #361, its behaviour folded into `assignments/`.)
   - Pattern (verbatim from `quality/service.ts:28-35`): `if (isScopeAuthzEnabled() &&
     actor.role === 'manager') { const inScope = await isHotelInScope(actor.scope ?? null,
     target.hotel_id); if (!inScope) throw new ForbiddenError(...); }`. Admin keeps its
@@ -586,7 +587,7 @@ not silent renumbering.
 
 #### PR 9.1 — RM role/scope verification + envelope refactor
 
-- **Files:** `backend/src/modules/work-requests/controller.ts`, `work-applications/controller.ts`,
+- **Files:** `backend/src/modules/job-requests/controller.ts`, `assignments/controller.ts`,
   `assignments/controller.ts` (envelope refactor); new `backend/src/lib/http-envelope.ts` exporting
   `sendSuccess(res, data, extra?)`/`sendPaginated(res, data, pagination, extra?)`, extracted from the
   identical inline shape already repeated in every handler (`work-requests/controller.ts:30-34,56-68`

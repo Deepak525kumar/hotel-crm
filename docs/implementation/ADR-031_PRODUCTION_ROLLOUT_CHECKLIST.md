@@ -30,7 +30,7 @@ that proxy breaks in a repository with no live deployment.
   (This bullet previously also cited `docs/05-execution/CHANGELOG.md`; that file was deleted
   2026-07-27 as part of the execution-tracking redesign — its history remains recoverable via
   `git log -- docs/05-execution/CHANGELOG.md`, and it never recorded a deployment either.)
-- `scripts/deploy.sh` (a manual, SSH-based deploy path independent of GitHub Actions) exists and
+- `deploy.sh` (repository root — a manual, SSH-based deploy path independent of GitHub Actions) exists and
   is not itself proven unused — but no record of its use appears anywhere in the repository.
 
 ## The two flags this checklist gates
@@ -51,7 +51,7 @@ first real production deployment of any commit at or after PR-7."
       EC2/RDS or equivalent, per `docs/legacy/infrastructure/AWS_DEPLOYMENT_EXECUTION_PLAN.md`'s
       plan or its successor).
 - [ ] **RO-2** The deploy pipeline (automated via `.github/workflows/deploy-production.yml`, or the
-      manual `scripts/deploy.sh` path) completes successfully at least once against that
+      manual `deploy.sh` path) completes successfully at least once against that
       environment — i.e., a `release/*` tag exists, or an equivalent manual-deploy record is made.
 - [ ] **RO-3** `token_generation` is verified live-readable on the production `User` table (M-1's
       migration has actually run there — `prisma migrate deploy` succeeded, not just validated).
