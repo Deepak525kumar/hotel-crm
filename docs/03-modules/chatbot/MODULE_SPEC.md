@@ -27,14 +27,14 @@
 - **Target — token/cost management:** A hard monthly token budget cap stored in config, a per-conversation token limit, a cached required-document list, and graceful fallback to a static checklist UI when limits are hit (CRR §8 line 109; PDD §4.14 line 151, §5.6 line 192 "Chatbot budget guard" job, §7.1 lines 267-268, §11 line 442). Chatbot owns the guardrail/decision to trigger fallback; the consumer only reacts to the signal (`ADR-013` item 3; `onboarding/MODULE_SPEC.md` §16.1).
 - **Target — guardrails:** Transport (TLS in transit, not end-to-end encrypted) and input-validation/injection-defense guardrails for the conversation itself, including accepted-upload-type enforcement as a conversation-level guardrail (`onboarding/MODULE_SPEC.md:325`; PDD §5.2; `ADR-013`) — **scoped (v0.1.1, `FIND-ARCH-01`) to lightweight, conversational type/format hints only (e.g., confirming a stated file type/format with the worker), independent of whether Chatbot ever handles file bytes directly (`OD-CHAT-003`), and distinct from Documents' own byte-level storage-layer validation (`RULE-DOC-09`)** — see `OD-CHAT-007` for a disclosed tension between the two layers' accepted-type sets.
 - **Target — AI audit:** Conversation-level logging (start/end, fallback triggers) for compliance and dispute resolution, consistent with the platform's general audit-log mandate (CRR §30) and `onboarding/MODULE_SPEC.md:360`'s reference to "Chatbot conversation started/ended (timestamp, [OPEN] conversation transcript retention)".
-- **Target — secondary use (forward-looking, Compliance-owned workflow, Chatbot-executed):** The same agent is reused for GDPR subject-rights (data access/export) requests (CRR §8 line 110; CRR §26 line 343). `docs/03-modules/compliance/` holds only `.gitkeep` — no Compliance module specification exists yet to confirm this consumption contract from the other side; this is recorded here as a one-sided boundary assertion (mirrors `docs/03-modules/documents/MODULE_SPEC.md`'s `OD-DOC-012` treatment of its own Compliance-forward-looking edge).
+- **Target — secondary use (forward-looking, Compliance-owned workflow, Chatbot-executed):** The same agent is reused for GDPR subject-rights (data access/export) requests (CRR §8 line 110; CRR §26 line 343). `docs/03-modules/compliance/` holds only `.gitkeep` — **superseded 2026-08-22: `SPEC-COMPLIANCE-001` now exists at `docs/03-modules/compliance/MODULE_SPEC.md` (REVIEW), so this contract can and should be confirmed from the other side rather than asserted one-sidedly** — this was recorded here as a one-sided boundary assertion (mirrors `docs/03-modules/documents/MODULE_SPEC.md`'s `OD-DOC-012` treatment of its own Compliance-forward-looking edge).
 - **Target — tool execution / conversation memory:** Named by `ADR-013` as owned responsibility classes; CRR/PDD confirm no concrete tool call and no explicit memory/persistence model — see `OD-CHAT-002`, `OD-CHAT-003`, `OD-CHAT-008`.
 
 **Out of scope:** (owned elsewhere and referenced, never redefined — Constitution §6)
 
 - **The onboarding business workflow itself** — onboarding state and its transitions, onboarding steps (Personalfragebogen, document-collection *orchestration decision-making*, contract-signing coordination, pool/claim, hire approval), onboarding-specific validation, onboarding completion signaling, and onboarding's own business rules are owned by Onboarding (`docs/03-modules/onboarding/MODULE_SPEC.md`). Onboarding triggers a Chatbot conversation and reacts to its outcome; it does not implement, configure, or operate the agent (`ADR-013` items 2-3).
 - **Document storage** — document lifecycle, metadata, upload mechanism, storage abstraction (S3 EU), version history, categories, permissions, access, retrieval, and archival are owned by Documents (`backend-documents`, `SPEC-DOCUMENTS-001`). Documents' own specification independently frames Chatbot as "a distinct capability... Documents is the storage/retrieval target the chatbot's document-collection flow writes to and reads from, not the chatbot itself" (`documents/MODULE_SPEC.md:34`) — consistent with, not contradicting, this module's boundary. Whether Chatbot's own (unconfirmed) tool-execution surface ever calls Documents' upload interface directly, versus file upload being an entirely separate non-conversational UI action, is disclosed as open, not resolved, at `OD-CHAT-003`.
-- **The GDPR subject-rights workflow and fulfilment ownership** — request intake, response assembly, and delivery to the data subject are conceptually owned by Compliance (CRR §8 line 110, §26 line 343); Chatbot only executes the conversation Compliance's workflow triggers (`ADR-013` item 3). No Compliance specification exists yet (`docs/03-modules/compliance/` holds only `.gitkeep`).
+- **The GDPR subject-rights workflow and fulfilment ownership** — request intake, response assembly, and delivery to the data subject are conceptually owned by Compliance (CRR §8 line 110, §26 line 343); Chatbot only executes the conversation Compliance's workflow triggers (`ADR-013` item 3). No Compliance specification exists yet (`docs/03-modules/compliance/` holds only `.gitkeep` — **superseded 2026-08-22, see the Status Addendum below**).
 - **Employee/account lifecycle and activation** — whether an onboarding account activates is Onboarding/Employee-Management's decision, not this module's; Chatbot emits a completion/fallback signal only (`onboarding/MODULE_SPEC.md:150`; `ADR-013`).
 - **Contract lifecycle** — owned by `backend-hr`/`SPEC-HR-001` per `ADR-012`; unrelated to this module.
 - **Retention-sweep execution, consent governance, special-category field-governance policy** — conceptually Compliance's, unrelated to this module beyond disclosing which retention tier Chatbot's own records fall under, where determinable (`OD-CHAT-019`).
@@ -306,6 +306,61 @@ Proposed only — **NOT applied**. Application requires the appropriate synchron
 - **`SYNC_STATE.yaml`:** record this specification's authoring session as a new `SYNC-*` entry: `REVIEW` status, G1.5 gate not re-run per this task's instruction (citing `ADR-013`/`SYNC-027`/`SYNC-028`/`SIR-GLOB-015` as evidence of a clean boundary), G4 round not yet performed, no registry/graph edits applied yet (proposal only, this session).
 - **`.claude/governance/SPECIFICATION_ISSUES_REGISTER.md`:** add a new `## Module: Chatbot` section (per the register's Update Protocol) once this specification completes a G4 review round, aggregating `OD-CHAT-001` through `OD-CHAT-020` as its initial entries; until then, the register's existing `SIR-GLOB-015` (RESOLVED) row remains accurate and requires no correction.
 
+## Status Addendum — 2026-08-22 (recorded, not versioned)
+
+**Why this section exists.** This specification's *Current Repository Behaviour* is anchored to
+`181529e` (2026-07-12). Its claims about **this** module remain true — `backend/src/modules/chatbot/`
+still contains only `.placeholder`, is still not imported or route-mounted, still has no
+Claude/Anthropic SDK dependency in `backend/package.json`, and there is still no Prisma model for
+any conversation entity. Its claims about **neighbouring** modules have aged. Recorded per the
+append-only correction convention; no requirement, rule, interface, or open-decision id is
+renumbered or restated.
+
+### Neighbour facts that changed
+
+| Claim as written | Status at 2026-08-22 |
+|---|---|
+| `docs/03-modules/compliance/` holds only `.gitkeep` | **False.** `SPEC-COMPLIANCE-001` exists (`REVIEW`) and defines 8 `IF-COMPLIANCE-*` interfaces. The forward-looking GDPR-subject-rights boundary can now be confirmed bilaterally instead of asserted one-sidedly. |
+| Consent has no module in code | **False.** `backend/src/modules/consent/` is built and route-mounted at `/api/v1/consent`; `SPEC-CONSENT-001@0.3.0` is FROZEN. A daily consent gate ships and is enforced server- and client-side. |
+| `MODULE_REGISTRY.yaml:202-212` | Line-drifted. `backend-chatbot` is now at `MODULE_REGISTRY.yaml:237`. |
+| `DEPENDENCY_GRAPH.yaml:40-43` | Line-drifted. The chatbot node is now at `DEPENDENCY_GRAPH.yaml:72`. |
+| `API_INDEX.yaml:32-34` | Line-drifted. The chatbot row is now at `API_INDEX.yaml:40`. |
+
+### What must be settled before implementation starts
+
+These are recorded as **prerequisites, not decisions** — none is resolved here.
+
+1. **The tool registry has nothing to bind to.** `ADR-053` principle 2 requires every chatbot tool
+   to invoke an *existing* `IF-*` interface owned by another module, and forbids creating backend
+   capability for the chatbot's benefit. Seven module specifications currently define **zero**
+   `IF-*` interfaces — `job-dispatch`, `attendance`, `quality`, `notifications`, `analytics`,
+   `onboarding`, and (now retired) `document-templates`. Those are precisely the worker-facing
+   capabilities a chatbot exists to reach: "what shifts do I have", "did I check in", "what's my
+   rating", "what did I miss", "how many hours this month". Authoring those interfaces is a
+   prerequisite of the tool registry, not a parallel task.
+2. **No index maps an interface to its owner.** 72 distinct `IF-*` identifiers exist across the
+   specifications. `.claude/knowledge/CONTRACT_INDEX.yaml` indexes something different — seven
+   code-level shared contracts (`notification-service`, `auth-middleware`, `prisma-schema`, …). A
+   registry needs `IF-id → owning module → signature → consumers → risk tier`, and no such artifact
+   exists.
+3. **No language contract.** The platform ships six UI locales (`de`, `en`, `fr`, `ar`, `uk`, `ur`;
+   two right-to-left) with the user's choice persisted on `User.preferred_language`, across the web
+   app and both mobile apps. None of this appears in any module specification. A conversational
+   interface cannot be specified without stating which language it answers in and where that comes
+   from. `ADR-068` settles this for the *consent notice* only, not platform-wide.
+4. **Authentication transport.** The chatbot is planned as both a web surface (chat page + floating
+   widget) and a mobile surface. Web authenticates by httpOnly cookie and mobile by bearer token —
+   see `SPEC-AUTH-001`'s own Status Addendum (2026-08-22). Note especially that the `SameSite=Lax`
+   CSRF posture is justified *only* by the same-origin Next.js rewrite proxy.
+5. **`GD-19` is formally deferred.** `docs/implementation/GD-19_CHATBOT_CHECKPOINT.md` records
+   **DEFERRED — POST-MVP** by explicit human decision, 2026-07-28. Resuming requires flipping that
+   status by an equally explicit decision, not by implication.
+6. **`ADR-053` reserves a decision that shapes the whole retrieval layer.** Its own forward-looking
+   note distinguishes *action tools* (invoke another module's `IF-*`) from **knowledge providers**
+   (semantic search, RAG retrieval, memory lookup, knowledge-base search), observes that the latter
+   "may not map to any single owning module's interface", and explicitly reserves it for a future
+   architecture decision. That decision does not exist yet.
+
 ## Review and Change Log
 
 | Version | Date | Change | Findings resolved | Approver |
@@ -319,6 +374,7 @@ Proposed only — **NOT applied**. Application requires the appropriate synchron
 | 0.1.3 (byproduct correction, recorded not versioned) | 2026-07-28 | Narrow correction applied as a byproduct of `GD-09`'s ratification (`ADR-033`, GDPR retention-tier assignment, Decided via the Governance Resolution workflow, Option (c)). `OD-CHAT-019` (conversation-adjacent record retention tier) marked RESOLVED (provisional) for metadata/spend counters only — Tier 2 (5-year general); transcripts remain contingent on `OD-CHAT-008`. Pending tax-advisor sign-off (`OD-RETENTION-01`), non-blocking. Does **not** unblock this module's own G2 freeze (`OD-CHAT-005`/`006`/`013`) or build (`GD-19`). No version bump (nonsemantic correction, `LOOP_CONTROL.md` §7 exemption). | `OD-CHAT-019` RESOLVED (provisional, metadata/counters, `ADR-033`) | — (byproduct correction; no new G4 round; `REVIEW` status and standing G2 blockers unaffected) |
 | 0.1.3 (byproduct correction, recorded not versioned) | 2026-07-28 | Narrow correction applied as a byproduct of `GD-17`'s ratification (`ADR-037`, Consent module — lifecycle & fail-safety, Decided via the Governance Resolution workflow). `OD-CHAT-008`'s consent-requirement portion marked RESOLVED via Consent's own `OD-CONSENT-002`: chatbot engagement requires explicit consent; a decline routes to a manual/non-chatbot onboarding path, does not block onboarding. The transcript-persistence portion of `OD-CHAT-008` remains OPEN, not decided by `ADR-037`. Does **not** unblock this module's own G2 freeze (`OD-CHAT-005`/`006`/`013`) or build (`GD-19`). No version bump (nonsemantic correction, `LOOP_CONTROL.md` §7 exemption). | `OD-CHAT-008` consent portion RESOLVED (`ADR-037`); persistence portion remains OPEN | — (byproduct correction; no new G4 round; `REVIEW` status and standing G2 blockers unaffected) |
 | 0.2.0 | 2026-07-28 | **`GD-19` sub-decision 1, per `ADR-053`** (Tool-execution scope, Decided via the Governance Resolution workflow, substantially reformulated twice during ratification at the commissioning human's explicit direction). `OD-CHAT-002` resolved: the chatbot is ratified as a first-class platform interface (a dedicated chat interface accessible as a full chat page and floating assistant widget) and an **AI orchestration layer, not a business module** — it owns conversation, intent recognition, clarification, tool selection, and response generation; every executable platform capability exposed through the chatbot is implemented as a tool that invokes an existing `IF-*` interface owned by another module, which retains all business rules, validation, authorization, state changes, persistence, and auditing. Tools are allow-listed individually via a **tool-registry/plugin model** (new tools added by registration, never by modifying core orchestration logic), each classified into a risk tier: read-only (immediate execution), low-risk write (confirmation optional, decided per-tool), high-risk/irreversible write (confirmation mandatory). No specific tool is approved by this decision — it ratifies the architecture only. `OD-CHAT-001` (entity shape) and `OD-CHAT-003` (file-handling) are informed but not resolved: both updated to note the tool-call-log requirement and the settled (if-ever-built) file-upload-tool mechanism, respectively. No code changes (`backend-chatbot` remains zero-code). This module's own G2 freeze remains blocked on `OD-CHAT-005`/`006`/`013`; its build remains gated on the remainder of `GD-19`. | `OD-CHAT-002` RESOLVED (`ADR-053`); `OD-CHAT-001`/`OD-CHAT-003` informed, not resolved | Commissioning human (2026-07-28, Governance Resolution workflow, `GD-19` sub-decision 1) |
+| 0.2.0 (forward-note, recorded not versioned) | 2026-08-22 | **Status Addendum.** This module's own current-state claims re-verified and still true (still `.placeholder`, still unmounted, still no SDK dependency, still no conversation model). Corrected the stale neighbour claims: `docs/03-modules/compliance/` no longer holds only `.gitkeep` (`SPEC-COMPLIANCE-001` exists, 8 `IF-COMPLIANCE-*`), consent is built and mounted, and three knowledge-index line citations have drifted. Recorded six implementation prerequisites -- the zero-`IF-*` gap in seven specs, the absent interface index, the missing language contract, the dual-transport auth model, `GD-19`'s DEFERRED status, and `ADR-053`'s reserved knowledge-provider decision -- as prerequisites, none resolved here. | — (documentation-accuracy correction; no findings) | — (recorded, not a versioned amendment; G2 freeze is reserved human authority) |
 
 ---
 
