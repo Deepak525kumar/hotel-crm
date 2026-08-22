@@ -1,6 +1,6 @@
 schema_version: 1
 project: hotel-crm
-checked_at: "2026-07-28"
+checked_at: "2026-08-22"
 baseline_revision: 1aa5f88bce9ef27c9b0563363ebaa211d8aca240  # rebound by SYNC-055, 2026-07-28; see cache_state block for the actively-maintained per-revision record
 default_branch: main
 status: governance-artifacts-generated
@@ -40,6 +40,60 @@ indexes:
     source: .claude/VERSION.yaml
 
 known_drift:
+  - id: SYNC-073
+    type: documentation-synchronization
+    status: partially-resolved
+    description: >-
+      Documentation synchronization pass, 2026-08-22, run against origin/main at
+      8626256 after an audit of the full documentation estate. The knowledge layer
+      had not been re-baselined since SYNC-072 (0169ecb, 2026-07-31) while ~520
+      commits landed.
+
+      RESOLVED IN THIS PASS. (1) DECISION_INDEX.md stopped at ADR-061; rows added
+      for ADR-065..070 plus a note that ADR-062..064 were never allocated.
+      (2) Ten specification version citations in MODULE_REGISTRY.yaml and ten in
+      SPECIFICATION_INDEX.yaml had drifted from the spec documents; all reconciled
+      to the document, which the index summarizes and never outranks
+      (knowledge/README.md Rule 3). Notably both indexes independently held
+      SPEC-AUTH-001@0.3.0, a value the auth spec itself records as an error and had
+      already withdrawn to 0.2.6. (3) backend-onboarding had no row in either index
+      despite SPEC-ONBOARDING-001 being cited as a governing specification by
+      ADR-030, ADR-065 and the E2E suite; rows added and the spec given its first
+      Document Control block. (4) API_INDEX.yaml re-derived directly from
+      backend/src/routes/v1/index.ts: every evidence line number was wrong (the
+      mount block moved from lines 22-40 to 37-52), four mounted APIs were absent
+      entirely (/documents, /retention, /compliance, /employees), six clients:
+      arrays were wrong, and /calendar still carried a "stub service
+      (NotImplementedError)" note that has been false since the module shipped.
+      (5) SPEC-QUAL-001 still filed the rework loop as unbuilt (built 2026-08-18..20,
+      ADR-069) and SPEC-AUTH-001 contained no occurrence of "cookie" despite the
+      dual-transport model shipping in PR #391/#394; both corrected by append-only
+      Status Addenda. (6) A stale agent worktree caused 65 blocking
+      repository-integrity findings on every local run; removed, and "worktrees"
+      added to the checker's ignoreDirNames.
+
+      NOT RESOLVED -- deliberately not restamped, because restamping without
+      re-derivation would misrepresent them as verified. DEPENDENCY_GRAPH.yaml and
+      BOUNDARY_INDEX.yaml remain at 069f139 (2026-08-01); CONTRACT_INDEX.yaml
+      remains at 1aa5f88 (2026-07-28). Their content was not re-derived in this
+      pass. A full Repository Synchronization Workflow run is still owed for those
+      three. API_INDEX.yaml summarizes DEPENDENCY_GRAPH's consumes-api edges, so
+      its rebind is ahead of its own source -- recorded here rather than hidden.
+
+      ALSO RECORDED, NOT REMEDIATED. Six shipped features have no specification
+      anywhere: internationalization (six locales, two right-to-left, persisted on
+      User.preferred_language, across three clients), the httpOnly cookie auth
+      model (now described in SPEC-AUTH-001's addendum but with no Decision
+      Record), re-onboarding of deactivated workers, quality threshold warnings,
+      dark mode, and the settings page. Seven module specifications define zero
+      IF-* interfaces (job-dispatch, attendance, quality, notifications, analytics,
+      onboarding, and the retired document-templates), which blocks ADR-053's
+      chatbot tool registry; and no artifact indexes the 72 IF-* identifiers that
+      do exist. Nine documentation sections under docs/ remain .gitkeep-only,
+      including all API and database reference material.
+    authority_needed: none for the resolved items; a Repository Synchronization
+      Workflow run for the three unrebound indexes; human product authority for the
+      unspecified features
   - id: SYNC-001
     type: ownership
     status: blocked
