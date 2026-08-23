@@ -24,6 +24,7 @@ outranks a specification it amends.
 | [`14-governance/architecture-decisions/`](14-governance/architecture-decisions/) | ADRs | **Decision authority** |
 | [`15-audits/`](15-audits/) | Dated, immutable point-in-time audits | Historical evidence only |
 | [`implementation/`](implementation/) | Live sequencing plan, governance register, decision backlog | Planning authority |
+| [`implementation/CHATBOT_IMPLEMENTATION_PLAN.md`](implementation/CHATBOT_IMPLEMENTATION_PLAN.md) | Chatbot build order — **draft, not authorized to start** (`GD-19` deferred) | Planning |
 | [`legacy/`](legacy/) | Superseded material | **Historical evidence only — never current** |
 
 ## Where things are that aren't here

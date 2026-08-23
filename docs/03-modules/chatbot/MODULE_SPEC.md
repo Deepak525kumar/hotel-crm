@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Spec ID / version | `SPEC-CHATBOT-001 / 0.2.0` |
+| Spec ID / version | `SPEC-CHATBOT-001 / 0.2.1` (amended 2026-08-23 — Implementation-Time Inputs section added; see Review and Change Log) |
 | Status | `REVIEW` |
 | Owner | `unassigned` — reserved human authority (`SYNC-001`); `.claude/knowledge/MODULE_REGISTRY.yaml:202-212` already records `backend-chatbot` as `owner: unassigned`, `lifecycle: declared`, `implementation_status: unimplemented-stub`, `specification: UNKNOWN`. No `CODEOWNERS` file exists and `backend/package.json`'s `author` field is empty (`"author": ""`, `backend/package.json:23`) — consistent with the repository-wide `SIR-GLOB-001` invariant. |
 | Authors / reviewers | Author: Module Author (documentation workflow), operating under `ADR-013` (Accepted, 2026-07-12) — the settled Chatbot-vs-Onboarding ownership boundary. A Boundary Collision Gate (G1.5) was executed for a proposed `SPEC-CHATBOT-001` **before** this session and returned **FAIL** (`SYNC-027`: `docs/03-modules/onboarding/MODULE_SPEC.md` independently claimed first-person execution ownership of the identical capability); the collision was resolved by the commissioning human decision recorded as `ADR-013`, applied to `docs/03-modules/onboarding/MODULE_SPEC.md` (now v1.1) by a follow-on governance-synchronization pass (`SYNC-028`), which also marked `SIR-GLOB-015` `RESOLVED`. Per this authoring task's explicit instruction, the gate is **not** re-run here; `ADR-013`, `SYNC-027`, `SYNC-028`, and `SIR-GLOB-015` (RESOLVED) are cited as the evidence of record for a clean boundary. **G4 independent reviews (round 1, on v0.1.0, rev `181529e`) completed in parallel:** Architecture `PASS_WITH_ACTIONS`; Dependency `PASS_WITH_ACTIONS`; Consistency `PASS_WITH_ACTIONS`; Performance `PASS_WITH_ACTIONS`; Security **`FAIL`** (3 High findings). v0.1.1 was the correction pass applying every merged finding from that round (see Review and Change Log). **G4 re-review round 2 (on v0.1.1, same revision `181529e` — documentation-only, no commit boundary crossed) completed in parallel for the three flagged dimensions:** Security `PASS_WITH_ACTIONS` (all 5 round-1 findings confirmed resolved; 2 new Medium: `FIND-NEW-001`, `FIND-NEW-002`); Dependency `PASS_WITH_ACTIONS` (3 of 4 round-1 findings confirmed resolved, 1 only partially resolved — the `Compliance → Chatbot` edge's Contract column still literally read `undefined`; 1 new Medium: `FIND-DEP-06`); Architecture **`FAIL`** (all 4 round-1 findings confirmed resolved, but 1 new High finding, `FIND-05`, arising from this module's own v0.1.1 `OD-CHAT-004` direct-access resolution: an incompatible Direction/Auth pairing on `IF-CHATBOT-StartConversation` and an undefined consumer-status-query path for `IF-CHATBOT-GetConversationOutcome`, leaving `REQ-CHAT-010`'s MUST-level completion/fallback signal with no specified delivery mechanism). This v0.1.2 is the round-2 correction pass resolving `FIND-05`/`FIND-DEP-06` and the `FIND-NEW-001`/`FIND-NEW-002` Security findings by splitting the interaction model into an in-process module-to-module call path (mirroring the existing `notification-service` singleton-call pattern, `.claude/knowledge/DEPENDENCY_GRAPH.yaml:82-89,334-344,431`) for `StartConversation` and `GetConversationOutcome`'s consumer-facing mode, while leaving `ExchangeMessage` and `GetConversationOutcome`'s worker-facing mode as direct end-user access (see Review and Change Log). **G4 re-review round 3 (on v0.1.2, same revision `181529e`) completed in parallel for Architecture, Dependency, and Security:** Architecture `PASS_WITH_ACTIONS` (all round-2 findings confirmed resolved; 2 new: 1 Medium `FIND-06`, 1 Low `FIND-07`); Dependency `PASS_WITH_ACTIONS` (all round-2 findings confirmed resolved; 1 new Medium `FIND-DEP-07`); Security `PASS_WITH_ACTIONS` (all round-2 findings confirmed resolved; 1 new Medium `FIND-SEC-R3-01`). Consistency and Performance remain `PASS_WITH_ACTIONS`, carried over untouched from round 1. **Zero Critical/High findings remain anywhere across all five G4 dimensions.** This v0.1.3 is a polish pass closing out the three round-3 Medium findings plus the one Low finding (see Review and Change Log); FROZEN status continues to be withheld (Constitution §12; G2 is reserved human authority). |
@@ -361,6 +361,129 @@ These are recorded as **prerequisites, not decisions** — none is resolved here
    "may not map to any single owning module's interface", and explicitly reserves it for a future
    architecture decision. That decision does not exist yet.
 
+## Implementation-Time Inputs (added v0.2.1, 2026-08-23)
+
+**What this section is.** Provider, model, and tool-binding decisions taken at implementation-planning
+time, recorded so they are not rediscovered from a chat transcript. **None of it resolves an open
+decision above** — `OD-CHAT-005`, `OD-CHAT-006`, and `OD-CHAT-013` remain open, and `GD-19` remains
+`DEFERRED — POST-MVP`. The step-by-step build order lives in
+[`docs/implementation/CHATBOT_IMPLEMENTATION_PLAN.md`](../../implementation/CHATBOT_IMPLEMENTATION_PLAN.md).
+
+### 1. ⚠️ A design document this plan depends on is not in the repository
+
+The implementation plan repeatedly cites an architecture/design document by section — **§9**
+(prompt-injection posture), **§10** (the budget-cap table), **§16** (rollout metrics) — and also
+depends on it for the proposed `backend/src/modules/chatbot/` file layout and the Prisma models
+`ChatbotConversation` / `ChatbotToolCall`.
+
+**That document does not exist anywhere in this repository.** It exists only in the conversation that
+produced the plan. Until it is committed, the plan is **not executable as written**: four of its steps
+reference content nobody can read.
+
+**Required before Step 2 of the plan:** commit that design document (suggested path
+`docs/02-architecture/system/CHATBOT_ORCHESTRATION_DESIGN.md`) and replace the §-references in the
+plan with real links. This is recorded as `OD-CHAT-020`.
+
+### 2. Provider and model
+
+| Decision | Value | Authority |
+|---|---|---|
+| Model | **`claude-haiku-4-5`** — use this exact id, no date suffix | CRR §8 (Claude Haiku named as the adopted model); PDD §4.14, §7.1, §11 |
+| Access path (now) | **Anthropic API directly** | Implementation-time choice: least setup for the pre-production spike |
+| Access path (later) | **Amazon Bedrock**, before any real worker PII flows | EU data residency — see §5 below |
+| Pricing | $1 / MTok input, $5 / MTok output | Anthropic first-party rates. Bedrock is partner-operated and priced separately. |
+
+**Three constraints of this model that the orchestrator must be built around.** Each would otherwise
+be discovered as a runtime error:
+
+1. **The context window is 200K, not 1M.** Haiku 4.5 is the only current model with a 200K window;
+   every other current model has 1M. Conversation-history growth must be bounded against 200K.
+2. **`output_config.effort` is not supported and returns an error on Haiku 4.5.** Effort tuning is a
+   Claude 4.6+ / 5-family feature. Do not write `effort` into the request builder.
+3. **Adaptive thinking is not available.** Haiku 4.5 predates it; extended thinking on this model
+   uses `thinking: {type: "enabled", budget_tokens: N}` with `budget_tokens` < `max_tokens`,
+   minimum 1024. For an L1 router emitting a single structured tool call, thinking should simply be
+   **off** — it is latency and cost the routing decision does not need.
+
+**If the model is ever changed**, all three of the above change with it, and the orchestrator's
+request builder is the single place that must be revisited.
+
+### 3. Prompt caching — the dominant cost lever, with a floor that can silently disable it
+
+The system prompt and tool digest are re-sent on every turn, so caching them is worth more than any
+other cost optimization at this scale. Cached reads bill at roughly 10% of the input rate.
+
+**The constraint that matters:** the minimum cacheable prefix is **~1024 tokens**. A prefix shorter
+than that **silently does not cache** — no error, no warning, just full price forever. A terse system
+prompt plus a handful of tool definitions can easily fall under the floor.
+
+- Render order is `tools` → `system` → `messages`. Keep the stable prefix first; put per-turn
+  volatile content (timestamps, request ids, the user's message) **after** the last breakpoint.
+- Maximum 4 breakpoints per request.
+- **Verify, don't assume:** `usage.cache_read_input_tokens` must be non-zero across repeated turns.
+  Zero means a silent invalidator — a timestamp in the system prompt, non-deterministic JSON key
+  order, or a tool list whose order varies between requests.
+
+`ADR-053`'s tool-registry model helps here: a registry that renders tools in a deterministic order
+produces a byte-stable prefix. **A registry that iterates an unordered map does not**, and will
+destroy the cache hit rate without failing any test.
+
+### 4. Tool binding — bind to `IF-*` ids, not to services
+
+`ADR-053` principle 2 requires every tool to invoke an **existing** `IF-*` interface owned by another
+module. As of 2026-08-23 those interfaces exist and are indexed with risk tiers in
+[`.claude/knowledge/INTERFACE_INDEX.yaml`](../../../.claude/knowledge/INTERFACE_INDEX.yaml) — 123
+ids, 50 of them as-built. A tool registration therefore names an `IF-` id; it does not reach for a
+service directly.
+
+**Recommended first tool, and why:**
+
+| Interface | Tier | Status | Note |
+|---|---|---|---|
+| **`IF-ANALYTICS-GetMyStats`** | read-only | **as-built** | **Start here.** Self-only for any authenticated role, takes no arguments, and deliberately does not ride `/stats`' role guard (`GD-06`). It exercises the executor end-to-end with the least authorization surface to get wrong. |
+| `IF-ASSIGN-ListAssignments` | read-only | as-built | "What shifts do I have" |
+| `IF-ATT-ListAttendance` | read-only | as-built | "Did I check in" |
+| `IF-QUAL-GetLeaderboard` | read-only | as-built | Worker access is own-hotel-group, non-contact fields only (`ADR-067`) |
+| `IF-NOTIF-MarkAsRead` | **low-risk write** | as-built | Reversible and self-scoped — the natural first write tool |
+
+**Two interfaces the plan assumed were available are not.** Both are specified as `target`, meaning
+the specification describes them as unbuilt even though the owning module ships:
+
+- **`IF-DOC-ListWorkerDocuments`** — `status: target`, no risk tier
+- **`IF-HR-GetContractStatus`** — `status: target`, no risk tier
+
+Binding a tool to either one first requires reconciling its specification against the built code and
+assigning a tier. **That is spec work, not chatbot work**, and it belongs to the owning module. Until
+it is done, the document-status and contract-status tools cannot be registered without violating
+`ADR-053` principle 2. Recorded as `OD-CHAT-021`.
+
+### 5. Dependencies on decisions owned elsewhere
+
+| Dependency | Owner | Status |
+|---|---|---|
+| **Which language does the chatbot answer in?** | `SPEC-I18N-001` `OD-I18N-03` | **OPEN.** Six UI locales ship, two right-to-left, preference on `User.preferred_language` — which is **nullable**, so "never chose" is a real state the chatbot must handle. The German fallback would answer a Ukrainian speaker in German on any missing string: tolerable for UI chrome, **not** for generated conversation. |
+| RTL in a conversational surface | `SPEC-I18N-001` `OD-I18N-04` | **OPEN** — unassessed |
+| Auth transport for the web widget and mobile screens | `ADR-071` | **Proposed.** Web authenticates by httpOnly cookie, mobile by bearer token. |
+| CSRF posture for a **separately-hosted** widget | `ADR-071` `OD-AUTH-T2` | **OPEN and blocking.** `SameSite=Lax` is safe only because the browser reaches the API through a same-origin Next.js rewrite proxy. A widget served from another origin breaks that and needs a CSRF design first. |
+| Knowledge providers vs. action tools | `ADR-053` forward note | **OPEN.** Semantic search / RAG / memory lookup ground a response rather than invoking a capability, and may map to no single owning module's interface. Shapes the whole retrieval layer. |
+| EU data residency for real worker PII | — | Migrate to Bedrock (`AnthropicBedrockMantle` client; model ids take an `anthropic.` prefix) behind the same provider interface **before** real personal data reaches the model. |
+
+### 6. Infrastructure that already exists — build no new runtime
+
+Verified in code at `8626256`. The plan's budget-guard job and conversation persistence need **no new
+infrastructure**:
+
+- **Scheduler:** `backend/src/lib/scheduler.ts`, with the Platform Worker at `backend/src/worker.ts`
+  (`ADR-029`). Register a budget-guard job the same way `HrContractExpiryReminderJob` and
+  `JobRequestAutoCloseJob` do. `ADR-057` already settled Platform-Worker-not-BullMQ.
+- **Transactional outbox:** `OutboxEvent` plus the drain (`ADR-029`) — reuse for any notification the
+  chatbot causes; never send side effects outside a transaction.
+- **Feature flag:** `strictBooleanFlag(false)` in `backend/src/config/env.ts` — the pattern
+  `FEATURE_EMPLOYMENT_RECORD` uses. It parses strictly rather than treating a typo as `false`.
+- **Registry entries:** `backend-chatbot` already exists in `MODULE_REGISTRY.yaml`,
+  `API_INDEX.yaml` (under `unregistered`), `DEPENDENCY_GRAPH.yaml` and `BOUNDARY_INDEX.yaml`. These
+  need their `lifecycle`/`status` **updated**, not created.
+
 ## Review and Change Log
 
 | Version | Date | Change | Findings resolved | Approver |
@@ -375,6 +498,7 @@ These are recorded as **prerequisites, not decisions** — none is resolved here
 | 0.1.3 (byproduct correction, recorded not versioned) | 2026-07-28 | Narrow correction applied as a byproduct of `GD-17`'s ratification (`ADR-037`, Consent module — lifecycle & fail-safety, Decided via the Governance Resolution workflow). `OD-CHAT-008`'s consent-requirement portion marked RESOLVED via Consent's own `OD-CONSENT-002`: chatbot engagement requires explicit consent; a decline routes to a manual/non-chatbot onboarding path, does not block onboarding. The transcript-persistence portion of `OD-CHAT-008` remains OPEN, not decided by `ADR-037`. Does **not** unblock this module's own G2 freeze (`OD-CHAT-005`/`006`/`013`) or build (`GD-19`). No version bump (nonsemantic correction, `LOOP_CONTROL.md` §7 exemption). | `OD-CHAT-008` consent portion RESOLVED (`ADR-037`); persistence portion remains OPEN | — (byproduct correction; no new G4 round; `REVIEW` status and standing G2 blockers unaffected) |
 | 0.2.0 | 2026-07-28 | **`GD-19` sub-decision 1, per `ADR-053`** (Tool-execution scope, Decided via the Governance Resolution workflow, substantially reformulated twice during ratification at the commissioning human's explicit direction). `OD-CHAT-002` resolved: the chatbot is ratified as a first-class platform interface (a dedicated chat interface accessible as a full chat page and floating assistant widget) and an **AI orchestration layer, not a business module** — it owns conversation, intent recognition, clarification, tool selection, and response generation; every executable platform capability exposed through the chatbot is implemented as a tool that invokes an existing `IF-*` interface owned by another module, which retains all business rules, validation, authorization, state changes, persistence, and auditing. Tools are allow-listed individually via a **tool-registry/plugin model** (new tools added by registration, never by modifying core orchestration logic), each classified into a risk tier: read-only (immediate execution), low-risk write (confirmation optional, decided per-tool), high-risk/irreversible write (confirmation mandatory). No specific tool is approved by this decision — it ratifies the architecture only. `OD-CHAT-001` (entity shape) and `OD-CHAT-003` (file-handling) are informed but not resolved: both updated to note the tool-call-log requirement and the settled (if-ever-built) file-upload-tool mechanism, respectively. No code changes (`backend-chatbot` remains zero-code). This module's own G2 freeze remains blocked on `OD-CHAT-005`/`006`/`013`; its build remains gated on the remainder of `GD-19`. | `OD-CHAT-002` RESOLVED (`ADR-053`); `OD-CHAT-001`/`OD-CHAT-003` informed, not resolved | Commissioning human (2026-07-28, Governance Resolution workflow, `GD-19` sub-decision 1) |
 | 0.2.0 (forward-note, recorded not versioned) | 2026-08-22 | **Status Addendum.** This module's own current-state claims re-verified and still true (still `.placeholder`, still unmounted, still no SDK dependency, still no conversation model). Corrected the stale neighbour claims: `docs/03-modules/compliance/` no longer holds only `.gitkeep` (`SPEC-COMPLIANCE-001` exists, 8 `IF-COMPLIANCE-*`), consent is built and mounted, and three knowledge-index line citations have drifted. Recorded six implementation prerequisites -- the zero-`IF-*` gap in seven specs, the absent interface index, the missing language contract, the dual-transport auth model, `GD-19`'s DEFERRED status, and `ADR-053`'s reserved knowledge-provider decision -- as prerequisites, none resolved here. | — (documentation-accuracy correction; no findings) | — (recorded, not a versioned amendment; G2 freeze is reserved human authority) |
+| 0.2.1 | 2026-08-23 | **Amended (Implementation-Time Inputs).** Records the provider/model decision (`claude-haiku-4-5` per CRR §8, Anthropic API now / Bedrock before real PII) and the three model constraints the orchestrator must be built around — 200K context, `output_config.effort` unsupported, no adaptive thinking. Records prompt caching as the dominant cost lever together with the ~1024-token minimum prefix that silently disables it, and warns that a tool registry iterating an unordered map destroys cache hits without failing a test. Binds tools to `IF-*` ids per `ADR-053` principle 2, now that 123 are indexed with risk tiers, and names `IF-ANALYTICS-GetMyStats` as the recommended first tool. **New open decisions:** `OD-CHAT-020` (the design document the plan cites by section is absent from the repository, making four steps unexecutable) and `OD-CHAT-021` (`IF-DOC-ListWorkerDocuments`/`IF-HR-GetContractStatus` are specified `target` though their modules ship, so no tool may bind to them yet). Records dependencies owned elsewhere: `OD-I18N-03` (answer language), `ADR-071`/`OD-AUTH-T2` (auth transport and cross-origin CSRF), and `ADR-053`'s reserved knowledge-provider decision. Resolves no existing open decision; `GD-19` remains DEFERRED. | — (no findings; implementation-planning input) | — (not a G2 freeze; reserved human authority) |
 
 ---
 
