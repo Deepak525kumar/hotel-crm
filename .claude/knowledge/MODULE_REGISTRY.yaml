@@ -315,7 +315,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-FRONTEND-001@0.1.0 (REVIEW)  # SPECIFICATION ADDED 2026-08-23: this field read UNKNOWN. SPEC-FRONTEND-001 now exists at docs/08-frontend/FRONTEND_SPEC.md (REVIEW -- authored after implementation, no G4 round, no G2 freeze). Open decisions are recorded in the document rather than resolved.
     evidence: frontend/package.json; ecosystem.config.js:25 (hotel-crm-web); nginx/hotelcrm.conf:92 (proxy_pass to :3000)
 
   - id: mobile-worker
@@ -327,7 +327,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-MOBILE-001@0.1.0 (REVIEW)  # SPECIFICATION ADDED 2026-08-23: this field read UNKNOWN. SPEC-MOBILE-001 now exists at docs/09-mobile/MOBILE_SPEC.md (REVIEW -- authored after implementation, no G4 round, no G2 freeze). Open decisions are recorded in the document rather than resolved.
     evidence: mobile/worker-app/package.json; package.json:9 (mobile/* workspace)
 
   - id: mobile-checker
@@ -339,7 +339,7 @@ modules:
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed
-    specification: UNKNOWN
+    specification: SPEC-MOBILE-001@0.1.0 (REVIEW)  # SPECIFICATION ADDED 2026-08-23: this field read UNKNOWN. SPEC-MOBILE-001 now exists at docs/09-mobile/MOBILE_SPEC.md (REVIEW -- authored after implementation, no G4 round, no G2 freeze). Open decisions are recorded in the document rather than resolved.
     evidence: mobile/checker-app/package.json; package.json:9 (mobile/* workspace)
 
   - id: operations

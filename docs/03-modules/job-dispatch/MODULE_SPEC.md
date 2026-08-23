@@ -335,6 +335,48 @@ specified here beyond the confirmed behavior in Requirements/Rules; they will be
 the target milestone (M2 Dispatch, PIVOT §12) begins. WorkApplication endpoints (above) are
 removed in Phase 1.
 
+
+### Named interface contracts (added 2026-08-23, recorded not versioned)
+
+**Why this table exists.** This specification described its HTTP envelope and error mapping but
+declared no named `IF-*` contracts, so nothing could reference this module's capabilities by
+identifier. `ADR-053` requires every chatbot tool to invoke an **existing** `IF-*` interface owned by
+another module, and forbids creating backend capability for the chatbot's benefit — which made a
+module with zero named interfaces unreachable by design.
+
+These are **as-built**, reverse-specified from the code cited in each row at `8626256`. They name what
+already exists; **no new capability is introduced, and no behaviour changes.** Contracts remain
+**unversioned** in code, so each carries `v0` and a compatibility posture of baseline/UNKNOWN,
+matching this document's existing vocabulary.
+
+The **Risk tier** column is `ADR-053`'s classification, recorded here so a future tool registry does
+not have to re-derive it: *read-only* executes immediately; *low-risk write* takes confirmation per
+tool at registration; *high-risk write* takes **mandatory** confirmation enforced by the
+orchestration layer regardless of registration preference. Assigning a tier here is **not** approval
+to expose any of these as a tool — `ADR-053` principle 4 requires each tool integration to be its
+own explicit approval.
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-JOBD-CreateJobRequest / v0` | Inbound (command) | job request payload | Created `JobRequest` | **High-risk write** — creates operational demand others act on | `requireRole(['admin','manager','regional_manager'])` + `staffing:write` | `job-requests/routes.ts:113` → `service.ts:154` |
+| `IF-JOBD-ListJobRequests / v0` | Inbound (query) | filters | `JobRequest[]`, scope-filtered | Read-only | Authenticated; scope enforced in service | `job-requests/routes.ts:114` → `service.ts:212` |
+| `IF-JOBD-GetJobRequest / v0` | Inbound (query) | job request id | `JobRequest` | Read-only | Authenticated; scope-checked | `job-requests/routes.ts:115` → `service.ts:306` |
+| `IF-JOBD-UpdateJobRequest / v0` | Inbound (command) | job request id, patch | Updated `JobRequest` | **High-risk write** | role guard + `staffing:write` | `job-requests/routes.ts:116` → `service.ts:343` |
+| `IF-JOBD-RaiseBroadcast / v0` | Inbound (command) | broadcast input (skill slots, counts) | Created broadcast + notifications to every eligible worker, in one transaction | **High-risk write** — fans out notifications to many people and cannot be un-sent | role-gated; `FEATURE_JOBDISPATCH_PHASE2` | `job-requests/routes.ts:33` → `service.ts:547` |
+| `IF-JOBD-GetBroadcastEligibility / v0` | Inbound (query) | broadcast id | Whether the caller may accept, and why not | Read-only | Authenticated | `job-requests/routes.ts:58` → `service.ts:644` |
+| `IF-JOBD-AcceptBroadcast / v0` | Inbound (command) | broadcast id | `WorkerAssignment`, or `requirement_fulfilled` when another worker won the race | **High-risk write** — commits the worker to a shift; first-accept arbitration via a conditional `updateMany` on `confirmed_count` (`ADR-057`) | **No role gate — worker-initiated by design** | `job-requests/routes.ts:72` → `service.ts:860` |
+| `IF-JOBD-CloseBroadcast / v0` | Inbound (command) | broadcast id | Broadcast closed early; raising manager notified | **High-risk write** — withdraws an offer others may be acting on | role-gated | `job-requests/routes.ts:84` → `service.ts:1007` |
+| `IF-JOBD-CloseExpiredBroadcasts / v0` | **Internal (scheduled job)** | cutoff, batch size | Count transitioned `OPEN → EXPIRED` | Not tool-eligible | Platform Worker only; no HTTP surface | `job-requests/service.ts:1124`, `worker.ts` |
+| `IF-ASSIGN-ListAssignments / v0` | Inbound (query) | filters | `WorkerAssignment[]`, scope-filtered | Read-only | Authenticated; scope enforced | `assignments/routes.ts:86` → `service.ts:241` |
+| `IF-ASSIGN-GetAssignment / v0` | Inbound (query) | assignment id | `WorkerAssignment` | Read-only | Authenticated; eligibility re-checked for worker callers | `assignments/routes.ts:87` → `service.ts:325` |
+| `IF-ASSIGN-UpdateAssignment / v0` | Inbound (command) | assignment id, patch (incl. status transitions) | Updated `WorkerAssignment` | **High-risk write** — drives shift lifecycle (start/complete/cancel) | Authenticated; scope + eligibility guard | `assignments/routes.ts:88` → `service.ts:358` |
+| `IF-ASSIGN-Reassign / v0` | Inbound (command) | assignment id, new worker | Atomically reassigned; both workers notified | **High-risk write** — removes work from one person and gives it to another | Manager/admin scope | `assignments/routes.ts:122` → `service.ts:564` |
+| `IF-ASSIGN-LogRoomsCompleted / v0` | Inbound (command) | assignment id, room count | Created `RoomsCompletedEntry` | Low-risk write — additive, correctable via the update contract | Authenticated; scope-checked | `assignments/routes.ts:100` → `service.ts:760` |
+| `IF-ASSIGN-UpdateRoomsCompleted / v0` | Inbound (command) | assignment id, corrected count | Updated entry | Low-risk write | Authenticated; scope-checked | `assignments/routes.ts:108` → `service.ts:834` |
+| `IF-ASSIGN-PlaceOnCalendar / v0` | Inbound (command) | worker, hotel, date | Created `CalendarEntry` + `WorkerAssignment` | **High-risk write** — commits a person to a day; rejected if they have a declared absence | Manager/admin scope | `assignments/routes.ts:31` → `service.ts:923` |
+| `IF-ASSIGN-MoveCalendarEntry / v0` | Inbound (command) | entry id, target date | Moved entry | **High-risk write** | Manager/admin scope | `assignments/routes.ts:65` → `service.ts:1082` |
+| `IF-ASSIGN-ListCalendarEntries / v0` | Inbound (query) | date range, scope filters | `CalendarEntry[]` | Read-only | Authenticated; scope enforced | `assignments/routes.ts:49` → `service.ts:1219` |
+
 ## Events
 
 No event bus exists (MODULE_REGISTRY `published_events: none-observed`, `consumed_events: none-observed`

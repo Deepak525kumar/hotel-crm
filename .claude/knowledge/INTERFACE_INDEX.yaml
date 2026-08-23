@@ -1,0 +1,190 @@
+schema_version: 1
+purpose: >-
+  Canonical lookup: named interface contract (IF-*) -> owning module -> defining
+  specification -> build status -> ADR-053 risk tier. Answers "who owns this
+  interface, is it built, and what confirmation policy would a tool over it
+  require" without reading every module specification.
+
+  Created 2026-08-23. Before this file existed there was no index over IF-* at
+  all: CONTRACT_INDEX.yaml indexes something different (code-level shared
+  contracts such as notification-service and auth-middleware), and the only way
+  to resolve an IF-id was to grep 19 specifications. ADR-053 makes every chatbot
+  tool a binding to an existing IF-* interface, so a registry needs exactly this
+  table.
+
+  This index SUMMARIZES the specifications and never outranks them
+  (.claude/knowledge/README.md Rule 3). Where this file and a MODULE_SPEC.md
+  disagree, the specification wins and this file is the thing to correct.
+scope: project-specification
+derived_from: [docs/03-modules]  # every MODULE_SPEC.md beneath it
+version_source: .claude/VERSION.yaml
+observed_revision: 8626256
+
+# ---------------------------------------------------------------------------
+# risk_tier values are ADR-053's three classes. They are recorded here so a
+# future tool registry does not re-derive them:
+#   read-only          executes immediately, no confirmation
+#   low-risk-write     confirmation OPTIONAL, decided per tool at registration
+#   high-risk-write    confirmation MANDATORY, enforced by the orchestration
+#                      layer regardless of the tool's registration preference
+#   not-tool-eligible  no HTTP surface / no human actor (scheduled jobs,
+#                      in-process-only calls whose transactional guarantee
+#                      depends on sharing the caller's transaction)
+#   unassigned         the interface is TARGET (unbuilt); assigning a tier
+#                      would mean inventing behaviour. Assign when it is built.
+#
+# RECORDING A TIER IS NOT APPROVAL TO EXPOSE AN INTERFACE AS A TOOL.
+# ADR-053 principle 4: tool invocation is allow-listed, and each tool
+# integration is its own explicit approval. This file is an inventory.
+# ---------------------------------------------------------------------------
+
+interfaces:
+  - { id: IF-ANALYTICS-GetDashboardStats, owner_module: backend-analytics, spec: SPEC-ANALYTICS-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ANALYTICS-GetHotelLeaderboard, owner_module: backend-analytics, spec: SPEC-ANALYTICS-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ANALYTICS-GetHotelSummary, owner_module: backend-analytics, spec: SPEC-ANALYTICS-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ANALYTICS-GetLeaderboard, owner_module: backend-analytics, spec: SPEC-ANALYTICS-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ANALYTICS-GetMyStats, owner_module: backend-analytics, spec: SPEC-ANALYTICS-001, status: as-built, risk_tier: read-only, note: "Self-only, any authenticated role; deliberately does not ride /stats role guard (GD-06). The natural first read-only chatbot tool." }
+  - { id: IF-ASSIGN-GetAssignment, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ASSIGN-ListAssignments, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ASSIGN-ListCalendarEntries, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ASSIGN-LogRoomsCompleted, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-ASSIGN-MoveCalendarEntry, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-ASSIGN-PlaceOnCalendar, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-ASSIGN-Reassign, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-ASSIGN-UpdateAssignment, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-ASSIGN-UpdateRoomsCompleted, owner_module: backend-assignments, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-ATT-CheckIn, owner_module: backend-attendance, spec: SPEC-ATT-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-ATT-GetAttendance, owner_module: backend-attendance, spec: SPEC-ATT-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ATT-ListAttendance, owner_module: backend-attendance, spec: SPEC-ATT-001, status: as-built, risk_tier: read-only }
+  - { id: IF-ATT-UpdateAttendance, owner_module: backend-attendance, spec: SPEC-ATT-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-AUTH-GetAuditTrail, owner_module: backend-auth, spec: SPEC-AUTH-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-CreateOperation, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-GetAvailability, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-GetOperations, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-GetOwnCalendar, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-MarkSickVacation, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CAL-PlaceAssignment, owner_module: backend-calendar, spec: SPEC-CALENDAR-001, status: target, risk_tier: unassigned }
+  - { id: IF-CHATBOT-ExchangeMessage, owner_module: backend-chatbot, spec: SPEC-CHATBOT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CHATBOT-GetConversationOutcome, owner_module: backend-chatbot, spec: SPEC-CHATBOT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CHATBOT-StartConversation, owner_module: backend-chatbot, spec: SPEC-CHATBOT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CHATBOT-StartSubjectRightsConversation, owner_module: backend-chatbot, spec: SPEC-CHATBOT-001, status: target, risk_tier: unassigned }
+  - { id: IF-COMPLIANCE-FulfilSubjectRightsRequest, owner_module: backend-compliance, spec: SPEC-COMPLIANCE-001, status: target, risk_tier: unassigned }
+  - { id: IF-COMPLIANCE-GetAuditTrail, owner_module: backend-compliance, spec: SPEC-COMPLIANCE-001, status: target, risk_tier: unassigned }
+  - { id: IF-COMPLIANCE-GetGovernanceReport, owner_module: backend-compliance, spec: SPEC-COMPLIANCE-001, status: target, risk_tier: unassigned }
+  - { id: IF-CONSENT-CheckStatus, owner_module: backend-consent, spec: SPEC-CONSENT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CONSENT-GetAuditHistory, owner_module: backend-consent, spec: SPEC-CONSENT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CONSENT-RecordDecision, owner_module: backend-consent, spec: SPEC-CONSENT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CONSENT-RequestConsent, owner_module: backend-consent, spec: SPEC-CONSENT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CONSENT-WithdrawConsent, owner_module: backend-consent, spec: SPEC-CONSENT-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-CreateHotel, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-DeleteHotel, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-GetHotel, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-Hotel, owner_module: backend-crm, spec: SPEC-CRM-001, status: suspect, risk_tier: unassigned, note: "Matched from prose, not from a contract row. Likely a partial/malformed identifier rather than a real contract. Recorded so it is not silently treated as one; needs a decision at the owning spec's next revision." }
+  - { id: IF-CRM-ListHotels, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-PauseJobs, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-CRM-UpdateHotel, owner_module: backend-crm, spec: SPEC-CRM-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-ArchiveDocument, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-DocumentVersionHistory, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-ExportWorkerDocuments, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-GetDocument, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-GetDocumentCompleteness, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-ListWorkerDocuments, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-DOC-UploadDocument, owner_module: backend-documents, spec: SPEC-DOCUMENTS-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Approve, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-CreateEmployee, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Deactivate, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-DeleteEmployee, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-ExportEmployeeData, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-GetBlocklist, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-GetProfileHistory, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-GetSkills, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-GetSpecialCategory, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-LifecycleSignal, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Reactivate, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Rehire, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Reject, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-RemoveBlocklist, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-Restore, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-SetBlocklist, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-EMP-SubmitForReview, owner_module: employee-management, spec: SPEC-EMP-001, status: target, risk_tier: unassigned }
+  - { id: IF-GEO-DISTANCE, owner_module: backend-geo, spec: SPEC-GEO-001, status: suspect, risk_tier: unassigned, note: "Matched from prose, not from a contract row. Likely a partial/malformed identifier rather than a real contract. Recorded so it is not silently treated as one; needs a decision at the owning spec's next revision." }
+  - { id: IF-GEO-VerifyGeofence, owner_module: backend-geo, spec: SPEC-GEO-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-ConfirmContractSigned, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-ContractExpiryReminder, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-CreateContract, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-CreatePayroll, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-FulfilPayslipRequest, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-GenerateContract, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-GetContractStatus, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-ListContracts, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-ListPayroll, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-RequestPayslip, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-UploadDocument, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-HR-UploadSignedContract, owner_module: backend-hr, spec: SPEC-HR-001, status: target, risk_tier: unassigned }
+  - { id: IF-JOBD-AcceptBroadcast, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write, note: "No role gate -- worker-initiated by design. First-accept arbitration via conditional updateMany on confirmed_count (ADR-057)." }
+  - { id: IF-JOBD-CloseBroadcast, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-JOBD-CloseExpiredBroadcasts, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: not-tool-eligible }
+  - { id: IF-JOBD-CreateJobRequest, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-JOBD-GetBroadcastEligibility, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-JOBD-GetJobRequest, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-JOBD-ListJobRequests, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: read-only }
+  - { id: IF-JOBD-RaiseBroadcast, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-JOBD-UpdateJobRequest, owner_module: backend-job-requests, spec: SPEC-JOB-DISPATCH-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-NOTIF-DiscardDeadLetter, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-NOTIF-Enqueue, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: low-risk-write, note: "In-process module-to-module call only, not HTTP-reachable. The single-commit outbox guarantee (ADR-029) depends on sharing the caller transaction, so it cannot be exposed over HTTP without breaking that guarantee." }
+  - { id: IF-NOTIF-GetNotifications, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: read-only }
+  - { id: IF-NOTIF-GetOutboxMetrics, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: read-only }
+  - { id: IF-NOTIF-ListDeadLetters, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: read-only }
+  - { id: IF-NOTIF-MarkAsRead, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-NOTIF-RegisterPushToken, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-NOTIF-RequeueDeadLetter, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-NOTIF-SendNotification, owner_module: backend-notifications, spec: SPEC-NOTIF-001, status: as-built, risk_tier: low-risk-write, note: "In-process module-to-module call only, not HTTP-reachable. The single-commit outbox guarantee (ADR-029) depends on sharing the caller transaction, so it cannot be exposed over HTTP without breaking that guarantee." }
+  - { id: IF-ONB-Approve, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-Deactivate, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-DeactivateForContractLapse, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: not-tool-eligible, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-Reactivate, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-Rehire, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-Reject, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management behind assertLifecycleAuthority() (ADR-030 note 3)." }
+  - { id: IF-ONB-SubmitForReview, owner_module: employee-management, spec: SPEC-EMP-001, status: as-built, risk_tier: high-risk-write, note: "Capability specified by SPEC-ONBOARDING-001; implemented in employee-management (ADR-030 note 3). Self-service is universal per ADR-065 section 5." }
+  - { id: IF-QUAL-AssignRework, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-QUAL-CompleteRework, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: low-risk-write }
+  - { id: IF-QUAL-CreateRating, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-QUAL-CreateVerification, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: high-risk-write }
+  - { id: IF-QUAL-GetHotelLeaderboard, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: read-only, note: "A Worker may read their own hotel group board, non-contact fields only (ADR-067)." }
+  - { id: IF-QUAL-GetLeaderboard, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: read-only }
+  - { id: IF-QUAL-GetVerificationPhotos, owner_module: backend-quality, spec: SPEC-QUAL-001, status: as-built, risk_tier: read-only }
+  - { id: IF-RETENTION-CheckEligibility, owner_module: backend-retention, spec: SPEC-RETENTION-001, status: target, risk_tier: unassigned }
+  - { id: IF-RETENTION-GetDeletionAuditLog, owner_module: backend-retention, spec: SPEC-RETENTION-001, status: target, risk_tier: unassigned }
+  - { id: IF-RETENTION-RegisterCategory, owner_module: backend-retention, spec: SPEC-RETENTION-001, status: target, risk_tier: unassigned }
+  - { id: IF-RETENTION-TagRecord, owner_module: backend-retention, spec: SPEC-RETENTION-001, status: target, risk_tier: unassigned }
+  - { id: IF-USERS-CreateUser, owner_module: backend-users, spec: SPEC-USERS-001, status: target, risk_tier: unassigned }
+  - { id: IF-USERS-DeleteUser, owner_module: backend-users, spec: SPEC-USERS-001, status: target, risk_tier: unassigned }
+  - { id: IF-USERS-GetUser, owner_module: backend-users, spec: SPEC-USERS-001, status: target, risk_tier: unassigned }
+  - { id: IF-USERS-ListUsers, owner_module: backend-users, spec: SPEC-USERS-001, status: target, risk_tier: unassigned }
+  - { id: IF-USERS-UpdateUser, owner_module: backend-users, spec: SPEC-USERS-001, status: target, risk_tier: unassigned }
+
+summary:
+  total: 123
+  as_built: 50
+  target: 71
+  suspect: 2
+  note: >-
+    50 as-built contracts were reverse-specified on 2026-08-23 across the six
+    specifications that previously declared none -- job-dispatch, attendance,
+    quality, notifications, analytics and onboarding. Those six were exactly the
+    worker-facing capabilities a chatbot needs to reach, so ADR-053's tool
+    registry had nothing to bind to. The remaining `target` rows predate that
+    pass and describe interfaces that are specified but not built; they carry no
+    risk tier because assigning one would mean inventing behaviour.
+
+known_gaps:
+  - The 'target' rows are not evidence that a capability is missing from the
+    product -- several describe behaviour delivered under a different name by a
+    different module. Reconciling them is per-spec work, not an index change.
+  - IF-CRM-Hotel and IF-GEO-DISTANCE are recorded as `suspect`: they were
+    extracted from prose rather than a contract row and are probably not real
+    identifiers.
+  - No interface anywhere carries a real version. Contracts are unversioned in
+    code, so every row is effectively v0 with a baseline/UNKNOWN compatibility
+    posture. Version assignment remains a pending human decision
+    (DEPENDENCY_GRAPH.yaml remaining_human_decisions).

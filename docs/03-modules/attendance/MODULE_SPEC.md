@@ -272,6 +272,34 @@ Update schema gain coordinate fields; Close gains a geofence gate — shapes NOT
 also requires the geofence is UNDER OPEN DECISION (OQ-04). These contracts are not specified beyond
 the confirmed behavior above and will be authored at milestone M3 (Field ops, PIVOT §12).
 
+
+### Named interface contracts (added 2026-08-23, recorded not versioned)
+
+**Why this table exists.** This specification described its HTTP envelope and error mapping but
+declared no named `IF-*` contracts, so nothing could reference this module's capabilities by
+identifier. `ADR-053` requires every chatbot tool to invoke an **existing** `IF-*` interface owned by
+another module, and forbids creating backend capability for the chatbot's benefit — which made a
+module with zero named interfaces unreachable by design.
+
+These are **as-built**, reverse-specified from the code cited in each row at `8626256`. They name what
+already exists; **no new capability is introduced, and no behaviour changes.** Contracts remain
+**unversioned** in code, so each carries `v0` and a compatibility posture of baseline/UNKNOWN,
+matching this document's existing vocabulary.
+
+The **Risk tier** column is `ADR-053`'s classification, recorded here so a future tool registry does
+not have to re-derive it: *read-only* executes immediately; *low-risk write* takes confirmation per
+tool at registration; *high-risk write* takes **mandatory** confirmation enforced by the
+orchestration layer regardless of registration preference. Assigning a tier here is **not** approval
+to expose any of these as a tool — `ADR-053` principle 4 requires each tool integration to be its
+own explicit approval.
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-ATT-CheckIn / v0` | Inbound (command) | assignment/placement context, optional geo payload | Created `Attendance`; may call `IF-GEO-VerifyGeofence` | Low-risk write — worker-initiated and self-scoped, but time-sensitive and not freely repeatable | `requireRole(['worker'])`, self-scoped | `attendance/routes.ts:13` → `service.ts:40` |
+| `IF-ATT-ListAttendance / v0` | Inbound (query) | filters (worker, hotel, date range) | `Attendance[]`, scope-filtered | Read-only | Authenticated; hotel/worker scope enforced in service | `attendance/routes.ts:14` → `service.ts:246` |
+| `IF-ATT-GetAttendance / v0` | Inbound (query) | attendance id | `Attendance` | Read-only | Authenticated; scope-checked | `attendance/routes.ts:15` → `service.ts:301` |
+| `IF-ATT-UpdateAttendance / v0` | Inbound (command) | attendance id, corrected `check_in_at`/`check_out_at` | Updated `Attendance` | **High-risk write** — a manager correcting attendance rewrites the record payroll and tardiness derive from | Manager/admin scope | `attendance/routes.ts:16` → `service.ts:326` |
+
 ## Events
 
 No event bus exists (MODULE_REGISTRY `published_events: none-observed`, `MODULE_REGISTRY.yaml:126`).

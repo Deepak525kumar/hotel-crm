@@ -307,6 +307,37 @@ rating-tier label on reads (TREQ-003); a rework-assignment endpoint + worker com
 contracts are not specified beyond the confirmed behavior above and will be authored at milestone M3
 (Field ops, PIVOT §12).
 
+
+### Named interface contracts (added 2026-08-23, recorded not versioned)
+
+**Why this table exists.** This specification described its HTTP envelope and error mapping but
+declared no named `IF-*` contracts, so nothing could reference this module's capabilities by
+identifier. `ADR-053` requires every chatbot tool to invoke an **existing** `IF-*` interface owned by
+another module, and forbids creating backend capability for the chatbot's benefit — which made a
+module with zero named interfaces unreachable by design.
+
+These are **as-built**, reverse-specified from the code cited in each row at `8626256`. They name what
+already exists; **no new capability is introduced, and no behaviour changes.** Contracts remain
+**unversioned** in code, so each carries `v0` and a compatibility posture of baseline/UNKNOWN,
+matching this document's existing vocabulary.
+
+The **Risk tier** column is `ADR-053`'s classification, recorded here so a future tool registry does
+not have to re-derive it: *read-only* executes immediately; *low-risk write* takes confirmation per
+tool at registration; *high-risk write* takes **mandatory** confirmation enforced by the
+orchestration layer regardless of registration preference. Assigning a tier here is **not** approval
+to expose any of these as a tool — `ADR-053` principle 4 requires each tool integration to be its
+own explicit approval.
+
+| Contract ID / version | Direction | Input | Output | Risk tier | Authorization | Evidence |
+|---|---|---|---|---|---|---|
+| `IF-QUAL-CreateVerification / v0` | Inbound (command) | assignment id, score (0–100, coerced from multipart), optional photo files | Created `QualityVerification` | **High-risk write** — creates a durable rating record affecting a worker's standing and can trigger the rework loop | `quality:write`; checker/manager scope | `quality/routes.ts:34` → `service.ts:516` |
+| `IF-QUAL-GetVerificationPhotos / v0` | Inbound (query) | verification id | Presigned S3 photo references | Read-only | `quality:read` | `quality/routes.ts:46` → `service.ts:754` |
+| `IF-QUAL-AssignRework / v0` | Inbound (command) | verification/assignment reference, actor | New rework `WorkerAssignment` linked to the original (`ADR-069`); starts the 20-minute escalation clock | **High-risk write** — creates work for another person and starts an escalation timer that notifies a Manager | `quality:write` | `quality/routes.ts:51` → `service.ts:364` |
+| `IF-QUAL-CompleteRework / v0` | Inbound (command) | assignment id, photo evidence, actor | Rework marked complete; checker notified | Low-risk write — worker-initiated, self-scoped, deliberately not permission-gated as a checker action | Self-scoped to the assigned worker | `quality/routes.ts:58` → `service.ts:445` |
+| `IF-QUAL-CreateRating / v0` | Inbound (command) | rating payload, actor | Created `Rating`; refreshes `WorkerOverallRating` | **High-risk write** — durable and affects standing | `quality:write` | `quality/routes.ts:63` → `service.ts:643` |
+| `IF-QUAL-GetLeaderboard / v0` | Inbound (query) | pagination (`page`, `per_page` ≤ 100, `ADR-035`) | Ranked worker entries | Read-only | `quality:read` | `quality/routes.ts:66` → `service.ts:804` |
+| `IF-QUAL-GetHotelLeaderboard / v0` | Inbound (query) | hotel id, pagination | Ranked entries for one hotel | Read-only. **A Worker may read their own hotel group's board, non-contact fields only** (`ADR-067`) | `quality:read` + `checkHotelAccess()` | `quality/routes.ts:69` |
+
 ## Events
 
 No event bus exists (MODULE_REGISTRY `published_events: none-observed`, `MODULE_REGISTRY.yaml:129-139`).
@@ -627,9 +658,20 @@ modelled as a **new `WorkerAssignment` linked to the original**, not as a state 
 | Worker-facing rework surface | **BUILT** | `mobile/worker-app/src/app/rework/[id].tsx`; web UI in the assignments surface |
 | Worker view of own hotel group's leaderboard | **BUILT** | `backend/src/modules/quality/routes.ts:69` — `GET /quality/leaderboard/by-hotel/:hotel_id`, governed by `ADR-067` |
 
+**Also built since, added 2026-08-23.** The **two-step warning thresholds are built** (PR #498) and
+should no longer be read as target:
+
+| Behaviour | Evidence |
+|---|---|
+| First warning when the overall score falls below **70** — worker only | `NotificationType.QUALITY_RATING_WARNING_70` (`schema.prisma:120`); `quality/service.ts:219-231` |
+| Second warning below **50** — worker **and** manager | `NotificationType.QUALITY_RATING_WARNING_50` (`schema.prisma:121`) |
+| Each warning fires at most once | `WorkerOverallRating.warning_70_sent_at` / `warning_50_sent_at` (`schema.prisma:1245-1246`) — nullable timestamps, set on first send |
+| A drop straight past both thresholds marks 70 as sent too, so the worker gets one notification rather than two | `quality/service.ts:226` |
+| Warnings are evaluated only once a worker actually has rated assignments | `quality/service.ts:222` — guards against firing on an empty denominator |
+
 **Still target, not built** (unchanged by the above): the 0–100-only rating model with no 5-star
-system, rating tiers (Elite/High/Standard/Low/Probation), recency-weighted averaging over the last
-10 jobs, and the two-step warning thresholds (first <70, second <50 → manager). The dormant
+system, rating tiers (Elite/High/Standard/Low/Probation), and recency-weighted averaging over the
+last 10 jobs. The dormant
 `photo_urls`/`rework_*` schema columns noted in the original text are no longer dormant.
 
 **Governing records added since freeze:** `ADR-067` (worker leaderboard visibility — own hotel
