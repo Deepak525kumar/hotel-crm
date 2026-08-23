@@ -43,8 +43,8 @@ is specified as a single capability (the three modules are NOT split).
   is **removed**.
 
 **In scope:**
-- `backend/src/modules/work-requests/` — `[CURRENT]` create, publish, list, get, patch, roster fan-out; `[TARGET]` repurposed as broadcast `JobRequest` (PIVOT §9.1).
-- `backend/src/modules/work-applications/` — `[CURRENT]` apply, list, review (accept/reject/withdraw), 7-step accept transaction; `[TARGET]` module and model **removed** (PIVOT §9.2).
+- `backend/src/modules/work-requests/` — **path renamed to `backend/src/modules/job-requests/` by Epic 9 PR 9.4 (see Review and Change Log, 0.3.3); the route mount `/work-requests` was deliberately retained.** `[CURRENT]` create, publish, list, get, patch, roster fan-out; `[TARGET]` repurposed as broadcast `JobRequest` (PIVOT §9.1).
+- `backend/src/modules/work-applications/` — **path no longer exists; the module was removed (TREQ-011/`ADR-058`) and its behaviour folded into `backend/src/modules/assignments/` by the person-centric assignment rework (PR #361).** `[CURRENT]` apply, list, review (accept/reject/withdraw), 7-step accept transaction; `[TARGET]` module and model **removed** (PIVOT §9.2).
 - `backend/src/modules/assignments/` — `[CURRENT]` list, get, lifecycle transitions; `[TARGET]` created directly from calendar or broadcast accept, mandatory `application_id` dropped (PIVOT §9.1).
 - Data contract for `WorkRequest`, `WorkApplication`, `WorkerAssignment`, and the migration-level CHECK and partial unique index that back capacity/double-booking invariants; `[TARGET]` new `CalendarEntry` and `JobRequest` models (PIVOT §9.3) and the daily-exclusivity partial unique index (PIVOT §9.4).
 

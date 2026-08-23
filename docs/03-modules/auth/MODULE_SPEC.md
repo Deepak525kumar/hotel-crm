@@ -738,6 +738,70 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
   issuance if/when this candidate advances (consistent with the pattern already used for
   `SYNC-008`/`SYNC-009`/`SYNC-010`).
 
+## Status Addendum — Token Transport (2026-08-22, recorded not versioned)
+
+**Why this section exists.** This specification described token issuance and verification without
+ever naming how a token *travels* between client and server — the word "cookie" did not appear
+anywhere in it. Since PR #391/#394 (2026-08-09) the platform has run a **dual-transport** model,
+and a reader planning any new client surface (notably the Chatbot's web widget and its two mobile
+screens) would otherwise have to read the middleware to discover it. Recorded per this
+repository's append-only correction convention; no frozen requirement, rule, or interface id is
+renumbered or restated.
+
+### The model as built
+
+| | Web (`frontend/`) | Mobile (`mobile/worker-app`, `mobile/checker-app`) |
+|---|---|---|
+| Access token | `access_token` httpOnly cookie | `Authorization: Bearer` header |
+| Refresh token | `refresh_token` httpOnly cookie, no request body | `refresh_token` in the JSON body |
+| Set by | `setAuthCookies()` on login / signup / refresh | same responses also return tokens in the JSON body |
+| Cleared by | `clearAuthCookies()` on logout | client discards its stored tokens |
+
+Both transports are served **unconditionally** on every auth response — there is no client-type
+branching on the server. Mobile's bare `fetch()` clients ignore `Set-Cookie` outright, and never
+send a cookie back; web uses the cookies and ignores the body tokens.
+
+### Precedence, and why the two directions differ
+
+- **Access token — the header wins** (`backend/src/middleware/auth.ts:17-21`). An explicit
+  credential must never be silently shadowed by an ambient cookie. This also guarantees the change
+  could not alter mobile behaviour, since mobile never sends the cookie.
+- **Refresh token — the cookie wins** (`backend/src/modules/auth/controller.ts:17`). Web sends only
+  the cookie and no body at all; mobile sends only the body and never has the cookie, so the two
+  cases are disjoint in practice.
+
+### Cookie attributes and the CSRF posture
+
+Set by `cookieOptions()` in `backend/src/lib/cookies.ts`:
+
+| Attribute | Value | Note |
+|---|---|---|
+| `httpOnly` | `true`, unconditional | The entire point — closes the XSS localStorage-read exposure this replaced. Never make conditional. |
+| `secure` | `NODE_ENV === 'production'` | |
+| `sameSite` | `'lax'` | |
+| `path` | `'/'` | |
+| `domain` | `env.COOKIE_DOMAIN` (optional) | `backend/src/config/env.ts:122` |
+
+**`SameSite=Lax` is sufficient here, and no CSRF token scheme is required**, because the browser
+only ever talks to a **same-origin Next.js rewrite proxy** — `frontend/next.config.ts:45-51`
+rewrites `/api/:path*` to the internal backend. These are not cross-site cookies. **If a future
+client ever calls the API cross-origin, this reasoning does not carry over and the CSRF posture
+must be re-derived before that client ships.** That is the single most important constraint in this
+section for anyone adding a new client surface.
+
+`setAuthCookies`/`clearAuthCookies` deliberately share one options object: `res.clearCookie()`
+silently no-ops unless its attributes exactly match those used to set the cookie, so drift between
+the two would produce a logout that does not log out. Cookie parsing is enabled globally
+(`cookieParser()`, `backend/src/app.ts:21`).
+
+### Governance status
+
+**This model has no Decision Record.** It shipped as security-hardening item #4 under the
+2026-08-08/09 batch rather than through a Decision Record, and the reasoning above is reconstructed
+from the implementation's own comments, which are unusually complete. An ADR ratifying the
+dual-transport model — and explicitly bounding the same-origin assumption — is **owed** and is
+recorded as an open item rather than treated as settled here.
+
 ## Review and Change Log
 
 | Version | Date | Change | Findings resolved | Approver |
@@ -753,3 +817,4 @@ Proposed only — NOT applied. Application requires the appropriate synchronizat
 | 0.2.6 (forward-note, recorded not versioned) | 2026-08-02 | **Forward-note, `backend-compliance` epic PR 1.** `IF-AUTH-GetAuditTrail`'s `[TARGET STATE]` marker removed — `AuthService.getAuditTrail()` is now implemented (`backend/src/modules/auth/{service,types}.ts`), closing `docs/03-modules/compliance/MODULE_SPEC.md`'s `OD-COMPLIANCE-004` from this module's side. Also corrected the interface's own framing: the prior text named `backend-compliance` as the specific consumer this interface exists "for"; reworded to state the interface is deliberately generic and caller-agnostic (matching `ADR-016`'s own anticipated "`IF-AUTH-*`/`IF-AUDIT-*` contract" phrasing, not a Compliance-shaped one), with Compliance disclosed as one consumer, not the interface's sole intended caller. Service-only (no HTTP route) — no external caller was identified for this capability; `backend-compliance` itself consumes it via a direct in-process call (`complianceService` importing `authService`), the same pattern `backend-hr` already uses for `documentService`, per `ADR-032`. No requirement, rule, or open decision touched; no other interface, route, or Security-gate item affected. Security gate `FAIL`/blocking status from prior versions unaffected (untouched by this note). No version bump — nonsemantic forward-note (`LOOP_CONTROL.md` §7 exemption), mirroring this document's own `AUDIT-H2`/`ADR-022` precedents above. | `OD-COMPLIANCE-004` closed from this module's side (interface now implemented) | — (nonsemantic annotation; no approver action required; Security gate `FAIL`/blocking status and G2 freeze reservation unaffected). |
 | 0.2.3 (forward-note, recorded not versioned) | 2026-07-26 | **Forward-note per `ADR-030`** (Accepted, ratified 2026-07-25, session `claude/gd-02-manager-write-authority-b2g7rx` — Manager Write Authority / Capability-Based Permission Model). `TREQ-AUTH-002` gains its RM counterpart token: `REGIONAL_MANAGER` (D-5) resolves to `{type:'hotel_group'}` scope from `HotelGroup.regional_manager_user_id` (D-7), reusing the unchanged claim shape `{type:'hotel'|'hotel_group'|'global'}` established by `ADR-023`. `OQ-AUTH-13` (RM role token, exact string) **closes** — the token is `REGIONAL_MANAGER`, uppercase-enum/lowercase-claim convention preserved. `OQ-AUTH-08` (org-chart visibility) **resolves to its permission half only**: `org_chart:read` granted to Admin + Regional Manager (C-33), matching CONFIRMED §1:23; the org-chart data model itself is explicitly left open by `ADR-030` §7/§8 and **is not closed by this note**. Corrected in place at the referencing rows (`TREQ-AUTH-002`, `OQ-AUTH-13`, `OQ-AUTH-08` above) rather than left showing "unbuilt"/"OPEN". No requirement or rule identifier is renumbered; no G4 dimension re-run; the Security gate `FAIL`/blocking status from prior versions is unaffected (`ADR-030` neither fixes nor touches those findings). No version bump — nonsemantic forward-note (`LOOP_CONTROL.md` §7 exemption), mirroring this document's own `ADR-022` forward-note precedent above. | `OQ-AUTH-13` — closed by `ADR-030`; `OQ-AUTH-08` — permission half closed, data-model half remains OPEN. | — (nonsemantic annotation; no approver action required; Security gate `FAIL`/blocking status and G2 freeze reservation unaffected). |
 | 0.2.6 (forward-note, recorded not versioned) | 2026-08-05 | **Forward-note, Regional Manager V1 (PR #338/#339) — build completion of the design/decision the 2026-07-26 and 2026-07-29 forward-notes above recorded.** `TREQ-AUTH-002`'s "Target; gains its RM counterpart token" language and `REQ-USERS`-adjacent "4 lowercased string tokens" current-state framing (`:167`, "Role (current)" row) are now stale as statements of repository fact: `REGIONAL_MANAGER` is a live fifth token (`prisma/schema.prisma:31`), `AuthService.resolveScope()` issues its `{type:'hotel_group'}` claim unconditionally on login/refresh (`backend/src/modules/auth/service.ts`), and `resolveHotelAccess()`/`resolveWorkerScope()` (`middleware/permissions.ts`) both special-case `regional_manager` via `isScopedManagerRole()` (`lib/scope.ts`) — closing `SIR-AUTH-021`'s prior gap (no RM branch existed at ratification time) and the analogous gap `resolveWorkerScope()` independently had (found and closed during PR #338's own review, not previously tracked by a named `OQ-AUTH-*`/`SIR-AUTH-*` row). Corrected in place at `TREQ-AUTH-002` and the "Role (current)" row above rather than left showing "Target"/"4 tokens". `OQ-AUTH-06` (the `checkHotelAccess` admin/manager/checker bypass) is UNCHANGED by this note — still open, still Confirmed High, unrelated to the RM build. No requirement or rule identifier renumbered; no G4 dimension re-run; Security gate `FAIL`/blocking status from prior versions unaffected. No version bump — nonsemantic forward-note (`LOOP_CONTROL.md` §7 exemption), mirroring this document's own `ADR-030`/`ADR-060` forward-note precedents above. | `TREQ-AUTH-002`, "Role (current)" row — corrected to reflect the shipped build, not a new decision. | — (nonsemantic annotation; no approver action required; Security gate `FAIL`/blocking status and G2 freeze reservation unaffected). |
+| 0.2.6 (forward-note, recorded not versioned) | 2026-08-22 | **Status Addendum — Token Transport.** Records the dual-transport model shipped in PR #391/#394 (2026-08-09): httpOnly `access_token`/`refresh_token` cookies for web, `Authorization: Bearer` + JSON-body refresh for mobile, header-wins for access and cookie-wins for refresh, `SameSite=Lax` justified by the same-origin Next.js rewrite proxy. The specification had contained no occurrence of "cookie" at all. Documentation-accuracy correction only — no requirement, rule, interface, or open-decision id renumbered or restated. Discloses that the model still has **no Decision Record** and that an ADR bounding the same-origin CSRF assumption is owed. | — (documentation-accuracy correction; no findings) | — (recorded, not a versioned amendment; G2 freeze is reserved human authority) |

@@ -110,7 +110,7 @@ coordinates live on the `Hotel` model or a new `backend-geo`-owned model.
 
 | Claim/requirement | Source path, line, revision, or decision | Authority | Status |
 |---|---|---|---|
-| `backend/src/modules/geo/` contains only `.placeholder`; no `.ts` files | `backend/src/modules/geo/.placeholder` @HEAD | Code (direct inspection) | Observed (High) |
+| `backend/src/modules/geo/` contains only `.placeholder`; no `.ts` files | `backend/src/modules/geo/.placeholder` @`0d84fa5` (authoring revision) | Code (direct inspection) | **SUPERSEDED 2026-08-22** — true at the authoring revision, false since. The module is built and route-mounted: `controller.ts`, `distance.ts`, `retention-sweep-job.ts`, `routes.ts`, `service.ts`, `types.ts`; mounted at `/api/v1/geo` (`routes/v1/index.ts`). The `.placeholder` file is gone. The three registry/graph rows below are stale for the same reason. |
 | Not imported, not mounted at any route; `implementation_status: unimplemented-stub`, `dependencies: []`, `specification: UNKNOWN` | `MODULE_REGISTRY.yaml:214-224` | Registry | Observed (High) |
 | `lifecycle: placeholder-unregistered`; "not imported or mounted anywhere. No relationships exist." | `DEPENDENCY_GRAPH.yaml:51` | Graph | Observed (High) |
 | Listed as `orphan_modules` entry: "placeholder-unregistered; only .placeholder file; no imports, no mount, no client." | `DEPENDENCY_GRAPH.yaml:339-340` | Graph | Observed (High) |
