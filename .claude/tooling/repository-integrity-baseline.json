@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "generated_at": "2026-07-16",
-  "note": "Pre-existing findings accepted at Repository Integrity Validation adoption time (framework v1.4.0). See repository-integrity-check.js Design Note and SIR-GLOB-020 (governance/SPECIFICATION_ISSUES_REGISTER.md) for remediation tracking. New findings not present here fail CI.",
+  "note": "Pre-existing findings accepted at Repository Integrity Validation adoption time (framework v1.4.0). See repository-integrity-check.js Design Note and SIR-GLOB-020 (governance/SPECIFICATION_ISSUES_REGISTER.md) for remediation tracking. New findings not present here fail CI. 2026-08-23: four yaml-parse-error entries added when that check was introduced; all four were already failing on origin/main and are tracked as pre-existing drift (SYNC-055), not accepted as correct. A YAML file that currently parses and later stops parsing is NOT baselined and fails CI.",
   "entries": [
     {
       "fingerprint": "d76f05f556333bf1",
@@ -23,6 +23,34 @@
       "file": "backend/README.md",
       "target": "AWS_DEPLOYMENT_GUIDE.md",
       "note": "Target exists only at docs/legacy/infrastructure/AWS_DEPLOYMENT_GUIDE.md, not at repo root as linked; current-doc replacement unknown. Tracked as SIR-GLOB-020."
+    },
+    {
+      "fingerprint": "a1060656c5779ce8",
+      "checkId": "yaml-parse-error",
+      "file": ".claude/knowledge/BOUNDARY_INDEX.yaml",
+      "target": "yaml.safe_load",
+      "note": "Long-standing: unquoted narrative text containing ': ' in note fields. Present on origin/main before the yaml-parse-error check existed. Recorded as drift by SYNC-055 (SYNC_STATE.yaml), which explicitly declined to fix it because it would mean rewriting long-standing governance-authored narrative."
+    },
+    {
+      "fingerprint": "03494786149094e9",
+      "checkId": "yaml-parse-error",
+      "file": ".claude/knowledge/DEPENDENCY_GRAPH.yaml",
+      "target": "yaml.safe_load",
+      "note": "Long-standing, same cause as BOUNDARY_INDEX. Present on origin/main. See SYNC-055."
+    },
+    {
+      "fingerprint": "620a6bbe9939568a",
+      "checkId": "yaml-parse-error",
+      "file": ".claude/knowledge/MODULE_REGISTRY.yaml",
+      "target": "yaml.safe_load",
+      "note": "Long-standing, same cause. Present on origin/main. See SYNC-055. NOTE: this file is consumed by tooling via line-regex, not by a YAML parser, so it currently works despite not parsing -- that is the fragility this baseline records."
+    },
+    {
+      "fingerprint": "0d4afc83c5fc1077",
+      "checkId": "yaml-parse-error",
+      "file": ".claude/knowledge/SPECIFICATION_INDEX.yaml",
+      "target": "yaml.safe_load",
+      "note": "Long-standing, same cause. Present on origin/main. See SYNC-055."
     }
   ]
 }
