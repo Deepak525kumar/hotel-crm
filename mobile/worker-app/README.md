@@ -1,56 +1,46 @@
-# Welcome to your Expo app 👋
+# Worker app — Hotel CRM
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo / React Native application for FHM Hotelservice GmbH's workforce operations platform.
+Role: **Worker**.
 
-## Get started
+**Specification:** [`docs/09-mobile/MOBILE_SPEC.md`](../../docs/09-mobile/MOBILE_SPEC.md)
+· **Docs map:** [`docs/README.md`](../../docs/README.md)
 
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Running it
 
 ```bash
-npm run reset-project
+npm install        # from the repository root — this is a workspace
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Point it at a running backend. **Check the API base URL before every EAS build** — a misconfigured
+build produces an app that launches, renders correctly, and cannot connect to anything. That has
+shipped before (PRs #488, #492).
 
-### Other setup steps
+## Screens
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Shared with the sibling app: login, home, profile, notifications, absences, consent, documents, HR.
+Specific to this one: shifts and shift detail (check-in/out), marketplace and job offers, ratings, rework with photo evidence.
 
-## Learn more
+## Two things to know before you change anything
 
-To learn more about developing your project with Expo, look at the following resources:
+**1. Auth is bearer tokens, not cookies.** The web client uses httpOnly cookies; this app cannot —
+bare `fetch()` ignores `Set-Cookie` and has no cookie jar. Tokens are persisted via
+`src/lib/persistent-storage.ts` (`expo-secure-store`: Keychain on iOS, EncryptedSharedPreferences
+on Android). The backend serves both transports unconditionally, so no negotiation happens. See
+[`ADR-071`](../../docs/14-governance/architecture-decisions/ADR-071-dual-transport-authentication.md).
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**2. The client never adjudicates.** Geofence outcomes, eligibility and lifecycle transitions are
+all decided server-side. A visible button does not mean the user is authorized — render optimistically
+if you like, but never treat a client-side check as the decision.
 
-## Join the community
+## Localization
 
-Join our community of developers creating universal apps.
+Six locales, two right-to-left (`ar`, `ur`), each app carrying its own catalogue copy. Specified in
+[`SPEC-I18N-001`](../../docs/02-architecture/system/INTERNATIONALIZATION.md). **On-device RTL has
+never been verified** (`OD-MOB-04`) — if you have a device, check it and record the result.
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Known gaps
+
+No automated test suite (`OD-MOB-02`). Offline behaviour is unspecified (`OD-MOB-03`). No
+documented minimum OS versions (`OD-MOB-06`).
