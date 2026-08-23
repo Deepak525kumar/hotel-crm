@@ -77,7 +77,7 @@ resolves.
 | `OD-FE-02` | Accessibility has never been audited; no WCAG target is set | **OPEN** |
 | `OD-FE-03` | No performance budget (bundle size, LCP) | **OPEN** |
 | `OD-FE-04` | Playwright coverage is narrow relative to the surface area | **OPEN** |
-| `OD-FE-05` | `frontend/README.md` is still unmodified `create-next-app` boilerplate | **OPEN** |
+| `OD-FE-05` | `frontend/README.md` was unmodified `create-next-app` boilerplate | **RESOLVED 2026-08-23** — replaced with a project README |
 
 ## 6. Evidence
 

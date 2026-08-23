@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Web client — Hotel CRM
 
-## Getting Started
+Next.js 16 (App Router) dashboard for FHM Hotelservice GmbH's workforce operations platform.
+Manager, Regional Manager and Admin surfaces primarily; Worker and Checker self-service secondarily.
 
-First, run the development server:
+**Specification:** [`docs/08-frontend/FRONTEND_SPEC.md`](../docs/08-frontend/FRONTEND_SPEC.md)
+· **Docs map:** [`docs/README.md`](../docs/README.md)
+
+## Running it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install          # from the repository root — this is a workspace
+npm run dev          # http://localhost:3000, proxies /api/* to the backend
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The backend must be running (default `http://localhost:3001`). `next.config.ts` rewrites
+`/api/:path*` to it — **that same-origin proxy is what makes the cookie auth model safe**, so don't
+bypass it by pointing the client at the backend directly. See
+[`ADR-071`](../docs/14-governance/architecture-decisions/ADR-071-dual-transport-authentication.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Does |
+|---|---|
+| `npm run dev` / `build` / `start` | Next.js dev, production build, serve |
+| `npm run type-check` | `tsc --noEmit` |
+| `npm run lint` | ESLint |
+| `npm test` | Jest unit tests |
+| `npm run test:e2e` | Playwright browser tests (`e2e/`) |
+| `npm run test:no-localstorage-tokens` | **Guard — see below** |
 
-## Learn More
+## Two things to know before you change anything
 
-To learn more about Next.js, take a look at the following resources:
+**1. Auth tokens never go in `localStorage`.** They live in httpOnly cookies the client cannot read.
+`npm run test:no-localstorage-tokens` fails the build if that regresses, because a regression
+silently reopens the XSS token-theft path the cookie migration existed to close. If that check
+fails, do not work around it.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**2. Role gates must not be exact-match.** `regional_manager` is a distinct role from `manager` and
+breaks silently against a gate that only tests for `manager` — the UI simply renders nothing, with
+no error. Use the capability hooks (`useEmploymentPermissions()` and friends), not inline role
+string comparisons.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Layout
 
-## Deploy on Vercel
+```
+app/          routes; (protected)/ is the authenticated group
+components/   shared and feature components
+lib/          api.ts (client + refresh/revocation), locales.ts, i18n/, types
+stores/       zustand: auth, locale
+hooks/        capability seams, data hooks
+e2e/          Playwright        __tests__/  Jest
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Localization (six locales, two RTL) is specified in
+[`SPEC-I18N-001`](../docs/02-architecture/system/INTERNATIONALIZATION.md). Deployed on Vercel,
+separately from the backend.

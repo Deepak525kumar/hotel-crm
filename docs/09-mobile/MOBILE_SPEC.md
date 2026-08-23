@@ -73,7 +73,7 @@ in the EAS profile before every release build.
 | `OD-MOB-02` | No automated mobile test suite; neither app has E2E coverage | **OPEN** |
 | `OD-MOB-03` | Offline behaviour is unspecified — what a worker can do without connectivity | **OPEN** |
 | `OD-MOB-04` | RTL rendering has not been verified on device for `ar`/`ur` | **OPEN** |
-| `OD-MOB-05` | Both `README.md` files are unmodified Expo boilerplate ("Welcome to your Expo app") | **OPEN** |
+| `OD-MOB-05` | Both `README.md` files were unmodified Expo boilerplate ("Welcome to your Expo app") | **RESOLVED 2026-08-23** — replaced with per-app READMEs |
 | `OD-MOB-06` | No documented minimum OS versions or device support matrix | **OPEN** |
 
 ## 7. Evidence

@@ -57,30 +57,31 @@ replace them.
 | 10 | `scenarios/10-calendar-shift-summary.md` | Calendar / daily shift summary |
 | 11 | `scenarios/11-daily-consent-gate.md` | Daily consent gate: enforcement, escape hatches, day rollover |
 | 12 | `scenarios/12-checker-photo-evidence-and-rework.md` | Checker photo evidence, rework loop, escalation, ADR-069 metric exclusion |
+| 13 | `scenarios/13-language-and-rtl.md` | Language preference, fallback, the UI/consent locale subset invariant, RTL |
+| 14 | `scenarios/14-payslip-requests.md` | Payslip request → fulfil, role asymmetry, UI/backend agreement |
+| 15 | `scenarios/15-re-onboarding.md` | Re-onboarding a paused worker, `employment_cycle`, document-gate skip, nav lockout |
 
-**Start with 00. Then 01-07 and 09-12 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07 and 09-15 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
-### Known coverage gaps (recorded 2026-08-22)
+### Coverage status (updated 2026-08-23)
 
-Three shipped features have no scenario. Listed here rather than left to be rediscovered, per this
-suite's own rule that a gap found but not written down gets found again from scratch. **These are
-outstanding work, not passed checks.**
+Scenarios 13, 14 and 15 were written on 2026-08-23 to close the gaps recorded the day before. They
+have **not been executed** — they are authored against the specifications and the code, not against
+a run. **The first person to run them should expect to correct them**, and should record the run
+under `runs/` either way.
 
-| Missing scenario | Feature | Shipped | Governing record |
-|---|---|---|---|
-| `13-language-and-rtl.md` | Six UI locales (`de en fr ar uk ur`), two right-to-left, persisted on `User.preferred_language`, across web and both mobile apps | PRs #471–#484 | **none — undocumented, no specification** |
-| `14-payslip-requests.md` | Payslip request intake, manager fulfilment, date validation | PRs #487–#491 | `ADR-014`, `SPEC-HR-001` |
-| `15-re-onboarding.md` | Re-onboarding of inactive/deactivated workers, nav lockout, capability pin | PRs #468, #469 | `ADR-065` (partially) |
+What still has no scenario:
 
-The language one matters most and is the least testable as things stand: there is no specification
-saying which language any surface should render in, so a scenario would have to invent its own pass
-criteria. Writing the specification comes first.
+| Gap | Why it is still open |
+|---|---|
+| Login throttling (`ADR-070`, PR #509) | Shipped after the newest run log |
+| Welcome email on account creation (PR #508) | Shipped after the newest run log; needs a mail-capture approach |
+| Backend-generated string localization | `SPEC-I18N-001` `OD-I18N-06` — nobody has established whether notifications and emails honour `preferred_language` at all |
+| Mobile anything | Neither app has automated coverage (`SPEC-MOBILE-001` `OD-MOB-02`); scenario 13 step 6 flags on-device RTL specifically |
 
-Login throttling (`ADR-070`, PR #509) and the welcome-email-on-account-creation path (PR #508) also
-landed after the newest run log and are not yet exercised by any scenario.
-
----
+The newest run log predates roughly a dozen merged PRs. **A fresh run against current `main` is worth
+more than any single scenario above.**
 
 ## Governing specifications
 
