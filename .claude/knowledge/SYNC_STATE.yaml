@@ -136,6 +136,21 @@ known_drift:
       three. API_INDEX.yaml summarizes DEPENDENCY_GRAPH's consumes-api edges, so
       its rebind is ahead of its own source -- recorded here rather than hidden.
 
+      FOLLOW-UP (2026-08-23, full-system review of this pass): a yaml-parse-error
+      check was added to repository-integrity-check.js. Every other YAML check in
+      that tool reads line-by-line with a regex and never parses, so a
+      syntactically invalid index passed the tool and both governance CI jobs
+      silently -- which is exactly how two broke during this very pass
+      (API_INDEX.yaml, valid on origin/main, was regressed by a string-templated
+      note emitting a literal backslash-quote and an unquoted bracket inside a
+      flow mapping; the new INTERFACE_INDEX.yaml never parsed at all, from a
+      plain block scalar containing a colon-space). Both are fixed and verified
+      by parse. The four long-standing failures named above (MODULE_REGISTRY,
+      SPECIFICATION_INDEX, DEPENDENCY_GRAPH, BOUNDARY_INDEX) are recorded in
+      repository-integrity-baseline.json as pre-existing -- accepted as known,
+      not as correct. A file that parses today and stops parsing tomorrow is not
+      baselined and fails CI.
+
       ALSO RECORDED, NOT REMEDIATED. Six shipped features have no specification
       anywhere: internationalization (six locales, two right-to-left, persisted on
       User.preferred_language, across three clients), the httpOnly cookie auth

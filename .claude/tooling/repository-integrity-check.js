@@ -27,6 +27,9 @@
  *   duplicate-adr-number                    two distinct ADR files claiming the same ADR-<n> number
  *   duplicate-identity-key                  two list entries in one YAML index sharing the same id/module value
  *   missing-canonical-reference             MODULE_REGISTRY.yaml cites a SPEC-* id absent from SPECIFICATION_INDEX.yaml
+ *   yaml-parse-error                        a YAML file that yaml.safe_load cannot parse (every other YAML check here
+ *                                           reads line-by-line with a regex and never parses, so an invalid index
+ *                                           otherwise passes this tool and CI silently)
  *   orphan-document                         active doc with zero inbound references from any scanned source (WARN, non-blocking)
  *
  * Usage:
@@ -61,6 +64,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const TOOLING_DIR = __dirname;
@@ -280,6 +284,97 @@ function checkYamlFile(fileAbs, relFile) {
   return { content, lines };
 }
 
+// ---------- check: yaml-parse-error ----------
+//
+// Why this exists. Every other YAML check in this file reads the file
+// LINE BY LINE with a regex (see checkYamlFile) -- it never parses. That
+// means a syntactically invalid YAML index passes every check in this tool
+// and every CI job, silently. That is not hypothetical: on 2026-08-23 two
+// index files shipped broken through a full green run --
+// API_INDEX.yaml (a string-templated note emitted a literal \" escape and an
+// unquoted "[" inside a flow mapping) and INTERFACE_INDEX.yaml (a plain
+// block scalar containing ": " which YAML reads as a mapping key).
+//
+// It matters most for INTERFACE_INDEX.yaml, whose entire purpose is to be
+// machine-read by a future tool registry (ADR-053). A machine-readable index
+// that cannot be machine-read fails its only job, and nothing would say so.
+//
+// Dependency constraint: the repository-integrity CI job runs with NO
+// npm install (checkout -> setup-node -> node script), and no YAML parser is
+// resolvable from this repository. So rather than add a dependency to a
+// deliberately dependency-free tool, this shells out to Python's yaml, which
+// is preinstalled on GitHub's ubuntu runners.
+//
+// If no parser is available the check REPORTS that it skipped. It must never
+// pass silently -- a guard that quietly does nothing is worse than none.
+let yamlParserStatus = null;
+let yamlParseSkipped = false;
+
+function yamlParserAvailable() {
+  if (yamlParserStatus !== null) return yamlParserStatus;
+  const probe = spawnSync('python3', ['-c', 'import yaml'], { encoding: 'utf8' });
+  yamlParserStatus = probe.status === 0;
+  return yamlParserStatus;
+}
+
+// Batched deliberately: one child process for every YAML file, not one per
+// file. 21 spawns is 21 chances for a transient failure in CI, and a guard
+// that flakes gets disabled.
+function checkAllYamlParse(yamlFiles) {
+  if (yamlFiles.length === 0) return;
+
+  if (!yamlParserAvailable()) {
+    // Never pass silently. A guard that quietly does nothing is worse than
+    // no guard, because it reads as a green check.
+    yamlParseSkipped = true;
+    process.stdout.write(
+      '[NOTICE] yaml-parse-error check SKIPPED -- python3 with PyYAML is not available on this machine.\n' +
+        '         YAML files were NOT verified to parse. This is not a pass. Install PyYAML, or\n' +
+        '         run the check where one is available (GitHub ubuntu runners ship it).\n',
+    );
+    return;
+  }
+
+  const script = [
+    'import sys, yaml',
+    'for p in sys.argv[1:]:',
+    '    try:',
+    '        yaml.safe_load(open(p, encoding="utf-8").read())',
+    '    except Exception as e:',
+    '        m = getattr(e, "problem_mark", None)',
+    '        loc = ("line %d: " % (m.line + 1)) if m else ""',
+    // chr(9)/chr(10) rather than escapes: a backslash escape here has to survive
+    // JS string parsing before Python ever sees it, and if it does not, the Python
+    // source silently becomes invalid and this whole check no-ops.
+    '        sys.stdout.write(p + chr(9) + loc + " ".join(str(e).split())[:170] + chr(10))',
+  ].join('\n');
+
+  const res = spawnSync('python3', ['-c', script, ...yamlFiles.map((f) => f.abs)], {
+    encoding: 'utf8',
+    maxBuffer: 8 * 1024 * 1024,
+  });
+
+  if (res.error || res.status !== 0) {
+    yamlParseSkipped = true;
+    process.stdout.write(
+      `[NOTICE] yaml-parse-error check could not run (${res.error ? res.error.message : 'exit ' + res.status}). ` +
+        'YAML files were NOT verified to parse. This is not a pass.\n' +
+        (res.stderr ? `         stderr: ${String(res.stderr).split('\n').slice(0, 4).join(' | ').slice(0, 300)}\n` : ''),
+    );
+    return;
+  }
+
+  const byAbs = new Map(yamlFiles.map((f) => [f.abs, f.rel]));
+  for (const line of (res.stdout || '').split('\n')) {
+    if (!line.trim()) continue;
+    const tab = line.indexOf('\t');
+    if (tab === -1) continue;
+    const abs = line.slice(0, tab);
+    const detail = line.slice(tab + 1);
+    addFinding('yaml-parse-error', byAbs.get(abs) || abs, 'yaml.safe_load', detail);
+  }
+}
+
 // ---------- check: duplicate identity keys within one YAML list ----------
 
 function checkDuplicateIdentityKeys(relFile, lines) {
@@ -413,6 +508,8 @@ function run() {
       if (resolved && exists(resolved)) captureInbound(resolved);
     }
   }
+
+  checkAllYamlParse(yamlFiles);
 
   for (const { abs, rel } of yamlFiles) {
     const { lines } = checkYamlFile(abs, rel);

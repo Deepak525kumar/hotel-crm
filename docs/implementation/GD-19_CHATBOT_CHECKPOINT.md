@@ -7,6 +7,7 @@
 | Governing architecture | `ADR-053` (Accepted, 2026-07-28) — retained in force. Nothing in this deferral weakens, reopens, or supersedes it. |
 | Isolation from MVP | **Confirmed isolated.** Verified by direct text search: no `GD-20`, `GD-21`, or `GD-22` section references any `OD-CHAT-*` item, `SPEC-CHATBOT-001`, or `backend-chatbot`; no `docs/03-modules/{job-dispatch,attendance,crm}/MODULE_SPEC.md` references chatbot in either direction. See "Dependency verification" below for the full check. |
 | Resume trigger | Post-MVP, when Product Owner/Architect decide to resume Chatbot module work — no other governance decision is blocked on this resuming. |
+| **Update 2026-08-23** | This checkpoint was written on 2026-07-28 as a zero-context-loss resumption point. Several of its "whenever this resumes" assumptions have since been overtaken — see §7 below, added 2026-08-23. **Status is unchanged: still DEFERRED.** A step-by-step build order now exists at [`CHATBOT_IMPLEMENTATION_PLAN.md`](CHATBOT_IMPLEMENTATION_PLAN.md), and the provider/model decisions are recorded in `SPEC-CHATBOT-001` §Implementation-Time Inputs. |
 
 ---
 
@@ -102,3 +103,43 @@ grep -n "chatbot\|OD-CHAT" docs/03-modules/crm/MODULE_SPEC.md             → no
 `GD-20` (Job-Dispatch pivot), `GD-21` (Attendance automation), `GD-22` (Hotel-Group billing) — none of their own `GOVERNANCE_DECISIONS_REQUIRED.md` sections name any `OD-CHAT-*` item, `SPEC-CHATBOT-001`, or `backend-chatbot` in their "Merges findings," dependencies, or recommendations.
 
 **Conclusion: `GD-19` is completely isolated from all remaining MVP governance work.** Deferring it blocks nothing in `GD-20`/`GD-21`/`GD-22`.
+
+---
+
+## 7. What changed since this checkpoint was written (added 2026-08-23)
+
+This section exists because §5's recommendations were written against a repository that has since
+moved. **Nothing here reopens `ADR-053` or changes the deferral** — it records which of this
+document's stated obstacles still stand and which do not.
+
+### Cleared
+
+| Obstacle as recorded 2026-07-28 | Status 2026-08-23 |
+|---|---|
+| No module specified zero `IF-*` interfaces for the capabilities a chatbot would call, so `ADR-053`'s tool registry had nothing to bind to | **Cleared.** 123 `IF-*` ids are indexed in `.claude/knowledge/INTERFACE_INDEX.yaml`, 50 as-built, each with an `ADR-053` risk tier. The six specs that declared none — job-dispatch, attendance, quality, notifications, analytics, onboarding — now name their contracts. |
+| `SPEC-CHATBOT-001` asserted neighbour facts that had gone stale (compliance/consent holding only `.gitkeep`) | **Cleared** by that spec's 2026-08-22 Status Addendum. Its claims about the chatbot module itself were re-verified and remain true — still `.placeholder`, still unmounted, still no SDK dependency. |
+| No language contract for a conversational surface | **Partly cleared.** `SPEC-I18N-001` now exists and names the question as `OD-I18N-03`. It is a *named open decision* rather than an unknown — still to be decided, but no longer to be discovered. |
+| Auth transport for client surfaces undocumented | **Cleared** by `ADR-071` (Proposed): httpOnly cookie for web, bearer for mobile. |
+
+### New, and blocking
+
+| Item | Detail |
+|---|---|
+| **`OD-CHAT-020`** | The implementation plan cites an architecture document by section (**§9** prompt injection, **§10** budget caps, **§16** metrics) and depends on it for the module file layout and the `ChatbotConversation`/`ChatbotToolCall` Prisma models. **That document is not in this repository** — it exists only in the conversation that produced the plan. Four plan steps are unexecutable until it is committed. |
+| **`OD-CHAT-021`** | `IF-DOC-ListWorkerDocuments` and `IF-HR-GetContractStatus` are specified `target` even though `backend-documents` and `backend-hr` both ship. No tool may bind to them without violating `ADR-053` principle 2. Reconciling is owning-module spec work. |
+
+### Model facts, now recorded rather than assumed
+
+`SPEC-CHATBOT-001` §Implementation-Time Inputs records the adopted model as **`claude-haiku-4-5`**
+(CRR §8) and three constraints that shape the orchestrator, each of which would otherwise surface as
+a runtime error: the context window is **200K**, `output_config.effort` is **unsupported and errors**,
+and adaptive thinking is unavailable on this model. It also records prompt caching as the dominant
+cost lever together with the ~1024-token minimum prefix below which caching silently does not happen.
+
+### `ADR-053`'s reserved decision is still reserved
+
+The forward-looking note in §1 — **knowledge providers** (semantic search, RAG retrieval, memory
+lookup) as distinct from action tools, possibly mapping to no single owning module's interface — has
+**not** been decided. It remains reserved for its own architecture decision and shapes the entire
+retrieval layer. Nothing in the 2026-08-23 documentation work touched it, deliberately: authoring it
+would have meant inventing product policy.

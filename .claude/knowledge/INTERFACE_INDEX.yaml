@@ -181,7 +181,8 @@ known_gaps:
   - The 'target' rows are not evidence that a capability is missing from the
     product -- several describe behaviour delivered under a different name by a
     different module. Reconciling them is per-spec work, not an index change.
-  - IF-CRM-Hotel and IF-GEO-DISTANCE are recorded as `suspect`: they were
+  - >-
+    IF-CRM-Hotel and IF-GEO-DISTANCE are recorded as suspect - they were
     extracted from prose rather than a contract row and are probably not real
     identifiers.
   - No interface anywhere carries a real version. Contracts are unversioned in
