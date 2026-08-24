@@ -2,6 +2,23 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { requirePermission } from '../middleware/permissions.js';
 
+// Storage is mocked, not merely unconfigured. createVerification() and (as of
+// 2026-08-24) createRating() both call uploadPhotos(), which resolves a REAL
+// S3 client whenever S3_BUCKET is set — so without this these unit tests
+// perform live network I/O. That passed on a workstation with working AWS
+// credentials and failed in CI with "The bucket you are attempting to access
+// must be addressed using the specified endpoint", masking the assertion
+// under test. Mirrors quality-photos-authz.test.ts, which already does this.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    getPresignedUrl: async () => 'https://signed.example/p.jpg',
+    delete: async () => undefined,
+  }),
+  generateQualityPhotoKey: (assignmentId: string, kind: string, name: string) =>
+    `quality/${assignmentId}/${kind}/test-uuid/${name}`,
+}));
+
 // CRR §15 enforced 2026-08-24: createRating rejects an empty photos array.
 const RATING_PHOTO = [
   { buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' },
