@@ -519,7 +519,7 @@ export class QualityService extends BaseService {
     // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
     photos: UploadedPhoto[] = []
   ) {
-    const { assignment_id, score, notes } = data;
+    const { assignment_id, score, notes, criteria_scores } = data;
 
     const assignment = await this.prisma.workerAssignment.findUnique({
       where: { id: assignment_id },
@@ -605,6 +605,9 @@ export class QualityService extends BaseService {
             score: numScore,
             status: derivedStatus,
             notes: notes ?? null,
+            criteria_scores: criteria_scores
+              ? (criteria_scores as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
             photo_urls: photoKeys,
           },
         });
@@ -845,6 +848,62 @@ export class QualityService extends BaseService {
    * URLs are minted per request and expire in 15 minutes; they are never
    * persisted, which is why the column stores keys.
    */
+  /**
+   * IF-QUAL-ListVerifications — inspections this actor may see.
+   *
+   * Added 2026-08-24: an inspection was unreachable once it left the pending
+   * attendance queue. The checker app had no history surface at all, so a
+   * checker could not revisit what they had recorded, and the evidence was
+   * effectively one-shot.
+   *
+   * Scoping mirrors the single-record gate rather than inventing a second
+   * rule: a checker sees inspections at hotels where they hold an active
+   * assignment, a scoped manager/RM sees their own hotels, an admin sees
+   * everything, and a worker sees only inspections about themselves. Deny by
+   * default for anything else.
+   */
+  async listVerifications(actor: Actor, limit = 50) {
+    const role = actor.role.toLowerCase();
+    const take = Math.min(Math.max(limit, 1), 100);
+    let where: Prisma.QualityVerificationWhereInput;
+
+    if (role === 'admin') {
+      where = {};
+    } else if (role === 'checker') {
+      const hotels = await this.prisma.workerAssignment.findMany({
+        where: { worker_id: actor.userId, status: { in: ACTIVE_ASSIGNMENT_STATUSES } },
+        select: { hotel_id: true },
+        distinct: ['hotel_id'],
+      });
+      // No active assignment anywhere -> no hotels -> empty list, not a 403:
+      // an empty history is the honest answer for a checker not currently
+      // rostered, and matches how the attendance queue behaves.
+      where = { hotel_id: { in: hotels.map((h) => h.hotel_id) } };
+    } else if (isScopedManagerRole(role)) {
+      const scope = actor.scope ?? null;
+      if (!scope) {
+        where = { hotel_id: { in: [] } };
+      } else if (scope.type === 'global') {
+        where = {};
+      } else if (scope.type === 'hotel') {
+        where = { hotel_id: scope.hotel_id };
+      } else {
+        where = { hotel: { hotel_group_id: scope.hotel_group_id } };
+      }
+    } else if (role === 'worker') {
+      where = { assignment: { worker_id: actor.userId } };
+    } else {
+      throw new ForbiddenError('Cannot list inspections');
+    }
+
+    return this.prisma.qualityVerification.findMany({
+      where,
+      orderBy: { created_at: 'desc' },
+      take,
+      include: { assignment: { select: { worker_id: true, day: true } } },
+    });
+  }
+
   /**
    * IF-QUAL-GetVerification — the inspection record itself.
    *

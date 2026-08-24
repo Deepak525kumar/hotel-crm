@@ -15,6 +15,22 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
 import { usePhotoPicker } from '@/hooks/usePhotoPicker';
 
+// TREQ-005 / CRR §15's confirmed inspection checklist, in the order the
+// requirement lists them. Kept as a local constant mirroring the backend's
+// INSPECTION_CHECKLIST_ITEMS (quality/inspection-checklist.ts) — the app has
+// no shared-constants package with the server, and the labels already exist
+// under the `checklist.*` i18n namespace in all six locales.
+const CHECKLIST_ITEMS = [
+  'dust',
+  'bathroom',
+  'bed_linen',
+  'mirror',
+  'floor',
+  'minibar_restocking',
+  'fragrance_amenities',
+  'other',
+] as const;
+
 type VerificationStatus = 'PASSED' | 'NEEDS_REWORK' | 'FAILED';
 
 const STATUS_COLORS: Record<VerificationStatus, string> = {
@@ -45,6 +61,10 @@ export default function QualityVerificationScreen() {
   const router = useRouter();
   const [score, setScore] = useState(80);
   const [notes, setNotes] = useState('');
+  // Per-item scores, kept as strings so a field can be genuinely empty
+  // ("not assessed") rather than defaulting to 0, which would silently record
+  // a failing mark for something the checker never looked at.
+  const [criteria, setCriteria] = useState<Partial<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
   // CRR §15: the checker uploads a photo WITH the rating.
   const picker = usePhotoPicker();
@@ -59,10 +79,29 @@ export default function QualityVerificationScreen() {
       Alert.alert(t('errors.title'), t('quality.photoRequired'));
       return;
     }
+    // Only include items the checker actually filled in, and validate them
+    // here so a bad value is caught before the upload rather than after it.
+    const criteriaScores: Record<string, number> = {};
+    for (const item of CHECKLIST_ITEMS) {
+      const raw = criteria[item];
+      if (raw === undefined || raw === '') continue;
+      const value = Number(raw);
+      if (!Number.isInteger(value) || value < 0 || value > 100) {
+        Alert.alert(t('errors.title'), t('quality.checklistItemRange'));
+        return;
+      }
+      criteriaScores[item] = value;
+    }
+
     setSaving(true);
     try {
       const verification = await api.quality.createVerification(
-        { assignment_id: id, score, notes: notes || undefined },
+        {
+          assignment_id: id,
+          score,
+          notes: notes || undefined,
+          criteria_scores: Object.keys(criteriaScores).length > 0 ? criteriaScores : undefined,
+        },
         picker.photos
       );
       // Route to the evidence screen rather than just dismissing. Two reasons:
@@ -139,6 +178,24 @@ export default function QualityVerificationScreen() {
     },
     photoName: { color: theme.textSecondary, fontSize: 12, flexShrink: 1 },
     photoRemove: { color: '#E53E3E', fontSize: 12, fontWeight: '600' },
+    criteriaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingVertical: 6,
+    },
+    criteriaLabel: { color: theme.text, fontSize: 14, flex: 1 },
+    criteriaInput: {
+      backgroundColor: theme.background,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      color: theme.text,
+      fontSize: 14,
+      width: 72,
+      textAlign: 'center',
+    },
     notesInput: {
       backgroundColor: theme.background,
       borderRadius: 10,
@@ -206,6 +263,30 @@ export default function QualityVerificationScreen() {
             </View>
             <Text style={styles.outcomeHint}>{t("quality.determinedByScore")}</Text>
           </View>
+        </View>
+
+        {/* TREQ-005 / CRR §15: the confirmed inspection checklist. Each item
+            is optional and 0-100 — an empty field means "not assessed", which
+            is different from scoring it zero. The headline score above stays
+            the checker's own overall judgement; these do not compute it. */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>{t('quality.checklist')}</Text>
+          {CHECKLIST_ITEMS.map((item) => (
+            <View key={item} style={styles.criteriaRow}>
+              <Text style={styles.criteriaLabel}>{t(`checklist.${item}`)}</Text>
+              <TextInput
+                style={styles.criteriaInput}
+                keyboardType="number-pad"
+                placeholder="—"
+                placeholderTextColor={theme.textSecondary}
+                maxLength={3}
+                value={criteria[item] ?? ''}
+                onChangeText={(v) =>
+                  setCriteria((prev) => ({ ...prev, [item]: v.replace(/[^0-9]/g, '') }))
+                }
+              />
+            </View>
+          ))}
         </View>
 
         <View style={styles.card}>

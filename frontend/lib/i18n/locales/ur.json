@@ -201,7 +201,8 @@
     "queue": "قطار",
     "attendanceDetail": "حاضری کی تفصیل",
     "qualityCheck": "معیار کی جانچ",
-    "rateWorker": "ورکر کی درجہ بندی"
+    "rateWorker": "ورکر کی درجہ بندی",
+    "history": "تاریخ"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -397,7 +398,9 @@
     "detailsTitle": "شفٹ کی تفصیلات",
     "upcomingTitle": "آنے والی شفٹیں",
     "offerNoLongerOpen": "یہ پیشکش اب کھلی نہیں ہے۔",
-    "alreadyFilledByAnother": "یہ شفٹ پہلے ہی کسی اور کارکن نے لے لی ہے۔"
+    "alreadyFilledByAnother": "یہ شفٹ پہلے ہی کسی اور کارکن نے لے لی ہے۔",
+    "hotel": "ہوٹل",
+    "noneAssigned": "آپ کے پاس ابھی کوئی اسائنمنٹ نہیں۔"
   },
   "jobs": {
     "none": "کوئی کھلی نوکری نہیں ملی۔",
@@ -912,7 +915,10 @@
     "reworkNotesRequired": "بیان کریں کہ کیا دوبارہ کرنا ہے۔",
     "reworkAssigned": "دوبارہ کام تفویض کر دیا گیا۔ کارکن کو مطلع کر دیا گیا۔",
     "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
-    "reworkCompleted": "دوبارہ کام مکمل"
+    "reworkCompleted": "دوبارہ کام مکمل",
+    "checklist": "معائنہ چیک لسٹ",
+    "checklistItemRange": "ہر آئٹم 0 سے 100 کے درمیان مکمل عدد ہونا چاہیے۔",
+    "noInspections": "ابھی تک کوئی معائنہ ریکارڈ نہیں ہوا۔"
   },
   "ratings": {
     "comment": "تبصرہ",

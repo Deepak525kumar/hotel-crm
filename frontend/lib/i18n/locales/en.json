@@ -200,7 +200,8 @@
     "queue": "Queue",
     "attendanceDetail": "Attendance Detail",
     "qualityCheck": "Quality Check",
-    "rateWorker": "Rate Worker"
+    "rateWorker": "Rate Worker",
+    "history": "History"
   },
   "roles": {
     "admin": "Admin",
@@ -396,7 +397,9 @@
     "detailsTitle": "Shift Details",
     "upcomingTitle": "Upcoming Shifts",
     "offerNoLongerOpen": "This offer is no longer open.",
-    "alreadyFilledByAnother": "This shift was already filled by another worker."
+    "alreadyFilledByAnother": "This shift was already filled by another worker.",
+    "hotel": "Hotel",
+    "noneAssigned": "You have no assignments yet."
   },
   "jobs": {
     "none": "No open jobs found.",
@@ -911,7 +914,10 @@
     "reworkNotesRequired": "Describe what needs redoing.",
     "reworkAssigned": "Rework assigned. The worker has been notified.",
     "reworkPending": "Rework assigned — awaiting the worker",
-    "reworkCompleted": "Rework completed"
+    "reworkCompleted": "Rework completed",
+    "checklist": "Inspection checklist",
+    "checklistItemRange": "Each checklist item must be a whole number from 0 to 100.",
+    "noInspections": "No inspections recorded yet."
   },
   "ratings": {
     "comment": "Comment",

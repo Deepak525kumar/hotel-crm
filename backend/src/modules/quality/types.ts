@@ -18,12 +18,23 @@ export const CreateQualityVerificationSchema = z.object({
   // number through unchanged, and .int() still rejects "50.5" or "abc".
   score: z.coerce.number().int().min(0).max(100),
   notes: z.string().optional(),
+  // TREQ-005 / CRR §15 checklist. Same multipart handling as
+  // CreateRatingSchema below: this endpoint is multipart (photos), and
+  // multipart has a flat field model, so a nested object arrives
+  // JSON-stringified in one field.
+  criteria_scores: z.preprocess((val) => {
+    if (typeof val === 'string') {
+      try { return JSON.parse(val); } catch { return val; }
+    }
+    return val;
+  }, z.record(z.enum(INSPECTION_CHECKLIST_ITEMS), z.coerce.number().int().min(0).max(100)).optional()),
 });
 
 export interface CreateQualityVerificationRequest {
   assignment_id: string;
   score: number; // 0-100
   notes?: string;
+  criteria_scores?: Partial<Record<InspectionChecklistItem, number>>;
 }
 
 // 2026-08-24: this endpoint now accepts multipart (CRR §15's photo

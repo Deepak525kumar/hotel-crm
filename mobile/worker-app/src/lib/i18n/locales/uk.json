@@ -200,7 +200,8 @@
     "queue": "Черга",
     "attendanceDetail": "Деталі відвідування",
     "qualityCheck": "Перевірка якості",
-    "rateWorker": "Оцінити працівника"
+    "rateWorker": "Оцінити працівника",
+    "history": "Історія"
   },
   "roles": {
     "admin": "Адміністратор",
@@ -396,7 +397,9 @@
     "detailsTitle": "Деталі зміни",
     "upcomingTitle": "Майбутні зміни",
     "offerNoLongerOpen": "Ця пропозиція більше не відкрита.",
-    "alreadyFilledByAnother": "Цю зміну вже зайняв інший працівник."
+    "alreadyFilledByAnother": "Цю зміну вже зайняв інший працівник.",
+    "hotel": "Готель",
+    "noneAssigned": "У вас ще немає призначень."
   },
   "jobs": {
     "none": "Відкритих вакансій не знайдено.",
@@ -911,7 +914,10 @@
     "reworkNotesRequired": "Опишіть, що потрібно переробити.",
     "reworkAssigned": "Переробку призначено. Працівника сповіщено.",
     "reworkPending": "Переробку призначено — очікується працівник",
-    "reworkCompleted": "Переробку завершено"
+    "reworkCompleted": "Переробку завершено",
+    "checklist": "Контрольний список огляду",
+    "checklistItemRange": "Кожен пункт має бути цілим числом від 0 до 100.",
+    "noInspections": "Оглядів ще не зафіксовано."
   },
   "ratings": {
     "comment": "Коментар",

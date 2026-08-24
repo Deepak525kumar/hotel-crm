@@ -200,7 +200,8 @@
     "queue": "Warteschlange",
     "attendanceDetail": "Anwesenheitsdetails",
     "qualityCheck": "Qualitätsprüfung",
-    "rateWorker": "Mitarbeiter bewerten"
+    "rateWorker": "Mitarbeiter bewerten",
+    "history": "Verlauf"
   },
   "roles": {
     "admin": "Administrator",
@@ -396,7 +397,9 @@
     "detailsTitle": "Schichtdetails",
     "upcomingTitle": "Kommende Schichten",
     "offerNoLongerOpen": "Dieses Angebot ist nicht mehr offen.",
-    "alreadyFilledByAnother": "Diese Schicht wurde bereits von einem anderen Mitarbeiter besetzt."
+    "alreadyFilledByAnother": "Diese Schicht wurde bereits von einem anderen Mitarbeiter besetzt.",
+    "hotel": "Hotel",
+    "noneAssigned": "Sie haben noch keine Einsätze."
   },
   "jobs": {
     "none": "Keine offenen Jobs gefunden.",
@@ -911,7 +914,10 @@
     "reworkNotesRequired": "Beschreiben Sie, was nachgearbeitet werden muss.",
     "reworkAssigned": "Nacharbeit zugewiesen. Der Mitarbeiter wurde benachrichtigt.",
     "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
-    "reworkCompleted": "Nacharbeit abgeschlossen"
+    "reworkCompleted": "Nacharbeit abgeschlossen",
+    "checklist": "Inspektions-Checkliste",
+    "checklistItemRange": "Jeder Punkt muss eine ganze Zahl von 0 bis 100 sein.",
+    "noInspections": "Noch keine Inspektionen erfasst."
   },
   "ratings": {
     "comment": "Kommentar",

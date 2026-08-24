@@ -1152,6 +1152,19 @@ model QualityVerification {
   score               Int // 0–100; CHECK constraint in migration
   status              VerificationStatus @default(PASSED)
   notes               String?
+  // TREQ-005 / CRR §15's confirmed inspection checklist: dust, bathroom,
+  // bed_linen, mirror, floor, minibar_restocking, fragrance_amenities, other —
+  // each 0-100 and optional. Added 2026-08-24: the checklist existed only on
+  // Rating, which the web app writes, so the CHECKER performing the inspection
+  // in the room had no way to record itemised findings while a manager at a
+  // desk did. Same shape and same validated key set as Rating.criteria_scores
+  // (quality/types.ts is the validator; this column is Json).
+  //
+  // Deliberately duplicated rather than shared: a QualityVerification and a
+  // Rating are two different records of two different acts, and collapsing
+  // them is an open modelling question (see the leaderboard double-count note
+  // on Rating), not something to settle with a foreign key here.
+  criteria_scores Json?
   photo_urls          String[] // evidence uploaded to object storage
   rework_required     Boolean            @default(false)
   rework_notes        String?
