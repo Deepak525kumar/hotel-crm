@@ -899,7 +899,13 @@
     "markDone": "Mark as done",
     "reworkTitle": "Rework required",
     "reworkPhotoRequired": "Add at least one photo before marking this done.",
-    "photoUnavailable": "Image unavailable"
+    "photoUnavailable": "Image unavailable",
+    "photos": "Photos",
+    "photosHint": "Up to {{max}} images, 10 MB each.",
+    "tooManyPhotos": "At most {{max}} photos may be attached.",
+    "photoTooLarge": "{{name}} is larger than {{mb}} MB.",
+    "photoRequired": "Add at least one photo before submitting this rating.",
+    "evidence": "Evidence"
   },
   "ratings": {
     "comment": "Comment",
