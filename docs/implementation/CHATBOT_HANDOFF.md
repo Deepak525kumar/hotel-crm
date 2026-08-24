@@ -35,7 +35,7 @@ There is no chatbot yet. There is a **safe harness for one**, plus a working zer
 
 Routes, all authenticated, all behind the flag: `GET /chatbot/commands`, `POST /chatbot/conversations`, `POST /chatbot/conversations/:id/messages`, `GET /chatbot/conversations/:id`, `GET /chatbot/tools`, `POST /chatbot/tools/invoke`.
 
-Database: `ChatbotConversation`, `ChatbotToolCall`, `ChatbotBudgetCounter`. Migration `20260824112010_add_chatbot_conversation_toolcall_budget` was applied to a throwaway PostgreSQL 16 instance and verified at the data layer (tables, indexes, FKs, the unique constraint on `idempotency_key`, no drift), including a from-scratch run of every migration against an empty database.
+Database: `ChatbotConversation`, `ChatbotToolCall`, `ChatbotBudgetCounter`. Migration `20260824112010_add_chatbot_conversation_toolcall_budget` ships with the paired `down.sql` this repo's migrate harness requires, and was applied to a throwaway PostgreSQL 16 instance and verified at the data layer (tables, indexes, FKs, the unique constraint on `idempotency_key`, no drift).
 
 ## 3. What is NOT built — and why
 
@@ -92,15 +92,13 @@ Steps 2–4 are redundant on purpose. Layer 4 exists because `assignments/servic
 
 **Mock-only tests prove nothing about the database.** Every chatbot test mocks Prisma. The migration was verified separately against a real PostgreSQL instance; any future DB-shaped claim needs the same treatment.
 
+**Every migration needs a paired `down.sql`.** The CI job *Forward · Rollback · Recovery* fails the build without one. Check an existing migration for the convention before writing a new one — enum changes in particular are delicate, since PostgreSQL has no `ALTER TYPE ... DROP VALUE` and a mis-ordered rebuild silently relabels existing rows.
+
+**Verify your base branch is current before concluding anything about the repo.** A stale working branch made `prisma migrate dev` report drift for columns that a migration on `origin/main` already created, which was briefly mistaken for a missing-migration defect. Confirm against `origin/main`, not whatever branch happens to be checked out.
+
 ## 7. Next steps, in order
 
 1. **Close the three G2 blockers** (§4). `OD-CHAT-013` needs a human owner, not an ADR.
 2. **Step 5 — wire the provider.** One Bedrock implementation behind `LlmProvider`, plus the L1 router. Needs the API key and the provider decision. Nothing else changes: the budget gate, redaction, executor, tool-call log and templates are all in place and tested. **Spend the first real key on a smoke test** — mock mode cannot validate real request/response shapes.
 3. **Expand the L0 command set.** It is the cheapest capability in the system: every phrase added there is a question that never costs a token. Expect this to dominate the cost model; instrument the L0 hit rate.
 4. **Add read-only self-scoped tools** one at a time (documents status, attendance, contract status), each with its own registry entry, its own authz matrix test, and its own approval per `ADR-053` item 4.
-
-## 8. Unrelated defect found along the way
-
-While validating the migration against a fresh database, `prisma migrate dev` revealed that `Contract.contract_pdf_s3_key`, `Contract.last_worker_expiry_reminder_at`, `Contract.worker_expiry_reminder_count`, `WorkerOverallRating.warning_50_sent_at`, `WorkerOverallRating.warning_70_sent_at`, and three `NotificationType` enum values exist in a **committed** `schema.prisma` but **no migration ever created them**. Any database provisioned from migrations alone is missing columns the generated Prisma client expects.
-
-Prisma wanted to fold these into the chatbot migration, which would have misattributed them. They are split into `20260824112000_backfill_missing_quality_hr_schema`, authored from the committed schema with no new design decisions. **This is not a chatbot change and deserves review on its own terms.**
