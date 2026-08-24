@@ -73,7 +73,7 @@ export function ContractStatusCard({
     );
   }
 
-  const needsSignature = contract.status === 'DRAFT' || contract.status === 'ISSUED';
+  const needsSignature = contract.status === 'PENDING';
 
   return (
     <ThemedView type="backgroundElement" style={styles.card}>

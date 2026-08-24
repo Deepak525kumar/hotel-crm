@@ -104,5 +104,4 @@ setOnAuthFailure(async () => {
   await deleteItem(KEYS.ACCESS_TOKEN);
   await deleteItem(KEYS.REFRESH_TOKEN);
   useAuthStore.setState({ user: null, accessToken: null, refreshToken: null });
-  router.replace('/(auth)/login');
 });
