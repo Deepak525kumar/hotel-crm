@@ -75,6 +75,13 @@ done
 read *any* other worker's evidence photos — an IDOR. The handler must be deny-by-default and
 match the subject worker explicitly. Do not drop this assertion because the other three pass.
 
+> **Table note (corrected 2026-08-24).** `rework_completed_at`, `rework_escalated_at`,
+> `rework_required` and `rework_notes` live on **`QualityVerification`**, not on
+> `WorkerAssignment`. The assignment side carries only `rework_of_assignment_id` and
+> `rework_verification_id`. Querying the wrong table returns
+> `ERROR: column "rework_completed_at" does not exist`, which is easy to misread as a
+> missing migration.
+
 ## Step 4 — Assign rework, and check the linked assignment
 
 ```bash
@@ -114,7 +121,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -X POST -H "Authorization: Bearer $WT" 
 
 **PASS:** `400`. Then repeat **with** `-F "photos=@..."`.
 
-**PASS:** `200`; and in the database `rework_completed_at` is set, the rework assignment is
+**PASS:** `200`; and in the database `QualityVerification.rework_completed_at` is set, the rework assignment is
 `COMPLETED`, `photo_urls` has grown from 1 to 2 (the completion photo is *appended* via
 `{ push: [...] }`, it does not replace the checker's evidence), and the Checker has a
 `REWORK_COMPLETED` notification.
@@ -126,18 +133,18 @@ duplicate completion must not append a third photo.
 
 Call Step 6's successful request with a *different* worker's token.
 
-**PASS:** `403`/`404`, and `rework_completed_at` stays null. The endpoint is self-scoped;
+**PASS:** `403`/`404`, and `QualityVerification.rework_completed_at` stays null. The endpoint is self-scoped;
 the assignment id is guessable.
 
 ## Step 8 — Escalation after 20 minutes, and the race against completion
 
 Backdate the rework assignment's creation by 21 minutes, then run the escalation job.
 
-**PASS:** `rework_escalated_at` is set once, and **both** the Manager and the Checker receive
+**PASS:** `QualityVerification.rework_escalated_at` is set once, and **both** the Manager and the Checker receive
 `REWORK_OVERDUE` (CRR §14 requires both). Run the job a second time: no duplicate
 notifications.
 
-Now the case worth encoding: set `rework_completed_at` on an overdue row and run the job.
+Now the case worth encoding: set `QualityVerification.rework_completed_at` on an overdue row and run the job.
 
 **PASS:** **no** `REWORK_OVERDUE` is sent. The job's claim must re-check
 `rework_completed_at IS NULL` inside the compare-and-swap, not just `rework_escalated_at IS

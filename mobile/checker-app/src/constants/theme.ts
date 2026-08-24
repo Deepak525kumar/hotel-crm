@@ -9,18 +9,20 @@ import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
+    text: '#09090B',
+    background: '#F8FAFC', // Slate 50
+    backgroundElement: '#FFFFFF', // Pure white cards
+    backgroundSelected: '#E2E8F0', // Slate 200
+    textSecondary: '#64748B', // Slate 500
+    primary: '#4F46E5', // Indigo 600
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
+    text: '#FAFAFA',
+    background: '#09090B', // Zinc 950 (True OLED-like)
+    backgroundElement: '#18181B', // Zinc 900
+    backgroundSelected: '#27272A', // Zinc 800
+    textSecondary: '#A1A1AA', // Zinc 400
+    primary: '#6366F1', // Indigo 500
   },
 } as const;
 

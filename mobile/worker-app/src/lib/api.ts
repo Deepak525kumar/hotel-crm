@@ -20,6 +20,7 @@ import type {
   AcceptBroadcastResult,
   WorkerDocument,
   DocumentCategory,
+  DocumentCompleteness,
   ConsentStatus,
   ConsentNotice,
   ConsentRecord,
@@ -492,6 +493,8 @@ export const api = {
       request<WorkerDocument[]>(
         `/documents/workers/${workerId}/documents${category ? `?category=${category}` : ''}`
       ),
+    getCompleteness: (workerId: string) =>
+      request<DocumentCompleteness>(`/documents/workers/${workerId}/documents/completeness`),
     // Takes the raw picker-asset shape (uri/name/mimeType, as returned by
     // expo-document-picker; `size` deliberately not accepted here — the
     // backend derives file_size_bytes server-side from the parsed file,
@@ -536,6 +539,12 @@ export const api = {
         body: form,
       });
     },
+    delete: (documentId: string) =>
+      request<void>(`/documents/documents/${documentId}`, { method: 'DELETE' }),
+  },
+  employee: {
+    submitForReview: (employeeId: string) =>
+      request<unknown>(`/employee-management/employees/${encodeURIComponent(employeeId)}/submit-for-review`, { method: 'POST' }),
   },
   consent: {
     // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is
@@ -574,6 +583,9 @@ export const api = {
   hr: {
     getContractStatus: (workerId: string) =>
       request<ContractDto | null>(`/hr/workers/${encodeURIComponent(workerId)}/contract-status`),
+
+    getContractDownloadUrl: (workerId: string) =>
+      `${BASE_URL}/hr/workers/${encodeURIComponent(workerId)}/contract-download`,
 
     listPayroll: () =>
       request<PayslipRequestDto[]>('/hr/payroll'),

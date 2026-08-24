@@ -9,8 +9,13 @@ import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  GENERAL: 'documents.categoryGENERAL',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ID_CARD: 'documents.categoryID_CARD',
+  RESIDENCE_PERMIT: 'documents.categoryRESIDENCE_PERMIT',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
+  DRIVERS_LICENSE: 'documents.categoryDRIVERS_LICENSE',
+  CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
+  GENERAL: 'documents.categoryGENERAL',
 };
 
 export function UploadDocumentCard({

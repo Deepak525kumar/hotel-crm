@@ -43,6 +43,12 @@ router.post(
 // see what an inspection recorded. The worker the inspection is ABOUT is
 // admitted in the service, which is the layer that knows whose assignment it
 // is.
+// The inspection record. quality:read, same gate as its photos below — the
+// record and the evidence attached to it are one disclosure.
+router.get('/verifications/:verification_id', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.getVerification(req, res, next)
+);
+
 router.get('/verifications/:verification_id/photos', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getVerificationPhotos(req, res, next)
 );
@@ -60,8 +66,25 @@ router.post(
   photoUpload.array('photos', MAX_PHOTOS_PER_VERIFICATION),
   (req, res, next) => qualityController.completeRework(req, res, next)
 );
-router.post('/ratings', requirePermission('quality:write'), (req, res, next) =>
-  qualityController.createRating(req, res, next)
+// CRR §15: same "checker/supervisor uploads a photo WITH the rating"
+// requirement as /verifications above — Rating is the checklist-based score
+// that actually feeds WorkerOverallRating (see quality/service.ts
+// refreshWorkerOverallRating), so the requirement is enforced here too
+// (2026-08-24). A request with no files still succeeds at the transport
+// layer; the service enforces at least one.
+router.post(
+  '/ratings',
+  requirePermission('quality:write'),
+  photoUpload.array('photos', MAX_PHOTOS_PER_VERIFICATION),
+  (req, res, next) => qualityController.createRating(req, res, next)
+);
+
+// Presigned URLs for one rating's evidence — same shape as
+// /verifications/:id/photos above, quality:read rather than quality:write for
+// the identical reason (managers/RMs hold read and must be able to see what
+// a rating recorded).
+router.get('/ratings/:rating_id/photos', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.getRatingPhotos(req, res, next)
 );
 router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getLeaderboard(req, res, next)

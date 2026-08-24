@@ -439,7 +439,14 @@
     "uploadFirstHint": "Téléversez votre premier document pour commencer.",
     "uploadFailed": "Échec du téléversement. Veuillez réessayer.",
     "unsupportedType": "Type de fichier non pris en charge. Autorisés : PDF, JPEG, PNG, WEBP.",
-    "exceedsMaxSize": "Le fichier dépasse la taille maximale de 10 Mo."
+    "exceedsMaxSize": "Le fichier dépasse la taille maximale de 10 Mo.",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "RH et paie",
@@ -899,7 +906,19 @@
     "markDone": "Marquer comme terminé",
     "reworkPhotoRequired": "Ajoutez au moins une photo avant de marquer ceci comme terminé.",
     "reworkTitle": "Reprise requise",
-    "photoUnavailable": "Image indisponible"
+    "photoUnavailable": "Image indisponible",
+    "photos": "Photos",
+    "photosHint": "Jusqu'à {{max}} images, 10 Mo chacune.",
+    "tooManyPhotos": "Au maximum {{max}} photos peuvent être jointes.",
+    "photoTooLarge": "{{name}} dépasse {{mb}} Mo.",
+    "photoRequired": "Ajoutez au moins une photo avant de soumettre cette évaluation.",
+    "evidence": "Preuve",
+    "assignRework": "Attribuer une reprise",
+    "reworkNotesPlaceholder": "Que faut-il refaire ?",
+    "reworkNotesRequired": "Décrivez ce qui doit être refait.",
+    "reworkAssigned": "Reprise attribuée. L'employé a été notifié.",
+    "reworkPending": "Reprise attribuée — en attente de l'employé",
+    "reworkCompleted": "Reprise terminée"
   },
   "ratings": {
     "comment": "Commentaire",

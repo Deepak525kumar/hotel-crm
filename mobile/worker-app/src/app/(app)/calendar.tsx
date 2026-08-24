@@ -72,7 +72,7 @@ function AbsenceCard({
   );
 }
 
-export default function AbsencesScreen() {
+export default function CalendarScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const [items, setItems] = useState<CalendarAbsence[]>([]);

@@ -2,6 +2,19 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 import { requirePermission } from '../middleware/permissions.js';
 
+// CRR §15 enforced 2026-08-24: createRating rejects an empty photos array.
+const RATING_PHOTO = [
+  { buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' },
+] as any;
+
+// CRR §15 is enforced as of 2026-08-24: createVerification() rejects an empty
+// photos array. These suites exercise duplicate handling / notification
+// enqueue, not the photo rule, so they pass a minimal valid photo rather than
+// asserting on it.
+const PHOTO_FIXTURE = [
+  { buffer: Buffer.from('x'), mimeType: 'image/jpeg', originalName: 'e.jpg' },
+] as any;
+
 // refreshWorkerOverallRating()'s 2026-08-13 due-date fix reads "today" via
 // this helper -- pinned for deterministic assertions, same pattern
 // calendar-entries.test.ts already establishes for the identical helper.
@@ -248,7 +261,8 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'admin' }
+        { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
       )
     ).rejects.toMatchObject({ name: 'ConflictError' });
 
@@ -268,7 +282,8 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'admin' }
+        { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
       )
     ).rejects.toMatchObject({ name: 'ConflictError' });
   });
@@ -280,7 +295,8 @@ describe('Quality createVerification — concurrent duplicate handling (P2-04)',
     await expect(
       service.createVerification(
         { assignment_id: 'a1', score: 80 } as any,
-        { userId: 'u1', role: 'admin' }
+        { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
       )
     ).rejects.toThrow('db down');
   });
@@ -307,7 +323,8 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
 
     await service.createVerification(
       { assignment_id: 'a1', score: 80 } as any,
-      { userId: 'u1', role: 'admin' }
+      { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
     );
 
     expect(mockPrisma.$transaction).toHaveBeenCalledTimes(1);
@@ -323,7 +340,8 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
 
     await service.createVerification(
       { assignment_id: 'a1', score: 50 } as any,
-      { userId: 'u1', role: 'admin' }
+      { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
     );
 
     const notifData = mockNotification.create.mock.calls[0][0].data;
@@ -334,7 +352,11 @@ describe('Quality createVerification — notification enqueue (ADR-029 GD-01, Ep
     mockQualityVerification.create.mockRejectedValue(new Error('db down'));
 
     await expect(
-      service.createVerification({ assignment_id: 'a1', score: 80 } as any, { userId: 'u1', role: 'admin' })
+      service.createVerification(
+        { assignment_id: 'a1', score: 80 } as any,
+        { userId: 'u1', role: 'admin' },
+        PHOTO_FIXTURE
+      )
     ).rejects.toThrow('db down');
 
     expect(mockOutboxEvent.create).not.toHaveBeenCalled();
@@ -437,7 +459,8 @@ describe('Quality createRating — duplicate rating handling (P1-02)', () => {
     await expect(
       service.createRating(
         { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
-        { userId: 'u1', role: 'admin' }
+        { userId: 'u1', role: 'admin' },
+        RATING_PHOTO
       )
     ).rejects.toMatchObject({
       name: 'ConflictError',
@@ -473,7 +496,8 @@ describe('Quality createRating — RATING_RECEIVED notification (GAP-1)', () => 
   it('emits RATING_RECEIVED to the rated worker after a successful rating', async () => {
     await service.createRating(
       { assignment_id: 'a1', worker_id: 'w1', score: 80 } as any,
-      { userId: 'u1', role: 'admin' }
+      { userId: 'u1', role: 'admin' },
+        RATING_PHOTO
     );
 
     expect(mockNotification.create).toHaveBeenCalledTimes(1);
@@ -518,7 +542,8 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
 
     await service.createRating(
       { assignment_id: 'a1', worker_id: 'w1', score: 72 } as any,
-      { userId: 'u1', role: 'admin' }
+      { userId: 'u1', role: 'admin' },
+        RATING_PHOTO
     );
 
     expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);

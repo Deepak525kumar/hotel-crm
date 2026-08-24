@@ -150,6 +150,18 @@ export default function ShiftDetailScreen() {
           <ThemedView type="backgroundElement" style={styles.section}>
             {wr ? (
               <>
+                {wr.hotel?.name && (
+                  <>
+                    <InfoRow label={t('jobs.hotel')} value={wr.hotel.name} />
+                    <View style={styles.divider} />
+                  </>
+                )}
+                {wr.hotel?.address && (
+                  <>
+                    <InfoRow label={t('jobs.location')} value={wr.hotel.address} />
+                    <View style={styles.divider} />
+                  </>
+                )}
                 <InfoRow
                   label={t('fields.date')}
                   value={new Date(wr.shift_date).toLocaleDateString('en-US', {
@@ -159,6 +171,15 @@ export default function ShiftDetailScreen() {
                 <View style={styles.divider} />
                 <InfoRow label={t('fields.time')} value={`${wr.shift_start_time} – ${wr.shift_end_time}`} />
                 <View style={styles.divider} />
+                {wr.description && (
+                  <>
+                    <View style={styles.infoRowColumn}>
+                      <ThemedText type="small" themeColor="textSecondary" style={{ marginBottom: Spacing.one }}>{t('jobs.description')}</ThemedText>
+                      <ThemedText type="small">{wr.description}</ThemedText>
+                    </View>
+                    <View style={styles.divider} />
+                  </>
+                )}
               </>
             ) : null}
             <InfoRow label={t('fields.status')} value={shift.status.replace(/_/g, ' ')} />
@@ -221,6 +242,7 @@ const styles = StyleSheet.create({
   title: { marginBottom: Spacing.three },
   section: { borderRadius: Spacing.two, overflow: 'hidden', marginBottom: Spacing.three },
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
+  infoRowColumn: { flexDirection: 'column', paddingHorizontal: Spacing.three, paddingVertical: Spacing.three },
   divider: { height: 1, backgroundColor: '#E0E1E6', marginHorizontal: Spacing.three },
   sectionLabel: { marginBottom: Spacing.two, textTransform: 'uppercase', letterSpacing: 0.8 },
   checkInBtn: { backgroundColor: '#38A169', borderRadius: Spacing.two, height: 48, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.two },

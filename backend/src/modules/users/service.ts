@@ -77,7 +77,25 @@ export class UserService extends BaseService {
       (where['AND'] as any[]).push({
         OR: [
           { employment_record: { hotel_group_id: targetGroupId } },
-          { managed_hotels: { some: { hotel_group_id: targetGroupId } } }
+          { managed_hotels: { some: { hotel_group_id: targetGroupId } } },
+          // 2026-08-24: a not-yet-approved applicant has hotel_group_id = null
+          // until activation (ADR-065 Decision 2), so the first branch excluded
+          // it and a Manager could not see the Worker/Checker they had just
+          // created — the account appeared to vanish from the Users tab
+          // immediately after a successful create.
+          //
+          // target_hotel_group_id is set at creation from the CREATING actor's
+          // own scope, so it answers "whose applicant is this" for exactly the
+          // window in which hotel_group_id cannot. Guarded on
+          // `hotel_group_id: null` so this matches ONLY pre-approval records —
+          // an activated worker is always matched by their real group above,
+          // never by a stale target.
+          {
+            employment_record: {
+              hotel_group_id: null,
+              target_hotel_group_id: targetGroupId,
+            },
+          },
         ]
       });
     }

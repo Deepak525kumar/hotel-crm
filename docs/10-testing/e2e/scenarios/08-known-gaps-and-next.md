@@ -26,6 +26,8 @@ whole E2E suite).
 | ~~4~~ | ~~**`consent.recordDecision()` atomicity gap** — `consentRecord.create` → `logAudit` → `notifyResponsibleManager`, all unwrapped~~ | **FIXED** — Wrapped in `$transaction`, threading `tx` through to notifications and audit logging. | — | — |
 | ~~5~~ | ~~**Audit-outside-transaction sites** (per `ADR-029`, not `ADR-036`)~~ | **FIXED** — `geo/service.ts`, `document-templates/service.ts`, and `attendance/service.ts` all updated to wrap audits in `$transaction`. | — | — |
 | ~~6~~ | ~~**Orphaned S3 objects possible** — `storage.upload()` runs *before* the DB transaction with no compensating `storage.delete()`~~ | **FIXED** — Wrapped the DB transaction in a `try/catch` and added a compensating `storage.delete()` on failure. | — | — |
+| 11 | **A newly created Worker/Checker is invisible to the Manager who created it, until that applicant submits for review** | Creation itself succeeds (`201`, correct `EmploymentRecord` + `Contract`, both `PENDING`). But `EmploymentRecord.hotel_group_id` is deliberately `null` until approval (`ADR-065` Decision 2), and the scope checks on the surfaces the creator lands on read **`hotel_group_id`**, not `target_hotel_group_id`. Three symptoms, one cause: (a) the UI redirects to `/users/<id>` after create, and that page renders **"Failed to load employment status"** and **"Failed to load contract status"** — `GET /employees/by-user/:id` → `403 "Record is outside your scope"` and `GET /hr/workers/:id/contract-status` → `403 "Cannot access worker …"`; (b) the new user does **not** appear in the Users tab (`GET /users` applies the same scope filter); (c) it is not in the Review Queue either — that is **by design**, `getReviewQueue` filters `submitted_for_review_at: { not: null }` (`employee-management/service.ts:1991-1993`). Net effect: the manager creates the account, sees two error banners, and then cannot see or track it anywhere until the applicant logs in, uploads six documents and submits. **The fix already exists and is simply not applied here:** `isWorkerInReviewerScope()` (`lib/scope.ts:166`, added 2026-08-13 for the review-queue gap) falls back to `target_hotel_group_id` when `hotel_group_id` is null, and falls through to the strict check once it is set. Today only `documents/routes.ts:88` uses it. | Looks like a failed creation to the operator; the created account appears lost. High confusion cost, and the natural next action (open the user, add documents) is unavailable | `lib/scope.ts` `isWorkerInGroupScope` (strict) vs `isWorkerInReviewerScope` (PENDING-aware); `employee-management/routes.ts:28` `GET /by-user/:user_id`; `hr/routes.ts:204` `contract-status`; `users` list scope filter | Route the two detail-page reads (and the Users list) through `isWorkerInReviewerScope`, matching `documents/routes.ts`. Decide separately whether an unsubmitted applicant should also appear in some manager-facing list — the Review Queue's `submitted_for_review_at` filter is deliberate, so that is a product question, not a bug |
+| 14 | **Shift-summary PUT returns `500` on an invalid body instead of `422`** | `PUT /calendar/hotels/:hotel_id/shift-summaries/:date` calls `dailyShiftSummarySchema.parse(req.body)` (`calendar/shift-summary/routes.ts:68`) — the throwing form. The raised `ZodError` is not an `AppError`, so the error handler falls through to its generic branch and answers `500 INTERNAL_ERROR` with "An unexpected error occurred". Reproduced with `{"total_rooms":"abc"}`; the backend log shows a bare `ZodError`. Every other route in this repo uses `safeParse` + `ValidationError` (see `assignments/controller.ts`'s `zodDetails`, or the `validateQuery` middleware). Note the field names are also easy to get wrong from the scenario text — they are `stay_over_rooms`/`total_people_working`, not `stayover_rooms`/`workers_assigned` — and getting them wrong is exactly what produces the misleading 500. | A client sending a malformed summary is told the server broke, with no field-level detail, and the failure looks like an outage rather than bad input. Also pollutes error tracking with a non-incident | `backend/src/modules/calendar/shift-summary/routes.ts:68` (`.parse`, should be `.safeParse` + `ValidationError`); contrast `middleware/validation.ts` | Swap to `safeParse` and raise `ValidationError` with the Zod issues, matching the rest of the codebase. Cheap, contained fix |
 
 ## 2. Judgment calls awaiting the project owner
 
@@ -215,6 +217,61 @@ is legitimate (add a pin with its authority and remediation owner) or it is an a
 authorization widening (revert the code).
 
 ## 6. Fixed — history (do not re-investigate, but do regression-test)
+### 2026-08-24 — Two rating paths, one unevidenced; and four i18n keys that never existed
+
+Found during a code-level audit of the checker app against its backend routes.
+
+**Mobile shipped a second, spec-violating rating path.** `rating/[id].tsx` was a **1–5 star
+picker** (`score × 20`) writing to `Rating`, alongside `quality/[id].tsx`'s CRR-compliant 0–100
+photo-required screen writing to `QualityVerification`. CRR §15 says "Quality score is 0–100
+(**not** a 5-star system)". Worse, only `Rating` feeds `WorkerOverallRating` — so the compliant
+screen could not move a worker's standing, while the non-compliant one could, with no photo.
+Retired the screen, its route registration, and its nav link.
+
+**`Rating` had no photo capability at all**, so CRR §15 was unenforceable on the one model that
+drives the leaderboard. Added `Rating.photo_urls` (migration
+`20260824211701_add_rating_photo_evidence`, with paired `down.sql`), S3 upload via the existing
+`uploadPhotos()` with a new `'rating'` key kind, a `GET /quality/ratings/:id/photos` retrieval
+endpoint mirroring the verification one (**including its checker-assignment gate rather than JWT
+scope** — checkers never receive a scope), a required photo picker in the web ratings modal, and
+enforcement in `createRating()` placed after authorization. `POST /quality/ratings` now accepts
+multipart; `criteria_scores` is JSON-stringified into one field because multipart cannot carry a
+nested object. `createRating()` was also restructured so the assignment lookup and authorization
+run outside the transaction, keeping the S3 upload off the row locks — matching
+`createVerification()`.
+
+**Four i18n keys were referenced but never defined.** `quality.photos`, `quality.photosHint`,
+`quality.tooManyPhotos`, `quality.photoTooLarge` are used by the photo UI on **both** clients but
+existed in **none** of the 12 locale files, so those labels rendered as raw key strings
+(`quality.photos`) in all six languages. Added across web and mobile, with `photoRequired` and
+`evidence`. Pre-existing and unrelated to the rating work — found only because the new picker
+reused the same keys.
+
+Regression tests: `quality-scope-authz.test.ts` "refuses a rating with no photo, even in scope";
+`inspection-checklist-http.test.ts` "rejects a rating with no photo (CRR §15)".
+
+### 2026-08-24 — Checker evidence flow: photo requirement unenforced, and checkers locked out of their own photos
+
+Both found while walking scenario 12 against a live stack, both fixed the same day.
+
+**A rating could be submitted with no photo.** `POST /quality/verifications` returned `201` and
+stored `photo_urls = {}`. `createVerification()` carried the CRR §15 comment above its `photos`
+parameter but never length-checked it, while the worker half of the same clause
+(`completeRework`) did enforce it. Fixed by adding the matching guard, placed **after** the
+authorization branches so an out-of-scope actor still gets `403`, not a validation hint.
+Regression test: `quality-scope-authz.test.ts` "refuses a rating with no photo, even in scope".
+
+**A Checker could never read evidence photos, including its own.**
+`GET /quality/verifications/:id/photos` gated `checker` through
+`isHotelInScope(actor.scope, …)`, but `auth/service.ts#resolveScope` mints a scope only for
+admin/RM/manager — a checker's JWT always carries `scope: null`, so the check could never pass.
+This broke the checker app's verification screen outright. Fixed by gating the checker on the
+same rule `createVerification` already uses for that role (an active assignment at that hotel),
+which needs no JWT scope and keeps read and write consistent. Deliberately **not** fixed by
+teaching `resolveScope` to mint a checker scope — that would change every scope-gated route at
+once. Regression tests: `quality-photos-authz.test.ts` "admits a checker … WITHOUT any JWT
+scope" / "REFUSES a checker with no active assignment at that hotel".
+
 
 | Defect | Fixed in |
 |---|---|

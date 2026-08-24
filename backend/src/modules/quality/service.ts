@@ -324,7 +324,7 @@ export class QualityService extends BaseService {
   private async uploadPhotos(
     photos: UploadedPhoto[],
     assignmentId: string,
-    kind: 'inspection' | 'rework'
+    kind: 'inspection' | 'rework' | 'rating'
   ): Promise<string[]> {
     if (photos.length === 0) return [];
     if (photos.length > MAX_PHOTOS_PER_VERIFICATION) {
@@ -554,6 +554,22 @@ export class QualityService extends BaseService {
       }
     }
 
+    // CRR §15 enforcement (2026-08-24). The comment on the `photos` parameter
+    // above has stated this requirement since the parameter was added, but
+    // nothing checked it: a rating with no photo returned 201 and stored
+    // `photo_urls = {}`, so the evidence that justifies the whole
+    // rating/rework/dispute loop was optional in practice. The worker half of
+    // the same CRR clause was already enforced — completeRework() throws
+    // 'A photo is required to mark rework as done' on an empty array — so the
+    // two halves of one rule disagreed.
+    //
+    // Placed AFTER the authorization branches above, deliberately: an actor
+    // who may not rate this assignment must get that answer (403), not a
+    // validation hint. Authorization first, business validation second.
+    if (photos.length === 0) {
+      throw new ValidationError('A photo is required to submit a rating');
+    }
+
     const existing = await this.prisma.qualityVerification.findUnique({
       where: { assignment_id },
     });
@@ -640,7 +656,15 @@ export class QualityService extends BaseService {
     return verification;
   }
 
-  async createRating(data: CreateRatingRequest, actor: Actor) {
+  async createRating(
+    data: CreateRatingRequest,
+    actor: Actor,
+    // CRR §15: "the Checker/supervisor uploads a photo WITH the rating."
+    // Added 2026-08-24 — Rating is the checklist-based score that actually
+    // feeds WorkerOverallRating (see refreshWorkerOverallRating below), and it
+    // had no photo capability at all until now, unlike QualityVerification.
+    photos: UploadedPhoto[] = []
+  ) {
     const { assignment_id, worker_id, score, comment, criteria_scores } = data;
 
     if (!assignment_id || !worker_id) {
@@ -650,41 +674,57 @@ export class QualityService extends BaseService {
       throw new ValidationError('score must be an integer between 0 and 100');
     }
 
-    const rating = await this.prisma.$transaction(async (tx) => {
-      const assignment = await tx.workerAssignment.findUnique({
-        where: { id: assignment_id },
-        select: { id: true, hotel_id: true, worker_id: true, day: true },
+    // Restructured 2026-08-24 to mirror createVerification's shape: the
+    // assignment lookup and authorization now happen OUTSIDE the transaction
+    // (this.prisma, not tx), so the S3 upload below never runs while a DB
+    // transaction — and its row locks — is open.
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignment_id },
+      select: { id: true, hotel_id: true, worker_id: true, day: true },
+    });
+    if (!assignment) {
+      throw new NotFoundError('Assignment not found');
+    }
+    if (assignment.worker_id !== worker_id) {
+      throw new ForbiddenError('worker_id does not match the assignment worker');
+    }
+
+    // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
+    // rate for hotels in their scope claim. Admin/checker unchanged.
+    // regional_manager included as defense-in-depth — see verifyAttendance()
+    // above for why (C-27 denies RM `quality:write` today).
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError('Cannot rate for this hotel');
+      }
+    } else if (actor.role === 'checker') {
+      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: actor.userId,
+          hotel_id: assignment.hotel_id,
+          day: assignment.day,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES }
+        }
       });
-      if (!assignment) {
-        throw new NotFoundError('Assignment not found');
+      if (!checkerAssignment) {
+        throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
       }
-      if (assignment.worker_id !== worker_id) {
-        throw new ForbiddenError('worker_id does not match the assignment worker');
-      }
+    }
 
-      // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager may only
-      // rate for hotels in their scope claim. Admin/checker unchanged.
-      // regional_manager included as defense-in-depth — see verifyAttendance()
-      // above for why (C-27 denies RM `quality:write` today).
-      if (isScopedManagerRole(actor.role)) {
-        const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
-        if (!inScope) {
-          throw new ForbiddenError('Cannot rate for this hotel');
-        }
-      } else if (actor.role === 'checker') {
-        const checkerAssignment = await tx.workerAssignment.findFirst({
-          where: {
-            worker_id: actor.userId,
-            hotel_id: assignment.hotel_id,
-            day: assignment.day,
-            status: { in: ACTIVE_ASSIGNMENT_STATUSES }
-          }
-        });
-        if (!checkerAssignment) {
-          throw new ForbiddenError('Checker must have an active assignment at the same hotel on the same day');
-        }
-      }
+    // CRR §15 enforcement. Placed AFTER authorization, same reasoning as
+    // createVerification's identical guard: an actor who may not rate this
+    // assignment must get that answer (403), not a validation hint.
+    if (photos.length === 0) {
+      throw new ValidationError('A photo is required to submit a rating');
+    }
 
+    // Uploaded BEFORE the transaction opens — see uploadPhotos' own comment on
+    // createVerification's identical call for why (an S3 round-trip inside a
+    // transaction holds row locks for the duration of a network upload).
+    const photoKeys = await this.uploadPhotos(photos, assignment_id, 'rating');
+
+    const rating = await this.prisma.$transaction(async (tx) => {
       let created;
       try {
         created = await tx.rating.create({
@@ -698,6 +738,7 @@ export class QualityService extends BaseService {
             criteria_scores: criteria_scores
               ? (criteria_scores as Prisma.InputJsonValue)
               : Prisma.JsonNull,
+            photo_urls: photoKeys,
           },
         });
       } catch (error) {
@@ -742,6 +783,59 @@ export class QualityService extends BaseService {
   }
 
   /**
+   * Presigned URLs for one rating's evidence. Mirrors getVerificationPhotos
+   * exactly, including its 2026-08-24 checker fix: the checker branch is
+   * gated on an active assignment at that hotel, NOT on JWT scope — a
+   * checker's JWT never carries one (resolveScope mints scope only for
+   * admin/RM/manager), so a scope-based gate here would deny every checker
+   * unconditionally, same defect as the verification-photos endpoint had.
+   */
+  async getRatingPhotos(ratingId: string, actor: Actor) {
+    const rating = await this.prisma.rating.findUnique({
+      where: { id: ratingId },
+      select: { id: true, hotel_id: true, worker_id: true, photo_urls: true },
+    });
+    if (!rating) throw new NotFoundError('Rating not found');
+
+    const isSubject = rating.worker_id === actor.userId;
+    const role = actor.role.toLowerCase();
+
+    if (isSubject) {
+      // The worker the rating is about — they have every reason to see the
+      // evidence used to score them.
+    } else if (role === 'admin') {
+      // Unscoped by design, matching every other admin read.
+    } else if (role === 'checker') {
+      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: actor.userId,
+          hotel_id: rating.hotel_id,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        },
+        select: { id: true },
+      });
+      if (!checkerAssignment) {
+        throw new ForbiddenError('Cannot view evidence for this hotel');
+      }
+    } else if (isScopedManagerRole(role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, rating.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
+    } else {
+      throw new ForbiddenError('Cannot view evidence for this rating');
+    }
+
+    const storage = await getStorageClient();
+    const photos = await Promise.all(
+      rating.photo_urls.map(async (key) => ({
+        key,
+        url: await storage.getPresignedUrl(key),
+      }))
+    );
+
+    return { rating_id: rating.id, photos };
+  }
+
+  /**
    * Presigned URLs for one inspection's photo evidence (CRR §14/§15).
    *
    * Keys are useless to a client on their own -- the bucket is private -- so
@@ -751,6 +845,71 @@ export class QualityService extends BaseService {
    * URLs are minted per request and expire in 15 minutes; they are never
    * persisted, which is why the column stores keys.
    */
+  /**
+   * IF-QUAL-GetVerification — the inspection record itself.
+   *
+   * Added 2026-08-24: the evidence screen could fetch photos but not the
+   * verification they belong to, so it could not show the score, the derived
+   * status, or whether rework had already been assigned — which is what a
+   * checker needs in order to decide whether to assign it. Same authorization
+   * as the photos endpoint, via the shared helper below.
+   */
+  async getVerification(verificationId: string, actor: Actor) {
+    const verification = await this.prisma.qualityVerification.findUnique({
+      where: { id: verificationId },
+      include: { assignment: { select: { worker_id: true, day: true } } },
+    });
+    if (!verification) throw new NotFoundError('Verification not found');
+    await this.assertCanViewVerification(verification, actor);
+    return verification;
+  }
+
+  /**
+   * Shared read gate for an inspection and its evidence.
+   *
+   * Extracted 2026-08-24 so getVerification() and getVerificationPhotos()
+   * cannot drift apart — the record and the photos attached to it are the
+   * same disclosure, and gating them differently would mean one endpoint
+   * leaking what the other withholds.
+   */
+  private async assertCanViewVerification(
+    verification: { hotel_id: string; assignment?: { worker_id: string } | null },
+    actor: Actor
+  ): Promise<void> {
+    const isSubject = verification.assignment?.worker_id === actor.userId;
+    const role = actor.role.toLowerCase();
+
+    if (isSubject) return; // the worker the inspection is about
+    if (role === 'admin') return; // unscoped by design
+
+    if (role === 'checker') {
+      // Assignment-based, NOT JWT scope: a checker's token never carries a
+      // scope (resolveScope mints one only for admin/RM/manager), so a
+      // scope gate here would deny every checker unconditionally.
+      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: actor.userId,
+          hotel_id: verification.hotel_id,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        },
+        select: { id: true },
+      });
+      if (!checkerAssignment) {
+        throw new ForbiddenError('Cannot view evidence for this hotel');
+      }
+      return;
+    }
+
+    if (isScopedManagerRole(role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, verification.hotel_id);
+      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
+      return;
+    }
+
+    // Any other role, including a WORKER who is not the subject.
+    throw new ForbiddenError('Cannot view evidence for this inspection');
+  }
+
   async getVerificationPhotos(verificationId: string, actor: Actor) {
     const verification = await this.prisma.qualityVerification.findUnique({
       where: { id: verificationId },
@@ -758,34 +917,7 @@ export class QualityService extends BaseService {
     });
     if (!verification) throw new NotFoundError('Verification not found');
 
-    // Who may look at room evidence:
-    //  - the checker who recorded it, and any admin (quality:read gates the
-    //    route itself);
-    //  - a scope-bound manager/RM, only for hotels in their scope;
-    //  - the WORKER the inspection is about -- they uploaded the rework photo
-    //    and the inspection is a record about their own work. Withholding it
-    //    would mean a worker cannot see the evidence used to judge them.
-    // Deny by default. quality:read alone is NOT sufficient: ADR-067 granted
-    // WORKER that token so a worker can see their own hotel group's
-    // leaderboard, so gating on the permission alone would let any worker read
-    // any other worker's room evidence by id -- an IDOR, and on
-    // special-category-adjacent data.
-    const isSubject = verification.assignment?.worker_id === actor.userId;
-    const role = actor.role.toLowerCase();
-
-    if (isSubject) {
-      // The worker the inspection is about. They uploaded the rework photo and
-      // the record is about their own work; withholding it would mean they
-      // cannot see the evidence used to judge them.
-    } else if (role === 'admin') {
-      // Unscoped by design, matching every other admin read.
-    } else if (isScopedManagerRole(role) || role === 'checker') {
-      const inScope = await isHotelInScope(actor.scope ?? null, verification.hotel_id);
-      if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
-    } else {
-      // Any other role, including a WORKER who is not the subject.
-      throw new ForbiddenError('Cannot view evidence for this inspection');
-    }
+    await this.assertCanViewVerification(verification, actor);
 
     const storage = await getStorageClient();
     const photos = await Promise.all(

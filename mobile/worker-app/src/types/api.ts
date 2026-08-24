@@ -17,6 +17,7 @@ export interface User {
    * negotiates from the device's own languages instead of assuming German.
    */
   preferred_language?: string | null;
+  employment_status?: string | null;
 }
 
 export interface AuthResponse {
@@ -251,7 +252,7 @@ export interface BackendPagination {
 
 // SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16). Matches backend WorkerDocumentDto
 // exactly (backend/src/modules/documents/types.ts).
-export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT';
+export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT' | 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'CONTRACT_SCAN';
 
 export interface WorkerDocument {
   id: string;
@@ -279,6 +280,15 @@ export const DAILY_ACCESS_GATE_INSTANCE = 'daily-access-gate';
 // Discriminated result, not a thrown error for "no decision yet"
 // (RULE-CONSENT-06). A decision from a prior day or a superseded notice
 // version reads as `absent` again (RULE-CONSENT-02, evaluated server-side).
+export interface DocumentCompleteness {
+  worker_id: string;
+  work_permit_required: boolean;
+  is_complete: boolean;
+  missing_categories: DocumentCategory[];
+  categories: Record<DocumentCategory, boolean>;
+  document_count: number;
+}
+
 export type ConsentStatus =
   | { status: 'granted'; notice_version: string; decided_at: string }
   | { status: 'declined'; notice_version: string; decided_at: string }

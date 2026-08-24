@@ -70,12 +70,12 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
-          name="absences"
+          name="calendar"
           options={{
-            title: t('nav.sickVacation'),
+            title: t('nav.calendar'),
             tabBarIcon: ({ color, size }) => (
               <SymbolView
-                name={{ ios: 'cross.case.fill', android: 'medical_services', web: 'medical_services' }}
+                name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
                 tintColor={color}
                 size={size}
               />

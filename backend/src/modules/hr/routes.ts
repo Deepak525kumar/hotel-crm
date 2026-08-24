@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { authMiddleware } from '../../middleware/auth.js';
 import { checkWorkerScope, requirePermission, requireRole } from '../../middleware/permissions.js';
+import { isWorkerInReviewerScope } from '../../lib/scope.js';
 import { hrController } from './controller.js';
 import { validateQuery } from '../../middleware/validation.js';
 import { ListContractsQuerySchema, ListPayslipRequestsQuerySchema } from './types.js';
@@ -63,6 +64,53 @@ function scopeWorkerRoute() {
     if (req.auth?.role === 'worker') {
       next();
       return;
+    }
+    checkWorkerScope()(req, res, next);
+  };
+}
+
+/**
+ * Read-only variant of `scopeWorkerRoute()` that also admits a reviewer whose
+ * scope matches a **not-yet-approved** applicant's `target_*` fields.
+ *
+ * 2026-08-24: `checkWorkerScope()` resolves through `isWorkerInGroupScope()`,
+ * which reads `EmploymentRecord.hotel_group_id` — null until activation
+ * (ADR-065 Decision 2). So a Manager who had just created a Worker/Checker got
+ * `403 "Cannot access worker …"` on that applicant's contract status, and the
+ * page the UI redirects to after creation rendered "Failed to load contract
+ * status" on an otherwise successful create.
+ *
+ * `isWorkerInReviewerScope()` (lib/scope.ts) falls back to the applicant's
+ * `target_hotel_group_id`/`target_primary_hotel_id` while `hotel_group_id` is
+ * null, and defers to the strict check once it is set — so this never widens
+ * access to an activated worker. Use ONLY on read routes: it deliberately
+ * admits a reviewer to view, never to write.
+ */
+function scopeWorkerReadRoute() {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    if (req.auth && req.auth.userId === req.params.worker_id) {
+      next();
+      return;
+    }
+    if (req.auth?.role === 'worker') {
+      next();
+      return;
+    }
+    if (req.auth?.role === 'admin') {
+      next();
+      return;
+    }
+    try {
+      const allowed = await isWorkerInReviewerScope(
+        req.auth?.scope ?? null,
+        req.params.worker_id
+      );
+      if (allowed) {
+        next();
+        return;
+      }
+    } catch {
+      // Fall through to the strict guard rather than failing open.
     }
     checkWorkerScope()(req, res, next);
   };
@@ -204,7 +252,7 @@ router.get(
   '/workers/:worker_id/contract-status',
   requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   requireContractReadAccess(),
-  scopeWorkerRoute(),
+  scopeWorkerReadRoute(),
   (req, res, next) => hrController.getContractStatus(req, res, next)
 );
 

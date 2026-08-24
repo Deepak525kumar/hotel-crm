@@ -14,6 +14,13 @@ import { useTranslation } from 'react-i18next';
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
   GENERAL: 'documents.categoryGENERAL',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
+  TAX_NUMBER: 'documents.categoryTAX_NUMBER',
+  SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
+  HEALTH_INSURANCE: 'documents.categoryHEALTH_INSURANCE',
+  ID_CARD: 'documents.categoryID_CARD',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ADDRESS: 'documents.categoryADDRESS',
+  CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
 };
 
 export function UploadDocumentCard({
@@ -72,7 +79,7 @@ export function UploadDocumentCard({
           </ThemedView>
 
           <ThemedView style={styles.row} type="backgroundElement">
-            {(['GENERAL', 'WORK_PERMIT'] as const).map((c) => (
+            {(['GENERAL', 'WORK_PERMIT', 'TAX_NUMBER', 'SOCIAL_SECURITY_NUMBER', 'HEALTH_INSURANCE', 'ID_CARD', 'PASSPORT', 'ADDRESS', 'CONTRACT_SCAN'] as const).map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}
@@ -153,7 +160,7 @@ export function UploadDocumentCard({
 const styles = StyleSheet.create({
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two, marginBottom: Spacing.three },
   header: { marginBottom: Spacing.one },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, flexWrap: 'wrap' },
   flex: { flex: 1 },
   pickButton: {
     height: 44,
@@ -164,7 +171,7 @@ const styles = StyleSheet.create({
   },
   pickButtonText: { color: '#fff' },
   categoryButton: {
-    flex: 1,
+    width: '48%',
     height: 36,
     borderRadius: Spacing.two,
     justifyContent: 'center',

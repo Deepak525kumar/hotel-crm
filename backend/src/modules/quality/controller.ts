@@ -87,6 +87,28 @@ export class QualityController {
     }
   }
 
+  // The inspection record itself, so a client can show the score/status and
+  // decide whether rework is still assignable. Same gate as the photos below.
+  async getVerification(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.verification_id;
+      if (!id) throw new ValidationError('verification_id is required');
+      const result = await qualityService.getVerification(id, {
+        userId: req.auth.userId,
+        role: req.auth.role,
+        scope: req.auth.scope ?? null,
+      });
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // CRR §14/§15: serve the evidence so the checker can actually see what they
   // were notified with. Keys alone are useless -- the bucket is private.
   async getVerificationPhotos(req: Request, res: Response, next: NextFunction) {
@@ -114,12 +136,36 @@ export class QualityController {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');
       const parsed = CreateRatingSchema.safeParse(req.body);
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
-      const result = await qualityService.createRating(parsed.data, {
+      const result = await qualityService.createRating(
+        parsed.data,
+        {
+          userId: req.auth.userId,
+          role: req.auth.role,
+          scope: req.auth.scope ?? null,
+        },
+        photosFrom(req)
+      );
+      res.status(201).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getRatingPhotos(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const id = req.params.rating_id;
+      if (!id) throw new ValidationError('rating_id is required');
+      const result = await qualityService.getRatingPhotos(id, {
         userId: req.auth.userId,
         role: req.auth.role,
         scope: req.auth.scope ?? null,
       });
-      res.status(201).json({
+      res.status(200).json({
         status: 'success',
         data: result,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

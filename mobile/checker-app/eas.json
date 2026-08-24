@@ -14,13 +14,13 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.deepcleaninghub.de/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.hotelcrm.app/api/v1"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://api.deepcleaninghub.de/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://api.hotelcrm.app/api/v1"
       }
     }
   },

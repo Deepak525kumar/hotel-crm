@@ -1137,6 +1137,9 @@ function CreateRatingModal({
   // removing an item is then a one-line change in lib/types.ts and cannot
   // leave the form and the API disagreeing about the set.
   const [criteria, setCriteria] = useState<Partial<Record<InspectionChecklistItem, string>>>({});
+  // CRR §15 (2026-08-24): the rating carries its own photo evidence. Same
+  // limits and same picker shape as CreateVerificationModal above.
+  const [photos, setPhotos] = useState<File[]>([]);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const create = useAsyncAction();
 
@@ -1144,7 +1147,29 @@ function CreateRatingModal({
     setScore("");
     setComment("");
     setCriteria({});
+    setPhotos([]);
     setFieldError(null);
+  };
+
+  const onPickPhotos = (files: FileList | null) => {
+    setFieldError(null);
+    if (!files) return;
+    const next = [...photos, ...Array.from(files)];
+    if (next.length > MAX_VERIFICATION_PHOTOS) {
+      setFieldError(t("quality.tooManyPhotos", { max: MAX_VERIFICATION_PHOTOS }));
+      return;
+    }
+    const tooBig = next.find((f) => f.size > MAX_VERIFICATION_PHOTO_BYTES);
+    if (tooBig) {
+      setFieldError(
+        t("quality.photoTooLarge", {
+          name: tooBig.name,
+          mb: Math.floor(MAX_VERIFICATION_PHOTO_BYTES / (1024 * 1024)),
+        }),
+      );
+      return;
+    }
+    setPhotos(next);
   };
 
   const handleClose = () => {
@@ -1176,15 +1201,26 @@ function CreateRatingModal({
       criteriaScores[item] = value;
     }
 
+    // CRR §15: the photo accompanies the rating. Checked client-side so the
+    // checker is told before a round-trip; the server enforces it too and
+    // stays authoritative.
+    if (photos.length === 0) {
+      setFieldError(t("quality.photoRequired"));
+      return;
+    }
+
     create.run(
       () =>
-        qualityApi.createRating({
-          assignment_id: assignmentId,
-          worker_id: workerId,
-          score: parsed,
-          comment: comment.trim() || undefined,
-          criteria_scores: Object.keys(criteriaScores).length > 0 ? criteriaScores : undefined,
-        }),
+        qualityApi.createRating(
+          {
+            assignment_id: assignmentId,
+            worker_id: workerId,
+            score: parsed,
+            comment: comment.trim() || undefined,
+            criteria_scores: Object.keys(criteriaScores).length > 0 ? criteriaScores : undefined,
+          },
+          photos,
+        ),
       {
         onSuccess: (rating) => {
           onCreated(rating);
@@ -1236,6 +1272,43 @@ function CreateRatingModal({
               }
             />
           ))}
+        </div>
+        {/* CRR §15: photo evidence accompanies the rating. Unlike the
+            verification modal's picker, this one is REQUIRED -- Rating is the
+            score that feeds WorkerOverallRating, so an unevidenced rating
+            would move a worker's standing with nothing backing it. */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium">{t("quality.photos")}</label>
+          <input
+            type="file"
+            accept={ACCEPTED_PHOTO_TYPES}
+            multiple
+            // Same rationale as the verification picker: honoured on mobile
+            // browsers, ignored on desktop, so one control serves a checker
+            // standing in the room and a manager at a desk.
+            capture="environment"
+            onChange={(e) => onPickPhotos(e.target.files)}
+            className="block w-full text-sm"
+          />
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {t("quality.photosHint", { max: MAX_VERIFICATION_PHOTOS })}
+          </p>
+          {photos.length > 0 && (
+            <ul className="space-y-1 text-xs text-gray-600 dark:text-gray-400">
+              {photos.map((f, i) => (
+                <li key={`${f.name}-${i}`} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setPhotos(photos.filter((_, j) => j !== i))}
+                    className="shrink-0 text-red-600 hover:underline dark:text-red-400"
+                  >
+                    {t("common.remove")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
         <Textarea
           label={t("fields.commentOptional")}

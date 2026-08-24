@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 import pkg from "./package.json" with { type: "json" };
 
 // Security #4 (2026-08-09): server-only (no NEXT_PUBLIC_ prefix -- never
@@ -52,4 +53,19 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  // org: process.env.SENTRY_ORG // Injected via env variable
+  // project: process.env.SENTRY_PROJECT // Injected via env variable
+
+  // Source map upload auth token (see Source Maps section below)
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload wider set of client source files for better stack trace resolution
+  widenClientFileUpload: true,
+
+  // Create a proxy API route to bypass ad-blockers
+  tunnelRoute: "/monitoring",
+
+  // Suppress non-CI output
+  silent: !process.env.CI,
+});

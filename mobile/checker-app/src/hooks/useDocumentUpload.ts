@@ -57,7 +57,10 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
       setError(null);
       setUploading(true);
       try {
-        const doc = await api.documents.upload(workerId, pending, input);
+        const inputToSend = input.is_work_permit !== undefined 
+          ? { ...input, is_work_permit: String(input.is_work_permit) as unknown as boolean }
+          : input;
+        const doc = await api.documents.upload(workerId, pending, inputToSend);
         onUploaded(doc);
         setPending(null);
       } catch (err) {

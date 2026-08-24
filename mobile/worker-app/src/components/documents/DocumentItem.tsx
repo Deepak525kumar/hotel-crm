@@ -13,9 +13,16 @@ import { useTranslation } from 'react-i18next';
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
   GENERAL: 'documents.categoryGENERAL',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
+  TAX_NUMBER: 'documents.categoryTAX_NUMBER',
+  SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
+  HEALTH_INSURANCE: 'documents.categoryHEALTH_INSURANCE',
+  ID_CARD: 'documents.categoryID_CARD',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ADDRESS: 'documents.categoryADDRESS',
+  CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
 };
 
-export function DocumentItem({ document }: { document: WorkerDocument }) {
+export function DocumentItem({ document, onDelete, isDeleting }: { document: WorkerDocument; onDelete?: (id: string) => void; isDeleting?: boolean }) {
   const { t } = useTranslation();
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
@@ -29,13 +36,20 @@ export function DocumentItem({ document }: { document: WorkerDocument }) {
             {document.expires_at && ` · Expires ${formatExpiry(document.expires_at)}`}
           </ThemedText>
         </ThemedView>
-        {document.presigned_url ? (
-          <Pressable onPress={() => openDocument(document)}>
-            <ThemedText type="linkPrimary">{t('documents.view')}</ThemedText>
-          </Pressable>
-        ) : (
-          <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
-        )}
+        <ThemedView style={styles.actions} type="backgroundElement">
+          {document.presigned_url ? (
+            <Pressable onPress={() => openDocument(document)}>
+              <ThemedText type="linkPrimary">{t('documents.view')}</ThemedText>
+            </Pressable>
+          ) : (
+            <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
+          )}
+          {onDelete && (
+            <Pressable onPress={() => onDelete(document.id)} disabled={isDeleting} style={styles.deleteButton}>
+              <ThemedText type="small" style={{ color: isDeleting ? '#A0AEC0' : '#E53E3E' }}>{t("common.remove")}</ThemedText>
+            </Pressable>
+          )}
+        </ThemedView>
       </ThemedView>
     </ThemedView>
   );
@@ -45,4 +59,6 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.two, padding: Spacing.three, marginBottom: Spacing.two },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   info: { flex: 1, gap: 2 },
+  actions: { alignItems: 'flex-end', gap: Spacing.one },
+  deleteButton: { marginTop: Spacing.one },
 });
