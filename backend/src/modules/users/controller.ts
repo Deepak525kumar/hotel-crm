@@ -26,6 +26,7 @@ export class UserController {
         if (!req.auth) throw new UnauthorizedError();
         const result = await userService.listUsers(req.query as never, {
           role: req.auth.role,
+          userId: req.auth.userId,
           scope: req.auth.scope ?? null,
         });
         res.status(200).json({
