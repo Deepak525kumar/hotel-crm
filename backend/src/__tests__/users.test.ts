@@ -271,6 +271,52 @@ describe('UserService', () => {
       });
     });
 
+    // Bug: a manager could see peer managers (and their own RM) in the
+    // /users list, because the group-grain filter above (needed since
+    // EmploymentRecord scoping has no hotel grain) also matches any other
+    // manager/RM account in the same group. Only a Regional Manager
+    // legitimately manages every hotel manager in their group.
+    describe('peer-manager exclusion', () => {
+      it('excludes other managers and the regional manager from a hotel manager\'s listing', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'manager', userId: 'me', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: any }>;
+        expect(call[0]?.where.AND).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              OR: expect.arrayContaining([
+                { role: { notIn: ['MANAGER', 'REGIONAL_MANAGER'] } },
+                { id: 'me' },
+              ]),
+            }),
+          ])
+        );
+      });
+
+      it('does not restrict a regional manager\'s listing to exclude managers under them', async () => {
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.user.count.mockResolvedValue(0);
+
+        await service.listUsers(
+          { page: 1, limit: 20, role: undefined, hotel_id: undefined, search: undefined, is_active: undefined },
+          { role: 'regional_manager', userId: 'me', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        );
+
+        const call = (mockPrisma.user.findMany as jest.Mock).mock.calls[0] as Array<{ where: any }>;
+        const clauses = (call[0]?.where.AND ?? []) as Array<{ OR?: unknown[] }>;
+        const hasPeerExclusion = clauses.some((c) =>
+          c.OR?.some((o) => JSON.stringify(o).includes('notIn'))
+        );
+        expect(hasPeerExclusion).toBe(false);
+      });
+    });
+
     // hotel_id filter resolves the hotel's group and filters via the
     // employment_record relation at group grain.
     describe('hotel_id filter', () => {

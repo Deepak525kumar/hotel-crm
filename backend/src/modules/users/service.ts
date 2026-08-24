@@ -27,7 +27,7 @@ export class UserService extends BaseService {
   // manager/regional_manager — any manager could list every user regardless
   // of hotel/group. `actor` is optional so existing internal callers (none
   // currently) keep compiling; the controller always passes it.
-  async listUsers(query: ListUsersQuery, actor?: { role: string; scope?: UserScope | null }) {
+  async listUsers(query: ListUsersQuery, actor?: { role: string; userId?: string; scope?: UserScope | null }) {
     const { page, limit, role, hotel_id, search, is_active } = query;
     const skip = (page - 1) * limit;
 
@@ -77,6 +77,22 @@ export class UserService extends BaseService {
           { employment_record: { hotel_group_id: targetGroupId } },
           { managed_hotels: { some: { hotel_group_id: targetGroupId } } }
         ]
+      });
+    }
+
+    // A Hotel Manager's group-grain filter above (needed because
+    // EmploymentRecord scoping is group-, not hotel-grain) also matches
+    // OTHER manager/regional_manager accounts in the same group -- their
+    // peers and their own RM, neither of whom report to them. Only a
+    // Regional Manager legitimately manages every hotel manager in their
+    // group, so this exclusion applies to 'manager' only.
+    if (actor && actor.role === 'manager') {
+      if (!where['AND']) where['AND'] = [];
+      (where['AND'] as any[]).push({
+        OR: [
+          { role: { notIn: ['MANAGER', 'REGIONAL_MANAGER'] } },
+          ...(actor.userId ? [{ id: actor.userId }] : []),
+        ],
       });
     }
     if (search) {
