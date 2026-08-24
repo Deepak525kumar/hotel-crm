@@ -145,19 +145,19 @@ declare const __dirname: string | undefined;
 // entrypoint-relative walk-up-to-package.json fallback is used instead.
 function resolveDefaultContractPdfPath(): string {
   if (typeof __dirname !== 'undefined') {
-    return resolve(__dirname, '..', '..', '..', 'assets', 'contracts', 'default-contract-template.pdf');
+    return resolve(__dirname, '..', '..', '..', 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
   }
   const entry = process.argv[1];
   let dir = entry ? dirname(resolve(entry)) : process.cwd();
   for (let i = 0; i < 10; i += 1) {
     if (existsSync(resolve(dir, 'package.json'))) {
-      return resolve(dir, 'assets', 'contracts', 'default-contract-template.pdf');
+      return resolve(dir, 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
     }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  return resolve(process.cwd(), 'assets', 'contracts', 'default-contract-template.pdf');
+  return resolve(process.cwd(), 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
 }
 
 const DEFAULT_CONTRACT_PDF_PATH = resolveDefaultContractPdfPath();
@@ -268,9 +268,9 @@ export class HrService extends BaseService {
   // Auto-invoked by employee-management's createEmployee() the moment an
   // application record is created (see that method's own comment) — there is
   // exactly one contract PDF in this system (assets/contracts/
-  // default-contract-template.pdf), so no template_id selection or
-  // Personalfragebogen prerequisite applies the way createContract()'s manual
-  // HR path requires: the file is static, not rendered per-worker. The
+  // Personalfragebogen_NEU.pdf), so no template_id selection prerequisite
+  // applies the way createContract()'s manual HR path requires: the file is
+  // static, not rendered per-worker. The
   // applicant downloads it (getDefaultContractPdf below), marks FULL_TIME or
   // PART_TIME by hand exactly as the record's own employment_type says,
   // signs it, and returns it via the existing uploadSignedContract() /

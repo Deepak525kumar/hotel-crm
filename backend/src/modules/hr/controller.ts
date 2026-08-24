@@ -58,7 +58,7 @@ export class HrController {
   }
 
   // 2026-08-13 contract feature: serves the single default contract PDF
-  // asset (assets/contracts/default-contract-template.pdf via
+  // asset (assets/contracts/Personalfragebogen_NEU.pdf via
   // hrService.getDefaultContractPdf()). requireContractReadAccess()/
   // scopeWorkerRoute() at the route layer are the same gate
   // getContractStatus already uses -- worker downloads their own, manager/
@@ -67,7 +67,7 @@ export class HrController {
     try {
       const pdf = await hrService.getDefaultContractPdf();
       res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="contract-template.pdf"');
+      res.setHeader('Content-Disposition', 'attachment; filename="Personalfragebogen_NEU.pdf"');
       res.status(200).send(pdf);
     } catch (error) {
       next(error);

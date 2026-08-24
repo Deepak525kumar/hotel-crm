@@ -36,15 +36,96 @@ import {
 // notice_version against this constant.
 const CURRENT_NOTICE_VERSION = 'v1';
 
-// PDD/CRR do not supply legal notice copy (Zirove/DPO-authored content is
-// out of this module's authorship per the Out of Scope section) -- this is
-// a structural placeholder proving the per-language/RTL contract
-// (REQ-CONSENT-004/RULE-CONSENT-04), not a claim of legally-reviewed text.
+// DPO-authored legal notice (FHM Hotelservice GmbH, Stand: Juni 2026),
+// replacing the structural placeholder that previously stood in this slot.
+// Provided in German only -- SUPPORTED_LANGUAGES' other 12 entries fall back
+// to this text until a per-language translation is authored, same as any
+// other language absent from a NOTICE_CONTENT entry would (OD-CONSENT-009's
+// DEFAULT_LANGUAGE fallback covers the client-preferred-language case; this
+// covers the notice-content case, since only one legally-reviewed copy
+// exists so far).
+const GERMAN_NOTICE_TEXT = `Datenschutzinformation nach Art. 13 DSGVO – FHM Hotelservice GmbH
+
+Information über die Verarbeitung personenbezogener Daten gemäß Art. 13 und Art. 14 der Datenschutz-Grundverordnung (DSGVO) in Verbindung mit § 26 Bundesdatenschutzgesetz (BDSG)
+
+Mit dieser Information klären wir Sie als Beschäftigte bzw. Bewerberin oder Beschäftigten bzw. Bewerber darüber auf, welche personenbezogenen Daten wir im Rahmen der Begründung, Durchführung und Beendigung Ihres Beschäftigungsverhältnisses erheben und verarbeiten, zu welchen Zwecken und auf welcher Rechtsgrundlage dies geschieht und welche Rechte Ihnen zustehen. Bitte lesen Sie diese Information aufmerksam durch und bestätigen Sie den Erhalt am Ende dieses Dokuments.
+
+1. Verantwortlicher für die Datenverarbeitung
+Verantwortlich für die Verarbeitung Ihrer personenbezogenen Daten im Sinne des Art. 4 Nr. 7 DSGVO ist:
+FHM Hotelservice GmbH
+Berner Str. 38
+60437 Frankfurt am Main
+Vertreten durch die Geschäftsführerin: Frau Snezhana Todorova
+Telefon: +49 160 97044182 · E-Mail: info@deepcleaninghub.com
+
+2. Datenschutzbeauftragter / Ansprechpartner für den Datenschutz
+Bei Fragen zum Datenschutz und zur Wahrnehmung Ihrer Rechte können Sie sich an folgende Stelle wenden:
+• Sofern ein Datenschutzbeauftragter bestellt ist: [Name / Funktion], [Anschrift], E-Mail: [datenschutz@…]
+• Andernfalls erreichen Sie den für den Datenschutz Verantwortlichen über die unter Ziffer 1 genannten Kontaktdaten.
+Hinweis: Die Bestellung eines Datenschutzbeauftragten ist nach § 38 BDSG verpflichtend, sobald in der Regel mindestens 20 Personen ständig mit der automatisierten Verarbeitung personenbezogener Daten beschäftigt sind oder eine Datenschutz-Folgenabschätzung erforderlich ist.
+
+3. Zwecke der Verarbeitung und Rechtsgrundlagen
+Wir verarbeiten Ihre personenbezogenen Daten ausschließlich zu festgelegten, eindeutigen und legitimen Zwecken:
+• Begründung, Durchführung und Beendigung des Beschäftigungsverhältnisses (z. B. Bewerbung, Arbeitsvertrag, Einsatzplanung, Arbeitszeiterfassung, Leistungs- und Verhaltensbeurteilung) — § 26 Abs. 1 BDSG; Art. 6 Abs. 1 lit. b DSGVO
+• Lohn- und Gehaltsabrechnung sowie Erfüllung steuer- und sozialversicherungsrechtlicher Pflichten — Art. 6 Abs. 1 lit. c DSGVO; § 26 BDSG
+• Erfüllung gesetzlicher Pflichten (z. B. Nachweisgesetz, Mindestlohngesetz, Arbeitsschutz, Aufbewahrungspflichten) — Art. 6 Abs. 1 lit. c DSGVO
+• Wahrung berechtigter Interessen (z. B. IT-Sicherheit, Geltendmachung oder Abwehr von Rechtsansprüchen, Organisation des Betriebs) — Art. 6 Abs. 1 lit. f DSGVO
+• Verarbeitung besonderer Kategorien personenbezogener Daten (z. B. Gesundheitsdaten bei Arbeitsunfähigkeit, Schwerbehinderung) — § 26 Abs. 3 BDSG; Art. 9 Abs. 2 lit. b DSGVO
+• Verarbeitungen, die auf Ihrer freiwilligen Einwilligung beruhen (z. B. Mitarbeiterfotos, freiwillige Angaben) — § 26 Abs. 2 BDSG; Art. 6 Abs. 1 lit. a DSGVO
+
+4. Kategorien der verarbeiteten personenbezogenen Daten
+Je nach Stand des Beschäftigungsverhältnisses verarbeiten wir insbesondere folgende Datenkategorien:
+• Stammdaten: Name, Geburtsdatum, Geburtsort, Anschrift, Staatsangehörigkeit, Familienstand, Kontaktdaten
+• Vertrags- und Abrechnungsdaten: Eintrittsdatum, Funktion/Tätigkeit, Einsatzort, Arbeitszeiten, Vergütung, Bankverbindung, Steuer-ID, Sozialversicherungsnummer, Krankenkasse, Konfession (für Kirchensteuer)
+• Qualifikations- und Leistungsdaten: Zeugnisse, Qualifikationen, Beurteilungen, Fehlzeiten
+• Aufenthalts- und Arbeitserlaubnisdaten (soweit erforderlich) sowie Ausweisdaten
+• Besondere Kategorien (Art. 9 DSGVO): Gesundheitsdaten (z. B. Arbeitsunfähigkeitsbescheinigungen), Daten zu einer Schwerbehinderung – nur soweit gesetzlich erforderlich
+
+5. Herkunft der Daten
+Wir verarbeiten überwiegend Daten, die wir unmittelbar von Ihnen erhalten. Soweit dies für die Durchführung des Beschäftigungsverhältnisses erforderlich ist, verarbeiten wir auch Daten, die wir zulässigerweise von Dritten (z. B. von einem früheren Arbeitgeber, von Behörden oder aus öffentlich zugänglichen Quellen) erhalten haben (Art. 14 DSGVO).
+
+6. Empfänger bzw. Kategorien von Empfängern
+Innerhalb des Unternehmens erhalten nur die Stellen Zugriff auf Ihre Daten, die diese zur Erfüllung ihrer Aufgaben benötigen. Eine Weitergabe an externe Empfänger erfolgt nur, soweit dies gesetzlich vorgeschrieben oder zulässig ist. Empfänger können insbesondere sein:
+• Finanzbehörden (Finanzamt), Träger der Sozialversicherung, Krankenkassen, Berufsgenossenschaft
+• Steuerberater bzw. Lohnabrechnungsstelle (als Auftragsverarbeiter nach Art. 28 DSGVO)
+• Banken zur Durchführung des Zahlungsverkehrs (Gehaltsüberweisung)
+• Auftraggeber bzw. Kunden im Rahmen des Einsatzes (z. B. Zutritts- und Sicherheitslisten in Hotelobjekten), soweit erforderlich
+• IT-Dienstleister sowie Anbieter cloudbasierter Personal- und Buchhaltungssoftware (als Auftragsverarbeiter nach Art. 28 DSGVO)
+• Gerichte, Rechtsanwälte und Behörden, soweit zur Wahrung von Rechten erforderlich
+
+7. Übermittlung an Drittländer
+Eine Übermittlung Ihrer Daten in ein Land außerhalb der Europäischen Union bzw. des Europäischen Wirtschaftsraums (Drittland) ist grundsätzlich nicht vorgesehen. Sollte im Einzelfall eine Übermittlung erfolgen (z. B. durch den Einsatz von IT-Dienstleistern), geschieht dies nur unter den Voraussetzungen der Art. 44 ff. DSGVO, insbesondere auf Grundlage eines Angemessenheitsbeschlusses der EU-Kommission oder geeigneter Garantien (z. B. EU-Standardvertragsklauseln).
+
+8. Dauer der Speicherung
+Wir verarbeiten und speichern Ihre Daten für die Dauer des Beschäftigungsverhältnisses. Darüber hinaus speichern wir Daten nur, solange gesetzliche Aufbewahrungs- oder Nachweispflichten bestehen oder die Daten zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen erforderlich sind. Maßgeblich sind insbesondere die handels- und steuerrechtlichen Aufbewahrungsfristen (in der Regel 6 bzw. 10 Jahre nach § 257 HGB und § 147 AO). Bewerberdaten werden bei einer Absage regelmäßig nach spätestens 6 Monaten gelöscht, sofern Sie keiner längeren Speicherung zugestimmt haben.
+
+9. Ihre Rechte als betroffene Person
+Ihnen stehen gegenüber dem Verantwortlichen folgende Rechte hinsichtlich Ihrer personenbezogenen Daten zu:
+• Auskunft über die zu Ihrer Person gespeicherten Daten (Art. 15 DSGVO)
+• Berichtigung unrichtiger oder Vervollständigung unvollständiger Daten (Art. 16 DSGVO)
+• Löschung Ihrer Daten, soweit keine gesetzliche Aufbewahrungspflicht entgegensteht (Art. 17 DSGVO)
+• Einschränkung der Verarbeitung (Art. 18 DSGVO)
+• Datenübertragbarkeit der von Ihnen bereitgestellten Daten (Art. 20 DSGVO)
+• Widerspruch gegen Verarbeitungen, die auf Art. 6 Abs. 1 lit. f DSGVO beruhen, aus Gründen Ihrer besonderen Situation (Art. 21 DSGVO)
+
+10. Widerruf einer Einwilligung
+Soweit eine Verarbeitung auf Ihrer Einwilligung beruht (Art. 6 Abs. 1 lit. a, Art. 9 Abs. 2 lit. a DSGVO, § 26 Abs. 2 BDSG), haben Sie das Recht, diese Einwilligung jederzeit mit Wirkung für die Zukunft zu widerrufen. Die Rechtmäßigkeit der bis zum Widerruf erfolgten Verarbeitung bleibt davon unberührt. Ein Widerruf ist formlos gegenüber den unter Ziffer 1 genannten Kontaktdaten möglich.
+
+11. Beschwerderecht bei einer Aufsichtsbehörde
+Unbeschadet anderweitiger Rechtsbehelfe steht Ihnen ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde zu (Art. 77 DSGVO), insbesondere bei der Aufsichtsbehörde Ihres Wohnsitzes oder des Sitzes des Verantwortlichen. Zuständig für die FHM Hotelservice GmbH ist:
+Der Hessische Beauftragte für Datenschutz und Informationsfreiheit (HBDI)
+Postfach 3163, 65021 Wiesbaden · E-Mail: poststelle@datenschutz.hessen.de
+
+12. Pflicht zur Bereitstellung der Daten
+Die Bereitstellung bestimmter personenbezogener Daten ist gesetzlich oder vertraglich vorgeschrieben bzw. für den Abschluss und die Durchführung des Beschäftigungsverhältnisses erforderlich. Werden diese Daten nicht bereitgestellt, kann das Beschäftigungsverhältnis ggf. nicht begründet oder fortgeführt werden bzw. können gesetzliche Pflichten (z. B. die Lohnabrechnung) nicht erfüllt werden. Freiwillige Angaben sind als solche gekennzeichnet.
+
+13. Automatisierte Entscheidungsfindung und Profiling
+Eine ausschließlich auf einer automatisierten Verarbeitung – einschließlich Profiling – beruhende Entscheidung im Sinne des Art. 22 DSGVO, die Ihnen gegenüber rechtliche Wirkung entfaltet oder Sie in ähnlicher Weise erheblich beeinträchtigt, findet nicht statt.
+
+FHM Hotelservice GmbH · Frankfurt am Main · Stand: Juni 2026`;
+
 const NOTICE_CONTENT: Record<SupportedLanguage, string> = Object.fromEntries(
-  SUPPORTED_LANGUAGES.map((lang) => [
-    lang,
-    `[${lang}] Data-protection notice (Art. 13 DSGVO), version ${CURRENT_NOTICE_VERSION} -- legal content pending Zirove/DPO authorship.`,
-  ])
+  SUPPORTED_LANGUAGES.map((lang) => [lang, GERMAN_NOTICE_TEXT])
 ) as Record<SupportedLanguage, string>;
 
 export interface RequestConsentResult {
