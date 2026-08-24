@@ -1202,6 +1202,15 @@ model Rating {
   // { punctuality, quality, attitude } -- readable, never written again.
   // Validated in quality/types.ts, not by the database: this is Json.
   criteria_scores Json?
+  // CRR §15 (2026-08-24): "the Checker/supervisor uploads a photo WITH the
+  // rating" applies to this model too — Rating is the checklist-based
+  // inspection score that actually feeds WorkerOverallRating, and it had no
+  // photo column at all, so the requirement was unenforceable here even
+  // though QualityVerification.photo_urls already existed for the same CRR
+  // clause. Same shape as QualityVerification.photo_urls: keys, not URLs — a
+  // presigned URL lives 15 minutes, so persisting one would store a value
+  // that is dead almost immediately.
+  photo_urls      String[]         @default([])
   created_at      DateTime         @default(now())
   updated_at      DateTime         @updatedAt
 

@@ -899,7 +899,13 @@
     "markDone": "Als erledigt markieren",
     "reworkPhotoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie dies als erledigt markieren.",
     "reworkTitle": "Nacharbeit erforderlich",
-    "photoUnavailable": "Bild nicht verfügbar"
+    "photoUnavailable": "Bild nicht verfügbar",
+    "photos": "Fotos",
+    "photosHint": "Bis zu {{max}} Bilder, je 10 MB.",
+    "tooManyPhotos": "Es dürfen höchstens {{max}} Fotos angehängt werden.",
+    "photoTooLarge": "{{name}} ist größer als {{mb}} MB.",
+    "photoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie diese Bewertung absenden.",
+    "evidence": "Nachweis"
   },
   "ratings": {
     "comment": "Kommentar",

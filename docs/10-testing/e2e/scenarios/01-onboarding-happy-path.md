@@ -122,7 +122,9 @@ curl -s -X POST http://localhost:3001/api/v1/documents/workers/<WORKER_USER_ID>/
 point — that column is only written by the manager-upload path, and by confirmation. Reading
 it as "has the applicant signed?" is the defect fixed on 2026-08-13.
 
-`GET /hr/workers/<id>/contract` must now report `signed_scan_uploaded: true`. Then approve:
+`GET /hr/workers/<id>/contract-status` must now report `signed_scan_uploaded: true`. Then approve:
+
+**Corrected 2026-08-24:** this line said `/contract`, which does not exist and returns a generic `404 Resource not found` — easy to misread as "the contract is missing" when the contract row is present and `PENDING`. `hr/routes.ts` exposes `contract-status`, `contract-download`, `contract-scan`, `contract-confirm`, `contract-extend`, `contract-lapse` — no bare `/contract`.
 
 ```bash
 curl -s -X POST http://localhost:3001/api/v1/employees/E2E-W-01/approve \

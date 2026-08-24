@@ -28,6 +28,7 @@ jest.mock('../modules/documents/storage.js', () => ({
 }));
 
 const mockFindUnique = jest.fn() as jest.MockedFunction<(...a: unknown[]) => any>;
+const mockCheckerAssignment = jest.fn() as jest.MockedFunction<(...a: unknown[]) => any>;
 
 import { QualityService } from '../modules/quality/service.js';
 
@@ -43,6 +44,10 @@ function svc() {
   // The service reads through this.prisma; point it at the mock.
   (s as unknown as { prisma: unknown }).prisma = {
     qualityVerification: { findUnique: (...a: unknown[]) => mockFindUnique(...a) },
+    // 2026-08-24: the checker branch no longer resolves through JWT scope
+    // (a checker never receives one) — it asks whether the checker has an
+    // active assignment at that hotel, the same rule createVerification uses.
+    workerAssignment: { findFirst: (...a: unknown[]) => mockCheckerAssignment(...a) },
   };
   return s;
 }
@@ -54,6 +59,7 @@ beforeEach(() => {
   mockFindUnique.mockResolvedValue(VERIFICATION);
   mockGetPresignedUrl.mockResolvedValue('https://signed.example/p.jpg');
   mockInScope.mockResolvedValue(true);
+  mockCheckerAssignment.mockResolvedValue({ id: 'chk-assignment' });
 });
 
 describe('getVerificationPhotos — who may see room evidence', () => {
@@ -76,7 +82,7 @@ describe('getVerificationPhotos — who may see room evidence', () => {
     expect(mockInScope).not.toHaveBeenCalled();
   });
 
-  it.each(['manager', 'regional_manager', 'checker'])(
+  it.each(['manager', 'regional_manager'])(
     'admits %s only for a hotel in their scope',
     async (role) => {
       await svc().getVerificationPhotos('v1', actor(role));
@@ -84,7 +90,7 @@ describe('getVerificationPhotos — who may see room evidence', () => {
     }
   );
 
-  it.each(['manager', 'regional_manager', 'checker'])(
+  it.each(['manager', 'regional_manager'])(
     'REFUSES %s for a hotel outside their scope',
     async (role) => {
       mockInScope.mockResolvedValue(false);
@@ -93,6 +99,24 @@ describe('getVerificationPhotos — who may see room evidence', () => {
       );
     }
   );
+
+  // Checker is gated on its assignment, NOT on JWT scope — regression guard
+  // for the 2026-08-24 defect where a checker could never read evidence,
+  // including photos it had just uploaded, because resolveScope() never mints
+  // a scope for the checker role and isHotelInScope(null, …) always denies.
+  it('admits a checker with an active assignment at that hotel, WITHOUT any JWT scope', async () => {
+    const r = await svc().getVerificationPhotos('v1', actor('checker'));
+    expect(r.photos).toHaveLength(1);
+    expect(mockCheckerAssignment).toHaveBeenCalled();
+    expect(mockInScope).not.toHaveBeenCalled();
+  });
+
+  it('REFUSES a checker with no active assignment at that hotel', async () => {
+    mockCheckerAssignment.mockResolvedValue(null);
+    await expect(svc().getVerificationPhotos('v1', actor('checker'))).rejects.toThrow(
+      /Cannot view evidence for this hotel/
+    );
+  });
 
   it('404s an unknown verification rather than leaking existence', async () => {
     mockFindUnique.mockResolvedValue(null);

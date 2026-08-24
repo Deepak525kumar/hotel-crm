@@ -196,16 +196,13 @@ export default function AttendanceDetailScreen() {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.outlineButton, { borderColor: '#f59e0b' }]}
-          onPress={() =>
-            router.push(`/rating/${record.assignment_id}?worker_id=${record.worker_id}`)
-          }
-        >
-          <Text style={{ color: '#f59e0b', fontSize: 15, fontWeight: '600' }}>
-            Rate Worker →
-          </Text>
-        </TouchableOpacity>
+        {/* The separate "Rate Worker" screen was retired on 2026-08-24. It
+            was a 1-5 star picker (score x 20) writing to the Rating model,
+            which contradicted CRR §15's "Quality score is 0-100 (not a
+            5-star system)" and collected no photo evidence -- so it was the
+            one path that could move a worker's leaderboard standing with
+            nothing backing it. Quality Verification above is the checker's
+            single rating path: free 0-100 score, photo required. */}
       </ScrollView>
     </>
   );

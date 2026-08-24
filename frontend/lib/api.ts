@@ -596,8 +596,36 @@ export const qualityApi = {
   assignRework: (input: { verification_id: string; notes: string }) =>
     apiFetch<Assignment>("/quality/rework", { method: "POST", body: input }),
 
-  createRating: (input: CreateRatingInput) =>
-    apiFetch<Rating>("/quality/ratings", { method: "POST", body: input }),
+  /**
+   * CRR §15 (2026-08-24): a photo now accompanies the rating here too, so
+   * this sends multipart on the same one-code-path basis as
+   * createVerification above — the backend route parses multipart either way.
+   *
+   * `criteria_scores` is JSON.stringify'd into a single field: multipart has
+   * a flat field model and cannot carry a nested object. The server's schema
+   * parses it back (quality/types.ts CreateRatingSchema).
+   */
+  createRating: (input: CreateRatingInput, photos: File[] = []) => {
+    const form = new FormData();
+    form.append("assignment_id", input.assignment_id);
+    form.append("worker_id", input.worker_id);
+    form.append("score", String(input.score));
+    if (input.comment) form.append("comment", input.comment);
+    if (input.criteria_scores) {
+      form.append("criteria_scores", JSON.stringify(input.criteria_scores));
+    }
+    for (const photo of photos) form.append("photos", photo);
+    return apiFetch<Rating>("/quality/ratings", { method: "POST", body: form });
+  },
+
+  /**
+   * Presigned URLs for one rating's evidence. Same on-demand fetch and same
+   * 15-minute expiry reasoning as verificationPhotos above.
+   */
+  ratingPhotos: (ratingId: string) =>
+    apiFetch<{ rating_id: string; photos: { key: string; url: string | null }[] }>(
+      `/quality/ratings/${ratingId}/photos`,
+    ),
 
   /**
    * ADR-067: the group-scoped peer leaderboard. NOT the same endpoint as

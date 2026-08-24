@@ -899,7 +899,13 @@
     "markDone": "Marquer comme terminé",
     "reworkPhotoRequired": "Ajoutez au moins une photo avant de marquer ceci comme terminé.",
     "reworkTitle": "Reprise requise",
-    "photoUnavailable": "Image indisponible"
+    "photoUnavailable": "Image indisponible",
+    "photos": "Photos",
+    "photosHint": "Jusqu'à {{max}} images, 10 Mo chacune.",
+    "tooManyPhotos": "Au maximum {{max}} photos peuvent être jointes.",
+    "photoTooLarge": "{{name}} dépasse {{mb}} Mo.",
+    "photoRequired": "Ajoutez au moins une photo avant de soumettre cette évaluation.",
+    "evidence": "Preuve"
   },
   "ratings": {
     "comment": "Commentaire",

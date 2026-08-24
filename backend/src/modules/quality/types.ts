@@ -26,10 +26,21 @@ export interface CreateQualityVerificationRequest {
   notes?: string;
 }
 
+// 2026-08-24: this endpoint now accepts multipart (CRR §15's photo
+// requirement, previously unenforceable here — Rating had no photo_urls
+// column at all). Every multipart field arrives as a STRING, and a nested
+// object like criteria_scores cannot survive multipart's flat field model at
+// all, so the client JSON-stringifies it into one field. Mirrors
+// CreateQualityVerificationSchema's z.coerce.number() fix for `score` (that
+// endpoint hit the identical "multipart sends strings" defect first).
+const criteriaScoresShape = z
+  .record(z.enum(INSPECTION_CHECKLIST_ITEMS), z.coerce.number().int().min(0).max(100))
+  .optional();
+
 export const CreateRatingSchema = z.object({
   assignment_id: z.string().min(1),
   worker_id: z.string().min(1),
-  score: z.number().int().min(0).max(100),
+  score: z.coerce.number().int().min(0).max(100),
   comment: z.string().optional(),
   // TREQ-005: keys are the confirmed inspection checklist, not free-form.
   // This was `z.record(z.string(), z.number())`, which accepted any key at
@@ -37,9 +48,20 @@ export const CreateRatingSchema = z.object({
   // happily and nothing ever surfaced the divergence from CONFIRMED §15.
   // Values are 0-100 to match Rating.score's scale (ADR-026); the old schema
   // accepted any number, including negatives and 5000.
-  criteria_scores: z
-    .record(z.enum(INSPECTION_CHECKLIST_ITEMS), z.number().int().min(0).max(100))
-    .optional(),
+  criteria_scores: z.preprocess((val) => {
+    // JSON callers already send a real object; multipart callers send the
+    // same object JSON.stringify'd into one field. A malformed string is
+    // passed through unchanged so the record/enum validation below produces
+    // a normal field-level error instead of this preprocessor swallowing it.
+    if (typeof val === 'string') {
+      try {
+        return JSON.parse(val);
+      } catch {
+        return val;
+      }
+    }
+    return val;
+  }, criteriaScoresShape),
 });
 
 export interface CreateRatingRequest {

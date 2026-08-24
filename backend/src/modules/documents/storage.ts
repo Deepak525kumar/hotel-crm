@@ -45,7 +45,10 @@ export function generateStorageKey(
  */
 export function generateQualityPhotoKey(
   assignmentId: string,
-  kind: 'inspection' | 'rework',
+  // 'rating' added 2026-08-24: the checklist-based Rating model's own CRR §15
+  // photo evidence, distinct from 'inspection' (QualityVerification) and
+  // 'rework' (the worker's rework-completion photo).
+  kind: 'inspection' | 'rework' | 'rating',
   originalFilename: string
 ): string {
   const uuid = crypto.randomUUID();
