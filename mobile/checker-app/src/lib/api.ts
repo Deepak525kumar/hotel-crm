@@ -378,6 +378,27 @@ export const api = {
      * demand -- the URLs expire in 15 minutes, so caching them with the
      * verification would store values that are already dead.
      */
+    /**
+     * The inspection record itself. Needed alongside the photos so the
+     * evidence screen can show the score and decide whether rework is still
+     * assignable — CRR §14's "Checker assigns rework to a specific worker".
+     */
+    getVerification: (verificationId: string) =>
+      request<QualityVerification>(
+        `/quality/verifications/${encodeURIComponent(verificationId)}`
+      ),
+
+    /**
+     * CRR §14: assign rework for a failed inspection to the same worker.
+     * Creates a second, linked assignment; a second call for the same
+     * verification is a 409, not a duplicate.
+     */
+    assignRework: (verificationId: string, notes: string) =>
+      request<unknown>('/quality/rework', {
+        method: 'POST',
+        body: JSON.stringify({ verification_id: verificationId, notes }),
+      }),
+
     verificationPhotos: (verificationId: string) =>
       request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
         `/quality/verifications/${encodeURIComponent(verificationId)}/photos`

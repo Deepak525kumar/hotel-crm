@@ -905,7 +905,13 @@
     "tooManyPhotos": "At most {{max}} photos may be attached.",
     "photoTooLarge": "{{name}} is larger than {{mb}} MB.",
     "photoRequired": "Add at least one photo before submitting this rating.",
-    "evidence": "Evidence"
+    "evidence": "Evidence",
+    "assignRework": "Assign rework",
+    "reworkNotesPlaceholder": "What needs redoing?",
+    "reworkNotesRequired": "Describe what needs redoing.",
+    "reworkAssigned": "Rework assigned. The worker has been notified.",
+    "reworkPending": "Rework assigned — awaiting the worker",
+    "reworkCompleted": "Rework completed"
   },
   "ratings": {
     "comment": "Comment",

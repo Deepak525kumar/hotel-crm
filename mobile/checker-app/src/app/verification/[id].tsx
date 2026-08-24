@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -9,44 +20,93 @@ import { BackLink } from '@/components/BackLink';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
+import type { QualityVerification } from '@/types/api';
 
 /**
- * CRR §14: "Checker is notified with the photo + details."
+ * The inspection record and its evidence.
  *
- * This is where that photo is actually seen. The keys stored on the
- * verification are useless to a client on their own -- the bucket is private
- * -- so the evidence was write-only until this screen existed: uploaded,
- * recorded, and impossible to look at.
+ * CRR §14: "Checker is notified with the photo + details" — this is where that
+ * photo is actually seen. The keys stored on the verification are useless to a
+ * client on their own (the bucket is private), so the evidence was write-only
+ * until this screen existed. URLs are minted per request and expire in 15
+ * minutes, so they are fetched here rather than carried in the push payload,
+ * which could sit unread in a tray for hours.
  *
- * URLs are minted per request and expire in 15 minutes, so they are fetched
- * here rather than carried in the push payload, which could sit unread in a
- * tray for hours.
+ * CRR §14 also: "Checker assigns rework to a specific worker." That action
+ * lives here (added 2026-08-24) because this is the only screen that shows a
+ * checker what they are deciding about — the score, the outcome, and the
+ * photos. Previously the checker app had no rework capability at all: no API
+ * method, no UI, so the one role the requirement names could not do it.
  */
 export default function VerificationEvidenceScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
+
+  const [verification, setVerification] = useState<QualityVerification | null>(null);
   const [photos, setPhotos] = useState<{ key: string; url: string | null }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reworkNotes, setReworkNotes] = useState('');
+  const [assigning, setAssigning] = useState(false);
+
+  const load = useCallback(async () => {
+    setError(null);
+    try {
+      // Both in parallel: the record drives what actions are offered, the
+      // photos are the evidence itself. A failure in either is surfaced —
+      // a silently photo-less inspection reads as one that never had any.
+      const [v, p] = await Promise.all([
+        api.quality.getVerification(id),
+        api.quality.verificationPhotos(id),
+      ]);
+      setVerification(v);
+      setPhotos(p.photos);
+    } catch (e) {
+      setError(translateApiError(e, t, 'errors.generic'));
+    }
+  }, [id, t]);
 
   useEffect(() => {
-    let cancelled = false;
+    void load();
+  }, [load]);
+
+  const handleAssignRework = () => {
+    if (!reworkNotes.trim()) {
+      Alert.alert(t('errors.title'), t('quality.reworkNotesRequired'));
+      return;
+    }
+    setAssigning(true);
     void api.quality
-      .verificationPhotos(id)
-      .then((r) => {
-        if (!cancelled) setPhotos(r.photos);
+      .assignRework(id, reworkNotes.trim())
+      .then(() => {
+        setReworkNotes('');
+        // Re-read rather than patching local state: the server decides whether
+        // rework is now assigned, and a 409 from a concurrent assignment must
+        // not leave this screen showing a success it did not get.
+        return load();
       })
-      .catch((e) => {
-        if (!cancelled) setError(translateApiError(e, t, 'errors.generic'));
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [id, t]);
+      .then(() => Alert.alert(t('common.submitted'), t('quality.reworkAssigned')))
+      .catch((e) => Alert.alert(t('errors.title'), translateApiError(e, t, 'errors.generic')))
+      .finally(() => setAssigning(false));
+  };
+
+  // A passed inspection has nothing to rework, and rework can only be assigned
+  // once (the server enforces this with a compare-and-swap and answers 409).
+  const canAssignRework =
+    verification !== null &&
+    verification.status !== 'PASSED' &&
+    verification.rework_required !== true;
 
   const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     content: { padding: 16, gap: 16 },
+    card: { backgroundColor: theme.backgroundElement, borderRadius: 14, padding: 16, gap: 8 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    label: { color: theme.textSecondary, fontSize: 13 },
+    score: { fontSize: 34, fontWeight: '800', color: theme.text },
+    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    badgeText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    notes: { color: theme.text, fontSize: 14 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     photo: { width: 150, height: 150, borderRadius: 10, backgroundColor: theme.backgroundElement },
     missing: {
@@ -61,8 +121,34 @@ export default function VerificationEvidenceScreen() {
       padding: 8,
     },
     missingText: { color: theme.textSecondary, fontSize: 11, textAlign: 'center' },
+    input: {
+      backgroundColor: theme.background,
+      borderRadius: 10,
+      padding: 12,
+      color: theme.text,
+      fontSize: 14,
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    button: { backgroundColor: '#f59e0b', borderRadius: 12, padding: 15, alignItems: 'center' },
+    buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
     error: { color: '#E53E3E', fontSize: 13 },
+    pill: {
+      alignSelf: 'flex-start',
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      backgroundColor: '#f59e0b22',
+    },
+    pillText: { color: '#b45309', fontSize: 12, fontWeight: '600' },
   });
+
+  const statusColor =
+    verification?.status === 'PASSED'
+      ? '#22c55e'
+      : verification?.status === 'NEEDS_REWORK'
+        ? '#f59e0b'
+        : '#ef4444';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -71,8 +157,28 @@ export default function VerificationEvidenceScreen() {
         <ThemedText type="subtitle">{t('quality.evidence')}</ThemedText>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {!verification && !error ? <ActivityIndicator color={theme.text} /> : null}
 
-        {!photos && !error ? <ActivityIndicator color={theme.text} /> : null}
+        {verification ? (
+          <View style={styles.card}>
+            <View style={styles.row}>
+              <Text style={styles.score}>{verification.score}</Text>
+              <View style={[styles.badge, { backgroundColor: statusColor }]}>
+                <Text style={styles.badgeText}>{verification.status}</Text>
+              </View>
+            </View>
+            {verification.notes ? <Text style={styles.notes}>{verification.notes}</Text> : null}
+            {verification.rework_required ? (
+              <View style={styles.pill}>
+                <Text style={styles.pillText}>
+                  {verification.rework_completed_at
+                    ? t('quality.reworkCompleted')
+                    : t('quality.reworkPending')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
 
         {photos && photos.length === 0 ? (
           <ThemedText type="small" themeColor="textSecondary">
@@ -98,6 +204,33 @@ export default function VerificationEvidenceScreen() {
             ),
           )}
         </View>
+
+        {canAssignRework ? (
+          <View style={styles.card}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.assignRework')}
+            </ThemedText>
+            <TextInput
+              style={styles.input}
+              placeholder={t('quality.reworkNotesPlaceholder')}
+              placeholderTextColor={theme.textSecondary}
+              value={reworkNotes}
+              onChangeText={setReworkNotes}
+              multiline
+            />
+            <Pressable
+              style={[styles.button, assigning && { opacity: 0.6 }]}
+              onPress={handleAssignRework}
+              disabled={assigning}
+            >
+              {assigning ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>{t('quality.assignRework')}</Text>
+              )}
+            </Pressable>
+          </View>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
