@@ -201,7 +201,8 @@
     "queue": "قائمة الانتظار",
     "attendanceDetail": "تفاصيل الحضور",
     "qualityCheck": "فحص الجودة",
-    "rateWorker": "تقييم العامل"
+    "rateWorker": "تقييم العامل",
+    "history": "السجل"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -397,7 +398,9 @@
     "detailsTitle": "تفاصيل الوردية",
     "upcomingTitle": "الورديات القادمة",
     "offerNoLongerOpen": "لم يعد هذا العرض متاحاً.",
-    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر."
+    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر.",
+    "hotel": "الفندق",
+    "noneAssigned": "ليس لديك أي مهام بعد."
   },
   "jobs": {
     "none": "لم يتم العثور على وظائف متاحة.",
@@ -912,7 +915,10 @@
     "reworkNotesRequired": "صف ما يجب إعادة عمله.",
     "reworkAssigned": "تم تعيين إعادة العمل. تم إخطار العامل.",
     "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
-    "reworkCompleted": "اكتملت إعادة العمل"
+    "reworkCompleted": "اكتملت إعادة العمل",
+    "checklist": "قائمة تدقيق الفحص",
+    "checklistItemRange": "يجب أن يكون كل عنصر رقمًا صحيحًا من 0 إلى 100.",
+    "noInspections": "لم يتم تسجيل أي عمليات فحص بعد."
   },
   "ratings": {
     "comment": "تعليق",

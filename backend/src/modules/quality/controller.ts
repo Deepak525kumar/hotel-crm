@@ -87,6 +87,24 @@ export class QualityController {
     }
   }
 
+  async listVerifications(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const limit = req.query.limit ? Number(req.query.limit) : undefined;
+      const result = await qualityService.listVerifications(
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
+        Number.isFinite(limit) ? (limit as number) : undefined
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   // The inspection record itself, so a client can show the score/status and
   // decide whether rework is still assignable. Same gate as the photos below.
   async getVerification(req: Request, res: Response, next: NextFunction) {

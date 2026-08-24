@@ -1,4 +1,5 @@
 import type {
+  Assignment,
   User,
   AuthResponse,
   AttendanceRecord,
@@ -316,6 +317,23 @@ export const api = {
       }),
   },
 
+  /**
+   * The checker's OWN assignments. A checker may only verify or rate where
+   * they hold an active assignment at that hotel that day (enforced in
+   * quality/service.ts), so without this they could be refused by a rule they
+   * had no way to see — a 403 with no visible cause.
+   */
+  assignments: {
+    mine: (params?: { status?: string; per_page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set('status', params.status);
+      qs.set('per_page', String(params?.per_page ?? 50));
+      // The server scopes a self-scoped role to their own rows; no worker_id
+      // is sent, and one would be ignored for this role anyway.
+      return request<{ data: Assignment[]; total: number }>(`/assignments?${qs}`);
+    },
+  },
+
   attendance: {
     list: (params?: {
       is_verified?: boolean;
@@ -350,13 +368,23 @@ export const api = {
      * disk when the request is sent, so images never sit in JS memory.
      */
     createVerification: (
-      data: { assignment_id: string; score: number; notes?: string },
+      data: {
+        assignment_id: string;
+        score: number;
+        notes?: string;
+        // TREQ-005 / CRR §15 checklist. JSON-stringified into one multipart
+        // field below: multipart is flat and cannot carry a nested object.
+        criteria_scores?: Record<string, number>;
+      },
       photos: { uri: string; name: string; type: string }[] = []
     ) => {
       const form = new FormData();
       form.append('assignment_id', data.assignment_id);
       form.append('score', String(data.score));
       if (data.notes) form.append('notes', data.notes);
+      if (data.criteria_scores && Object.keys(data.criteria_scores).length > 0) {
+        form.append('criteria_scores', JSON.stringify(data.criteria_scores));
+      }
       for (const photo of photos) form.append('photos', photo as unknown as Blob);
       return request<QualityVerification>('/quality/verifications', {
         method: 'POST',
@@ -383,6 +411,10 @@ export const api = {
      * evidence screen can show the score and decide whether rework is still
      * assignable — CRR §14's "Checker assigns rework to a specific worker".
      */
+    /** Inspection history this checker may see — scoped server-side by role. */
+    listVerifications: (limit = 50) =>
+      request<QualityVerification[]>(`/quality/verifications?limit=${limit}`),
+
     getVerification: (verificationId: string) =>
       request<QualityVerification>(
         `/quality/verifications/${encodeURIComponent(verificationId)}`

@@ -200,7 +200,8 @@
     "queue": "File d'attente",
     "attendanceDetail": "Détail de présence",
     "qualityCheck": "Contrôle qualité",
-    "rateWorker": "Évaluer l'employé"
+    "rateWorker": "Évaluer l'employé",
+    "history": "Historique"
   },
   "roles": {
     "admin": "Administrateur",
@@ -396,7 +397,9 @@
     "detailsTitle": "Détails du service",
     "upcomingTitle": "Services à venir",
     "offerNoLongerOpen": "Cette offre n'est plus ouverte.",
-    "alreadyFilledByAnother": "Ce service a déjà été pourvu par un autre employé."
+    "alreadyFilledByAnother": "Ce service a déjà été pourvu par un autre employé.",
+    "hotel": "Hôtel",
+    "noneAssigned": "Vous n'avez aucune affectation."
   },
   "jobs": {
     "none": "Aucune offre disponible.",
@@ -911,7 +914,10 @@
     "reworkNotesRequired": "Décrivez ce qui doit être refait.",
     "reworkAssigned": "Reprise attribuée. L'employé a été notifié.",
     "reworkPending": "Reprise attribuée — en attente de l'employé",
-    "reworkCompleted": "Reprise terminée"
+    "reworkCompleted": "Reprise terminée",
+    "checklist": "Liste de contrôle d'inspection",
+    "checklistItemRange": "Chaque élément doit être un entier de 0 à 100.",
+    "noInspections": "Aucune inspection enregistrée."
   },
   "ratings": {
     "comment": "Commentaire",

@@ -47,6 +47,32 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="shifts"
+          options={{
+            title: t('nav.myShifts'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="history"
+          options={{
+            title: t('nav.history'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'clock.arrow.circlepath', android: 'history', web: 'history' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="leaderboard"
           options={{
             title: t('nav.leaderboard'),

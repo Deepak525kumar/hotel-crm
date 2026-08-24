@@ -43,6 +43,13 @@ router.post(
 // see what an inspection recorded. The worker the inspection is ABOUT is
 // admitted in the service, which is the layer that knows whose assignment it
 // is.
+// Inspection history. Scoped in the service per role — see listVerifications.
+// Registered BEFORE '/verifications/:verification_id' so the literal path is
+// not captured as an id (Express matches in registration order).
+router.get('/verifications', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.listVerifications(req, res, next)
+);
+
 // The inspection record. quality:read, same gate as its photos below — the
 // record and the evidence attached to it are one disclosure.
 router.get('/verifications/:verification_id', requirePermission('quality:read'), (req, res, next) =>
