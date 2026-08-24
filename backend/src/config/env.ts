@@ -405,6 +405,39 @@ const envSchema = z.object({
   // enough that a legitimate user who forgot their password isn't locked
   // out for an unreasonable stretch.
   AUTH_LOGIN_THROTTLE_DURATION_MS: z.coerce.number().int().positive().default(900000),
+  // -------------------------------------------------------------------------
+  // SPEC-CHATBOT-001 (ADR-013, ADR-053) — scaffold cutover flag. Defaults
+  // FALSE: while off, `/chatbot` routes fall through to the 404 handler,
+  // matching this repo's "both-off = current behavior" posture (same shape
+  // as FEATURE_EMPLOYMENT_RECORD). strictBooleanFlag, not z.coerce.boolean(),
+  // for the same reason as every other flag in this file — a kill switch
+  // must not silently invert on `FEATURE_CHATBOT=false`.
+  //
+  // No LLM provider is wired at this stage (no CHATBOT_PROVIDER/model config
+  // below) — this flag currently gates only the module scaffold, the
+  // authorization boundary, and one real read-only tool exercised without
+  // any AI call. Provider config is added when Step 5 of the integration
+  // plan (wiring the model) actually happens.
+  // -------------------------------------------------------------------------
+  FEATURE_CHATBOT: strictBooleanFlag(false),
+
+  // REQ-CHAT-004: hard monthly token budget cap, config-stored. Not read
+  // anywhere yet (no provider is wired) — present now so ChatbotBudgetCounter
+  // and its guard can be exercised in tests ahead of Step 5.
+  CHATBOT_MONTHLY_TOKEN_CAP: z.coerce.number().int().positive().default(2000000),
+  // REQ-CHAT-005: per-conversation token limit.
+  CHATBOT_CONVERSATION_TOKEN_CAP: z.coerce.number().int().positive().default(25000),
+  // OD-CHAT-010 abuse-prevention: per-worker daily cap, distinct from the
+  // CRR §2/§3 login-rate-limiting exclusion (SPEC-CHATBOT-001 is explicit
+  // these must not be conflated).
+  CHATBOT_USER_DAILY_TOKEN_CAP: z.coerce.number().int().positive().default(60000),
+  CHATBOT_MAX_TOOL_CALLS_PER_TURN: z.coerce.number().int().positive().default(5),
+  CHATBOT_TURN_TIMEOUT_MS: z.coerce.number().int().positive().default(20000),
+  // HMAC secret for high-risk-write confirmation tokens (§6/§9 of the
+  // architecture doc). Only required once a HIGH_RISK_WRITE tool is
+  // registered — none is yet — enforced below via superRefine rather than
+  // `.min(32)` unconditionally, so the scaffold boots without it.
+  CHATBOT_CONFIRM_TOKEN_SECRET: z.string().optional(),
 })
   // ---------------------------------------------------------------------------
   // Fail-closed guard: a deployed environment must have real object storage.
@@ -462,6 +495,20 @@ const envSchema = z.object({
           'ADR-070 requires the manager-notify alert to always fire before login ' +
           'throttling engages.',
       });
+    }
+
+    // Only require the confirmation-token secret once the flag that could
+    // ever mount a HIGH_RISK_WRITE tool is on — the scaffold today registers
+    // none, so requiring this unconditionally would block booting a
+    // read-only-only deployment for a secret nothing yet uses.
+    if (env.FEATURE_CHATBOT && env.CHATBOT_CONFIRM_TOKEN_SECRET !== undefined) {
+      if (env.CHATBOT_CONFIRM_TOKEN_SECRET.length < 32) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['CHATBOT_CONFIRM_TOKEN_SECRET'],
+          message: 'CHATBOT_CONFIRM_TOKEN_SECRET must be at least 32 characters when set',
+        });
+      }
     }
   });
 

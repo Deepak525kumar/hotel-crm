@@ -249,9 +249,9 @@ modules:
   - id: backend-chatbot
     type: backend-module
     path: backend/src/modules/chatbot
-    owner: unassigned
-    lifecycle: declared
-    implementation_status: unimplemented-stub  # directory holds only .placeholder; not route-registered
+    owner: unassigned  # OD-CHAT-013 still open (SYNC-001); blocks G2 regardless of code
+    lifecycle: in-progress
+    implementation_status: scaffold-behind-flag  # mounted at /api/v1/chatbot behind FEATURE_CHATBOT (default OFF); no LLM provider wired
     dependencies: []
     published_events: none-observed
     consumed_events: none-observed

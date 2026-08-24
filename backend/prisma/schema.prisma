@@ -448,6 +448,12 @@ model User {
   created_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryCreator")
   updated_shift_summaries DailyShiftSummary[] @relation("ShiftSummaryUpdater")
 
+  // SPEC-CHATBOT-001 (ADR-013/ADR-053), scaffold-only: backend-chatbot's
+  // conversation record. Behind FEATURE_CHATBOT (default OFF) — see
+  // config/env.ts. Self-scoped only: a conversation's worker is always the
+  // authenticated actor who started it (see modules/chatbot/tools/actor.ts).
+  chatbot_conversations ChatbotConversation[] @relation("chatbot_conversation_worker")
+
   @@index([role])
   @@index([is_active])
   @@index([deleted_at])
@@ -1904,4 +1910,83 @@ model DailyShiftSummary {
 
   @@unique([hotel_id, date])
   @@index([hotel_id])
+}
+
+// -----------------------------------------------------------------------------
+// SPEC-CHATBOT-001 (ADR-013, ADR-053) — scaffold only, behind FEATURE_CHATBOT.
+//
+// Deliberately minimal at this stage: no LLM provider is wired yet (no
+// Bedrock/Anthropic credentials configured), so these models exist only to
+// support Steps 2-4 of the integration plan — module scaffold, the
+// authorization boundary (tools/executor.ts), and one real read-only tool
+// (assignments.list_mine), all exercisable with zero AI calls. No transcript
+// content is stored (OD-CHAT-008 is open) — session_state is structured,
+// tool_calls stores an args hash, never argument values or results.
+// -----------------------------------------------------------------------------
+
+enum ChatbotPurpose {
+  WORKFORCE_ASSISTANT
+  ONBOARDING_DOCUMENT_COLLECTION
+  GDPR_SUBJECT_RIGHTS
+}
+
+enum ChatbotConversationStatus {
+  IN_PROGRESS
+  COMPLETED
+  FALLBACK_TRIGGERED
+}
+
+model ChatbotConversation {
+  id            String                    @id @default(cuid())
+  worker_id     String
+  worker        User                      @relation("chatbot_conversation_worker", fields: [worker_id], references: [id], onDelete: Cascade)
+  purpose       ChatbotPurpose
+  status        ChatbotConversationStatus @default(IN_PROGRESS)
+  hotel_id      String? // scope pin captured at start, per resolveHotelAccess's role/scope shape
+  model_used    String?
+  tokens_input  Int                       @default(0)
+  tokens_output Int                       @default(0)
+  turn_count    Int                       @default(0)
+  // Structured session state (§12 of the architecture doc) — NOT a
+  // transcript. Never store raw message content here.
+  session_state Json                      @default("{}")
+  created_at    DateTime                  @default(now())
+  updated_at    DateTime                  @updatedAt
+  closed_at     DateTime?
+
+  tool_calls ChatbotToolCall[]
+
+  @@index([worker_id, status])
+  @@index([created_at])
+}
+
+model ChatbotToolCall {
+  id              String              @id @default(cuid())
+  conversation_id String
+  conversation    ChatbotConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+  turn_index      Int
+  tool_name       String
+  tier            String // READ_ONLY | LOW_RISK_WRITE | HIGH_RISK_WRITE
+  idempotency_key String              @unique
+  // Hash only — arguments and results may carry personal data and are never
+  // persisted here; dispute-resolution traceability comes from the hash plus
+  // the owning service's own AuditLog row (ADR-053 item 3).
+  args_hash       String
+  confirmed       Boolean             @default(false)
+  status          String // SUCCESS | DENIED | FAILED | SKIPPED_IDEMPOTENT
+  denial_reason   String?
+  duration_ms     Int?
+  created_at      DateTime            @default(now())
+
+  @@index([conversation_id, turn_index])
+}
+
+// REQ-CHAT-004: hard monthly token budget cap. One row per calendar month,
+// read+incremented synchronously per turn (OD-CHAT-011 candidate i) — see
+// the architecture doc §10 for why a pure interval-poller is the wrong
+// failure direction for a hard cap.
+model ChatbotBudgetCounter {
+  year_month    String   @id // "2026-08"
+  tokens_spent  Int      @default(0)
+  updated_at    DateTime @updatedAt
 }

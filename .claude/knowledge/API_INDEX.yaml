@@ -40,7 +40,9 @@ apis:
   - { mount: /api/v1/compliance, module: backend-compliance, evidence: routes/v1/index.ts:52, clients: [frontend-web], note: "ADDED 2026-08-22 -- absent from this index despite backend-compliance being implemented (PRs 1-4)." }
   - { mount: /api/v1/employees, module: employee-management, evidence: routes/v1/index.ts:58, clients: [frontend-web], note: "ADDED 2026-08-22 -- absent from this index. Gated by FEATURE_EMPLOYMENT_RECORD (default OFF); while disabled the request falls through to the 404 handler rather than erroring (ADR-024 D3 'both-off = current behavior'). Mounted via an inline feature-flag middleware, which is why it does not match the plain router.use pattern the other rows do." }
 
+  - { mount: /api/v1/chatbot, module: backend-chatbot, evidence: "routes/v1/index.ts (gated by isChatbotEnabled())", clients: [], note: "SCAFFOLD behind FEATURE_CHATBOT (default OFF) -- while off, routes fall through to the 404 handler (ADR-024 D3 both-off posture). No LLM provider is wired: what is mounted is the ADR-053 tool-registry authorization boundary (modules/chatbot/tools/executor.ts) plus one self-scoped READ_ONLY tool (assignments.list_mine, wrapping IF-ASG-ListAssignments). Routes: GET /tools (permission-filtered manifest), POST /tools/invoke (direct tool invocation, no model in the loop). SPEC-CHATBOT-001@0.2.0 remains REVIEW, not FROZEN -- OD-CHAT-005/006/013 are unresolved, so no write tool and no cross-worker tool may be registered; enforced mechanically by __tests__/chatbot-tool-registry-hygiene.test.ts. No client consumer exists in frontend/ or mobile/." }
+
 unregistered:  # not mounted; hold only a .placeholder file; no API surface
-  - backend-chatbot
+  []  # backend-chatbot moved to the mounted list above (scaffold behind FEATURE_CHATBOT, default OFF)
 
 invalidated_by: [route registration change, client consumer change, DEPENDENCY_GRAPH revision change]
