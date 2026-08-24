@@ -3,7 +3,7 @@ import { optionalAuthMiddleware } from '../../middleware/auth.js';
 import { consentGateMiddleware } from '../../middleware/consentGate.js';
 import { checkReadiness } from '../../lib/health.js';
 import { HTTP_STATUS } from '../../config/constants.js';
-import { isEmploymentRecordEnabled } from '../../config/feature-flags.js';
+import { isChatbotEnabled, isEmploymentRecordEnabled } from '../../config/feature-flags.js';
 
 import authRoutes from '../../modules/auth/routes.js';
 import userRoutes from '../../modules/users/routes.js';
@@ -22,6 +22,7 @@ import consentRoutes from '../../modules/consent/routes.js';
 import retentionRoutes from '../../modules/retention/routes.js';
 import complianceRoutes from '../../modules/compliance/routes.js';
 import employeeManagementRoutes from '../../modules/employee-management/routes.js';
+import chatbotRoutes from '../../modules/chatbot/routes.js';
 
 const router = Router();
 
@@ -61,6 +62,22 @@ router.use('/employees', (req, res, next) => {
     return;
   }
   employeeManagementRoutes(req, res, next);
+});
+
+// Chatbot routes (SPEC-CHATBOT-001, ADR-013/ADR-053) — gated by
+// FEATURE_CHATBOT (default OFF), same shape as the employment-record gate
+// above. While disabled, requests fall through to the 404 handler
+// ("both-off = current behavior").
+//
+// Scaffold stage: no LLM provider is wired. What is mounted here is the tool
+// executor's authorization boundary plus one self-scoped read-only tool,
+// exercisable with zero AI calls.
+router.use('/chatbot', (req, res, next) => {
+  if (!isChatbotEnabled()) {
+    next();
+    return;
+  }
+  chatbotRoutes(req, res, next);
 });
 
 // Liveness endpoint used by deploy scripts and GitHub Actions health checks:

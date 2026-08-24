@@ -115,3 +115,17 @@ export function isConsentGateEnabled(): boolean {
 export function getConsentGateRoles(): readonly string[] {
   return getEnv().CONSENT_GATE_ROLES;
 }
+
+/**
+ * SPEC-CHATBOT-001 (ADR-013, ADR-053) scaffold cutover flag. When disabled
+ * (default), `/chatbot` routes fall through to the 404 handler, matching the
+ * "both-off = current behavior" posture (same shape as
+ * `isEmploymentRecordEnabled`'s route-mount gate in routes/v1/index.ts).
+ *
+ * The module registered behind this flag today has no LLM provider wired —
+ * only the scaffold, the authorization boundary, and one real read-only tool
+ * exercised with zero AI calls.
+ */
+export function isChatbotEnabled(): boolean {
+  return getEnv().FEATURE_CHATBOT;
+}

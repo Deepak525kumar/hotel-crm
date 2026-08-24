@@ -50,6 +50,29 @@ Three non-negotiables from that suite:
   found but not recorded there will be rediscovered from scratch — that has already happened
   more than once in this project.
 
+## Chatbot Work (mandatory entry point)
+
+Before writing, reviewing, or planning **any** `backend-chatbot` code — including any variant of
+"continue the chatbot", "wire up the LLM", "add a chatbot tool", or "enable the assistant" — you
+MUST read [`docs/implementation/CHATBOT_HANDOFF.md`](../docs/implementation/CHATBOT_HANDOFF.md)
+first, and then [`GD-19_CHATBOT_CHECKPOINT.md`](../docs/implementation/GD-19_CHATBOT_CHECKPOINT.md)
+for the governance state.
+
+That handoff records what exists, what is deliberately refused and why, and the traps that have
+already cost time. Three non-negotiables from it:
+
+- **`SPEC-CHATBOT-001` is `REVIEW`, not `FROZEN`,** and three G2 blockers stand
+  (`OD-CHAT-005`, `OD-CHAT-006`, `OD-CHAT-013`). `FEATURE_CHATBOT` must not be enabled outside
+  development until they close. `ADR-053` approves the tool-registry *architecture*, never a
+  specific tool — each tool is its own approval.
+- **The model never produces an authorization input.** Identity, role, scope and permissions are
+  re-derived from `req.auth` at execution time, never accepted as tool arguments. This is enforced
+  at compile time, at registration, and by a static test; do not weaken any of the three.
+- **Check new tools against the real `ROLE_PERMISSIONS`.** A tool once required a token the
+  `WORKER` role does not hold and would have denied every worker in production, while 100+ tests
+  passed because they fabricated the permission. A green suite built on invented permissions
+  proves only that the code agrees with itself.
+
 ## Agent System
 
 Agent contracts live in `agents/`. Each agent owns one responsibility, receives a minimal context package, and returns a structured artifact. The main conversation adopts the Lead Architect contract and coordinates specialists; do not delegate orchestration to a child agent because subagents cannot spawn other subagents. The Lead Architect does not perform specialist reviews. Add specialists by adding a contract; do not change the operating model.
