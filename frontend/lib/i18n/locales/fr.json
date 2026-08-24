@@ -905,7 +905,13 @@
     "tooManyPhotos": "Au maximum {{max}} photos peuvent être jointes.",
     "photoTooLarge": "{{name}} dépasse {{mb}} Mo.",
     "photoRequired": "Ajoutez au moins une photo avant de soumettre cette évaluation.",
-    "evidence": "Preuve"
+    "evidence": "Preuve",
+    "assignRework": "Attribuer une reprise",
+    "reworkNotesPlaceholder": "Que faut-il refaire ?",
+    "reworkNotesRequired": "Décrivez ce qui doit être refait.",
+    "reworkAssigned": "Reprise attribuée. L'employé a été notifié.",
+    "reworkPending": "Reprise attribuée — en attente de l'employé",
+    "reworkCompleted": "Reprise terminée"
   },
   "ratings": {
     "comment": "Commentaire",

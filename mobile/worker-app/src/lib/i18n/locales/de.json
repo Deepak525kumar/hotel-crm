@@ -905,7 +905,13 @@
     "tooManyPhotos": "Es dürfen höchstens {{max}} Fotos angehängt werden.",
     "photoTooLarge": "{{name}} ist größer als {{mb}} MB.",
     "photoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie diese Bewertung absenden.",
-    "evidence": "Nachweis"
+    "evidence": "Nachweis",
+    "assignRework": "Nacharbeit zuweisen",
+    "reworkNotesPlaceholder": "Was muss nachgearbeitet werden?",
+    "reworkNotesRequired": "Beschreiben Sie, was nachgearbeitet werden muss.",
+    "reworkAssigned": "Nacharbeit zugewiesen. Der Mitarbeiter wurde benachrichtigt.",
+    "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
+    "reworkCompleted": "Nacharbeit abgeschlossen"
   },
   "ratings": {
     "comment": "Kommentar",

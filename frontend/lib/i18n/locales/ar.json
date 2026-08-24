@@ -906,7 +906,13 @@
     "tooManyPhotos": "يمكن إرفاق {{max}} صور كحد أقصى.",
     "photoTooLarge": "{{name}} أكبر من {{mb}} ميغابايت.",
     "photoRequired": "أضف صورة واحدة على الأقل قبل إرسال هذا التقييم.",
-    "evidence": "الأدلة"
+    "evidence": "الأدلة",
+    "assignRework": "تعيين إعادة العمل",
+    "reworkNotesPlaceholder": "ما الذي يجب إعادة عمله؟",
+    "reworkNotesRequired": "صف ما يجب إعادة عمله.",
+    "reworkAssigned": "تم تعيين إعادة العمل. تم إخطار العامل.",
+    "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
+    "reworkCompleted": "اكتملت إعادة العمل"
   },
   "ratings": {
     "comment": "تعليق",

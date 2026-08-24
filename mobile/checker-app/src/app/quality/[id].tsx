@@ -61,12 +61,23 @@ export default function QualityVerificationScreen() {
     }
     setSaving(true);
     try {
-      await api.quality.createVerification(
+      const verification = await api.quality.createVerification(
         { assignment_id: id, score, notes: notes || undefined },
         picker.photos
       );
-      Alert.alert(t("common.submitted"), t('quality.recorded'), [
-        { text: t('common.ok'), onPress: () => router.back() },
+      // Route to the evidence screen rather than just dismissing. Two reasons:
+      // it is the only in-app way to reach that screen (it was previously
+      // reachable ONLY by tapping a push notification, so a missed push meant
+      // the evidence could never be viewed), and for a failing score it is
+      // where the checker assigns rework — CRR §14.
+      Alert.alert(t('common.submitted'), t('quality.recorded'), [
+        {
+          text: t('common.ok'),
+          onPress: () =>
+            verification?.id
+              ? router.replace(`/verification/${verification.id}`)
+              : router.back(),
+        },
       ]);
     } catch (e: any) {
       Alert.alert(t("errors.title"), e.message ?? t('quality.submitFailed'));
