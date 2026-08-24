@@ -1,6 +1,20 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import type { Request, Response, NextFunction } from 'express';
 
+// Storage is mocked, not merely unconfigured: createVerification()/createRating()
+// call uploadPhotos(), which resolves a REAL S3 client whenever S3_BUCKET is set,
+// so without this these tests perform live network I/O — green on a workstation
+// with working AWS credentials, red in CI. Mirrors quality-photos-authz.test.ts.
+jest.mock('../modules/documents/storage.js', () => ({
+  getStorageClient: async () => ({
+    upload: async () => undefined,
+    getPresignedUrl: async () => 'https://signed.example/p.jpg',
+    delete: async () => undefined,
+  }),
+  generateQualityPhotoKey: (assignmentId: string, kind: string, name: string) =>
+    `quality/${assignmentId}/${kind}/test-uuid/${name}`,
+}));
+
 /**
  * Quality scope-authorization regression for Epic 5 PR 5.5 (ADR-024).
  *
