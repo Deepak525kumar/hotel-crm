@@ -2407,6 +2407,28 @@ export class EmployeeManagementService extends BaseService {
     const scope = actor.scope ?? null;
     if (!scope) return false; // deny-by-default (no scope claim)
     if (scope.type === 'global') return true;
+
+    // 2026-08-24: a PENDING record has no hotel_group_id — that is set only on
+    // activation (ADR-065 Decision 2) — so every branch below denied it, and a
+    // Manager could not read the applicant they had just created. The UI
+    // redirects to that applicant's page on create, which therefore rendered
+    // "Failed to load employment status" immediately after a successful 201.
+    //
+    // target_hotel_group_id/target_primary_hotel_id are set at creation from
+    // the CREATING actor's own scope, and are the pre-approval equivalent of
+    // hotel_group_id for exactly this question: may this reviewer VIEW a
+    // not-yet-approved applicant. Same reasoning, and same fallback order, as
+    // lib/scope.ts's isWorkerInReviewerScope(), which was added for the
+    // review-queue instance of this identical gap on 2026-08-13.
+    //
+    // Safe to widen here because every caller of assertVisibility() is a READ
+    // (getByUserId, getSkills, getProfileHistory). The fallback applies only
+    // while hotel_group_id is null, so it can never widen access to an
+    // already-activated record whose real group differs from a stale target.
+    if (!record.hotel_group_id) {
+      return this.isPendingRecordInReviewerScope(scope, record);
+    }
+
     if (scope.type === 'hotel_group') {
       return record.hotel_group_id === scope.hotel_group_id;
     }
@@ -2417,7 +2439,50 @@ export class EmployeeManagementService extends BaseService {
       where: { id: scope.hotel_id },
       select: { hotel_group_id: true },
     });
-    return !!hotel && !!record.hotel_group_id && hotel.hotel_group_id === record.hotel_group_id;
+    return !!hotel && hotel.hotel_group_id === record.hotel_group_id;
+  }
+
+  /**
+   * Read-only visibility for a not-yet-approved record, resolved from its
+   * `target_*` fields. Never call this for a record that already has a
+   * `hotel_group_id` — that one has a real group and must use it.
+   */
+  private async isPendingRecordInReviewerScope(
+    scope: NonNullable<AuthContext['scope']>,
+    record: EmploymentRecord
+  ): Promise<boolean> {
+    if (scope.type === 'hotel_group') {
+      if (record.target_hotel_group_id) {
+        return record.target_hotel_group_id === scope.hotel_group_id;
+      }
+      // Target recorded at hotel grain only (a Manager-created applicant seen
+      // by their RM): resolve the hotel's group and compare on that.
+      if (record.target_primary_hotel_id) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: record.target_primary_hotel_id },
+          select: { hotel_group_id: true },
+        });
+        return !!hotel && hotel.hotel_group_id === scope.hotel_group_id;
+      }
+      return false;
+    }
+
+    if (scope.type === 'hotel') {
+      if (record.target_primary_hotel_id === scope.hotel_id) return true;
+      // Group-grain target (an RM-created applicant) vs a hotel-scoped
+      // manager: match through the hotel's own group, mirroring the
+      // group-grain rule the activated path uses.
+      if (record.target_hotel_group_id) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: scope.hotel_id },
+          select: { hotel_group_id: true },
+        });
+        return !!hotel && hotel.hotel_group_id === record.target_hotel_group_id;
+      }
+      return false;
+    }
+
+    return false;
   }
 
   /**
