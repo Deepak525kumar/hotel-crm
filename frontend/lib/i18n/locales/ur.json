@@ -900,7 +900,13 @@
     "markDone": "مکمل نشان زد کریں",
     "reworkPhotoRequired": "مکمل نشان زد کرنے سے پہلے کم از کم ایک تصویر شامل کریں۔",
     "reworkTitle": "دوبارہ کام درکار ہے",
-    "photoUnavailable": "تصویر دستیاب نہیں"
+    "photoUnavailable": "تصویر دستیاب نہیں",
+    "photos": "تصاویر",
+    "photosHint": "زیادہ سے زیادہ {{max}} تصاویر، ہر ایک 10 ایم بی۔",
+    "tooManyPhotos": "زیادہ سے زیادہ {{max}} تصاویر منسلک کی جا سکتی ہیں۔",
+    "photoTooLarge": "{{name}} کا حجم {{mb}} ایم بی سے زیادہ ہے۔",
+    "photoRequired": "یہ درجہ بندی جمع کرانے سے پہلے کم از کم ایک تصویر شامل کریں۔",
+    "evidence": "ثبوت"
   },
   "ratings": {
     "comment": "تبصرہ",

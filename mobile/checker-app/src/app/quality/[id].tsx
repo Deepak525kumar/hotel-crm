@@ -52,6 +52,13 @@ export default function QualityVerificationScreen() {
   const derivedStatus = deriveStatus(score);
 
   const handleSubmit = async () => {
+    // CRR §15: the photo accompanies the rating. Checked here so the checker
+    // is told before a round-trip over hotel wifi; the server enforces it too
+    // and stays authoritative.
+    if (picker.photos.length === 0) {
+      Alert.alert(t('errors.title'), t('quality.photoRequired'));
+      return;
+    }
     setSaving(true);
     try {
       await api.quality.createVerification(

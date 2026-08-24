@@ -134,8 +134,21 @@ describe('Quality scope authorization', () => {
   describe('WRITE verifications (OQ-09 / SIR-QUAL-004)', () => {
     it('allows a manager to verify an in-scope assignment (201)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
-      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h1', score: 80 });
+      // Multipart with a photo: CRR §15 is enforced as of 2026-08-24, so a
+      // photo-less rating is a 422 regardless of scope. This case is about
+      // scope, so it supplies the photo and asserts the scope outcome.
+      const res = await request(makeApp())
+        .post('/quality/verifications')
+        .field('assignment_id', 'asg_h1')
+        .field('score', '80')
+        .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
       expect(res.status).toBe(201);
+    });
+
+    it('refuses a rating with no photo, even in scope (CRR §15)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      const res = await request(makeApp()).post('/quality/verifications').send({ assignment_id: 'asg_h1', score: 80 });
+      expect(res.status).toBe(422);
     });
 
     it('denies a manager verifying an out-of-scope assignment (403)', async () => {
@@ -156,10 +169,24 @@ describe('Quality scope authorization', () => {
   describe('WRITE ratings (OQ-09 / SIR-QUAL-004)', () => {
     it('allows a manager to rate an in-scope assignment (201)', async () => {
       testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
+      // Multipart with a photo: CRR §15 is enforced on ratings as of
+      // 2026-08-24, so a photo-less rating is 422 regardless of scope. This
+      // case is about scope, so it supplies the photo.
+      const res = await request(makeApp())
+        .post('/quality/ratings')
+        .field('assignment_id', 'asg_h1')
+        .field('worker_id', 'w1')
+        .field('score', '80')
+        .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
+      expect(res.status).toBe(201);
+    });
+
+    it('refuses a rating with no photo, even in scope (CRR §15)', async () => {
+      testAuth = { userId: 'mgr_1', role: 'manager', permissions: ['quality:write'], scope: { type: 'hotel', hotel_id: 'h1' } };
       const res = await request(makeApp())
         .post('/quality/ratings')
         .send({ assignment_id: 'asg_h1', worker_id: 'w1', score: 80 });
-      expect(res.status).toBe(201);
+      expect(res.status).toBe(422);
     });
 
     it('denies a manager rating an out-of-scope assignment (403)', async () => {

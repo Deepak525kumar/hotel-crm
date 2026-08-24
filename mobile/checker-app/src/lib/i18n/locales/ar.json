@@ -900,7 +900,13 @@
     "markDone": "وضع علامة كمنجز",
     "reworkPhotoRequired": "أضف صورة واحدة على الأقل قبل وضع علامة الإنجاز.",
     "reworkTitle": "إعادة العمل مطلوبة",
-    "photoUnavailable": "الصورة غير متاحة"
+    "photoUnavailable": "الصورة غير متاحة",
+    "photos": "الصور",
+    "photosHint": "حتى {{max}} صور، ‏10 ميغابايت لكل منها.",
+    "tooManyPhotos": "يمكن إرفاق {{max}} صور كحد أقصى.",
+    "photoTooLarge": "{{name}} أكبر من {{mb}} ميغابايت.",
+    "photoRequired": "أضف صورة واحدة على الأقل قبل إرسال هذا التقييم.",
+    "evidence": "الأدلة"
   },
   "ratings": {
     "comment": "تعليق",

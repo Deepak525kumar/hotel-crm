@@ -57,10 +57,6 @@ export default function RootLayout() {
           name="quality/[id]"
           options={{ title: t('nav.qualityCheck'), headerShown: true }}
         />
-        <Stack.Screen
-          name="rating/[id]"
-          options={{ title: t('nav.rateWorker'), headerShown: true }}
-        />
         {/*
           These three render their own <BackLink /> and title inside a
           SafeAreaView (the same chrome worker-app's copies use), so the

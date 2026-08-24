@@ -1029,6 +1029,13 @@ export interface Rating {
   score: number;
   comment: string | null;
   criteria_scores: RatingCriteriaScores | null;
+  /**
+   * CRR §15 photo evidence (2026-08-24). S3 KEYS, not URLs — presigned URLs
+   * expire in 15 minutes, so they are minted on demand by
+   * `qualityApi.ratingPhotos()` rather than stored. Same shape and same
+   * reasoning as `QualityVerification.photo_urls`.
+   */
+  photo_urls: string[];
   created_at: string;
   updated_at: string;
 }

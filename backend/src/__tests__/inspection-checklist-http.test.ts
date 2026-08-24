@@ -123,12 +123,14 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
   it('accepts the confirmed checklist and persists it verbatim', async () => {
     const res = await request(makeApp())
       .post('/quality/ratings')
-      .send({
-        assignment_id: 'asg_1',
-        worker_id: 'w1',
-        score: 80,
-        criteria_scores: { dust: 90, bathroom: 70, bed_linen: 100 },
-      });
+      // Multipart, and criteria_scores JSON-stringified into one field:
+      // CRR §15's photo is enforced on ratings as of 2026-08-24, and
+      // multipart's flat field model cannot carry a nested object.
+      .field('assignment_id', 'asg_1')
+      .field('worker_id', 'w1')
+      .field('score', '80')
+      .field('criteria_scores', JSON.stringify({ dust: 90, bathroom: 70, bed_linen: 100 }))
+      .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(201);
     // Verify what was actually written, not just the status code -- a 201
@@ -166,8 +168,19 @@ describe('inspection checklist over HTTP (TREQ-005)', () => {
   it('still accepts a rating with no checklist at all', async () => {
     const res = await request(makeApp())
       .post('/quality/ratings')
-      .send({ assignment_id: 'asg_1', worker_id: 'w1', score: 80 });
+      .field('assignment_id', 'asg_1')
+      .field('worker_id', 'w1')
+      .field('score', '80')
+      .attach('photos', Buffer.from('x'), { filename: 'e.jpg', contentType: 'image/jpeg' });
 
     expect(res.status).toBe(201);
+  });
+
+  it('rejects a rating with no photo (CRR §15)', async () => {
+    const res = await request(makeApp())
+      .post('/quality/ratings')
+      .send({ assignment_id: 'asg_1', worker_id: 'w1', score: 80 });
+
+    expect(res.status).toBe(422);
   });
 });
