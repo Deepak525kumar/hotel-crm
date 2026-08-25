@@ -239,18 +239,10 @@ const envSchema = z.object({
   // FEATURE_TOKEN_GENERATION_ENFORCEMENT (formerly here) are retired — both
   // cutovers are complete and unconditional in middleware/auth.ts.
 
-  // Job Dispatch Phase 1 cutover flag (Epic 9, TREQ-011). Defaults FALSE.
-  // Gates nothing in PR 9.2 itself (WorkApplication removal is unconditional
-  // in this PR) — it exists for PR 9.3/9.4 and the mobile companion PR to
-  // consume once the replacement dispatch flow lands.
-  FEATURE_JOBDISPATCH_PHASE1: strictBooleanFlag(false),
-
   // Job Dispatch Phase 2 cutover flag (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03).
   // Defaults FALSE. Gates the new POST/GET /assignments/calendar-entries
   // routes only — while off, those routes 404 (fall through), matching the
   // "both-off = current behavior" posture every prior epic flag has used.
-  // Distinct from FEATURE_JOBDISPATCH_PHASE1 (Phase 1, PR 9.2/9.3/9.4): each
-  // phase gets its own flag per this repo's existing per-phase precedent.
   FEATURE_JOBDISPATCH_PHASE2: strictBooleanFlag(false),
 
   // ---------------------------------------------------------------------------
