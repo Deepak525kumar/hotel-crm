@@ -45,10 +45,13 @@
     "@babel/preset-env": "^7.29.7",
     "@babel/preset-typescript": "^7.29.7",
     "@react-native/metro-config": "0.86.2",
+    "@testing-library/react-native": "^14.0.1",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.2.2",
     "eslint-config-expo": "~57.0.1",
     "jest": "^29.7.0",
+    "jest-expo": "~57.0.4",
+    "test-renderer": "^1.2.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -66,24 +69,6 @@
     "test": "jest --forceExit",
     "test:coverage": "jest --coverage --forceExit",
     "typecheck": "tsc -p tsconfig.test.json"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "transform": {
-      "^.+\\.tsx?$": "babel-jest"
-    },
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ],
-    "moduleNameMapper": {
-      "^@/(.*)$": "<rootDir>/src/$1",
-      "^expo-secure-store$": "<rootDir>/src/__mocks__/expo-secure-store.ts",
-      "^react-native$": "<rootDir>/src/__mocks__/react-native.ts",
-      "^expo-constants$": "<rootDir>/src/__mocks__/expo-constants.ts"
-    },
-    "transformIgnorePatterns": [
-      "node_modules/(?!(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)"
-    ]
   },
   "private": true
 }
