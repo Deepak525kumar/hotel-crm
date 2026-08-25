@@ -8,8 +8,13 @@ import { logger } from '../../lib/logger.js';
  * Device push-token storage, behind one contract so the PUSH transport and
  * the registration endpoint always agree on where tokens live.
  *
- * Two implementations, selected per deployment by resolvePushTokenStore():
- *  - FirestorePushTokenStore, when Firebase is configured. Tokens live at
+ * Two implementations, selected per deployment by resolvePushTokenStore()
+ * from FEATURE_PUSH_TOKEN_STORE_FIRESTORE (default off). The flag is
+ * deliberately separate from the FIREBASE_* credentials, which exist to enable
+ * FCM sends: conflating them would mean an operator fixing Android push also
+ * migrated the token store in the same step, unasked.
+ *  - FirestorePushTokenStore, when the flag is on and Firebase is usable.
+ *    Tokens live at
  *    `users/{userId}/pushTokens/{digest}`, readable from the Firebase console
  *    alongside the rest of the project's push configuration.
  *  - PrismaPushTokenStore, otherwise — the original `PushToken` table. Local
@@ -248,6 +253,15 @@ export class PrismaPushTokenStore implements PushTokenStore {
 }
 
 export interface PushTokenStoreConfig {
+  /**
+   * Explicit opt-in to the Firestore store. Separate from the two Firebase
+   * credentials on purpose: those enable FCM sends, and conflating the two
+   * would mean an operator supplying the service-account key to fix Android
+   * push also migrated the token store in the same step, without asking for
+   * it — every already-registered device silently unreachable until its next
+   * app launch.
+   */
+  firestoreEnabled?: boolean;
   firebaseProjectId?: string;
   firebaseServiceAccountKeyBase64?: string;
 }
@@ -260,12 +274,26 @@ export function resolvePushTokenStore(
   prisma: PrismaClient,
   config: PushTokenStoreConfig
 ): PushTokenStore {
+  // Not opted in: stay on the table, and do not touch Firebase at all. Checked
+  // before getFirestoreClient so a deployment that has FCM credentials (for
+  // Android sends) but has not asked for the Firestore store neither
+  // initializes the Admin SDK nor changes where tokens live.
+  if (!config.firestoreEnabled) {
+    return new PrismaPushTokenStore(prisma);
+  }
+
   const firestore = getFirestoreClient({
     projectId: config.firebaseProjectId,
     serviceAccountKeyBase64: config.firebaseServiceAccountKeyBase64,
   });
 
   if (!firestore) {
+    // Opted in but unusable — an operator asked for Firestore and is not
+    // getting it. Louder than the silent fallback the unconfigured case
+    // deserves, because here the intent is explicit and unmet.
+    logger.error(
+      'FEATURE_PUSH_TOKEN_STORE_FIRESTORE is on but Firebase is not usable (FIREBASE_PROJECT_ID / FIREBASE_SERVICE_ACCOUNT_KEY_BASE64) — falling back to the PushToken table'
+    );
     return new PrismaPushTokenStore(prisma);
   }
 
