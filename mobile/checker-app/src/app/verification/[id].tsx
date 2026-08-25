@@ -106,6 +106,8 @@ export default function VerificationEvidenceScreen() {
     score: { fontSize: 34, fontWeight: '800', color: theme.text },
     badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
     badgeText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    meta: { color: theme.text, fontSize: 15, fontWeight: '600', marginTop: 8 },
+    metaSecondary: { color: theme.textSecondary, fontSize: 13, marginTop: 2 },
     notes: { color: theme.text, fontSize: 14 },
     grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
     photo: { width: 150, height: 150, borderRadius: 10, backgroundColor: theme.backgroundElement },
@@ -167,6 +169,33 @@ export default function VerificationEvidenceScreen() {
                 <Text style={styles.badgeText}>{verification.status}</Text>
               </View>
             </View>
+            {/* Whose work, where and when. The screen used to show a score and
+                photos with no way to tell which shift was inspected. */}
+            {verification.assignment?.worker && (
+              <Text style={styles.meta}>
+                {`${verification.assignment.worker.first_name} ${verification.assignment.worker.last_name}`.trim()}
+              </Text>
+            )}
+            {(verification.hotel || verification.assignment?.day) && (
+              <Text style={styles.metaSecondary}>
+                {[
+                  verification.hotel
+                    ? [verification.hotel.name, verification.hotel.city].filter(Boolean).join(' · ')
+                    : null,
+                  verification.assignment?.day
+                    ? new Date(verification.assignment.day).toLocaleDateString()
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join('  ·  ')}
+              </Text>
+            )}
+            {verification.verified_by && (
+              <Text style={styles.metaSecondary}>
+                {t('quality.inspectedBy', 'Inspected by')}{' '}
+                {`${verification.verified_by.first_name} ${verification.verified_by.last_name}`.trim()}
+              </Text>
+            )}
             {verification.notes ? <Text style={styles.notes}>{verification.notes}</Text> : null}
             {verification.rework_required ? (
               <View style={styles.pill}>

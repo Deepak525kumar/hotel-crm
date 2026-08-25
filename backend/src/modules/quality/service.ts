@@ -857,7 +857,24 @@ export class QualityService extends BaseService {
   async getVerification(verificationId: string, actor: Actor) {
     const verification = await this.prisma.qualityVerification.findUnique({
       where: { id: verificationId },
-      include: { assignment: { select: { worker_id: true, day: true } } },
+      include: {
+        // Names, not just ids. The checker app's evidence screen showed a
+        // score, a status and photos with no indication of WHOSE work was
+        // inspected or WHERE -- and it could not resolve them itself, because
+        // /crm/hotels/:id is scoped and 403s for a checker.
+        //
+        // Included on the same query rather than fetched separately: all three
+        // are direct relations, so this stays one round trip.
+        assignment: {
+          select: {
+            worker_id: true,
+            day: true,
+            worker: { select: { id: true, first_name: true, last_name: true } },
+          },
+        },
+        hotel: { select: { id: true, name: true, city: true } },
+        verified_by: { select: { id: true, first_name: true, last_name: true } },
+      },
     });
     if (!verification) throw new NotFoundError('Verification not found');
     await this.assertCanViewVerification(verification, actor);

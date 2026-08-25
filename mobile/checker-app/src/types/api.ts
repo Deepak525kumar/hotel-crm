@@ -101,6 +101,21 @@ export interface QualityVerification {
   rework_notes?: string | null;
   rework_completed_at?: string | null;
   rework_escalated_at?: string | null;
+  /**
+   * Whose work, where, when, and who inspected it — nested by
+   * GET /quality/verifications/:id.
+   *
+   * The evidence screen previously showed a score, a status and photos with no
+   * indication of any of it, and could not resolve the names itself:
+   * /crm/hotels/:id is scoped and 403s for a checker.
+   */
+  assignment?: {
+    worker_id: string;
+    day: string;
+    worker?: { id: string; first_name: string; last_name: string } | null;
+  } | null;
+  hotel?: { id: string; name: string; city: string } | null;
+  verified_by?: { id: string; first_name: string; last_name: string } | null;
 }
 
 export interface Rating {
