@@ -18,5 +18,13 @@
     "expo": "~57.0.14",
     "react": "19.2.3",
     "react-native": "0.86.2"
+  },
+  "overrides": {
+    "@react-native/metro-config": "0.86.2",
+    "@react-native/metro-babel-transformer": "0.86.2",
+    "@react-native/babel-preset": "0.86.2",
+    "@react-native/babel-plugin-codegen": "0.86.2",
+    "@react-native/codegen": "0.86.2",
+    "@react-native/js-polyfills": "0.86.2"
   }
 }
