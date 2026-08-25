@@ -79,4 +79,36 @@ export interface AttendanceDto {
   verified_at: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Who and where, resolved for the read paths (list/getById).
+   *
+   * Without these the DTO carried only ids, and the checker app rendered
+   * `Worker ···{worker_id.slice(-6)}` — literally the last six characters of a
+   * cuid — with no hotel shown at all. A checker verifying attendance could not
+   * tell whose attendance it was.
+   *
+   * Nested here rather than expecting the client to call /users/:id and
+   * /crm/hotels/:id: both are scoped for a checker (the hotel endpoint 403s
+   * outright), so the names were unreachable. The existing scope gate on
+   * list()/getById() already decides which attendance rows the caller sees, so
+   * this exposes no row they could not already read — only the names for it.
+   */
+  worker: AttendancePersonDto | null;
+  hotel: AttendanceHotelDto | null;
+  /** The name of whoever verified it, when it has been verified. */
+  verified_by_name: string | null;
+}
+
+/** Just enough to identify a person on screen. No contact details or role. */
+export interface AttendancePersonDto {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/** Just enough to identify the site. No commercial or managerial fields. */
+export interface AttendanceHotelDto {
+  id: string;
+  name: string;
+  city: string;
 }

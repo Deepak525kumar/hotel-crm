@@ -55,6 +55,16 @@ export interface AttendanceRecord {
   verified_at: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Nested by the API on the read paths. Before this the DTO carried only ids
+   * and the queue screen rendered `Worker ···{worker_id.slice(-6)}` — the tail
+   * of a cuid — so a checker could not tell whose attendance they were
+   * verifying, or at which hotel. Optional because the mutation responses
+   * (verify/check-in) do not populate them.
+   */
+  worker?: { id: string; first_name: string; last_name: string } | null;
+  hotel?: { id: string; name: string; city: string } | null;
+  verified_by_name?: string | null;
 }
 
 export type AssignmentStatus = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';

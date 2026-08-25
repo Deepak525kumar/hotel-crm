@@ -142,6 +142,24 @@ export default function AttendanceDetailScreen() {
             <Text style={styles.badgeText}>{record.status}</Text>
           </View>
           <View style={styles.divider} />
+          {/* Who and where. The DTO used to carry only ids, so this screen
+              showed times and a status with no indication of whose shift it
+              was. */}
+          {record.worker && (
+            <InfoRow
+              label={t('fields.worker', 'Worker')}
+              value={`${record.worker.first_name} ${record.worker.last_name}`.trim()}
+            />
+          )}
+          {record.hotel && (
+            <InfoRow
+              label={t('fields.hotel')}
+              value={[record.hotel.name, record.hotel.city].filter(Boolean).join(' · ')}
+            />
+          )}
+          {record.verified_by_name && (
+            <InfoRow label={t('attendance.verifiedBy', 'Verified by')} value={record.verified_by_name} />
+          )}
           <InfoRow label={t("shifts.checkIn")} value={formatDateTime(record.check_in_at)} />
           <InfoRow label={t("shifts.checkOut")} value={formatDateTime(record.check_out_at)} />
           <InfoRow label={t("attendance.expectedStart")} value={formatDateTime(record.expected_start)} />
