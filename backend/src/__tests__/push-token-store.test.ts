@@ -235,34 +235,70 @@ describe('FirestorePushTokenStore', () => {
 });
 
 describe('resolvePushTokenStore', () => {
+  const REAL_SHAPED_KEY = Buffer.from(
+    JSON.stringify({
+      project_id: 'proj',
+      client_email: 'svc@proj.iam.gserviceaccount.com',
+      private_key: '-----BEGIN PRIVATE KEY-----\nnot-a-real-key\n-----END PRIVATE KEY-----\n',
+    })
+  ).toString('base64');
+
   beforeEach(() => {
     resetFirestoreClientForTests();
   });
 
-  it('falls back to the PushToken table when Firebase is not configured', () => {
+  it('uses the PushToken table by default', () => {
     expect(resolvePushTokenStore({} as any, {})).toBeInstanceOf(PrismaPushTokenStore);
   });
 
-  it('falls back to the PushToken table when only the project id is set', () => {
-    // FCM v1 auth needs the service-account key too; a half-configured
-    // deployment must degrade to a working store, not a broken Firestore client.
+  // The regression that made the flag necessary. FIREBASE_PROJECT_ID and
+  // FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 exist to enable FCM sends, which is
+  // the only way Android push works at all. If they also selected the store,
+  // an operator fixing Android push would silently migrate every device token
+  // to an empty Firestore collection in the same step, and every already
+  // registered device would go unreachable until its next app launch.
+  it('does NOT switch to Firestore just because FCM credentials are present', () => {
+    const store = resolvePushTokenStore({} as any, {
+      firebaseProjectId: 'proj',
+      firebaseServiceAccountKeyBase64: Buffer.from(
+        JSON.stringify({
+          project_id: 'proj',
+          client_email: 'svc@proj.iam.gserviceaccount.com',
+          private_key: 'irrelevant — must not be read',
+        })
+      ).toString('base64'),
+    });
+    expect(store).toBeInstanceOf(PrismaPushTokenStore);
+  });
+
+  it('falls back to the PushToken table when opted in but Firebase is unconfigured', () => {
     expect(
-      resolvePushTokenStore({} as any, { firebaseProjectId: 'proj' })
+      resolvePushTokenStore({} as any, { firestoreEnabled: true })
     ).toBeInstanceOf(PrismaPushTokenStore);
   });
 
-  it('falls back to the PushToken table when the service-account key is not JSON', () => {
+  it('falls back when opted in with only the project id', () => {
+    // FCM v1 auth needs the service-account key too; a half-configured
+    // deployment must degrade to a working store, not a broken Firestore client.
+    expect(
+      resolvePushTokenStore({} as any, { firestoreEnabled: true, firebaseProjectId: 'proj' })
+    ).toBeInstanceOf(PrismaPushTokenStore);
+  });
+
+  it('falls back when opted in and the service-account key is not JSON', () => {
     expect(
       resolvePushTokenStore({} as any, {
+        firestoreEnabled: true,
         firebaseProjectId: 'proj',
         firebaseServiceAccountKeyBase64: Buffer.from('not json').toString('base64'),
       })
     ).toBeInstanceOf(PrismaPushTokenStore);
   });
 
-  it('falls back to the PushToken table when the key is JSON but missing required fields', () => {
+  it('falls back when opted in and the key is JSON but missing required fields', () => {
     expect(
       resolvePushTokenStore({} as any, {
+        firestoreEnabled: true,
         firebaseProjectId: 'proj',
         firebaseServiceAccountKeyBase64: Buffer.from(
           JSON.stringify({ project_id: 'proj' })
@@ -271,21 +307,16 @@ describe('resolvePushTokenStore', () => {
     ).toBeInstanceOf(PrismaPushTokenStore);
   });
 
-  it('falls back to the PushToken table when the private key itself is unusable', () => {
+  it('falls back when opted in and the private key itself is unusable', () => {
     // Structurally complete JSON whose PEM is corrupt: cert() validates the
     // key eagerly and throws. Unguarded this crashed the worker at boot while
     // building the transport registry, taking email and every scheduled job
     // down with push.
     expect(
       resolvePushTokenStore({} as any, {
+        firestoreEnabled: true,
         firebaseProjectId: 'proj',
-        firebaseServiceAccountKeyBase64: Buffer.from(
-          JSON.stringify({
-            project_id: 'proj',
-            client_email: 'svc@proj.iam.gserviceaccount.com',
-            private_key: '-----BEGIN PRIVATE KEY-----\nnot-a-real-key\n-----END PRIVATE KEY-----\n',
-          })
-        ).toString('base64'),
+        firebaseServiceAccountKeyBase64: REAL_SHAPED_KEY,
       })
     ).toBeInstanceOf(PrismaPushTokenStore);
   });

@@ -156,6 +156,7 @@ export class NotificationService extends BaseService {
   ): Promise<StoredPushToken> {
     const env = getEnv();
     const store = resolvePushTokenStore(this.prisma, {
+      firestoreEnabled: env.FEATURE_PUSH_TOKEN_STORE_FIRESTORE,
       firebaseProjectId: env.FIREBASE_PROJECT_ID,
       firebaseServiceAccountKeyBase64: env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
     });
