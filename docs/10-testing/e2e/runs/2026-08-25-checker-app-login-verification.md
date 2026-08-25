@@ -9,8 +9,9 @@
 
 **Scope:** one question — *can a CHECKER sign into the checker app with their credentials?* — NOT
 a run of the numbered scenarios. Scenario rows are therefore blank rather than PASS. Recorded here
-because the run also found a defect that makes both mobile test suites unrunnable from a clean
-checkout, which is exactly the class of thing this suite exists to stop being rediscovered.
+because the login result is worth keeping, and because the run raised a suspected defect in the
+mobile test setup that turned out to be a locally-broken `node_modules` — writing down a disproved
+defect is what stops the next session re-investigating the same dead end.
 
 ## Results
 
@@ -18,7 +19,7 @@ checkout, which is exactly the class of thing this suite exists to stop being re
 |---|---|---|
 | 00–12 | NOT RUN | Out of scope for this pass |
 | — (ad-hoc) checker login | **PASS** | Real endpoints, real database, real client module — detailed below |
-| — (ad-hoc) mobile test suites | **FAIL → FIXED** | Both apps' `npm test` aborted before running a single test; fixed in this pass |
+| — (ad-hoc) mobile test suites | NOT A DEFECT | Investigated after a local failure; the failure was self-inflicted (below) |
 
 ### Checker login — PASS, verified at the data layer
 
@@ -66,36 +67,60 @@ login path, on either side.
 
 ## New defects found
 
-1. **Both mobile apps' test suites could not run at all from a clean install** —
-   `jest.config.js`'s `components` project uses `preset: 'jest-expo/ios'`, and `jest-expo`
-   requires the peer dependency `@react-native/jest-preset`, which was declared in **no**
-   `package.json` and was **absent from `package-lock.json`**. `npx jest` aborted with a
-   `Validation Error` before running a single test — so **zero** tests ran, `unit` project
-   included, in `mobile/checker-app` *and* `mobile/worker-app`. **High.** Fixed in this pass:
-   `@react-native/jest-preset: 0.86.2` added to both apps' `devDependencies` and to the lockfile.
-   Verified by deleting `node_modules`, re-running `npm ci --include=dev` from the committed
-   lockfile, and getting 150/150 (checker) and 210/210 (worker) tests green.
+**None.** One suspected defect was investigated and **disproved** — recorded here in full because
+the disproof is the useful part.
 
-   This matters more than a missing dependency usually would. The `components` project exists
-   *because* the 2026-08-25 mobile flow verification found five defects living in `.tsx` files
-   that no test could reach. One of the tests it unblocks, `LoginInputs.test.tsx`, guards the
-   `autoCapitalize="none"` fix on the password field — the bug where iOS silently upper-cased the
-   first character of a typed password and login failed with "Invalid credentials" on correct
-   credentials. That guard was not running.
+*The claim I initially made, and why it was wrong.* In this container `npx jest` in
+`mobile/checker-app` aborted with a jest-expo validation error — `@react-native/jest-preset` not
+found — before running a single test, in both mobile apps and for the `unit` project too. It is
+declared in no `package.json`, so I concluded the `components` project was dead on a clean
+checkout and "fixed" it by declaring the dependency.
 
-2. **`NODE_ENV=production` is set in the container image**, which makes `npm ci`/`npm install`
+*That was wrong, and here is the evidence.* `react-native@0.86.2` declares
+`@react-native/jest-preset` as a **peer dependency**, and npm installs peers automatically. Checked
+at the base commit `0de3fe0`, in a clean `git worktree` with no prior state:
+
+| Install at base commit `0de3fe0` | `@react-native/jest-preset` present? | `npx jest --ci` |
+|---|---|---|
+| per-app `npm ci` in `mobile/checker-app` (what CI does) | yes | 18 suites, **150/150**, 2 projects |
+| root workspace `npm ci --include=dev` | yes | 18 suites, **150/150**, 2 projects |
+
+CI on `main` at that same commit agrees: job `Mobile · checker-app` logs
+`Tests: 150 passed, 150 total` / `Ran all test suites in 2 projects`. **The suites were never dead,
+in CI or on a clean checkout.** The change was reverted; the repository needed no fix.
+
+*What actually broke my tree.* `--legacy-peer-deps`, which I reached for to get past an unrelated
+peer conflict. That flag **disables automatic peer installation**, so it silently removed the
+preset that `react-native` would otherwise have pulled in. Combined with the `NODE_ENV=production`
+problem below — each partial install pruning the previous one's packages — it produced a tree no
+clean checkout ever produces.
+
+*The lesson worth keeping.* A tool failure in a hand-repaired `node_modules` is evidence about that
+tree, not about the repository. Before filing a dependency defect, reproduce it in a clean worktree
+and check what CI actually did on the base commit — both were one command away here, and either
+would have caught this before it reached a PR description.
+
+## Environment problems (not repository defects)
+
+1. **`NODE_ENV=production` is set in this container image**, which makes `npm ci`/`npm install`
    silently skip **all** devDependencies — no `tsx`, no `jest`, no babel presets — so the backend
-   cannot start and no suite can run until it is overridden (`NODE_ENV=development npm ci
-   --include=dev`). **Environment issue, not a repository defect**, but it costs a lot of time to
-   diagnose because the failure looks like a broken lockfile, and each partial install prunes the
-   previous one's packages.
+   cannot start and no suite can run until it is overridden:
+   `NODE_ENV=development npm ci --include=dev`. Worth knowing before diagnosing anything else: it
+   looks like a broken lockfile, and each partial install prunes the previous one's packages.
+   **Do not reach for `--legacy-peer-deps` to escape it** — that disables automatic peer
+   installation and cost this run a false defect report (above).
+
+2. **No Docker daemon**, so scenario 00's `docker compose up -d postgres redis` does not apply.
+   A local PostgreSQL 16 cluster (`pg_ctlcluster 16 main start`) served instead; Redis was not
+   needed for this pass.
 
 ## Could not test
 
 1. **The login screen as a running app on a device or simulator** — no Expo/Metro run, no
    emulator in this container. `login.tsx` was verified by reading it plus its component tests
-   (`LoginInputs.test.tsx`, which now runs); the store and transport beneath it were verified for
-   real against the live backend, as described above. The rendered screen itself is a gap.
+   (`LoginInputs.test.tsx`, which covers the login inputs' autoCapitalize/autoCorrect settings);
+   the store and transport beneath it were verified for real against the live backend, as described
+   above. The rendered screen itself is a gap.
 2. **Anything after the login screen** — `router.replace('/(app)')`, `AuthGuard`, and the daily
    consent gate a freshly-created checker meets on first entry (their `employment_status` is
    `PENDING`) were not exercised. Scenario 11 covers the consent gate; this run did not.
@@ -107,5 +132,7 @@ login path, on either side.
 
 ## Scenario files updated this run
 
-- `README.md` — ADR-070 login throttling removed from the "not yet exercised by any scenario"
-  note, now pointing here; a note added that the mobile suites were unrunnable and since fixed.
+- `README.md` — ADR-070 login throttling removed from the "not yet exercised by any scenario" note,
+  now pointing here. Its claim that the mobile jest configs collect only `*.test.ts` corrected: both
+  apps now run a second `components` project over `*.test.tsx`, and it does run (150 tests in
+  checker-app, 210 in worker-app, in CI and on a clean checkout).
