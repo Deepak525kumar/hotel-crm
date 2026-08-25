@@ -28,6 +28,16 @@ import { logger } from '../../lib/logger.js';
  * launch (registerForPushNotificationsAsync runs on every signed-in start).
  * Until then they receive no push. No data is destroyed — the `PushToken`
  * table is left in place and simply stops being read.
+ *
+ * One property does NOT carry over: `PushToken.user_id` has
+ * `onDelete: Cascade`, so deleting a User removed their device tokens for
+ * free. Firestore has no foreign key, so a Firestore deployment keeps a
+ * deleted user's tokens until each device is invalidated by its provider.
+ * That is currently unreachable — the only `prisma.user.delete` call is the
+ * compensating rollback for a user whose employment record failed to create,
+ * moments after creation and long before any device could register. Any
+ * future hard-delete or GDPR-erasure path must delete
+ * `users/{userId}/pushTokens` explicitly; a cascade will not do it.
  */
 
 export interface StoredPushToken {
@@ -55,7 +65,11 @@ export interface PushTokenStore {
   /** Every device registered to this user. Empty when the user has none. */
   listForUser(userId: string): Promise<StoredPushToken[]>;
 
-  /** Removes one device token. Must not throw when it is already gone. */
+  /**
+   * Removes one device token. Callers treat pruning as best-effort (the
+   * transport already catches): the Firestore store is idempotent, but the
+   * Prisma store rejects a row that a concurrent request already removed.
+   */
   delete(userId: string, id: string): Promise<void>;
 }
 
@@ -89,6 +103,34 @@ export class FirestorePushTokenStore implements PushTokenStore {
     return this.firestore.collection('users').doc(userId).collection('pushTokens');
   }
 
+  /**
+   * Reverse index, token digest -> current owner, maintained alongside the
+   * per-user documents.
+   *
+   * It exists solely to make re-registration reassign ownership. The Prisma
+   * store gets that for free: `PushToken.token` is UNIQUE, so upserting an
+   * existing token moves the single row to the new user. Firestore's
+   * per-user subcollections have no such cross-user constraint — writing
+   * `users/{new}/pushTokens/{id}` leaves `users/{old}/pushTokens/{id}`
+   * untouched, and the previous owner's notifications would keep arriving on
+   * a device that now belongs to someone else. That is the shared-device and
+   * account-switch case, not a hypothetical.
+   *
+   * A collection-group query on `token` would avoid the second collection,
+   * but requires a deployed composite/collection-group index — a silent
+   * runtime failure in any project where that index was never created.
+   * A document-id lookup needs no index at all.
+   *
+   * The index only knows about tokens this store wrote. A document placed
+   * under `users/{userId}/pushTokens` by anything else (a console edit, a
+   * client writing directly) has no owner entry and so would not be
+   * reassigned away. firestore.rules denies all client access precisely so
+   * this store stays the only writer.
+   */
+  private ownerRef(id: string) {
+    return this.firestore.collection('pushTokenOwners').doc(id);
+  }
+
   async upsert(
     userId: string,
     token: string,
@@ -96,14 +138,36 @@ export class FirestorePushTokenStore implements PushTokenStore {
     app: PushApp
   ): Promise<StoredPushToken> {
     const id = documentIdFor(token);
-    await this.collection(userId)
-      .doc(id)
-      .set(
+    const tokenRef = this.collection(userId).doc(id);
+    const ownerRef = this.ownerRef(id);
+
+    // One transaction, not three writes: a device that switches accounts must
+    // never be readable as belonging to both users, not even briefly — that
+    // window is exactly when the previous owner's push would leak to the new
+    // owner's device. Firestore also retries the transaction on contention,
+    // which settles two concurrent registrations of the same token
+    // deterministically rather than by write order.
+    await this.firestore.runTransaction(async (tx) => {
+      // All reads must precede all writes in a Firestore transaction.
+      const ownerSnapshot = await tx.get(ownerRef);
+      const previousOwner = ownerSnapshot.exists
+        ? (ownerSnapshot.data()?.user_id as unknown)
+        : undefined;
+
+      if (typeof previousOwner === 'string' && previousOwner && previousOwner !== userId) {
+        tx.delete(this.collection(previousOwner).doc(id));
+      }
+
+      tx.set(ownerRef, { user_id: userId, updated_at: new Date().toISOString() });
+      tx.set(
+        tokenRef,
         { token, platform, app, updated_at: new Date().toISOString() },
         // merge: preserves any field a future writer adds without this code
         // having to know about it; the four fields here are always rewritten.
         { merge: true }
       );
+    });
+
     return { id, token, platform, app };
   }
 
@@ -137,8 +201,17 @@ export class FirestorePushTokenStore implements PushTokenStore {
   }
 
   async delete(userId: string, id: string): Promise<void> {
-    // Firestore's delete is idempotent — deleting a missing document resolves.
-    await this.collection(userId).doc(id).delete();
+    // Both documents in one atomic batch, so the reverse index cannot outlive
+    // the token it points at. Firestore's delete is idempotent, so a document
+    // already removed by a concurrent prune is not an error.
+    //
+    // A stale index entry would in fact be harmless (the subsequent
+    // tx.delete in upsert() tolerates a missing document), but leaving one
+    // behind per invalidated device makes pushTokenOwners grow without bound.
+    const batch = this.firestore.batch();
+    batch.delete(this.collection(userId).doc(id));
+    batch.delete(this.ownerRef(id));
+    await batch.commit();
   }
 }
 

@@ -90,25 +90,43 @@ export function getFirestoreClient(config: FirebaseAdminConfig): Firestore | und
   // Named app, never the default: this process may run alongside other
   // Firebase usage, and initializeApp() on an already-initialized default app
   // throws.
-  let app: App;
-  const existing = getApps().find((candidate: { name: string }) => candidate.name === APP_NAME);
-  if (existing) {
-    app = getApp(APP_NAME);
-  } else {
-    app = initializeApp(
-      {
-        credential: cert({
-          projectId: serviceAccount.projectId,
-          clientEmail: serviceAccount.clientEmail,
-          privateKey: serviceAccount.privateKey,
-        }),
-        projectId,
-      },
-      APP_NAME
-    );
+  //
+  // The whole construction is guarded because cert() validates the private
+  // key eagerly and throws on a structurally valid JSON key whose PEM is
+  // corrupt or truncated. Unguarded, that would surface as a 500 on push-token
+  // registration and — worse — as a crash while building the outbox transport
+  // registry at worker boot, taking down email delivery and every scheduled
+  // job along with push. Degrading to the Prisma store matches how every
+  // other unusable-config path here behaves.
+  try {
+    let app: App;
+    const existing = getApps().find((candidate: { name: string }) => candidate.name === APP_NAME);
+    if (existing) {
+      app = getApp(APP_NAME);
+    } else {
+      app = initializeApp(
+        {
+          credential: cert({
+            projectId: serviceAccount.projectId,
+            clientEmail: serviceAccount.clientEmail,
+            privateKey: serviceAccount.privateKey,
+          }),
+          projectId,
+        },
+        APP_NAME
+      );
+    }
+
+    cached = getFirestore(app);
+  } catch (error) {
+    // No key material in the log line: the message comes from the SDK, which
+    // reports key *shape* problems, and is never concatenated with the key.
+    logger.error('Firebase Admin initialization failed — falling back to the PushToken table', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    cached = undefined;
   }
 
-  cached = getFirestore(app);
   return cached;
 }
 
