@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.hotelcrm.workerapp",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
