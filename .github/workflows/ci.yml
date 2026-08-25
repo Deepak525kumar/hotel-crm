@@ -138,6 +138,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
+      - name: Use npm 11 (matches committed lockfiles)
+        run: npm install -g npm@11
 
       - name: Install backend deps
         run: npm ci
@@ -227,6 +229,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: package-lock.json
+      - name: Use npm 11 (matches committed lockfiles)
+        run: npm install -g npm@11
 
       - name: Install deps (workspaces)
         run: npm ci
@@ -280,6 +284,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: package-lock.json
+      - name: Use npm 11 (matches committed lockfiles)
+        run: npm install -g npm@11
 
       - name: Install deps (workspaces)
         run: npm ci
@@ -355,6 +361,8 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: mobile/${{ matrix.app }}/package-lock.json
+      - name: Use npm 11 (matches committed lockfiles)
+        run: npm install -g npm@11
 
       - name: Install deps
         run: npm ci
