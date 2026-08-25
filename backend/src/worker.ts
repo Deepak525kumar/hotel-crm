@@ -86,7 +86,6 @@ async function main() {
           apnsBundleIdChecker: env.APNS_BUNDLE_ID_CHECKER,
           firebaseProjectId: env.FIREBASE_PROJECT_ID,
           firebaseServiceAccountKeyBase64: env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
-          pushTokenStoreFirestore: env.FEATURE_PUSH_TOKEN_STORE_FIRESTORE,
         })
       );
 

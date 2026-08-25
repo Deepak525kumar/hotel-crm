@@ -281,11 +281,7 @@ describe('NotificationService', () => {
         update: { user_id: 'u1', platform: PushPlatform.IOS, app: PushApp.WORKER },
         create: { token: 'device-token-abc', platform: PushPlatform.IOS, app: PushApp.WORKER, user_id: 'u1' },
       });
-      // Ownership is asserted on the write itself, not on the return value:
-      // registerPushToken returns the store-agnostic StoredPushToken (which
-      // deliberately carries no user_id — the user is the collection/row key,
-      // not a field the caller re-reads).
-      expect(result.token).toBe('device-token-abc');
+      expect(result.user_id).toBe('u1');
     });
 
     it('re-registering an existing token under a different user reassigns ownership (security-correctness)', async () => {
@@ -301,8 +297,7 @@ describe('NotificationService', () => {
 
       const args = mockPushToken.upsert.mock.calls[0][0] as any;
       expect(args.update.user_id).toBe('u2');
-      expect(args.create.user_id).toBe('u2');
-      expect(result.token).toBe('device-token-abc');
+      expect(result.user_id).toBe('u2');
     });
   });
 });

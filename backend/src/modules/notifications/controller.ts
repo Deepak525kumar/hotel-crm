@@ -49,13 +49,7 @@ export class NotificationController {
       );
       res.status(201).json({
         status: 'success',
-        // `user_id` is re-attached from `req.auth`, never from the store: the
-        // response shape predates the Firestore-backed store (whose
-        // StoredPushToken carries no user_id — the user is the collection key,
-        // not a document field), and existing clients must not see the field
-        // disappear. Sourcing it from req.auth also keeps it impossible for a
-        // store to report an owner other than the authenticated caller.
-        data: { ...result, user_id: req.auth.userId },
+        data: result,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
       });
     } catch (error) {
