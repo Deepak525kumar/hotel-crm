@@ -29,7 +29,6 @@ Arbeitsvertrag*.pdf
 Arbeitsvertrag_Alona_Likhoto_final.pdf
 hotelcrm-key1.pem
 
-
 # Agent skill packs: downloaded content, restored from skills-lock.json by the
 # tooling that fetched them. Ignored so a local skill install does not show up
 # as repository changes; the lock file is the only thing worth versioning, and
@@ -56,26 +55,15 @@ GoogleService-Info.plist
 # The backend never reads a key FILE -- it reads the base64 of one from
 # FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 (see backend/.env.example), so there is
 # no reason for one to be in the tree at all.
-*-firebase-adminsdk-*.json
-firebase-adminsdk-*.json
-service-account*.json
-
-# Firebase Admin service-account keys, and anything derived from one.
-#
-# The Firebase console's "Generate new private key" button downloads
-# <project>-firebase-adminsdk-<hash>.json straight into whatever directory the
-# browser is pointed at -- frequently a repository root -- and a single
-# `git add -A` would sweep it into a commit. The key grants full backend access
-# to the Firebase project, including Firestore, bypassing firestore.rules
-# entirely; a leak means rotating it, not deleting the commit.
-#
-# The backend never reads a key FILE: it reads the base64 of one from
-# FIREBASE_SERVICE_ACCOUNT_KEY_BASE64. Nothing here ever needs to be tracked.
-# The base64 patterns are covered too -- that string IS the private key, just
-# re-encoded, and is no safer to commit than the JSON.
+# Globs are deliberately broad: the console's filename format has changed
+# before, and a key that slips through because it was named slightly
+# differently is a rotation, not an inconvenience. The base64 forms count too
+# -- the string in FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 IS the private key, just
+# re-encoded. *.p8 is the APNs signing key: same class of secret, arrives the
+# same way, and is equally not needed in the tree.
 *firebase-adminsdk*.json
 *service-account*.json
 *serviceAccount*.json
-serviceAccountKey.json
 FIREBASE_SERVICE_ACCOUNT_KEY_BASE64*
 *.p8
+
