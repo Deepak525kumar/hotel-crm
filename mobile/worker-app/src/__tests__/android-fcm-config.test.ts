@@ -39,13 +39,13 @@ describe('Android FCM configuration (worker-app)', () => {
     // is never pruned and each notification instead retries on backoff to
     // DEAD_LETTER. Nothing about that points at the config.
     //
-    // This exact mismatch happened: the committed config was for
-    // fhm-hotelservice while the backend's FIREBASE_PROJECT_ID and
-    // service-account key were hotel-crm-b0a24. Pinned here so the two can
-    // never silently disagree again. If the project legitimately changes,
-    // update this line, .firebaserc, and the backend env together.
+    // This exact mismatch nearly shipped: the backend was briefly pointed at
+    // a second Firebase project (hotel-crm-b0a24) while these configs were for
+    // fhm-hotelservice. Pinned here so the two can never silently disagree. If
+    // the project legitimately changes, update this line, .firebaserc, and the
+    // backend's FIREBASE_PROJECT_ID + service-account key together.
     const services = JSON.parse(readFileSync('google-services.json', 'utf8'));
-    expect(services.project_info.project_id).toBe('hotel-crm-b0a24');
+    expect(services.project_info.project_id).toBe('fhm-hotelservice');
   });
 
   it('google-services.json contains a client for this app’s applicationId', () => {
