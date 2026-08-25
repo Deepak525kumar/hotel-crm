@@ -143,6 +143,22 @@ export interface LeaderboardEntry {
   };
 }
 
+/**
+ * The subset of EmploymentRecord this app needs. `employee_id` is the
+ * human-facing code (e.g. "EMP-W-001") that every /employees lifecycle
+ * endpoint is keyed by — distinct from the user id, and not present on
+ * /auth/me, so it has to be resolved via /employees/by-user/:userId.
+ */
+export interface EmploymentRecordDto {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  job_title: string;
+  start_date: string;
+  status: string;
+  submitted_for_review_at?: string | null;
+}
+
 export interface DashboardStats {
   total_shifts: number;
   completed_shifts: number;

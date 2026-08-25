@@ -1,5 +1,6 @@
 import type { UiLocale } from '@/lib/locales';
 import type {
+  EmploymentRecordDto,
   User,
   AuthResponse,
   WorkRequest,
@@ -543,8 +544,29 @@ export const api = {
       request<void>(`/documents/documents/${documentId}`, { method: 'DELETE' }),
   },
   employee: {
+    /**
+     * Resolves this user's EmploymentRecord, or null when none exists yet
+     * (null, not a 404). Workers hold `employees:read` and the service scopes
+     * visibility to self, so a worker may call this for their own account.
+     *
+     * Required before submitForReview: the lifecycle endpoints are keyed by
+     * the human-facing `employee_id` (e.g. "EMP-W-001"), which is NOT the
+     * user id and is not returned by /auth/me. Mirrors what the web client
+     * does (employeesApi.getByUserId -> record.employee_id).
+     */
+    getByUserId: (userId: string) =>
+      request<EmploymentRecordDto | null>(`/employees/by-user/${encodeURIComponent(userId)}`),
+
+    /**
+     * `employeeId` is the EmploymentRecord's `employee_id`, never the user id.
+     *
+     * This endpoint previously carried an `/employee-management` prefix and was
+     * called with the user id. Both were wrong: the router is mounted at
+     * `/employees`, and the service resolves the record by `employee_id`. Every
+     * submission 404'd, so onboarding could not be completed from the app.
+     */
     submitForReview: (employeeId: string) =>
-      request<unknown>(`/employee-management/employees/${encodeURIComponent(employeeId)}/submit-for-review`, { method: 'POST' }),
+      request<unknown>(`/employees/${encodeURIComponent(employeeId)}/submit-for-review`, { method: 'POST' }),
   },
   consent: {
     // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is

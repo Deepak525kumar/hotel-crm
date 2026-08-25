@@ -59,7 +59,20 @@ export default function DashboardScreen() {
     if (!user) return;
     setSubmitting(true);
     try {
-      await api.employee.submitForReview(user.id);
+      // The lifecycle endpoints are keyed by the EmploymentRecord's
+      // `employee_id` ("EMP-W-001"), not the user id, and /auth/me does not
+      // return it — so it has to be resolved first. Passing user.id here (and
+      // to an `/employee-management` path that is not mounted) meant every
+      // submission 404'd and onboarding could not be completed from the app.
+      const record = await api.employee.getByUserId(user.id);
+      if (!record) {
+        Alert.alert(
+          t('errors.title'),
+          t('onboarding.noEmploymentRecord', 'Your employment record is not ready yet. Please contact your manager.')
+        );
+        return;
+      }
+      await api.employee.submitForReview(record.employee_id);
       Alert.alert(t('common.success', 'Success'), t('onboarding.submittedForReview', 'Your application has been submitted for review.'));
       // A full app reload would be ideal here to update the user context, but for now we reload dashboard data
       await Promise.all([mutateStats(), mutateAssignments()]);
