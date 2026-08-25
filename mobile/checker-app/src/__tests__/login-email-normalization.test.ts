@@ -52,7 +52,7 @@ describe('login email normalization', () => {
     jest.clearAllMocks();
     login.mockResolvedValue({
       access_token: 'a', refresh_token: 'r',
-      user: { id: 'u1', email: 'john@example.com', role: 'worker' },
+      user: { id: 'u1', email: 'john@example.com', role: 'checker' },
     });
   });
 

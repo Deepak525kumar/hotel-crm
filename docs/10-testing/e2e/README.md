@@ -97,6 +97,13 @@ checkout on 2026-08-25 (`runs/2026-08-25-checker-app-login-verification.md`). Sc
 still partial — most screens have no component test — so "the mobile tests pass" remains weak
 evidence about any particular screen.
 
+A 2026-08-25 pass on the checker app's sign-in
+(`runs/2026-08-25-checker-app-role-gate.md`) found that its role allow-list was consulted only on
+the login screen, after the auth store had already been populated — so a restored session of any
+role came back on every launch unchecked. The gate now lives in the store. The lesson generalises:
+a client-side check that runs *after* state is set is not a gate, because the navigation guard
+watches that same state.
+
 One caution from that run, about diagnosis rather than coverage: a jest-expo preset error blamed on
 a missing dependency turned out to be a locally-broken `node_modules` (`--legacy-peer-deps`
 suppresses the peer install `react-native` relies on), not a repository defect. Reproduce a
