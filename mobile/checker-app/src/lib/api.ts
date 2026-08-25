@@ -551,6 +551,9 @@ export const api = {
     getContractStatus: (workerId: string) =>
       request<ContractDto | null>(`/hr/workers/${encodeURIComponent(workerId)}/contract-status`),
 
+    getContractDownloadUrl: (workerId: string) =>
+      `${BASE_URL}/hr/workers/${encodeURIComponent(workerId)}/contract-download`,
+
     listPayroll: () =>
       request<PayslipRequestDto[]>('/hr/payroll'),
 

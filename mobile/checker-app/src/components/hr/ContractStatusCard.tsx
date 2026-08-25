@@ -29,7 +29,7 @@ export function ContractStatusCard({
     try {
       const url = api.hr.getContractDownloadUrl(workerId);
       const token = getAccessToken();
-      const fileUri = `${FileSystem.documentDirectory}contract.pdf`;
+      const fileUri = `${FileSystem.Paths.document.uri}contract.pdf`;
 
       const result = await FileSystem.downloadAsync(url, fileUri, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},

@@ -13,13 +13,11 @@ import { useTranslation } from 'react-i18next';
 // the label follows the active language rather than being frozen at import.
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
   GENERAL: 'documents.categoryGENERAL',
-  WORK_PERMIT: 'documents.categoryWORK_PERMIT',
-  TAX_NUMBER: 'documents.categoryTAX_NUMBER',
-  SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
-  HEALTH_INSURANCE: 'documents.categoryHEALTH_INSURANCE',
-  ID_CARD: 'documents.categoryID_CARD',
   PASSPORT: 'documents.categoryPASSPORT',
-  ADDRESS: 'documents.categoryADDRESS',
+  ID_CARD: 'documents.categoryID_CARD',
+  RESIDENCE_PERMIT: 'documents.categoryRESIDENCE_PERMIT',
+  WORK_PERMIT: 'documents.categoryWORK_PERMIT',
+  DRIVERS_LICENSE: 'documents.categoryDRIVERS_LICENSE',
   CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
 };
 
@@ -79,7 +77,7 @@ export function UploadDocumentCard({
           </ThemedView>
 
           <ThemedView style={styles.row} type="backgroundElement">
-            {(['GENERAL', 'WORK_PERMIT', 'TAX_NUMBER', 'SOCIAL_SECURITY_NUMBER', 'HEALTH_INSURANCE', 'ID_CARD', 'PASSPORT', 'ADDRESS', 'CONTRACT_SCAN'] as const).map((c) => (
+            {(['GENERAL', 'PASSPORT', 'ID_CARD', 'RESIDENCE_PERMIT', 'WORK_PERMIT', 'DRIVERS_LICENSE', 'CONTRACT_SCAN'] as const).map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}

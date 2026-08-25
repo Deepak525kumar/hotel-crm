@@ -44,7 +44,7 @@ export default function LoginScreen() {
         return;
       }
       if (params.returnTo) {
-        router.replace(params.returnTo as string);
+        router.replace(params.returnTo as any);
       } else {
         router.replace('/(app)');
       }

@@ -6,7 +6,8 @@ import Animated, { FadeInUp } from 'react-native-reanimated';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuthStore } from '@/stores/auth-store';
-import { api, translateApiError } from '@/lib/api';
+import { api } from '@/lib/api';
+import { translateApiError } from '@/lib/api-error-i18n';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
@@ -82,7 +83,7 @@ export default function DashboardScreen() {
 
           {user?.employment_status === 'PENDING' && (
             <ThemedView type="backgroundElement" style={[styles.shiftCard, { borderColor: '#D69E2E', borderWidth: 1, marginBottom: Spacing.four }]}>
-              <ThemedText type="defaultSemiBold" style={{ color: '#D69E2E', marginBottom: Spacing.one }}>Onboarding Incomplete</ThemedText>
+              <ThemedText type="smallBold" style={{ color: '#D69E2E', marginBottom: Spacing.one }}>Onboarding Incomplete</ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={{ marginBottom: Spacing.three }}>
                 Please ensure all your documents are uploaded and your contract is signed. Once everything is ready, submit your profile for review.
               </ThemedText>

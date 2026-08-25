@@ -2,24 +2,20 @@ import { useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  FlatList,
   RefreshControl,
-  Pressable,
-  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { api, translateApiError } from '@/lib/api';
+import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/auth-store';
-import { Spacing } from '@/constants/theme';
-import { ContractStatusCard } from '@/components/hr/ContractStatusCard';
 
 function statusColor(status: string): string {
   switch (status) {
@@ -40,41 +36,20 @@ export default function QueueScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuthStore();
-  const [submitting, setSubmitting] = useState(false);
 
   const { data: recordsData, error: recordsError, isLoading: recordsLoading, isValidating: recordsValidating, mutate: mutateRecords } = useSWR(
     user ? `/attendance/list/${user.id}` : null,
     () => api.attendance.list({ is_verified: false, per_page: 50 })
   );
   
-  const { data: contractData, error: contractError, isLoading: contractLoading, isValidating: contractValidating, mutate: mutateContract } = useSWR(
-    user?.employment_status === 'PENDING' ? `/hr/contract/${user.id}` : null,
-    () => api.hr.getContractStatus(user.id)
-  );
-
   const rawRecords = recordsData?.data ?? [];
   const records = rawRecords.filter((r) => r.status !== 'EXPECTED');
-  const loading = recordsLoading || contractLoading;
-  const refreshing = recordsValidating || contractValidating;
-  const contract = contractData || null;
-  const error = recordsError || contractError ? t('common.loadFailed') : null;
+  const loading = recordsLoading;
+  const refreshing = recordsValidating;
+  const error = recordsError ? t('common.loadFailed') : null;
 
   const onRefresh = async () => {
-    await Promise.all([mutateRecords(), mutateContract()]);
-  };
-
-  const handleSubmitForReview = async () => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      await api.employee.submitForReview(user.id);
-      Alert.alert(t('common.success', 'Success'), t('onboarding.submittedForReview', 'Your application has been submitted for review.'));
-      await onRefresh();
-    } catch (e: any) {
-      Alert.alert(t('errors.title'), translateApiError(e, t, 'errors.generic'));
-    } finally {
-      setSubmitting(false);
-    }
+    await mutateRecords();
   };
 
   const styles = StyleSheet.create({
@@ -147,29 +122,6 @@ export default function QueueScreen() {
         <Text style={styles.headerTitle}>{t("attendance.queueTitle")}</Text>
         <Text style={styles.headerSubtitle}>{records.length} pending verification</Text>
       </View>
-
-      {user?.employment_status === 'PENDING' && (
-        <View style={[{ borderColor: '#D69E2E', borderWidth: 1, marginHorizontal: 16, marginBottom: 16, padding: 16, borderRadius: 12, backgroundColor: theme.backgroundElement }]}>
-          <Text style={{ color: '#D69E2E', marginBottom: Spacing.one, fontWeight: '600' }}>Onboarding Incomplete</Text>
-          <Text style={{ color: theme.textSecondary, marginBottom: Spacing.three, fontSize: 13 }}>
-            Please ensure all your documents are uploaded and your contract is signed. Once everything is ready, submit your profile for review.
-          </Text>
-          
-          <Pressable
-            onPress={handleSubmitForReview}
-            disabled={submitting}
-            style={({ pressed }) => [
-              { backgroundColor: '#D69E2E', opacity: pressed || submitting ? 0.7 : 1, padding: 12, borderRadius: 8, alignItems: 'center', marginBottom: 12 }
-            ]}
-          >
-            <Text style={{ color: '#fff', fontWeight: '600' }}>
-              {submitting ? 'Submitting...' : 'Submit for Review'}
-            </Text>
-          </Pressable>
-          
-          <ContractStatusCard contract={contract} loading={loading} />
-        </View>
-      )}
 
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
