@@ -125,6 +125,64 @@ export interface AssignmentDto {
   // manager/RM sees in-scope, admin sees all) -- no separate check needed,
   // since this is read-only exposure of data the caller could already see.
   rooms_completed: RoomsCompletedEntryDto | null;
+  /**
+   * The shift's calendar day (WorkerAssignment.day). Previously absent from the
+   * DTO, which is why a worker's shift screen could not say WHEN the shift was:
+   * the row carried the date all along, the API just never returned it.
+   *
+   * Nullable because not every path that builds this DTO selects the column;
+   * the read paths (list/getById) always populate it. A display field must not
+   * be able to crash a response.
+   */
+  day: string | null; // YYYY-MM-DD
+  /**
+   * Where the shift is. Populated on the read paths (list/getById) only.
+   *
+   * This is deliberately served here rather than by letting clients call
+   * `/crm/hotels/:id`: that endpoint is scoped by the caller's hotel/group
+   * claim, so a worker assigned to a hotel gets 403 on it and `/crm/hotels`
+   * returns an empty list — verified against a running backend. A worker
+   * genuinely could not see the address of the hotel they were sent to, on
+   * mobile or web.
+   *
+   * Widening hotel read access to fix that would hand every worker the whole
+   * hotel estate. Nesting it in the assignment keeps the exposure exactly as
+   * narrow as it should be: the ownership/scope gate on list()/getById()
+   * already decides which assignments the caller may see, so a worker receives
+   * hotel details only for hotels they are actually assigned to.
+   *
+   * `latitude`/`longitude` are nullable in the schema and currently unset for
+   * every hotel, so clients must handle their absence — map links fall back to
+   * the address string.
+   */
+  hotel: AssignmentHotelDto | null;
+  /**
+   * Shift times, when this assignment came from a JobRequest. Calendar-placed
+   * assignments have a day but no times (the times live on JobRequest, and
+   * there is no request), so these are null rather than invented.
+   */
+  shift_start_time: string | null; // HH:mm
+  shift_end_time: string | null; // HH:mm
+  /** Display name of the manager who assigned the shift, for "assigned by". */
+  assigned_by_name: string | null;
+}
+
+/**
+ * The hotel fields a worker needs to actually get to their shift. A subset of
+ * the Hotel model on purpose — nothing commercial or managerial (rates,
+ * blocklists, manager identity, accepting_jobs) leaks through this path.
+ */
+export interface AssignmentHotelDto {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  country: string;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
 }
 
 // Epic 9 PR 9.5 (TREQ-001/TRULE-001, MIG-GAP-03).

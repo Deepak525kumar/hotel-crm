@@ -31,6 +31,7 @@ import {
   ReassignAssignmentInput,
   RoomsCompletedEntryDto,
   UpdateAssignmentInput,
+  AssignmentHotelDto,
 } from './types.js';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 
@@ -212,10 +213,24 @@ export async function resolveScheduledStart(
 }
 
 export class AssignmentService extends BaseService {
+  /**
+   * Extra, batch-resolved context for the read paths.
+   *
+   * Optional so the mutation paths (create/update/cancel/...) keep returning the
+   * same shape without paying for three extra lookups each; their callers
+   * refetch the list or the row afterwards. list() and getById() populate it,
+   * which is where clients actually read shift details from.
+   */
   private toDto(
     a: WorkerAssignment,
     roomsCompleted: RoomsCompletedEntry | null = null,
-    roomsCompletedEnteredByName: string | null = null
+    roomsCompletedEnteredByName: string | null = null,
+    context: {
+      hotel?: AssignmentHotelDto | null;
+      shiftStartTime?: string | null;
+      shiftEndTime?: string | null;
+      assignedByName?: string | null;
+    } = {}
   ): AssignmentDto {
     return {
       id: a.id,
@@ -235,8 +250,47 @@ export class AssignmentService extends BaseService {
       rooms_completed: roomsCompleted
         ? this.toRoomsCompletedDto(roomsCompleted, roomsCompletedEnteredByName)
         : null,
+      day: AssignmentService.isoDay(a.day),
+      hotel: context.hotel ?? null,
+      shift_start_time: context.shiftStartTime ?? null,
+      shift_end_time: context.shiftEndTime ?? null,
+      assigned_by_name: context.assignedByName ?? null,
     };
   }
+
+  /**
+   * `day` is a Prisma `@db.Date`, which arrives as a Date at UTC midnight.
+   * toISOString().slice(0, 10) is therefore the stored calendar day exactly —
+   * using a locale formatter here would shift it a day either side of UTC.
+   *
+   * Tolerates a missing value instead of throwing: the column is non-null, but
+   * not every code path that builds a DTO has selected it (and no caller should
+   * crash over a display field). Returns null so the client can omit the row
+   * rather than render "Invalid Date".
+   */
+  private static isoDay(day: Date | null | undefined): string | null {
+    return day ? day.toISOString().slice(0, 10) : null;
+  }
+
+  /** Maps a Hotel row to the narrow shape a worker is allowed to see. */
+  private static toHotelDto(h: {
+    id: string; name: string; address: string; city: string; country: string;
+    timezone: string; latitude: number | null; longitude: number | null;
+    contact_phone: string | null; contact_email: string | null;
+  }): AssignmentHotelDto {
+    return {
+      id: h.id, name: h.name, address: h.address, city: h.city, country: h.country,
+      timezone: h.timezone, latitude: h.latitude, longitude: h.longitude,
+      contact_phone: h.contact_phone, contact_email: h.contact_email,
+    };
+  }
+
+  /** The columns toHotelDto needs — kept in one place so the two call sites cannot drift. */
+  private static readonly HOTEL_SELECT = {
+    id: true, name: true, address: true, city: true, country: true,
+    timezone: true, latitude: true, longitude: true,
+    contact_phone: true, contact_email: true,
+  } as const;
 
   async list(
     query: ListAssignmentsQuery,
@@ -310,13 +364,52 @@ export class AssignmentService extends BaseService {
       : [];
     const entererById = new Map(enterers.map((u) => [u.id, u]));
 
+    // Batched exactly like the two lookups above -- one query each for the
+    // whole page, never one per row. Without these the API returned bare ids
+    // and no client could tell the worker where or when the shift was.
+    const hotelIdsOnPage = [...new Set(records.map((r) => r.hotel_id))];
+    const jobRequestIdsOnPage = [
+      ...new Set(records.map((r) => r.job_request_id ?? r.work_request_id).filter((v): v is string => !!v)),
+    ];
+    const assignerIds = [...new Set(records.map((r) => r.assigned_by_id))];
+
+    const [hotelsOnPage, jobRequestsOnPage, assigners] = await Promise.all([
+      hotelIdsOnPage.length
+        ? this.prisma.hotel.findMany({
+            where: { id: { in: hotelIdsOnPage } },
+            select: AssignmentService.HOTEL_SELECT,
+          })
+        : [],
+      jobRequestIdsOnPage.length
+        ? this.prisma.jobRequest.findMany({
+            where: { id: { in: jobRequestIdsOnPage } },
+            select: { id: true, shift_start_time: true, shift_end_time: true },
+          })
+        : [],
+      assignerIds.length
+        ? this.prisma.user.findMany({
+            where: { id: { in: assignerIds } },
+            select: { id: true, first_name: true, last_name: true },
+          })
+        : [],
+    ]);
+    const hotelById = new Map(hotelsOnPage.map((h) => [h.id, AssignmentService.toHotelDto(h)]));
+    const jobRequestById = new Map(jobRequestsOnPage.map((j) => [j.id, j]));
+    const assignerById = new Map(assigners.map((u) => [u.id, u]));
+
     return {
       data: records.map((r) => {
         const roomsCompleted = roomsCompletedByAssignment.get(r.id) ?? null;
         const enteredByName = roomsCompleted
           ? AssignmentService.fullName(entererById.get(roomsCompleted.entered_by_id))
           : null;
-        return this.toDto(r, roomsCompleted, enteredByName);
+        const request = jobRequestById.get(r.job_request_id ?? r.work_request_id ?? '');
+        return this.toDto(r, roomsCompleted, enteredByName, {
+          hotel: hotelById.get(r.hotel_id) ?? null,
+          shiftStartTime: request?.shift_start_time ?? null,
+          shiftEndTime: request?.shift_end_time ?? null,
+          assignedByName: AssignmentService.fullName(assignerById.get(r.assigned_by_id) ?? null),
+        });
       }),
       total,
     };
@@ -352,7 +445,34 @@ export class AssignmentService extends BaseService {
         )
       : null;
 
-    return this.toDto(assignment, roomsCompleted, enteredByName);
+    // Same three lookups as list(), for one row. Serving the hotel here rather
+    // than making the client call /crm/hotels/:id is deliberate: that endpoint
+    // is scoped by the caller's hotel claim and 403s for a worker assigned to
+    // the hotel, so the address was unreachable. The ownership gate above
+    // already limited this response to the caller's own assignment.
+    const [hotel, request, assigner] = await Promise.all([
+      this.prisma.hotel.findUnique({
+        where: { id: assignment.hotel_id },
+        select: AssignmentService.HOTEL_SELECT,
+      }),
+      assignment.job_request_id ?? assignment.work_request_id
+        ? this.prisma.jobRequest.findUnique({
+            where: { id: (assignment.job_request_id ?? assignment.work_request_id)! },
+            select: { shift_start_time: true, shift_end_time: true },
+          })
+        : null,
+      this.prisma.user.findUnique({
+        where: { id: assignment.assigned_by_id },
+        select: { first_name: true, last_name: true },
+      }),
+    ]);
+
+    return this.toDto(assignment, roomsCompleted, enteredByName, {
+      hotel: hotel ? AssignmentService.toHotelDto(hotel) : null,
+      shiftStartTime: request?.shift_start_time ?? null,
+      shiftEndTime: request?.shift_end_time ?? null,
+      assignedByName: AssignmentService.fullName(assigner),
+    });
   }
 
   async update(

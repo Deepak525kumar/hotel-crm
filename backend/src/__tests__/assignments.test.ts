@@ -17,6 +17,11 @@ const mockEmploymentRecord = {
 
 const mockHotel = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // list()/getById() now nest hotel details in the DTO so a worker can see
+  // where their shift is; default to "no hotels resolved", which leaves
+  // AssignmentDto.hotel null exactly as it is for a row whose hotel was
+  // deleted.
+  findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
 };
 
 const mockRating = {
@@ -53,6 +58,9 @@ const mockEmployeeBlocklistEntry = {
 
 const mockJobRequest = {
   findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  // Batched shift-time lookup for a page of assignments. Empty = calendar-placed
+  // rows, which have a day and no times.
+  findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
 };
 
 // Critical fix (2026-08-08): reassign() now checks isWorkerAbsentOnDay()
@@ -97,6 +105,12 @@ const mockPrisma = {
   // linked request) so the guard is a no-op for fixtures that don't opt in --
   // matching a calendar-placed assignment, which has no shift time.
   jobRequest: mockJobRequest,
+  // assigned_by_name resolution. list() previously touched prisma.user only
+  // when a rooms-completed entry existed, so this mock did not need to exist.
+  user: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  },
   notification: mockNotification,
   outboxEvent: mockOutboxEvent,
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
@@ -829,6 +843,98 @@ describe('AssignmentService', () => {
       await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
       const where = mockWorkerAssignment.findMany.mock.calls[0][0].where;
       expect(where.worker_id).toBe('w1');
+    });
+
+    // The worker could not see WHERE or WHEN their shift was: the DTO carried
+    // only ids and a status, and /crm/hotels/:id 403s for a worker assigned to
+    // that hotel while /crm/hotels returns an empty list for them (verified
+    // against a running backend). So the hotel is nested here instead, scoped
+    // by the ownership gate this method already applies.
+    describe('shift details (hotel, day, times, assigner)', () => {
+      const HOTEL = {
+        id: 'h1', name: 'Downtown Hotel', address: '1 Main St', city: 'Berlin',
+        country: 'Germany', timezone: 'Europe/Berlin', latitude: null, longitude: null,
+        contact_phone: null, contact_email: null,
+      };
+
+      it('nests the hotel a worker is assigned to', async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([makeAssignment({ hotel_id: 'h1' })]);
+        mockWorkerAssignment.count.mockResolvedValue(1);
+        mockHotel.findMany.mockResolvedValue([HOTEL]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        expect(res.data[0].hotel).toEqual(HOTEL);
+      });
+
+      it('exposes the calendar day, which the row always carried', async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([
+          makeAssignment({ day: new Date('2026-08-19T00:00:00.000Z') }),
+        ]);
+        mockWorkerAssignment.count.mockResolvedValue(1);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        // Formatted from the UTC-midnight @db.Date, so it is the stored day and
+        // not shifted by the server's timezone.
+        expect(res.data[0].day).toBe('2026-08-19');
+      });
+
+      it('leaves times null for a calendar-placed shift rather than inventing them', async () => {
+        // Times live on JobRequest; a calendar placement has none.
+        mockWorkerAssignment.findMany.mockResolvedValue([
+          makeAssignment({ work_request_id: null, job_request_id: null }),
+        ]);
+        mockWorkerAssignment.count.mockResolvedValue(1);
+        mockJobRequest.findMany.mockResolvedValue([]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        expect(res.data[0].shift_start_time).toBeNull();
+        expect(res.data[0].shift_end_time).toBeNull();
+      });
+
+      it('returns the shift times when the assignment came from a request', async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([
+          makeAssignment({ job_request_id: 'jr1' }),
+        ]);
+        mockWorkerAssignment.count.mockResolvedValue(1);
+        mockJobRequest.findMany.mockResolvedValue([
+          { id: 'jr1', shift_start_time: '08:00', shift_end_time: '16:00' },
+        ]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        expect(res.data[0].shift_start_time).toBe('08:00');
+        expect(res.data[0].shift_end_time).toBe('16:00');
+      });
+
+      it('batches the lookups — one query per page, not per row', async () => {
+        // Three rows at the same hotel must not become three hotel queries.
+        mockWorkerAssignment.findMany.mockResolvedValue([
+          makeAssignment({ id: 'a1', hotel_id: 'h1' }),
+          makeAssignment({ id: 'a2', hotel_id: 'h1' }),
+          makeAssignment({ id: 'a3', hotel_id: 'h1' }),
+        ]);
+        mockWorkerAssignment.count.mockResolvedValue(3);
+        mockHotel.findMany.mockClear();
+        mockHotel.findMany.mockResolvedValue([HOTEL]);
+
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        expect(mockHotel.findMany).toHaveBeenCalledTimes(1);
+        expect(mockHotel.findMany.mock.calls[0][0].where.id.in).toEqual(['h1']);
+      });
+
+      it('leaves hotel null when the hotel no longer resolves', async () => {
+        mockWorkerAssignment.findMany.mockResolvedValue([makeAssignment({ hotel_id: 'gone' })]);
+        mockWorkerAssignment.count.mockResolvedValue(1);
+        mockHotel.findMany.mockResolvedValue([]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+
+        expect(res.data[0].hotel).toBeNull();
+      });
     });
 
     it('does not scope admin', async () => {

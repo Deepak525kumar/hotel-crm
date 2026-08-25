@@ -96,6 +96,12 @@ jest.mock('../lib/db.js', () => {
     // Reached only when list() returns rows (batched lookup, not N+1).
     roomsCompletedEntry: { findMany: async () => [] },
     user: { findMany: async () => [] },
+    // AssignmentService.list() nests hotel details and shift times in the DTO
+    // (so a worker can see where and when their shift is), which the
+    // assignments.list_mine tool reaches through. Empty results keep these
+    // fixtures' assertions about the reply text unchanged.
+    hotel: { findMany: async () => [] },
+    jobRequest: { findMany: async () => [] },
     auditLog: {
       create: async ({ data }: any) => {
         lastAuditRow = data;

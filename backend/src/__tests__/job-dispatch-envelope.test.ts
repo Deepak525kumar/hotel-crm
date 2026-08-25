@@ -100,6 +100,10 @@ jest.mock('../lib/db.js', () => ({
   getPrisma: () => ({
     hotel: {
       findUnique: async ({ where }: any) => hotels[where.id] ?? null,
+      // AssignmentService.list() batches hotel details into the DTO so a worker
+      // can see where the shift is.
+      findMany: async ({ where }: any) =>
+        Object.values(hotels).filter((h: any) => (where?.id?.in ?? []).includes(h.id)),
     },
     jobRequest: {
       findUnique: async ({ where }: any) => workRequests[where.id] ?? null,
@@ -153,6 +157,10 @@ jest.mock('../lib/db.js', () => ({
       update: async ({ where, data }: any) => ({ ...assignments[where.id], ...data, updated_at: new Date() }),
     },
     employmentRecord: { findMany: async () => [] },
+    // assigned_by_name resolution in AssignmentService.list()/getById(). The
+    // service previously touched prisma.user only when a rooms-completed entry
+    // existed, so this fixture never needed the model.
+    user: { findMany: async () => [], findUnique: async () => null },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0 },
     workerOverallRating: { upsert: async () => ({}) },

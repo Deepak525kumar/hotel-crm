@@ -1,4 +1,4 @@
-import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View } from 'react-native';
+import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -11,6 +11,7 @@ import type { WorkerAssignment, Attendance } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../../lib/api-error-i18n';
+import { formatHotelAddress, hasCoordinates, mapsUrlFor, type MapPlatform } from '@/lib/map-link';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -135,6 +136,30 @@ export default function ShiftDetailScreen() {
   }
 
   const wr = shift.work_request;
+  const hotel = shift.hotel ?? null;
+  // shift.day is the authoritative calendar day (YYYY-MM-DD, always present);
+  // work_request.shift_date only exists for request-backed shifts.
+  const dayIso = shift.day ?? wr?.shift_date ?? null;
+  const shiftDay = dayIso
+    ? new Date(dayIso).toLocaleDateString(undefined, {
+        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+      })
+    : null;
+
+  const openDirections = async () => {
+    if (!hotel) return;
+    const platform: MapPlatform =
+      Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+    const url = mapsUrlFor(hotel, platform);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      // A device with no map app at all: tell the worker rather than failing
+      // silently, and leave the address on screen above to copy.
+      Alert.alert(t('errors.title'), t('shifts.mapsUnavailable', 'No map app is available on this device.'));
+    }
+  };
+
   const canCheckIn = ['CONFIRMED', 'IN_PROGRESS'].includes(shift.status) && !att?.check_in_at;
   const canCheckOut = !!(att?.check_in_at && !att?.check_out_at);
 
@@ -148,42 +173,114 @@ export default function ShiftDetailScreen() {
           </ThemedText>
 
           <ThemedView type="backgroundElement" style={styles.section}>
-            {wr ? (
+            {/* Read from the assignment itself, not from work_request. Every
+                assignment in production is calendar-placed, so work_request is
+                null and this card used to render nothing but the status — the
+                worker could not see where or when their shift was. */}
+            {hotel?.name && (
               <>
-                {wr.hotel?.name && (
-                  <>
-                    <InfoRow label={t('jobs.hotel')} value={wr.hotel.name} />
-                    <View style={styles.divider} />
-                  </>
-                )}
-                {wr.hotel?.address && (
-                  <>
-                    <InfoRow label={t('jobs.location')} value={wr.hotel.address} />
-                    <View style={styles.divider} />
-                  </>
-                )}
-                <InfoRow
-                  label={t('fields.date')}
-                  value={new Date(wr.shift_date).toLocaleDateString('en-US', {
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
-                  })}
-                />
+                <InfoRow label={t('jobs.hotel')} value={hotel.name} />
                 <View style={styles.divider} />
-                <InfoRow label={t('fields.time')} value={`${wr.shift_start_time} – ${wr.shift_end_time}`} />
-                <View style={styles.divider} />
-                {wr.description && (
-                  <>
-                    <View style={styles.infoRowColumn}>
-                      <ThemedText type="small" themeColor="textSecondary" style={{ marginBottom: Spacing.one }}>{t('jobs.description')}</ThemedText>
-                      <ThemedText type="small">{wr.description}</ThemedText>
-                    </View>
-                    <View style={styles.divider} />
-                  </>
-                )}
               </>
-            ) : null}
+            )}
+            {hotel && (
+              <>
+                <InfoRow label={t('jobs.location')} value={formatHotelAddress(hotel)} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {shiftDay && (
+              <>
+                <InfoRow label={t('fields.date')} value={shiftDay} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {/* Times exist only for JobRequest-backed shifts; a calendar
+                placement has a day and no times, so the row is omitted rather
+                than showing "null – null". */}
+            {shift.shift_start_time && shift.shift_end_time && (
+              <>
+                <InfoRow label={t('fields.time')} value={`${shift.shift_start_time} – ${shift.shift_end_time}`} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {wr?.position && (
+              <>
+                <InfoRow label={t('jobs.position', 'Position')} value={wr.position} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {hotel?.timezone && (
+              <>
+                <InfoRow label={t('fields.timezone', 'Timezone')} value={hotel.timezone} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {shift.assigned_by_name && (
+              <>
+                <InfoRow label={t('shifts.assignedBy', 'Assigned by')} value={shift.assigned_by_name} />
+                <View style={styles.divider} />
+              </>
+            )}
+            {wr?.description && (
+              <>
+                <View style={styles.infoRowColumn}>
+                  <ThemedText type="small" themeColor="textSecondary" style={{ marginBottom: Spacing.one }}>{t('jobs.description')}</ThemedText>
+                  <ThemedText type="small">{wr.description}</ThemedText>
+                </View>
+                <View style={styles.divider} />
+              </>
+            )}
             <InfoRow label={t('fields.status')} value={shift.status.replace(/_/g, ' ')} />
           </ThemedView>
+
+          {/* Getting there. An address-based link, because no hotel has
+              coordinates yet; mapsUrlFor prefers them automatically once they
+              exist. */}
+          {hotel && (
+            <ThemedView type="backgroundElement" style={styles.section}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void openDirections()}
+                style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.7 : 1 }]}
+              >
+                <ThemedText type="smallBold">
+                  {t('shifts.openInMaps', 'Open in Maps')}
+                </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {hasCoordinates(hotel)
+                    ? t('shifts.exactLocation', 'Exact location')
+                    : t('shifts.addressSearch', 'By address')}
+                </ThemedText>
+              </Pressable>
+              {hotel.contact_phone && (
+                <>
+                  <View style={styles.divider} />
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void Linking.openURL(`tel:${hotel.contact_phone}`)}
+                    style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <ThemedText type="smallBold">{t('shifts.callHotel', 'Call hotel')}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">{hotel.contact_phone}</ThemedText>
+                  </Pressable>
+                </>
+              )}
+              {hotel.contact_email && (
+                <>
+                  <View style={styles.divider} />
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => void Linking.openURL(`mailto:${hotel.contact_email}`)}
+                    style={({ pressed }) => [styles.linkRow, { opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <ThemedText type="smallBold">{t('shifts.emailHotel', 'Email hotel')}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">{hotel.contact_email}</ThemedText>
+                  </Pressable>
+                </>
+              )}
+            </ThemedView>
+          )}
 
           <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("nav.attendance")}</ThemedText>
           <ThemedView type="backgroundElement" style={styles.section}>
@@ -234,6 +331,13 @@ export default function ShiftDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  linkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+  },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },

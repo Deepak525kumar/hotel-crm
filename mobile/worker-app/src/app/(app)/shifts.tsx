@@ -39,17 +39,23 @@ function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => v
             </ThemedText>
           </View>
         </ThemedView>
-        {item.work_request && (
-          <>
-            <ThemedText type="small" themeColor="textSecondary">
-              {new Date(item.work_request.shift_date).toLocaleDateString('en-US', {
-                weekday: 'short', month: 'short', day: 'numeric',
-              })}
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {item.work_request.shift_start_time} – {item.work_request.shift_end_time}
-            </ThemedText>
-          </>
+        {/* Reads the assignment's own fields. Gating this on work_request meant
+            every calendar-placed shift (i.e. all of them in production) showed
+            no date at all — just a title and a status badge. */}
+        {item.hotel?.name && (
+          <ThemedText type="small" themeColor="textSecondary">{item.hotel.name}</ThemedText>
+        )}
+        {(item.day ?? item.work_request?.shift_date) && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {new Date((item.day ?? item.work_request!.shift_date) as string).toLocaleDateString(undefined, {
+              weekday: 'short', month: 'short', day: 'numeric',
+            })}
+          </ThemedText>
+        )}
+        {item.shift_start_time && item.shift_end_time && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {item.shift_start_time} – {item.shift_end_time}
+          </ThemedText>
         )}
         {item.attendance?.check_in_at && (
           <ThemedText type="small" themeColor="textSecondary">

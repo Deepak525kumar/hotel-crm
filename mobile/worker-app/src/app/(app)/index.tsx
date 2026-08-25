@@ -139,11 +139,24 @@ export default function DashboardScreen() {
                     <ThemedText type="smallBold">
                       {shift.work_request?.position ?? t('common.shift')}
                     </ThemedText>
+                    {/* From the assignment, not work_request: the latter is null
+                        for calendar-placed shifts, which is all of them in
+                        production, so this line used to render " – " with the
+                        date missing entirely. */}
+                    {shift.hotel?.name && (
+                      <ThemedText type="small" themeColor="textSecondary">{shift.hotel.name}</ThemedText>
+                    )}
                     <ThemedText type="small" themeColor="textSecondary">
-                      {shift.work_request?.shift_date
-                        ? new Date(shift.work_request.shift_date).toLocaleDateString()
-                        : ''}{' '}
-                      {shift.work_request?.shift_start_time} – {shift.work_request?.shift_end_time}
+                      {[
+                        (shift.day ?? shift.work_request?.shift_date)
+                          ? new Date((shift.day ?? shift.work_request!.shift_date) as string).toLocaleDateString()
+                          : null,
+                        shift.shift_start_time && shift.shift_end_time
+                          ? `${shift.shift_start_time} – ${shift.shift_end_time}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join('  ')}
                     </ThemedText>
                     <ThemedView
                       style={[

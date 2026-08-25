@@ -54,6 +54,28 @@ export interface WorkRequest {
   created_at: string;
 }
 
+/**
+ * The hotel fields the API nests inside an assignment.
+ *
+ * Served this way because /crm/hotels/:id is scoped by the caller's hotel claim
+ * and 403s for a worker assigned to that hotel, and /crm/hotels returns an
+ * empty list for them — so this is the only way a worker can see where their
+ * shift is. latitude/longitude are null for every hotel today, so map links
+ * fall back to the address.
+ */
+export interface AssignmentHotel {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  country: string;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+}
+
 export interface WorkerAssignment {
   id: string;
   work_request_id: string;
@@ -67,6 +89,21 @@ export interface WorkerAssignment {
   created_at: string;
   work_request?: WorkRequest;
   attendance?: Attendance | null;
+  /**
+   * Fields the API now nests on every assignment (list and detail).
+   *
+   * Before this, the DTO carried only ids and a status, so the shift screen
+   * could show neither where nor when the shift was — it rendered hotel, date
+   * and time only inside a `work_request` block, and every assignment in the
+   * database is calendar-placed with work_request null. A worker opening a
+   * shift saw a status and nothing else.
+   */
+  day?: string; // YYYY-MM-DD
+  hotel?: AssignmentHotel | null;
+  /** Null for calendar-placed shifts: times live on a JobRequest, and there is none. */
+  shift_start_time?: string | null; // HH:mm
+  shift_end_time?: string | null; // HH:mm
+  assigned_by_name?: string | null;
 }
 
 export interface Attendance {
