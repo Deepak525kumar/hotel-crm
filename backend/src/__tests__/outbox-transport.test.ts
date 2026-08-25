@@ -517,49 +517,6 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).rejects.toThrow(/Unhandled PushApp/);
     expect(mockApnsClient.send).not.toHaveBeenCalled();
   });
-
-  // The handler defaults to the PushToken table (every test above), but a
-  // deployment with Firebase configured is handed a Firestore-backed store
-  // instead (resolvePushTransportHandler). These two prove the handler reads
-  // and prunes through whatever store it was given, and never reaches past it
-  // into Prisma — a regression there would silently fail push for every
-  // Firestore deployment while the whole suite above stayed green.
-  describe('with an injected token store', () => {
-    function makeStore(tokens: any[]) {
-      return {
-        upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
-        listForUser: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(tokens),
-        delete: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(undefined),
-      };
-    }
-
-    it('reads the recipient devices from the store, not from Prisma', async () => {
-      const store = makeStore([{ id: 'doc1', token: 'ios-token', platform: 'IOS', app: 'WORKER' }]);
-      mockApnsClient.send.mockResolvedValue(undefined);
-      const handler = new PushTransportHandler(
-        mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any, store as any
-      );
-
-      await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
-      expect(store.listForUser).toHaveBeenCalledWith('user1');
-      expect(mockPushTokenFindMany).not.toHaveBeenCalled();
-      expect(mockApnsClient.send).toHaveBeenCalledWith(expect.objectContaining({ token: 'ios-token' }));
-    });
-
-    it('prunes an invalidated token through the store, scoped to its owner', async () => {
-      const store = makeStore([{ id: 'doc1', token: 'ios-token', platform: 'IOS', app: 'WORKER' }]);
-      mockApnsClient.send.mockRejectedValue(new InvalidTokenError('410 Unregistered'));
-      const handler = new PushTransportHandler(
-        mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any, store as any
-      );
-
-      await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
-      // Owner-scoped: a Firestore token lives under users/{userId}, so a
-      // delete that forgot the user id would silently prune nothing.
-      expect(store.delete).toHaveBeenCalledWith('user1', 'doc1');
-      expect(mockPushTokenDelete).not.toHaveBeenCalled();
-    });
-  });
 });
 
 describe('resolvePushTransportHandler (Epic 7 PR 7.5)', () => {

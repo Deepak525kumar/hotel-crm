@@ -8,6 +8,7 @@ import {
   Prisma,
   PushApp,
   PushPlatform,
+  PushToken,
 } from '@prisma/client';
 import crypto from 'node:crypto';
 import { BaseService } from '../../lib/base-service.js';
@@ -15,8 +16,6 @@ import { DatabaseTransaction } from '../../lib/db.js';
 import { ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { EnqueueNotificationInput } from './outbox.types.js';
 import { NotificationPayload } from './types.js';
-import { getEnv } from '../../config/env.js';
-import { resolvePushTokenStore, type StoredPushToken } from './push-token-store.js';
 
 export class NotificationService extends BaseService {
   /**
@@ -141,26 +140,17 @@ export class NotificationService extends BaseService {
    * security-correctness requirement: a stale token must stop delivering to
    * a previous user the moment a new one registers it.
    */
-  /**
-   * Registers a device token against the store this deployment uses
-   * (Firestore when Firebase is configured, the `PushToken` table otherwise —
-   * see push-token-store.ts). Deliberately goes through resolvePushTokenStore
-   * rather than writing Prisma directly, so registration and the PUSH
-   * transport can never end up reading and writing different stores.
-   */
   async registerPushToken(
     userId: string,
     token: string,
     platform: PushPlatform,
     app: PushApp
-  ): Promise<StoredPushToken> {
-    const env = getEnv();
-    const store = resolvePushTokenStore(this.prisma, {
-      firestoreEnabled: env.FEATURE_PUSH_TOKEN_STORE_FIRESTORE,
-      firebaseProjectId: env.FIREBASE_PROJECT_ID,
-      firebaseServiceAccountKeyBase64: env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64,
+  ): Promise<PushToken> {
+    return this.prisma.pushToken.upsert({
+      where: { token },
+      update: { user_id: userId, platform, app },
+      create: { token, platform, app, user_id: userId },
     });
-    return store.upsert(userId, token, platform, app);
   }
 }
 
