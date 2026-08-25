@@ -29,3 +29,27 @@ Arbeitsvertrag*.pdf
 Arbeitsvertrag_Alona_Likhoto_final.pdf
 hotelcrm-key1.pem
 
+
+# Firebase Admin service-account keys, APNs signing keys, and anything derived
+# from either. REAL SECRETS.
+#
+# The Firebase console's "Generate new private key" button downloads
+# <project>-firebase-adminsdk-<hash>.json straight into whatever directory the
+# browser last used -- frequently a repository root -- and a single
+# `git add -A` would sweep it into a commit. That key grants full backend
+# access to the Firebase project, Firestore included, bypassing
+# firestore.rules entirely. A leak means rotating the key, not deleting the
+# commit.
+#
+# The base64 forms are covered because the string in
+# FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 IS the private key, just re-encoded, and
+# is no safer to commit than the JSON. *.p8 is the APNs signing key: same class
+# of secret, arrives the same way.
+#
+# Nothing here ever needs to be tracked -- the backend reads the base64 from
+# the environment, never a key file from disk.
+*firebase-adminsdk*.json
+*service-account*.json
+*serviceAccount*.json
+FIREBASE_SERVICE_ACCOUNT_KEY_BASE64*
+*.p8
