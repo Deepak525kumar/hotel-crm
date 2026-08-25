@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -8,7 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { ConsentNoticeCard } from '@/components/consent/ConsentNoticeCard';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
+import { api, setOnConsentRequired } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
 import { shouldBypassConsentGate } from '@/lib/consent-gate-decision';
@@ -43,11 +43,15 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [statusUnknown, setStatusUnknown] = useState(false);
   const [enforced, setEnforced] = useState(true);
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
+  // Which calendar day the current `status` was read on, for the rollover check.
+  const dayRef = useRef(new Date().toDateString());
 
   const isAdmin = user?.role === 'admin';
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    // A re-check triggered in the background must not flash a full-screen
+    // spinner over a screen the worker is already using.
+    if (!opts?.silent) setLoading(true);
     setError(null);
     setStatusUnknown(false);
     try {
@@ -95,6 +99,50 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
       return;
     }
     void load();
+  }, [user, isAdmin, load]);
+
+  // A consent read is only ever a snapshot, and this component used to take
+  // exactly one, at mount. Three things can invalidate it while the app stays
+  // open, and each gets a trigger below. Without them a worker whose consent
+  // was withdrawn kept a working UI until the app was force-quit -- the API
+  // was already refusing their calls, so the screen was lying to them.
+
+  // 1. The API refused a call with CONSENT_REQUIRED. This is the authoritative
+  //    signal: the server has decided, so re-read rather than trusting state.
+  //    `silent` keeps the full-screen spinner away -- the gate is being
+  //    re-checked underneath a UI the worker is still looking at.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    setOnConsentRequired(() => void load({ silent: true }));
+    return () => setOnConsentRequired(null);
+  }, [user, isAdmin, load]);
+
+  // 2. The app came back to the foreground. Covers consent withdrawn on
+  //    another device (or on the web) while this one sat backgrounded, before
+  //    the worker touches anything that would issue a request.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void load({ silent: true });
+    });
+    return () => sub.remove();
+  }, [user, isAdmin, load]);
+
+  // 3. Midnight passed with the app open. The gate is a DAILY one, so
+  //    yesterday's grant does not carry over -- an overnight shift would
+  //    otherwise never be re-prompted. Checked on a coarse interval rather
+  //    than a scheduled timer: the cost is one comparison a minute, and a
+  //    timer set for midnight does not survive the device sleeping through it.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    const id = setInterval(() => {
+      const today = new Date().toDateString();
+      if (dayRef.current !== today) {
+        dayRef.current = today;
+        void load({ silent: true });
+      }
+    }, 60_000);
+    return () => clearInterval(id);
   }, [user, isAdmin, load]);
 
   const decide = useCallback(

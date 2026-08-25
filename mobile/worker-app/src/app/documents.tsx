@@ -16,7 +16,6 @@ import { translateApiError } from '../lib/api-error-i18n';
 
 // For the completeness banner translation
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  GENERAL: 'documents.categoryGENERAL',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
   TAX_NUMBER: 'documents.categoryTAX_NUMBER',
   SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',

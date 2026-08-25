@@ -305,7 +305,16 @@ export interface BackendPagination {
 
 // SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16). Matches backend WorkerDocumentDto
 // exactly (backend/src/modules/documents/types.ts).
-export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT' | 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'CONTRACT_SCAN';
+/**
+ * Mirrors the backend `DocumentCategory` enum (prisma/schema.prisma) exactly.
+ *
+ * There is deliberately no `GENERAL` member. One used to exist here and on no
+ * server: it was the UploadDocumentCard's DEFAULT selection, so any worker who
+ * picked a file and uploaded without touching the category dropdown got a 422
+ * ("Invalid enum value ... received 'GENERAL'") every single time. Adding a
+ * catch-all here again silently breaks uploads on the default path.
+ */
+export type DocumentCategory = 'WORK_PERMIT' | 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'CONTRACT_SCAN';
 
 export interface WorkerDocument {
   id: string;

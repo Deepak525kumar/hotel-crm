@@ -80,7 +80,8 @@
     "shift": "Shift",
     "loadFailed": "Failed to load",
     "tomorrow": "Tomorrow",
-    "getDirections": "Get Directions"
+    "getDirections": "Get Directions",
+    "success": "Success"
   },
   "fields": {
     "name": "Name",
@@ -200,7 +201,8 @@
     "queue": "Queue",
     "attendanceDetail": "Attendance Detail",
     "qualityCheck": "Quality Check",
-    "rateWorker": "Rate Worker"
+    "rateWorker": "Rate Worker",
+    "schedule": "Schedule"
   },
   "roles": {
     "admin": "Admin",
@@ -752,7 +754,25 @@
     "downloadContract": "Download contract",
     "completeOnboardingAction": "Complete your onboarding",
     "contractExpiredNotice": "Your contract has expired. Please start the re-onboarding process to receive and upload a new contract.",
-    "rejectionReasonPlaceholder": "e.g. Invalid document uploaded"
+    "rejectionReasonPlaceholder": "e.g. Invalid document uploaded",
+    "title": "Complete your setup",
+    "statusPENDING": "In setup",
+    "statusREJECTED": "Not approved",
+    "statusDEACTIVATED": "Paused",
+    "statusDELETED": "Closed",
+    "statusPendingBody": "Upload the documents below, then submit for review. Your manager approves your account before you can pick up shifts.",
+    "statusRejectedBody": "Your application was not approved. Please speak to your manager — they can tell you what is needed and restart your setup.",
+    "statusDeactivatedBody": "Your account is paused, so shifts are unavailable. Please speak to your manager to have it reactivated.",
+    "statusDeletedBody": "This account is closed. Please speak to your manager if you think this is a mistake.",
+    "whatWeNeed": "What we still need",
+    "stillMissing": "Still to upload:",
+    "allDocumentsUploaded": "All required documents are uploaded. You can submit for review.",
+    "uploadDocuments": "Upload a document",
+    "uploaded": "Your documents",
+    "submitForReview": "Submit for review",
+    "submitDisabledHint": "Upload every required document before submitting.",
+    "noEmploymentRecord": "Your employment record is not ready yet. Please contact your manager.",
+    "submittedForReview": "Your application has been submitted for review."
   },
   "analytics": {
     "myPerformance": "My performance",
@@ -960,5 +980,19 @@
     "LOW": "Low",
     "PROBATION": "Probation",
     "unrated": "Not yet rated"
+  },
+  "home": {
+    "greetingMorning": "Good morning",
+    "greetingAfternoon": "Good afternoon",
+    "greetingEvening": "Good evening",
+    "greetingNoName": "Welcome back",
+    "nextShift": "Next shift",
+    "noUpcomingShifts": "No upcoming shifts",
+    "noUpcomingShiftsBody": "When a shift is assigned to you it will appear here.",
+    "browseJobs": "Browse open jobs",
+    "openJobs": "Open jobs",
+    "yourWeek": "Your week",
+    "viewAll": "View all",
+    "documentsNeedAttention": "Documents need attention"
   }
 }

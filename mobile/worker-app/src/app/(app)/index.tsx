@@ -1,49 +1,68 @@
-import { StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Pressable } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useAuthStore } from '@/stores/auth-store';
-import { api } from '@/lib/api';
-import { translateApiError } from '@/lib/api-error-i18n';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
 
-function StatCard({ label, value, accent, index = 0 }: { label: string; value: string | number; accent?: string; index?: number }) {
-  return (
-    <Animated.View entering={FadeInUp.delay(index * 100)} style={[styles.statCard, { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }]}>
-      <ThemedText type="title" style={accent ? { color: accent } : undefined}>
-        {value}
-      </ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        {label}
-      </ThemedText>
-    </Animated.View>
-  );
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Badge, Button, Card, EmptyState, SectionHeader, StatTile } from '@/components/ui';
+import { useAuthStore } from '@/stores/auth-store';
+import { api } from '@/lib/api';
+import { Spacing } from '@/constants/theme';
+import { greetingKeyForHour, workerDisplayName } from '@/lib/greeting';
+import type { WorkerAssignment } from '@/types/api';
+
+/**
+ * Home.
+ *
+ * Rebuilt on the shared UI primitives (`components/ui`) rather than inline
+ * styles. The previous version hardcoded `#FFFFFF` card backgrounds and
+ * `#38A169`/`#3182CE` status pills, so in dark mode every card was a white
+ * slab and the shift text on it was unreadable.
+ *
+ * Also absorbs the Jobs tab: with the tab bar down to three, open jobs are a
+ * section here with a link to the full list.
+ */
+
+function statusTone(status: string) {
+  if (status === 'IN_PROGRESS') return 'success' as const;
+  if (status === 'CONFIRMED') return 'primary' as const;
+  return 'neutral' as const;
 }
 
-export default function DashboardScreen() {
+function shiftWhen(shift: WorkerAssignment): string {
+  // From the assignment, not work_request: the latter is null for
+  // calendar-placed shifts, which is all of them in production, so this line
+  // used to render " – " with the date missing entirely.
+  const day = shift.day ?? shift.work_request?.shift_date;
+  return [
+    day ? new Date(day as string).toLocaleDateString() : null,
+    shift.shift_start_time && shift.shift_end_time
+      ? `${shift.shift_start_time} – ${shift.shift_end_time}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('  ·  ');
+}
+
+export default function HomeScreen() {
   const { t } = useTranslation();
   const { user } = useAuthStore();
-  const theme = useTheme();
-  
-  const [submitting, setSubmitting] = useState(false);
+  const router = useRouter();
 
-  // Using SWR for caching and automatic revalidation on focus/reconnect
-  const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } = useSWR(
-    user ? `/analytics/myStats/${user.id}` : null,
-    () => api.analytics.myStats()
-  );
-  
-  const { data: assignments, isLoading: assignmentsLoading, isValidating: assignmentsValidating, mutate: mutateAssignments } = useSWR(
-    user ? `/assignments/list/${user.id}` : null,
-    () => api.assignments.list({ limit: 5 })
-  );
+  const { data: stats, isLoading: statsLoading, isValidating: statsValidating, mutate: mutateStats } =
+    useSWR(user ? `/analytics/myStats/${user.id}` : null, () => api.analytics.myStats());
 
-  const upcoming = Array.isArray(assignments) 
+  const {
+    data: assignments,
+    isLoading: assignmentsLoading,
+    isValidating: assignmentsValidating,
+    mutate: mutateAssignments,
+  } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }));
+
+  const upcoming = Array.isArray(assignments)
     ? assignments.filter((s) => ['CONFIRMED', 'IN_PROGRESS'].includes(s.status))
     : [];
 
@@ -54,123 +73,105 @@ export default function DashboardScreen() {
     await Promise.all([mutateStats(), mutateAssignments()]);
   };
 
-
-  const handleSubmitForReview = async () => {
-    if (!user) return;
-    setSubmitting(true);
-    try {
-      // The lifecycle endpoints are keyed by the EmploymentRecord's
-      // `employee_id` ("EMP-W-001"), not the user id, and /auth/me does not
-      // return it — so it has to be resolved first. Passing user.id here (and
-      // to an `/employee-management` path that is not mounted) meant every
-      // submission 404'd and onboarding could not be completed from the app.
-      const record = await api.employee.getByUserId(user.id);
-      if (!record) {
-        Alert.alert(
-          t('errors.title'),
-          t('onboarding.noEmploymentRecord', 'Your employment record is not ready yet. Please contact your manager.')
-        );
-        return;
-      }
-      await api.employee.submitForReview(record.employee_id);
-      Alert.alert(t('common.success', 'Success'), t('onboarding.submittedForReview', 'Your application has been submitted for review.'));
-      // A full app reload would be ideal here to update the user context, but for now we reload dashboard data
-      await Promise.all([mutateStats(), mutateAssignments()]);
-    } catch (e: any) {
-      Alert.alert(t('errors.title'), translateApiError(e, t, 'errors.generic'));
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const name = workerDisplayName(user?.first_name);
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ScrollView
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <ThemedText type="subtitle" style={styles.greeting}>
-            Hi, {user?.first_name} 👋
-          </ThemedText>
-
-          {user?.employment_status === 'PENDING' && (
-            <ThemedView type="backgroundElement" style={[styles.shiftCard, { borderColor: '#D69E2E', borderWidth: 1, marginBottom: Spacing.four }]}>
-              <ThemedText type="smallBold" style={{ color: '#D69E2E', marginBottom: Spacing.one }}>Onboarding Incomplete</ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={{ marginBottom: Spacing.three }}>
-                Please ensure all your documents are uploaded and your contract is signed. Once everything is ready, submit your profile for review.
-              </ThemedText>
-              <Pressable
-                onPress={handleSubmitForReview}
-                disabled={submitting}
-                style={({ pressed }) => [
-                  styles.submitButton,
-                  { backgroundColor: '#D69E2E', opacity: pressed || submitting ? 0.7 : 1 }
-                ]}
-              >
-                {submitting ? <ActivityIndicator size="small" color="#fff" /> : <ThemedText type="smallBold" style={{ color: '#fff' }}>Submit for Review</ThemedText>}
-              </Pressable>
-            </ThemedView>
-          )}
+          <View style={styles.header}>
+            <ThemedText type="small" themeColor="textSecondary">
+              {t(greetingKeyForHour(new Date().getHours()))}
+            </ThemedText>
+            <ThemedText type="title">{name ? name : t('home.greetingNoName')}</ThemedText>
+          </View>
 
           {loading ? (
             <ActivityIndicator style={styles.loader} />
           ) : (
             <>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("profile.overview")}</ThemedText>
-              <ThemedView style={styles.statsGrid}>
-                <StatCard label={t('shifts.upcoming')} value={upcoming.length} accent={theme.text} />
-                <StatCard label={t('status.completed')} value={stats?.completed_assignments ?? 0} />
-                <StatCard label={t('shifts.roomsCompleted')} value={stats?.rooms_completed ?? 0} />
-                <StatCard
+              <SectionHeader title={t('profile.overview')} />
+              <View style={styles.statsGrid}>
+                <StatTile label={t('shifts.upcoming')} value={upcoming.length} tone="primary" />
+                <StatTile label={t('status.completed')} value={stats?.completed_assignments ?? 0} />
+              </View>
+              <View style={styles.statsGrid}>
+                <StatTile label={t('shifts.roomsCompleted')} value={stats?.rooms_completed ?? 0} />
+                <StatTile
                   label={t('fields.rating')}
                   value={stats?.average_rating ? stats.average_rating.toFixed(1) : '—'}
+                  tone={stats?.average_rating ? 'success' : 'neutral'}
                 />
-              </ThemedView>
+              </View>
 
-              <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("shifts.upcomingTitle")}</ThemedText>
+              <SectionHeader
+                title={t('shifts.upcomingTitle')}
+                action={
+                  upcoming.length > 0 ? (
+                    <ThemedText
+                      type="small"
+                      themeColor="textSecondary"
+                      onPress={() => router.push('/(app)/shifts')}
+                    >
+                      {t('home.viewAll')}
+                    </ThemedText>
+                  ) : null
+                }
+              />
+
               {upcoming.length === 0 ? (
-                <ThemedView type="backgroundElement" style={styles.emptyCard}>
-                  <ThemedText type="small" themeColor="textSecondary" style={styles.centerText}>{t("shifts.noneUpcoming")}</ThemedText>
-                </ThemedView>
+                <EmptyState
+                  title={t('home.noUpcomingShifts')}
+                  body={t('home.noUpcomingShiftsBody')}
+                  action={
+                    <Button
+                      label={t('home.browseJobs')}
+                      variant="ghost"
+                      onPress={() => router.push('/(app)/marketplace')}
+                    />
+                  }
+                />
               ) : (
                 upcoming.map((shift, index) => (
-                  <Animated.View entering={FadeInUp.delay((index + 4) * 100)} key={shift.id} style={[styles.shiftCard, { backgroundColor: '#FFFFFF', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }]}>
-                    <ThemedText type="smallBold">
-                      {shift.work_request?.position ?? t('common.shift')}
-                    </ThemedText>
-                    {/* From the assignment, not work_request: the latter is null
-                        for calendar-placed shifts, which is all of them in
-                        production, so this line used to render " – " with the
-                        date missing entirely. */}
-                    {shift.hotel?.name && (
-                      <ThemedText type="small" themeColor="textSecondary">{shift.hotel.name}</ThemedText>
-                    )}
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {[
-                        (shift.day ?? shift.work_request?.shift_date)
-                          ? new Date((shift.day ?? shift.work_request!.shift_date) as string).toLocaleDateString()
-                          : null,
-                        shift.shift_start_time && shift.shift_end_time
-                          ? `${shift.shift_start_time} – ${shift.shift_end_time}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join('  ')}
-                    </ThemedText>
-                    <ThemedView
-                      style={[
-                        styles.badge,
-                        { backgroundColor: shift.status === 'IN_PROGRESS' ? '#38A169' : '#3182CE' },
-                      ]}
-                    >
-                      <ThemedText type="small" style={styles.badgeText}>
-                        {shift.status.replace('_', ' ')}
+                  <Animated.View entering={FadeInUp.delay(index * 80)} key={shift.id}>
+                    <Card style={styles.shiftCard}>
+                      <View style={styles.shiftTop}>
+                        <ThemedText type="smallBold" style={styles.shiftTitle}>
+                          {shift.work_request?.position ?? t('common.shift')}
+                        </ThemedText>
+                        <Badge
+                          label={shift.status.replace('_', ' ')}
+                          tone={statusTone(shift.status)}
+                        />
+                      </View>
+                      {shift.hotel?.name ? (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {shift.hotel.name}
+                        </ThemedText>
+                      ) : null}
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {shiftWhen(shift)}
                       </ThemedText>
-                    </ThemedView>
+                    </Card>
                   </Animated.View>
                 ))
               )}
+
+              <SectionHeader title={t('home.openJobs')} />
+              <Card>
+                <ThemedText type="small" themeColor="textSecondary">
+                  {t('marketplace.description', 'Shifts you can apply for.')}
+                </ThemedText>
+                <Button
+                  label={t('home.browseJobs')}
+                  variant="secondary"
+                  onPress={() => router.push('/(app)/marketplace')}
+                />
+              </Card>
             </>
           )}
         </ScrollView>
@@ -181,16 +182,12 @@ export default function DashboardScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
-  greeting: { marginBottom: Spacing.four },
-  loader: { marginTop: Spacing.six },
-  sectionLabel: { marginBottom: Spacing.two, marginTop: Spacing.three, textTransform: 'uppercase', letterSpacing: 0.8 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
-  statCard: { flex: 1, minWidth: '45%', borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one },
-  shiftCard: { borderRadius: Spacing.two, padding: Spacing.three, marginBottom: Spacing.two, gap: Spacing.one },
-  emptyCard: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center' },
-  centerText: { textAlign: 'center' },
-  badge: { alignSelf: 'flex-start', borderRadius: Spacing.one, paddingHorizontal: Spacing.two, paddingVertical: 2, marginTop: Spacing.one },
-  badgeText: { color: '#fff', fontSize: 11 },
-  submitButton: { height: 40, borderRadius: Spacing.two, justifyContent: 'center', alignItems: 'center' },
+  safeArea: { flex: 1 },
+  content: { paddingHorizontal: Spacing.three, paddingTop: Spacing.three, paddingBottom: Spacing.six, gap: Spacing.two },
+  header: { gap: Spacing.half, marginBottom: Spacing.two },
+  loader: { marginTop: Spacing.five },
+  statsGrid: { flexDirection: 'row', gap: Spacing.two },
+  shiftCard: { marginBottom: Spacing.two },
+  shiftTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  shiftTitle: { flex: 1 },
 });
