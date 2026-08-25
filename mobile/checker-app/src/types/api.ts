@@ -84,6 +84,13 @@ export interface QualityVerification {
   status: VerificationStatus;
   notes: string | null;
   created_at: string;
+  // CRR §14 rework state. Present on the record fetched by
+  // api.quality.getVerification(); the evidence screen reads these to decide
+  // whether "Assign rework" is still offered.
+  rework_required?: boolean;
+  rework_notes?: string | null;
+  rework_completed_at?: string | null;
+  rework_escalated_at?: string | null;
 }
 
 export interface Rating {
@@ -208,7 +215,7 @@ export interface WorkerDocument {
   updated_at: string;
 }
 
-export type DocumentCategory = 'GENERAL' | 'WORK_PERMIT';
+export type DocumentCategory = 'GENERAL' | 'PASSPORT' | 'ID_CARD' | 'RESIDENCE_PERMIT' | 'WORK_PERMIT' | 'DRIVERS_LICENSE' | 'CONTRACT_SCAN';
 
 export interface ContractDto {
   id: string;

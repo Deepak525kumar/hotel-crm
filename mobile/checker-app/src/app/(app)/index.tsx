@@ -1,18 +1,21 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  FlatList,
   RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import useSWR from 'swr';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { useAuthStore } from '@/stores/auth-store';
 
 function statusColor(status: string): string {
   switch (status) {
@@ -32,27 +35,22 @@ export default function QueueScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { user } = useAuthStore();
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (!isRefresh) setLoading(true);
-    setError(null);
-    try {
-      const result = await api.attendance.list({ is_verified: false, per_page: 50 });
-      const data = result.data ?? [];
-      setRecords(data.filter((r) => r.status !== 'EXPECTED'));
-    } catch (e: any) {
-      setError(e.message ?? t('common.loadFailed'));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [t]);
+  const { data: recordsData, error: recordsError, isLoading: recordsLoading, isValidating: recordsValidating, mutate: mutateRecords } = useSWR(
+    user ? `/attendance/list/${user.id}` : null,
+    () => api.attendance.list({ is_verified: false, per_page: 50 })
+  );
+  
+  const rawRecords = recordsData?.data ?? [];
+  const records = rawRecords.filter((r) => r.status !== 'EXPECTED');
+  const loading = recordsLoading;
+  const refreshing = recordsValidating;
+  const error = recordsError ? t('common.loadFailed') : null;
 
-  useEffect(() => { load(); }, [load]);
+  const onRefresh = async () => {
+    await mutateRecords();
+  };
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.background },
@@ -63,18 +61,20 @@ export default function QueueScreen() {
     statCard: {
       flex: 1,
       backgroundColor: theme.backgroundElement,
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 12,
       alignItems: 'center',
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
     statNum: { fontSize: 22, fontWeight: '700', color: theme.text },
     statLabel: { fontSize: 11, color: theme.textSecondary, marginTop: 2 },
     card: {
       backgroundColor: theme.backgroundElement,
-      borderRadius: 12,
+      borderRadius: 16,
       padding: 14,
       marginHorizontal: 16,
       marginBottom: 8,
+      shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
     },
     cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     workerLabel: { fontSize: 15, fontWeight: '600', color: theme.text },
@@ -87,26 +87,28 @@ export default function QueueScreen() {
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   });
 
-  const renderItem = ({ item }: { item: AttendanceRecord }) => (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/attendance/${item.id}`)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardRow}>
-        <Text style={styles.workerLabel}>Worker ···{item.worker_id.slice(-6)}</Text>
-        <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
-          <Text style={styles.badgeText}>{item.status}</Text>
+  const renderItem = ({ item, index }: { item: AttendanceRecord; index: number }) => (
+    <Animated.View entering={FadeInUp.delay((index + 2) * 100)}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => router.push(`/attendance/${item.id}`)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardRow}>
+          <Text style={styles.workerLabel}>Worker ···{item.worker_id.slice(-6)}</Text>
+          <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
+            <Text style={styles.badgeText}>{item.status}</Text>
+          </View>
         </View>
-      </View>
-      <Text style={styles.cardSub}>
-        In: {formatTime(item.check_in_at)} · Out: {formatTime(item.check_out_at)}
-        {item.minutes_late ? ` · ${item.minutes_late}m late` : ''}
-      </Text>
-    </TouchableOpacity>
+        <Text style={styles.cardSub}>
+          In: {formatTime(item.check_in_at)} · Out: {formatTime(item.check_out_at)}
+          {item.minutes_late ? ` · ${item.minutes_late}m late` : ''}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={[styles.container, styles.loading]}>
         <ActivityIndicator size="large" color={theme.text} />
@@ -146,7 +148,7 @@ export default function QueueScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load(true); }}
+            onRefresh={onRefresh}
             tintColor={theme.text}
           />
         }

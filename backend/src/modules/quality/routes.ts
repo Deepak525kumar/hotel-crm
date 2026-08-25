@@ -43,6 +43,12 @@ router.post(
 // see what an inspection recorded. The worker the inspection is ABOUT is
 // admitted in the service, which is the layer that knows whose assignment it
 // is.
+// The inspection record. quality:read, same gate as its photos below — the
+// record and the evidence attached to it are one disclosure.
+router.get('/verifications/:verification_id', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.getVerification(req, res, next)
+);
+
 router.get('/verifications/:verification_id/photos', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getVerificationPhotos(req, res, next)
 );

@@ -845,55 +845,47 @@ export class QualityService extends BaseService {
    * URLs are minted per request and expire in 15 minutes; they are never
    * persisted, which is why the column stores keys.
    */
-  async getVerificationPhotos(verificationId: string, actor: Actor) {
+  /**
+   * IF-QUAL-GetVerification — the inspection record itself.
+   *
+   * Added 2026-08-24: the evidence screen could fetch photos but not the
+   * verification they belong to, so it could not show the score, the derived
+   * status, or whether rework had already been assigned — which is what a
+   * checker needs in order to decide whether to assign it. Same authorization
+   * as the photos endpoint, via the shared helper below.
+   */
+  async getVerification(verificationId: string, actor: Actor) {
     const verification = await this.prisma.qualityVerification.findUnique({
       where: { id: verificationId },
-      include: { assignment: { select: { worker_id: true } } },
+      include: { assignment: { select: { worker_id: true, day: true } } },
     });
     if (!verification) throw new NotFoundError('Verification not found');
+    await this.assertCanViewVerification(verification, actor);
+    return verification;
+  }
 
-    // Who may look at room evidence:
-    //  - the checker who recorded it, and any admin (quality:read gates the
-    //    route itself);
-    //  - a scope-bound manager/RM, only for hotels in their scope;
-    //  - the WORKER the inspection is about -- they uploaded the rework photo
-    //    and the inspection is a record about their own work. Withholding it
-    //    would mean a worker cannot see the evidence used to judge them.
-    // Deny by default. quality:read alone is NOT sufficient: ADR-067 granted
-    // WORKER that token so a worker can see their own hotel group's
-    // leaderboard, so gating on the permission alone would let any worker read
-    // any other worker's room evidence by id -- an IDOR, and on
-    // special-category-adjacent data.
+  /**
+   * Shared read gate for an inspection and its evidence.
+   *
+   * Extracted 2026-08-24 so getVerification() and getVerificationPhotos()
+   * cannot drift apart — the record and the photos attached to it are the
+   * same disclosure, and gating them differently would mean one endpoint
+   * leaking what the other withholds.
+   */
+  private async assertCanViewVerification(
+    verification: { hotel_id: string; assignment?: { worker_id: string } | null },
+    actor: Actor
+  ): Promise<void> {
     const isSubject = verification.assignment?.worker_id === actor.userId;
     const role = actor.role.toLowerCase();
 
-    if (isSubject) {
-      // The worker the inspection is about. They uploaded the rework photo and
-      // the record is about their own work; withholding it would mean they
-      // cannot see the evidence used to judge them.
-    } else if (role === 'admin') {
-      // Unscoped by design, matching every other admin read.
-    } else if (role === 'checker') {
-      // 2026-08-24: this branch used to share the manager/RM path below, gating
-      // the checker on isHotelInScope(actor.scope, …). But resolveScope()
-      // (auth/service.ts) mints a scope ONLY for admin (global), RM (via
-      // HotelGroup.regional_manager_user_id) and manager (via
-      // Hotel.manager_user_id). A Checker matches none of those, so its JWT
-      // always carries `scope: null` and this check could never pass — a
-      // checker could not read evidence photos at all, including the ones it
-      // had just uploaded, which left the checker app's verification screen
-      // unable to display evidence.
-      //
-      // Gated instead on the same rule createVerification() already uses for
-      // this role: the checker must have an active assignment at that hotel on
-      // that day. That is the rule the module actually expresses for checkers,
-      // it needs no JWT scope, and it keeps read and write consistent — the
-      // previous split (write via assignment, read via scope) is what allowed
-      // the two to disagree.
-      //
-      // Deliberately NOT fixed by teaching resolveScope() to mint a checker
-      // scope: that would change every scope-gated route at once, far beyond
-      // this defect.
+    if (isSubject) return; // the worker the inspection is about
+    if (role === 'admin') return; // unscoped by design
+
+    if (role === 'checker') {
+      // Assignment-based, NOT JWT scope: a checker's token never carries a
+      // scope (resolveScope mints one only for admin/RM/manager), so a
+      // scope gate here would deny every checker unconditionally.
       const checkerAssignment = await this.prisma.workerAssignment.findFirst({
         where: {
           worker_id: actor.userId,
@@ -905,13 +897,27 @@ export class QualityService extends BaseService {
       if (!checkerAssignment) {
         throw new ForbiddenError('Cannot view evidence for this hotel');
       }
-    } else if (isScopedManagerRole(role)) {
+      return;
+    }
+
+    if (isScopedManagerRole(role)) {
       const inScope = await isHotelInScope(actor.scope ?? null, verification.hotel_id);
       if (!inScope) throw new ForbiddenError('Cannot view evidence for this hotel');
-    } else {
-      // Any other role, including a WORKER who is not the subject.
-      throw new ForbiddenError('Cannot view evidence for this inspection');
+      return;
     }
+
+    // Any other role, including a WORKER who is not the subject.
+    throw new ForbiddenError('Cannot view evidence for this inspection');
+  }
+
+  async getVerificationPhotos(verificationId: string, actor: Actor) {
+    const verification = await this.prisma.qualityVerification.findUnique({
+      where: { id: verificationId },
+      include: { assignment: { select: { worker_id: true } } },
+    });
+    if (!verification) throw new NotFoundError('Verification not found');
+
+    await this.assertCanViewVerification(verification, actor);
 
     const storage = await getStorageClient();
     const photos = await Promise.all(

@@ -7,6 +7,8 @@ import { useLocaleStore } from '@/stores/locale-store';
 // Side-effect import: initialises i18next before any screen calls useTranslation.
 import '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
+import { AuthGuard } from '@/components/AuthGuard';
+import { ConsentGate } from '@/components/consent/ConsentGate';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,31 +47,27 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-        <Stack.Screen name="(app)" options={{ headerShown: false }} />
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen
-          name="attendance/[id]"
-          options={{ title: t('nav.attendanceDetail'), headerShown: true }}
-        />
-        <Stack.Screen
-          name="quality/[id]"
-          options={{ title: t('nav.qualityCheck'), headerShown: true }}
-        />
-        {/*
-          These three render their own <BackLink /> and title inside a
-          SafeAreaView (the same chrome worker-app's copies use), so the
-          native header is suppressed rather than given a nav.* title —
-          two stacked headers otherwise. They existed as files here but
-          were unreachable: unregistered and unlinked, and invisible to
-          tsc because tsconfig.test.json never included src/app/**.
-        */}
-        <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="documents" options={{ headerShown: false }} />
-        <Stack.Screen name="consent" options={{ headerShown: false }} />
-        <Stack.Screen name="hr" options={{ headerShown: false }} />
-      </Stack>
+      <AuthGuard>
+        <ConsentGate>
+          <Stack>
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(app)" options={{ headerShown: false }} />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="attendance/[id]"
+              options={{ title: t('nav.attendanceDetail'), headerShown: true }}
+            />
+            <Stack.Screen
+              name="quality/[id]"
+              options={{ title: t('nav.qualityCheck'), headerShown: true }}
+            />
+            <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="documents" options={{ headerShown: false }} />
+            <Stack.Screen name="consent" options={{ headerShown: false }} />
+            <Stack.Screen name="hr" options={{ headerShown: false }} />
+          </Stack>
+        </ConsentGate>
+      </AuthGuard>
     </ThemeProvider>
   );
 }

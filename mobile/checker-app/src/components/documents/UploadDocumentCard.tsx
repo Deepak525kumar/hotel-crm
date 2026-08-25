@@ -8,9 +8,17 @@ import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
+// Translation KEYS, not display strings: this map is module-scope, where
+// t() cannot be called. Each value is resolved at render time instead, so
+// the label follows the active language rather than being frozen at import.
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
   GENERAL: 'documents.categoryGENERAL',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ID_CARD: 'documents.categoryID_CARD',
+  RESIDENCE_PERMIT: 'documents.categoryRESIDENCE_PERMIT',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
+  DRIVERS_LICENSE: 'documents.categoryDRIVERS_LICENSE',
+  CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
 };
 
 export function UploadDocumentCard({
@@ -69,7 +77,7 @@ export function UploadDocumentCard({
           </ThemedView>
 
           <ThemedView style={styles.row} type="backgroundElement">
-            {(['GENERAL', 'WORK_PERMIT'] as const).map((c) => (
+            {(['GENERAL', 'PASSPORT', 'ID_CARD', 'RESIDENCE_PERMIT', 'WORK_PERMIT', 'DRIVERS_LICENSE', 'CONTRACT_SCAN'] as const).map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}
@@ -108,7 +116,7 @@ export function UploadDocumentCard({
           <TextInput
             value={expiresAt}
             onChangeText={setExpiresAt}
-            placeholder={t('documents.expiryPlaceholder')}
+            placeholder="Expiry date (optional, YYYY-MM-DD)"
             placeholderTextColor={theme.textSecondary}
             editable={!uploading}
             style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
@@ -150,7 +158,7 @@ export function UploadDocumentCard({
 const styles = StyleSheet.create({
   card: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two, marginBottom: Spacing.three },
   header: { marginBottom: Spacing.one },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
+  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, flexWrap: 'wrap' },
   flex: { flex: 1 },
   pickButton: {
     height: 44,
@@ -161,7 +169,7 @@ const styles = StyleSheet.create({
   },
   pickButtonText: { color: '#fff' },
   categoryButton: {
-    flex: 1,
+    width: '48%',
     height: 36,
     borderRadius: Spacing.two,
     justifyContent: 'center',

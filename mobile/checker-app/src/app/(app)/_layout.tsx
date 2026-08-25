@@ -2,25 +2,14 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
-import { ConsentGate } from '@/components/consent/ConsentGate';
 import { PushRegistration } from '@/components/PushRegistration';
 
 export default function AppLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
 
-  // RULE-CONSENT-01: the daily notice must be accepted before the worker can
-  // use the system. Wrapping the (app) tree rather than the root layout
-  // because this tree only renders for a signed-in user and the consent
-  // endpoints are authenticated.
-  //
-  // <PushRegistration /> sits INSIDE the gate deliberately. It used to be two
-  // useEffects on this component, which React runs on mount whatever the
-  // component renders -- so with the gate live they fired against a gated
-  // /notifications route, took a swallowed 403, and never retried that
-  // session. As a child of the gate, mount implies consent.
   return (
-    <ConsentGate>
+    <>
       <PushRegistration />
       <Tabs
         screenOptions={{
@@ -99,6 +88,6 @@ export default function AppLayout() {
           }}
         />
       </Tabs>
-    </ConsentGate>
+    </>
   );
 }

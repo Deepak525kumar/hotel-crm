@@ -7,7 +7,7 @@ import {
   StyleSheet,
   TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useAuthStore } from '@/stores/auth-store';
@@ -26,6 +26,7 @@ export default function LoginScreen() {
   const [error, setError] = useState<string | null>(null);
   const { login, logout, isLoading } = useAuthStore();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const theme = useTheme();
 
   const handleLogin = async () => {
@@ -42,7 +43,11 @@ export default function LoginScreen() {
         setError(t("auth.noAppAccess"));
         return;
       }
-      router.replace('/(app)');
+      if (params.returnTo) {
+        router.replace(params.returnTo as any);
+      } else {
+        router.replace('/(app)');
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
         setError(

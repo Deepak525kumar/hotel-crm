@@ -439,7 +439,14 @@
     "uploadFirstHint": "Laden Sie Ihr erstes Dokument hoch, um zu beginnen.",
     "uploadFailed": "Upload fehlgeschlagen. Bitte versuchen Sie es erneut.",
     "unsupportedType": "Nicht unterstützter Dateityp. Erlaubt: PDF, JPEG, PNG, WEBP.",
-    "exceedsMaxSize": "Die Datei überschreitet die maximale Größe von 10 MB."
+    "exceedsMaxSize": "Die Datei überschreitet die maximale Größe von 10 MB.",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "Personal & Lohn",
@@ -905,7 +912,13 @@
     "tooManyPhotos": "Es dürfen höchstens {{max}} Fotos angehängt werden.",
     "photoTooLarge": "{{name}} ist größer als {{mb}} MB.",
     "photoRequired": "Fügen Sie mindestens ein Foto hinzu, bevor Sie diese Bewertung absenden.",
-    "evidence": "Nachweis"
+    "evidence": "Nachweis",
+    "assignRework": "Nacharbeit zuweisen",
+    "reworkNotesPlaceholder": "Was muss nachgearbeitet werden?",
+    "reworkNotesRequired": "Beschreiben Sie, was nachgearbeitet werden muss.",
+    "reworkAssigned": "Nacharbeit zugewiesen. Der Mitarbeiter wurde benachrichtigt.",
+    "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
+    "reworkCompleted": "Nacharbeit abgeschlossen"
   },
   "ratings": {
     "comment": "Kommentar",

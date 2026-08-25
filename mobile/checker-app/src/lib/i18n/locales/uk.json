@@ -439,7 +439,14 @@
     "uploadFirstHint": "Завантажте свій перший документ, щоб почати.",
     "uploadFailed": "Не вдалося завантажити. Спробуйте ще раз.",
     "unsupportedType": "Непідтримуваний тип файлу. Дозволено: PDF, JPEG, PNG, WEBP.",
-    "exceedsMaxSize": "Файл перевищує максимальний розмір 10 МБ."
+    "exceedsMaxSize": "Файл перевищує максимальний розмір 10 МБ.",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "Кадри та зарплата",
@@ -905,7 +912,13 @@
     "tooManyPhotos": "Можна долучити щонайбільше {{max}} фотографій.",
     "photoTooLarge": "{{name}} перевищує {{mb}} МБ.",
     "photoRequired": "Додайте щонайменше одну фотографію перед надсиланням цієї оцінки.",
-    "evidence": "Докази"
+    "evidence": "Докази",
+    "assignRework": "Призначити переробку",
+    "reworkNotesPlaceholder": "Що потрібно переробити?",
+    "reworkNotesRequired": "Опишіть, що потрібно переробити.",
+    "reworkAssigned": "Переробку призначено. Працівника сповіщено.",
+    "reworkPending": "Переробку призначено — очікується працівник",
+    "reworkCompleted": "Переробку завершено"
   },
   "ratings": {
     "comment": "Коментар",

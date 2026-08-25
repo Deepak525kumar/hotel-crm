@@ -475,6 +475,16 @@ const envSchema = z.object({
           'or run with NODE_ENV=development if you intend to use stub storage.',
       });
     }
+    
+    if (requiresRealStorage && env.AWS_REGION !== 'eu-central-1') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AWS_REGION'],
+        message:
+          `AWS_REGION must be eu-central-1 when NODE_ENV=${env.NODE_ENV} for GDPR compliance. ` +
+          `Found: ${env.AWS_REGION}`,
+      });
+    }
 
     // ADR-070: AUTH_LOGIN_THROTTLE_THRESHOLD must stay above
     // AUTH_FAILED_LOGIN_NOTIFY_THRESHOLD so the manager-notify path

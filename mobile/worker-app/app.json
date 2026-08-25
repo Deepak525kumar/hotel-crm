@@ -61,7 +61,8 @@
           "photosPermission": "Used only when you attach a photo to show that rework is done.",
           "cameraPermission": "Used only when you take a photo to show that rework is done."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -12,11 +12,15 @@ export function DocumentsList({
   loading,
   refreshing,
   onRefresh,
+  onDelete,
+  deletingId,
 }: {
   documents: WorkerDocument[];
   loading: boolean;
   refreshing: boolean;
   onRefresh: () => void;
+  onDelete?: (id: string) => void;
+  deletingId?: string | null;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -29,7 +33,7 @@ export function DocumentsList({
     <FlatList
       data={documents}
       keyExtractor={(d) => d.id}
-      renderItem={({ item }) => <DocumentItem document={item} />}
+      renderItem={({ item }) => <DocumentItem document={item} onDelete={onDelete} isDeleting={deletingId === item.id} />}
       ListEmptyComponent={
         <ThemedView type="backgroundElement" style={styles.empty}>
           <ThemedText type="smallBold" style={styles.emptyTitle}>{t("documents.none")}</ThemedText>

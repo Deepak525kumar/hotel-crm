@@ -2,8 +2,10 @@ import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, Vie
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
+import useSWR from 'swr';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { WorkerAssignment, AssignmentStatus } from '@/types/api';
@@ -62,44 +64,37 @@ function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => v
 export default function ShiftsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [items, setItems] = useState<WorkerAssignment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { user } = useAuthStore();
+  
+  const { data: assignments, isLoading: loading, isValidating: refreshing, mutate } = useSWR(
+    user ? `/assignments/list_all/${user.id}` : null,
+    () => api.assignments.list({ limit: 50 })
+  );
+  
+  const items = Array.isArray(assignments) ? assignments : [];
 
-  const load = useCallback(async () => {
-    try {
-      const res = await api.assignments.list({ limit: 50 });
-      setItems(Array.isArray(res) ? res : []);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
-  const onRefresh = useCallback(() => { setRefreshing(true); load(); }, [load]);
+  const onRefresh = async () => {
+    await mutate();
+  };
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedText type="subtitle" style={styles.header}>{t('nav.myShifts')}</ThemedText>
-        {loading ? (
+        {loading && !items.length ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
           <FlatList
             data={items}
             keyExtractor={(i) => i.id}
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={5}
+            removeClippedSubviews={true}
             renderItem={({ item }) => (
               <ShiftCard
                 item={item}
                 onPress={() => {
-                  // A rework row has no shift detail to show -- no work
-                  // request, no scheduled start. Its only action is "upload a
-                  // photo and mark done", which is the rework screen.
-                  //
-                  // Two separate calls rather than a ternary inside push():
-                  // expo-router types each route as a literal, and the union
-                  // of two template literals is not assignable to Href.
                   if (item.rework_of_assignment_id) {
                     router.push(`/rework/${item.id}`);
                     return;

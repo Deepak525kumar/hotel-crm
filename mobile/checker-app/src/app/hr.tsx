@@ -108,7 +108,7 @@ export default function HRScreen() {
         )}
 
         <ThemedText type="smallBold" style={styles.sectionTitle}>{t("hr.contractStatus")}</ThemedText>
-        <ContractStatusCard contract={contract} loading={loading} />
+        <ContractStatusCard contract={contract} loading={loading} workerId={user?.id || ''} />
 
         <PayslipRequestsList
           requests={requests}

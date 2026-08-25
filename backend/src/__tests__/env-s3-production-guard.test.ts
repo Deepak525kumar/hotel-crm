@@ -98,9 +98,18 @@ describe('S3_BUCKET startup guard (fail-closed for deployed environments)', () =
     it(`boots when NODE_ENV=${nodeEnv} and S3_BUCKET is set`, async () => {
       process.env['NODE_ENV'] = nodeEnv;
       process.env['S3_BUCKET'] = 'hotelcrm-uploads';
+      process.env['AWS_REGION'] = 'eu-central-1';
 
       const env = await loadEnvFresh();
       expect(env.S3_BUCKET).toBe('hotelcrm-uploads');
+    });
+
+    it(`refuses to boot when NODE_ENV=${nodeEnv} and AWS_REGION is not eu-central-1`, async () => {
+      process.env['NODE_ENV'] = nodeEnv;
+      process.env['S3_BUCKET'] = 'hotelcrm-uploads';
+      process.env['AWS_REGION'] = 'us-east-1';
+
+      await expect(loadEnvFresh()).rejects.toThrow(/AWS_REGION must be eu-central-1/);
     });
   }
 

@@ -439,7 +439,14 @@
     "uploadFirstHint": "Upload your first document to get started.",
     "uploadFailed": "Upload failed. Please try again.",
     "unsupportedType": "Unsupported file type. Allowed: PDF, JPEG, PNG, WEBP.",
-    "exceedsMaxSize": "File exceeds the maximum size of 10 MB."
+    "exceedsMaxSize": "File exceeds the maximum size of 10 MB.",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "HR & Payroll",
@@ -905,7 +912,13 @@
     "tooManyPhotos": "At most {{max}} photos may be attached.",
     "photoTooLarge": "{{name}} is larger than {{mb}} MB.",
     "photoRequired": "Add at least one photo before submitting this rating.",
-    "evidence": "Evidence"
+    "evidence": "Evidence",
+    "assignRework": "Assign rework",
+    "reworkNotesPlaceholder": "What needs redoing?",
+    "reworkNotesRequired": "Describe what needs redoing.",
+    "reworkAssigned": "Rework assigned. The worker has been notified.",
+    "reworkPending": "Rework assigned — awaiting the worker",
+    "reworkCompleted": "Rework completed"
   },
   "ratings": {
     "comment": "Comment",

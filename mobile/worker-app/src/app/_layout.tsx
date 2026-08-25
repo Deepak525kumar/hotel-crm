@@ -6,6 +6,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useLocaleStore } from '@/stores/locale-store';
 // Side-effect import: initialises i18next before any screen calls useTranslation.
 import '@/lib/i18n';
+import { AuthGuard } from '@/components/AuthGuard';
+import { ConsentGate } from '@/components/consent/ConsentGate';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -43,7 +45,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <AuthGuard>
+        <ConsentGate>
+          <Stack screenOptions={{ headerShown: false }} />
+        </ConsentGate>
+      </AuthGuard>
     </ThemeProvider>
   );
 }

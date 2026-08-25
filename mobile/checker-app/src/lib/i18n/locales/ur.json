@@ -440,7 +440,14 @@
     "uploadFirstHint": "شروع کرنے کے لیے اپنی پہلی دستاویز اپ لوڈ کریں۔",
     "uploadFailed": "اپ لوڈ ناکام۔ دوبارہ کوشش کریں۔",
     "unsupportedType": "غیر معاون فائل قسم۔ اجازت: PDF, JPEG, PNG, WEBP۔",
-    "exceedsMaxSize": "فائل 10 ایم بی کی حد سے زیادہ ہے۔"
+    "exceedsMaxSize": "فائل 10 ایم بی کی حد سے زیادہ ہے۔",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -906,7 +913,13 @@
     "tooManyPhotos": "زیادہ سے زیادہ {{max}} تصاویر منسلک کی جا سکتی ہیں۔",
     "photoTooLarge": "{{name}} کا حجم {{mb}} ایم بی سے زیادہ ہے۔",
     "photoRequired": "یہ درجہ بندی جمع کرانے سے پہلے کم از کم ایک تصویر شامل کریں۔",
-    "evidence": "ثبوت"
+    "evidence": "ثبوت",
+    "assignRework": "دوبارہ کام تفویض کریں",
+    "reworkNotesPlaceholder": "کیا دوبارہ کرنے کی ضرورت ہے؟",
+    "reworkNotesRequired": "بیان کریں کہ کیا دوبارہ کرنا ہے۔",
+    "reworkAssigned": "دوبارہ کام تفویض کر دیا گیا۔ کارکن کو مطلع کر دیا گیا۔",
+    "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
+    "reworkCompleted": "دوبارہ کام مکمل"
   },
   "ratings": {
     "comment": "تبصرہ",

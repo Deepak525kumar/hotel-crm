@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -90,12 +90,12 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   }, [t]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (!user || isAdmin) {
       setLoading(false);
       return;
     }
     void load();
-  }, [isAdmin, load]);
+  }, [user, isAdmin, load]);
 
   const decide = useCallback(
     async (decision: 'GRANTED' | 'DECLINED') => {
@@ -138,45 +138,50 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   // This block previously claimed to fail open and did not: on an error
   // `status` stayed null and `loading` went false, so it fell through to the
   // wall below.
-  if (shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced })) return <>{children}</>;
-
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.centre, { backgroundColor: theme.background }]}>
-        <ActivityIndicator color={theme.text} />
-      </SafeAreaView>
-    );
-  }
-
+  if (!user) return <>{children}</>;
+  const isBypassed = shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced });
   const declined = status?.status === 'declined';
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText type="subtitle" style={styles.header}>
-          {declined ? t('consent.lockedTitle') : t('consent.gateTitle')}
-        </ThemedText>
+    <>
+      {children}
+      {!isBypassed && (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: theme.background, zIndex: 9999 }]}>
+          {loading ? (
+            <SafeAreaView style={[styles.centre, { backgroundColor: theme.background }]}>
+              <ActivityIndicator color={theme.text} />
+            </SafeAreaView>
+          ) : (
+            <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.background }]}>
+              <ScrollView contentContainerStyle={styles.content}>
+                <ThemedText type="subtitle" style={styles.header}>
+                  {declined ? t('consent.lockedTitle') : t('consent.gateTitle')}
+                </ThemedText>
 
-        <ThemedText type="small" themeColor="textSecondary" style={styles.body}>
-          {declined ? t('consent.lockedBody') : t('consent.gateBody')}
-        </ThemedText>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.body}>
+                  {declined ? t('consent.lockedBody') : t('consent.gateBody')}
+                </ThemedText>
 
-        {error ? (
-          <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="small" style={{ color: '#E53E3E' }}>
-              {error}
-            </ThemedText>
-            <Pressable onPress={() => void load()} style={styles.retry}>
-              <ThemedText type="smallBold">{t('consent.gateRetry')}</ThemedText>
-            </Pressable>
-          </ThemedView>
-        ) : null}
+                {error ? (
+                  <ThemedView type="backgroundElement" style={styles.card}>
+                    <ThemedText type="small" style={{ color: '#E53E3E' }}>
+                      {error}
+                    </ThemedText>
+                    <Pressable onPress={() => void load()} style={styles.retry}>
+                      <ThemedText type="smallBold">{t('consent.gateRetry')}</ThemedText>
+                    </Pressable>
+                  </ThemedView>
+                ) : null}
 
-        {notice ? (
-          <ConsentNoticeCard notice={notice} deciding={deciding} onDecide={decide} />
-        ) : null}
-      </ScrollView>
-    </SafeAreaView>
+                {notice ? (
+                  <ConsentNoticeCard notice={notice} deciding={deciding} onDecide={decide} />
+                ) : null}
+              </ScrollView>
+            </SafeAreaView>
+          )}
+        </View>
+      )}
+    </>
   );
 }
 

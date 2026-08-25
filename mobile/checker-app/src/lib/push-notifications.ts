@@ -1,5 +1,5 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import type { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
 import { PUSH_APP } from '@/constants/app-config';
@@ -34,7 +34,14 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
     return 'unsupported-platform';
   }
 
+  // Expo Go on Android no longer supports remote push notifications
+  if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+    console.warn('Push token registration skipped: not supported in Expo Go on Android.');
+    return 'unsupported-platform';
+  }
+
   try {
+    const Notifications = require('expo-notifications') as typeof import('expo-notifications');
     // Ask only when not already granted: on iOS the OS prompt is one-shot, and
     // re-requesting an already-granted permission is a needless round-trip.
     const existing = await Notifications.getPermissionsAsync();
@@ -90,6 +97,13 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
  * keep hand-syncing two files.
  */
 export function subscribeToPushNotifications(router: Router): () => void {
+  // Expo Go on Android no longer supports remote push notifications
+  if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+    return () => {};
+  }
+  
+  const Notifications = require('expo-notifications') as typeof import('expo-notifications');
+
   // Foreground behavior: show the OS banner/sound/badge even while the app
   // is open, rather than the SDK default of suppressing it. `notifications`
   // is the app's only channel (Alerts tab lists the same rows), so there is

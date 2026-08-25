@@ -363,21 +363,56 @@ export const api = {
         body: form,
       });
     },
-    createRating: (data: {
-      assignment_id: string;
-      worker_id: string;
-      score: number;
-      comment?: string;
-    }) =>
-      request<Rating>('/quality/ratings', {
+    createRating: (
+      data: {
+        assignment_id: string;
+        worker_id: string;
+        score: number;
+        comment?: string;
+        criteria_scores?: Record<string, number>;
+      },
+      photos: { uri: string; name: string; type: string }[] = []
+    ) => {
+      const form = new FormData();
+      form.append('assignment_id', data.assignment_id);
+      form.append('worker_id', data.worker_id);
+      form.append('score', String(data.score));
+      if (data.comment) form.append('comment', data.comment);
+      if (data.criteria_scores) {
+        form.append('criteria_scores', JSON.stringify(data.criteria_scores));
+      }
+      for (const photo of photos) form.append('photos', photo as unknown as Blob);
+      return request<Rating>('/quality/ratings', {
         method: 'POST',
-        body: JSON.stringify(data),
-      }),
+        body: form,
+      });
+    },
     /**
      * CRR §14/§15: presigned URLs for one inspection's evidence. Fetched on
      * demand -- the URLs expire in 15 minutes, so caching them with the
      * verification would store values that are already dead.
      */
+    /**
+     * The inspection record itself. Needed alongside the photos so the
+     * evidence screen can show the score and decide whether rework is still
+     * assignable — CRR §14's "Checker assigns rework to a specific worker".
+     */
+    getVerification: (verificationId: string) =>
+      request<QualityVerification>(
+        `/quality/verifications/${encodeURIComponent(verificationId)}`
+      ),
+
+    /**
+     * CRR §14: assign rework for a failed inspection to the same worker.
+     * Creates a second, linked assignment; a second call for the same
+     * verification is a 409, not a duplicate.
+     */
+    assignRework: (verificationId: string, notes: string) =>
+      request<unknown>('/quality/rework', {
+        method: 'POST',
+        body: JSON.stringify({ verification_id: verificationId, notes }),
+      }),
+
     verificationPhotos: (verificationId: string) =>
       request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
         `/quality/verifications/${encodeURIComponent(verificationId)}/photos`
@@ -515,6 +550,9 @@ export const api = {
   hr: {
     getContractStatus: (workerId: string) =>
       request<ContractDto | null>(`/hr/workers/${encodeURIComponent(workerId)}/contract-status`),
+
+    getContractDownloadUrl: (workerId: string) =>
+      `${BASE_URL}/hr/workers/${encodeURIComponent(workerId)}/contract-download`,
 
     listPayroll: () =>
       request<PayslipRequestDto[]>('/hr/payroll'),

@@ -440,7 +440,14 @@
     "uploadFirstHint": "ارفع مستندك الأول للبدء.",
     "uploadFailed": "فشل التحميل. يرجى المحاولة مرة أخرى.",
     "unsupportedType": "نوع ملف غير مدعوم. المسموح: PDF، JPEG، PNG، WEBP.",
-    "exceedsMaxSize": "يتجاوز الملف الحجم الأقصى 10 ميغابايت."
+    "exceedsMaxSize": "يتجاوز الملف الحجم الأقصى 10 ميغابايت.",
+    "categoryTAX_NUMBER": "Tax Number",
+    "categorySOCIAL_SECURITY_NUMBER": "Social Security",
+    "categoryHEALTH_INSURANCE": "Health Insurance",
+    "categoryID_CARD": "ID Card",
+    "categoryPASSPORT": "Passport",
+    "categoryADDRESS": "Proof of Address",
+    "categoryCONTRACT_SCAN": "Signed Contract"
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -906,7 +913,13 @@
     "tooManyPhotos": "يمكن إرفاق {{max}} صور كحد أقصى.",
     "photoTooLarge": "{{name}} أكبر من {{mb}} ميغابايت.",
     "photoRequired": "أضف صورة واحدة على الأقل قبل إرسال هذا التقييم.",
-    "evidence": "الأدلة"
+    "evidence": "الأدلة",
+    "assignRework": "تعيين إعادة العمل",
+    "reworkNotesPlaceholder": "ما الذي يجب إعادة عمله؟",
+    "reworkNotesRequired": "صف ما يجب إعادة عمله.",
+    "reworkAssigned": "تم تعيين إعادة العمل. تم إخطار العامل.",
+    "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
+    "reworkCompleted": "اكتملت إعادة العمل"
   },
   "ratings": {
     "comment": "تعليق",

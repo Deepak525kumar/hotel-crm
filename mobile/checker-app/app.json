@@ -55,7 +55,8 @@
           "photosPermission": "Used only when you attach photo evidence to a room inspection.",
           "cameraPermission": "Used only when you photograph a room during an inspection."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,
