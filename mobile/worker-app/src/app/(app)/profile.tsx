@@ -7,7 +7,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useState } from 'react';
-import { LanguagePicker } from '@/components/LanguagePicker';
 import { useTranslation } from 'react-i18next';
 
 export default function ProfileScreen() {
@@ -37,7 +36,20 @@ export default function ProfileScreen() {
             and five buttons. Without this the sign-out button sits below the
             fold on a small phone with no way to reach it. */}
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <ThemedText type="subtitle" style={styles.header}>{t("profile.title")}</ThemedText>
+        {/* Settings lives here, top-right, rather than as a fifth bottom tab:
+            the tab bar is for what a worker touches during a shift. */}
+        <ThemedView style={styles.headerRow}>
+          <ThemedText type="subtitle" style={styles.header}>{t("profile.title")}</ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('settings.title', 'Settings')}
+            onPress={() => router.push('/settings')}
+            hitSlop={12}
+            style={({ pressed }) => [styles.settingsButton, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <ThemedText type="subtitle">⚙</ThemedText>
+          </Pressable>
+        </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.card}>
           <ThemedView style={styles.row} type="backgroundElement">
@@ -116,8 +128,6 @@ export default function ProfileScreen() {
           </ThemedView>
         </Pressable>
 
-        <LanguagePicker />
-
         <Pressable
           onPress={handleLogout}
           disabled={isLoggingOut}
@@ -152,8 +162,17 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.four,
     gap: Spacing.three,
   },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   header: {
     paddingBottom: Spacing.two,
+  },
+  settingsButton: {
+    paddingBottom: Spacing.two,
+    paddingHorizontal: Spacing.one,
   },
   card: {
     borderRadius: Spacing.three,

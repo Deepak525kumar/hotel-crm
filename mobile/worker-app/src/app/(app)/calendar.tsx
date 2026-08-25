@@ -1,10 +1,15 @@
-import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { Modal, TextInput, StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState, useCallback } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
 import { api } from '@/lib/api';
+import {
+  ABSENCE_REASON_MAX_LENGTH,
+  normalizeAbsenceReason,
+  validateAbsenceReason,
+} from '@/lib/absence-reason';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
 import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
@@ -79,6 +84,13 @@ export default function CalendarScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState<{ day: string; kind: CalendarAbsenceKind } | null>(null);
+  // VACATION requires a reason, so the tap opens this prompt rather than
+  // submitting straight away.
+  const [reasonPrompt, setReasonPrompt] = useState<
+    { daysFromToday: 0 | 1; kind: CalendarAbsenceKind } | null
+  >(null);
+  const [reasonText, setReasonText] = useState('');
+  const [reasonError, setReasonError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
@@ -106,13 +118,13 @@ export default function CalendarScreen() {
   // as sick or vacation. Only these two days are offered here (not an
   // arbitrary date picker) to keep this slice's UI surface minimal; the
   // backend itself accepts any current/future day.
-  const handleMark = useCallback(
-    async (daysFromToday: 0 | 1, kind: CalendarAbsenceKind) => {
+  const submitMark = useCallback(
+    async (daysFromToday: 0 | 1, kind: CalendarAbsenceKind, reason?: string) => {
       const day = isoDateInCalendarTimezone(daysFromToday);
       setErrorMessage(null);
       setMarking({ day, kind });
       try {
-        await api.calendar.markAbsence({ day, kind });
+        await api.calendar.markAbsence({ day, kind, reason: normalizeAbsenceReason(reason) });
         await load();
       } catch (error) {
         setErrorMessage(translateApiError(error, t, 'absences.markFailed'));
@@ -122,6 +134,40 @@ export default function CalendarScreen() {
     },
     [load, t]
   );
+
+  // VACATION needs a reason (backend MarkAbsenceSchema), so it opens a prompt
+  // instead of firing immediately. SICK stays one tap on purpose: the backend
+  // does not require a reason for it, and asking would both slow down someone
+  // marking themselves sick and invite health details this system
+  // deliberately does not collect.
+  const handleMark = useCallback(
+    (daysFromToday: 0 | 1, kind: CalendarAbsenceKind) => {
+      if (kind === 'VACATION') {
+        setReasonPrompt({ daysFromToday, kind });
+        setReasonText('');
+        setReasonError(null);
+        return;
+      }
+      void submitMark(daysFromToday, kind);
+    },
+    [submitMark]
+  );
+
+  const confirmReason = useCallback(async () => {
+    if (!reasonPrompt) return;
+    const problem = validateAbsenceReason(reasonPrompt.kind, reasonText);
+    if (problem) {
+      setReasonError(
+        problem === 'required'
+          ? t('absences.reasonRequired', 'A reason is required for vacation.')
+          : t('absences.reasonTooLong', 'Please keep the reason under 500 characters.')
+      );
+      return;
+    }
+    const { daysFromToday, kind } = reasonPrompt;
+    setReasonPrompt(null);
+    await submitMark(daysFromToday, kind, reasonText);
+  }, [reasonPrompt, reasonText, submitMark, t]);
 
   // Confirmed before firing: withdrawing does NOT restore a shift that was
   // auto-cancelled when the absence was marked (the slot may already have been
@@ -228,12 +274,96 @@ export default function CalendarScreen() {
             showsVerticalScrollIndicator={false}
           />
         )}
+
+        {/* Reason prompt for VACATION. A modal rather than Alert.prompt, which
+            is iOS-only — on Android that would have silently done nothing. */}
+        <Modal
+          visible={reasonPrompt !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setReasonPrompt(null)}
+        >
+          <ThemedView style={styles.modalBackdrop} type="background">
+            <ThemedView style={styles.modalCard} type="backgroundElement">
+              <ThemedText type="smallBold">
+                {t('absences.reasonTitle', 'Reason for vacation')}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={styles.modalHint}>
+                {t('absences.reasonHint', 'Required for vacation. Do not enter medical details.')}
+              </ThemedText>
+              <TextInput
+                value={reasonText}
+                onChangeText={(next) => {
+                  setReasonText(next);
+                  setReasonError(null);
+                }}
+                placeholder={t('absences.reasonPlaceholder', 'e.g. family trip, personal days')}
+                placeholderTextColor={theme.textSecondary}
+                maxLength={ABSENCE_REASON_MAX_LENGTH}
+                multiline
+                autoFocus
+                style={[styles.modalInput, { color: theme.text, backgroundColor: theme.background }]}
+              />
+              {reasonError && (
+                <ThemedText type="small" style={styles.modalError}>
+                  {reasonError}
+                </ThemedText>
+              )}
+              <ThemedView style={styles.modalActions} type="backgroundElement">
+                <Pressable
+                  onPress={() => setReasonPrompt(null)}
+                  style={({ pressed }) => [styles.modalButton, { opacity: pressed ? 0.7 : 1 }]}
+                >
+                  <ThemedText type="small">{t('common.cancel', 'Cancel')}</ThemedText>
+                </Pressable>
+                <Pressable
+                  onPress={() => void confirmReason()}
+                  style={({ pressed }) => [
+                    styles.modalButton,
+                    { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
+                  ]}
+                >
+                  <ThemedText type="smallBold">{t('common.confirm', 'Confirm')}</ThemedText>
+                </Pressable>
+              </ThemedView>
+            </ThemedView>
+          </ThemedView>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'center',
+    padding: Spacing.four,
+  },
+  modalCard: {
+    borderRadius: Spacing.three,
+    padding: Spacing.three,
+    gap: Spacing.one,
+  },
+  modalHint: { marginBottom: Spacing.two },
+  modalInput: {
+    minHeight: 72,
+    borderRadius: Spacing.two,
+    padding: Spacing.two,
+    textAlignVertical: 'top',
+  },
+  modalError: { color: '#E53E3E' },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  modalButton: {
+    paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.three,
+    borderRadius: Spacing.two,
+  },
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
   header: { marginBottom: Spacing.three },
