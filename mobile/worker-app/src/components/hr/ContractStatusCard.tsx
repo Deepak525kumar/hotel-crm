@@ -5,9 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import type { ContractDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
-import { api, getAccessToken } from '@/lib/api';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
+import { downloadContract } from '@/lib/contract-download';
 import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import { useState } from 'react';
 
@@ -27,22 +25,9 @@ export function ContractStatusCard({
   const handleDownload = async () => {
     setDownloading(true);
     try {
-      const url = api.hr.getContractDownloadUrl(workerId);
-      const token = getAccessToken();
-      const fileUri = `${FileSystem.Paths.document.uri}contract.pdf`;
-
-      const result = await FileSystem.downloadAsync(url, fileUri, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-
-      if (result.status !== 200) {
-        throw new Error('Download failed');
-      }
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(result.uri);
-      } else {
-        Alert.alert('Success', `Contract downloaded to ${result.uri}`);
+      const { uri, outcome } = await downloadContract(workerId);
+      if (outcome === 'saved') {
+        Alert.alert('Success', `Contract downloaded to ${uri}`);
       }
     } catch (e) {
       Alert.alert(t('errors.title'), t('hr.dataLoadFailed'));
