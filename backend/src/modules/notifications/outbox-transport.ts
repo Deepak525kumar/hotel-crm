@@ -6,6 +6,11 @@ import {
   SendgridProviderClient,
 } from './email-provider.js';
 import { ApnsProviderClient, FcmProviderClient, InvalidTokenError, PushProviderClient } from './push-provider.js';
+import {
+  PrismaPushTokenStore,
+  resolvePushTokenStore,
+  type PushTokenStore,
+} from './push-token-store.js';
 
 /**
  * Compile-time exhaustiveness check: a call site only type-checks if `value`
@@ -265,7 +270,14 @@ export class PushTransportHandler implements TransportHandler {
     private readonly apnsClient?: PushProviderClient,
     private readonly fcmClient?: PushProviderClient,
     /** Per-app APNs topics (bundle IDs), deployment configuration — never persisted. */
-    private readonly apnsTopics: Partial<Record<PushApp, string>> = {}
+    private readonly apnsTopics: Partial<Record<PushApp, string>> = {},
+    /**
+     * Where this deployment's device tokens live (push-token-store.ts).
+     * Defaults to the `PushToken` table, which is what a deployment without
+     * Firebase configured uses; resolvePushTransportHandler supplies the
+     * Firestore-backed store when Firebase is configured.
+     */
+    private readonly tokenStore: PushTokenStore = new PrismaPushTokenStore(prisma)
   ) {}
 
   private clientFor(platform: PushPlatform): PushProviderClient | undefined {
@@ -319,7 +331,7 @@ export class PushTransportHandler implements TransportHandler {
       return;
     }
 
-    const tokens = await this.prisma.pushToken.findMany({ where: { user_id: notification.user_id } });
+    const tokens = await this.tokenStore.listForUser(notification.user_id);
 
     if (tokens.length === 0) {
       logger.info('PushTransportHandler: recipient has no registered devices, skipping', {
@@ -386,7 +398,7 @@ export class PushTransportHandler implements TransportHandler {
             platform: pushToken.platform,
           });
           try {
-            await this.prisma.pushToken.delete({ where: { id: pushToken.id } });
+            await this.tokenStore.delete(notification.user_id, pushToken.id);
           } catch (deleteError) {
             // Best-effort: a delete failure (e.g. already removed by a concurrent
             // request) must not fail this delivery attempt.
@@ -498,5 +510,15 @@ export function resolvePushTransportHandler(
     logger.warn('PUSH transport: FCM not configured — Android devices will be skipped, not delivered');
   }
 
-  return new PushTransportHandler(prisma, apnsClient, fcmClient, apnsTopics);
+  // Same resolver the registration endpoint uses (service.registerPushToken),
+  // so the transport always reads from the store registration wrote to.
+  const tokenStore = resolvePushTokenStore(prisma, {
+    firebaseProjectId,
+    firebaseServiceAccountKeyBase64,
+  });
+  logger.info('PUSH transport: device tokens read from', {
+    store: tokenStore instanceof PrismaPushTokenStore ? 'postgres (PushToken)' : 'firestore',
+  });
+
+  return new PushTransportHandler(prisma, apnsClient, fcmClient, apnsTopics, tokenStore);
 }
