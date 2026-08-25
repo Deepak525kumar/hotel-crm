@@ -23,6 +23,7 @@ export default function RootLayout() {
   const user = useAuthStore((s) => s.user);
   const hydrateLocale = useLocaleStore((s) => s.hydrate);
   const hydrateTheme = useThemeStore((s) => s.hydrate);
+  const themeHydrated = useThemeStore((s) => s.hydrated);
   const reconcileLocale = useLocaleStore((s) => s.reconcileFromServer);
   const localeReconciled = useLocaleStore((s) => s.reconciled);
 
@@ -44,11 +45,15 @@ export default function RootLayout() {
     void reconcileLocale(user?.preferred_language ?? null);
   }, [isInitialized, localeReconciled, user?.preferred_language, reconcileLocale]);
 
+  // Also waits for the stored theme. Without it the app paints in the OS scheme
+  // for the moment storage takes to answer, so a worker who chose dark sees a
+  // white flash on every launch. The store sets `hydrated` even when storage
+  // throws, so this cannot hold the splash screen open.
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && themeHydrated) {
       SplashScreen.hideAsync();
     }
-  }, [isInitialized]);
+  }, [isInitialized, themeHydrated]);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
