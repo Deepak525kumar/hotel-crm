@@ -28,7 +28,16 @@ const mockPrisma = {
   outboxEvent: mockOutboxEvent,
   jobRequest: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   calendarEntry: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
-  hotel: { findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
+  hotel: {
+    findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+    // list()/getById() now nest worker and hotel names in the DTO, because the
+    // checker app could otherwise only show the tail of a cuid.
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  },
+  user: {
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+  },
   auditLog: { create: jest.fn() as jest.MockedFunction<(...args: any[]) => any> },
   $transaction: jest.fn(async (cb: any) => cb(mockPrisma)) as jest.MockedFunction<(...args: any[]) => any>,
 };
@@ -611,6 +620,78 @@ describe('AttendanceService', () => {
       await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
       const where = mockAttendance.findMany.mock.calls[0][0].where;
       expect(where.worker_id).toBe('w1');
+    });
+
+    // The checker app rendered `Worker ···{worker_id.slice(-6)}` -- the tail of a
+    // cuid -- because the DTO carried only ids. A checker could not tell whose
+    // attendance they were verifying, or at which hotel. /crm/hotels/:id 403s
+    // for a checker, so the client could not resolve it either.
+    describe('who and where', () => {
+      const WORKER = { id: 'w1', first_name: 'Wanda', last_name: 'Worker' };
+      const HOTEL = { id: 'h1', name: 'Downtown Hotel', city: 'Berlin' };
+
+      it('nests the worker name', async () => {
+        mockAttendance.findMany.mockResolvedValue([makeRecord({ worker_id: 'w1', hotel_id: 'h1' })]);
+        mockAttendance.count.mockResolvedValue(1);
+        mockPrisma.user.findMany.mockResolvedValue([WORKER]);
+        mockPrisma.hotel.findMany.mockResolvedValue([HOTEL]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'c1', role: 'checker' });
+
+        expect(res.data[0].worker).toEqual(WORKER);
+        expect(res.data[0].hotel).toEqual(HOTEL);
+      });
+
+      it('resolves the verifier separately from the worker', async () => {
+        // Same table, two different people; a naive single lookup would show
+        // the worker as the verifier.
+        mockAttendance.findMany.mockResolvedValue([
+          makeRecord({ worker_id: 'w1', hotel_id: 'h1', verified_by_id: 'c9' }),
+        ]);
+        mockAttendance.count.mockResolvedValue(1);
+        mockPrisma.user.findMany.mockImplementation(async ({ where }: any) =>
+          where.id.in.includes('c9')
+            ? [{ id: 'c9', first_name: 'Carl', last_name: 'Checker' }]
+            : [WORKER]
+        );
+        mockPrisma.hotel.findMany.mockResolvedValue([HOTEL]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'c1', role: 'checker' });
+
+        expect(res.data[0].verified_by_name).toBe('Carl Checker');
+        expect(res.data[0].worker?.first_name).toBe('Wanda');
+      });
+
+      it('batches the lookups — one query per page, not per row', async () => {
+        mockAttendance.findMany.mockResolvedValue([
+          makeRecord({ id: 'r1', worker_id: 'w1', hotel_id: 'h1' }),
+          makeRecord({ id: 'r2', worker_id: 'w1', hotel_id: 'h1' }),
+          makeRecord({ id: 'r3', worker_id: 'w1', hotel_id: 'h1' }),
+        ]);
+        mockAttendance.count.mockResolvedValue(3);
+        mockPrisma.hotel.findMany.mockClear();
+        mockPrisma.hotel.findMany.mockResolvedValue([HOTEL]);
+        mockPrisma.user.findMany.mockResolvedValue([WORKER]);
+
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'c1', role: 'checker' });
+
+        expect(mockPrisma.hotel.findMany).toHaveBeenCalledTimes(1);
+        expect(mockPrisma.hotel.findMany.mock.calls[0][0].where.id.in).toEqual(['h1']);
+      });
+
+      it('leaves the names null when they no longer resolve', async () => {
+        // A deleted worker or hotel must not break the row for the others.
+        mockAttendance.findMany.mockResolvedValue([makeRecord({ worker_id: 'gone', hotel_id: 'gone' })]);
+        mockAttendance.count.mockResolvedValue(1);
+        mockPrisma.user.findMany.mockResolvedValue([]);
+        mockPrisma.hotel.findMany.mockResolvedValue([]);
+
+        const res = await service.list({ page: 1, per_page: 20 } as any, { userId: 'c1', role: 'checker' });
+
+        expect(res.data[0].worker).toBeNull();
+        expect(res.data[0].hotel).toBeNull();
+        expect(res.data[0].verified_by_name).toBeNull();
+      });
     });
 
     it('does not scope manager', async () => {

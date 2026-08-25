@@ -84,7 +84,12 @@ const dbMock = {
   },
   hotel: {
     findUnique: async ({ where }: any) => ({ hotel_group_id: where.id === 'h1' ? 'g1' : 'g2' }),
+    // getById()/list() now nest hotel and worker names so a checker can tell
+    // whose attendance a row is; these fixtures only assert on status codes, so
+    // empty results are fine.
+    findMany: async () => [],
   },
+  user: { findMany: async () => [], findUnique: async () => null },
   auditLog: { create: async () => undefined },
   workerAssignment: { findUnique: async () => ({ assigned_by_id: 'mgr_1' }) },
   // ADR-029 (GD-01, Epic 7 PR 7.3): AttendanceService.update() now wraps its

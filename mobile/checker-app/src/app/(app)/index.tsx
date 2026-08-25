@@ -95,11 +95,24 @@ export default function QueueScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.cardRow}>
-          <Text style={styles.workerLabel}>Worker ···{item.worker_id.slice(-6)}</Text>
+          {/* The API now nests the worker, so this shows a name. It used to
+              render `Worker ···{worker_id.slice(-6)}` -- the tail of a cuid --
+              because the DTO carried only ids, and a checker could not tell
+              whose attendance they were about to verify. */}
+          <Text style={styles.workerLabel}>
+            {item.worker
+              ? `${item.worker.first_name} ${item.worker.last_name}`.trim()
+              : t('attendance.unknownWorker', 'Unknown worker')}
+          </Text>
           <View style={[styles.badge, { backgroundColor: statusColor(item.status) }]}>
             <Text style={styles.badgeText}>{item.status}</Text>
           </View>
         </View>
+        {item.hotel && (
+          <Text style={styles.cardSub}>
+            {[item.hotel.name, item.hotel.city].filter(Boolean).join(' · ')}
+          </Text>
+        )}
         <Text style={styles.cardSub}>
           In: {formatTime(item.check_in_at)} · Out: {formatTime(item.check_out_at)}
           {item.minutes_late ? ` · ${item.minutes_late}m late` : ''}

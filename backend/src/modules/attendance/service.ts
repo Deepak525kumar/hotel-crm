@@ -9,13 +9,28 @@ import { getEnv } from '../../config/env.js';
 // pure predicates, so suites mocking the permissions middleware need not stub them.
 import { isScopedManagerRole, isSelfScopedRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
-import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput } from './types.js';
+import { AttendanceDto, CheckInInput, ListAttendanceQuery, UpdateAttendanceInput,
+  AttendancePersonDto,
+  AttendanceHotelDto,
+} from './types.js';
 import { assignmentService, resolveScheduledStart } from '../assignments/service.js';
 import { AssignmentStatus } from '@prisma/client';
 import { todayInCalendarTimezone } from '../../lib/utils.js';
 
 export class AttendanceService extends BaseService {
-  private toDto(a: Attendance): AttendanceDto {
+  /**
+   * `context` is optional so the mutation paths (checkIn/checkOut/verify/...)
+   * keep their current cost and shape; their callers refetch. list() and
+   * getById() populate it, which is where the checker app reads from.
+   */
+  private toDto(
+    a: Attendance,
+    context: {
+      worker?: AttendancePersonDto | null;
+      hotel?: AttendanceHotelDto | null;
+      verifiedByName?: string | null;
+    } = {}
+  ): AttendanceDto {
     return {
       id: a.id,
       assignment_id: a.assignment_id,
@@ -34,8 +49,15 @@ export class AttendanceService extends BaseService {
       verified_at: a.verified_at?.toISOString() ?? null,
       created_at: a.created_at.toISOString(),
       updated_at: a.updated_at.toISOString(),
+      worker: context.worker ?? null,
+      hotel: context.hotel ?? null,
+      verified_by_name: context.verifiedByName ?? null,
     };
   }
+
+  /** The columns the two enrichment call sites select — kept together so they cannot drift. */
+  private static readonly PERSON_SELECT = { id: true, first_name: true, last_name: true } as const;
+  private static readonly HOTEL_SELECT = { id: true, name: true, city: true } as const;
 
   async checkIn(
     input: CheckInInput,
@@ -295,7 +317,39 @@ export class AttendanceService extends BaseService {
       this.prisma.attendance.count({ where }),
     ]);
 
-    return { data: records.map((r) => this.toDto(r)), total };
+    // Batched: one query each for the whole page, never one per row. Without
+    // these the checker app could only render the tail of a cuid where a
+    // worker's name belongs.
+    const workerIds = [...new Set(records.map((r) => r.worker_id))];
+    const hotelIds = [...new Set(records.map((r) => r.hotel_id))];
+    const verifierIds = [...new Set(records.map((r) => r.verified_by_id).filter((v): v is string => !!v))];
+
+    const [workers, hotels, verifiers] = await Promise.all([
+      workerIds.length
+        ? this.prisma.user.findMany({ where: { id: { in: workerIds } }, select: AttendanceService.PERSON_SELECT })
+        : [],
+      hotelIds.length
+        ? this.prisma.hotel.findMany({ where: { id: { in: hotelIds } }, select: AttendanceService.HOTEL_SELECT })
+        : [],
+      verifierIds.length
+        ? this.prisma.user.findMany({ where: { id: { in: verifierIds } }, select: AttendanceService.PERSON_SELECT })
+        : [],
+    ]);
+    const workerById = new Map(workers.map((w) => [w.id, w]));
+    const hotelById = new Map(hotels.map((h) => [h.id, h]));
+    const verifierById = new Map(verifiers.map((v) => [v.id, v]));
+
+    return {
+      data: records.map((r) => {
+        const verifier = r.verified_by_id ? verifierById.get(r.verified_by_id) : undefined;
+        return this.toDto(r, {
+          worker: workerById.get(r.worker_id) ?? null,
+          hotel: hotelById.get(r.hotel_id) ?? null,
+          verifiedByName: verifier ? `${verifier.first_name} ${verifier.last_name}`.trim() : null,
+        });
+      }),
+      total,
+    };
   }
 
   async getById(
@@ -320,7 +374,20 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    return this.toDto(record);
+    // Same three lookups as list(), for one row.
+    const [worker, hotel, verifier] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: record.worker_id }, select: AttendanceService.PERSON_SELECT }),
+      this.prisma.hotel.findUnique({ where: { id: record.hotel_id }, select: AttendanceService.HOTEL_SELECT }),
+      record.verified_by_id
+        ? this.prisma.user.findUnique({ where: { id: record.verified_by_id }, select: AttendanceService.PERSON_SELECT })
+        : null,
+    ]);
+
+    return this.toDto(record, {
+      worker,
+      hotel,
+      verifiedByName: verifier ? `${verifier.first_name} ${verifier.last_name}`.trim() : null,
+    });
   }
 
   async update(
