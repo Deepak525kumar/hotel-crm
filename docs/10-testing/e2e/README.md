@@ -81,6 +81,14 @@ criteria. Writing the specification comes first.
 Login throttling (`ADR-070`, PR #509) and the welcome-email-on-account-creation path (PR #508) also
 landed after the newest run log and are not yet exercised by any scenario.
 
+**No mobile screen is covered by any suite.** Both apps' jest configs collect only
+`**/__tests__/**/*.test.ts`, so every `.tsx` screen and component is invisible to CI. The
+2026-08-25 mobile flow verification (`runs/2026-08-25-mobile-app-flow-verification.md`) found eight
+defects, five of them living in `.tsx` files that passed typecheck — contract download threw on
+every attempt, onboarding submission 404'd, marking a vacation always failed, and a checker saw the
+tail of a cuid where a worker's name belonged. None were caught by a green suite, because no suite
+could reach them. Treat "the mobile tests pass" as saying nothing about any screen.
+
 Push is the newest and most consequential of these: the 2026-08-25 run (`runs/2026-08-25-auth-and-push-verification.md`) found that no device had ever registered a token, and that a `DELIVERED` PUSH outbox event does not mean a device received anything — `PushTransportHandler.deliver()` returns early without throwing when the recipient has no devices, and the worker marks any non-throwing deliver as `DELIVERED`. **Do not read outbox status as evidence that push works.** A scenario here has to assert on a real device token and a real provider response, not on event status.
 
 ---
