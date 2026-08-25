@@ -31,6 +31,23 @@ describe('Android FCM configuration (worker-app)', () => {
     expect(existsSync(app.android.googleServicesFile)).toBe(true);
   });
 
+  it('google-services.json belongs to the Firebase project the backend uses', () => {
+    // FCM registration tokens are scoped to the SENDER project. A config
+    // downloaded from a different Firebase project builds and runs fine, mints
+    // tokens happily, and then every send fails with SENDER_ID_MISMATCH (403)
+    // — which push-provider.ts does not classify as UNREGISTERED, so the token
+    // is never pruned and each notification instead retries on backoff to
+    // DEAD_LETTER. Nothing about that points at the config.
+    //
+    // This exact mismatch happened: the committed config was for
+    // fhm-hotelservice while the backend's FIREBASE_PROJECT_ID and
+    // service-account key were hotel-crm-b0a24. Pinned here so the two can
+    // never silently disagree again. If the project legitimately changes,
+    // update this line, .firebaserc, and the backend env together.
+    const services = JSON.parse(readFileSync('google-services.json', 'utf8'));
+    expect(services.project_info.project_id).toBe('hotel-crm-b0a24');
+  });
+
   it('google-services.json contains a client for this app’s applicationId', () => {
     // Firebase matches a client by package_name at build time. A config
     // downloaded for the other app would build fine and then fail to produce
