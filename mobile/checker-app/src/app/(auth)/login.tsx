@@ -96,6 +96,11 @@ export default function LoginScreen() {
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            // Autocorrect can rewrite an address outright (a domain
+            // "corrected" to a dictionary word), which fails the same
+            // silent way.
+            autoCorrect={false}
+            spellCheck={false}
             keyboardType="email-address"
             autoComplete="email"
             editable={!isLoading}
@@ -114,6 +119,15 @@ export default function LoginScreen() {
             value={password}
             onChangeText={setPassword}
             secureTextEntry
+            // React Native defaults autoCapitalize to "sentences". On iOS a
+            // secure field still applies it, so the first character of a typed
+            // password is silently upper-cased and login fails with "Invalid
+            // credentials" on a correct password -- while the same credentials
+            // work on web, which has no such behaviour. The email field above
+            // already set this; the password field did not.
+            autoCapitalize="none"
+            autoCorrect={false}
+            spellCheck={false}
             autoComplete="current-password"
             editable={!isLoading}
           />
