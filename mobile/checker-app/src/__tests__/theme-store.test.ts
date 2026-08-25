@@ -41,3 +41,50 @@ describe('isThemeMode', () => {
     expect(isThemeMode(undefined)).toBe(false);
   });
 });
+
+describe('hydrate', () => {
+  it('marks itself hydrated even when storage throws', async () => {
+    // The splash screen waits on `hydrated`. If a storage failure left it
+    // false, the app would never finish launching — a stuck splash is a far
+    // worse outcome than opening in the OS scheme.
+    jest.resetModules();
+    jest.doMock('@/lib/persistent-storage', () => ({
+      getItem: async () => {
+        throw new Error('SecureStore unavailable');
+      },
+      setItem: async () => undefined,
+    }));
+    const { useThemeStore: store } = require('@/stores/theme-store');
+
+    await store.getState().hydrate();
+
+    expect(store.getState().hydrated).toBe(true);
+    expect(store.getState().mode).toBe('system');
+  });
+
+  it('falls back to system for an unrecognized stored value', async () => {
+    jest.resetModules();
+    jest.doMock('@/lib/persistent-storage', () => ({
+      getItem: async () => 'sepia',
+      setItem: async () => undefined,
+    }));
+    const { useThemeStore: store } = require('@/stores/theme-store');
+
+    await store.getState().hydrate();
+
+    expect(store.getState().mode).toBe('system');
+  });
+
+  it('restores a stored choice', async () => {
+    jest.resetModules();
+    jest.doMock('@/lib/persistent-storage', () => ({
+      getItem: async () => 'dark',
+      setItem: async () => undefined,
+    }));
+    const { useThemeStore: store } = require('@/stores/theme-store');
+
+    await store.getState().hydrate();
+
+    expect(store.getState().mode).toBe('dark');
+  });
+});

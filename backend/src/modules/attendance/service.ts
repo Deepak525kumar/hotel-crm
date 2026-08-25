@@ -55,9 +55,38 @@ export class AttendanceService extends BaseService {
     };
   }
 
-  /** The columns the two enrichment call sites select — kept together so they cannot drift. */
+  /** The columns every enrichment call site selects — kept together so they cannot drift. */
   private static readonly PERSON_SELECT = { id: true, first_name: true, last_name: true } as const;
   private static readonly HOTEL_SELECT = { id: true, name: true, city: true } as const;
+
+  /**
+   * Resolves the names for one record.
+   *
+   * Used by the mutation paths as well as getById, deliberately. Leaving writes
+   * un-enriched made the same field populated on a read and null on a write of
+   * the SAME row, and the checker app assigns the verify() response straight
+   * into state — so tapping "Verify" erased the worker name and hotel that had
+   * just been on screen. A DTO field that means "not loaded" in one response and
+   * "no such worker" in another is not a contract a client can use.
+   */
+  private async enrichContext(record: Attendance): Promise<{
+    worker: AttendancePersonDto | null;
+    hotel: AttendanceHotelDto | null;
+    verifiedByName: string | null;
+  }> {
+    const [worker, hotel, verifier] = await Promise.all([
+      this.prisma.user.findUnique({ where: { id: record.worker_id }, select: AttendanceService.PERSON_SELECT }),
+      this.prisma.hotel.findUnique({ where: { id: record.hotel_id }, select: AttendanceService.HOTEL_SELECT }),
+      record.verified_by_id
+        ? this.prisma.user.findUnique({ where: { id: record.verified_by_id }, select: AttendanceService.PERSON_SELECT })
+        : null,
+    ]);
+    return {
+      worker,
+      hotel,
+      verifiedByName: verifier ? `${verifier.first_name} ${verifier.last_name}`.trim() : null,
+    };
+  }
 
   async checkIn(
     input: CheckInInput,
@@ -262,7 +291,7 @@ export class AttendanceService extends BaseService {
       true // internalBypass = true
     );
 
-    return this.toDto(updated);
+    return this.toDto(updated, await this.enrichContext(updated));
   }
 
   async list(
@@ -374,20 +403,7 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    // Same three lookups as list(), for one row.
-    const [worker, hotel, verifier] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: record.worker_id }, select: AttendanceService.PERSON_SELECT }),
-      this.prisma.hotel.findUnique({ where: { id: record.hotel_id }, select: AttendanceService.HOTEL_SELECT }),
-      record.verified_by_id
-        ? this.prisma.user.findUnique({ where: { id: record.verified_by_id }, select: AttendanceService.PERSON_SELECT })
-        : null,
-    ]);
-
-    return this.toDto(record, {
-      worker,
-      hotel,
-      verifiedByName: verifier ? `${verifier.first_name} ${verifier.last_name}`.trim() : null,
-    });
+    return this.toDto(record, await this.enrichContext(record));
   }
 
   async update(
@@ -604,7 +620,7 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    return this.toDto(updated);
+    return this.toDto(updated, await this.enrichContext(updated));
   }
 }
 

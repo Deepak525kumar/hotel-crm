@@ -285,7 +285,61 @@ export class AssignmentService extends BaseService {
     };
   }
 
-  /** The columns toHotelDto needs — kept in one place so the two call sites cannot drift. */
+  /**
+   * Resolves hotel, shift times and assigner for one assignment.
+   *
+   * Used by the write path as well as getById, deliberately. When only the read
+   * paths were enriched, the same field was populated on a read and null on a
+   * write of the SAME row -- and the web assignment page does
+   * `mutate(updated, { revalidate: false })`, writing the mutation response
+   * straight into the SWR cache without refetching. Any field rendered from the
+   * DTO would blank out the moment a worker tapped Start or Complete.
+   *
+   * Serving the hotel here rather than making the client call /crm/hotels/:id
+   * is deliberate: that endpoint is scoped by the caller's hotel claim and 403s
+   * for a worker assigned to the hotel, so the address was unreachable. The
+   * ownership gate on each caller already limits which assignment this is.
+   *
+   * Cost note: update() runs this too, and JobRequestService's cancel-cascade
+   * calls update() once per assignment tied to the cancelled request, so a
+   * cascade pays three extra primary-key lookups per assignment for a DTO it
+   * discards. Accepted rather than adding a "don't enrich" flag: N is bounded
+   * by the request's workers_needed, the reads are indexed point lookups, and
+   * a mutation response that silently differs from a read is the bug this
+   * exists to prevent.
+   */
+  private async enrichContext(assignment: WorkerAssignment): Promise<{
+    hotel: AssignmentHotelDto | null;
+    shiftStartTime: string | null;
+    shiftEndTime: string | null;
+    assignedByName: string | null;
+  }> {
+    const requestId = assignment.job_request_id ?? assignment.work_request_id;
+    const [hotel, request, assigner] = await Promise.all([
+      this.prisma.hotel.findUnique({
+        where: { id: assignment.hotel_id },
+        select: AssignmentService.HOTEL_SELECT,
+      }),
+      requestId
+        ? this.prisma.jobRequest.findUnique({
+            where: { id: requestId },
+            select: { shift_start_time: true, shift_end_time: true },
+          })
+        : null,
+      this.prisma.user.findUnique({
+        where: { id: assignment.assigned_by_id },
+        select: { first_name: true, last_name: true },
+      }),
+    ]);
+    return {
+      hotel: hotel ? AssignmentService.toHotelDto(hotel) : null,
+      shiftStartTime: request?.shift_start_time ?? null,
+      shiftEndTime: request?.shift_end_time ?? null,
+      assignedByName: AssignmentService.fullName(assigner),
+    };
+  }
+
+  /** The columns toHotelDto needs — kept in one place so the call sites cannot drift. */
   private static readonly HOTEL_SELECT = {
     id: true, name: true, address: true, city: true, country: true,
     timezone: true, latitude: true, longitude: true,
@@ -445,34 +499,7 @@ export class AssignmentService extends BaseService {
         )
       : null;
 
-    // Same three lookups as list(), for one row. Serving the hotel here rather
-    // than making the client call /crm/hotels/:id is deliberate: that endpoint
-    // is scoped by the caller's hotel claim and 403s for a worker assigned to
-    // the hotel, so the address was unreachable. The ownership gate above
-    // already limited this response to the caller's own assignment.
-    const [hotel, request, assigner] = await Promise.all([
-      this.prisma.hotel.findUnique({
-        where: { id: assignment.hotel_id },
-        select: AssignmentService.HOTEL_SELECT,
-      }),
-      assignment.job_request_id ?? assignment.work_request_id
-        ? this.prisma.jobRequest.findUnique({
-            where: { id: (assignment.job_request_id ?? assignment.work_request_id)! },
-            select: { shift_start_time: true, shift_end_time: true },
-          })
-        : null,
-      this.prisma.user.findUnique({
-        where: { id: assignment.assigned_by_id },
-        select: { first_name: true, last_name: true },
-      }),
-    ]);
-
-    return this.toDto(assignment, roomsCompleted, enteredByName, {
-      hotel: hotel ? AssignmentService.toHotelDto(hotel) : null,
-      shiftStartTime: request?.shift_start_time ?? null,
-      shiftEndTime: request?.shift_end_time ?? null,
-      assignedByName: AssignmentService.fullName(assigner),
-    });
+    return this.toDto(assignment, roomsCompleted, enteredByName, await this.enrichContext(assignment));
   }
 
   async update(
@@ -669,7 +696,7 @@ export class AssignmentService extends BaseService {
       ...(next === AssignmentStatus.CANCELLED ? { cancellation_reason: updated.cancellation_reason } : {}),
     });
 
-    return this.toDto(updated);
+    return this.toDto(updated, null, null, await this.enrichContext(updated));
   }
 
   // Job-dispatch lifecycle feature (2026-08-05): atomic reassign. Replaces

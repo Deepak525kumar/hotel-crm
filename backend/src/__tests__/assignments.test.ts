@@ -280,8 +280,19 @@ describe('AssignmentService', () => {
         mockWorkerAssignment.findUnique.mockResolvedValue(
           makeAssignment({ work_request_id: null, job_request_id: null })
         );
+        // The update() result must describe the SAME row that was read: a
+        // calendar-placed assignment stays request-less. The default fixture
+        // carries work_request_id 'wr1', so returning it here described an
+        // assignment that had somehow gained a request mid-update, and the
+        // assertion below then failed for a reason the guard has nothing to do
+        // with.
         mockWorkerAssignment.update.mockResolvedValue(
-          makeAssignment({ status: 'IN_PROGRESS', started_at: new Date() })
+          makeAssignment({
+            status: 'IN_PROGRESS',
+            started_at: new Date(),
+            work_request_id: null,
+            job_request_id: null,
+          })
         );
 
         await service.update('a1', { status: 'IN_PROGRESS' }, 'w1', 'worker', undefined, true);
@@ -935,6 +946,27 @@ describe('AssignmentService', () => {
 
         expect(res.data[0].hotel).toBeNull();
       });
+    });
+
+    // Regression: the web assignment page does
+    // `mutate(updated, { revalidate: false })` -- it writes the mutation
+    // response into the SWR cache and does NOT refetch. With only the read
+    // paths enriched, every detail field blanked out the moment a worker
+    // tapped Start or Complete.
+    it('update() returns the same hotel and day as a read', async () => {
+      const row = makeAssignment({ hotel_id: 'h1', day: new Date('2026-08-19T00:00:00.000Z') });
+      mockWorkerAssignment.findUnique.mockResolvedValue(row);
+      mockWorkerAssignment.update.mockResolvedValue(row);
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1', name: 'Downtown Hotel', address: '1 Main St', city: 'Berlin',
+        country: 'Germany', timezone: 'Europe/Berlin', latitude: null, longitude: null,
+        contact_phone: null, contact_email: null,
+      });
+
+      const dto = await service.update('a1', { status: 'IN_PROGRESS' } as any, 'admin1', 'admin');
+
+      expect(dto.hotel?.name).toBe('Downtown Hotel');
+      expect(dto.day).toBe('2026-08-19');
     });
 
     it('does not scope admin', async () => {

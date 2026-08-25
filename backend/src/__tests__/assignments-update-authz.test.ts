@@ -96,6 +96,12 @@ jest.mock('../lib/db.js', () => {
     // resolveScheduledStart() finds no shift time and the guard correctly
     // does not apply. This suite is about authorization, not scheduling.
     jobRequest: { findUnique: async () => null },
+    // update() now returns the same enriched DTO as a read, because the web
+    // page writes the mutation response straight into its SWR cache without
+    // refetching -- so hotel/day/times would otherwise blank out on Start or
+    // Complete. That needs a user lookup for assigned_by_name; this suite is
+    // about authorization, so an anonymous assigner is fine.
+    user: { findUnique: async () => null, findMany: async () => [] },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0 },
     workerOverallRating: { upsert: async () => ({}) },
