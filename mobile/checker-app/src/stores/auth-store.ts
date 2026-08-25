@@ -58,7 +58,16 @@ export const useAuthStore = create<AuthState>((set) => ({
   login: async (email, password) => {
     set({ isLoading: true });
     try {
-      const response = await api.auth.login(email, password);
+      // Normalized here, not at the call site, so every entry point benefits.
+      // Reported from the field: a valid credential was rejected as "Invalid
+      // credentials". Cause: signup stores the address lowercased, the backend
+      // looked users up by literal email, and Postgres compares
+      // case-sensitively — so any capital letter the user typed produced a 401
+      // on their own account. The backend is being fixed too, but normalizing
+      // client-side means a build keeps working against a backend that has not
+      // been updated yet, and email addresses are case-insensitive in practice
+      // regardless.
+      const response = await api.auth.login(email.trim().toLowerCase(), password);
       setAccessToken(response.access_token);
       setRefreshToken(response.refresh_token);
       await setItem(KEYS.ACCESS_TOKEN, response.access_token);
