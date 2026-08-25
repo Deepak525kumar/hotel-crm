@@ -16,7 +16,12 @@ export const SignupSchema = z.object({
 }).strict();
 
 export const LoginSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // .toLowerCase() mirrors SignupSchema above. Without it, a user who signed
+  // up as "John@x.com" (stored lowercased by signup) could not log in with the
+  // exact string they typed at signup: the lookup is by literal email and
+  // Postgres' unique index is case-sensitive, so it found nothing and returned
+  // "Invalid credentials". They were locked out of their own account.
+  email: z.string().email('Invalid email address').toLowerCase(),
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -54,7 +59,12 @@ export const UpdateProfileSchema = z.object({
 // reveals account existence; the confirm step requires the single-use token
 // issued by the request step as proof of email ownership.
 export const PasswordResetRequestSchema = z.object({
-  email: z.string().email('Invalid email address'),
+  // Normalized for the same reason as LoginSchema: the lookup is by literal
+  // email. Un-normalized, a mixed-case request for a lowercased account found
+  // no user, and the endpoint's deliberate anti-enumeration 200 meant the
+  // caller was told "sent" while no token was ever issued -- so a locked-out
+  // user could not self-recover either.
+  email: z.string().email('Invalid email address').toLowerCase(),
 }).strict();
 
 export const PasswordResetConfirmSchema = z.object({

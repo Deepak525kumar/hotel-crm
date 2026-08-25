@@ -13,7 +13,10 @@ import { z } from 'zod';
 // "Start onboarding" step, which no longer exists.
 export const CreateUserSchema = z
   .object({
-    email: z.string().email(),
+    // Lowercased so an admin-created account is stored the same way signup
+    // stores one. Postgres' unique index on User.email is case-sensitive, so
+    // without this "John@x.com" and "john@x.com" are two different accounts.
+    email: z.string().email().toLowerCase(),
     password: z.string().min(8),
     first_name: z.string().min(1).max(100),
     last_name: z.string().min(1).max(100),

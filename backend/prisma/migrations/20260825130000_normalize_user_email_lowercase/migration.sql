@@ -1,0 +1,19 @@
+-- Normalizes existing User.email values to lowercase.
+--
+-- Required by the input normalization added alongside this migration. Signup
+-- has always lowercased the email it stores, but login, password-reset and
+-- admin user-creation did not normalize their input, so the table can hold
+-- mixed-case addresses. Once login lowercases its input, a row stored as
+-- "John@x.com" would stop matching any login attempt — the fix would lock out
+-- exactly the accounts it is meant to rescue. This closes that gap.
+--
+-- Deliberately NOT wrapped in a collision-tolerant form: User.email is UNIQUE
+-- and this statement is transactional, so if two rows differ only by case the
+-- UPDATE raises a unique violation and the whole migration rolls back. That is
+-- the intended behaviour — a genuine collision is two real accounts for one
+-- person, which a human has to resolve (merge or rename), not something a
+-- migration should silently pick a winner for.
+--
+-- Verified against the development database before authoring: 68 users, 4 with
+-- uppercase characters, 0 collisions after lowercasing.
+UPDATE "User" SET email = lower(email) WHERE email <> lower(email);
