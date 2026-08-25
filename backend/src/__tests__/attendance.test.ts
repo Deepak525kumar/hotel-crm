@@ -567,6 +567,29 @@ describe('AttendanceService', () => {
       ).rejects.toMatchObject({ name: 'ForbiddenError' });
     });
 
+    // Regression: the checker detail screen does `setRecord(await verify(...))`.
+    // When only the read paths were enriched, verifying erased the worker name
+    // and hotel that had just been on screen -- the same field meant "not
+    // loaded" on a write and "no such worker" on a read.
+    it('returns the same worker/hotel names on a write as on a read', async () => {
+      mockAttendance.findUnique.mockResolvedValue(makeRecord({ worker_id: 'w1', hotel_id: 'h1' }));
+      mockAttendance.update.mockResolvedValue(
+        makeRecord({ worker_id: 'w1', hotel_id: 'h1', is_verified: true, verified_by_id: 'c9', verified_at: new Date() })
+      );
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+        where.id === 'c9'
+          ? { id: 'c9', first_name: 'Carl', last_name: 'Checker' }
+          : { id: 'w1', first_name: 'Wanda', last_name: 'Worker' }
+      );
+      mockPrisma.hotel.findUnique.mockResolvedValue({ id: 'h1', name: 'Downtown Hotel', city: 'Berlin' });
+
+      const dto = await service.update('att1', { is_verified: true }, 'c9', 'admin');
+
+      expect(dto.worker).toEqual({ id: 'w1', first_name: 'Wanda', last_name: 'Worker' });
+      expect(dto.hotel).toEqual({ id: 'h1', name: 'Downtown Hotel', city: 'Berlin' });
+      expect(dto.verified_by_name).toBe('Carl Checker');
+    });
+
     it('allows manager to verify and sets verified_by_id', async () => {
       mockAttendance.findUnique.mockResolvedValue(makeRecord());
       mockAttendance.update.mockResolvedValue(
