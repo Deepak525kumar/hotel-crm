@@ -138,6 +138,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   // This block previously claimed to fail open and did not: on an error
   // `status` stayed null and `loading` went false, so it fell through to the
   // wall below.
+  if (!user) return <>{children}</>;
   const isBypassed = shouldBypassConsentGate({ isAdmin, status, statusUnknown, enforced });
   const declined = status?.status === 'declined';
 
