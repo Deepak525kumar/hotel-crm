@@ -1,9 +1,13 @@
 import { Stack, DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import { useColorScheme } from 'react-native';
+// Our hook, not React Native's: the navigation chrome (DarkTheme/DefaultTheme)
+// must honour the user's theme setting too, or the header and tab bar stay in
+// the OS scheme while every screen switches.
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEffect } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 import { useAuthStore } from '@/stores/auth-store';
 import { useLocaleStore } from '@/stores/locale-store';
+import { useThemeStore } from '@/stores/theme-store';
 // Side-effect import: initialises i18next before any screen calls useTranslation.
 import '@/lib/i18n';
 import { AuthGuard } from '@/components/AuthGuard';
@@ -16,6 +20,7 @@ export default function RootLayout() {
   const { initialize, isInitialized } = useAuthStore();
   const user = useAuthStore((s) => s.user);
   const hydrateLocale = useLocaleStore((s) => s.hydrate);
+  const hydrateTheme = useThemeStore((s) => s.hydrate);
   const reconcileLocale = useLocaleStore((s) => s.reconcileFromServer);
   const localeReconciled = useLocaleStore((s) => s.reconciled);
 
@@ -28,6 +33,12 @@ export default function RootLayout() {
   useEffect(() => {
     void hydrateLocale();
   }, [hydrateLocale]);
+
+  // Same reasoning for the stored light/dark choice: without this the app opens
+  // in the OS scheme and then snaps to the user's setting once storage resolves.
+  useEffect(() => {
+    void hydrateTheme();
+  }, [hydrateTheme]);
 
   // Once auth resolves, the stored preference (if any) wins over the cached
   // and device-negotiated guess. Runs whichever way auth settles: a signed-

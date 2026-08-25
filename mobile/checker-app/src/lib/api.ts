@@ -443,7 +443,10 @@ export const api = {
   // no worker_id is ever sent, so these need no role gate and none exists.
   calendar: {
     myAbsences: () => request<CalendarAbsence[]>('/calendar/my-absences'),
-    markAbsence: (input: { day: string; kind: CalendarAbsenceKind }) =>
+    // `reason` is REQUIRED by the backend for VACATION and optional for SICK
+    // (MarkAbsenceSchema). It was missing entirely here, so every vacation
+    // request came back 422.
+    markAbsence: (input: { day: string; kind: CalendarAbsenceKind; reason?: string }) =>
       request<CalendarAbsence>('/calendar/my-absences', {
         method: 'POST',
         body: JSON.stringify(input),

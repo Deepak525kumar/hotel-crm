@@ -457,7 +457,10 @@ export const api = {
     // GD-18 narrow slice: self-scoped to the authenticated worker (server-side,
     // via req.auth.userId — no worker_id is ever sent from the client).
     myAbsences: () => request<CalendarAbsence[]>('/calendar/my-absences'),
-    markAbsence: (input: { day: string; kind: CalendarAbsenceKind }) =>
+    // `reason` is REQUIRED by the backend for VACATION and optional for SICK
+    // (MarkAbsenceSchema). It was missing entirely here, so every vacation
+    // request came back 422.
+    markAbsence: (input: { day: string; kind: CalendarAbsenceKind; reason?: string }) =>
       request<CalendarAbsence>('/calendar/my-absences', {
         method: 'POST',
         body: JSON.stringify(input),
