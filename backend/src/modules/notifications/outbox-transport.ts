@@ -451,6 +451,8 @@ export function resolvePushTransportHandler(
     apnsBundleIdChecker?: string;
     firebaseProjectId?: string;
     firebaseServiceAccountKeyBase64?: string;
+    /** Opt-in to the Firestore push-token store; see push-token-store.ts. */
+    pushTokenStoreFirestore?: boolean;
   }
 ): TransportHandler {
   const {
@@ -461,6 +463,7 @@ export function resolvePushTransportHandler(
     apnsBundleIdChecker,
     firebaseProjectId,
     firebaseServiceAccountKeyBase64,
+    pushTokenStoreFirestore,
   } = config;
 
   // Per-app topics (Epic 7 PR 7.8). Each app is configured independently, in
@@ -513,6 +516,7 @@ export function resolvePushTransportHandler(
   // Same resolver the registration endpoint uses (service.registerPushToken),
   // so the transport always reads from the store registration wrote to.
   const tokenStore = resolvePushTokenStore(prisma, {
+    firestoreEnabled: pushTokenStoreFirestore,
     firebaseProjectId,
     firebaseServiceAccountKeyBase64,
   });

@@ -163,6 +163,17 @@ const envSchema = z.object({
   // service account, not a static server key. FIREBASE_PROJECT_ID alone is
   // insufficient for v1 auth.
   FIREBASE_SERVICE_ACCOUNT_KEY_BASE64: z.string().optional(),
+  // Device push-token store selector (push-token-store.ts). Deliberately its
+  // OWN flag rather than being implied by the two FIREBASE_* variables above:
+  // those exist to enable FCM sends, and without this separation an operator
+  // fixing Android push (by supplying the service-account key FCM has always
+  // required) would silently also migrate the token store to Firestore,
+  // stranding every already-registered device until it happened to relaunch.
+  // Enabling FCM and moving the store are unrelated decisions and are now
+  // made independently. Off = the `PushToken` table, the long-standing
+  // behaviour. Requires both FIREBASE_* variables when on; if they are
+  // missing the store falls back to Postgres and logs the misconfiguration.
+  FEATURE_PUSH_TOKEN_STORE_FIRESTORE: strictBooleanFlag(false),
 
   // Sentry (error tracking)
   SENTRY_DSN: z.string().optional(),
