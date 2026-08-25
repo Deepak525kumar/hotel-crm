@@ -45,3 +45,17 @@ skills-lock.json
 # runs through Firebase. Android's google-services.json IS committed -- it is
 # required in the build for FCM.
 GoogleService-Info.plist
+
+# Firebase Admin SDK service-account keys. REAL SECRETS: the private_key in
+# one of these grants full backend access to the Firebase project (Firestore
+# included, bypassing firestore.rules). They are downloaded to the repository
+# root by the Firebase console's "Generate new private key" button, which is
+# exactly where a `git add -A` would sweep one up. One appeared there during
+# this work; verified never committed.
+#
+# The backend never reads a key FILE -- it reads the base64 of one from
+# FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 (see backend/.env.example), so there is
+# no reason for one to be in the tree at all.
+*-firebase-adminsdk-*.json
+firebase-adminsdk-*.json
+service-account*.json
