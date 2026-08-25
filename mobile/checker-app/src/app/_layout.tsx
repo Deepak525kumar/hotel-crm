@@ -8,6 +8,7 @@ import { useLocaleStore } from '@/stores/locale-store';
 import '@/lib/i18n';
 import { useTranslation } from 'react-i18next';
 import { AuthGuard } from '@/components/AuthGuard';
+import { ConsentGate } from '@/components/consent/ConsentGate';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,23 +48,25 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthGuard>
-        <Stack>
-          <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-          <Stack.Screen name="(app)" options={{ headerShown: false }} />
-          <Stack.Screen name="index" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="attendance/[id]"
-            options={{ title: t('nav.attendanceDetail'), headerShown: true }}
-          />
-          <Stack.Screen
-            name="quality/[id]"
-            options={{ title: t('nav.qualityCheck'), headerShown: true }}
-          />
-          <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
-          <Stack.Screen name="documents" options={{ headerShown: false }} />
-          <Stack.Screen name="consent" options={{ headerShown: false }} />
-          <Stack.Screen name="hr" options={{ headerShown: false }} />
-        </Stack>
+        <ConsentGate>
+          <Stack>
+            <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+            <Stack.Screen name="(app)" options={{ headerShown: false }} />
+            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="attendance/[id]"
+              options={{ title: t('nav.attendanceDetail'), headerShown: true }}
+            />
+            <Stack.Screen
+              name="quality/[id]"
+              options={{ title: t('nav.qualityCheck'), headerShown: true }}
+            />
+            <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="documents" options={{ headerShown: false }} />
+            <Stack.Screen name="consent" options={{ headerShown: false }} />
+            <Stack.Screen name="hr" options={{ headerShown: false }} />
+          </Stack>
+        </ConsentGate>
       </AuthGuard>
     </ThemeProvider>
   );

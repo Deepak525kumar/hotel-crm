@@ -2,7 +2,6 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
-import { ConsentGate } from '@/components/consent/ConsentGate';
 import { PushRegistration } from '@/components/PushRegistration';
 
 export default function AppLayout() {
@@ -20,7 +19,7 @@ export default function AppLayout() {
   // /notifications route, took a swallowed 403, and never retried that
   // session. As a child of the gate, mount implies consent.
   return (
-    <ConsentGate>
+    <>
       <PushRegistration />
       <Tabs
         screenOptions={{
@@ -109,6 +108,6 @@ export default function AppLayout() {
           }}
         />
       </Tabs>
-    </ConsentGate>
+    </>
   );
 }

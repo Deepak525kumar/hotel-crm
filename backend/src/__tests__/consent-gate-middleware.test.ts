@@ -67,8 +67,15 @@ describe('feature flag', () => {
 });
 
 describe('who is gated', () => {
-  it.each(GATED_ROLES)('blocks %s with no consent record', async (role) => {
+  it.each(GATED_ROLES)('blocks %s with no consent record on /attendance', async (role) => {
     const err = await run(makeReq('/attendance', { userId: 'u1', role }));
+    expect(err).toBeInstanceOf(Error);
+    expect((err as { code: string }).code).toBe('CONSENT_REQUIRED');
+    expect((err as { statusCode: number }).statusCode).toBe(403);
+  });
+
+  it.each(GATED_ROLES)('blocks %s with no consent record on /quality/:id', async (role) => {
+    const err = await run(makeReq('/quality/12345', { userId: 'u1', role }));
     expect(err).toBeInstanceOf(Error);
     expect((err as { code: string }).code).toBe('CONSENT_REQUIRED');
     expect((err as { statusCode: number }).statusCode).toBe(403);

@@ -1,0 +1,8 @@
+{
+  "android": {
+    "package": "com.mayankk21.hotelcrmmvp"
+  },
+  "ios": {
+    "bundleIdentifier": "com.mayankk21.hotelcrmmvp"
+  }
+}

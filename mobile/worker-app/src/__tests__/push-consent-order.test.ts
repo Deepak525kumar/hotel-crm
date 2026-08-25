@@ -20,16 +20,23 @@ describe('push registration runs only after the consent gate', () => {
     expect(layout).not.toContain('registerForPushNotificationsAsync');
   });
 
-  it('renders PushRegistration inside ConsentGate, not beside it', () => {
-    // Search the JSX only -- the doc comment above the return also names
-    // <PushRegistration />, and indexOf would find that mention first.
-    const jsx = layout.slice(layout.indexOf('return ('));
+  it('ConsentGate is wrapped around the root Stack layout', () => {
+    const rootLayout = readFileSync('src/app/_layout.tsx', 'utf8');
+    const jsx = rootLayout.slice(rootLayout.indexOf('return ('));
     const gateOpen = jsx.indexOf('<ConsentGate>');
-    const push = jsx.indexOf('<PushRegistration />');
+    const stack = jsx.indexOf('<Stack');
     const gateClose = jsx.indexOf('</ConsentGate>');
+    
     expect(gateOpen).toBeGreaterThanOrEqual(0);
-    expect(push).toBeGreaterThan(gateOpen);
-    expect(push).toBeLessThan(gateClose);
+    expect(stack).toBeGreaterThan(gateOpen);
+    expect(stack).toBeLessThan(gateClose);
+  });
+
+  it('renders PushRegistration in the app layout', () => {
+    // Search the JSX only
+    const jsx = layout.slice(layout.indexOf('return ('));
+    const push = jsx.indexOf('<PushRegistration />');
+    expect(push).toBeGreaterThanOrEqual(0);
   });
 
   it('keeps the registration call in the gated component', () => {

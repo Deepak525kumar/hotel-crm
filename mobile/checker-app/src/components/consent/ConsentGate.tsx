@@ -90,12 +90,12 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   }, [t]);
 
   useEffect(() => {
-    if (isAdmin) {
+    if (!user || isAdmin) {
       setLoading(false);
       return;
     }
     void load();
-  }, [isAdmin, load]);
+  }, [user, isAdmin, load]);
 
   const decide = useCallback(
     async (decision: 'GRANTED' | 'DECLINED') => {
