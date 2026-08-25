@@ -66,29 +66,11 @@ export function isGD02MatrixEnabled(): boolean {
 // unconditional in middleware/auth.ts, both cutovers being complete.
 
 /**
- * Job Dispatch Phase 1 cutover flag (Epic 9, TREQ-011).
- * Gates nothing in PR 9.2 itself — WorkApplication/ApplicationStatus and
- * WorkerAssignment.application_id are removed unconditionally in this PR,
- * with no code path reading this flag yet. It is introduced here so PR 9.3
- * (WorkerAssignment repointed to a nullable job_request_id) and PR 9.4, plus
- * the still-pending mobile companion PR, have a single cutover flag to
- * consume from the start of the phase, matching this repo's existing
- * "flag lands ahead of its first consumer" precedent (e.g. FEATURE_RM_ROLE).
- */
-export function isJobDispatchPhase1Enabled(): boolean {
-  return getEnv().FEATURE_JOBDISPATCH_PHASE1;
-}
-
-/**
  * Job Dispatch Phase 2 cutover flag (Epic 9 PR 9.5, TREQ-001/MIG-GAP-03).
  * When disabled (default), `POST /assignments/calendar-entries` and
  * `GET /assignments/calendar-entries` fall through to the 404 handler,
  * matching the "both-off = current behavior" posture (same shape as
  * `isEmploymentRecordEnabled`'s route-mount gate in routes/v1/index.ts).
- * Separate flag from `isJobDispatchPhase1Enabled()` — Phase 1 (WorkApplication
- * removal, job_request_id repointing, WorkRequest->JobRequest rename) is a
- * distinct cutover from Phase 2 (calendar direct-assignment), each gated
- * independently per this repo's existing per-phase flag precedent.
  */
 export function isJobDispatchPhase2Enabled(): boolean {
   return getEnv().FEATURE_JOBDISPATCH_PHASE2;

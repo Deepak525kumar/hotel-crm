@@ -13,7 +13,7 @@ Forward migrations are applied deterministically by `prisma migrate deploy` in
 CI and in the staging/production deploy workflows (ADR-004). Prisma Migrate has
 **no native down/rollback**: the production deploy performs a *code-only*
 rollback and explicitly assumes migrations are backward-compatible
-(`.github/workflows/deploy-production.yml`, "Rollback model"). S0-2 closes that
+(`.github/workflows/deploy.yml`, "Rollback model"). S0-2 closes that
 gap with a reviewed, deterministic rollback path layered on top of the existing
 tooling — it does not replace `prisma migrate deploy`.
 
