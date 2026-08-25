@@ -59,6 +59,14 @@ const mockEmployeeBlocklistEntry = {
 
 const mockPrisma = {
   hotel: mockHotel,
+  // The cancel-cascade delegates to AssignmentService.update(), which now
+  // returns the same enriched DTO as a read (the web page writes the mutation
+  // response into its SWR cache without refetching). That needs an assigner
+  // lookup; this suite discards the returned DTO, so null is fine.
+  user: {
+    findUnique: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(null),
+    findMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue([]),
+  },
   jobRequest: mockWorkRequest,
   employmentRecord: mockEmploymentRecord,
   employeeBlocklistEntry: mockEmployeeBlocklistEntry,
