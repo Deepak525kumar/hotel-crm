@@ -212,6 +212,60 @@ export async function resolveScheduledStart(
   return new Date(guess + (guess - asRead));
 }
 
+/**
+ * Resolves an assignment's scheduled end instant, accounting for overnight shifts.
+ * If shift_end_time < shift_start_time, the end is on the day after shift_date.
+ */
+export async function resolveScheduledEnd(
+  tx: Prisma.TransactionClient | ReturnType<typeof getPrisma>,
+  assignment: { work_request_id: string | null; job_request_id: string | null; hotel_id: string }
+): Promise<Date | null> {
+  const requestId = assignment.work_request_id ?? assignment.job_request_id;
+  if (!requestId) return null;
+
+  const request = await tx.jobRequest.findUnique({
+    where: { id: requestId },
+    select: { shift_date: true, shift_start_time: true, shift_end_time: true },
+  });
+  if (!request?.shift_date || !request.shift_start_time || !request.shift_end_time) return null;
+
+  const startMatch = /^(\d{2}):(\d{2})$/.exec(request.shift_start_time);
+  const endMatch = /^(\d{2}):(\d{2})$/.exec(request.shift_end_time);
+  if (!startMatch || !endMatch) return null;
+  
+  const [, startH, startM] = startMatch;
+  const [, endH, endM] = endMatch;
+
+  const hotel = await tx.hotel.findUnique({
+    where: { id: assignment.hotel_id },
+    select: { timezone: true },
+  });
+  const zone = hotel?.timezone || 'Europe/Berlin';
+
+  const y = request.shift_date.getUTCFullYear();
+  const mo = request.shift_date.getUTCMonth() + 1;
+  const d = request.shift_date.getUTCDate();
+
+  // If end time is earlier than start time, it's an overnight shift ending the next day
+  const isOvernight = (Number(endH) < Number(startH)) || (Number(endH) === Number(startH) && Number(endM) < Number(startM));
+  
+  const guess = Date.UTC(y, mo - 1, isOvernight ? d + 1 : d, Number(endH), Number(endM));
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  });
+  const parts = Object.fromEntries(
+    fmt.formatToParts(new Date(guess)).filter((p) => p.type !== 'literal').map((p) => [p.type, p.value])
+  ) as Record<string, string>;
+  const asRead = Date.UTC(
+    Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+    Number(parts.hour) % 24, Number(parts.minute), Number(parts.second)
+  );
+  return new Date(guess + (guess - asRead));
+}
+
 export class AssignmentService extends BaseService {
   /**
    * Extra, batch-resolved context for the read paths.
@@ -1453,7 +1507,7 @@ export class AssignmentService extends BaseService {
   }
 
   /**
-   * Sweeps CONFIRMED and IN_PROGRESS assignments that are past their shift end
+   * Sweeps CONFIRMED assignments that are past their shift end
    * time by more than the configured grace period, marking them as NO_SHOW.
    * Calendar-placed assignments (no JobRequest) are marked NO_SHOW if their
    * calendar day is strictly before today in UTC.
@@ -1461,28 +1515,22 @@ export class AssignmentService extends BaseService {
   async sweepNoShows(gracePeriodMs: number, batchSize: number): Promise<number> {
     const cutoff = new Date(Date.now() - gracePeriodMs);
 
+    // Only CONFIRMED shifts can be marked as NO_SHOW. If it's IN_PROGRESS,
+    // the worker checked in, so they did show up.
     const candidates = await this.prisma.workerAssignment.findMany({
       where: {
-        status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
-      },
-      include: {
-        job_request: { select: { shift_date: true, shift_end_time: true } },
-        work_request: { select: { shift_date: true, shift_end_time: true } },
+        status: AssignmentStatus.CONFIRMED,
       },
       take: batchSize,
     });
 
-    let updated = 0;
+    let updatedCount = 0;
     for (const assignment of candidates) {
       let isExpired = false;
 
-      const req = assignment.job_request || assignment.work_request;
-      if (req) {
-        const [hours, minutes] = req.shift_end_time.split(':').map(Number);
-        const shiftEnd = new Date(req.shift_date);
-        shiftEnd.setUTCHours(hours, minutes, 0, 0);
-
-        if (shiftEnd < cutoff) {
+      if (assignment.work_request_id || assignment.job_request_id) {
+        const shiftEnd = await resolveScheduledEnd(this.prisma, assignment);
+        if (shiftEnd && shiftEnd < cutoff) {
           isExpired = true;
         }
       } else {
@@ -1494,15 +1542,47 @@ export class AssignmentService extends BaseService {
       }
 
       if (isExpired) {
-        await this.prisma.workerAssignment.update({
-          where: { id: assignment.id },
-          data: { status: AssignmentStatus.NO_SHOW, updated_at: new Date() },
-        });
-        updated++;
+        try {
+          await this.prisma.$transaction(async (tx) => {
+            // Re-check status within transaction to avoid race conditions
+            const current = await tx.workerAssignment.findUnique({ where: { id: assignment.id } });
+            if (current?.status !== AssignmentStatus.CONFIRMED) return;
+
+            await tx.workerAssignment.update({
+              where: { id: assignment.id },
+              data: { status: AssignmentStatus.NO_SHOW, updated_at: new Date() },
+            });
+
+            // Recompute rating since NO_SHOW is a terminal outcome that hurts completion rate
+            await refreshWorkerOverallRating(tx, assignment.worker_id);
+            
+            // Log the audit event using the system user (null actor or special system string)
+            await this.logAudit(
+              null, // actor_id
+              null, // actor_role
+              'UPDATE_ASSIGNMENT', 
+              'WORKER_ASSIGNMENT', 
+              assignment.id, 
+              {
+                from_status: AssignmentStatus.CONFIRMED,
+                to_status: AssignmentStatus.NO_SHOW,
+              }, 
+              undefined, // ip_address
+              undefined, // old_values
+              undefined, // new_values
+              tx
+            );
+            
+            updatedCount++;
+          });
+        } catch (error) {
+          // Log error but continue with other candidates
+          console.error(`Failed to sweep assignment ${assignment.id} to NO_SHOW:`, error);
+        }
       }
     }
 
-    return updated;
+    return updatedCount;
   }
 }
 
