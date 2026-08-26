@@ -226,7 +226,18 @@ export class DocumentService extends BaseService {
     const storage = await getStorageClient();
     return Promise.all(
       docs.map(async (doc) => {
-        const url = await storage.getPresignedUrl(doc.s3_key).catch(() => null);
+        const url = await storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
+          // Was `.catch(() => null)`. A null presigned_url renders as "no View
+          // link" in every client, so a permissions or bucket misconfiguration
+          // presented to users as "download is broken" while leaving no trace
+          // anywhere -- the one piece of evidence needed to tell a stub from a
+          // denied GetObject was being discarded here.
+          logger.error('documents_presign_failed', {
+            document_id: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
         return this.toDto(doc, url);
       })
     );
@@ -269,7 +280,18 @@ export class DocumentService extends BaseService {
     }
 
     const storage = await getStorageClient();
-    const url = await storage.getPresignedUrl(doc.s3_key).catch(() => null);
+    const url = await storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
+          // Was `.catch(() => null)`. A null presigned_url renders as "no View
+          // link" in every client, so a permissions or bucket misconfiguration
+          // presented to users as "download is broken" while leaving no trace
+          // anywhere -- the one piece of evidence needed to tell a stub from a
+          // denied GetObject was being discarded here.
+          logger.error('documents_presign_failed', {
+            document_id: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
     return this.toDto(doc, url);
   }
 
@@ -476,7 +498,18 @@ export class DocumentService extends BaseService {
     const storage = await getStorageClient();
     return Promise.all(
       docs.map(async (doc) => {
-        const url = await storage.getPresignedUrl(doc.s3_key).catch(() => null);
+        const url = await storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
+          // Was `.catch(() => null)`. A null presigned_url renders as "no View
+          // link" in every client, so a permissions or bucket misconfiguration
+          // presented to users as "download is broken" while leaving no trace
+          // anywhere -- the one piece of evidence needed to tell a stub from a
+          // denied GetObject was being discarded here.
+          logger.error('documents_presign_failed', {
+            document_id: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        });
         return this.toDto(doc, url);
       })
     );
