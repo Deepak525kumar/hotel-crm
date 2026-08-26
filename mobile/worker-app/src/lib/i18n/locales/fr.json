@@ -488,7 +488,10 @@
     "noContractYet": "Vous n'avez pas encore de contrat dans le système.",
     "noPayslipsRequestedYet": "Vous n'avez encore demandé aucun bulletin de paie.",
     "dataLoadFailed": "Impossible de charger les données RH.",
-    "payslipConfirm": "Souhaitez-vous demander votre bulletin de paie pour {{period}} ?"
+    "payslipConfirm": "Souhaitez-vous demander votre bulletin de paie pour {{period}} ?",
+    "contractSavedTo": "Contrat enregistré dans {{uri}}",
+    "contractDownloadFailed": "Le contrat n’a pas pu être téléchargé.",
+    "contractModuleMissing": "Cette version de l’application ne contient pas un composant requis ({{module}}). Veuillez mettre à jour ou réinstaller l’application, puis réessayer."
   },
   "consent": {
     "title": "Consentement à la protection des données",

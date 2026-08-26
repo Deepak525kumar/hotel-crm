@@ -11,7 +11,8 @@ import {
   validateAbsenceReason,
 } from '@/lib/absence-reason';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
+import { Badge, BadgeTone, Button, Card, EmptyState, SectionHeader } from '@/components/ui';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { translateApiError } from '../../lib/api-error-i18n';
@@ -25,9 +26,15 @@ const KIND_LABEL_KEY: Record<CalendarAbsenceKind, string> = {
   VACATION: 'absences.kindVACATION',
 };
 
-const KIND_COLOR: Record<CalendarAbsenceKind, string> = {
-  SICK: '#E53E3E',
-  VACATION: '#3182CE',
+/**
+ * Semantic tones, not raw hexes. These were `#E53E3E` / `#3182CE` painted as
+ * badge fills with white text, which ignored the colour scheme: the same two
+ * colours in dark mode against a near-black ground, and white-on-light in the
+ * modal error line.
+ */
+const KIND_TONE: Record<CalendarAbsenceKind, BadgeTone> = {
+  SICK: 'danger',
+  VACATION: 'primary',
 };
 
 function AbsenceCard({
@@ -40,40 +47,30 @@ function AbsenceCard({
   withdrawing: boolean;
 }) {
   const { t } = useTranslation();
-  const color = KIND_COLOR[item.kind];
   // The backend refuses to delete a past absence, so offering the action on
   // one would only ever produce an error. Same rule the web app applies.
   const isPast = item.day < isoDateInCalendarTimezone(0);
 
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
+    <Card>
       <ThemedView style={styles.cardRow} type="backgroundElement">
         <ThemedText type="smallBold">{formatDay(item.day)}</ThemedText>
-        <ThemedView style={[styles.badge, { backgroundColor: color }]} type="backgroundElement">
-          <ThemedText type="small" style={styles.badgeText}>
-            {t(KIND_LABEL_KEY[item.kind])}
-          </ThemedText>
-        </ThemedView>
+        <Badge label={t(KIND_LABEL_KEY[item.kind])} tone={KIND_TONE[item.kind]} />
       </ThemedView>
       {!isPast && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('absences.withdrawA11y', {
+        <Button
+          label={t('consent.withdraw')}
+          variant="ghost"
+          onPress={() => onWithdraw(item)}
+          loading={withdrawing}
+          accessibilityHint={t('absences.withdrawA11y', {
             kind: t(KIND_LABEL_KEY[item.kind]).toLowerCase(),
             day: formatDay(item.day),
           })}
-          onPress={() => onWithdraw(item)}
-          disabled={withdrawing}
-          style={({ pressed }) => [styles.withdrawButton, { opacity: pressed || withdrawing ? 0.6 : 1 }]}
-        >
-          {withdrawing ? (
-            <ActivityIndicator size="small" />
-          ) : (
-            <ThemedText type="small" style={styles.withdrawText}>{t("consent.withdraw")}</ThemedText>
-          )}
-        </Pressable>
+          style={styles.withdrawButton}
+        />
       )}
-    </ThemedView>
+    </Card>
   );
 }
 
@@ -221,35 +218,29 @@ export default function CalendarScreen() {
                 {daysFromToday === 0 ? t('common.today') : t('common.tomorrow')}
               </ThemedText>
               {(['SICK', 'VACATION'] as const).map((kind) => (
-                <Pressable
+                <Button
                   key={kind}
+                  label={t(KIND_LABEL_KEY[kind])}
+                  // Sick reads as the destructive/urgent one, vacation as the
+                  // ordinary one -- the same pairing the badges use.
+                  variant={kind === 'SICK' ? 'danger' : 'primary'}
                   onPress={() => handleMark(daysFromToday, kind)}
                   disabled={marking !== null}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    { backgroundColor: KIND_COLOR[kind], opacity: pressed || marking !== null ? 0.7 : 1 },
-                  ]}
-                >
-                  {isMarking(daysFromToday, kind) ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ThemedText type="small" style={styles.actionButtonText}>
-                      {t(KIND_LABEL_KEY[kind])}
-                    </ThemedText>
-                  )}
-                </Pressable>
+                  loading={isMarking(daysFromToday, kind)}
+                  style={styles.actionButton}
+                />
               ))}
             </ThemedView>
           ))}
         </ThemedView>
 
         {errorMessage && (
-          <ThemedText type="small" style={styles.errorText}>
+          <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
             {errorMessage}
           </ThemedText>
         )}
 
-        <ThemedText type="small" themeColor="textSecondary" style={styles.listHeader}>{t("calendar.yourMarkedDays")}</ThemedText>
+        <SectionHeader title={t('calendar.yourMarkedDays')} />
 
         {loading ? (
           <ActivityIndicator style={styles.loader} color={theme.text} />
@@ -264,11 +255,7 @@ export default function CalendarScreen() {
                 withdrawing={withdrawingId === item.id}
               />
             )}
-            ListEmptyComponent={
-              <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">{t("profile.noAbsences")}</ThemedText>
-              </ThemedView>
-            }
+            ListEmptyComponent={<EmptyState title={t('profile.noAbsences')} />}
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
@@ -305,26 +292,22 @@ export default function CalendarScreen() {
                 style={[styles.modalInput, { color: theme.text, backgroundColor: theme.background }]}
               />
               {reasonError && (
-                <ThemedText type="small" style={styles.modalError}>
+                <ThemedText type="small" style={{ color: theme.danger }}>
                   {reasonError}
                 </ThemedText>
               )}
               <ThemedView style={styles.modalActions} type="backgroundElement">
-                <Pressable
+                <Button
+                  label={t('common.cancel')}
+                  variant="ghost"
                   onPress={() => setReasonPrompt(null)}
-                  style={({ pressed }) => [styles.modalButton, { opacity: pressed ? 0.7 : 1 }]}
-                >
-                  <ThemedText type="small">{t('common.cancel', 'Cancel')}</ThemedText>
-                </Pressable>
-                <Pressable
+                  style={styles.modalButton}
+                />
+                <Button
+                  label={t('common.confirm')}
                   onPress={() => void confirmReason()}
-                  style={({ pressed }) => [
-                    styles.modalButton,
-                    { backgroundColor: theme.backgroundSelected, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <ThemedText type="smallBold">{t('common.confirm', 'Confirm')}</ThemedText>
-                </Pressable>
+                  style={styles.modalButton}
+                />
               </ThemedView>
             </ThemedView>
           </ThemedView>
@@ -341,7 +324,7 @@ const styles = StyleSheet.create({
     padding: Spacing.four,
   },
   modalCard: {
-    borderRadius: Spacing.three,
+    borderRadius: Radius.lg,
     padding: Spacing.three,
     gap: Spacing.one,
   },
@@ -352,40 +335,26 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
     textAlignVertical: 'top',
   },
-  modalError: { color: '#E53E3E' },
+  modalError: {},
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: Spacing.two,
     marginTop: Spacing.two,
   },
-  modalButton: {
-    paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.two,
-  },
+  modalButton: { flex: 1 },
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
   header: { marginBottom: Spacing.three },
   actionsCard: { borderRadius: Spacing.three, padding: Spacing.three, gap: Spacing.two, marginBottom: Spacing.three },
   actionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
-  actionButton: {
-    minWidth: 84,
-    height: 36,
-    borderRadius: Spacing.two,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.two,
-  },
-  actionButtonText: { color: '#fff' },
-  errorText: { color: '#E53E3E', marginBottom: Spacing.two },
-  listHeader: { marginBottom: Spacing.two },
+  actionButton: { minWidth: 96, flexShrink: 1 },
+  errorText: { marginBottom: Spacing.two },
   loader: { marginTop: Spacing.six },
   list: { gap: Spacing.two, paddingBottom: Spacing.six },
   card: { borderRadius: Spacing.two, padding: Spacing.three },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  badge: { borderRadius: Spacing.one, paddingHorizontal: Spacing.two, paddingVertical: 2 },
   // `Spacing.xs` / `Spacing.sm` do not exist on this app's scale (it is
   // half/one/two/three/...), so these three values were `undefined` and the
   // button rendered with no spacing at all. The syntax error above masked the
@@ -397,9 +366,4 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.one,
     paddingHorizontal: Spacing.two,
   },
-  withdrawText: {
-    textDecorationLine: 'underline',
-  },
-  badgeText: { color: '#fff', fontSize: 11 },
-  empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center' },
 });

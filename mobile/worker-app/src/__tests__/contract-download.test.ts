@@ -1,120 +1,153 @@
-import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-
 /**
- * Contract download (lib/contract-download.ts).
+ * The contract download had every failure mode collapse into one useless
+ * sentence ("data load failed"), on top of two TOP-LEVEL native imports that
+ * could take the whole HR screen down before the button was even tapped.
  *
- * This exists because the previous implementation was broken in a way nothing
- * could catch. It called `FileSystem.downloadAsync`, which expo-file-system@57
- * still exports — as a stub that unconditionally throws, to push callers onto
- * the `File`/`Directory` API:
- *
- *     export async function downloadAsync(...) {
- *       throw errorOnLegacyMethodUse('downloadAsync');
- *     }
- *
- * TypeScript accepted the call because the symbol exists with the right
- * signature; the component holding it was a .tsx, which this project's jest
- * config (`**\/__tests__/**\/*.test.ts`) never picks up; and the component
- * swallowed the throw into a generic "failed to load" alert. So every contract
- * download failed and every suite stayed green.
- *
- * Each test below pins something that was independently wrong or missing.
- * Mocks are created inside the jest.mock factories and read back afterwards:
- * ES imports are hoisted above module-scope consts, so a factory referencing
- * an outer `const` hits the temporal dead zone.
+ * These cases pin the three behaviours that matter to a worker holding a phone:
+ * a missing native module is reported as such, a transfer failure carries its
+ * real reason, and sharing being unavailable still counts as a successful
+ * download because the bytes are on disk.
  */
-
-jest.mock('expo-file-system', () => {
-  const downloadFileAsync = jest.fn();
-  class FakeFile {
-    uri: string;
-    static downloadFileAsync = downloadFileAsync;
-    constructor(...parts: any[]) {
-      this.uri = parts.map((p) => (typeof p === 'string' ? p : (p?.uri ?? ''))).join('/');
-    }
-  }
-  return { File: FakeFile, Paths: { document: { uri: 'file:///documents' } } };
-});
-
-jest.mock('expo-sharing', () => ({
-  isAvailableAsync: jest.fn(),
-  shareAsync: jest.fn(),
-}));
-
-jest.mock('@/lib/api', () => ({
-  api: {
-    hr: {
-      getContractDownloadUrl: (id: string) =>
-        `https://api.test/hr/workers/${id}/contract-download`,
-    },
-  },
-  getAccessToken: () => 'test-access-token',
-}));
-
-import { downloadContract } from '@/lib/contract-download';
-
-const { File } = require('expo-file-system');
-const Sharing = require('expo-sharing');
-const downloadFileAsync = File.downloadFileAsync as jest.MockedFunction<(...a: any[]) => any>;
-const isAvailableAsync = Sharing.isAvailableAsync as jest.MockedFunction<(...a: any[]) => any>;
-const shareAsync = Sharing.shareAsync as jest.MockedFunction<(...a: any[]) => any>;
-
 describe('downloadContract', () => {
+  const WORKER = 'worker-1';
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    downloadFileAsync.mockResolvedValue({ uri: 'file:///documents/contract.pdf' });
-    isAvailableAsync.mockResolvedValue(true);
-    shareAsync.mockResolvedValue(undefined);
+    jest.resetModules();
+    jest.doMock('@/lib/api', () => ({
+      api: { hr: { getContractDownloadUrl: (id: string) => `https://api.test/hr/workers/${id}/contract-download` } },
+      getAccessToken: () => 'test-token',
+    }));
+  });
+
+  function mockFileSystem(downloadImpl: () => Promise<{ uri: string }>) {
+    class FakeFile {
+      static downloadFileAsync = jest.fn(downloadImpl as (...args: unknown[]) => Promise<{ uri: string }>);
+      uri = 'file:///documents/contract.pdf';
+      constructor(..._parts: unknown[]) {}
+    }
+    jest.doMock('expo-file-system', () => ({ File: FakeFile, Paths: { document: 'file:///documents' } }));
+    return FakeFile;
+  }
+
+  it('reports a missing filesystem module as NATIVE_MODULE_MISSING, naming the module', async () => {
+    jest.doMock('expo-file-system', () => {
+      throw new Error("Cannot find native module 'ExpoFileSystem'");
+    });
+    const { downloadContract, ContractDownloadError } = require('@/lib/contract-download');
+
+    await expect(downloadContract(WORKER)).rejects.toMatchObject({
+      code: 'NATIVE_MODULE_MISSING',
+      detail: 'expo-file-system',
+    });
+    await expect(downloadContract(WORKER)).rejects.toBeInstanceOf(ContractDownloadError);
   });
 
   it('uses File.downloadFileAsync, never the legacy downloadAsync stub', async () => {
-    // The whole bug. If this regresses to FileSystem.downloadAsync, the SDK
-    // throws and downloadFileAsync is never reached.
-    await downloadContract('worker-1');
-    expect(downloadFileAsync).toHaveBeenCalledTimes(1);
+    // Preserved from the original suite: this was the whole of an earlier bug.
+    // `FileSystem.downloadAsync` still EXISTS with the right signature, so
+    // TypeScript accepts it, but it is a stub that throws unconditionally at
+    // runtime — every download failed silently. If the implementation
+    // regresses to it, downloadFileAsync is never reached and this fails.
+    const FakeFile = mockFileSystem(async () => ({ uri: 'file:///documents/contract.pdf' }));
+    jest.doMock('expo-sharing', () => ({
+      isAvailableAsync: async () => true,
+      shareAsync: async () => undefined,
+    }));
+    const { downloadContract } = require('@/lib/contract-download');
+
+    await downloadContract(WORKER);
+
+    expect(FakeFile.downloadFileAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('requests the contract for the given worker', async () => {
+  it('puts the requested worker id in the URL', async () => {
+    // "the correct contract downloads": the worker id must reach the URL, or a
+    // worker is handed someone else's document.
+    const FakeFile = mockFileSystem(async () => ({ uri: 'file:///documents/contract.pdf' }));
+    jest.doMock('expo-sharing', () => ({
+      isAvailableAsync: async () => true,
+      shareAsync: async () => undefined,
+    }));
+    const { downloadContract } = require('@/lib/contract-download');
+
     await downloadContract('worker-42');
-    const [url] = downloadFileAsync.mock.calls[0] as [string, unknown, unknown];
-    // "the correct contract downloads": the worker id must reach the URL, or
-    // everyone gets whatever the endpoint defaults to.
-    expect(url).toBe('https://api.test/hr/workers/worker-42/contract-download');
+
+    const call = FakeFile.downloadFileAsync.mock.calls[0] as unknown as [string, unknown, unknown];
+    expect(call[0]).toContain('worker-42');
   });
 
-  it('sends the bearer token — the endpoint is authenticated', async () => {
-    await downloadContract('worker-1');
-    const [, , options] = downloadFileAsync.mock.calls[0] as [string, unknown, any];
-    expect(options.headers).toEqual({ Authorization: 'Bearer test-access-token' });
-  });
+  it('sends the auth header and overwrites a previous download', async () => {
+    const FakeFile = mockFileSystem(async () => ({ uri: 'file:///documents/contract.pdf' }));
+    jest.doMock('expo-sharing', () => ({
+      isAvailableAsync: async () => true,
+      shareAsync: async () => undefined,
+    }));
+    const { downloadContract } = require('@/lib/contract-download');
 
-  it('passes idempotent so a second download overwrites instead of failing', async () => {
-    // The destination filename is fixed, so without this the SDK rejects the
-    // second tap with DestinationAlreadyExists.
-    await downloadContract('worker-1');
-    const [, , options] = downloadFileAsync.mock.calls[0] as [string, unknown, any];
-    expect(options.idempotent).toBe(true);
-  });
+    const result = await downloadContract(WORKER);
 
-  it('opens the share sheet and reports it', async () => {
-    const result = await downloadContract('worker-1');
-    expect(shareAsync).toHaveBeenCalledWith('file:///documents/contract.pdf');
     expect(result).toEqual({ uri: 'file:///documents/contract.pdf', outcome: 'shared' });
+    const call = FakeFile.downloadFileAsync.mock.calls[0] as unknown as [string, unknown, Record<string, unknown>];
+    const [url, , options] = call;
+    expect(url).toBe(`https://api.test/hr/workers/${WORKER}/contract-download`);
+    // Without the header the endpoint 401s and the worker is told the contract
+    // failed to load; without idempotent a second download rejects outright.
+    expect(options).toMatchObject({
+      headers: { Authorization: 'Bearer test-token' },
+      idempotent: true,
+    });
   });
 
-  it('reports "saved" without sharing when the share sheet is unavailable', async () => {
-    isAvailableAsync.mockResolvedValue(false);
-    const result = await downloadContract('worker-1');
-    expect(shareAsync).not.toHaveBeenCalled();
-    expect(result.outcome).toBe('saved');
+  it('still counts as a successful download when sharing is missing', async () => {
+    mockFileSystem(async () => ({ uri: 'file:///documents/contract.pdf' }));
+    jest.doMock('expo-sharing', () => {
+      throw new Error("Cannot find native module 'ExpoSharing'");
+    });
+    const { downloadContract } = require('@/lib/contract-download');
+
+    // The bytes are on disk. Failing here would throw away a download that
+    // actually worked, over an optional convenience.
+    await expect(downloadContract(WORKER)).resolves.toEqual({
+      uri: 'file:///documents/contract.pdf',
+      outcome: 'saved',
+    });
   });
 
-  it('propagates a non-2xx failure instead of pretending success', async () => {
-    // File.downloadFileAsync rejects with the HTTP status and writes no file,
-    // so an expired session surfaces rather than leaving a JSON error body on
-    // disk named contract.pdf.
-    downloadFileAsync.mockRejectedValue(new Error('UnableToDownload: 401'));
-    await expect(downloadContract('worker-1')).rejects.toThrow('401');
-    expect(shareAsync).not.toHaveBeenCalled();
+  it('reports saved, not failed, when the share sheet is dismissed', async () => {
+    mockFileSystem(async () => ({ uri: 'file:///documents/contract.pdf' }));
+    jest.doMock('expo-sharing', () => ({
+      isAvailableAsync: async () => true,
+      shareAsync: async () => {
+        throw new Error('User dismissed the share sheet');
+      },
+    }));
+    const { downloadContract } = require('@/lib/contract-download');
+
+    await expect(downloadContract(WORKER)).resolves.toMatchObject({ outcome: 'saved' });
+  });
+
+  it('carries the underlying reason on a transfer failure', async () => {
+    mockFileSystem(async () => {
+      throw new Error('UnableToDownload: 403');
+    });
+    jest.doMock('expo-sharing', () => ({ isAvailableAsync: async () => true, shareAsync: async () => undefined }));
+    const { downloadContract } = require('@/lib/contract-download');
+
+    await expect(downloadContract(WORKER)).rejects.toMatchObject({
+      code: 'TRANSFER_FAILED',
+      detail: 'UnableToDownload: 403',
+    });
+  });
+});
+
+describe('contract-download module', () => {
+  it('has no top-level native imports', () => {
+    // These are what crashed the importing screen before the button was tapped.
+    const src = require('fs').readFileSync(
+      require('path').join(__dirname, '..', 'lib', 'contract-download.ts'),
+      'utf8',
+    );
+    expect(src).not.toMatch(/^import .*from 'expo-file-system'/m);
+    expect(src).not.toMatch(/^import .*from 'expo-sharing'/m);
   });
 });

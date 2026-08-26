@@ -488,7 +488,10 @@
     "noContractYet": "You do not have a contract in the system yet.",
     "noPayslipsRequestedYet": "You have not requested any payslips yet.",
     "dataLoadFailed": "Could not load HR data.",
-    "payslipConfirm": "Would you like to request your payslip for {{period}}?"
+    "payslipConfirm": "Would you like to request your payslip for {{period}}?",
+    "contractSavedTo": "Contract saved to {{uri}}",
+    "contractDownloadFailed": "The contract could not be downloaded.",
+    "contractModuleMissing": "This app build is missing a required component ({{module}}). Please update or reinstall the app, then try again."
   },
   "consent": {
     "title": "Data-protection consent",
