@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { getEnv } from '../config/env.js';
 import { logger } from './logger.js';
@@ -41,10 +42,36 @@ export function signAccessToken(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>
 
 export function signRefreshToken(userId: string): string {
   const env = getEnv();
-  return jwt.sign({ sub: userId, type: 'refresh' }, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
-    algorithm: 'HS256',
-  });
+  return jwt.sign(
+    {
+      sub: userId,
+      type: 'refresh',
+      // Makes every refresh token unique, which the payload alone did not.
+      //
+      // The claims were {sub, type} plus the iat/exp jsonwebtoken adds at
+      // SECOND granularity, so two tokens minted for one user inside the same
+      // second were byte-identical. Session.refresh_token is @unique and
+      // stores a hash of this value, so the second insert hit the constraint
+      // and the caller got `409 CONFLICT — A record with this value already
+      // exists`. Reproduced by firing two logins concurrently: one 200, one
+      // 409.
+      //
+      // Reachable without anything exotic: a double-tapped sign-in button, two
+      // devices signing in together, or a login racing a token refresh. It
+      // also meant two distinct sessions could share one refresh token, so
+      // rotating or revoking either would act on both.
+      //
+      // randomUUID rather than a counter or a timestamp: sessions are created
+      // by more than one process, so uniqueness cannot depend on
+      // process-local state.
+      jti: crypto.randomUUID(),
+    },
+    env.JWT_REFRESH_SECRET,
+    {
+      expiresIn: env.JWT_REFRESH_EXPIRY as SignOptions['expiresIn'],
+      algorithm: 'HS256',
+    }
+  );
 }
 
 export function signTokens(payload: Omit<AccessTokenPayload, 'iat' | 'exp'>): JwtTokens {

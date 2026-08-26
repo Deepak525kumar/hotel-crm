@@ -78,16 +78,45 @@ The language one matters most and is the least testable as things stand: there i
 saying which language any surface should render in, so a scenario would have to invent its own pass
 criteria. Writing the specification comes first.
 
-Login throttling (`ADR-070`, PR #509) and the welcome-email-on-account-creation path (PR #508) also
-landed after the newest run log and are not yet exercised by any scenario.
+The welcome-email-on-account-creation path (PR #508) landed after the newest run log and is not yet
+exercised by any scenario. Login throttling (`ADR-070`, PR #509) was exercised ad-hoc on
+2026-08-25 (`runs/2026-08-25-checker-app-login-verification.md`: 401 through attempt 10, 429 with
+`Retry-After: 900` on attempt 11, enforced ahead of the bcrypt compare so the correct password is
+refused during the window) — but it still has no scenario file of its own.
 
-**No mobile screen is covered by any suite.** Both apps' jest configs collect only
-`**/__tests__/**/*.test.ts`, so every `.tsx` screen and component is invisible to CI. The
+**Mobile screen coverage is new and thin.** The
 2026-08-25 mobile flow verification (`runs/2026-08-25-mobile-app-flow-verification.md`) found eight
 defects, five of them living in `.tsx` files that passed typecheck — contract download threw on
 every attempt, onboarding submission 404'd, marking a vacation always failed, and a checker saw the
-tail of a cuid where a worker's name belonged. None were caught by a green suite, because no suite
-could reach them. Treat "the mobile tests pass" as saying nothing about any screen.
+tail of a cuid where a worker's name belonged. None were caught by a green suite, because the jest
+configs collected only `**/__tests__/**/*.test.ts` and no suite could reach a screen.
+
+Both apps' `jest.config.js` now add a second `components` project that collects `*.test.tsx`, and
+it does run — 150 tests in `checker-app`, 210 in `worker-app`, verified both in CI and from a clean
+checkout on 2026-08-25 (`runs/2026-08-25-checker-app-login-verification.md`). Screen coverage is
+still partial — most screens have no component test — so "the mobile tests pass" remains weak
+evidence about any particular screen.
+
+A 2026-08-25 pass on the checker app's sign-in
+(`runs/2026-08-25-checker-app-role-gate.md`) found that its role allow-list was consulted only on
+the login screen, after the auth store had already been populated — so a restored session of any
+role came back on every launch unchecked. The gate now lives in the store. The lesson generalises:
+a client-side check that runs *after* state is set is not a gate, because the navigation guard
+watches that same state.
+
+A second build-level trap, found from a real iOS build on 2026-08-26: both mobile apps defaulted to
+Expo's dev-server port 8081, and when worker-app's server holds it, `expo run:ios` in `checker-app`
+can skip starting a server and bake 8081 into the build — so a checker build serves worker-app's
+JavaScript. The apps look alike enough that this reads as a checker-app bug. `checker-app` now pins
+`--port 8082` in its `start`/`ios`/`android`/`web` scripts (`src/__tests__/dev-server-port.test.ts`
+guards it). **Before believing any mobile finding, confirm which app's bundle you are actually
+running.**
+
+One caution from that run, about diagnosis rather than coverage: a jest-expo preset error blamed on
+a missing dependency turned out to be a locally-broken `node_modules` (`--legacy-peer-deps`
+suppresses the peer install `react-native` relies on), not a repository defect. Reproduce a
+dependency failure in a clean worktree, and check what CI did on the base commit, before believing
+it.
 
 Push is the newest and most consequential of these: the 2026-08-25 run (`runs/2026-08-25-auth-and-push-verification.md`) found that no device had ever registered a token, and that a `DELIVERED` PUSH outbox event does not mean a device received anything — `PushTransportHandler.deliver()` returns early without throwing when the recipient has no devices, and the worker marks any non-throwing deliver as `DELIVERED`. **Do not read outbox status as evidence that push works.** A scenario here has to assert on a real device token and a real provider response, not on event status.
 

@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, RoleNotAllowedError } from '@/stores/auth-store';
 import { api, setAccessToken, setRefreshToken, getAccessToken, getRefreshToken } from '@/lib/api';
 
 jest.mock('expo-router', () => ({ router: { replace: jest.fn() } }));
@@ -217,5 +217,79 @@ describe('logout()', () => {
 
     expect(mockSetAccessToken).toHaveBeenCalledWith(null);
     expect(mockSetRefreshToken).toHaveBeenCalledWith(null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// role gate
+// ---------------------------------------------------------------------------
+
+describe('role gate', () => {
+  const foreignUser = { ...mockUser, id: 'u9', email: 'worker@hotel.com', role: 'worker' as const };
+
+  it('refuses a login by a role this app does not serve and stores no session', async () => {
+    mockApi.auth.login.mockResolvedValue({
+      access_token: 'a',
+      refresh_token: 'r',
+      user: foreignUser,
+    });
+    mockApi.auth.logout.mockResolvedValue(undefined);
+
+    await expect(useAuthStore.getState().login('worker@hotel.com', 'pw')).rejects.toBeInstanceOf(
+      RoleNotAllowedError,
+    );
+
+    const state = useAuthStore.getState();
+    expect(state.user).toBeNull();
+    expect(state.accessToken).toBeNull();
+    expect(state.isLoading).toBe(false);
+    // The tokens the backend just issued are revoked, not left live.
+    expect(mockApi.auth.logout).toHaveBeenCalled();
+    expect(mockSetAccessToken).toHaveBeenLastCalledWith(null);
+    // Nothing is persisted, so a relaunch cannot restore the refused session.
+    expect(mockSecureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('still refuses the login when revoking the tokens fails', async () => {
+    mockApi.auth.login.mockResolvedValue({
+      access_token: 'a',
+      refresh_token: 'r',
+      user: foreignUser,
+    });
+    mockApi.auth.logout.mockRejectedValue(new Error('network'));
+
+    await expect(useAuthStore.getState().login('worker@hotel.com', 'pw')).rejects.toBeInstanceOf(
+      RoleNotAllowedError,
+    );
+
+    expect(useAuthStore.getState().user).toBeNull();
+    expect(mockSecureStore.setItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('does not restore a stored session belonging to a role this app does not serve', async () => {
+    mockSecureStore.getItemAsync.mockImplementation(async (key: string) =>
+      key === 'hotel_crm_access_token' ? 'stored-access' : 'stored-refresh',
+    );
+    mockApi.auth.me.mockResolvedValue(foreignUser);
+
+    await useAuthStore.getState().initialize();
+
+    const state = useAuthStore.getState();
+    expect(state.user).toBeNull();
+    expect(state.isInitialized).toBe(true);
+    expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('hotel_crm_access_token');
+    expect(mockSecureStore.deleteItemAsync).toHaveBeenCalledWith('hotel_crm_refresh_token');
+  });
+
+  it('admits the roles this app does serve', async () => {
+    mockApi.auth.login.mockResolvedValue({
+      access_token: 'a',
+      refresh_token: 'r',
+      user: mockUser,
+    });
+
+    await useAuthStore.getState().login(mockUser.email, 'pw');
+
+    expect(useAuthStore.getState().user).toEqual(mockUser);
   });
 });

@@ -11,7 +11,6 @@ import { useTranslation } from 'react-i18next';
 // t() cannot be called. Each value is resolved at render time instead, so
 // the label follows the active language rather than being frozen at import.
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  GENERAL: 'documents.categoryGENERAL',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
   TAX_NUMBER: 'documents.categoryTAX_NUMBER',
   SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',

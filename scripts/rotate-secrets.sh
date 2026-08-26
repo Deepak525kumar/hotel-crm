@@ -5,7 +5,7 @@
 # Usage: bash rotate-secrets.sh [access|refresh|all]
 set -euo pipefail
 
-SECRET_ENV="/etc/hotel-crm/.env"
+SECRET_ENV="/home/ubuntu/apps/hotel-crm/backend/.env"
 ROTATE="${1:-all}"
 
 if [ ! -f "$SECRET_ENV" ]; then
@@ -38,6 +38,7 @@ fi
 
 echo "==> Reloading application with new secrets"
 pm2 reload hotel-crm-api --update-env
+pm2 reload hotel-crm-worker --update-env
 
 echo "==> Purging all sessions from database (forces re-login)"
 set -a

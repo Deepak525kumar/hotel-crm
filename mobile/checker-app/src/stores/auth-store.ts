@@ -3,6 +3,27 @@ import { deleteItem, getItem, setItem } from '@/lib/persistent-storage';
 import { router } from 'expo-router';
 import { api, setAccessToken, setRefreshToken, setOnTokenRefreshed, setOnAuthFailure, getAccessToken, getRefreshToken } from '@/lib/api';
 import type { User } from '@/types/api';
+import { ALLOWED_ROLES } from '@/constants/app-config';
+
+/**
+ * Thrown when the credentials are valid but the account's role has no business
+ * in this app. Enforced here rather than on the login screen because the screen
+ * is not the only way a session enters the store: a session restored from
+ * storage on launch never passes through it, so a role check that lives only
+ * there lets a previously-signed-in account of the wrong role back in on every
+ * subsequent launch. Setting `user` also releases the AuthGuard, which
+ * navigates into `(app)` the moment it sees a user -- so the check has to run
+ * *before* the store is populated, not after.
+ */
+export class RoleNotAllowedError extends Error {
+  constructor() {
+    super('This account does not have access to this app');
+    this.name = 'RoleNotAllowedError';
+  }
+}
+
+const isAllowedRole = (user: User | null | undefined): boolean =>
+  !!user && ALLOWED_ROLES.includes(user.role);
 
 const KEYS = {
   ACCESS_TOKEN: 'hotel_crm_access_token',
@@ -37,6 +58,11 @@ export const useAuthStore = create<AuthState>((set) => ({
         setRefreshToken(refreshToken);
         try {
           const user = await api.auth.me();
+          if (!isAllowedRole(user)) {
+            // A stored session for an account of the wrong role: drop it and
+            // start signed out rather than restoring it.
+            throw new RoleNotAllowedError();
+          }
           // Read tokens from the module mirror after me() returns: a transparent startup
           // refresh inside request() updates _accessToken/_refreshToken before returning,
           // so these values are always current regardless of whether a refresh occurred.
@@ -70,6 +96,19 @@ export const useAuthStore = create<AuthState>((set) => ({
       const response = await api.auth.login(email.trim().toLowerCase(), password);
       setAccessToken(response.access_token);
       setRefreshToken(response.refresh_token);
+      if (!isAllowedRole(response.user)) {
+        // Revoke the tokens the backend just issued, then leave the store
+        // untouched so no session -- not even a momentary one -- exists.
+        try {
+          await api.auth.logout();
+        } catch {
+          // ignore -- the local session is discarded either way
+        }
+        setAccessToken(null);
+        setRefreshToken(null);
+        set({ isLoading: false });
+        throw new RoleNotAllowedError();
+      }
       await setItem(KEYS.ACCESS_TOKEN, response.access_token);
       await setItem(KEYS.REFRESH_TOKEN, response.refresh_token);
       set({

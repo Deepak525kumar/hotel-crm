@@ -15,10 +15,10 @@ business priority (that call belongs to the user).
    file's own "extracted from repository evidence" convention — remove entirely at the next full
    resynchronization pass rather than silently deleting a line a future reader might otherwise
    wonder about.
-2. **Fix `scripts/rotate-secrets.sh` to match the reconciled PM2 topology** — it still targets
-   `/etc/hotel-crm/.env` (the running processes now load env from `backend/.env`) and reloads
-   only `hotel-crm-api` (missing `hotel-crm-worker`). Update both before relying on this script
-   for a real secret rotation.
+2. ~~**Fix `scripts/rotate-secrets.sh` to match the reconciled PM2 topology.**~~ — **DONE.**
+   `SECRET_ENV` now points at `/home/ubuntu/apps/hotel-crm/backend/.env` (matching
+   `ecosystem.config.js`'s `--env-file`), and the script now reloads both `hotel-crm-api` and
+   `hotel-crm-worker`.
 3. **Remove or explicitly annotate the vestigial frontend server block in
    `nginx/hotelcrm.conf`** — it proxies to `127.0.0.1:3000`, but nothing runs there; the
    frontend is deployed separately on Vercel. Left in place today only because removing nginx
@@ -43,11 +43,12 @@ business priority (that call belongs to the user).
     re-registration at next app-shell mount.
 13. **Track APNs/Apple Developer account expiry** — no automated reminder exists for bundle
     ID/Developer account lifecycle.
-14. **Delete the vestigial `FEATURE_JOBDISPATCH_PHASE1` flag** and its dead accessor — confirmed
-    to gate nothing; pure cleanup.
-15. **Fix the stale `deploy-production.yml` cross-reference** in
-    `docs/11-deployment/ci-cd/MIGRATION_ROLLBACK_HARNESS.md` — it points at a workflow file that
-    doesn't exist in this repository.
+14. ~~**Delete the vestigial `FEATURE_JOBDISPATCH_PHASE1` flag** and its dead accessor.**~~ —
+    **DONE.** Removed from `backend/src/config/env.ts` and `backend/src/config/feature-flags.ts`;
+    confirmed nothing else read it outside its own definition.
+15. ~~**Fix the stale `deploy-production.yml` cross-reference** in
+    `docs/11-deployment/ci-cd/MIGRATION_ROLLBACK_HARNESS.md`.~~ — **DONE.** Corrected to
+    `.github/workflows/deploy.yml`, the workflow that actually exists.
 
 ## Testing
 

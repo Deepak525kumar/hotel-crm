@@ -10,9 +10,9 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { useAuthStore } from '@/stores/auth-store';
+import { useAuthStore, RoleNotAllowedError } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
-import { APP_NAME, ALLOWED_ROLES } from '@/constants/app-config';
+import { APP_NAME } from '@/constants/app-config';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError } from '@/lib/api';
 import * as WebBrowser from 'expo-web-browser';
@@ -24,7 +24,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const { login, logout, isLoading } = useAuthStore();
+  const { login, isLoading } = useAuthStore();
   const router = useRouter();
   const params = useLocalSearchParams();
   const theme = useTheme();
@@ -37,19 +37,15 @@ export default function LoginScreen() {
     }
     try {
       await login(email.trim(), password);
-      const user = useAuthStore.getState().user;
-      if (user && !ALLOWED_ROLES.includes(user.role)) {
-        await logout();
-        setError(t("auth.noAppAccess"));
-        return;
-      }
       if (params.returnTo) {
         router.replace(params.returnTo as any);
       } else {
         router.replace('/(app)');
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 429) {
+      if (err instanceof RoleNotAllowedError) {
+        setError(t('auth.noAppAccess'));
+      } else if (err instanceof ApiError && err.status === 429) {
         setError(
           err.retryAfterSeconds !== undefined
             ? t('auth.tooManyAttemptsRetry', { seconds: err.retryAfterSeconds })

@@ -81,7 +81,8 @@
     "shift": "شفٹ",
     "loadFailed": "لوڈ ناکام",
     "tomorrow": "کل",
-    "getDirections": "راستہ حاصل کریں"
+    "getDirections": "راستہ حاصل کریں",
+    "success": "کامیاب"
   },
   "fields": {
     "name": "نام",
@@ -201,7 +202,8 @@
     "queue": "قطار",
     "attendanceDetail": "حاضری کی تفصیل",
     "qualityCheck": "معیار کی جانچ",
-    "rateWorker": "ورکر کی درجہ بندی"
+    "rateWorker": "ورکر کی درجہ بندی",
+    "schedule": "شیڈول"
   },
   "roles": {
     "admin": "ایڈمن",
@@ -487,7 +489,10 @@
     "noContractYet": "سسٹم میں ابھی آپ کا کوئی معاہدہ نہیں ہے۔",
     "noPayslipsRequestedYet": "آپ نے ابھی تک کوئی تنخواہ سلپ نہیں مانگی۔",
     "dataLoadFailed": "ایچ آر ڈیٹا لوڈ نہیں ہو سکا۔",
-    "payslipConfirm": "کیا آپ {{period}} کے لیے اپنی تنخواہ کی پرچی طلب کرنا چاہتے ہیں؟"
+    "payslipConfirm": "کیا آپ {{period}} کے لیے اپنی تنخواہ کی پرچی طلب کرنا چاہتے ہیں؟",
+    "contractSavedTo": "معاہدہ {{uri}} میں محفوظ ہو گیا",
+    "contractDownloadFailed": "معاہدہ ڈاؤن لوڈ نہیں ہو سکا۔",
+    "contractModuleMissing": "ایپ کے اس بلڈ میں ایک مطلوبہ جزو ({{module}}) موجود نہیں۔ براہِ کرم ایپ کو اپ ڈیٹ یا دوبارہ انسٹال کریں اور پھر کوشش کریں۔"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -753,7 +758,25 @@
     "downloadContract": "معاہدہ ڈاؤن لوڈ کریں",
     "completeOnboardingAction": "اپنی آن بورڈنگ مکمل کریں",
     "contractExpiredNotice": "آپ کے معاہدے کی میعاد ختم ہو گئی ہے۔ نیا معاہدہ حاصل کرنے اور اپ لوڈ کرنے کے لیے دوبارہ آن بورڈنگ کا عمل شروع کریں۔",
-    "rejectionReasonPlaceholder": "مثلاً غلط دستاویز اپ لوڈ کی گئی"
+    "rejectionReasonPlaceholder": "مثلاً غلط دستاویز اپ لوڈ کی گئی",
+    "title": "اپنا سیٹ اپ مکمل کریں",
+    "statusPENDING": "زیرِ عمل",
+    "statusREJECTED": "منظور نہیں ہوا",
+    "statusDEACTIVATED": "عارضی طور پر بند",
+    "statusDELETED": "بند",
+    "statusPendingBody": "نیچے دیے گئے دستاویزات اپ لوڈ کریں، پھر جائزے کے لیے بھیجیں۔ شفٹ لینے سے پہلے آپ کا مینیجر آپ کا اکاؤنٹ منظور کرتا ہے۔",
+    "statusRejectedBody": "آپ کی درخواست منظور نہیں ہوئی۔ براہِ کرم اپنے مینیجر سے بات کریں، وہ بتا سکتے ہیں کہ کیا درکار ہے اور سیٹ اپ دوبارہ شروع کر سکتے ہیں۔",
+    "statusDeactivatedBody": "آپ کا اکاؤنٹ عارضی طور پر بند ہے، اس لیے شفٹیں دستیاب نہیں۔ دوبارہ فعال کرانے کے لیے اپنے مینیجر سے رابطہ کریں۔",
+    "statusDeletedBody": "یہ اکاؤنٹ بند ہو چکا ہے۔ اگر آپ سمجھتے ہیں کہ یہ غلطی ہے تو اپنے مینیجر سے بات کریں۔",
+    "whatWeNeed": "ہمیں اب بھی کیا درکار ہے",
+    "stillMissing": "ابھی اپ لوڈ کرنا باقی ہے:",
+    "allDocumentsUploaded": "تمام مطلوبہ دستاویزات اپ لوڈ ہو چکے ہیں۔ آپ جائزے کے لیے بھیج سکتے ہیں۔",
+    "uploadDocuments": "دستاویز اپ لوڈ کریں",
+    "uploaded": "آپ کے دستاویزات",
+    "submitForReview": "جائزے کے لیے بھیجیں",
+    "submitDisabledHint": "بھیجنے سے پہلے تمام مطلوبہ دستاویزات اپ لوڈ کریں۔",
+    "noEmploymentRecord": "آپ کا ملازمت ریکارڈ ابھی تیار نہیں۔ براہِ کرم اپنے مینیجر سے رابطہ کریں۔",
+    "submittedForReview": "آپ کی درخواست جائزے کے لیے بھیج دی گئی ہے۔"
   },
   "analytics": {
     "myPerformance": "میری کارکردگی",
@@ -961,5 +984,19 @@
     "LOW": "کم",
     "PROBATION": "زیرِ نگرانی",
     "unrated": "ابھی درجہ بندی نہیں ہوئی"
+  },
+  "home": {
+    "greetingMorning": "صبح بخیر",
+    "greetingAfternoon": "اچھی دوپہر",
+    "greetingEvening": "شام بخیر",
+    "greetingNoName": "خوش آمدید",
+    "nextShift": "اگلی شفٹ",
+    "noUpcomingShifts": "کوئی آنے والی شفٹ نہیں",
+    "noUpcomingShiftsBody": "جب آپ کو شفٹ تفویض ہوگی تو وہ یہاں دکھائی دے گی۔",
+    "browseJobs": "دستیاب ملازمتیں دیکھیں",
+    "openJobs": "دستیاب ملازمتیں",
+    "yourWeek": "آپ کا ہفتہ",
+    "viewAll": "سب دیکھیں",
+    "documentsNeedAttention": "دستاویزات پر توجہ درکار ہے"
   }
 }

@@ -602,17 +602,20 @@ describe('AuthService', () => {
         expect(error.retryAfterSeconds).toBeLessThanOrEqual(120);
       });
 
-      // The entry check (`login_locked_until > new Date()`) and the
-      // Retry-After computation (`... - Date.now()`) read the clock twice,
-      // microseconds apart. For a lock expiring almost immediately, a naive
-      // subtraction could land at exactly 0 (or, in the narrow window where
-      // the second read crosses the boundary, negative) -- never a valid
-      // Retry-After delay-seconds value. Asserts the `Math.max(1, ...)`
-      // clamp rather than the literal race (which is not deterministically
-      // reproducible in a test).
+      // A lock with well under a second left still yields a whole, positive
+      // Retry-After rather than 0.
+      //
+      // Previously this set the lock 1ms in the future, which made the test
+      // flaky: the entry check is `login_locked_until > new Date()`, so any
+      // scheduling delay over 1ms let the lock expire before the service read
+      // it, login fell through to the wrong-password path, and the assertion
+      // saw UnauthorizedError. It failed intermittently in CI under load.
+      //
+      // 900ms is comfortably inside the lock while still sub-second, so
+      // Math.ceil is what has to round it up to 1.
       it('never returns a zero or negative Retry-After for an almost-expired lock', async () => {
         mockPrisma.user.findUnique.mockResolvedValue(
-          throttleUser({ login_locked_until: new Date(Date.now() + 1) })
+          throttleUser({ login_locked_until: new Date(Date.now() + 900) })
         );
 
         const error = await service
@@ -620,8 +623,42 @@ describe('AuthService', () => {
           .catch((e) => e);
 
         expect(error.name).toBe('TooManyRequestsError');
-        expect(error.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+        expect(error.retryAfterSeconds).toBe(1);
         expect(Number.isInteger(error.retryAfterSeconds)).toBe(true);
+      });
+
+      // The `Math.max(1, ...)` clamp itself, deterministically.
+      //
+      // The clamp only matters when the delta is <= 0, which happens when the
+      // lock expires BETWEEN the entry check (`new Date()`) and the
+      // computation (`Date.now()`) — microseconds apart, and not reproducible
+      // by waiting. The old test tried to approach that window with a 1ms lock
+      // and only bought flakiness: Math.ceil already returns >= 1 for any
+      // positive delta, so it never reached the clamp at all.
+      //
+      // Stubbing Date.now alone splits the two reads: `new Date()` still sees
+      // real time, so the entry check passes, while the computation sees a
+      // moment after the lock expired and subtracts to a negative.
+      it('clamps to 1 when the lock expires between the two clock reads', async () => {
+        const lockedUntil = new Date(Date.now() + 1000);
+        mockPrisma.user.findUnique.mockResolvedValue(
+          throttleUser({ login_locked_until: lockedUntil })
+        );
+
+        const realNow = Date.now;
+        // Well past the lock, so the raw computation is negative.
+        Date.now = () => lockedUntil.getTime() + 5000;
+        try {
+          const error = await service
+            .login({ email: 'user@test.com', password: 'anything' })
+            .catch((e) => e);
+
+          expect(error.name).toBe('TooManyRequestsError');
+          // Without the clamp this would be -5 (Math.ceil(-5000 / 1000)).
+          expect(error.retryAfterSeconds).toBe(1);
+        } finally {
+          Date.now = realNow;
+        }
       });
 
       it('allows login once login_locked_until has passed', async () => {
