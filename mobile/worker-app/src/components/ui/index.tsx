@@ -249,15 +249,25 @@ export function ListRow({
   subtitle,
   right,
   onPress,
+  last,
 }: {
   title: string;
   subtitle?: string;
   right?: ReactNode;
   onPress?: () => void;
+  /** Last row in its card: drops the divider that would otherwise sit against
+   *  the card's own edge. */
+  last?: boolean;
 }) {
   const theme = useTheme();
   const content = (
-    <View style={[styles.row, { borderColor: theme.border }]}>
+    <View
+      style={[
+        styles.row,
+        { borderColor: theme.border },
+        last ? styles.rowLast : null,
+      ]}
+    >
       <View style={styles.rowText}>
         <ThemedText type="smallBold">{title}</ThemedText>
         {subtitle ? (
@@ -329,5 +339,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  rowLast: { borderBottomWidth: 0 },
   rowText: { flex: 1, gap: Spacing.half },
 });

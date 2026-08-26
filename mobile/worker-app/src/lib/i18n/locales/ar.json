@@ -599,7 +599,8 @@
     "employeeId": "رقم الموظف",
     "jobTitle": "المسمى الوظيفي",
     "startDate": "تاريخ البدء",
-    "employmentStatus": "الحالة"
+    "employmentStatus": "الحالة",
+    "reportingLine": "التسلسل الإداري"
   },
   "skills": {
     "CLEANER": "عامل نظافة",
@@ -1063,6 +1064,7 @@
     "documentsNeedAttention": "المستندات تحتاج إلى انتباه"
   },
   "marketplace": {
-    "description": "المناوبات التي يمكنك التقدم لها."
+    "description": "المناوبات التي يمكنك التقدم لها.",
+    "noneOpen": "لا توجد وظائف مفتوحة حالياً."
   }
 }

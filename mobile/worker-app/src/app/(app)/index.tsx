@@ -1,4 +1,4 @@
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
@@ -9,6 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Badge, Button, Card, EmptyState, ScreenHeader, SectionHeader, StatTile } from '@/components/ui';
 import { NotificationBell } from '@/components/NotificationBell';
+import { assignmentStatusTone } from '@/lib/assignment-status-tone';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
@@ -26,12 +27,6 @@ import type { WorkerAssignment } from '@/types/api';
  * Also absorbs the Jobs tab: with the tab bar down to three, open jobs are a
  * section here with a link to the full list.
  */
-
-function statusTone(status: string) {
-  if (status === 'IN_PROGRESS') return 'success' as const;
-  if (status === 'CONFIRMED') return 'primary' as const;
-  return 'neutral' as const;
-}
 
 function shiftWhen(shift: WorkerAssignment): string {
   // From the assignment, not work_request: the latter is null for
@@ -63,15 +58,23 @@ export default function HomeScreen() {
     mutate: mutateAssignments,
   } = useSWR(user ? `/assignments/list/${user.id}` : null, () => api.assignments.list({ limit: 5 }));
 
+  // Open jobs are listed here, not just linked to: the dashboard is where a
+  // worker without shifts actually looks for work, and this section previously
+  // showed only a sentence and a button.
+  const { data: openJobs, isValidating: jobsValidating, mutate: mutateJobs } = useSWR(
+    user ? `/work-requests/open/${user.id}` : null,
+    () => api.workRequests.list({ status: 'OPEN', limit: 3 }),
+  );
+
   const upcoming = Array.isArray(assignments)
     ? assignments.filter((s) => ['CONFIRMED', 'IN_PROGRESS'].includes(s.status))
     : [];
 
   const loading = statsLoading || assignmentsLoading;
-  const refreshing = statsValidating || assignmentsValidating;
+  const refreshing = statsValidating || assignmentsValidating || jobsValidating;
 
   const onRefresh = async () => {
-    await Promise.all([mutateStats(), mutateAssignments()]);
+    await Promise.all([mutateStats(), mutateAssignments(), mutateJobs()]);
   };
 
   const name = workerDisplayName(user?.first_name);
@@ -124,20 +127,18 @@ export default function HomeScreen() {
               />
 
               {upcoming.length === 0 ? (
-                <EmptyState
-                  title={t('home.noUpcomingShifts')}
-                  body={t('home.noUpcomingShiftsBody')}
-                  action={
-                    <Button
-                      label={t('home.browseJobs')}
-                      variant="ghost"
-                      onPress={() => router.push('/(app)/marketplace')}
-                    />
-                  }
-                />
+                /* No action here: the Open Jobs section directly below is the
+                   answer to "no upcoming shifts", and offered the same button
+                   twice within one screen. */
+                <EmptyState title={t('home.noUpcomingShifts')} body={t('home.noUpcomingShiftsBody')} />
               ) : (
                 upcoming.map((shift, index) => (
                   <Animated.View entering={FadeInUp.delay(index * 80)} key={shift.id}>
+                    <Pressable
+                      onPress={() => router.push(`/shift/${shift.id}`)}
+                      accessibilityRole="button"
+                      style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                    >
                     <Card style={styles.shiftCard}>
                       <View style={styles.shiftTop}>
                         <ThemedText type="smallBold" style={styles.shiftTitle}>
@@ -145,7 +146,7 @@ export default function HomeScreen() {
                         </ThemedText>
                         <Badge
                           label={shift.status.replace('_', ' ')}
-                          tone={statusTone(shift.status)}
+                          tone={assignmentStatusTone(shift.status)}
                         />
                       </View>
                       {shift.hotel?.name ? (
@@ -157,21 +158,45 @@ export default function HomeScreen() {
                         {shiftWhen(shift)}
                       </ThemedText>
                     </Card>
+                    </Pressable>
                   </Animated.View>
                 ))
               )}
 
               <SectionHeader title={t('home.openJobs')} />
-              <Card>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {t('marketplace.description', 'Shifts you can apply for.')}
-                </ThemedText>
-                <Button
-                  label={t('home.browseJobs')}
-                  variant="secondary"
-                  onPress={() => router.push('/(app)/marketplace')}
-                />
-              </Card>
+              {Array.isArray(openJobs) && openJobs.length > 0 ? (
+                openJobs.map((job) => (
+                  <Pressable
+                    key={job.id}
+                    onPress={() => router.push(`/job/${job.id}`)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                  >
+                    <Card style={styles.shiftCard}>
+                      <ThemedText type="smallBold">{job.position ?? t('common.shift')}</ThemedText>
+                      {job.hotel?.name ? (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {job.hotel.name}
+                        </ThemedText>
+                      ) : null}
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {job.shift_date ? new Date(job.shift_date).toLocaleDateString() : ''}
+                      </ThemedText>
+                    </Card>
+                  </Pressable>
+                ))
+              ) : (
+                <Card>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('marketplace.noneOpen')}
+                  </ThemedText>
+                </Card>
+              )}
+              <Button
+                label={t('home.browseJobs')}
+                variant="secondary"
+                onPress={() => router.push('/(app)/marketplace')}
+              />
             </>
           )}
         </ScrollView>

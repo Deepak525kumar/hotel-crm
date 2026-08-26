@@ -112,13 +112,21 @@ export default function ProfileScreen() {
 
           {user.manager_name || user.creator_name ? (
             <>
-              <SectionHeader title={t('profile.overview')} />
+              {/* Titled "Overview", but it only ever showed who a worker
+                  reports to -- no summary of anything. Named for its contents
+                  instead, and the last row drops the divider that sat against
+                  the card edge. */}
+              <SectionHeader title={t('profile.reportingLine')} />
               <Card>
                 {user.manager_name ? (
-                  <ListRow title={t('profile.directManager')} subtitle={user.manager_name} />
+                  <ListRow
+                    title={t('profile.directManager')}
+                    subtitle={user.manager_name}
+                    last={!user.creator_name}
+                  />
                 ) : null}
                 {user.creator_name ? (
-                  <ListRow title={t('requests.createdBy')} subtitle={user.creator_name} />
+                  <ListRow title={t('requests.createdBy')} subtitle={user.creator_name} last />
                 ) : null}
               </Card>
             </>

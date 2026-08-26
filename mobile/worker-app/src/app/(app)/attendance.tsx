@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
@@ -37,6 +38,7 @@ function time(iso?: string | null): string {
 
 export default function AttendanceScreen() {
   const { t } = useTranslation();
+  const router = useRouter();
   const [items, setItems] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,6 +82,15 @@ export default function AttendanceScreen() {
             renderItem={({ item }) => {
               const minutes = workedMinutes(item);
               return (
+                // The record alone does not say which shift it belongs to --
+                // where, when, for which hotel. That detail already exists on
+                // the shift screen, so the row links to it.
+                <Pressable
+                  onPress={() => router.push(`/shift/${item.assignment_id}`)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('attendance.viewAssignment')}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+                >
                 <Card>
                   <View style={styles.row}>
                     <ThemedText type="smallBold">
@@ -95,6 +106,7 @@ export default function AttendanceScreen() {
                     {minutes !== null ? ` · ${formatDuration(minutes)}` : ''}
                   </ThemedText>
                 </Card>
+                </Pressable>
               );
             }}
           />

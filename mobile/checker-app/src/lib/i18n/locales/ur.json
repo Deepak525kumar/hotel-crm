@@ -599,7 +599,8 @@
     "employeeId": "ملازم آئی ڈی",
     "jobTitle": "عہدہ",
     "startDate": "آغاز کی تاریخ",
-    "employmentStatus": "حیثیت"
+    "employmentStatus": "حیثیت",
+    "reportingLine": "رپورٹنگ لائن"
   },
   "skills": {
     "CLEANER": "صفائی کارکن",
@@ -1063,6 +1064,7 @@
     "documentsNeedAttention": "دستاویزات پر توجہ درکار ہے"
   },
   "marketplace": {
-    "description": "شفٹس جن کے لیے آپ درخواست دے سکتے ہیں۔"
+    "description": "شفٹس جن کے لیے آپ درخواست دے سکتے ہیں۔",
+    "noneOpen": "فی الحال کوئی کھلی ملازمت نہیں۔"
   }
 }

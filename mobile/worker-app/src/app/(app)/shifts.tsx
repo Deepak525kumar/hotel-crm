@@ -4,14 +4,17 @@ import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
 import { NotificationBell } from '@/components/NotificationBell';
+import { assignmentStatusTone } from '@/lib/assignment-status-tone';
+import { useTheme } from '@/hooks/use-theme';
+import { SymbolView } from 'expo-symbols';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Badge, BadgeTone, Card, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
+import { Badge, Card, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
-import type { AssignmentStatus, WorkerAssignment } from '@/types/api';
+import type { WorkerAssignment } from '@/types/api';
 
 /**
  * Schedule — the merge of the old "My Shifts" and "Calendar" tabs.
@@ -25,19 +28,6 @@ import type { AssignmentStatus, WorkerAssignment } from '@/types/api';
  * of six raw hexes (`#3182CE`, `#38A169`, ...) applied as badge fills with
  * white text, which ignored the colour scheme entirely.
  */
-const STATUS_TONE: Record<AssignmentStatus, BadgeTone> = {
-  CONFIRMED: 'primary',
-  IN_PROGRESS: 'primary',
-  // The three terminal states carry the outcome, so they are the ones that
-  // must read at a glance: work done is green, work missed or called off is
-  // red. COMPLETED and CANCELLED were both 'neutral', which made a finished
-  // shift and a cancelled one look identical in a list -- the single most
-  // useful distinction on the screen.
-  COMPLETED: 'success',
-  NO_SHOW: 'danger',
-  CANCELLED: 'danger',
-  REASSIGNED: 'warning',
-};
 
 function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => void }) {
   const { t } = useTranslation();
@@ -60,7 +50,7 @@ function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => v
           </ThemedText>
           <Badge
             label={item.status.replace(/_/g, ' ')}
-            tone={STATUS_TONE[item.status] ?? 'neutral'}
+            tone={assignmentStatusTone(item.status) ?? 'neutral'}
           />
         </View>
 
@@ -97,6 +87,7 @@ function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => v
 }
 
 export default function ScheduleScreen() {
+  const theme = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -116,23 +107,31 @@ export default function ScheduleScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <ScreenHeader title={t('nav.schedule')} action={<NotificationBell />} />
+          <ScreenHeader
+            title={t('nav.schedule')}
+            action={
+              <View style={styles.headerActions}>
+                {/* Was a "Calendar ›" text link buried in a section header. */}
+                <Pressable
+                  onPress={() => router.push('/(app)/calendar')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nav.calendar')}
+                  hitSlop={8}
+                >
+                  <SymbolView
+                    name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
+                    tintColor={theme.text}
+                    size={24}
+                  />
+                </Pressable>
+                <NotificationBell />
+              </View>
+            }
+          />
         </View>
 
         <SectionHeader
           title={t('shifts.upcomingTitle')}
-          action={
-            <Pressable
-              onPress={() => router.push('/(app)/calendar')}
-              accessibilityRole="button"
-              accessibilityLabel={t('nav.calendar')}
-              hitSlop={8}
-            >
-              <ThemedText type="small" themeColor="textSecondary">
-                {t('nav.calendar')} ›
-              </ThemedText>
-            </Pressable>
-          }
         />
 
         {loading && !items.length ? (
@@ -175,6 +174,7 @@ export default function ScheduleScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safeArea: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   header: { marginBottom: Spacing.three },
   loader: { marginTop: Spacing.six },
   list: { gap: Spacing.two, paddingBottom: Spacing.six },

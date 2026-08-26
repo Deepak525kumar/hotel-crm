@@ -282,115 +282,119 @@ export default function CalendarScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader title={t('calendar.sickOrVacation')} action={<NotificationBell />} />
+        {/* One scroll container for the whole screen. The calendar and the
+            actions used to sit above a separately-scrolling FlatList, so the
+            marked-days list could only be scrolled inside whatever narrow strip
+            was left below the calendar. */}
+        <FlatList
+          data={loading ? [] : items}
+          keyExtractor={(i) => i.id}
+          renderItem={({ item }) => (
+            <AbsenceCard
+              item={item}
+              onWithdraw={handleWithdraw}
+              withdrawing={withdrawingId === item.id}
+            />
+          )}
+          ListHeaderComponent={
+            <>
+          <ScreenHeader title={t('calendar.sickOrVacation')} action={<NotificationBell />} />
 
-        <View style={styles.viewSwitch}>
-          {(['month', 'week', 'day'] as const).map((v) => (
-            <Pressable
-              key={v}
-              onPress={() => setView(v)}
-              style={[
-                styles.viewTab,
-                { borderColor: v === view ? theme.primary : 'transparent' },
-              ]}
-            >
-              <ThemedText type={v === view ? 'smallBold' : 'small'}>{t(`calendar.view${v}`)}</ThemedText>
-            </Pressable>
-          ))}
-        </View>
-
-        {view === 'month' ? (
-          <Calendar
-            current={selected}
-            onDayPress={(d: { dateString: string }) => onDayPress(d.dateString)}
-            markedDates={markedDates}
-            // Affordance to match the rule: a past day cannot be marked, so it
-            // should not look tappable either.
-            minDate={isoDateInCalendarTimezone(0)}
-            markingType="period"
-            firstDay={1}
-            theme={calendarTheme}
-          />
-        ) : view === 'week' ? (
-          <View style={styles.weekStrip}>
-            {weekOf(selected).map((day) => {
-              const isSelected = day === selected;
-              // Past days cannot be marked, so they must not look tappable.
-              const isPast = day < isoDateInCalendarTimezone(0);
-              return (
-                <Pressable
-                  key={day}
-                  onPress={() => onDayPress(day)}
-                  disabled={isPast}
-                  style={[
-                    styles.weekCell,
-                    { backgroundColor: isSelected ? theme.primary : 'transparent', opacity: isPast ? 0.35 : 1 },
-                  ]}
-                >
-                  <ThemedText type="small" style={isSelected ? { color: theme.onPrimary } : undefined}>
-                    {day.slice(8)}
-                  </ThemedText>
-                  {byDay.get(day) ? (
-                    <View style={[styles.dot, { backgroundColor: isSelected ? theme.onPrimary : theme.danger }]} />
-                  ) : null}
-                </Pressable>
-              );
-            })}
-          </View>
-        ) : null}
-
-        <Card>
-          <ThemedText type="smallBold">
-            {rangeEnd ? `${formatDay(rangeStart!)} – ${formatDay(rangeEnd)}` : formatDay(selected)}
-          </ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {selectedDays.length > 1
-              ? t('absences.daysSelected', { count: selectedDays.length })
-              : t('absences.tapAgainForRange')}
-          </ThemedText>
-
-          <View style={styles.actionRow}>
-            {(['SICK', 'VACATION'] as const).map((kind) => (
-              <Button
-                key={kind}
-                label={t(KIND_LABEL_KEY[kind])}
-                variant={kind === 'SICK' ? 'danger' : 'primary'}
-                onPress={() => handleMark(selectedDays, kind)}
-                disabled={marking !== null}
-                loading={isMarking(kind)}
-                style={styles.actionButton}
-              />
+          <View style={styles.viewSwitch}>
+            {(['month', 'week', 'day'] as const).map((v) => (
+              <Pressable
+                key={v}
+                onPress={() => setView(v)}
+                style={[
+                  styles.viewTab,
+                  { borderColor: v === view ? theme.primary : 'transparent' },
+                ]}
+              >
+                <ThemedText type={v === view ? 'smallBold' : 'small'}>{t(`calendar.view${v}`)}</ThemedText>
+              </Pressable>
             ))}
           </View>
-        </Card>
 
-        {errorMessage && (
-          <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
-            {errorMessage}
-          </ThemedText>
-        )}
+          {view === 'month' ? (
+            <Calendar
+              current={selected}
+              onDayPress={(d: { dateString: string }) => onDayPress(d.dateString)}
+              markedDates={markedDates}
+              // Affordance to match the rule: a past day cannot be marked, so it
+              // should not look tappable either.
+              minDate={isoDateInCalendarTimezone(0)}
+              markingType="period"
+              firstDay={1}
+              theme={calendarTheme}
+            />
+          ) : view === 'week' ? (
+            <View style={styles.weekStrip}>
+              {weekOf(selected).map((day) => {
+                const isSelected = day === selected;
+                // Past days cannot be marked, so they must not look tappable.
+                const isPast = day < isoDateInCalendarTimezone(0);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => onDayPress(day)}
+                    disabled={isPast}
+                    style={[
+                      styles.weekCell,
+                      { backgroundColor: isSelected ? theme.primary : 'transparent', opacity: isPast ? 0.35 : 1 },
+                    ]}
+                  >
+                    <ThemedText type="small" style={isSelected ? { color: theme.onPrimary } : undefined}>
+                      {day.slice(8)}
+                    </ThemedText>
+                    {byDay.get(day) ? (
+                      <View style={[styles.dot, { backgroundColor: isSelected ? theme.onPrimary : theme.danger }]} />
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
 
-        <SectionHeader title={t('calendar.yourMarkedDays')} />
+          <Card>
+            <ThemedText type="smallBold">
+              {rangeEnd ? `${formatDay(rangeStart!)} – ${formatDay(rangeEnd)}` : formatDay(selected)}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {selectedDays.length > 1
+                ? t('absences.daysSelected', { count: selectedDays.length })
+                : t('absences.tapAgainForRange')}
+            </ThemedText>
 
-        {loading ? (
-          <ActivityIndicator style={styles.loader} color={theme.text} />
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(i) => i.id}
-            renderItem={({ item }) => (
-              <AbsenceCard
-                item={item}
-                onWithdraw={handleWithdraw}
-                withdrawing={withdrawingId === item.id}
-              />
-            )}
-            ListEmptyComponent={<EmptyState title={t('profile.noAbsences')} />}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-            contentContainerStyle={styles.list}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
+            <View style={styles.actionRow}>
+              {(['SICK', 'VACATION'] as const).map((kind) => (
+                <Button
+                  key={kind}
+                  label={t(KIND_LABEL_KEY[kind])}
+                  variant={kind === 'SICK' ? 'danger' : 'primary'}
+                  onPress={() => handleMark(selectedDays, kind)}
+                  disabled={marking !== null}
+                  loading={isMarking(kind)}
+                  style={styles.actionButton}
+                />
+              ))}
+            </View>
+          </Card>
+
+          {errorMessage && (
+            <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
+              {errorMessage}
+            </ThemedText>
+          )}
+
+              <SectionHeader title={t('calendar.yourMarkedDays')} />
+              {loading ? <ActivityIndicator style={styles.loader} color={theme.text} /> : null}
+            </>
+          }
+          ListEmptyComponent={loading ? null : <EmptyState title={t('profile.noAbsences')} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+        />
 
         {/* Reason prompt for VACATION. A modal rather than Alert.prompt, which
             is iOS-only — on Android that would have silently done nothing. */}

@@ -598,7 +598,8 @@
     "employeeId": "Employee ID",
     "jobTitle": "Job title",
     "startDate": "Start date",
-    "employmentStatus": "Status"
+    "employmentStatus": "Status",
+    "reportingLine": "Reporting line"
   },
   "skills": {
     "CLEANER": "Cleaner",
@@ -1062,6 +1063,7 @@
     "documentsNeedAttention": "Documents need attention"
   },
   "marketplace": {
-    "description": "Shifts you can apply for."
+    "description": "Shifts you can apply for.",
+    "noneOpen": "No open jobs right now."
   }
 }

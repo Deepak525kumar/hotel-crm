@@ -598,7 +598,8 @@
     "employeeId": "Identifiant employé",
     "jobTitle": "Intitulé du poste",
     "startDate": "Date de début",
-    "employmentStatus": "Statut"
+    "employmentStatus": "Statut",
+    "reportingLine": "Ligne hiérarchique"
   },
   "skills": {
     "CLEANER": "Agent d'entretien",
@@ -1062,6 +1063,7 @@
     "documentsNeedAttention": "Documents à compléter"
   },
   "marketplace": {
-    "description": "Créneaux auxquels vous pouvez postuler."
+    "description": "Créneaux auxquels vous pouvez postuler.",
+    "noneOpen": "Aucune offre ouverte pour le moment."
   }
 }

@@ -598,7 +598,8 @@
     "employeeId": "ID працівника",
     "jobTitle": "Посада",
     "startDate": "Дата початку",
-    "employmentStatus": "Статус"
+    "employmentStatus": "Статус",
+    "reportingLine": "Підпорядкування"
   },
   "skills": {
     "CLEANER": "Прибиральник",
@@ -1062,6 +1063,7 @@
     "documentsNeedAttention": "Документи потребують уваги"
   },
   "marketplace": {
-    "description": "Зміни, на які ви можете подати заявку."
+    "description": "Зміни, на які ви можете подати заявку.",
+    "noneOpen": "Наразі немає відкритих вакансій."
   }
 }

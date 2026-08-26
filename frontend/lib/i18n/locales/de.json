@@ -598,7 +598,8 @@
     "employeeId": "Mitarbeiter-ID",
     "jobTitle": "Stellenbezeichnung",
     "startDate": "Eintrittsdatum",
-    "employmentStatus": "Status"
+    "employmentStatus": "Status",
+    "reportingLine": "Berichtslinie"
   },
   "skills": {
     "CLEANER": "Reinigungskraft",
@@ -1062,6 +1063,7 @@
     "documentsNeedAttention": "Dokumente benötigen Aufmerksamkeit"
   },
   "marketplace": {
-    "description": "Schichten, auf die Sie sich bewerben können."
+    "description": "Schichten, auf die Sie sich bewerben können.",
+    "noneOpen": "Derzeit keine offenen Stellen."
   }
 }
