@@ -3,7 +3,12 @@ import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { api, ApiError } from '@/lib/api';
-import { ALLOWED_MIME_TYPES, resolveMimeType, validatePickedAsset } from '@/lib/document-validation';
+import {
+  ALLOWED_MIME_TYPES,
+  resolveMimeType,
+  validateFileSize,
+  validatePickedAsset,
+} from '@/lib/document-validation';
 import { resolvePickedPhoto } from '@/lib/picked-photo';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { translateApiError } from '../lib/api-error-i18n';
@@ -121,7 +126,7 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         return;
       }
 
-      const sizeError = validatePickedAsset({ size: asset.fileSize });
+      const sizeError = validateFileSize(asset.fileSize);
       if (sizeError) {
         setError(t(sizeError));
         return;

@@ -48,6 +48,24 @@ export function resolveMimeType(asset: { mimeType?: string; name?: string }): st
   return asset.mimeType ?? mimeTypeFromFilename(asset.name);
 }
 
+/**
+ * Size-only check, for callers that have already established the MIME type by
+ * another route.
+ *
+ * The photo path resolves its own type via `resolvePickedPhoto` (transcoding
+ * HEIC to JPEG) and then only needs the size rule. It used to call
+ * `validatePickedAsset({ size })`, which was harmless while an absent
+ * mimeType passed -- and became a hard rejection of EVERY photo once that
+ * function started requiring a resolvable type. Splitting the two rules keeps
+ * each caller asking for what it actually means.
+ */
+export function validateFileSize(size: number | undefined): string | null {
+  if (size !== undefined && size > MAX_FILE_SIZE_BYTES) {
+    return 'documents.exceedsMaxSize';
+  }
+  return null;
+}
+
 export function validatePickedAsset(asset: {
   mimeType?: string;
   size?: number;

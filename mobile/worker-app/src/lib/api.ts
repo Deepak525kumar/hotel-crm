@@ -576,9 +576,15 @@ export const api = {
       }
     ) => {
       const form = new FormData();
-      if (asset.file) {
+      // `instanceof Blob`, NOT a truthiness check. expo-document-picker can
+      // hand back a non-Blob `file` on native, and appending that made React
+      // Native's own FormData throw "Unsupported FormDataPart implementation"
+      // -- it accepts only a string or an object with a string `uri`. A
+      // truthy-but-wrong `file` therefore broke every native upload, which is
+      // worse than the web gap it was added to close.
+      if (typeof Blob !== 'undefined' && asset.file instanceof Blob) {
         // Web: a real File/Blob, which FormData knows how to encode.
-        form.append('file', asset.file as Blob, asset.name);
+        form.append('file', asset.file, asset.name);
       } else {
         // Native: React Native's FormData takes {uri, name, type} (note
         // `type`, not `mimeType` -- a documented divergence from the picker's
