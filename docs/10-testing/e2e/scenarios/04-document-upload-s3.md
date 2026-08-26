@@ -127,6 +127,36 @@ S3 object, no metadata row, no audit row; clean passes through; the scanner rece
 If a real scanner vendor has since been selected, add a live end-to-end case here using the
 EICAR test string.
 
+## Step 6b — The native client path (NOT covered by any curl above)
+
+Every step above drives the server with `curl`, which builds multipart itself. A green
+Scenario 04 therefore says **nothing** about whether the worker app can upload at all, and for a
+long stretch it could not: every native upload failed with
+`Unsupported FormDataPart implementation` while this scenario passed and the web client worked.
+
+The reason curl cannot see it: Expo replaces the global `fetch` on native with its WinterCG
+implementation (`expo/src/winter/runtime.native.ts`), and that fetch serialises multipart
+itself. Its converter (`expo/src/winter/fetch/convertFormData.ts`) accepts a part only if it is
+a **string**, a **Blob**, or an **object exposing `bytes()`** — and React Native's own legacy
+`{uri, name, type}` part, which every RN guide shows and which RN's own `FormData` accepts, is
+not one of them. Expo's doc comment says so directly: `` `uri` is not supported for React
+Native's FormData. ``
+
+**To verify:** upload a document from the worker app (Metro is sufficient — this is a JS-layer
+failure, not a native-build one) and confirm the row and the S3 object, per Step 1's data-layer
+rule. Do not accept the app's own success toast.
+
+**PASS:** the part appended in `mobile/worker-app/src/lib/api.ts` is an `expo-file-system`
+`File` (which `implements Blob` and exposes `bytes()`), or a real `Blob` on web. Any part that is
+a bare object carrying `uri` is a FAIL, however plausible it looks.
+
+**Also check:** `expo-file-system` must be required **lazily** inside the upload function. A
+top-level import of an Expo module whose native half is absent throws during module evaluation
+and takes down every importer — that failure presents misleadingly, as
+`Route "./shift/[id].tsx" is missing the required default export`.
+
+---
+
 ## Step 7 — Cleanup
 
 ```bash
@@ -148,6 +178,7 @@ Delete objects you created and note any test rows left in the DB.
 - [ ] Inverse orphan risk (DB fail after S3 success) checked and reported
 - [ ] Stub-mode behaviour understood and prod config confirmed
 - [ ] Malware-seam tests pass; no claim of real detection
+- [ ] Upload verified **from the worker app**, not only via `curl` (Step 6b)
 
 ## Defects this scenario has caught
 
@@ -156,3 +187,4 @@ Delete objects you created and note any test rows left in the DB.
 | 4 of 7 categories impossible to upload | Validator hardcoded the old two-value enum |
 | Malware seam absent on this path | `OD-DOC-016` deferred; resolved by `ADR-066` Option A |
 | Accidental second S3 bucket created | `.env` name didn't match the pre-existing bucket |
+| Every native app upload failed, `Unsupported FormDataPart implementation`; web fine | Expo's WinterCG `fetch` replaces the global on native and rejects RN's `{uri, name, type}` part. Fixed in PR #569 by appending an `expo-file-system` `File`. |
