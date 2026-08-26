@@ -449,7 +449,8 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "uploadFailedReason": "فشل الرفع: {{reason}}"
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",

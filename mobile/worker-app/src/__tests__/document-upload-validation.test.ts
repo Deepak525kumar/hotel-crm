@@ -26,8 +26,29 @@ describe('validatePickedAsset', () => {
     expect(validatePickedAsset({ mimeType: 'application/pdf', size: 10 * 1024 * 1024 })).toBeNull();
   });
 
-  it('does not reject when mimeType is undefined (defers to the backend)', () => {
-    expect(validatePickedAsset({ size: 1024 })).toBeNull();
+  // This case previously asserted the opposite -- that an undefined mimeType
+  // passed here and "deferred to the backend". That deferral was not neutral:
+  // the upload then sent `application/octet-stream`, which the server's
+  // `z.enum(ALLOWED_MIME_TYPES)` rejects unconditionally. So it deferred to a
+  // guaranteed 422 on a file that was often perfectly acceptable, and the
+  // worker had no way to act on it. The type is now resolved from the
+  // filename first, and only genuinely unidentifiable files are refused.
+  it('resolves a missing mimeType from the filename extension', () => {
+    expect(validatePickedAsset({ name: 'passport.pdf', size: 1024 })).toBeNull();
+    expect(validatePickedAsset({ name: 'id-card.JPG', size: 1024 })).toBeNull();
+  });
+
+  it('rejects a file whose type cannot be identified at all', () => {
+    // No mimeType and no usable extension: sending octet-stream would only
+    // produce a server rejection the worker cannot act on.
+    expect(validatePickedAsset({ size: 1024 })).toBe('documents.unsupportedType');
+    expect(validatePickedAsset({ name: 'scan.heic', size: 1024 })).toBe('documents.unsupportedType');
+  });
+
+  it('still rejects an explicitly unsupported mimeType', () => {
+    expect(validatePickedAsset({ mimeType: 'application/zip', name: 'a.pdf' })).toBe(
+      'documents.unsupportedType',
+    );
   });
 
   it('does not reject when size is undefined (defers to the backend)', () => {

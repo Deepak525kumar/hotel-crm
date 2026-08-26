@@ -448,7 +448,8 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "uploadFailedReason": "Upload failed: {{reason}}"
   },
   "hr": {
     "title": "HR & Payroll",

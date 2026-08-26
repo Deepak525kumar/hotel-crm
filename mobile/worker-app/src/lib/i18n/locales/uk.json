@@ -448,7 +448,8 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "uploadFailedReason": "Не вдалося завантажити: {{reason}}"
   },
   "hr": {
     "title": "Кадри та зарплата",

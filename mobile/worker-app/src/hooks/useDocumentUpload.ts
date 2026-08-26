@@ -1,8 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
-import { api } from '@/lib/api';
-import { ALLOWED_MIME_TYPES, validatePickedAsset } from '@/lib/document-validation';
+import { api, ApiError } from '@/lib/api';
+import { ALLOWED_MIME_TYPES, resolveMimeType, validatePickedAsset } from '@/lib/document-validation';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { translateApiError } from '../lib/api-error-i18n';
 
@@ -43,7 +43,14 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
       return;
     }
 
-    setPending({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
+    // Resolved, not raw: the picker can report no MIME type at all, and the
+    // server only accepts a known one.
+    setPending({
+      uri: asset.uri,
+      name: asset.name,
+      mimeType: resolveMimeType(asset),
+      size: asset.size,
+    });
   }, [t]);
 
   const clearPending = useCallback(() => {
@@ -61,7 +68,20 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         onUploaded(doc);
         setPending(null);
       } catch (err) {
-        setError(translateApiError(err, t, 'documents.uploadFailed'));
+        // A server rejection (4xx/5xx) arrives as an ApiError carrying the
+        // server's own message, and translateApiError shows it verbatim.
+        // Anything else means `fetch` itself threw -- the request never got a
+        // response at all, which for a multipart upload almost always means
+        // the native layer could not read the picked file. That case used to
+        // collapse into a bare "Upload failed. Please try again.", which named
+        // nothing and made the failure undiagnosable from a device. Keep the
+        // underlying reason.
+        if (err instanceof ApiError) {
+          setError(translateApiError(err, t, 'documents.uploadFailed'));
+        } else {
+          const reason = err instanceof Error ? err.message : String(err);
+          setError(t('documents.uploadFailedReason', { reason }));
+        }
       } finally {
         setUploading(false);
       }
