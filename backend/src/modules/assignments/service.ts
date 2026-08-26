@@ -1,13 +1,4 @@
-import {
-  Prisma,
-  WorkerAssignment,
-  CalendarAbsenceKind,
-  CalendarEntry,
-  AssignmentStatus,
-  RoomsCompletedEntry,
-  OutboxSourceModule,
-  OutboxTransport,
-} from '@prisma/client';
+import { AssignmentStatus, AttendanceStatus, CalendarAbsenceKind, CalendarEntry, OutboxSourceModule, OutboxTransport, Prisma, RoomsCompletedEntry, WorkerAssignment } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
 import { ConflictError, ForbiddenError, NotFoundError } from '../../lib/errors.js';
 import { isWorkerEligibleForHotel } from '../../lib/roster-scope.js';
@@ -691,6 +682,22 @@ export class AssignmentService extends BaseService {
       // blocking any backfill. skill_slot_id is only ever set by
       // acceptBroadcast(), so this is a no-op for calendar-placed
       // assignments (skill_slot_id null) and never fires for COMPLETED.
+      // The attendance row is created EXPECTED when the shift is assigned, and
+      // only a check-in ever moved it. A cancelled shift therefore left
+      // attendance asserting the worker was still expected -- indefinitely,
+      // and visibly wrong on the worker's own attendance list.
+      //
+      // EXCUSED rather than deleted: the row is the record that the shift
+      // existed and was called off, which reports need to tell apart from a
+      // no-show. Scoped to EXPECTED so a shift cancelled after the worker had
+      // already checked in keeps its PRESENT/LATE evidence.
+      if (next === AssignmentStatus.CANCELLED) {
+        await tx.attendance.updateMany({
+          where: { assignment_id: assignment.id, status: AttendanceStatus.EXPECTED },
+          data: { status: AttendanceStatus.EXCUSED, updated_at: new Date() },
+        });
+      }
+
       if (next === AssignmentStatus.CANCELLED && assignment.skill_slot_id) {
         await tx.jobRequestSkillSlot.update({
           where: { id: assignment.skill_slot_id },
@@ -1551,6 +1558,19 @@ export class AssignmentService extends BaseService {
             await tx.workerAssignment.update({
               where: { id: assignment.id },
               data: { status: AssignmentStatus.NO_SHOW, updated_at: new Date() },
+            });
+
+            // The attendance row is created EXPECTED when the shift is assigned
+            // and only ever moved by a check-in. A worker who never checks in
+            // therefore left it EXPECTED forever -- the assignment said NO_SHOW
+            // while attendance still claimed the shift was upcoming, and the
+            // two views of the same shift disagreed permanently.
+            //
+            // Scoped to EXPECTED: a row already PRESENT/LATE means a check-in
+            // happened and must not be overwritten by a sweep.
+            await tx.attendance.updateMany({
+              where: { assignment_id: assignment.id, status: AttendanceStatus.EXPECTED },
+              data: { status: AttendanceStatus.ABSENT, updated_at: new Date() },
             });
 
             // Recompute rating since NO_SHOW is a terminal outcome that hurts completion rate

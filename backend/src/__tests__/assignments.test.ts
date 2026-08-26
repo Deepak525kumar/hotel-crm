@@ -34,6 +34,8 @@ const mockWorkerOverallRating = {
 
 const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // Cancelling or sweeping a shift closes its EXPECTED attendance row.
+  updateMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 
 const mockJobRequestSkillSlot = {
@@ -446,6 +448,45 @@ describe('AssignmentService', () => {
       expect(data.status).toBe('CANCELLED');
       expect(data.cancelled_at).toBeInstanceOf(Date);
       expect(data.cancellation_reason).toBe('sick');
+    });
+
+    // Attendance is created EXPECTED when the shift is assigned and was only
+    // ever moved by a check-in, so a cancelled shift left attendance asserting
+    // the worker was still expected -- permanently, and visibly wrong on the
+    // worker's own attendance list.
+    it('excuses the attendance row when the shift is cancelled', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+
+      await service.update('a1', { status: 'CANCELLED' }, 'mgr1', 'manager', { type: 'global' });
+
+      expect(mockAttendance.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { assignment_id: 'a1', status: 'EXPECTED' },
+          data: expect.objectContaining({ status: 'EXCUSED' }),
+        })
+      );
+    });
+
+    // A shift cancelled after the worker already checked in must keep its
+    // PRESENT/LATE evidence -- hence the EXPECTED-only where clause.
+    it('scopes the attendance close to EXPECTED rows only', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment());
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'CANCELLED' }));
+
+      await service.update('a1', { status: 'CANCELLED' }, 'mgr1', 'manager', { type: 'global' });
+
+      const where = mockAttendance.updateMany.mock.calls[0][0].where;
+      expect(where.status).toBe('EXPECTED');
+    });
+
+    it('leaves attendance alone when a shift is completed rather than cancelled', async () => {
+      mockWorkerAssignment.findUnique.mockResolvedValue(makeAssignment({ status: 'IN_PROGRESS' }));
+      mockWorkerAssignment.update.mockResolvedValue(makeAssignment({ status: 'COMPLETED' }));
+
+      await service.update('a1', { status: 'COMPLETED' }, 'mgr1', 'manager', { type: 'global' });
+
+      expect(mockAttendance.updateMany).not.toHaveBeenCalled();
     });
 
     // Audit-trail fix (2026-08-05): cancellation_reason was saved to the row
@@ -1295,6 +1336,38 @@ describe('AssignmentService', () => {
       });
       expect(mockWorkerOverallRating.upsert).toHaveBeenCalled();
       expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+
+    // The sweep marked the assignment NO_SHOW but left attendance EXPECTED, so
+    // the two views of the same shift disagreed permanently: the schedule said
+    // the worker never turned up, attendance said they were still due.
+    it('marks the attendance row ABSENT when it sweeps a no-show', async () => {
+      const shiftDate = new Date('2026-08-01T00:00:00Z');
+      const assignment = { id: 'a1', status: 'CONFIRMED', worker_id: 'w1', work_request_id: null, job_request_id: 'j1', hotel_id: 'h1', day: shiftDate };
+
+      mockWorkerAssignment.findMany.mockResolvedValue([assignment]);
+      mockWorkerAssignment.findUnique.mockResolvedValue(assignment);
+      mockJobRequest.findUnique.mockResolvedValue({
+        shift_date: shiftDate,
+        shift_start_time: '22:00',
+        shift_end_time: '02:00',
+      });
+      mockHotel.findUnique.mockResolvedValue({ timezone: 'Europe/Berlin' });
+
+      const realNow = Date.now;
+      Date.now = () => new Date('2026-08-02T04:00:00Z').getTime();
+      try {
+        await service.sweepNoShows(3600000, 100);
+      } finally {
+        Date.now = realNow;
+      }
+
+      expect(mockAttendance.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { assignment_id: 'a1', status: 'EXPECTED' },
+          data: expect.objectContaining({ status: 'ABSENT' }),
+        })
+      );
     });
   });
 });
