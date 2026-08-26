@@ -103,8 +103,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { readFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { BaseService } from '../../lib/base-service.js';
 
 import { ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
@@ -127,6 +126,7 @@ import type {
   PayslipRequestStatusType,
   ListPayslipRequestsQuery,
 } from './types.js';
+import { findBackendRoot } from '../../lib/backend-root.js';
 
 // 2026-08-13 contract feature: the single default contract PDF (replaces the
 // removed Document Templates module -- see ADR/decision note in
@@ -134,33 +134,17 @@ import type {
 // the same static file, marks it FULL_TIME or PART_TIME by hand, signs it,
 // and returns it via the pre-existing uploadSignedContract()/
 // confirmContractSigned() flow below -- no per-worker rendering.
-declare const __dirname: string | undefined;
+// Resolved through findBackendRoot(), which looks for a marker unique to this
+// package. The previous walk accepted any ancestor with a package.json, and
+// under pm2 (`process.argv[1]` is pm2's own ProcessContainer.js) that was
+// /usr/lib/node_modules/pm2 -- so every contract download 404'd in production.
+const DEFAULT_CONTRACT_PDF_PATH = resolve(
+  findBackendRoot(),
+  'assets',
+  'contracts',
+  'Personalfragebogen_NEU.pdf',
+);
 
-// Mirrors config/env.ts's backendRoot() dual CJS/ESM resolution exactly (see
-// that function's own comment): under ts-jest/CommonJS, `__dirname` is
-// provided by the module wrapper (this file lives at
-// `backend/src/modules/hr/` -> walk up 3 to `backend/`); under native ESM
-// (`node dist/server.js`), `__dirname` does not exist and `import.meta.url`
-// is unavailable at this module's target/module tsconfig settings, so the
-// entrypoint-relative walk-up-to-package.json fallback is used instead.
-function resolveDefaultContractPdfPath(): string {
-  if (typeof __dirname !== 'undefined') {
-    return resolve(__dirname, '..', '..', '..', 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
-  }
-  const entry = process.argv[1];
-  let dir = entry ? dirname(resolve(entry)) : process.cwd();
-  for (let i = 0; i < 10; i += 1) {
-    if (existsSync(resolve(dir, 'package.json'))) {
-      return resolve(dir, 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return resolve(process.cwd(), 'assets', 'contracts', 'Personalfragebogen_NEU.pdf');
-}
-
-const DEFAULT_CONTRACT_PDF_PATH = resolveDefaultContractPdfPath();
 
 
 
