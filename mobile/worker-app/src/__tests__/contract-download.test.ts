@@ -1,5 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+import { downloadContract } from '@/lib/contract-download';
+
 /**
  * Contract download (lib/contract-download.ts).
  *
@@ -50,8 +52,6 @@ jest.mock('@/lib/api', () => ({
   },
   getAccessToken: () => 'test-access-token',
 }));
-
-import { downloadContract } from '@/lib/contract-download';
 
 const { File } = require('expo-file-system');
 const Sharing = require('expo-sharing');
