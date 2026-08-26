@@ -545,7 +545,12 @@ export const api = {
     // Not fixed in this PR — backend scope, affects web identically.
     upload: (
       workerId: string,
-      asset: { uri: string; name: string; mimeType?: string },
+      // `file` is present on WEB only (expo-document-picker exposes it "for
+      // parity with the web File API"); `uri` is the native path. Sending the
+      // {uri,name,type} shape on web does not produce a file part at all --
+      // there the uri is a base64 data URI and react-native-web's FormData
+      // appends the object itself. Prefer the real File when it exists.
+      asset: { uri: string; name: string; mimeType?: string; file?: unknown },
       input: {
         category: DocumentCategory;
         is_work_permit?: boolean;
@@ -553,11 +558,19 @@ export const api = {
       }
     ) => {
       const form = new FormData();
-      form.append('file', {
-        uri: asset.uri,
-        name: asset.name,
-        type: asset.mimeType ?? 'application/octet-stream',
-      } as unknown as Blob);
+      if (asset.file) {
+        // Web: a real File/Blob, which FormData knows how to encode.
+        form.append('file', asset.file as Blob, asset.name);
+      } else {
+        // Native: React Native's FormData takes {uri, name, type} (note
+        // `type`, not `mimeType` -- a documented divergence from the picker's
+        // own field name) and reads the file itself at send time.
+        form.append('file', {
+          uri: asset.uri,
+          name: asset.name,
+          type: asset.mimeType ?? 'application/octet-stream',
+        } as unknown as Blob);
+      }
       form.append('category', input.category);
       form.append('original_filename', asset.name);
       form.append('mime_type', asset.mimeType ?? 'application/octet-stream');

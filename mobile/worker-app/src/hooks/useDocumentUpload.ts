@@ -11,6 +11,8 @@ export interface PendingUpload {
   name: string;
   mimeType?: string;
   size?: number;
+  /** Web only — the real File object, preferred over `uri` when present. */
+  file?: unknown;
 }
 
 /**
@@ -50,6 +52,7 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
       name: asset.name,
       mimeType: resolveMimeType(asset),
       size: asset.size,
+      file: (asset as { file?: unknown }).file,
     });
   }, [t]);
 
