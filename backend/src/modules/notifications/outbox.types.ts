@@ -75,4 +75,11 @@ export interface EnqueueNotificationInput {
    * transport's OutboxEvent row.
    */
   emailText?: string;
+  /**
+   * Pins the destination address for the EMAIL transport, overriding the
+   * recipient's current one. Needed only where the current address is the
+   * wrong one to reach -- an email change, where `to` would otherwise resolve
+   * at send time to the address that just replaced it.
+   */
+  emailTo?: string;
 }

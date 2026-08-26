@@ -82,7 +82,8 @@
     "tomorrow": "Morgen",
     "getDirections": "Route anzeigen",
     "success": "Erfolgreich",
-    "send": "Senden"
+    "send": "Senden",
+    "change": "Ändern"
   },
   "fields": {
     "name": "Name",
@@ -708,7 +709,9 @@
     "revokeAccessFor": "Dies entzieht <name>{{name}}</name> den Zugriff. Sie können das Konto über den Bearbeitungsbildschirm wieder aktivieren.",
     "reactivateAccountTitle": "Konto reaktivieren",
     "reactivateAccountBody": "Stellt den Anmeldezugang wieder her. Rolle und Geltungsbereich bleiben erhalten.",
-    "reactivateAction": "Reaktivieren"
+    "reactivateAction": "Reaktivieren",
+    "changeEmailTitle": "Anmelde-E-Mail ändern",
+    "changeEmailBody": "Dies ist die Adresse für die Anmeldung. Die Person wird auf allen Geräten abgemeldet; die alte und die neue Adresse werden benachrichtigt."
   },
   "requests": {
     "title": "Arbeitsanfrage",

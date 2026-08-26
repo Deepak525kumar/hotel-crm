@@ -82,7 +82,8 @@
     "tomorrow": "Tomorrow",
     "getDirections": "Get Directions",
     "success": "Success",
-    "send": "Send"
+    "send": "Send",
+    "change": "Change"
   },
   "fields": {
     "name": "Name",
@@ -708,7 +709,9 @@
     "revokeAccessFor": "This revokes access for <name>{{name}}</name>. You can reactivate the account from the edit screen.",
     "reactivateAccountTitle": "Reactivate account",
     "reactivateAccountBody": "Restores sign-in access. The account keeps its role and scope.",
-    "reactivateAction": "Reactivate"
+    "reactivateAction": "Reactivate",
+    "changeEmailTitle": "Change sign-in email",
+    "changeEmailBody": "This is the address they sign in with. They will be signed out on all devices, and both the old and the new address will be notified."
   },
   "requests": {
     "title": "Work request",

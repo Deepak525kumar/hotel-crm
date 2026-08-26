@@ -83,7 +83,8 @@
     "tomorrow": "غدًا",
     "getDirections": "الحصول على الاتجاهات",
     "success": "تم بنجاح",
-    "send": "إرسال"
+    "send": "إرسال",
+    "change": "تغيير"
   },
   "fields": {
     "name": "الاسم",
@@ -709,7 +710,9 @@
     "revokeAccessFor": "يؤدي هذا إلى إلغاء وصول <name>{{name}}</name>. يمكنك إعادة تفعيل الحساب من شاشة التعديل.",
     "reactivateAccountTitle": "إعادة تنشيط الحساب",
     "reactivateAccountBody": "يستعيد إمكانية تسجيل الدخول. يحتفظ الحساب بدوره ونطاقه.",
-    "reactivateAction": "إعادة تنشيط"
+    "reactivateAction": "إعادة تنشيط",
+    "changeEmailTitle": "تغيير بريد تسجيل الدخول",
+    "changeEmailBody": "هذا هو العنوان المستخدم لتسجيل الدخول. سيتم تسجيل الخروج من جميع الأجهزة، وسيتم إشعار العنوانين القديم والجديد."
   },
   "requests": {
     "title": "طلب عمل",

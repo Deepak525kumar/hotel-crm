@@ -1,0 +1,43 @@
+-- Paired rollback (repo convention). Rebuilds the enum without
+-- USER_EMAIL_CHANGED -- PostgreSQL has no ALTER TYPE ... DROP VALUE.
+--
+-- Value list derived from the previous rollback's generated list (itself taken
+-- from live pg_enum in enumsortorder) plus ACCOUNT_CREATED, which that
+-- migration appended. NOT retyped by hand: a mis-ordered rebuild does not
+-- error, it silently relabels every existing Notification row. Regenerate with
+--   SELECT string_agg(quote_literal(e.enumlabel::text), ', '
+--                     ORDER BY e.enumsortorder)
+--     FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+--    WHERE t.typname = 'NotificationType';
+-- if this ever needs hand-editing.
+--
+-- OutboxSourceModule is deliberately untouched: this feature reuses the
+-- existing USERS member and adds none.
+
+BEGIN;
+  ALTER TYPE "NotificationType" RENAME TO "NotificationType_old";
+
+  CREATE TYPE "NotificationType" AS ENUM (
+    'WORK_REQUEST_PUBLISHED', 'WORK_REQUEST_CANCELLED', 'WORK_REQUEST_EXPIRING_SOON',
+    'APPLICATION_RECEIVED', 'APPLICATION_ACCEPTED', 'APPLICATION_REJECTED',
+    'APPLICATION_WITHDRAWN', 'ASSIGNMENT_CONFIRMED', 'ASSIGNMENT_CANCELLED',
+    'SHIFT_REMINDER', 'CHECK_IN_REMINDER', 'ATTENDANCE_VERIFIED', 'WORKER_NO_SHOW',
+    'QUALITY_VERIFICATION_SUBMITTED', 'RATING_RECEIVED', 'REWORK_REQUIRED',
+    'CALENDAR_ABSENCE_MARKED', 'JOB_REQUEST_BROADCAST', 'JOB_REQUEST_CLOSED',
+    'HR_PAYSLIP_REQUESTED', 'HR_PAYSLIP_FULFILLED', 'HR_CONTRACT_EXPIRY_REMINDER',
+    'HR_PAYSLIP_REQUEST_ESCALATED', 'HR_CONTRACT_LAPSED', 'CONSENT_DECLINED',
+    'CALENDAR_ABSENCE_MARKED_FOR_WORKER', 'REPEATED_FAILED_LOGINS', 'SYSTEM',
+    'ONBOARDING_SUBMITTED', 'ONBOARDING_APPROVED', 'ONBOARDING_REJECTED', 'ACCOUNT_DEACTIVATED',
+    'ACCOUNT_REACTIVATED', 'HOTEL_DEACTIVATED', 'HOTEL_ACTIVATED', 'REWORK_COMPLETED',
+    'REWORK_OVERDUE', 'QUALITY_RATING_WARNING_70', 'QUALITY_RATING_WARNING_50',
+    'HR_CONTRACT_EXPIRY_WORKER_REMINDER', 'ACCOUNT_CREATED'
+  );
+
+  -- Loud failure beats silent corruption: any row still carrying
+  -- USER_EMAIL_CHANGED fails this cast rather than being rewritten.
+  ALTER TABLE "Notification"
+    ALTER COLUMN "type" TYPE "NotificationType"
+    USING ("type"::text::"NotificationType");
+
+  DROP TYPE "NotificationType_old";
+COMMIT;

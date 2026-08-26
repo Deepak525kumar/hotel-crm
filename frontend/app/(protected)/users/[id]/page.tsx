@@ -37,6 +37,7 @@ import {
   DataList,
   DataRow,
   FormError,
+  Input,
   Modal,
   PageHeader,
   Skeleton,
@@ -59,6 +60,9 @@ function UserDetail() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
   const reactivate = useAsyncAction();
+  const changeEmail = useAsyncAction();
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
 
   const [passwordResetSentAt, setPasswordResetSentAt] = useState<Date | null>(null);
   const passwordReset = useAsyncAction();
@@ -101,6 +105,26 @@ function UserDetail() {
         globalMutate((key) => Array.isArray(key) && key[0] === "users"),
       ]);
     });
+
+  // A dedicated endpoint, not a field on update(): PUT /users/:id also admits a
+  // hotel-scoped manager, and email is the sign-in identifier. The server
+  // revokes the user's sessions and notifies both the old and new address.
+  const onChangeEmail = () =>
+    changeEmail.run(
+      async () => {
+        await usersApi.updateEmail(id, emailDraft.trim());
+        await Promise.all([
+          globalMutate(["user", id]),
+          globalMutate((key) => Array.isArray(key) && key[0] === "users"),
+        ]);
+      },
+      {
+        onSuccess: () => {
+          setEmailOpen(false);
+          setEmailDraft("");
+        },
+      },
+    );
 
   const onDeactivate = () =>
     deactivate.run(
@@ -183,7 +207,26 @@ function UserDetail() {
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
-                <DataRow label={t("fields.email")} value={user.email} />
+                <DataRow
+                  label={t("fields.email")}
+                  value={
+                    <span className="flex items-center gap-2">
+                      {user.email}
+                      <RoleGate allow={["admin", "regional_manager"]}>
+                        <button
+                          type="button"
+                          className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                          onClick={() => {
+                            setEmailDraft(user.email);
+                            setEmailOpen(true);
+                          }}
+                        >
+                          {t("common.change")}
+                        </button>
+                      </RoleGate>
+                    </span>
+                  }
+                />
                 <DataRow label={t("fields.phone")} value={user.phone || "—"} />
                 <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
                 {user.role === "worker" && availability && (
@@ -364,6 +407,49 @@ function UserDetail() {
             )}
           </UserDeactivateGate>
         </>
+      )}
+
+      {user && (
+      <Modal
+        open={emailOpen}
+        onClose={() => !changeEmail.pending && setEmailOpen(false)}
+        title={t("users.changeEmailTitle")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setEmailOpen(false)}
+              disabled={changeEmail.pending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onChangeEmail}
+              loading={changeEmail.pending}
+              disabled={!emailDraft.trim() || emailDraft.trim() === user.email}
+            >
+              {t("common.save")}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t("users.changeEmailBody")}
+          </p>
+          <Input
+            type="email"
+            autoComplete="off"
+            value={emailDraft}
+            onChange={(e) => setEmailDraft(e.target.value)}
+            placeholder={user.email}
+          />
+          {changeEmail.error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{changeEmail.error}</p>
+          )}
+        </div>
+      </Modal>
       )}
 
       <Modal

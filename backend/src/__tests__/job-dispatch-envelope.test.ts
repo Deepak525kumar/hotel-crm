@@ -162,7 +162,7 @@ jest.mock('../lib/db.js', () => ({
     // existed, so this fixture never needed the model.
     user: { findMany: async () => [], findUnique: async () => null },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
-    attendance: { count: async () => 0 },
+    attendance: { count: async () => 0, updateMany: async () => ({ count: 0 }) },
     workerOverallRating: { upsert: async () => ({}) },
     jobRequestSkillSlot: { update: async () => ({}) },
     notification: { create: async () => ({ id: 'notif_new' }) },
@@ -212,6 +212,7 @@ jest.mock('../lib/db.js', () => ({
         attendance: {
           create: async ({ data }: any) => ({ id: 'att_new', ...data }),
           count: async () => 0,
+          updateMany: async () => ({ count: 0 }),
         },
         rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
         workerOverallRating: { upsert: async () => ({}) },

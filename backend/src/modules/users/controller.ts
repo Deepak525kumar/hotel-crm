@@ -6,6 +6,7 @@ import {
   UpdateUserProfileSchema,
   UpdateUserRoleSchema,
   ListUsersQuerySchema,
+  UpdateUserEmailSchema,
 } from './types.js';
 import { validateBody, validateQuery } from '../../middleware/validation.js';
 import { UnauthorizedError, ValidationError } from '../../lib/errors.js';
@@ -131,6 +132,30 @@ export class UserController {
 
   // ADR-030 D-4a: the dedicated Admin-only role-assignment endpoint. Mounted
   // unconditionally (additive, harmless while unused) — see users/routes.ts.
+  updateUserEmail = [
+    validateBody(UpdateUserEmailSchema),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        if (!req.auth) throw new UnauthorizedError();
+        const user = await userService.updateUserEmail(
+          req.params['user_id']!,
+          req.body,
+          req.auth.userId,
+          req.auth.role,
+          req.auth.scope ?? null,
+          req.ip
+        );
+        res.status(200).json({
+          status: 'success',
+          data: user,
+          meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  ];
+
   updateUserRole = [
     validateBody(UpdateUserRoleSchema),
     async (req: Request, res: Response, next: NextFunction) => {

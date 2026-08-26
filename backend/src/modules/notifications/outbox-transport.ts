@@ -142,7 +142,20 @@ export class EmailTransportHandler implements TransportHandler {
       return;
     }
 
-    if (!notification.user.email) {
+    // `event.payload.email_to` pins the destination, for the one case where
+    // the recipient's CURRENT address is the wrong one to reach: an email
+    // change. `to` is otherwise resolved at SEND time from the user record, so
+    // a "your email was changed" message queued before the change would still
+    // be delivered to the new address after it -- telling the new owner what
+    // they just did and telling the previous address nothing at all. Same
+    // reasoning as email_text for why it lives on OutboxEvent rather than
+    // Notification: OutboxEvent is never returned by a self-service endpoint.
+    const pinnedTo =
+      event.payload && typeof (event.payload as Record<string, unknown>).email_to === 'string'
+        ? ((event.payload as Record<string, unknown>).email_to as string)
+        : null;
+
+    if (!pinnedTo && !notification.user.email) {
       logger.info('EmailTransportHandler: recipient has no email on file, skipping', {
         event_id: event.event_id,
         aggregate_id: event.aggregate_id,
@@ -165,7 +178,7 @@ export class EmailTransportHandler implements TransportHandler {
       payload && typeof payload.email_text === 'string' ? payload.email_text : notification.message;
 
     await this.providerClient.send({
-      to: notification.user.email,
+      to: pinnedTo ?? notification.user.email,
       from: this.fromAddress,
       subject: notification.title,
       text: emailText,

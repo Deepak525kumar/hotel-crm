@@ -82,7 +82,8 @@
     "tomorrow": "Demain",
     "getDirections": "Obtenir l'itinéraire",
     "success": "Succès",
-    "send": "Envoyer"
+    "send": "Envoyer",
+    "change": "Modifier"
   },
   "fields": {
     "name": "Nom",
@@ -708,7 +709,9 @@
     "revokeAccessFor": "Cela révoque l'accès de <name>{{name}}</name>. Vous pouvez réactiver le compte depuis l'écran de modification.",
     "reactivateAccountTitle": "Réactiver le compte",
     "reactivateAccountBody": "Rétablit l’accès à la connexion. Le rôle et la portée sont conservés.",
-    "reactivateAction": "Réactiver"
+    "reactivateAction": "Réactiver",
+    "changeEmailTitle": "Modifier l’e-mail de connexion",
+    "changeEmailBody": "C’est l’adresse de connexion. La personne sera déconnectée de tous ses appareils, et l’ancienne comme la nouvelle adresse seront notifiées."
   },
   "requests": {
     "title": "Demande de travail",

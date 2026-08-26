@@ -568,6 +568,186 @@ export class UserService extends BaseService {
     return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
   }
 
+  /**
+   * Changes the account's email. Admin and Regional Manager only (enforced at
+   * the route); a Regional Manager may only reach users inside their own group.
+   *
+   * Email is the login identifier, which makes this three things at once and
+   * all three matter:
+   *
+   *  - A uniqueness change. Checked explicitly so a collision is a 409 rather
+   *    than a raw Prisma unique-constraint 500.
+   *  - A credential change. Existing sessions are revoked (token generation
+   *    bumped, the same mechanism deactivation uses) so the account cannot stay
+   *    signed in on a device under an address its owner no longer controls.
+   *  - A security event. Notified to the user, their hotel's manager and their
+   *    group's regional manager, and emailed to BOTH the old and the new
+   *    address -- the old one especially, since a hostile change is otherwise
+   *    completely silent to the person losing the account.
+   */
+  async updateUserEmail(
+    userId: string,
+    data: { email: string },
+    actorId: string,
+    actorRole: string,
+    actorScope: UserScope | null,
+    ip?: string
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, first_name: true, last_name: true, role: true },
+    });
+    if (!user) throw new NotFoundError('User not found');
+
+    const nextEmail = data.email.trim().toLowerCase();
+    const previousEmail = user.email;
+
+    // A no-op must not revoke sessions or fire a security notification.
+    if (nextEmail === previousEmail) {
+      return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
+    }
+
+    if (isScopedManagerRole(actorRole)) {
+      const inScope = await isWorkerInGroupScope(actorScope, userId);
+      if (!inScope) {
+        throw new ForbiddenError('You can only change the email of users in your own group');
+      }
+    }
+
+    const clash = await this.prisma.user.findUnique({ where: { email: nextEmail } });
+    if (clash && clash.id !== userId) {
+      throw new ConflictError('That email address is already in use');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id: userId },
+        data: { email: nextEmail },
+        select: {
+          id: true,
+          email: true,
+          first_name: true,
+          last_name: true,
+          phone: true,
+          role: true,
+          is_active: true,
+          updated_at: true,
+        },
+      });
+      await bumpTokenGeneration(tx, userId);
+      return result;
+    });
+
+    await this.logAudit(
+      actorId,
+      actorRole,
+      'MODIFY',
+      'USER',
+      userId,
+      { action: 'email_changed', token_generation_bumped: true },
+      ip,
+      // The addresses are the whole point of the record, but they are PII:
+      // they go in the audit trail's old/new values, not in `details`, which
+      // is the field surfaced most widely.
+      { email: previousEmail },
+      { email: nextEmail }
+    );
+
+    await this.notifyEmailChanged(user, previousEmail, nextEmail);
+
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
+  }
+
+  /**
+   * Fans the email change out to everyone with a legitimate interest.
+   *
+   * Best-effort and deliberately non-fatal: the address has already changed and
+   * sessions are already revoked by the time this runs, so a notification
+   * failure must not surface as a failed request and invite a retry that
+   * changes nothing.
+   */
+  private async notifyEmailChanged(
+    user: { id: string; first_name: string; last_name: string },
+    previousEmail: string,
+    nextEmail: string
+  ): Promise<void> {
+    const name = `${user.first_name} ${user.last_name}`.trim();
+    const title = 'Account email changed';
+    const message = `The email address for ${name} was changed from ${previousEmail} to ${nextEmail}.`;
+
+    try {
+      // The user, in-app and by email at the NEW address (the default
+      // resolution, since the record now holds it).
+      await notificationService.enqueue({
+        recipientId: user.id,
+        type: NotificationType.USER_EMAIL_CHANGED,
+        title,
+        message: `Your sign-in email was changed to ${nextEmail}. You have been signed out on all devices and will need to sign in again.`,
+        data: { previous_email: previousEmail, new_email: nextEmail },
+        transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      });
+
+      // ...and again, pinned to the OLD address. Without emailTo this second
+      // message would resolve `to` at send time and land at the new address
+      // as well -- telling whoever now holds the account what they already
+      // know, and telling the previous owner nothing. This is the one message
+      // that makes a hostile change visible to the person losing access.
+      await notificationService.enqueue({
+        recipientId: user.id,
+        type: NotificationType.USER_EMAIL_CHANGED,
+        title,
+        message: `The sign-in email for this account was changed to ${nextEmail}. If you did not expect this, contact an administrator immediately.`,
+        transports: [OutboxTransport.EMAIL],
+        emailTo: previousEmail,
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      });
+
+      const record = await this.prisma.employmentRecord.findUnique({
+        where: { user_id: user.id },
+        select: { hotel_group_id: true, primary_hotel_id: true },
+      });
+
+      const supervisorIds = new Set<string>();
+      if (record?.primary_hotel_id) {
+        const hotel = await this.prisma.hotel.findUnique({
+          where: { id: record.primary_hotel_id },
+          select: { manager_user_id: true },
+        });
+        if (hotel?.manager_user_id) supervisorIds.add(hotel.manager_user_id);
+      }
+      if (record?.hotel_group_id) {
+        const group = await this.prisma.hotelGroup.findUnique({
+          where: { id: record.hotel_group_id },
+          select: { regional_manager_user_id: true },
+        });
+        if (group?.regional_manager_user_id) supervisorIds.add(group.regional_manager_user_id);
+      }
+      // A manager who is also the subject would otherwise be told twice.
+      supervisorIds.delete(user.id);
+
+      for (const recipientId of supervisorIds) {
+        await notificationService.enqueue({
+          recipientId,
+          type: NotificationType.USER_EMAIL_CHANGED,
+          title,
+          message,
+          data: { user_id: user.id },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.USERS,
+          producerService: 'UserService',
+        });
+      }
+    } catch (error) {
+      logger.error('user_email_change_notification_failed', {
+        user_id: user.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // ADR-030 D-4a/D-4: the profile-only half of the PUT /users/:id split
   // (used once FEATURE_GD02_MATRIX is on). No `role` parameter exists on
   // this method at all — there is no field for an elevation guard to police,

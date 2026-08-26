@@ -898,6 +898,17 @@ export const usersApi = {
   updateRole: (id: string, input: UpdateUserRoleInput) =>
     apiFetch<UserDetail>(`/users/${id}/role`, { method: "PUT", body: input }),
 
+  /**
+   * Change the account's sign-in email. Admin and Regional Manager only, and a
+   * dedicated endpoint rather than a field on update() -- PUT /users/:id also
+   * admits a hotel-scoped manager, who must not be able to express this.
+   *
+   * Revokes the user's sessions server-side and notifies them at both the old
+   * and the new address.
+   */
+  updateEmail: (id: string, email: string) =>
+    apiFetch<UserDetail>(`/users/${id}/email`, { method: "PUT", body: { email } }),
+
   /** Soft-delete (deactivate) a user account. Admin-only backend-side. */
   remove: (id: string) =>
     apiFetch<void>(`/users/${id}`, { method: "DELETE" }),
