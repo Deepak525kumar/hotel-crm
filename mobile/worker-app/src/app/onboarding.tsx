@@ -8,13 +8,14 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Badge, Button, Card, SectionHeader } from '@/components/ui';
 import { DocumentChecklistRow } from '@/components/documents/DocumentChecklistRow';
+import { ContractStatusCard } from '@/components/hr/ContractStatusCard';
 import { buildChecklist, canSubmitForReview } from '@/lib/onboarding-checklist';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { DocumentCompleteness, WorkerDocument } from '@/types/api';
+import type { ContractDto, DocumentCompleteness, WorkerDocument } from '@/types/api';
 
 /**
  * Where a worker lands until their EmploymentRecord goes ACTIVE (ADR-065).
@@ -37,6 +38,7 @@ export default function OnboardingScreen() {
 
   const [documents, setDocuments] = useState<WorkerDocument[]>([]);
   const [completeness, setCompleteness] = useState<DocumentCompleteness | null>(null);
+  const [contract, setContract] = useState<ContractDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -48,12 +50,14 @@ export default function OnboardingScreen() {
     if (!user) return;
     setError(null);
     try {
-      const [docs, comp] = await Promise.all([
+      const [docs, comp, contractData] = await Promise.all([
         api.documents.list(user.id),
         api.documents.getCompleteness(user.id).catch(() => null),
+        api.hr.getContractStatus(user.id).catch(() => null),
       ]);
       setDocuments(Array.isArray(docs) ? docs : []);
       setCompleteness(comp);
+      setContract(contractData);
     } catch (e) {
       setError(translateApiError(e, t, 'documents.loadFailed'));
     } finally {
@@ -147,18 +151,24 @@ export default function OnboardingScreen() {
               {loading ? (
                 <ActivityIndicator />
               ) : (
-                <Card>
-                  {checklist.map((entry) =>
-                    user ? (
-                      <DocumentChecklistRow
-                        key={entry.key}
-                        entry={entry}
-                        workerId={user.id}
-                        onUploaded={onUploaded}
-                      />
-                    ) : null,
+                <>
+                  <Card>
+                    {checklist.map((entry) =>
+                      user ? (
+                        <DocumentChecklistRow
+                          key={entry.key}
+                          entry={entry}
+                          workerId={user.id}
+                          onUploaded={onUploaded}
+                        />
+                      ) : null,
+                    )}
+                  </Card>
+                  <SectionHeader title={t('hr.contract')} />
+                  {user && (
+                    <ContractStatusCard contract={contract} loading={loading} workerId={user.id} onUploadSuccess={load} />
                   )}
-                </Card>
+                </>
               )}
 
               <Button

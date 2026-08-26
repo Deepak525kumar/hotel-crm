@@ -17,6 +17,7 @@ export function ContractStatusCard({
   contract: ContractDto | null;
   loading: boolean;
   workerId: string;
+  onUploadSuccess?: () => void;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -50,8 +51,8 @@ export function ContractStatusCard({
   };
 
   const { pending, uploading, pickFile, upload, error, clearPending } = useDocumentUpload(workerId, () => {
-    Alert.alert('Success', 'Contract uploaded successfully.');
-    // In a real app we'd reload the contract status here
+    Alert.alert(t('common.success'), t('documents.uploadSuccess', 'Contract uploaded successfully.'));
+    onUploadSuccess?.();
   });
 
   if (loading) {

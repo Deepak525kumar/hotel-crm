@@ -19,7 +19,8 @@ export interface ChecklistEntry {
 }
 
 const ROWS: { key: string; labelKey: string; categories: DocumentCategory[] }[] = [
-  { key: 'ID_CARD_OR_PASSPORT', labelKey: 'onboarding.idOrPassport', categories: ['ID_CARD', 'PASSPORT'] },
+  { key: 'ID_CARD', labelKey: 'documents.categoryID_CARD', categories: ['ID_CARD'] },
+  { key: 'PASSPORT', labelKey: 'documents.categoryPASSPORT', categories: ['PASSPORT'] },
   { key: 'ADDRESS', labelKey: 'documents.categoryADDRESS', categories: ['ADDRESS'] },
   { key: 'TAX_NUMBER', labelKey: 'documents.categoryTAX_NUMBER', categories: ['TAX_NUMBER'] },
   { key: 'SOCIAL_SECURITY_NUMBER', labelKey: 'documents.categorySOCIAL_SECURITY_NUMBER', categories: ['SOCIAL_SECURITY_NUMBER'] },
