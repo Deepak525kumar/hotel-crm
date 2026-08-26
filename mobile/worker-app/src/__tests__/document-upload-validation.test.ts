@@ -1,4 +1,4 @@
-import { validatePickedAsset } from '@/lib/document-validation';
+import { validateFileSize, validatePickedAsset } from '@/lib/document-validation';
 
 /**
  * SPEC-DOCUMENTS-001@0.1.4 FROZEN (GD-16): client-side MIME/size pre-check
@@ -53,5 +53,27 @@ describe('validatePickedAsset', () => {
 
   it('does not reject when size is undefined (defers to the backend)', () => {
     expect(validatePickedAsset({ mimeType: 'application/pdf' })).toBeNull();
+  });
+});
+
+describe('validateFileSize', () => {
+  // The photo path knows its own MIME type (resolvePickedPhoto transcodes HEIC
+  // to JPEG) and only needs the size rule. It previously called
+  // validatePickedAsset({ size }), which silently became a hard rejection of
+  // EVERY photo when that function started requiring a resolvable type.
+  it('accepts a size-only check, which is all the photo path has', () => {
+    expect(validateFileSize(1024)).toBeNull();
+  });
+
+  it('accepts an unknown size', () => {
+    expect(validateFileSize(undefined)).toBeNull();
+  });
+
+  it('rejects over the limit', () => {
+    expect(validateFileSize(10 * 1024 * 1024 + 1)).toBe('documents.exceedsMaxSize');
+  });
+
+  it('accepts exactly the limit', () => {
+    expect(validateFileSize(10 * 1024 * 1024)).toBeNull();
   });
 });
