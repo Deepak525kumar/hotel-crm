@@ -807,6 +807,64 @@ describe('UserService', () => {
       );
     });
 
+    // Email is the password-reset channel, so changing an admin's address and
+    // then requesting a reset to it is a full account takeover. updateUser and
+    // updateUserRole both carry this guard; this method must too, and must not
+    // rely on admins merely happening to have no EmploymentRecord.
+    it('forbids a non-admin from changing an admin account\'s email', async () => {
+      arrange();
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+        where.id ? { ...subject, role: 'ADMIN' } : null
+      );
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'rm1', 'regional_manager', {
+          type: 'global',
+        } as never)
+      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can modify admin accounts' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('treats a soft-deleted account as absent', async () => {
+      arrange();
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+        where.id ? { ...subject, deleted_at: new Date() } : null
+      );
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'NotFoundError' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // The uniqueness probe is check-then-write, so two concurrent changes to
+    // the same address both pass it and the second loses on the constraint.
+    // That is an ordinary conflict, not a 500.
+    it('maps a lost unique-constraint race to a conflict, not a crash', async () => {
+      arrange();
+      mockPrisma.$transaction.mockImplementationOnce(async () => {
+        throw Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+      });
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    // The outbox exists so the change and its notifications commit together.
+    // Enqueuing after the commit would allow a crash to change the sign-in
+    // address and notify nobody -- the silent takeover this fan-out prevents.
+    it('enqueues the notifications inside the transaction', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      for (const call of mockNotificationEnqueue.mock.calls) {
+        expect(call[1]).toBeDefined();
+      }
+    });
+
     it('forbids a regional manager from reaching outside their own group', async () => {
       arrange({ record: null }); // isWorkerInGroupScope -> false
 

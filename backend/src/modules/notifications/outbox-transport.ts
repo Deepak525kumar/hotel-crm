@@ -150,10 +150,13 @@ export class EmailTransportHandler implements TransportHandler {
     // they just did and telling the previous address nothing at all. Same
     // reasoning as email_text for why it lives on OutboxEvent rather than
     // Notification: OutboxEvent is never returned by a self-service endpoint.
+    // Trimmed and emptiness-checked, not merely typeof-'string': an empty or
+    // whitespace payload value would otherwise satisfy the type test, bypass
+    // the has-an-address guard below, and be handed to the provider as the
+    // destination.
+    const rawPinnedTo = (event.payload as Record<string, unknown> | null)?.email_to;
     const pinnedTo =
-      event.payload && typeof (event.payload as Record<string, unknown>).email_to === 'string'
-        ? ((event.payload as Record<string, unknown>).email_to as string)
-        : null;
+      typeof rawPinnedTo === 'string' && rawPinnedTo.trim().length > 0 ? rawPinnedTo.trim() : null;
 
     if (!pinnedTo && !notification.user.email) {
       logger.info('EmailTransportHandler: recipient has no email on file, skipping', {
