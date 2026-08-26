@@ -466,6 +466,68 @@ describe('EmployeeManagementService', () => {
     });
   });
 
+  // 2026-08-26 (reported live: "skills are not being edited for a worker").
+  // updateEmployee() -- the only write path for the skills WorkerOnboardingCard
+  // edits -- called assertLifecycleAuthority() WITHOUT `allowUnassignedGroup:
+  // true`, unlike submitForReview/approve. hotel_group_id stays null until
+  // approval (ADR-065 Decision 2, fakeRecord()'s own default), so a scoped
+  // manager/RM editing skills for a not-yet-approved applicant -- precisely
+  // the case the skills row is deliberately shown empty for -- always hit
+  // isWorkerInGroupScope() against a null group and was denied. Same bug
+  // class as the contract-status/contract-download/documents-completeness
+  // fixes already in this module/HR.
+  describe('updateEmployee (skills edit, C-16 scope)', () => {
+    it('allows a scoped manager to set skills on a not-yet-approved applicant (hotel_group_id still null)', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, target_hotel_group_id: 'g1' })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotel.findFirst.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null); // not an RM
+      mockPrisma.employmentRecord.update.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, skills: [SkillTag.CLEANER] })
+      );
+
+      const manager = { userId: 'mgr_1', role: 'manager', permissions: [], scope: null };
+      const result = await service.updateEmployee(manager as any, 'E-001', { skills: [SkillTag.CLEANER] });
+
+      expect(result.skills).toEqual([SkillTag.CLEANER]);
+      expect(mockPrisma.employmentRecord.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ skills: [SkillTag.CLEANER] }) })
+      );
+    });
+
+    it('denies a manager who does not manage a hotel group at all when the record has no group yet', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, target_hotel_group_id: 'g1' })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotel.findFirst.mockResolvedValue(null);
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+
+      const manager = { userId: 'mgr_1', role: 'manager', permissions: [], scope: null };
+      await expect(
+        service.updateEmployee(manager as any, 'E-001', { skills: [SkillTag.CLEANER] })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+
+    it('denies a manager whose group differs from the application target', async () => {
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        fakeRecord({ status: EmploymentStatus.PENDING, target_hotel_group_id: 'g2' })
+      );
+      mockPrisma.user.findUnique.mockResolvedValue({ id: 'user_1', role: 'WORKER' });
+      mockPrisma.hotel.findFirst.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockPrisma.hotelGroup.findUnique.mockResolvedValue(null);
+
+      const manager = { userId: 'mgr_1', role: 'manager', permissions: [], scope: null };
+      await expect(
+        service.updateEmployee(manager as any, 'E-001', { skills: [SkillTag.CLEANER] })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+      expect(mockPrisma.employmentRecord.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('setBlocklist (REQ-EMP-005 / RULE-EMP-07)', () => {
     it('rejects a missing reason with ValidationError', async () => {
       await expect(
