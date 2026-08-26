@@ -480,7 +480,8 @@
     "deleteConfirm": "Ви впевнені, що хочете видалити цей документ?",
     "missingRequired": "Бракує обов’язкових документів",
     "missingRequiredDesc": "Будь ласка, завантажте такі відсутні документи:",
-    "uploadFailedReason": "Не вдалося завантажити: {{reason}}"
+    "uploadFailedReason": "Не вдалося завантажити: {{reason}}",
+    "uploadSuccess": "Document uploaded successfully"
   },
   "hr": {
     "title": "Кадри та зарплата",

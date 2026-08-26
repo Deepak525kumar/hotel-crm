@@ -480,7 +480,8 @@
     "deleteConfirm": "Voulez-vous vraiment supprimer ce document ?",
     "missingRequired": "Documents requis manquants",
     "missingRequiredDesc": "Veuillez téléverser les documents manquants suivants :",
-    "uploadFailedReason": "Échec du téléversement : {{reason}}"
+    "uploadFailedReason": "Échec du téléversement : {{reason}}",
+    "uploadSuccess": "Document uploaded successfully"
   },
   "hr": {
     "title": "RH et paie",

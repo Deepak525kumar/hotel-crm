@@ -113,7 +113,7 @@ import { isWorkerInGroupScope, resolveNonAdminScopeFilter } from '../../lib/scop
 import type { UserScope } from '../../lib/jwt.js';
 import type { ServiceActor } from '../../lib/types.js';
 import { documentService } from '../documents/service.js';
-import { generateStorageKey } from '../documents/storage.js';
+import { generateStorageKey, getStorageClient } from '../documents/storage.js';
 import { employeeManagementService } from '../employee-management/service.js';
 import { notificationService } from '../notifications/service.js';
 import { getMalwareScanner } from './malware-scan.js';
@@ -161,6 +161,8 @@ function resolveDefaultContractPdfPath(): string {
 }
 
 const DEFAULT_CONTRACT_PDF_PATH = resolveDefaultContractPdfPath();
+
+
 
 // Architectural assumption (review note, not a defect): this service's
 // worker-scoped Contract lookups (getContractStatus, and PR 3/4/5's
@@ -411,6 +413,19 @@ export class HrService extends BaseService {
   // the approving manager reviews the returned scan (RULE-HR-03).
   async getDefaultContractPdf(): Promise<Buffer> {
     try {
+      const storage = await getStorageClient();
+      try {
+        const s3Pdf = await storage.download('templates/Personalfragebogen_NEU.pdf');
+        if (s3Pdf.length > 0) {
+          return s3Pdf;
+        }
+      } catch (s3Error) {
+        logger.warn('hr_default_contract_s3_missing', {
+          error: s3Error instanceof Error ? s3Error.message : String(s3Error),
+          fallback: 'local_disk',
+        });
+      }
+
       return await readFile(DEFAULT_CONTRACT_PDF_PATH);
     } catch (error) {
       logger.error('hr_default_contract_pdf_missing', {

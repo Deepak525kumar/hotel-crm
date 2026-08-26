@@ -480,7 +480,8 @@
     "deleteConfirm": "Are you sure you want to remove this document?",
     "missingRequired": "Missing required documents",
     "missingRequiredDesc": "Please upload the following missing documents:",
-    "uploadFailedReason": "Upload failed: {{reason}}"
+    "uploadFailedReason": "Upload failed: {{reason}}",
+    "uploadSuccess": "Document uploaded successfully"
   },
   "hr": {
     "title": "HR & Payroll",
