@@ -481,7 +481,8 @@
     "deleteConfirm": "کیا آپ واقعی یہ دستاویز ہٹانا چاہتے ہیں؟",
     "missingRequired": "لازمی دستاویزات غائب ہیں",
     "missingRequiredDesc": "براہ کرم درج ذیل غائب دستاویزات اپ لوڈ کریں:",
-    "uploadFailedReason": "اپ لوڈ ناکام: {{reason}}"
+    "uploadFailedReason": "اپ لوڈ ناکام: {{reason}}",
+    "uploadSuccess": "Document uploaded successfully"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",

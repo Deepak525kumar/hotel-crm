@@ -13,6 +13,7 @@ export function ContractStatusCard({
   contract,
   loading,
   workerId,
+  onUploadSuccess,
 }: {
   contract: ContractDto | null;
   loading: boolean;

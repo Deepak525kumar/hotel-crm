@@ -31,10 +31,11 @@ function completeness(over: Partial<DocumentCompleteness> = {}): DocumentComplet
 }
 
 describe('buildChecklist', () => {
-  it('lists the five always-required rows when no work permit is needed', () => {
+  it('lists the six always-required rows when no work permit is needed', () => {
     const entries = buildChecklist([], completeness());
     expect(entries.map((e) => e.key)).toEqual([
-      'ID_CARD_OR_PASSPORT',
+      'ID_CARD',
+      'PASSPORT',
       'ADDRESS',
       'TAX_NUMBER',
       'SOCIAL_SECURITY_NUMBER',
@@ -47,16 +48,7 @@ describe('buildChecklist', () => {
     expect(entries.map((e) => e.key)).toContain('WORK_PERMIT');
   });
 
-  // The server pushes BOTH ID_CARD and PASSPORT onto missing_categories when
-  // neither is present, so rendering that array directly shows two rows for
-  // one either/or requirement -- and none once either is uploaded.
-  it('treats ID card and passport as one row satisfied by either', () => {
-    const withId = buildChecklist([doc('ID_CARD', '2026-08-01T00:00:00Z')], completeness());
-    const withPassport = buildChecklist([doc('PASSPORT', '2026-08-01T00:00:00Z')], completeness());
-    expect(withId[0]?.document?.category).toBe('ID_CARD');
-    expect(withPassport[0]?.document?.category).toBe('PASSPORT');
-    expect(withId).toHaveLength(withPassport.length);
-  });
+
 
   // Re-uploading is how a worker fixes a bad scan; the row must show the
   // replacement rather than the mistake.
@@ -98,6 +90,7 @@ describe('canSubmitForReview', () => {
   it('falls back to the local checklist when completeness is unavailable', () => {
     expect(canSubmitForReview(buildChecklist([], null), null)).toBe(false);
     const all: WorkerDocument[] = [
+      doc('ID_CARD', '2026-08-01T00:00:00Z'),
       doc('PASSPORT', '2026-08-01T00:00:00Z'),
       doc('ADDRESS', '2026-08-01T00:00:00Z'),
       doc('TAX_NUMBER', '2026-08-01T00:00:00Z'),

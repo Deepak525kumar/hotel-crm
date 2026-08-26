@@ -480,7 +480,8 @@
     "deleteConfirm": "Möchten Sie dieses Dokument wirklich entfernen?",
     "missingRequired": "Fehlende erforderliche Dokumente",
     "missingRequiredDesc": "Bitte laden Sie die folgenden fehlenden Dokumente hoch:",
-    "uploadFailedReason": "Upload fehlgeschlagen: {{reason}}"
+    "uploadFailedReason": "Upload fehlgeschlagen: {{reason}}",
+    "uploadSuccess": "Document uploaded successfully"
   },
   "hr": {
     "title": "Personal & Lohn",
