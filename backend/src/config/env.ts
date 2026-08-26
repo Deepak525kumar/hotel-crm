@@ -405,6 +405,11 @@ const envSchema = z.object({
   // enough that a legitimate user who forgot their password isn't locked
   // out for an unreasonable stretch.
   AUTH_LOGIN_THROTTLE_DURATION_MS: z.coerce.number().int().positive().default(900000),
+
+  // Default 15 minutes sweep for expired assignments to NO_SHOW.
+  ASSIGNMENT_NO_SHOW_INTERVAL_MS: z.coerce.number().int().positive().default(900000), // 15 mins
+  // Grace period before marking a shift as NO_SHOW (default 2 hours past shift end time)
+  ASSIGNMENT_NO_SHOW_GRACE_PERIOD_MS: z.coerce.number().int().positive().default(7200000), // 2 hours
   // -------------------------------------------------------------------------
   // SPEC-CHATBOT-001 (ADR-013, ADR-053) — scaffold cutover flag. Defaults
   // FALSE: while off, `/chatbot` routes fall through to the 404 handler,

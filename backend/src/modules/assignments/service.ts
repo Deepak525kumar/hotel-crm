@@ -1451,6 +1451,59 @@ export class AssignmentService extends BaseService {
       total,
     };
   }
+
+  /**
+   * Sweeps CONFIRMED and IN_PROGRESS assignments that are past their shift end
+   * time by more than the configured grace period, marking them as NO_SHOW.
+   * Calendar-placed assignments (no JobRequest) are marked NO_SHOW if their
+   * calendar day is strictly before today in UTC.
+   */
+  async sweepNoShows(gracePeriodMs: number, batchSize: number): Promise<number> {
+    const cutoff = new Date(Date.now() - gracePeriodMs);
+
+    const candidates = await this.prisma.workerAssignment.findMany({
+      where: {
+        status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
+      },
+      include: {
+        job_request: { select: { shift_date: true, shift_end_time: true } },
+        work_request: { select: { shift_date: true, shift_end_time: true } },
+      },
+      take: batchSize,
+    });
+
+    let updated = 0;
+    for (const assignment of candidates) {
+      let isExpired = false;
+
+      const req = assignment.job_request || assignment.work_request;
+      if (req) {
+        const [hours, minutes] = req.shift_end_time.split(':').map(Number);
+        const shiftEnd = new Date(req.shift_date);
+        shiftEnd.setUTCHours(hours, minutes, 0, 0);
+
+        if (shiftEnd < cutoff) {
+          isExpired = true;
+        }
+      } else {
+        const endOfDay = new Date(assignment.day);
+        endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+        if (endOfDay < cutoff) {
+          isExpired = true;
+        }
+      }
+
+      if (isExpired) {
+        await this.prisma.workerAssignment.update({
+          where: { id: assignment.id },
+          data: { status: AssignmentStatus.NO_SHOW, updated_at: new Date() },
+        });
+        updated++;
+      }
+    }
+
+    return updated;
+  }
 }
 
 export const assignmentService = new AssignmentService();
