@@ -58,7 +58,8 @@
           "cameraPermission": "Used only when you photograph a room during an inspection."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./plugins/withDisableUserScriptSandboxing.js"
     ],
     "experiments": {
       "typedRoutes": true,

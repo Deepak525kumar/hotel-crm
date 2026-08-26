@@ -17,6 +17,7 @@ import { GeoRetentionSweepJob } from './modules/geo/retention-sweep-job.js';
 import { RetentionSweepJob } from './modules/retention/sweep-job.js';
 import { JobRequestAutoCloseJob } from './modules/job-requests/auto-close-job.js';
 import { HrContractExpiryReminderJob } from './modules/hr/expiry-reminder-job.js';
+import { AssignmentNoShowJob } from './modules/assignments/no-show-job.js';
 
 /**
  * Platform Worker process entrypoint (ADR-029 §3). A second Node entrypoint over
@@ -140,6 +141,12 @@ async function main() {
         new HrContractExpiryReminderJob({
           intervalMs: env.HR_CONTRACT_EXPIRY_REMINDER_INTERVAL_MS,
           batchSize: env.HR_CONTRACT_EXPIRY_REMINDER_BATCH_SIZE,
+        })
+      )
+      .register(
+        new AssignmentNoShowJob({
+          intervalMs: env.ASSIGNMENT_NO_SHOW_INTERVAL_MS,
+          gracePeriodMs: env.ASSIGNMENT_NO_SHOW_GRACE_PERIOD_MS,
         })
       );
 

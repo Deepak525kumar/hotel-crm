@@ -3,14 +3,18 @@
  * stays consistent across detail views and tables.
  */
 
-/** Formats an ISO timestamp as a localized date + time, or "—" when absent. */
+/** Formats an ISO timestamp as a localized date + time, or "—" when absent/invalid. */
 export function formatDateTime(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleString() : "—";
+  if (!value) return "—";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleString();
 }
 
-/** Formats an ISO timestamp as a localized date, or "—" when absent. */
+/** Formats an ISO timestamp as a localized date, or "—" when absent/invalid. */
 export function formatDate(value: string | null | undefined): string {
-  return value ? new Date(value).toLocaleDateString() : "—";
+  if (!value) return "—";
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? "—" : d.toLocaleDateString();
 }
 
 /**

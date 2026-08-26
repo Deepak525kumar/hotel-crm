@@ -1,5 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+import { useAuthStore } from '@/stores/auth-store';
+
 /**
  * Login email normalization.
  *
@@ -41,8 +43,6 @@ jest.mock('@/lib/persistent-storage', () => ({
   setItem: jest.fn(async () => undefined),
   deleteItem: jest.fn(async () => undefined),
 }));
-
-import { useAuthStore } from '@/stores/auth-store';
 
 const { api } = require('@/lib/api');
 const login = api.auth.login as jest.MockedFunction<(...a: any[]) => any>;

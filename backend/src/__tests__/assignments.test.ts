@@ -1249,4 +1249,52 @@ describe('AssignmentService', () => {
       expect(data[1].work_request_id).toBe('wr1');
     });
   });
+
+  describe('sweepNoShows', () => {
+    it('only sweeps CONFIRMED assignments, not IN_PROGRESS', async () => {
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
+      await service.sweepNoShows(3600000, 100);
+      
+      expect(mockWorkerAssignment.findMany).toHaveBeenCalledWith({
+        where: { status: 'CONFIRMED' },
+        take: 100,
+      });
+    });
+
+    it('correctly calculates overnight shift end times', async () => {
+      const shiftDate = new Date('2026-08-01T00:00:00Z');
+      const assignment = { id: 'a1', status: 'CONFIRMED', worker_id: 'w1', work_request_id: null, job_request_id: 'j1', hotel_id: 'h1', day: shiftDate };
+      
+      mockWorkerAssignment.findMany.mockResolvedValue([assignment]);
+      mockWorkerAssignment.findUnique.mockResolvedValue(assignment);
+      
+      mockJobRequest.findUnique.mockResolvedValue({
+        shift_date: shiftDate,
+        shift_start_time: '22:00',
+        shift_end_time: '02:00', // Overnight
+      });
+      
+      // Berlin timezone
+      mockHotel.findUnique.mockResolvedValue({ timezone: 'Europe/Berlin' });
+
+      // "Now" is 2026-08-02 04:00:00 UTC
+      // 02:00 Berlin time on Aug 2nd is 00:00 UTC (assuming DST +02:00).
+      // Cutoff is Grace = 1 hr (3600000). Now = 04:00 UTC => cutoff is 03:00 UTC, which is > 00:00 UTC (expired).
+      const realNow = Date.now;
+      Date.now = () => new Date('2026-08-02T04:00:00Z').getTime();
+
+      try {
+        await service.sweepNoShows(3600000, 100);
+      } finally {
+        Date.now = realNow;
+      }
+
+      expect(mockWorkerAssignment.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: expect.objectContaining({ status: 'NO_SHOW' }),
+      });
+      expect(mockWorkerOverallRating.upsert).toHaveBeenCalled();
+      expect(mockPrisma.auditLog.create).toHaveBeenCalled();
+    });
+  });
 });
