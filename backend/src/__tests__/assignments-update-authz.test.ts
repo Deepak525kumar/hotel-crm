@@ -103,7 +103,7 @@ jest.mock('../lib/db.js', () => {
     // about authorization, so an anonymous assigner is fine.
     user: { findUnique: async () => null, findMany: async () => [] },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
-    attendance: { count: async () => 0 },
+    attendance: { count: async () => 0, updateMany: async () => ({ count: 0 }) },
     workerOverallRating: { upsert: async () => ({}) },
     // Assignment lifecycle notifications (2026-08-05): cancel enqueues one,
     // which calls prisma.notification.create()/outboxEvent.create()

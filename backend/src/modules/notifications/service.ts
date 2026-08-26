@@ -84,8 +84,11 @@ export class NotificationService extends BaseService {
           // comment) — a PUSH row for the same enqueue() call gets `{}`,
           // same as before, so an email-only override can never leak into a
           // push payload for the same event.
-          payload: (transport === OutboxTransport.EMAIL && input.emailText
-            ? { email_text: input.emailText }
+          payload: (transport === OutboxTransport.EMAIL && (input.emailText || input.emailTo)
+            ? {
+                ...(input.emailText ? { email_text: input.emailText } : {}),
+                ...(input.emailTo ? { email_to: input.emailTo } : {}),
+              }
             : {}) as Prisma.InputJsonValue,
           payload_version: 1,
           scheduled_for: scheduledFor,

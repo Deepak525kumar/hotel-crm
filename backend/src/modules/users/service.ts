@@ -22,6 +22,7 @@ import type { AuthContext } from '../../lib/types.js';
 // neither imports users/service.ts.
 import { employeeManagementService } from '../employee-management/service.js';
 import { notificationService } from '../notifications/service.js';
+import type { DatabaseTransaction } from '../../lib/db.js';
 import { getEnv } from '../../config/env.js';
 
 export class UserService extends BaseService {
@@ -566,6 +567,242 @@ export class UserService extends BaseService {
     // ADR-031 D-1/M-3 (PR-7): derived from ROLE_PERMISSIONS[role], not a
     // stored column (dropped).
     return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
+  }
+
+  /**
+   * Changes the account's email. Admin and Regional Manager only (enforced at
+   * the route); a Regional Manager may only reach users inside their own group.
+   *
+   * Email is the login identifier, which makes this three things at once and
+   * all three matter:
+   *
+   *  - A uniqueness change. Checked explicitly so a collision is a 409 rather
+   *    than a raw Prisma unique-constraint 500.
+   *  - A credential change. Existing sessions are revoked (token generation
+   *    bumped, the same mechanism deactivation uses) so the account cannot stay
+   *    signed in on a device under an address its owner no longer controls.
+   *  - A security event. Notified to the user, their hotel's manager and their
+   *    group's regional manager, and emailed to BOTH the old and the new
+   *    address -- the old one especially, since a hostile change is otherwise
+   *    completely silent to the person losing the account.
+   */
+  async updateUserEmail(
+    userId: string,
+    data: { email: string },
+    actorId: string,
+    actorRole: string,
+    actorScope: UserScope | null,
+    ip?: string
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        role: true,
+        deleted_at: true,
+      },
+    });
+    // Matches updateUser: a soft-deleted account is not addressable. Without
+    // this, a deleted user's address could be reassigned and the deleted
+    // account notified.
+    if (!user || user.deleted_at) throw new NotFoundError('User not found');
+
+    // Same guard updateUser and updateUserRole both carry, and for a sharper
+    // reason here: email is the password-reset channel, so changing an admin's
+    // address and then requesting a reset to it is a complete account
+    // takeover. Scope alone is not sufficient protection -- it only holds
+    // while admins have no EmploymentRecord, which is a convention, not an
+    // invariant this method can rely on.
+    if (actorRole !== 'admin' && user.role === 'ADMIN') {
+      throw new ForbiddenError('Only admins can modify admin accounts');
+    }
+
+    const nextEmail = data.email.trim().toLowerCase();
+    const previousEmail = user.email;
+
+    // A no-op must not revoke sessions or fire a security notification.
+    if (nextEmail === previousEmail) {
+      return { ...user, role: user.role.toLowerCase(), permissions: ROLE_PERMISSIONS[user.role] ?? [] };
+    }
+
+    if (isScopedManagerRole(actorRole)) {
+      const inScope = await isWorkerInGroupScope(actorScope, userId);
+      if (!inScope) {
+        throw new ForbiddenError('You can only change the email of users in your own group');
+      }
+    }
+
+    const clash = await this.prisma.user.findUnique({ where: { email: nextEmail } });
+    if (clash && clash.id !== userId) {
+      throw new ConflictError('That email address is already in use');
+    }
+
+    // Resolved before the transaction so the supervisor lookups do not sit
+    // inside it: the enqueues below must be transactional, the reads need not
+    // be.
+    const supervisorIds = await this.resolveEmailChangeSupervisors(userId);
+
+    let updated;
+    try {
+      updated = await this.prisma.$transaction(async (tx) => {
+        const result = await tx.user.update({
+          where: { id: userId },
+          data: { email: nextEmail },
+          select: {
+            id: true,
+            email: true,
+            first_name: true,
+            last_name: true,
+            phone: true,
+            role: true,
+            is_active: true,
+            updated_at: true,
+          },
+        });
+        await bumpTokenGeneration(tx, userId);
+
+        // Enqueued INSIDE the transaction, the convention every other
+        // security-relevant producer here follows (auth's password reset,
+        // consent, hr, quality). Outside it, a crash between commit and
+        // enqueue would change the sign-in address and notify nobody -- the
+        // exact silent takeover this fan-out exists to make visible.
+        await this.enqueueEmailChangeNotifications(
+          { id: user.id, first_name: user.first_name, last_name: user.last_name },
+          previousEmail,
+          nextEmail,
+          supervisorIds,
+          tx
+        );
+
+        return result;
+      });
+    } catch (error) {
+      // The uniqueness probe above is check-then-write: two concurrent changes
+      // to the same address both pass it and the second loses on the unique
+      // constraint. Without this the caller gets a raw 500 for what is a
+      // perfectly ordinary conflict.
+      if ((error as { code?: string }).code === 'P2002') {
+        throw new ConflictError('That email address is already in use');
+      }
+      throw error;
+    }
+
+    await this.logAudit(
+      actorId,
+      actorRole,
+      'MODIFY',
+      'USER',
+      userId,
+      { action: 'email_changed', token_generation_bumped: true },
+      ip,
+      // The addresses are the whole point of the record, but they are PII:
+      // they go in the audit trail's old/new values, not in `details`, which
+      // is the field surfaced most widely.
+      { email: previousEmail },
+      { email: nextEmail }
+    );
+
+    return { ...updated, role: updated.role.toLowerCase(), permissions: ROLE_PERMISSIONS[updated.role] ?? [] };
+  }
+
+  /**
+   * Everyone with a legitimate interest in a colleague's sign-in address
+   * changing: the manager of their primary hotel and the regional manager of
+   * their group.
+   *
+   * A Set, because one person can hold both postings and must not be told
+   * twice.
+   */
+  private async resolveEmailChangeSupervisors(userId: string): Promise<string[]> {
+    const record = await this.prisma.employmentRecord.findUnique({
+      where: { user_id: userId },
+      select: { hotel_group_id: true, primary_hotel_id: true },
+    });
+
+    const ids = new Set<string>();
+    if (record?.primary_hotel_id) {
+      const hotel = await this.prisma.hotel.findUnique({
+        where: { id: record.primary_hotel_id },
+        select: { manager_user_id: true },
+      });
+      if (hotel?.manager_user_id) ids.add(hotel.manager_user_id);
+    }
+    if (record?.hotel_group_id) {
+      const group = await this.prisma.hotelGroup.findUnique({
+        where: { id: record.hotel_group_id },
+        select: { regional_manager_user_id: true },
+      });
+      if (group?.regional_manager_user_id) ids.add(group.regional_manager_user_id);
+    }
+    // A manager who is also the subject already gets the two messages below.
+    ids.delete(userId);
+    return [...ids];
+  }
+
+  /** Enqueued within the caller's transaction -- see the call site. */
+  private async enqueueEmailChangeNotifications(
+    user: { id: string; first_name: string; last_name: string },
+    previousEmail: string,
+    nextEmail: string,
+    supervisorIds: string[],
+    tx: DatabaseTransaction
+  ): Promise<void> {
+    const name = `${user.first_name} ${user.last_name}`.trim();
+    const title = 'Account email changed';
+
+    // The user, in-app and by email at the NEW address (the default
+    // resolution, since the record now holds it).
+    await notificationService.enqueue(
+      {
+        recipientId: user.id,
+        type: NotificationType.USER_EMAIL_CHANGED,
+        title,
+        message: `Your sign-in email was changed to ${nextEmail}. You have been signed out on all devices and will need to sign in again.`,
+        data: { previous_email: previousEmail, new_email: nextEmail },
+        transports: [OutboxTransport.EMAIL, OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      },
+      tx
+    );
+
+    // ...and again, pinned to the OLD address. Without emailTo this second
+    // message would resolve `to` at send time and land at the new address as
+    // well -- telling whoever now holds the account what they already know,
+    // and telling the previous owner nothing. This is the one message that
+    // makes a hostile change visible to the person losing access.
+    await notificationService.enqueue(
+      {
+        recipientId: user.id,
+        type: NotificationType.USER_EMAIL_CHANGED,
+        title,
+        message: `The sign-in email for this account was changed to ${nextEmail}. If you did not expect this, contact an administrator immediately.`,
+        transports: [OutboxTransport.EMAIL],
+        emailTo: previousEmail,
+        sourceModule: OutboxSourceModule.USERS,
+        producerService: 'UserService',
+      },
+      tx
+    );
+
+    for (const recipientId of supervisorIds) {
+      await notificationService.enqueue(
+        {
+          recipientId,
+          type: NotificationType.USER_EMAIL_CHANGED,
+          title,
+          message: `The email address for ${name} was changed from ${previousEmail} to ${nextEmail}.`,
+          data: { user_id: user.id },
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.USERS,
+          producerService: 'UserService',
+        },
+        tx
+      );
+    }
   }
 
   // ADR-030 D-4a/D-4: the profile-only half of the PUT /users/:id split

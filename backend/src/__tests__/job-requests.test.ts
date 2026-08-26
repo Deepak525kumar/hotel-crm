@@ -43,6 +43,8 @@ const mockRating = {
 };
 const mockAttendance = {
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // Cancelling a shift closes its EXPECTED attendance row.
+  updateMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
 const mockWorkerOverallRating = {
   upsert: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,

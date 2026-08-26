@@ -12,6 +12,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { workerDisplayName } from '@/lib/greeting';
+import { SymbolView } from 'expo-symbols';
 
 /**
  * Profile.
@@ -74,7 +75,14 @@ export default function ProfileScreen() {
               hitSlop={12}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
             >
-                <ThemedText type="subtitle">⚙</ThemedText>
+                {/* Was a raw ⚙ glyph at subtitle size, which rendered at a
+                    different scale and baseline from every other icon in the
+                    app -- all of which use SymbolView. */}
+                <SymbolView
+                  name={{ ios: 'gearshape', android: 'settings', web: 'settings' }}
+                  tintColor={theme.text}
+                  size={24}
+                />
               </Pressable>
             </View>
           </View>

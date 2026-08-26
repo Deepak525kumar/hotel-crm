@@ -60,6 +60,7 @@ const mockPrisma = {
   },
   attendance: {
     count: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue(0),
+    updateMany: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({ count: 0 }),
   },
   workerOverallRating: {
     upsert: (jest.fn() as jest.MockedFunction<(...args: any[]) => any>).mockResolvedValue({}),

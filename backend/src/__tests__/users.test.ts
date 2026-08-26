@@ -707,6 +707,177 @@ describe('UserService', () => {
   // an existing ADMIN account. Not reachable over HTTP today (MANAGER lacks
   // users:write until GD-02), but this is the named prerequisite ADR-030
   // requires before that grant can be made.
+  describe('updateUserEmail', () => {
+    const subject = {
+      id: 'u1',
+      email: 'old@example.com',
+      first_name: 'Ada',
+      last_name: 'Lovelace',
+      role: 'WORKER',
+    };
+
+    function arrange(over: Record<string, unknown> = {}) {
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) => {
+        if (where.id) return subject;
+        // The uniqueness probe is by email; null means "free".
+        return (over.clash as unknown) ?? null;
+      });
+      mockPrisma.user.update.mockResolvedValue({
+        ...subject, email: 'new@example.com', phone: null, is_active: true, updated_at: new Date(),
+      });
+      mockPrisma.employmentRecord.findUnique.mockResolvedValue(
+        (over.record as unknown) ?? { hotel_group_id: 'g1', primary_hotel_id: 'h1' }
+      );
+      mockHotel.findUnique.mockResolvedValue({ manager_user_id: 'mgr1' });
+      mockHotelGroup.findUnique.mockResolvedValue({ regional_manager_user_id: 'rm1' });
+    }
+
+    it('rejects an address already in use, without writing', async () => {
+      arrange({ clash: { id: 'someone_else', email: 'new@example.com' } });
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // Email is the login identifier: leaving sessions alive would keep a
+    // hostile change usable on every device already signed in.
+    it('revokes existing sessions when the address changes', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { email: 'new@example.com' } })
+      );
+    });
+
+    // The message to the OLD address is the only one that reaches the person
+    // losing the account, so it must be pinned -- `to` otherwise resolves at
+    // send time to the address that just replaced it.
+    it('emails both the new address and the old one, pinning the old', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      const calls = mockNotificationEnqueue.mock.calls.map((c: any[]) => c[0]);
+      const pinned = calls.filter((c) => c.emailTo === 'old@example.com');
+      expect(pinned).toHaveLength(1);
+      expect(pinned[0].transports).toContain('EMAIL');
+
+      const toSubject = calls.filter((c) => c.recipientId === 'u1' && !c.emailTo);
+      expect(toSubject).toHaveLength(1);
+      expect(toSubject[0].transports).toContain('EMAIL');
+    });
+
+    it('notifies the hotel manager and the group regional manager', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      const recipients = mockNotificationEnqueue.mock.calls.map((c: any[]) => c[0].recipientId);
+      expect(recipients).toContain('mgr1');
+      expect(recipients).toContain('rm1');
+    });
+
+    it('does not notify a supervisor who is also the subject', async () => {
+      arrange();
+      mockHotel.findUnique.mockResolvedValue({ manager_user_id: 'u1' });
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      const supervisorCalls = mockNotificationEnqueue.mock.calls
+        .map((c: any[]) => c[0])
+        .filter((c) => c.recipientId === 'u1');
+      // Two for the subject (new address + pinned old), none as a supervisor.
+      expect(supervisorCalls).toHaveLength(2);
+    });
+
+    // A no-op must not revoke sessions or raise a security alert.
+    it('does nothing when the address is unchanged', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'old@example.com' }, 'admin1', 'admin', null);
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+      expect(mockNotificationEnqueue).not.toHaveBeenCalled();
+    });
+
+    it('normalizes case so the account can still log in', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: '  NEW@Example.COM  ' }, 'admin1', 'admin', null);
+      expect(mockPrisma.user.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { email: 'new@example.com' } })
+      );
+    });
+
+    // Email is the password-reset channel, so changing an admin's address and
+    // then requesting a reset to it is a full account takeover. updateUser and
+    // updateUserRole both carry this guard; this method must too, and must not
+    // rely on admins merely happening to have no EmploymentRecord.
+    it('forbids a non-admin from changing an admin account\'s email', async () => {
+      arrange();
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+        where.id ? { ...subject, role: 'ADMIN' } : null
+      );
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'rm1', 'regional_manager', {
+          type: 'global',
+        } as never)
+      ).rejects.toMatchObject({ name: 'ForbiddenError', message: 'Only admins can modify admin accounts' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it('treats a soft-deleted account as absent', async () => {
+      arrange();
+      mockPrisma.user.findUnique.mockImplementation(async ({ where }: any) =>
+        where.id ? { ...subject, deleted_at: new Date() } : null
+      );
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'NotFoundError' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+
+    // The uniqueness probe is check-then-write, so two concurrent changes to
+    // the same address both pass it and the second loses on the constraint.
+    // That is an ordinary conflict, not a 500.
+    it('maps a lost unique-constraint race to a conflict, not a crash', async () => {
+      arrange();
+      mockPrisma.$transaction.mockImplementationOnce(async () => {
+        throw Object.assign(new Error('Unique constraint failed'), { code: 'P2002' });
+      });
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null)
+      ).rejects.toMatchObject({ name: 'ConflictError' });
+    });
+
+    // The outbox exists so the change and its notifications commit together.
+    // Enqueuing after the commit would allow a crash to change the sign-in
+    // address and notify nobody -- the silent takeover this fan-out prevents.
+    it('enqueues the notifications inside the transaction', async () => {
+      arrange();
+      await service.updateUserEmail('u1', { email: 'new@example.com' }, 'admin1', 'admin', null);
+
+      for (const call of mockNotificationEnqueue.mock.calls) {
+        expect(call[1]).toBeDefined();
+      }
+    });
+
+    it('forbids a regional manager from reaching outside their own group', async () => {
+      arrange({ record: null }); // isWorkerInGroupScope -> false
+
+      await expect(
+        service.updateUserEmail('u1', { email: 'new@example.com' }, 'rm1', 'regional_manager', {
+          type: 'group', hotelGroupId: 'other',
+        } as never)
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+
+      expect(mockPrisma.user.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('updateUser', () => {
     it('forbids a manager from modifying an existing admin account, even with a non-privileged payload', async () => {
       mockPrisma.user.findUnique.mockResolvedValue({

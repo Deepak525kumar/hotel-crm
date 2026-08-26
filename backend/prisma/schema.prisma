@@ -153,6 +153,7 @@ enum NotificationType {
   // anything happened: a reviewer had to poll the Review Queue, and an
   // applicant had to keep reopening My Onboarding to find out whether they
   // had been approved.
+  USER_EMAIL_CHANGED // to the user, their manager and RMs: an admin/RM changed the account's email
   ONBOARDING_SUBMITTED // to the reviewer (the creator's own superior): an application awaits review
   ONBOARDING_APPROVED // to the applicant: their application was approved
   ONBOARDING_REJECTED // to the applicant: their application was rejected

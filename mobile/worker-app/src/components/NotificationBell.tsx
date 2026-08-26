@@ -26,11 +26,16 @@ export function NotificationBell() {
       accessibilityRole="button"
       accessibilityLabel={t('nav.alerts')}
       hitSlop={8}
+      style={({ pressed }) => [styles.button, { opacity: pressed ? 0.7 : 1 }]}
     >
-      <SymbolView name={{ ios: 'bell', android: 'notifications', web: 'notifications' }} tintColor={theme.text} size={24} />
+      <SymbolView
+        name={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
+        tintColor={theme.text}
+        size={24}
+      />
       {unread > 0 ? (
-        <View style={[styles.badge, { backgroundColor: theme.danger }]}>
-          <ThemedText style={[styles.count, { color: theme.onPrimary }]}>
+        <View style={[styles.badge, { backgroundColor: theme.danger, borderColor: theme.background }]}>
+          <ThemedText style={[styles.count, { color: theme.onPrimary }]} numberOfLines={1}>
             {unread > 9 ? '9+' : unread}
           </ThemedText>
         </View>
@@ -40,16 +45,25 @@ export function NotificationBell() {
 }
 
 const styles = StyleSheet.create({
+  // The badge used to be pinned at top:-4/right:-6 on a Pressable that sized
+  // itself to the 24px icon, so it sat OUTSIDE its parent's bounds -- Android
+  // clips that, and on iOS it collided with whatever sat beside it. The button
+  // now reserves the room the badge needs and the badge stays inside it.
+  button: { width: 34, height: 30, alignItems: 'flex-start', justifyContent: 'flex-end' },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
+    // Separates the badge from the bell it overlaps, in either theme.
+    borderWidth: 2,
   },
-  count: { fontSize: 10, fontWeight: '700' },
+  // lineHeight matched to the circle and font padding off: without both, the
+  // digit sits low and looks off-centre inside the dot.
+  count: { fontSize: 10, lineHeight: 14, fontWeight: '700', textAlign: 'center', includeFontPadding: false },
 });

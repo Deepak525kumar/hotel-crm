@@ -101,6 +101,23 @@ export const UpdateUserProfileSchema = z
   })
   .strict();
 
+// The dedicated email-change endpoint (PUT /users/:id/email), Admin and
+// Regional Manager only. Deliberately NOT a field on UpdateUserSchema /
+// UpdateUserProfileSchema, for exactly the reason `role` is not: PUT /users/:id
+// admits a scoped `manager`, and `.strict()` on a dedicated DTO is what makes
+// it impossible for that role to express the change at all -- it fails at the
+// schema boundary rather than relying on a service-layer check nobody
+// remembers to add.
+//
+// Lowercased to match LoginSchema and PasswordResetRequestSchema: the user
+// lookup is by literal email, so a mixed-case address here would lock the
+// account out of its own login and password-reset paths.
+export const UpdateUserEmailSchema = z
+  .object({
+    email: z.string().email('Invalid email address').toLowerCase(),
+  })
+  .strict();
+
 // ADR-030 D-4a: the dedicated, Admin-only role-assignment endpoint
 // (PUT /users/:id/role). `.strict()` so no profile field can ride along —
 // this route does exactly one thing (role + the assignment that goes with it).

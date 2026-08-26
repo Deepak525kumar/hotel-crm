@@ -37,6 +37,7 @@ import {
   DataList,
   DataRow,
   FormError,
+  Input,
   Modal,
   PageHeader,
   Skeleton,
@@ -58,6 +59,10 @@ function UserDetail() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
+  const reactivate = useAsyncAction();
+  const changeEmail = useAsyncAction();
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
 
   const [passwordResetSentAt, setPasswordResetSentAt] = useState<Date | null>(null);
   const passwordReset = useAsyncAction();
@@ -87,6 +92,39 @@ function UserDetail() {
         setRevokeConfirmOpen(false);
       },
     });
+
+  // The deactivate card was rendered only while `is_active` was true, so the
+  // moment an account was deactivated the whole card vanished and nothing
+  // anywhere offered the inverse -- despite the card's own copy promising
+  // "The account can be reactivated later."
+  const onReactivate = () =>
+    reactivate.run(async () => {
+      await usersApi.update(id, { is_active: true });
+      await Promise.all([
+        globalMutate(["user", id]),
+        globalMutate((key) => Array.isArray(key) && key[0] === "users"),
+      ]);
+    });
+
+  // A dedicated endpoint, not a field on update(): PUT /users/:id also admits a
+  // hotel-scoped manager, and email is the sign-in identifier. The server
+  // revokes the user's sessions and notifies both the old and new address.
+  const onChangeEmail = () =>
+    changeEmail.run(
+      async () => {
+        await usersApi.updateEmail(id, emailDraft.trim());
+        await Promise.all([
+          globalMutate(["user", id]),
+          globalMutate((key) => Array.isArray(key) && key[0] === "users"),
+        ]);
+      },
+      {
+        onSuccess: () => {
+          setEmailOpen(false);
+          setEmailDraft("");
+        },
+      },
+    );
 
   const onDeactivate = () =>
     deactivate.run(
@@ -169,7 +207,26 @@ function UserDetail() {
             </CardHeader>
             <CardContent className="py-2">
               <DataList>
-                <DataRow label={t("fields.email")} value={user.email} />
+                <DataRow
+                  label={t("fields.email")}
+                  value={
+                    <span className="flex items-center gap-2">
+                      {user.email}
+                      <RoleGate allow={["admin", "regional_manager"]}>
+                        <button
+                          type="button"
+                          className="text-sm text-blue-600 hover:underline dark:text-blue-400"
+                          onClick={() => {
+                            setEmailDraft(user.email);
+                            setEmailOpen(true);
+                          }}
+                        >
+                          {t("common.change")}
+                        </button>
+                      </RoleGate>
+                    </span>
+                  }
+                />
                 <DataRow label={t("fields.phone")} value={user.phone || "—"} />
                 <DataRow label={t("fields.role")} value={<RoleBadge role={user.role} />} />
                 {user.role === "worker" && availability && (
@@ -301,6 +358,30 @@ function UserDetail() {
           </RoleGate>
 
           <UserDeactivateGate>
+            {!user.is_active && (
+              <Card>
+                <CardContent className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {t("users.reactivateAccountTitle")}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {t("users.reactivateAccountBody")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    disabled={reactivate.pending}
+                    onClick={onReactivate}
+                  >
+                    {reactivate.pending
+                      ? t("common.saving")
+                      : t("users.reactivateAction")}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {user.is_active && (
               <Card className="border-red-100 dark:border-red-900/50">
                 <CardContent className="flex items-center justify-between gap-4">
@@ -326,6 +407,49 @@ function UserDetail() {
             )}
           </UserDeactivateGate>
         </>
+      )}
+
+      {user && (
+      <Modal
+        open={emailOpen}
+        onClose={() => !changeEmail.pending && setEmailOpen(false)}
+        title={t("users.changeEmailTitle")}
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => setEmailOpen(false)}
+              disabled={changeEmail.pending}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onChangeEmail}
+              loading={changeEmail.pending}
+              disabled={!emailDraft.trim() || emailDraft.trim() === user.email}
+            >
+              {t("common.save")}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {t("users.changeEmailBody")}
+          </p>
+          <Input
+            type="email"
+            autoComplete="off"
+            value={emailDraft}
+            onChange={(e) => setEmailDraft(e.target.value)}
+            placeholder={user.email}
+          />
+          {changeEmail.error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{changeEmail.error}</p>
+          )}
+        </div>
+      </Modal>
       )}
 
       <Modal

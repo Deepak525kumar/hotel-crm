@@ -50,6 +50,11 @@ router.put('/:user_id', requireRole(['admin', 'manager', 'regional_manager']), r
 // unconditionally — see controller.ts's updateUserRole for why this is safe
 // before FEATURE_GD02_MATRIX flips (no legacy caller exists for this route).
 router.put('/:user_id/role', requireRole(['admin', 'regional_manager']), ...userController.updateUserRole);
+// Email is the login identifier, so changing it is a separate, more tightly
+// scoped operation than the rest of the profile: Admin and Regional Manager
+// only, never a hotel-scoped manager. Kept off PUT /users/:id for the same
+// reason as /role -- see UpdateUserEmailSchema.
+router.put('/:user_id/email', requireRole(['admin', 'regional_manager']), requirePermission('users:write'), ...userController.updateUserEmail);
 // ADR-031 D-4 (PR-4): Admin-only "revoke all sessions" incident-response
 // action — bumps token_generation without touching Session rows (logout's
 // job, deliberately unchanged). Delegates to authController since
