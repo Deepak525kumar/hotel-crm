@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
-import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { parseBackoffScheduleMs } from '../modules/notifications/outbox-backoff.js';
+import { findBackendRoot } from '../lib/backend-root.js';
 
 // --- Module-directory resolution that is safe in BOTH module formats ---------
 //
@@ -27,31 +27,14 @@ import { parseBackoffScheduleMs } from '../modules/notifications/outbox-backoff.
 // entrypoint's directory looking for the `package.json` that marks the backend
 // root — which is exactly the anchor the old `import.meta.url` computation was
 // reaching for (`dist/config/env.js` -> `backend/`).
-declare const __dirname: string | undefined;
-
+// Delegates to findBackendRoot(), which identifies this package by a marker
+// file rather than by "has a package.json". The old walk started at
+// process.argv[1], which under pm2 is pm2's ProcessContainer.js, so it
+// resolved to pm2's own installation directory.
 function backendRoot(): string {
-  // CommonJS (ts-jest under Jest): `__dirname` is provided by the module
-  // wrapper, and this file lives at `backend/src/config/` -> `backend/`.
-  if (typeof __dirname !== 'undefined') {
-    return resolve(__dirname, '..', '..');
-  }
-
-  // Native ESM (production `node dist/server.js`). Walk up from the entrypoint
-  // directory until a directory containing both `package.json` and `.env`-able
-  // layout is found; fall back to the entrypoint's grandparent, which matches
-  // the previous `dist/config/env.js -> backend/` relationship.
-  const entry = process.argv[1];
-  let dir = entry ? dirname(resolve(entry)) : process.cwd();
-  for (let i = 0; i < 10; i += 1) {
-    if (existsSync(resolve(dir, 'package.json'))) {
-      return dir;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
+  return findBackendRoot();
 }
+
 
 // Release-audit fix: `z.coerce.boolean()` coerces ANY non-empty string —
 // including the literal string `"false"` and `"0"` — to `true` (it's
