@@ -156,19 +156,6 @@ const stubStorageClient: StorageClient = {
 };
 
 /**
- * Whether the active client is the no-op stub.
- *
- * Exported for the readiness probe: a stub in a deployed environment means
- * every document upload silently stores nothing while answering 200, and the
- * probe is the only place that can say so out loud. Identity comparison rather
- * than a flag on the interface, so the real client cannot accidentally claim
- * to be a stub or vice versa.
- */
-export function isStubStorage(client: StorageClient): boolean {
-  return client === stubStorageClient;
-}
-
-/**
  * Returns the active StorageClient for this process.
  * Uses the real S3 client when S3_BUCKET is set; falls back to the stub.
  * Lazy-initialises once per process to amortise SDK load cost.

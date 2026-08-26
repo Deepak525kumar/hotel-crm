@@ -223,24 +223,8 @@ export class DocumentService extends BaseService {
       orderBy: { created_at: 'desc' },
     });
 
-    const storage = await getStorageClient();
-    return Promise.all(
-      docs.map(async (doc) => {
-        const url = await storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
-          // Was `.catch(() => null)`. A null presigned_url renders as "no View
-          // link" in every client, so a permissions or bucket misconfiguration
-          // presented to users as "download is broken" while leaving no trace
-          // anywhere -- the one piece of evidence needed to tell a stub from a
-          // denied GetObject was being discarded here.
-          logger.error('documents_presign_failed', {
-            document_id: doc.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return null;
-        });
-        return this.toDto(doc, url);
-      })
-    );
+    const urls = await this.presignBatch(docs);
+    return docs.map((doc, i) => this.toDto(doc, urls[i] ?? null));
   }
 
   // ---------------------------------------------------------------------------
@@ -495,29 +479,54 @@ export class DocumentService extends BaseService {
       orderBy: { created_at: 'asc' },
     });
 
-    const storage = await getStorageClient();
-    return Promise.all(
-      docs.map(async (doc) => {
-        const url = await storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
-          // Was `.catch(() => null)`. A null presigned_url renders as "no View
-          // link" in every client, so a permissions or bucket misconfiguration
-          // presented to users as "download is broken" while leaving no trace
-          // anywhere -- the one piece of evidence needed to tell a stub from a
-          // denied GetObject was being discarded here.
-          logger.error('documents_presign_failed', {
-            document_id: doc.id,
-            error: err instanceof Error ? err.message : String(err),
-          });
-          return null;
-        });
-        return this.toDto(doc, url);
-      })
-    );
+    const urls = await this.presignBatch(docs);
+    return docs.map((doc, i) => this.toDto(doc, urls[i] ?? null));
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+  /**
+   * Presigns a batch of documents, logging at most one line for the batch.
+   *
+   * A null presigned_url renders as "no View link" in every client, so a
+   * permissions or bucket misconfiguration presented to users as "download is
+   * broken" while leaving no trace anywhere -- the error was previously
+   * discarded by `.catch(() => null)`.
+   *
+   * Logged once per batch rather than once per document: the cause is a single
+   * misconfiguration affecting every key, so listing 50 documents emitted 50
+   * identical error lines per request, from every polling client. The first
+   * message and a sample of ids are enough to act on.
+   */
+  private async presignBatch(docs: { id: string; s3_key: string }[]): Promise<(string | null)[]> {
+    const storage = await getStorageClient();
+    const failures: { id: string; error: string }[] = [];
+
+    const urls = await Promise.all(
+      docs.map((doc) =>
+        storage.getPresignedUrl(doc.s3_key).catch((err: unknown) => {
+          failures.push({
+            id: doc.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          return null;
+        })
+      )
+    );
+
+    if (failures.length > 0) {
+      logger.error('documents_presign_failed', {
+        failed_count: failures.length,
+        total_count: docs.length,
+        sample_document_ids: failures.slice(0, 5).map((f) => f.id),
+        error: failures[0]!.error,
+      });
+    }
+
+    return urls;
+  }
+
   private toDto(
     doc: {
       id: string;

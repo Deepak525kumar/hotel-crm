@@ -14,7 +14,9 @@ export const Colors = {
     backgroundElement: '#FFFFFF', // Pure white cards
     backgroundSelected: '#E2E8F0', // Slate 200
     textSecondary: '#64748B', // Slate 500
-    primary: '#4F46E5', // Indigo 600
+    // Matches the worker app: teal rather than a green, so the accent never
+    // competes with the meaning green carries for completed work.
+    primary: '#0F766E', // Teal 700 — 4.8:1 on white
   },
   dark: {
     text: '#FAFAFA',
@@ -22,7 +24,7 @@ export const Colors = {
     backgroundElement: '#18181B', // Zinc 900
     backgroundSelected: '#27272A', // Zinc 800
     textSecondary: '#A1A1AA', // Zinc 400
-    primary: '#6366F1', // Indigo 500
+    primary: '#0D9488', // Teal 600 — lifted for the dark ground
   },
 } as const;
 

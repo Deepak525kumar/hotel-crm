@@ -82,7 +82,8 @@
     "loadFailed": "فشل التحميل",
     "tomorrow": "غدًا",
     "getDirections": "الحصول على الاتجاهات",
-    "success": "تم بنجاح"
+    "success": "تم بنجاح",
+    "send": "إرسال"
   },
   "fields": {
     "name": "الاسم",
@@ -322,7 +323,14 @@
     "localDevBuild": "إصدار تطوير محلي",
     "pageDescription": "إعدادات حسابك وجلستك والتطبيق.",
     "signedInAs": "تم تسجيل الدخول بصفة",
-    "notAvailableYet": "غير متاح بعد"
+    "notAvailableYet": "غير متاح بعد",
+    "resetPassword": "إعادة تعيين كلمة المرور",
+    "resetPasswordBody": "سنرسل رابط إعادة التعيين إلى {{email}}.",
+    "resetPasswordSent": "إذا كان هذا البريد موجوداً، فالرابط في طريقه إليك.",
+    "resetPasswordFailed": "تعذر بدء إعادة التعيين. حاول مرة أخرى.",
+    "title": "الإعدادات",
+    "appearanceHint": "اختر مظهر التطبيق. \"مطابقة الجهاز\" يتبع إعدادات هاتفك.",
+    "storedOnDevice": "تُحفظ هذه التفضيلات على هذا الجهاز. كما تتم مزامنة لغتك مع حسابك."
   },
   "auth": {
     "login": "تسجيل الدخول",
@@ -350,7 +358,8 @@
     "resetLinkSentHint": "إذا كان هذا البريد الإلكتروني موجوداً، فقد أُرسل إليه رابط لإعادة تعيين كلمة المرور.",
     "enterNewPasswordHint": "أدخل كلمة مرور جديدة لحسابك.",
     "resetPasswordTitle": "إعادة تعيين كلمة المرور",
-    "invalidResetTokenMissing": "رمز إعادة التعيين غير صالح أو مفقود."
+    "invalidResetTokenMissing": "رمز إعادة التعيين غير صالح أو مفقود.",
+    "enterEmailForReset": "أدخل بريدك الإلكتروني أولاً ثم اضغط على نسيت كلمة المرور."
   },
   "search": {
     "byNameOrEmail": "ابحث بالاسم أو البريد الإلكتروني…",
@@ -399,7 +408,14 @@
     "detailsTitle": "تفاصيل الوردية",
     "upcomingTitle": "الورديات القادمة",
     "offerNoLongerOpen": "لم يعد هذا العرض متاحاً.",
-    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر."
+    "alreadyFilledByAnother": "تم شغل هذه الوردية بالفعل بواسطة موظف آخر.",
+    "assignedBy": "تم التعيين بواسطة",
+    "exactLocation": "الموقع الدقيق",
+    "addressSearch": "حسب العنوان",
+    "openInMaps": "فتح في الخرائط",
+    "mapsUnavailable": "لا يتوفر تطبيق خرائط على هذا الجهاز.",
+    "callHotel": "الاتصال بالفندق",
+    "emailHotel": "مراسلة الفندق"
   },
   "jobs": {
     "none": "لم يتم العثور على وظائف متاحة.",
@@ -415,7 +431,10 @@
     "position": "المنصب",
     "pay": "الأجر",
     "offerBadge": "عرض",
-    "noLongerOpen": "لم تعد هذه الوظيفة متاحة."
+    "noLongerOpen": "لم تعد هذه الوظيفة متاحة.",
+    "hotel": "الفندق",
+    "location": "الموقع",
+    "description": "الوصف"
   },
   "documents": {
     "title": "المستندات",
@@ -424,6 +443,7 @@
     "expiryPlaceholder": "تاريخ الانتهاء (اختياري، YYYY-MM-DD)",
     "expiryFormat": "يجب أن يكون تاريخ الانتهاء بصيغة YYYY-MM-DD.",
     "view": "عرض",
+    "viewAll": "عرض المستندات",
     "categoryGENERAL": "عام",
     "categoryWORK_PERMIT": "تصريح عمل",
     "upload": "رفع",
@@ -449,7 +469,18 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "التقاط صورة",
+    "choosePhoto": "اختيار صورة",
+    "cameraPermissionDenied": "يلزم الوصول إلى الكاميرا لالتقاط صورة. يمكنك تفعيله من الإعدادات.",
+    "libraryPermissionDenied": "يلزم الوصول إلى الصور لاختيار صورة. يمكنك تفعيله من الإعدادات.",
+    "replace": "استبدال",
+    "uploaded": "تم الرفع",
+    "required": "مطلوب",
+    "previewUnavailable": "المعاينة غير متاحة",
+    "deleteConfirm": "هل تريد بالتأكيد إزالة هذا المستند؟",
+    "missingRequired": "مستندات مطلوبة ناقصة",
+    "missingRequiredDesc": "يرجى رفع المستندات الناقصة التالية:"
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
@@ -558,7 +589,18 @@
     "sendResetLink": "إرسال رابط إعادة التعيين",
     "firstNameLastNameRequired": "الاسم الأول واسم العائلة مطلوبان.",
     "phoneInvalid": "يجب أن يكون الهاتف رقماً دولياً صالحاً، مثل +49301234567.",
-    "viewProfile": "عرض الملف الشخصي"
+    "viewProfile": "عرض الملف الشخصي",
+    "myDetails": "بياناتي",
+    "identity": "الهوية",
+    "name": "الاسم",
+    "email": "البريد الإلكتروني",
+    "role": "الدور",
+    "employment": "التوظيف",
+    "employeeId": "رقم الموظف",
+    "jobTitle": "المسمى الوظيفي",
+    "startDate": "تاريخ البدء",
+    "employmentStatus": "الحالة",
+    "reportingLine": "التسلسل الإداري"
   },
   "skills": {
     "CLEANER": "عامل نظافة",
@@ -598,7 +640,10 @@
     "viewWeek": "أسبوع",
     "viewMonth": "شهر",
     "sickOrVacation": "مرض / إجازة",
-    "yourMarkedDays": "أيامك المسجَّلة"
+    "yourMarkedDays": "أيامك المسجَّلة",
+    "viewmonth": "شهر",
+    "viewweek": "أسبوع",
+    "viewday": "يوم"
   },
   "hotels": {
     "inThisGroup": "الفنادق في هذه المجموعة",
@@ -778,7 +823,11 @@
     "submitForReview": "إرسال للمراجعة",
     "submitDisabledHint": "ارفع كل مستند مطلوب قبل الإرسال.",
     "noEmploymentRecord": "سجل التوظيف الخاص بك غير جاهز بعد. يرجى التواصل مع مديرك.",
-    "submittedForReview": "تم إرسال طلبك للمراجعة."
+    "submittedForReview": "تم إرسال طلبك للمراجعة.",
+    "idOrPassport": "بطاقة الهوية أو جواز السفر",
+    "checklistTitle": "مستنداتك",
+    "remainingCount": "لا يزال مطلوباً {{count}}",
+    "allUploaded": "تم رفع جميع المستندات"
   },
   "analytics": {
     "myPerformance": "أدائي",
@@ -853,7 +902,15 @@
     "verificationNotesPlaceholder": "ملاحظات التحقق (اختياري)…",
     "verifiedMark": "تم التحقق ✓",
     "verifiedBody": "تم التحقق من الحضور.",
-    "verifyFailed": "فشل التحقق"
+    "verifyFailed": "فشل التحقق",
+    "checkedInAt": "تم تسجيل الدخول: {{time}}",
+    "statusPRESENT": "حاضر",
+    "statusABSENT": "غائب",
+    "statusLATE": "متأخر",
+    "statusPARTIAL": "جزئي",
+    "statusEXCUSED": "بعذر",
+    "statusEXPECTED": "متوقع",
+    "unknownWorker": "عامل غير معروف"
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",
@@ -944,7 +1001,9 @@
     "reworkNotesRequired": "صف ما يجب إعادة عمله.",
     "reworkAssigned": "تم تعيين إعادة العمل. تم إخطار العامل.",
     "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
-    "reworkCompleted": "اكتملت إعادة العمل"
+    "reworkCompleted": "اكتملت إعادة العمل",
+    "reworkDone": "تم إرسال إعادة العمل {{when}}",
+    "inspectedBy": "تم التفتيش بواسطة"
   },
   "ratings": {
     "comment": "تعليق",
@@ -967,7 +1026,14 @@
     "withdrawBody": "لن يعد {{day}} مُعلَّمًا {{kind}}. الوردية الملغاة لهذا اليوم لا تُستعاد تلقائيًا.",
     "withdrawA11y": "إلغاء {{kind}} في {{day}}",
     "markFailed": "لم يتمكن من تسجيل الغياب.",
-    "withdrawFailed": "لم يتمكن من إلغاء الغياب."
+    "withdrawFailed": "لم يتمكن من إلغاء الغياب.",
+    "daysSelected": "تم اختيار {{count}} أيام",
+    "tapAgainForRange": "اضغط على يوم لاحق لتحديد فترة",
+    "reasonTitle": "سبب الإجازة",
+    "reasonHint": "مطلوب للإجازة. لا تُدخل تفاصيل طبية.",
+    "reasonPlaceholder": "مثال: رحلة عائلية، أيام شخصية",
+    "reasonRequired": "يلزم إدخال سبب للإجازة.",
+    "reasonTooLong": "يرجى إبقاء السبب أقل من 500 حرف."
   },
   "checklist": {
     "dust": "الغبار",
@@ -1000,5 +1066,9 @@
     "yourWeek": "أسبوعك",
     "viewAll": "عرض الكل",
     "documentsNeedAttention": "المستندات تحتاج إلى انتباه"
+  },
+  "marketplace": {
+    "description": "المناوبات التي يمكنك التقدم لها.",
+    "noneOpen": "لا توجد وظائف مفتوحة حالياً."
   }
 }

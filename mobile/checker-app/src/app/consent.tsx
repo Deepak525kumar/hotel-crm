@@ -13,6 +13,7 @@ import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../lib/api-error-i18n';
+import { useConsentRevisionStore } from '@/stores/consent-store';
 
 /**
  * Self-service record/decision surface, not an access-blocking wall — no
@@ -49,7 +50,7 @@ export default function ConsentScreen() {
     } finally {
       setStatusLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -67,7 +68,7 @@ export default function ConsentScreen() {
     } finally {
       setFetchingNotice(false);
     }
-  }, []);
+  }, [t]);
 
   const onDecide = useCallback(
     async (decision: 'GRANTED' | 'DECLINED') => {
@@ -92,7 +93,7 @@ export default function ConsentScreen() {
         setDeciding(null);
       }
     },
-    [notice]
+    [notice, t]
   );
 
   const onWithdraw = useCallback(async () => {
@@ -108,12 +109,15 @@ export default function ConsentScreen() {
       // of the server actually confirming the withdrawal.
       await api.consent.withdraw(DAILY_ACCESS_GATE_INSTANCE);
       setStatus({ status: 'absent' });
+      // Setting local state only updates THIS screen; the gate keeps its own
+      // copy and none of its triggers fire for a withdrawal performed here.
+      useConsentRevisionStore.getState().invalidate();
     } catch (error) {
       setActionError(translateApiError(error, t, 'consent.couldNotWithdraw'));
     } finally {
       setWithdrawing(false);
     }
-  }, []);
+  }, [t]);
 
   return (
     <ThemedView style={styles.container}>

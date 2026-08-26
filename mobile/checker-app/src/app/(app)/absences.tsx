@@ -1,6 +1,7 @@
-import { Modal, TextInput, StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { Modal, TextInput, StyleSheet, FlatList, Pressable, View, ActivityIndicator, RefreshControl, Alert } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { useTheme } from '@/hooks/use-theme';
@@ -11,6 +12,7 @@ import {
   validateAbsenceReason,
 } from '@/lib/absence-reason';
 import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
+import { resolveDaySelection, selectedDays as daysOf } from '@/lib/absence-selection';
 import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
 import { useTranslation } from 'react-i18next';
@@ -87,12 +89,19 @@ export default function AbsencesScreen() {
   // VACATION requires a reason, so the tap opens this prompt rather than
   // submitting straight away.
   const [reasonPrompt, setReasonPrompt] = useState<
-    { daysFromToday: 0 | 1; kind: CalendarAbsenceKind } | null
+    { days: string[]; kind: CalendarAbsenceKind } | null
   >(null);
   const [reasonText, setReasonText] = useState('');
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+  // A second tap on a later day turns the selection into a range, so a week off
+  // is two taps rather than seven visits to this screen. The screen previously
+  // offered only today and tomorrow as fixed buttons, which the backend never
+  // required.
+  const fallbackDay = isoDateInCalendarTimezone(0);
+  const [rangeStart, setRangeStart] = useState<string | null>(fallbackDay);
+  const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -119,15 +128,19 @@ export default function AbsencesScreen() {
   // arbitrary date picker) to keep this slice's UI surface minimal; the
   // backend itself accepts any current/future day.
   const submitMark = useCallback(
-    async (daysFromToday: 0 | 1, kind: CalendarAbsenceKind, reason?: string) => {
-      const day = isoDateInCalendarTimezone(daysFromToday);
+    async (days: string[], kind: CalendarAbsenceKind, reason?: string) => {
       setErrorMessage(null);
-      setMarking({ day, kind });
       try {
-        await api.calendar.markAbsence({ day, kind, reason: normalizeAbsenceReason(reason) });
+        // Sequential, not Promise.all: the backend applies last-write-wins per
+        // day and a partial failure must leave the days it did accept marked.
+        for (const day of days) {
+          setMarking({ day, kind });
+          await api.calendar.markAbsence({ day, kind, reason: normalizeAbsenceReason(reason) });
+        }
         await load();
       } catch (error) {
         setErrorMessage(translateApiError(error, t, 'absences.markFailed'));
+        await load();
       } finally {
         setMarking(null);
       }
@@ -141,14 +154,15 @@ export default function AbsencesScreen() {
   // marking themselves sick and invite health details this system
   // deliberately does not collect.
   const handleMark = useCallback(
-    (daysFromToday: 0 | 1, kind: CalendarAbsenceKind) => {
+    (days: string[], kind: CalendarAbsenceKind) => {
+      if (days.length === 0) return;
       if (kind === 'VACATION') {
-        setReasonPrompt({ daysFromToday, kind });
+        setReasonPrompt({ days, kind });
         setReasonText('');
         setReasonError(null);
         return;
       }
-      void submitMark(daysFromToday, kind);
+      void submitMark(days, kind);
     },
     [submitMark]
   );
@@ -164,9 +178,9 @@ export default function AbsencesScreen() {
       );
       return;
     }
-    const { daysFromToday, kind } = reasonPrompt;
+    const { days, kind } = reasonPrompt;
     setReasonPrompt(null);
-    await submitMark(daysFromToday, kind, reasonText);
+    await submitMark(days, kind, reasonText);
   }, [reasonPrompt, reasonText, submitMark, t]);
 
   // Confirmed before firing: withdrawing does NOT restore a shift that was
@@ -206,41 +220,104 @@ export default function AbsencesScreen() {
     [load, t]
   );
 
-  const isMarking = (daysFromToday: 0 | 1, kind: CalendarAbsenceKind) =>
-    marking?.day === isoDateInCalendarTimezone(daysFromToday) && marking.kind === kind;
+  const selected = useMemo(
+    () => daysOf({ start: rangeStart, end: rangeEnd }, fallbackDay),
+    [rangeStart, rangeEnd, fallbackDay],
+  );
+
+  const markedDates = useMemo(() => {
+    const marks: Record<string, Record<string, unknown>> = {};
+    for (const a of items) {
+      marks[a.day] = { marked: true, dotColor: a.kind === 'SICK' ? '#E53E3E' : theme.primary };
+    }
+    for (const day of selected) {
+      marks[day] = {
+        ...marks[day],
+        selected: true,
+        color: theme.primary,
+        textColor: theme.background,
+        startingDay: day === selected[0],
+        endingDay: day === selected[selected.length - 1],
+      };
+    }
+    return marks;
+  }, [items, selected, theme]);
+
+  // Rules (past days, range extension, 62-day cap) live in absence-selection so
+  // they are testable; this only applies the result.
+  const onDayPress = useCallback(
+    (day: string) => {
+      const next = resolveDaySelection({
+        current: { start: rangeStart, end: rangeEnd },
+        tapped: day,
+        today: isoDateInCalendarTimezone(0),
+      });
+      if (next.start === rangeStart && next.end === rangeEnd) return;
+      setRangeStart(next.start);
+      setRangeEnd(next.end);
+    },
+    [rangeStart, rangeEnd],
+  );
+
+  const isMarking = (kind: CalendarAbsenceKind) => marking?.kind === kind;
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedText type="subtitle" style={styles.header}>{t("calendar.sickOrVacation")}</ThemedText>
 
+        <Calendar
+          current={selected[0]}
+          onDayPress={(d: { dateString: string }) => onDayPress(d.dateString)}
+          markedDates={markedDates}
+          markingType="period"
+          firstDay={1}
+          minDate={fallbackDay}
+          theme={{
+            calendarBackground: theme.background,
+            dayTextColor: theme.text,
+            monthTextColor: theme.text,
+            textSectionTitleColor: theme.textSecondary,
+            todayTextColor: theme.primary,
+            arrowColor: theme.primary,
+            selectedDayBackgroundColor: theme.primary,
+            selectedDayTextColor: theme.background,
+          }}
+        />
+
         <ThemedView type="backgroundElement" style={styles.actionsCard}>
-          {([0, 1] as const).map((daysFromToday) => (
-            <ThemedView key={daysFromToday} style={styles.actionRow} type="backgroundElement">
-              <ThemedText type="small" style={styles.flex}>
-                {daysFromToday === 0 ? t('common.today') : t('common.tomorrow')}
-              </ThemedText>
-              {(['SICK', 'VACATION'] as const).map((kind) => (
-                <Pressable
-                  key={kind}
-                  onPress={() => handleMark(daysFromToday, kind)}
-                  disabled={marking !== null}
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    { backgroundColor: KIND_COLOR[kind], opacity: pressed || marking !== null ? 0.7 : 1 },
-                  ]}
-                >
-                  {isMarking(daysFromToday, kind) ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <ThemedText type="small" style={styles.actionButtonText}>
-                      {t(KIND_LABEL_KEY[kind])}
-                    </ThemedText>
-                  )}
-                </Pressable>
-              ))}
-            </ThemedView>
-          ))}
+          <ThemedText type="smallBold">
+            {rangeEnd ? `${formatDay(rangeStart!)} – ${formatDay(rangeEnd)}` : formatDay(selected[0]!)}
+          </ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {selected.length > 1
+              ? t('absences.daysSelected', { count: selected.length })
+              : t('absences.tapAgainForRange')}
+          </ThemedText>
+          <View style={styles.actionRow}>
+            {(['SICK', 'VACATION'] as const).map((kind) => (
+              <Pressable
+                key={kind}
+                onPress={() => handleMark(selected, kind)}
+                disabled={marking !== null}
+                style={({ pressed }) => [
+                  styles.actionButton,
+                  {
+                    backgroundColor: kind === 'SICK' ? '#E53E3E' : theme.primary,
+                    opacity: pressed || marking !== null ? 0.6 : 1,
+                  },
+                ]}
+              >
+                {isMarking(kind) ? (
+                  <ActivityIndicator color={theme.background} />
+                ) : (
+                  <ThemedText type="smallBold" style={{ color: theme.background }}>
+                    {t(KIND_LABEL_KEY[kind])}
+                  </ThemedText>
+                )}
+              </Pressable>
+            ))}
+          </View>
         </ThemedView>
 
         {errorMessage && (

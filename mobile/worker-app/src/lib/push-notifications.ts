@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 import type { useRouter } from 'expo-router';
 import { api } from '@/lib/api';
 import { PUSH_APP } from '@/constants/app-config';
+import { useNotificationStore } from '@/stores/notification-store';
 
 type Router = ReturnType<typeof useRouter>;
 
@@ -160,7 +161,15 @@ export function subscribeToPushNotifications(router: Router): () => void {
     router.push(route as Parameters<Router['push']>[0]);
   });
 
+  // A delivered push means the server created a notification, so the bell's
+  // unread count is now stale. Polling alone would leave it wrong for up to a
+  // minute while the banner is on screen saying otherwise.
+  const receivedSub = Notifications.addNotificationReceivedListener(() => {
+    void useNotificationStore.getState().refresh();
+  });
+
   return () => {
     responseSub.remove();
+    receivedSub.remove();
   };
 }

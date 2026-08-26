@@ -74,6 +74,19 @@ export default function AppLayout() {
           }}
         />
         <Tabs.Screen
+          name="attendance"
+          options={{
+            title: t('nav.attendance'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'clock', android: 'schedule', web: 'schedule' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: t('nav.profile'),

@@ -1,5 +1,5 @@
 import { getPrisma } from './db.js';
-import { getStorageClient, isStubStorage } from '../modules/documents/storage.js';
+import { getEnv } from '../config/env.js';
 
 /**
  * Health/readiness probes for the observability baseline (EPIC-PLATFORM, S0-3).
@@ -58,36 +58,29 @@ export async function checkDatabase(): Promise<DependencyHealth> {
 }
 
 /**
- * Verify that object storage is real and reachable.
+ * Whether object storage is real, from configuration alone.
  *
- * Reports `down` for a stub client as well as an unreachable bucket: in a
- * deployed environment the stub silently accepts uploads and stores nothing,
- * which is worse than an outage because nothing surfaces it. `config/env.ts`
- * refuses to boot production/staging without S3_BUCKET, so a stub here means
- * either a non-deployed NODE_ENV or that guard having been bypassed -- both
- * worth showing rather than hiding.
+ * `documents/storage.ts` falls back to a no-op stub exactly when S3_BUCKET is
+ * unset: uploads silently store nothing and presigned URLs come back null,
+ * which every client renders as a missing View link. That is the condition
+ * reported here.
  *
- * Never throws, matching checkDatabase.
+ * Read from env rather than by importing the storage module, for two reasons.
+ * `lib/` is the shared foundation and nothing else in it depends on a feature
+ * module; inverting that direction for a probe would be the wrong precedent.
+ * And this endpoint is hit constantly by the load balancer, so it must not
+ * construct an SDK client or make an S3 round-trip.
+ *
+ * A bucket that is configured but UNREACHABLE -- wrong name, denied GetObject
+ * -- is deliberately not detected here. That surfaces as the
+ * `documents_presign_failed` log, which carries the actual AWS message.
  */
-export async function checkStorage(): Promise<DependencyHealth> {
-  const start = Date.now();
-  try {
-    const client = await getStorageClient();
-    if (isStubStorage(client)) {
-      return {
-        status: 'down',
-        latency_ms: Date.now() - start,
-        error: 'storage is stubbed (S3_BUCKET unset): uploads are no-ops and presigned URLs are null',
-      };
-    }
-    return { status: 'up', latency_ms: Date.now() - start };
-  } catch (error) {
-    return {
-      status: 'down',
-      latency_ms: Date.now() - start,
-      error: error instanceof Error ? error.message : String(error),
-    };
-  }
+export function checkStorage(): DependencyHealth {
+  if (getEnv().S3_BUCKET?.trim()) return { status: 'up' };
+  return {
+    status: 'down',
+    error: 'storage is stubbed (S3_BUCKET unset): uploads are no-ops and presigned URLs are null',
+  };
 }
 
 /**
@@ -95,15 +88,16 @@ export async function checkStorage(): Promise<DependencyHealth> {
  * probe push on every health check would be both costly and user-visible.
  */
 export function checkPush(): DependencyHealth {
+  const env = getEnv();
+  // Mirrors selectPushHandler's own condition (outbox-transport.ts): APNs needs
+  // its key trio AND at least one bundle id, or iOS devices are skipped.
   const apns = Boolean(
-    process.env['APNS_PRIVATE_KEY_BASE64'] &&
-      process.env['APNS_KEY_ID'] &&
-      process.env['APNS_TEAM_ID'] &&
-      (process.env['APNS_BUNDLE_ID_WORKER'] || process.env['APNS_BUNDLE_ID_CHECKER']),
+    env.APNS_PRIVATE_KEY_BASE64 &&
+      env.APNS_KEY_ID &&
+      env.APNS_TEAM_ID &&
+      (env.APNS_BUNDLE_ID_WORKER || env.APNS_BUNDLE_ID_CHECKER),
   );
-  const fcm = Boolean(
-    process.env['FIREBASE_SERVICE_ACCOUNT_KEY_BASE64'] && process.env['FIREBASE_PROJECT_ID'],
-  );
+  const fcm = Boolean(env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64 && env.FIREBASE_PROJECT_ID);
   if (apns || fcm) return { status: 'up' };
   return {
     status: 'down',
@@ -121,7 +115,7 @@ export function checkPush(): DependencyHealth {
  * everything else. It is here to be seen, not to block.
  */
 export async function checkReadiness(): Promise<ReadinessReport> {
-  const [database, storage] = await Promise.all([checkDatabase(), checkStorage()]);
+  const database = await checkDatabase();
   const status = database.status === 'up' ? 'ready' : 'not_ready';
-  return { status, checks: { database, storage, push: checkPush() } };
+  return { status, checks: { database, storage: checkStorage(), push: checkPush() } };
 }

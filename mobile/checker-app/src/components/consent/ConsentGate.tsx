@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -8,12 +8,13 @@ import { ThemedView } from '@/components/themed-view';
 import { ConsentNoticeCard } from '@/components/consent/ConsentNoticeCard';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { api } from '@/lib/api';
+import { api, setOnConsentRequired } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
 import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
 import { shouldBypassConsentGate } from '@/lib/consent-gate-decision';
 import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useConsentRevisionStore } from '@/stores/consent-store';
 
 /**
  * RULE-CONSENT-01 daily access gate, client half.
@@ -35,6 +36,9 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
+  // Bumped by any in-app action that can change consent server-side (currently
+  // withdrawal, from the consent screen) -- see consent-store.
+  const consentRevision = useConsentRevisionStore((s) => s.revision);
 
   const [status, setStatus] = useState<ConsentStatus | null>(null);
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
@@ -44,10 +48,19 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [enforced, setEnforced] = useState(true);
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
 
+  // Which calendar day the current `status` was read on, for the rollover check.
+  const dayRef = useRef(new Date().toDateString());
+  // Whose consent `status` describes. The bypass check runs before the loading
+  // branch, so a cached `granted` from the previous account would let the next
+  // checker straight through for the duration of the refetch.
+  const statusUserRef = useRef<string | null>(user?.id ?? null);
+
   const isAdmin = user?.role === 'admin';
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { silent?: boolean }) => {
+    // A background re-check must not flash a full-screen spinner over a screen
+    // the checker is already using.
+    if (!opts?.silent) setLoading(true);
     setError(null);
     setStatusUnknown(false);
     try {
@@ -94,7 +107,55 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
+    // Drop the previous account's answer before asking about this one. Only on
+    // a user CHANGE -- clearing it on every silent recheck would flash the wall
+    // at someone whose consent is perfectly valid.
+    if (statusUserRef.current !== user.id) {
+      statusUserRef.current = user.id;
+      setStatus(null);
+      setNotice(null);
+      setStatusUnknown(false);
+    }
     void load();
+  }, [user, isAdmin, load, consentRevision]);
+
+  // A consent read is only ever a snapshot, and this component took exactly
+  // one, at mount. Three things can invalidate it while the app stays open.
+  // Without them a checker whose consent was withdrawn kept a working UI until
+  // the app was force-quit -- the API was already refusing their calls, so the
+  // screen was lying to them.
+
+  // 1. The API refused a call with CONSENT_REQUIRED -- the authoritative
+  //    signal, since the server has already decided.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    setOnConsentRequired(() => void load({ silent: true }));
+    return () => setOnConsentRequired(null);
+  }, [user, isAdmin, load]);
+
+  // 2. The app returned to the foreground. Covers consent withdrawn elsewhere
+  //    while this device sat backgrounded.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void load({ silent: true });
+    });
+    return () => sub.remove();
+  }, [user, isAdmin, load]);
+
+  // 3. Midnight passed with the app open. The gate is a DAILY one, so
+  //    yesterday's grant does not carry over. A coarse interval rather than a
+  //    timer set for midnight, which does not survive the device sleeping.
+  useEffect(() => {
+    if (!user || isAdmin) return;
+    const id = setInterval(() => {
+      const today = new Date().toDateString();
+      if (dayRef.current !== today) {
+        dayRef.current = today;
+        void load({ silent: true });
+      }
+    }, 60_000);
+    return () => clearInterval(id);
   }, [user, isAdmin, load]);
 
   const decide = useCallback(

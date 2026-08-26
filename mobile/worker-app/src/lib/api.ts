@@ -345,6 +345,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   auth: {
+    // Anti-enumeration by design: the server answers 200 whether or not the
+    // address exists, so callers must not infer anything from success.
+    requestPasswordReset: (email: string) =>
+      request<{ message: string }>('/auth/password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      }),
     login: (email: string, password: string) =>
       request<AuthResponse>('/auth/login', {
         method: 'POST',
@@ -430,6 +437,15 @@ export const api = {
         body: JSON.stringify({ check_out_at: new Date().toISOString(), ...location }),
       }),
     get: (id: string) => request<Attendance>(`/attendance/${id}`),
+    // GET /attendance is scoped by req.auth server-side, so a worker receives
+    // only their own records -- no worker_id is sent from the client.
+    listMine: (params?: { page?: number; per_page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.per_page) qs.set('per_page', String(params.per_page));
+      const q = qs.toString();
+      return request<Attendance[]>(`/attendance${q ? `?${q}` : ''}`);
+    },
     // Resolve the attendance record for an assignment dynamically. The backend
     // does not embed attendance on AssignmentDto, so the shift screen looks it
     // up by assignment_id to obtain the id needed for check-out.

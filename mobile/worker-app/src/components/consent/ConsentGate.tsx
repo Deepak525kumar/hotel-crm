@@ -14,6 +14,7 @@ import { DAILY_ACCESS_GATE_INSTANCE } from '@/types/api';
 import { shouldBypassConsentGate } from '@/lib/consent-gate-decision';
 import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useConsentRevisionStore } from '@/stores/consent-store';
 
 /**
  * RULE-CONSENT-01 daily access gate, client half.
@@ -35,6 +36,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const user = useAuthStore((s) => s.user);
+  // Bumped by any in-app action that can change consent server-side (currently
+  // withdrawal, from the consent screen). Without this the gate never learns
+  // about a withdrawal the worker performed themselves -- see consent-store.
+  const consentRevision = useConsentRevisionStore((s) => s.revision);
 
   const [status, setStatus] = useState<ConsentStatus | null>(null);
   const [notice, setNotice] = useState<ConsentNotice | null>(null);
@@ -45,6 +50,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
   // Which calendar day the current `status` was read on, for the rollover check.
   const dayRef = useRef(new Date().toDateString());
+  // Whose consent `status` describes. The bypass check below runs BEFORE the
+  // loading branch, so a cached `granted` from the previous account would let
+  // the next worker straight into the app for the duration of the refetch.
+  const statusUserRef = useRef<string | null>(user?.id ?? null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -98,8 +107,17 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
       setLoading(false);
       return;
     }
+    // Drop the previous account's answer before asking about this one. Only on
+    // a user CHANGE -- clearing it on every silent recheck would flash the
+    // wall at a worker whose consent is perfectly valid.
+    if (statusUserRef.current !== user.id) {
+      statusUserRef.current = user.id;
+      setStatus(null);
+      setNotice(null);
+      setStatusUnknown(false);
+    }
     void load();
-  }, [user, isAdmin, load]);
+  }, [user, isAdmin, load, consentRevision]);
 
   // A consent read is only ever a snapshot, and this component used to take
   // exactly one, at mount. Three things can invalidate it while the app stays

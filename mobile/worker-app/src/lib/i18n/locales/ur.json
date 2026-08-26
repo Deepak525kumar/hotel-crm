@@ -82,7 +82,8 @@
     "loadFailed": "لوڈ ناکام",
     "tomorrow": "کل",
     "getDirections": "راستہ حاصل کریں",
-    "success": "کامیاب"
+    "success": "کامیاب",
+    "send": "بھیجیں"
   },
   "fields": {
     "name": "نام",
@@ -322,7 +323,14 @@
     "localDevBuild": "مقامی ڈویلپمنٹ بلڈ",
     "pageDescription": "آپ کے اکاؤنٹ، سیشن اور ایپ کی ترجیحات۔",
     "signedInAs": "بطور سائن اِن",
-    "notAvailableYet": "ابھی دستیاب نہیں"
+    "notAvailableYet": "ابھی دستیاب نہیں",
+    "resetPassword": "پاس ورڈ ری سیٹ کریں",
+    "resetPasswordBody": "ہم {{email}} پر ری سیٹ لنک بھیجیں گے۔",
+    "resetPasswordSent": "اگر یہ ای میل موجود ہے تو لنک بھیجا جا رہا ہے۔",
+    "resetPasswordFailed": "پاس ورڈ ری سیٹ شروع نہیں ہو سکا۔ دوبارہ کوشش کریں۔",
+    "title": "ترتیبات",
+    "appearanceHint": "ایپ کی شکل منتخب کریں۔ \"ڈیوائس کے مطابق\" آپ کے فون کی ترتیبات کی پیروی کرتا ہے۔",
+    "storedOnDevice": "یہ ترجیحات اس ڈیوائس پر محفوظ ہیں۔ آپ کی زبان آپ کے اکاؤنٹ سے بھی ہم آہنگ ہوتی ہے۔"
   },
   "auth": {
     "login": "لاگ اِن",
@@ -350,7 +358,8 @@
     "resetLinkSentHint": "اگر یہ ای میل موجود ہے تو اسے پاس ورڈ ری سیٹ لنک بھیج دیا گیا ہے۔",
     "enterNewPasswordHint": "اپنے اکاؤنٹ کے لیے نیا پاس ورڈ درج کریں۔",
     "resetPasswordTitle": "پاس ورڈ ری سیٹ کریں",
-    "invalidResetTokenMissing": "غلط یا غائب ری سیٹ ٹوکن۔"
+    "invalidResetTokenMissing": "غلط یا غائب ری سیٹ ٹوکن۔",
+    "enterEmailForReset": "پہلے اپنا ای میل درج کریں، پھر پاس ورڈ بھول گئے پر ٹیپ کریں۔"
   },
   "search": {
     "byNameOrEmail": "نام یا ای میل سے تلاش کریں…",
@@ -399,7 +408,14 @@
     "detailsTitle": "شفٹ کی تفصیلات",
     "upcomingTitle": "آنے والی شفٹیں",
     "offerNoLongerOpen": "یہ پیشکش اب کھلی نہیں ہے۔",
-    "alreadyFilledByAnother": "یہ شفٹ پہلے ہی کسی اور کارکن نے لے لی ہے۔"
+    "alreadyFilledByAnother": "یہ شفٹ پہلے ہی کسی اور کارکن نے لے لی ہے۔",
+    "assignedBy": "تفویض کردہ از",
+    "exactLocation": "درست مقام",
+    "addressSearch": "بذریعہ پتہ",
+    "openInMaps": "نقشوں میں کھولیں",
+    "mapsUnavailable": "اس ڈیوائس پر کوئی نقشہ ایپ دستیاب نہیں۔",
+    "callHotel": "ہوٹل کو کال کریں",
+    "emailHotel": "ہوٹل کو ای میل کریں"
   },
   "jobs": {
     "none": "کوئی کھلی نوکری نہیں ملی۔",
@@ -415,7 +431,10 @@
     "position": "عہدہ",
     "pay": "اجرت",
     "offerBadge": "پیشکش",
-    "noLongerOpen": "یہ نوکری اب کھلی نہیں ہے۔"
+    "noLongerOpen": "یہ نوکری اب کھلی نہیں ہے۔",
+    "hotel": "ہوٹل",
+    "location": "مقام",
+    "description": "تفصیل"
   },
   "documents": {
     "title": "دستاویزات",
@@ -424,6 +443,7 @@
     "expiryPlaceholder": "میعاد ختم ہونے کی تاریخ (اختیاری، YYYY-MM-DD)",
     "expiryFormat": "میعاد کی تاریخ YYYY-MM-DD کی شکل میں ہونی چاہیے۔",
     "view": "دیکھیں",
+    "viewAll": "دستاویزات دیکھیں",
     "categoryGENERAL": "عمومی",
     "categoryWORK_PERMIT": "ورک پرمٹ",
     "upload": "اپ لوڈ",
@@ -449,7 +469,18 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "تصویر لیں",
+    "choosePhoto": "تصویر منتخب کریں",
+    "cameraPermissionDenied": "تصویر لینے کے لیے کیمرے تک رسائی درکار ہے۔ آپ اسے ترتیبات میں فعال کر سکتے ہیں۔",
+    "libraryPermissionDenied": "تصویر منتخب کرنے کے لیے تصاویر تک رسائی درکار ہے۔ آپ اسے ترتیبات میں فعال کر سکتے ہیں۔",
+    "replace": "تبدیل کریں",
+    "uploaded": "اپ لوڈ ہو گیا",
+    "required": "لازمی",
+    "previewUnavailable": "پیش نظارہ دستیاب نہیں",
+    "deleteConfirm": "کیا آپ واقعی یہ دستاویز ہٹانا چاہتے ہیں؟",
+    "missingRequired": "لازمی دستاویزات غائب ہیں",
+    "missingRequiredDesc": "براہ کرم درج ذیل غائب دستاویزات اپ لوڈ کریں:"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",
@@ -558,7 +589,18 @@
     "sendResetLink": "ری سیٹ لنک بھیجیں",
     "firstNameLastNameRequired": "پہلا اور آخری نام درکار ہیں۔",
     "phoneInvalid": "فون ایک درست بین الاقوامی نمبر ہونا چاہیے، مثلاً +49301234567۔",
-    "viewProfile": "پروفائل دیکھیں"
+    "viewProfile": "پروفائل دیکھیں",
+    "myDetails": "میری تفصیلات",
+    "identity": "شناخت",
+    "name": "نام",
+    "email": "ای میل",
+    "role": "کردار",
+    "employment": "ملازمت",
+    "employeeId": "ملازم آئی ڈی",
+    "jobTitle": "عہدہ",
+    "startDate": "آغاز کی تاریخ",
+    "employmentStatus": "حیثیت",
+    "reportingLine": "رپورٹنگ لائن"
   },
   "skills": {
     "CLEANER": "صفائی کارکن",
@@ -598,7 +640,10 @@
     "viewWeek": "ہفتہ",
     "viewMonth": "مہینہ",
     "sickOrVacation": "بیماری / چھٹی",
-    "yourMarkedDays": "آپ کے نشان زد دن"
+    "yourMarkedDays": "آپ کے نشان زد دن",
+    "viewmonth": "ماہ",
+    "viewweek": "ہفتہ",
+    "viewday": "دن"
   },
   "hotels": {
     "inThisGroup": "اس گروپ کے ہوٹل",
@@ -778,7 +823,11 @@
     "submitForReview": "جائزے کے لیے بھیجیں",
     "submitDisabledHint": "بھیجنے سے پہلے تمام مطلوبہ دستاویزات اپ لوڈ کریں۔",
     "noEmploymentRecord": "آپ کا ملازمت ریکارڈ ابھی تیار نہیں۔ براہِ کرم اپنے مینیجر سے رابطہ کریں۔",
-    "submittedForReview": "آپ کی درخواست جائزے کے لیے بھیج دی گئی ہے۔"
+    "submittedForReview": "آپ کی درخواست جائزے کے لیے بھیج دی گئی ہے۔",
+    "idOrPassport": "شناختی کارڈ یا پاسپورٹ",
+    "checklistTitle": "آپ کی دستاویزات",
+    "remainingCount": "{{count}} ابھی بھی درکار",
+    "allUploaded": "تمام دستاویزات اپ لوڈ ہو گئیں"
   },
   "analytics": {
     "myPerformance": "میری کارکردگی",
@@ -853,7 +902,15 @@
     "verificationNotesPlaceholder": "تصدیقی نوٹس (اختیاری)…",
     "verifiedMark": "تصدیق شدہ ✓",
     "verifiedBody": "حاضری کی تصدیق ہو گئی۔",
-    "verifyFailed": "تصدیق ناکام"
+    "verifyFailed": "تصدیق ناکام",
+    "checkedInAt": "چیک ان: {{time}}",
+    "statusPRESENT": "حاضر",
+    "statusABSENT": "غیر حاضر",
+    "statusLATE": "دیر سے",
+    "statusPARTIAL": "جزوی",
+    "statusEXCUSED": "معذور",
+    "statusEXPECTED": "متوقع",
+    "unknownWorker": "نامعلوم ورکر"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
@@ -944,7 +1001,9 @@
     "reworkNotesRequired": "بیان کریں کہ کیا دوبارہ کرنا ہے۔",
     "reworkAssigned": "دوبارہ کام تفویض کر دیا گیا۔ کارکن کو مطلع کر دیا گیا۔",
     "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
-    "reworkCompleted": "دوبارہ کام مکمل"
+    "reworkCompleted": "دوبارہ کام مکمل",
+    "reworkDone": "دوبارہ کام جمع کرایا گیا {{when}}",
+    "inspectedBy": "معائنہ کیا گیا از"
   },
   "ratings": {
     "comment": "تبصرہ",
@@ -967,7 +1026,14 @@
     "withdrawBody": "{{day}} کو مزید {{kind}} کے طور پر نشان زد نہیں کیا جائے گا۔ اس دن کے لیے منسوخ شدہ شفٹ خود بحال نہیں ہوتی۔",
     "withdrawA11y": "{{day}} کو {{kind}} واپس لیں",
     "markFailed": "غیر حاضری درج نہیں ہو سکی۔",
-    "withdrawFailed": "غیر حاضری واپس نہیں لی جا سکی۔"
+    "withdrawFailed": "غیر حاضری واپس نہیں لی جا سکی۔",
+    "daysSelected": "{{count}} دن منتخب",
+    "tapAgainForRange": "مدت منتخب کرنے کے لیے بعد کے دن پر ٹیپ کریں",
+    "reasonTitle": "چھٹی کی وجہ",
+    "reasonHint": "چھٹی کے لیے لازمی۔ طبی تفصیلات درج نہ کریں۔",
+    "reasonPlaceholder": "مثلاً خاندانی سفر، ذاتی دن",
+    "reasonRequired": "چھٹی کے لیے وجہ درکار ہے۔",
+    "reasonTooLong": "براہ کرم وجہ 500 حروف سے کم رکھیں۔"
   },
   "checklist": {
     "dust": "گرد",
@@ -1000,5 +1066,9 @@
     "yourWeek": "آپ کا ہفتہ",
     "viewAll": "سب دیکھیں",
     "documentsNeedAttention": "دستاویزات پر توجہ درکار ہے"
+  },
+  "marketplace": {
+    "description": "شفٹس جن کے لیے آپ درخواست دے سکتے ہیں۔",
+    "noneOpen": "فی الحال کوئی کھلی ملازمت نہیں۔"
   }
 }
