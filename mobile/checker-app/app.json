@@ -32,6 +32,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/with-metro-port",
       "expo-router",
       [
         "expo-splash-screen",

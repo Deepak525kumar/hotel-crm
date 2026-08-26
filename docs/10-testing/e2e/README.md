@@ -107,9 +107,13 @@ watches that same state.
 A second build-level trap, found from a real iOS build on 2026-08-26: both mobile apps defaulted to
 Expo's dev-server port 8081, and when worker-app's server holds it, `expo run:ios` in `checker-app`
 can skip starting a server and bake 8081 into the build — so a checker build serves worker-app's
-JavaScript. The apps look alike enough that this reads as a checker-app bug. `checker-app` now pins
-`--port 8082` in its `start`/`ios`/`android`/`web` scripts (`src/__tests__/dev-server-port.test.ts`
-guards it). **Before believing any mobile finding, confirm which app's bundle you are actually
+JavaScript. The apps look alike enough that this reads as a checker-app bug. `checker-app` now sets port 8082 in
+three places, because each start path bypasses the others: `--port` in its npm scripts,
+`RCT_METRO_PORT` in a committed `.env` (for `npx expo …` run directly), and a config plugin that
+writes the export into `ios/.xcode.env` on each prebuild (for builds started from Xcode, where the
+port is compiled into `RCTBundleURLProvider.mm` and no Expo CLI runs at all).
+`src/__tests__/dev-server-port.test.ts` guards all three. The first fix covered only the scripts and
+the failure came straight back. **Before believing any mobile finding, confirm which app's bundle you are actually
 running.**
 
 One caution from that run, about diagnosis rather than coverage: a jest-expo preset error blamed on
