@@ -239,7 +239,15 @@ export class EmployeeManagementService extends BaseService {
     // 1. Enforce jurisdiction
     const record = await this.prisma.employmentRecord.findUnique({ where: { employee_id: employeeId } });
     if (!record) throw new NotFoundError('Employment record not found');
-    await this.assertLifecycleAuthority(actor, record, 'update');
+    // 2026-08-26: was missing `allowUnassignedGroup: true` (present on
+    // submit-for-review just below). hotel_group_id stays null until
+    // approval (ADR-065 Decision 2), so isWorkerInGroupScope() can never
+    // succeed for a not-yet-approved applicant -- exactly the case
+    // WorkerOnboardingCard's skills row is deliberately shown for (a
+    // worker's first pass through onboarding). Editing skills for such an
+    // applicant 403'd every time; same bug class already fixed for
+    // contract-status/contract-download/documents completeness.
+    await this.assertLifecycleAuthority(actor, record, 'update', { allowUnassignedGroup: true });
 
     // 2. Validate skills if provided
     if (data.skills) {
