@@ -37,6 +37,14 @@ export default function RootLayout() {
     void hydrateLocale();
   }, [hydrateLocale]);
 
+  // Same reasoning for the stored light/dark choice: without this the app opens
+  // in the OS scheme and then snaps to the user's setting once storage resolves.
+  // It is also what flips `hydrated`, which gates hideAsync() below -- omitting
+  // it holds the splash screen open forever.
+  useEffect(() => {
+    void hydrateTheme();
+  }, [hydrateTheme]);
+
   // Once auth resolves, the stored preference (if any) wins over the cached
   // and device-negotiated guess. Runs whichever way auth settles: a signed-out
   // checker keeps their cached choice so the login screen is translated.
