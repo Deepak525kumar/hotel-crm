@@ -563,11 +563,6 @@ export const api = {
     // Not fixed in this PR — backend scope, affects web identically.
     upload: (
       workerId: string,
-      // `file` is present on WEB only (expo-document-picker exposes it "for
-      // parity with the web File API"); `uri` is the native path. Sending the
-      // {uri,name,type} shape on web does not produce a file part at all --
-      // there the uri is a base64 data URI and react-native-web's FormData
-      // appends the object itself. Prefer the real File when it exists.
       asset: { uri: string; name: string; mimeType?: string; file?: unknown },
       input: {
         category: DocumentCategory;
@@ -576,24 +571,53 @@ export const api = {
       }
     ) => {
       const form = new FormData();
-      // `instanceof Blob`, NOT a truthiness check. expo-document-picker can
-      // hand back a non-Blob `file` on native, and appending that made React
-      // Native's own FormData throw "Unsupported FormDataPart implementation"
-      // -- it accepts only a string or an object with a string `uri`. A
-      // truthy-but-wrong `file` therefore broke every native upload, which is
-      // worse than the web gap it was added to close.
+
+      // WHY THIS IS NOT THE {uri, name, type} SHAPE EVERY RN GUIDE SHOWS.
+      //
+      // Expo replaces the global `fetch` on native with its WinterCG
+      // implementation (expo/src/winter/runtime.native.ts:
+      // `install('fetch', () => require('./fetch').fetch)`). That fetch
+      // serialises multipart itself, and its converter
+      // (expo/src/winter/fetch/convertFormData.ts) accepts exactly three
+      // things per part:
+      //
+      //     a string | a Blob | an object with `bytes()`
+      //
+      // and throws `Unsupported FormDataPart implementation` on anything
+      // else. Its own doc comment is explicit: "`uri` is not supported for
+      // React Native's FormData."
+      //
+      // So RN's legacy {uri, name, type} part -- which React Native's OWN
+      // FormData still accepts -- fails under Expo's fetch, and every native
+      // document upload threw. The web client was unaffected because a
+      // browser sends a real File.
+      //
+      // expo-file-system's `File` satisfies the third branch: it exposes
+      // `bytes()` and a `name`, which is what the converter reads for the
+      // filename. Required lazily, never at module scope: a top-level import
+      // of an Expo module whose native half is absent throws during module
+      // evaluation and takes down every importer (the same failure that once
+      // presented as "Route is missing the required default export").
       if (typeof Blob !== 'undefined' && asset.file instanceof Blob) {
-        // Web: a real File/Blob, which FormData knows how to encode.
+        // Web: a real File/Blob, which FormData encodes directly.
         form.append('file', asset.file, asset.name);
       } else {
-        // Native: React Native's FormData takes {uri, name, type} (note
-        // `type`, not `mimeType` -- a documented divergence from the picker's
-        // own field name) and reads the file itself at send time.
-        form.append('file', {
-          uri: asset.uri,
-          name: asset.name,
-          type: asset.mimeType ?? 'application/octet-stream',
-        } as unknown as Blob);
+        let FileCtor: (new (uri: string) => unknown) | undefined;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          FileCtor = (require('expo-file-system') as { File: new (uri: string) => unknown }).File;
+        } catch {
+          FileCtor = undefined;
+        }
+        if (!FileCtor) {
+          throw new ApiError(
+            'NATIVE_MODULE_MISSING',
+            'This app build is missing a required component (expo-file-system). Please update or reinstall the app.',
+            0,
+            true,
+          );
+        }
+        form.append('file', new FileCtor(asset.uri) as unknown as Blob, asset.name);
       }
       form.append('category', input.category);
       form.append('original_filename', asset.name);

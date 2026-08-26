@@ -1,18 +1,19 @@
 /**
  * What `api.documents.upload` actually puts in the multipart body.
  *
- * Nothing tested this, which is how a truthiness check on `asset.file` shipped
- * and broke every NATIVE upload with React Native's own
+ * THE CONTRACT THIS ENFORCES. Expo replaces the global `fetch` on native with
+ * its WinterCG implementation, and that fetch serialises multipart itself.
+ * Its converter accepts exactly a string, a Blob, or an object with `bytes()`
+ * -- and throws `Unsupported FormDataPart implementation` on anything else.
+ * React Native's own legacy {uri, name, type} part is NOT accepted, which is
+ * why every native document upload failed while the web client worked.
  *
- *     Unsupported FormDataPart implementation
+ * Nothing asserted the body's contents before, which is how two separate
+ * broken parts shipped in a row: a truthy-but-non-Blob `file`, and then the
+ * {uri} shape that Expo's fetch never supported in the first place.
  *
- * RN's FormData accepts a string, or an object with a string `uri`, and
- * nothing else. expo-document-picker can hand back a `file` on native that is
- * neither, so preferring it whenever it was merely truthy produced a part RN
- * refused to encode. The web branch must be taken only for a genuine Blob.
- *
- * This drives the real module rather than restating its `if`: a test that
- * mirrors the branch would have passed against the broken code too.
+ * These drive the real module rather than restating its `if`: a test that
+ * mirrored the branch would have passed against both broken versions.
  */
 
 type Part = { name: string; value: unknown; filename?: string };
@@ -31,6 +32,10 @@ const ORIGINAL_FETCH = globalThis.fetch;
 function loadApiWithCapture() {
   jest.resetModules();
   (globalThis as { FormData?: unknown }).FormData = FakeFormData;
+
+  // expo-file-system is mapped to src/__mocks__/expo-file-system.ts by the
+  // `unit` project: its File exposes bytes(), which is exactly what Expo's
+  // fetch requires of a multipart part.
 
   const sent: { body?: FakeFormData } = {};
   (globalThis as { fetch?: unknown }).fetch = jest.fn(async (_url: string, options: RequestInit) => {
@@ -61,7 +66,7 @@ describe('documents.upload FormData part', () => {
     jest.resetModules();
   });
 
-  it('sends the {uri,name,type} shape on native — the only shape RN accepts', async () => {
+  it('sends a part Expo fetch can serialise on native, not the {uri} shape', async () => {
     const { api, sent } = loadApiWithCapture();
 
     await api.documents.upload(
@@ -70,14 +75,32 @@ describe('documents.upload FormData part', () => {
       { category: 'ID_CARD' },
     );
 
-    expect(filePart(sent.body).value).toEqual({
-      uri: 'file:///cache/id.pdf',
-      name: 'id.pdf',
-      type: 'application/pdf',
-    });
+    const value = filePart(sent.body).value as Record<string, unknown>;
+    // The exact rule from expo/src/winter/fetch/convertFormData.ts: a part
+    // must be a string, a Blob, or expose bytes(). A bare {uri} throws.
+    expect(typeof (value as { bytes?: unknown }).bytes).toBe('function');
   });
 
-  it('ignores a non-Blob `file` rather than handing RN a part it cannot encode', async () => {
+  it('never appends a bare {uri,name,type} object, which Expo fetch rejects', async () => {
+    const { api, sent } = loadApiWithCapture();
+
+    await api.documents.upload(
+      'worker-1',
+      { uri: 'file:///cache/id.pdf', name: 'id.pdf', mimeType: 'application/pdf' },
+      { category: 'ID_CARD' },
+    );
+
+    const value = filePart(sent.body).value as Record<string, unknown>;
+    const isBareUriObject =
+      typeof value === 'object' &&
+      value !== null &&
+      typeof value.uri === 'string' &&
+      typeof (value as { bytes?: unknown }).bytes !== 'function' &&
+      !(value instanceof Blob);
+    expect(isBareUriObject).toBe(false);
+  });
+
+  it('ignores a non-Blob `file` rather than trusting whatever the picker set', async () => {
     const { api, sent } = loadApiWithCapture();
 
     await api.documents.upload(
@@ -86,15 +109,13 @@ describe('documents.upload FormData part', () => {
         uri: 'file:///cache/id.pdf',
         name: 'id.pdf',
         mimeType: 'application/pdf',
-        // The regression: truthy, but not a Blob.
         file: { some: 'object' },
       },
       { category: 'ID_CARD' },
     );
 
     const value = filePart(sent.body).value as Record<string, unknown>;
-    expect(typeof value.uri).toBe('string');
-    expect(value.uri).toBe('file:///cache/id.pdf');
+    expect(typeof (value as { bytes?: unknown }).bytes).toBe('function');
   });
 
   it('uses a real Blob when there is one — the web case', async () => {

@@ -8,6 +8,24 @@ import {
   getAccessToken,
 } from '@/lib/api';
 
+/**
+ * React Native's FormData, which is what the app actually appends to on a
+ * device. It accepts any part -- serialisation is the fetch layer's problem,
+ * and on this stack that layer is Expo's WinterCG fetch (see src/__mocks__/expo-file-system.ts).
+ *
+ * jsdom's spec-compliant FormData is installed by this jest project and
+ * rejects parameter 2 unless it is a Blob, so without this the suite would be
+ * asserting against a runtime the worker app never has, and would fail on the
+ * very part shape that is correct on native.
+ */
+class RNFormData {
+  parts: [string, unknown, string?][] = [];
+  append(name: string, value: unknown, filename?: string) {
+    this.parts.push([name, value, filename]);
+  }
+}
+globalThis.FormData = RNFormData as unknown as typeof globalThis.FormData;
+
 const mockFetch = jest.fn();
 globalThis.fetch = mockFetch as typeof globalThis.fetch;
 
@@ -455,7 +473,7 @@ describe('request — FormData body', () => {
 // ---------------------------------------------------------------------------
 
 describe('documents.upload', () => {
-  it('maps the picker asset (uri/name/mimeType) onto the file part as {uri, name, type}', async () => {
+  it('sends a file part Expo fetch can serialise, under the field name multer expects', async () => {
     mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
     const appendSpy = jest.spyOn(FormData.prototype, 'append');
 
@@ -465,23 +483,22 @@ describe('documents.upload', () => {
       { category: 'ID_CARD' },
     );
 
-    // The field key that carries the actual file must be named "file" (the
-    // backend's multer middleware is `upload.single('file')`), and its value
-    // must remap the picker's `mimeType` field to `type` — a documented
-    // divergence from expo-document-picker's own asset shape, easy to get
-    // silently wrong if either field is ever renamed.
+    // This case previously asserted the part was `{uri, name, type}` -- React
+    // Native's legacy shape. That contract was WRONG on this stack and the
+    // assertion locked the bug in: Expo replaces the global fetch on native
+    // with its WinterCG implementation, whose converter accepts only a
+    // string, a Blob, or an object exposing bytes(), and throws
+    // "Unsupported FormDataPart implementation" on a bare {uri}. Every native
+    // upload failed. The field name is still asserted -- the backend's multer
+    // middleware is `upload.single('file')`.
     const fileCall = appendSpy.mock.calls.find(([field]) => field === 'file');
     expect(fileCall).toBeDefined();
-    expect(fileCall?.[1]).toMatchObject({
-      uri: 'file:///doc.pdf',
-      name: 'passport.pdf',
-      type: 'application/pdf',
-    });
+    expect(typeof (fileCall?.[1] as { bytes?: unknown })?.bytes).toBe('function');
 
     appendSpy.mockRestore();
   });
 
-  it('falls back to application/octet-stream when the picker returns no mimeType', async () => {
+  it('falls back to application/octet-stream in the mime_type field when the picker returns none', async () => {
     mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
     const appendSpy = jest.spyOn(FormData.prototype, 'append');
 
@@ -491,8 +508,12 @@ describe('documents.upload', () => {
       { category: 'ID_CARD' },
     );
 
-    const fileCall = appendSpy.mock.calls.find(([field]) => field === 'file');
-    expect(fileCall?.[1]).toMatchObject({ type: 'application/octet-stream' });
+    // Asserted on the FIELD, not the file part: `mime_type` is what the
+    // server's z.enum(ALLOWED_MIME_TYPES) validates. (It rejects
+    // application/octet-stream -- which is why useDocumentUpload resolves a
+    // real type from the filename before it ever gets here.)
+    const fields = Object.fromEntries(appendSpy.mock.calls.map(([k, v]) => [k, v]));
+    expect(fields['mime_type']).toBe('application/octet-stream');
 
     appendSpy.mockRestore();
   });
