@@ -33,6 +33,14 @@ yarn-error.*
 # local env files
 .env*.local
 
+# ...but this app's `.env` IS committed: it holds no secrets, only
+# RCT_METRO_PORT=8082, which keeps a checker build off worker-app's dev server
+# (see README, "Dev server port"). The repository root .gitignore excludes
+# `.env` everywhere, and a negation in a nested .gitignore is what overrides it.
+# Real local configuration still belongs in `.env.local`, which stays ignored
+# above and takes precedence over `.env` at load time.
+!.env
+
 # typescript
 *.tsbuildinfo
 
