@@ -44,6 +44,7 @@ const unit = {
     '^expo-secure-store$': '<rootDir>/src/__mocks__/expo-secure-store.ts',
     '^react-native$': '<rootDir>/src/__mocks__/react-native.ts',
     '^expo-constants$': '<rootDir>/src/__mocks__/expo-constants.ts',
+    '^expo-file-system$': '<rootDir>/src/__mocks__/expo-file-system.ts',
   },
   transformIgnorePatterns: [
     'node_modules/(?!(jest-)?react-native|@react-native(-community)?|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg)',
