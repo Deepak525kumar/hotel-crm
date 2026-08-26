@@ -1,4 +1,4 @@
-import { isoDateInCalendarTimezone, formatDay, datesInRange, weekOf, addDays } from '@/lib/calendar-dates';
+import { isoDateInCalendarTimezone, formatDay, datesInRange, weekOf, addDays, calendarDateOf } from '@/lib/calendar-dates';
 
 /**
  * GD-18 narrow slice (OD-CAL-04): the mobile "today"/"tomorrow" quick-mark
@@ -86,5 +86,25 @@ describe('addDays', () => {
   it('moves forward and backward across a month boundary', () => {
     expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
     expect(addDays('2026-09-01', -1)).toBe('2026-08-31');
+  });
+});
+
+describe('calendarDateOf', () => {
+  // Regression: attendance took `check_in_at.slice(0, 10)`, i.e. the UTC date.
+  // From ~22:00 Berlin onward that is the previous day, so a shift checked
+  // into just after midnight local displayed as yesterday.
+  it('uses the Berlin day, not the UTC day, late in the evening', () => {
+    // 2026-08-26T22:30Z is 2026-08-27 00:30 in Berlin (CEST, UTC+2).
+    expect(calendarDateOf('2026-08-26T22:30:00.000Z')).toBe('2026-08-27');
+  });
+
+  it('agrees with the UTC date during the middle of the day', () => {
+    expect(calendarDateOf('2026-08-26T09:00:00.000Z')).toBe('2026-08-26');
+  });
+
+  // Winter is UTC+1, so the boundary moves by an hour.
+  it('handles the winter offset', () => {
+    expect(calendarDateOf('2026-01-15T23:30:00.000Z')).toBe('2026-01-16');
+    expect(calendarDateOf('2026-01-15T22:30:00.000Z')).toBe('2026-01-15');
   });
 });

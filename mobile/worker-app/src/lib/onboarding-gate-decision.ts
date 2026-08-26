@@ -77,3 +77,22 @@ export function isGateOwnedRoute(pathname: string): boolean {
   const gateRoutes = [ONBOARDING_ROUTE, '/consent'];
   return gateRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
+
+/**
+ * Whether a user sitting on the onboarding screen should be sent into the app.
+ *
+ * The mirror of `shouldGateOnboarding`, and the half that was missing: the gate
+ * only ever pushed gated users TOWARD onboarding, so anyone who arrived there
+ * without being gated had no way off it. That is what made the cross-account
+ * `returnTo` bug survive until the app was reloaded.
+ *
+ * Also covers a worker whose record turns ACTIVE while they sit on the screen.
+ */
+export function shouldLeaveOnboarding(args: {
+  status: string | null | undefined;
+  role: string | null | undefined;
+  pathname: string;
+}): boolean {
+  if (args.pathname !== ONBOARDING_ROUTE) return false;
+  return !shouldGateOnboarding({ status: args.status, role: args.role });
+}

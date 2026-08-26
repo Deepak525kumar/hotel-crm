@@ -11,7 +11,8 @@ import {
   normalizeAbsenceReason,
   validateAbsenceReason,
 } from '@/lib/absence-reason';
-import { isoDateInCalendarTimezone, formatDay, weekOf, datesInRange } from '@/lib/calendar-dates';
+import { isoDateInCalendarTimezone, formatDay, weekOf } from '@/lib/calendar-dates';
+import { resolveDaySelection, selectedDays as daysOf } from '@/lib/absence-selection';
 import { Radius, Spacing } from '@/constants/theme';
 import { Badge, BadgeTone, Button, Card, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
@@ -99,20 +100,27 @@ export default function CalendarScreen() {
   const [rangeStart, setRangeStart] = useState<string | null>(null);
   const [rangeEnd, setRangeEnd] = useState<string | null>(null);
 
-  // First tap picks a day; a second tap on a LATER day extends it to a range.
-  // Anything else restarts the selection.
+  // Rules (past days, range extension, length cap) live in absence-selection
+  // so they are testable; this only applies the result. A tap that resolves to
+  // an unchanged selection was rejected -- a past day -- and must not move
+  // `selected` either, or the header would name a day that cannot be marked.
   const onDayPress = useCallback(
     (day: string) => {
-      const extending = rangeStart !== null && rangeEnd === null && day > rangeStart;
-      setRangeStart(extending ? rangeStart : day);
-      setRangeEnd(extending ? day : null);
-      setSelected(day);
+      const next = resolveDaySelection({
+        current: { start: rangeStart, end: rangeEnd },
+        tapped: day,
+        today: isoDateInCalendarTimezone(0),
+      });
+      if (next.start === rangeStart && next.end === rangeEnd) return;
+      setRangeStart(next.start);
+      setRangeEnd(next.end);
+      setSelected(next.start ?? day);
     },
     [rangeStart, rangeEnd],
   );
 
   const selectedDays = useMemo(
-    () => (rangeStart && rangeEnd ? datesInRange(rangeStart, rangeEnd) : [selected]),
+    () => daysOf({ start: rangeStart, end: rangeEnd }, selected),
     [rangeStart, rangeEnd, selected],
   );
 
@@ -296,6 +304,9 @@ export default function CalendarScreen() {
             current={selected}
             onDayPress={(d: { dateString: string }) => onDayPress(d.dateString)}
             markedDates={markedDates}
+            // Affordance to match the rule: a past day cannot be marked, so it
+            // should not look tappable either.
+            minDate={isoDateInCalendarTimezone(0)}
             markingType="period"
             firstDay={1}
             theme={calendarTheme}
@@ -304,13 +315,16 @@ export default function CalendarScreen() {
           <View style={styles.weekStrip}>
             {weekOf(selected).map((day) => {
               const isSelected = day === selected;
+              // Past days cannot be marked, so they must not look tappable.
+              const isPast = day < isoDateInCalendarTimezone(0);
               return (
                 <Pressable
                   key={day}
                   onPress={() => onDayPress(day)}
+                  disabled={isPast}
                   style={[
                     styles.weekCell,
-                    { backgroundColor: isSelected ? theme.primary : 'transparent' },
+                    { backgroundColor: isSelected ? theme.primary : 'transparent', opacity: isPast ? 0.35 : 1 },
                   ]}
                 >
                   <ThemedText type="small" style={isSelected ? { color: theme.onPrimary } : undefined}>

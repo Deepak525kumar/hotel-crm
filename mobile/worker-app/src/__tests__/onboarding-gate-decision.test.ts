@@ -3,6 +3,7 @@ import {
   isRouteAllowedWhileGated,
   isGateOwnedRoute,
   ONBOARDING_ROUTE,
+  shouldLeaveOnboarding,
 } from '@/lib/onboarding-gate-decision';
 
 describe('shouldGateOnboarding', () => {
@@ -71,5 +72,38 @@ describe('isGateOwnedRoute', () => {
 
   it('matches nested routes under a gate destination', () => {
     expect(isGateOwnedRoute('/onboarding/step-2')).toBe(true);
+  });
+});
+
+describe('shouldLeaveOnboarding', () => {
+  it('sends an ACTIVE worker off the onboarding screen', () => {
+    expect(shouldLeaveOnboarding({ status: 'ACTIVE', role: 'worker', pathname: '/onboarding' })).toBe(true);
+  });
+
+  it('leaves a PENDING worker where they belong', () => {
+    expect(shouldLeaveOnboarding({ status: 'PENDING', role: 'worker', pathname: '/onboarding' })).toBe(false);
+  });
+
+  // Mutually exclusive with shouldGateOnboarding by construction -- if both
+  // could be true for one state, AuthGuard would ping-pong between routes.
+  it('is never true at the same time as shouldGateOnboarding', () => {
+    for (const status of ['ACTIVE', 'PENDING', 'REJECTED', 'DEACTIVATED', 'DELETED', null, undefined, '']) {
+      for (const role of ['worker', 'admin']) {
+        const gate = shouldGateOnboarding({ status, role });
+        const leave = shouldLeaveOnboarding({ status, role, pathname: '/onboarding' });
+        expect(gate && leave).toBe(false);
+      }
+    }
+  });
+
+  it('does nothing on any other route', () => {
+    expect(shouldLeaveOnboarding({ status: 'ACTIVE', role: 'worker', pathname: '/shifts' })).toBe(false);
+    expect(shouldLeaveOnboarding({ status: 'ACTIVE', role: 'worker', pathname: '/onboarding-summary' })).toBe(false);
+  });
+
+  // Unknown status fails open in shouldGateOnboarding, so it must also mean
+  // "not gated" here -- otherwise a transient missing field strands the user.
+  it('treats an unknown status as not gated', () => {
+    expect(shouldLeaveOnboarding({ status: undefined, role: 'worker', pathname: '/onboarding' })).toBe(true);
   });
 });

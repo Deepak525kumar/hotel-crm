@@ -50,6 +50,10 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
   const [deciding, setDeciding] = useState<'GRANTED' | 'DECLINED' | null>(null);
   // Which calendar day the current `status` was read on, for the rollover check.
   const dayRef = useRef(new Date().toDateString());
+  // Whose consent `status` describes. The bypass check below runs BEFORE the
+  // loading branch, so a cached `granted` from the previous account would let
+  // the next worker straight into the app for the duration of the refetch.
+  const statusUserRef = useRef<string | null>(user?.id ?? null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -102,6 +106,15 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
     if (!user || isAdmin) {
       setLoading(false);
       return;
+    }
+    // Drop the previous account's answer before asking about this one. Only on
+    // a user CHANGE -- clearing it on every silent recheck would flash the
+    // wall at a worker whose consent is perfectly valid.
+    if (statusUserRef.current !== user.id) {
+      statusUserRef.current = user.id;
+      setStatus(null);
+      setNotice(null);
+      setStatusUnknown(false);
     }
     void load();
   }, [user, isAdmin, load, consentRevision]);

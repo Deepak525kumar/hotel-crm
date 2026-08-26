@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { api } from '@/lib/api';
 import { ALLOWED_MIME_TYPES, validatePickedAsset } from '@/lib/document-validation';
+import { resolvePickedPhoto } from '@/lib/picked-photo';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { translateApiError } from '../lib/api-error-i18n';
 
@@ -84,10 +85,16 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
 
       const options: ImagePicker.ImagePickerOptions = {
         mediaTypes: ['images'],
-        // Transcode to JPEG. Without this an iOS pick stays HEIC and the
-        // server refuses it.
         allowsEditing: false,
         quality: 0.8,
+        // The whole point of this path. `Automatic` (the default) lets the
+        // system hand back the original representation, which on an iPhone is
+        // HEIC -- a type the frozen upload policy does not allow.
+        // `Compatible` asks for the most compatible representation, i.e. JPEG.
+        // iOS 14+ only, which is why resolvePickedPhoto still checks the type
+        // it actually received rather than trusting this.
+        preferredAssetRepresentationMode:
+          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
       };
       const result =
         source === 'camera'
@@ -98,17 +105,24 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
       const asset = result.assets[0];
       if (!asset) return;
 
-      // The picker reports the ORIGINAL asset's mimeType on some platforms
-      // even after transcoding, so trust the transcode and normalise rather
-      // than validating a type that no longer describes the bytes.
-      const name = asset.fileName?.replace(/\.(heic|heif)$/i, '.jpg') ?? 'photo.jpg';
+      const resolution = resolvePickedPhoto({ mimeType: asset.mimeType, fileName: asset.fileName });
+      if (!resolution.ok) {
+        setError(t(resolution.errorKey));
+        return;
+      }
+
       const sizeError = validatePickedAsset({ size: asset.fileSize });
       if (sizeError) {
         setError(t(sizeError));
         return;
       }
 
-      setPending({ uri: asset.uri, name, mimeType: 'image/jpeg', size: asset.fileSize });
+      setPending({
+        uri: asset.uri,
+        name: resolution.name,
+        mimeType: resolution.mimeType,
+        size: asset.fileSize,
+      });
     },
     [t],
   );

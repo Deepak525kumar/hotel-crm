@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +7,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import { openDocument } from './open-document';
+import { shouldAutoUpload } from '@/lib/auto-upload-decision';
 import type { ChecklistEntry } from '@/lib/onboarding-checklist';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 
@@ -42,8 +43,21 @@ export function DocumentChecklistRow({
 
   // Upload as soon as something is picked: the row already knows the category,
   // so there is nothing left to ask.
+  //
+  // Attempted-once, tracked by ref, because a failed upload leaves `pending`
+  // set and flips `uploading` back to false -- which is exactly the state this
+  // effect fires on. Without the guard a rejected file (too large, wrong type,
+  // offline) retries as fast as the network allows, forever, from every
+  // affected device. Retrying is the explicit button below instead.
+  const attemptedUri = useRef<string | null>(null);
   useEffect(() => {
-    if (pending && !uploading) void upload({ category });
+    if (!pending) {
+      attemptedUri.current = null;
+      return;
+    }
+    if (!shouldAutoUpload({ pendingUri: pending.uri, uploading, attemptedUri: attemptedUri.current })) return;
+    attemptedUri.current = pending.uri;
+    void upload({ category });
   }, [pending, uploading, category, upload]);
 
   return (
@@ -122,11 +136,21 @@ export function DocumentChecklistRow({
           </View>
 
           {error ? (
-            <Pressable onPress={clearPending}>
+            <View style={styles.error}>
               <ThemedText type="small" style={{ color: theme.danger }}>
                 {error}
               </ThemedText>
-            </Pressable>
+              <View style={styles.buttons}>
+                {pending ? (
+                  <Pressable onPress={() => void upload({ category })} style={styles.action}>
+                    <ThemedText type="smallBold">{t('documents.retryUpload')}</ThemedText>
+                  </Pressable>
+                ) : null}
+                <Pressable onPress={clearPending} style={styles.action}>
+                  <ThemedText type="small" themeColor="textSecondary">{t('common.cancel')}</ThemedText>
+                </Pressable>
+              </View>
+            </View>
           ) : null}
         </View>
       ) : null}
@@ -145,4 +169,5 @@ const styles = StyleSheet.create({
   choice: { borderWidth: 1, borderRadius: Spacing.two, paddingVertical: 6, paddingHorizontal: Spacing.two },
   buttons: { flexDirection: 'row', gap: Spacing.two, flexWrap: 'wrap' },
   action: { paddingVertical: 6 },
+  error: { gap: Spacing.one },
 });

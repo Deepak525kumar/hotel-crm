@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppState, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { SymbolView } from 'expo-symbols';
@@ -8,27 +8,17 @@ import { ThemedText } from '@/components/themed-text';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotificationStore } from '@/stores/notification-store';
 
-const POLL_MS = 60_000;
-
 /** Bell with an unread badge, for a screen header. */
 export function NotificationBell() {
   const router = useRouter();
   const theme = useTheme();
   const { t } = useTranslation();
   const unread = useNotificationStore((s) => s.unread);
-  const refresh = useNotificationStore((s) => s.refresh);
+  const subscribe = useNotificationStore((s) => s.subscribe);
 
-  useEffect(() => {
-    void refresh();
-    const id = setInterval(() => void refresh(), POLL_MS);
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void refresh();
-    });
-    return () => {
-      clearInterval(id);
-      sub.remove();
-    };
-  }, [refresh]);
+  // Ref-counted in the store: several bells are mounted at once (Expo Router
+  // keeps visited tabs alive), but only one timer runs.
+  useEffect(() => subscribe(), [subscribe]);
 
   return (
     <Pressable

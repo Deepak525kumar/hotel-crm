@@ -5,6 +5,7 @@ import {
   shouldGateOnboarding,
   isRouteAllowedWhileGated,
   isGateOwnedRoute,
+  shouldLeaveOnboarding,
   ONBOARDING_ROUTE,
 } from '@/lib/onboarding-gate-decision';
 
@@ -56,8 +57,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       // covers a worker whose record turns ACTIVE while they sit on the
       // screen -- they are let into the app instead of stranded on it.
       user &&
-      !shouldGateOnboarding({ status: user.employment_status, role: user.role }) &&
-      pathname === ONBOARDING_ROUTE
+      shouldLeaveOnboarding({ status: user.employment_status, role: user.role, pathname })
     ) {
       router.replace('/(app)');
     }

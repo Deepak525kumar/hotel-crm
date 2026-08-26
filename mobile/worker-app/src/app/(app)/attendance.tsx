@@ -9,7 +9,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { Badge, Card, EmptyState, ScreenHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
-import { formatDay } from '@/lib/calendar-dates';
+import { calendarDateOf, calendarTimeOf, formatDay } from '@/lib/calendar-dates';
 import { formatDuration, workedMinutes } from '@/lib/attendance-format';
 import type { Attendance, AttendanceStatus } from '@/types/api';
 
@@ -32,7 +32,7 @@ const STATUS_TONE: Record<AttendanceStatus, 'success' | 'danger' | 'warning' | '
  * shift's hours had nothing to point at.
  */
 function time(iso?: string | null): string {
-  return iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+  return iso ? calendarTimeOf(iso) : '—';
 }
 
 export default function AttendanceScreen() {
@@ -83,7 +83,7 @@ export default function AttendanceScreen() {
                 <Card>
                   <View style={styles.row}>
                     <ThemedText type="smallBold">
-                      {item.check_in_at ? formatDay(item.check_in_at.slice(0, 10)) : '—'}
+                      {item.check_in_at ? formatDay(calendarDateOf(item.check_in_at)) : '—'}
                     </ThemedText>
                     <Badge
                       label={t(`attendance.status${item.status}`, item.status)}
