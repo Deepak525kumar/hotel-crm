@@ -699,6 +699,8 @@
     "broadcastsLoadFailed": "Failed to load broadcasts. Please try again.",
     "skillsNeeded": "Skills needed",
     "addSkill": "Add skill",
+    "noSkillOption": "No specific skill required",
+    "anySkill": "Any skill",
     "raiseBroadcastAction": "Raise broadcast",
     "slotClaimedByOther": "Someone else claimed this slot just before you — no shift was assigned."
   },

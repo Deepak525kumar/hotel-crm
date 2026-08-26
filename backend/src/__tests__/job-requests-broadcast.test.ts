@@ -241,6 +241,70 @@ describe('JobRequestService.raiseBroadcast', () => {
     expect(dto.skill_slots?.map((s) => s.skill)).toEqual(['CLEANER', 'WAITER']);
   });
 
+  // 2026-08-26 (reported live: "There should also be an option for none").
+  // RaiseBroadcastSchema accepts skill: null on a skill line, persisted as a
+  // JobRequestSkillSlot row with a null skill column (2026-08-26 migration).
+  it('persists a "no specific skill required" (null skill) line', async () => {
+    const noSkillInput = {
+      ...baseBroadcastInput,
+      skills: [{ skill: null, headcount: 3 }],
+    };
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(
+      makeJobRequestRow({
+        workers_needed: 3,
+        skill_slots: [makeSkillSlotRow({ skill: null, headcount: 3 })],
+      })
+    );
+
+    const dto = await service.raiseBroadcast(noSkillInput as never, { userId: 'mgr1', role: 'admin' });
+
+    expect(mockJobRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          skill_slots: { create: [{ skill: null, headcount: 3 }] },
+        }),
+      })
+    );
+    expect(dto.skill_slots).toEqual([{ id: 'slot1', skill: null, headcount: 3, confirmed_count: 0 }]);
+  });
+
+  it('persists a broadcast mixing a real skill line with a "no specific skill required" line', async () => {
+    const mixedInput = {
+      ...baseBroadcastInput,
+      skills: [
+        { skill: 'CLEANER' as const, headcount: 2 },
+        { skill: null, headcount: 1 },
+      ],
+    };
+    mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
+    mockJobRequest.create.mockResolvedValue(
+      makeJobRequestRow({
+        workers_needed: 3,
+        skill_slots: [
+          makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 2 }),
+          makeSkillSlotRow({ id: 'slot2', skill: null, headcount: 1 }),
+        ],
+      })
+    );
+
+    const dto = await service.raiseBroadcast(mixedInput as never, { userId: 'mgr1', role: 'admin' });
+
+    expect(mockJobRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          skill_slots: {
+            create: [
+              { skill: 'CLEANER', headcount: 2 },
+              { skill: null, headcount: 1 },
+            ],
+          },
+        }),
+      })
+    );
+    expect(dto.skill_slots?.map((s) => s.skill)).toEqual(['CLEANER', null]);
+  });
+
   it('publishes immediately (status OPEN, published_at set) — a broadcast has no DRAFT step', async () => {
     mockHotel.findUnique.mockResolvedValue({ id: 'h1', deleted_at: null, accepting_jobs: true });
     mockJobRequest.create.mockResolvedValue(makeJobRequestRow());
@@ -398,6 +462,72 @@ describe('JobRequestService.raiseBroadcast', () => {
         expect.objectContaining({
           data: expect.objectContaining({ source_module: 'WORK_REQUESTS', transport: 'PUSH' }),
         })
+      );
+    });
+
+    // 2026-08-26 (reported live: "when no skill is selected the request
+    // should go to all the workers that are in scope"). skill: null means
+    // "no specific skill required" -- unlike a real-skill slot, EVERY free
+    // roster worker is eligible, including one holding no skills at all.
+    it('notifies every free roster worker for a "no specific skill required" (null) slot, regardless of their own skills', async () => {
+      const noSkillInput = {
+        ...baseBroadcastInput,
+        skills: [{ skill: null, headcount: 3 }],
+      };
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(
+        makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 3 })] })
+      );
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }, { user_id: 'w3' }])
+        // w1 holds a skill, w2 holds a different one, w3 holds none at all —
+        // none of that should matter for a null slot.
+        .mockResolvedValueOnce([
+          { user_id: 'w1', skills: ['CLEANER'] },
+          { user_id: 'w2', skills: ['WAITER'] },
+          { user_id: 'w3', skills: [] },
+        ]);
+      mockWorkerAssignment.findMany.mockResolvedValue([]); // all free
+
+      await service.raiseBroadcast(noSkillInput as never, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).toHaveBeenCalledTimes(3);
+      const notifiedWorkers = mockNotification.create.mock.calls.map((call: any) => call[0].data.user_id);
+      expect(notifiedWorkers.sort()).toEqual(['w1', 'w2', 'w3']);
+    });
+
+    it('excludes a worker who is busy or absent from a null-skill slot too', async () => {
+      const noSkillInput = {
+        ...baseBroadcastInput,
+        skills: [{ skill: null, headcount: 3 }],
+      };
+      mockHotel.findUnique.mockResolvedValue({
+        id: 'h1',
+        deleted_at: null,
+        accepting_jobs: true,
+        hotel_group_id: 'g1',
+      });
+      mockJobRequest.create.mockResolvedValue(
+        makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 3 })] })
+      );
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+        .mockResolvedValueOnce([
+          { user_id: 'w1', skills: [] },
+          { user_id: 'w2', skills: [] },
+        ]);
+      mockWorkerAssignment.findMany.mockResolvedValue([{ worker_id: 'w1' }]); // w1 busy
+
+      await service.raiseBroadcast(noSkillInput as never, { userId: 'mgr1', role: 'admin' });
+
+      expect(mockNotification.create).toHaveBeenCalledTimes(1);
+      expect(mockNotification.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ user_id: 'w2' }) })
       );
     });
 
@@ -642,6 +772,51 @@ describe('JobRequestService.getBroadcastEligibility', () => {
 
     expect(dto.slots[0].eligible_count).toBe(0);
     expect(mockEmploymentRecord.findMany).not.toHaveBeenCalled();
+  });
+
+  // 2026-08-26: a null-skill slot's eligible set is every free roster
+  // worker — no skills.includes() filter applies at all.
+  it('includes every free roster worker (regardless of skills) for a "no specific skill required" (null) slot', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 3 })] })
+    );
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: [] },
+      ]);
+    mockWorkerAssignment.findMany.mockResolvedValue([]);
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots[0].skill).toBeNull();
+    expect(dto.slots[0].eligible_count).toBe(2);
+  });
+
+  it('computes independent eligible sets for a real-skill slot and a null-skill slot on the same broadcast', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({
+        skill_slots: [
+          makeSkillSlotRow({ id: 'slot1', skill: 'CLEANER', headcount: 1 }),
+          makeSkillSlotRow({ id: 'slot2', skill: null, headcount: 1 }),
+        ],
+      })
+    );
+    mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+    mockEmploymentRecord.findMany
+      .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+      .mockResolvedValueOnce([
+        { user_id: 'w1', skills: ['CLEANER'] },
+        { user_id: 'w2', skills: [] },
+      ]);
+    mockWorkerAssignment.findMany.mockResolvedValue([]);
+
+    const dto = await service.getBroadcastEligibility('jr1', { userId: 'mgr1', role: 'admin' });
+
+    expect(dto.slots.find((s) => s.skill === 'CLEANER')?.eligible_count).toBe(1);
+    expect(dto.slots.find((s) => s.skill === null)?.eligible_count).toBe(2);
   });
 
   it('calendar placement never triggers a broadcast (negative assertion, TRULE-002)', async () => {

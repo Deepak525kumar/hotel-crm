@@ -1070,7 +1070,7 @@ export const employeesApi = {
   update: (employeeId: string, data: Partial<{ job_title: string; employment_type: string; skills: string[] }>) =>
     apiFetch(`/employees/${employeeId}`, {
       method: "PATCH",
-      body: JSON.stringify(data),
+      body: data,
     }),
 
   /** Resolves a user's EmploymentRecord, or `null` if none exists yet (not a 404). Any role holding `employees:read` may call this; per-record visibility (self / group-scope / admin) is enforced service-side. */

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useBroadcasts } from "@/hooks/useWorkRequests";
 import { useHotel } from "@/hooks/useHotels";
+import { skillSlotLabel } from "@/lib/skills";
 import { JobDispatchPhase2WriteGate } from "@/components/auth/RoleGate";
 import { WorkRequestStatusBadge } from "@/components/work-requests/StatusBadge";
 import {
@@ -30,6 +31,7 @@ const PER_PAGE = 20;
 const COLUMNS = 5;
 
 function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
+  const { t } = useTranslation();
   const { data: hotel } = useHotel(wr.hotel_id);
 
   return (
@@ -45,7 +47,7 @@ function BroadcastRow({ broadcast: wr }: { broadcast: WorkRequest }) {
       </TD>
       <TD>
         {(wr.skill_slots ?? [])
-          .map((s) => `${s.confirmed_count}/${s.headcount} ${s.skill}`)
+          .map((s) => `${s.confirmed_count}/${s.headcount} ${skillSlotLabel(t, s.skill)}`)
           .join(", ")}
       </TD>
       <TD>

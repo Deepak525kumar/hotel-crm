@@ -71,7 +71,7 @@ function OfferCard({ item, onPress }: { item: Broadcast; onPress: () => void }) 
         )}
         {(item.skill_slots ?? []).map((slot) => (
           <ThemedText key={slot.id} type="small" themeColor="textSecondary">
-            {SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}: {slot.confirmed_count}/{slot.headcount}
+            {slot.skill === null ? t('requests.anySkill') : SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}: {slot.confirmed_count}/{slot.headcount}
           </ThemedText>
         ))}
       </ThemedView>
