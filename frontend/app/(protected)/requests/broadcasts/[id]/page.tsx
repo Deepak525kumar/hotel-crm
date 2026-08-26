@@ -1,6 +1,6 @@
 "use client";
 
-import { SKILL_LABEL_KEY } from "@/lib/skills";
+import { skillSlotLabel } from "@/lib/skills";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useWorkRequest, useBroadcastEligibility } from "@/hooks/useWorkRequests";
@@ -32,6 +32,9 @@ import {
   TextLink,
 } from "@/components/ui";
 import { BackLink } from "@/components/ui/BackLink";
+
+/** useAsyncAction's `key` must be a string; a null (no-skill-required) slot uses this sentinel instead. */
+const ANY_SKILL_KEY = "__ANY_SKILL__";
 
 export default function BroadcastDetailPage() {
   const { t } = useTranslation();
@@ -70,9 +73,9 @@ export default function BroadcastDetailPage() {
       errorMessage: "Failed to close this broadcast. Please try again.",
     });
 
-  const onAccept = (skill: SkillTag) =>
+  const onAccept = (skill: SkillTag | null) =>
     accept.run(() => workRequestsApi.acceptBroadcast(id, { skill }), {
-      key: skill,
+      key: skill ?? ANY_SKILL_KEY,
       onSuccess: (result) => {
         setAcceptResult(result);
         // Re-fetch both the request (confirmed_count moved) and this
@@ -227,7 +230,7 @@ export default function BroadcastDetailPage() {
                 >
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {t(SKILL_LABEL_KEY[slot.skill] ?? "") || slot.skill}
+                      {skillSlotLabel(t, slot.skill)}
                     </p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {slot.confirmed_count}/{slot.headcount} confirmed
@@ -243,7 +246,7 @@ export default function BroadcastDetailPage() {
                       size="sm"
                       className="shrink-0"
                       onClick={() => onAccept(slot.skill)}
-                      loading={accept.isPending(slot.skill)}
+                      loading={accept.isPending(slot.skill ?? ANY_SKILL_KEY)}
                       disabled={accept.pending}
                     >
                       {t("requests.acceptAction")}
@@ -263,7 +266,7 @@ export default function BroadcastDetailPage() {
               <>
                 <Badge tone="success">{t("status.confirmed")}</Badge>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  You&rsquo;re confirmed for this shift ({t(SKILL_LABEL_KEY[acceptResult.skill] ?? "") || acceptResult.skill}).
+                  You&rsquo;re confirmed for this shift ({skillSlotLabel(t, acceptResult.skill)}).
                 </p>
               </>
             ) : (

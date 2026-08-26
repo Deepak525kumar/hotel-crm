@@ -81,7 +81,8 @@
     "loadFailed": "Failed to load",
     "tomorrow": "Tomorrow",
     "getDirections": "Get Directions",
-    "success": "Success"
+    "success": "Success",
+    "send": "Send"
   },
   "fields": {
     "name": "Name",
@@ -321,7 +322,14 @@
     "localDevBuild": "Local development build",
     "pageDescription": "Your account, session and app preferences.",
     "signedInAs": "Signed in as",
-    "notAvailableYet": "Not available yet"
+    "notAvailableYet": "Not available yet",
+    "resetPassword": "Reset password",
+    "resetPasswordBody": "We will email a reset link to {{email}}.",
+    "resetPasswordSent": "If that email exists, a reset link is on its way.",
+    "resetPasswordFailed": "Could not start a password reset. Please try again.",
+    "title": "Settings",
+    "appearanceHint": "Choose how the app looks. \"Match device\" follows your phone settings.",
+    "storedOnDevice": "These preferences are saved on this device. Your language also syncs to your account."
   },
   "auth": {
     "login": "Log in",
@@ -349,7 +357,8 @@
     "resetLinkSentHint": "If that email exists, a password reset link has been sent to it.",
     "enterNewPasswordHint": "Enter a new password for your account.",
     "resetPasswordTitle": "Reset Password",
-    "invalidResetTokenMissing": "Invalid or missing reset token."
+    "invalidResetTokenMissing": "Invalid or missing reset token.",
+    "enterEmailForReset": "Enter your email address first, then tap Forgot password."
   },
   "search": {
     "byNameOrEmail": "Search by name or email…",
@@ -398,7 +407,14 @@
     "detailsTitle": "Shift Details",
     "upcomingTitle": "Upcoming Shifts",
     "offerNoLongerOpen": "This offer is no longer open.",
-    "alreadyFilledByAnother": "This shift was already filled by another worker."
+    "alreadyFilledByAnother": "This shift was already filled by another worker.",
+    "assignedBy": "Assigned by",
+    "exactLocation": "Exact location",
+    "addressSearch": "By address",
+    "openInMaps": "Open in Maps",
+    "mapsUnavailable": "No map app is available on this device.",
+    "callHotel": "Call hotel",
+    "emailHotel": "Email hotel"
   },
   "jobs": {
     "none": "No open jobs found.",
@@ -414,7 +430,10 @@
     "position": "Position",
     "pay": "Pay",
     "offerBadge": "OFFER",
-    "noLongerOpen": "This job is no longer open."
+    "noLongerOpen": "This job is no longer open.",
+    "hotel": "Hotel",
+    "location": "Location",
+    "description": "Description"
   },
   "documents": {
     "title": "Documents",
@@ -423,6 +442,7 @@
     "expiryPlaceholder": "Expiry date (optional, YYYY-MM-DD)",
     "expiryFormat": "Expiry date must use YYYY-MM-DD.",
     "view": "View",
+    "viewAll": "View Documents",
     "categoryGENERAL": "General",
     "categoryWORK_PERMIT": "Work permit",
     "upload": "Upload",
@@ -449,6 +469,17 @@
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
     "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "Take photo",
+    "choosePhoto": "Choose photo",
+    "cameraPermissionDenied": "Camera access is needed to take a photo. You can enable it in Settings.",
+    "libraryPermissionDenied": "Photo access is needed to choose a photo. You can enable it in Settings.",
+    "replace": "Replace",
+    "uploaded": "Uploaded",
+    "required": "Required",
+    "previewUnavailable": "Preview unavailable",
+    "deleteConfirm": "Are you sure you want to remove this document?",
+    "missingRequired": "Missing required documents",
+    "missingRequiredDesc": "Please upload the following missing documents:",
     "uploadFailedReason": "Upload failed: {{reason}}"
   },
   "hr": {
@@ -558,7 +589,18 @@
     "sendResetLink": "Send reset link",
     "firstNameLastNameRequired": "First and last name are required.",
     "phoneInvalid": "Phone must be a valid international number, e.g. +49301234567.",
-    "viewProfile": "View profile"
+    "viewProfile": "View profile",
+    "myDetails": "My details",
+    "identity": "Identity",
+    "name": "Name",
+    "email": "Email",
+    "role": "Role",
+    "employment": "Employment",
+    "employeeId": "Employee ID",
+    "jobTitle": "Job title",
+    "startDate": "Start date",
+    "employmentStatus": "Status",
+    "reportingLine": "Reporting line"
   },
   "skills": {
     "CLEANER": "Cleaner",
@@ -598,7 +640,10 @@
     "viewWeek": "Week",
     "viewMonth": "Month",
     "sickOrVacation": "Sick / Vacation",
-    "yourMarkedDays": "Your marked days"
+    "yourMarkedDays": "Your marked days",
+    "viewmonth": "Month",
+    "viewweek": "Week",
+    "viewday": "Day"
   },
   "hotels": {
     "inThisGroup": "Hotels in this group",
@@ -700,6 +745,8 @@
     "broadcastsLoadFailed": "Failed to load broadcasts. Please try again.",
     "skillsNeeded": "Skills needed",
     "addSkill": "Add skill",
+    "noSkillOption": "No specific skill required",
+    "anySkill": "Any skill",
     "raiseBroadcastAction": "Raise broadcast",
     "slotClaimedByOther": "Someone else claimed this slot just before you — no shift was assigned."
   },
@@ -776,7 +823,11 @@
     "submitForReview": "Submit for review",
     "submitDisabledHint": "Upload every required document before submitting.",
     "noEmploymentRecord": "Your employment record is not ready yet. Please contact your manager.",
-    "submittedForReview": "Your application has been submitted for review."
+    "submittedForReview": "Your application has been submitted for review.",
+    "idOrPassport": "ID card or passport",
+    "checklistTitle": "Your documents",
+    "remainingCount": "{{count}} still needed",
+    "allUploaded": "All documents uploaded"
   },
   "analytics": {
     "myPerformance": "My performance",
@@ -851,7 +902,15 @@
     "verificationNotesPlaceholder": "Verification notes (optional)...",
     "verifiedMark": "Verified ✓",
     "verifiedBody": "Attendance has been verified.",
-    "verifyFailed": "Failed to verify"
+    "verifyFailed": "Failed to verify",
+    "checkedInAt": "Checked in: {{time}}",
+    "statusPRESENT": "Present",
+    "statusABSENT": "Absent",
+    "statusLATE": "Late",
+    "statusPARTIAL": "Partial",
+    "statusEXCUSED": "Excused",
+    "statusEXPECTED": "Expected",
+    "unknownWorker": "Unknown worker"
   },
   "employees": {
     "noBlocked": "No blocked employees",
@@ -942,7 +1001,9 @@
     "reworkNotesRequired": "Describe what needs redoing.",
     "reworkAssigned": "Rework assigned. The worker has been notified.",
     "reworkPending": "Rework assigned — awaiting the worker",
-    "reworkCompleted": "Rework completed"
+    "reworkCompleted": "Rework completed",
+    "reworkDone": "Rework submitted {{when}}",
+    "inspectedBy": "Inspected by"
   },
   "ratings": {
     "comment": "Comment",
@@ -965,7 +1026,14 @@
     "withdrawBody": "{{day}} will no longer be marked {{kind}}. A shift cancelled for this day is not automatically restored.",
     "withdrawA11y": "Withdraw {{kind}} on {{day}}",
     "markFailed": "Could not mark absence.",
-    "withdrawFailed": "Could not withdraw absence."
+    "withdrawFailed": "Could not withdraw absence.",
+    "daysSelected": "{{count}} days selected",
+    "tapAgainForRange": "Tap a later day to select a range",
+    "reasonTitle": "Reason for vacation",
+    "reasonHint": "Required for vacation. Do not enter medical details.",
+    "reasonPlaceholder": "e.g. family trip, personal days",
+    "reasonRequired": "A reason is required for vacation.",
+    "reasonTooLong": "Please keep the reason under 500 characters."
   },
   "checklist": {
     "dust": "Dust",
@@ -998,5 +1066,9 @@
     "yourWeek": "Your week",
     "viewAll": "View all",
     "documentsNeedAttention": "Documents need attention"
+  },
+  "marketplace": {
+    "description": "Shifts you can apply for.",
+    "noneOpen": "No open jobs right now."
   }
 }

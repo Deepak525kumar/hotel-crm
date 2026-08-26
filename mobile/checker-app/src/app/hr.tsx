@@ -42,7 +42,7 @@ export default function HRScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [user]);
+  }, [user, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect

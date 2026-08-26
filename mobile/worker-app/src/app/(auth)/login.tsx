@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
+import { Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
@@ -15,8 +15,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
 import { APP_NAME, ALLOWED_ROLES } from '@/constants/app-config';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError } from '@/lib/api';
-import * as WebBrowser from 'expo-web-browser';
+import { api, ApiError } from '@/lib/api';
 import { translateApiError } from '../../lib/api-error-i18n';
 
 export default function LoginScreen() {
@@ -63,9 +62,22 @@ export default function LoginScreen() {
     }
   };
 
+  // Sends the reset email from the app rather than handing off to the web.
+  // This used to open EXPO_PUBLIC_FRONTEND_URL, which nothing sets in practice,
+  // so it fell back to http://localhost:3000 -- on a phone, localhost is the
+  // phone, and the button opened a dead page.
   const handleForgotPassword = async () => {
-    const frontendUrl = process.env.EXPO_PUBLIC_FRONTEND_URL ?? 'http://localhost:3000';
-    await WebBrowser.openBrowserAsync(`${frontendUrl}/forgot-password`);
+    setError(null);
+    if (!email.trim()) {
+      setError(t('auth.enterEmailForReset'));
+      return;
+    }
+    try {
+      await api.auth.requestPasswordReset(email);
+      Alert.alert(t('settings.resetPasswordSent'));
+    } catch (err) {
+      setError(translateApiError(err, t, 'settings.resetPasswordFailed'));
+    }
   };
 
   return (

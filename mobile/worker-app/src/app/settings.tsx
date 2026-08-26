@@ -1,4 +1,5 @@
-import { StyleSheet, ScrollView } from 'react-native';
+import { Alert, StyleSheet, ScrollView } from 'react-native';
+import { useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
@@ -7,6 +8,10 @@ import { ThemedView } from '@/components/themed-view';
 import { BackLink } from '@/components/BackLink';
 import { LanguagePicker } from '@/components/LanguagePicker';
 import { ThemePicker } from '@/components/ThemePicker';
+import { Button } from '@/components/ui';
+import { api } from '@/lib/api';
+import { translateApiError } from '@/lib/api-error-i18n';
+import { useAuthStore } from '@/stores/auth-store';
 import { Spacing } from '@/constants/theme';
 
 /**
@@ -24,6 +29,35 @@ import { Spacing } from '@/constants/theme';
  */
 export default function SettingsScreen() {
   const { t } = useTranslation();
+  const email = useAuthStore((s) => s.user?.email);
+  const [sending, setSending] = useState(false);
+
+  // Emails a reset link rather than changing the password in place: the backend
+  // has no authenticated change-password endpoint, and the emailed token is
+  // what proves control of the address. The worker app previously had no route
+  // to this at all once signed in, and the login screen's "Forgot password?"
+  // opened EXPO_PUBLIC_FRONTEND_URL -- unset in practice, so it defaulted to
+  // localhost and opened nothing on a phone.
+  const resetPassword = () => {
+    if (!email) return;
+    Alert.alert(t('settings.resetPassword'), t('settings.resetPasswordBody', { email }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.send'),
+        onPress: async () => {
+          setSending(true);
+          try {
+            await api.auth.requestPasswordReset(email);
+            Alert.alert(t('settings.resetPasswordSent'));
+          } catch (error) {
+            Alert.alert(translateApiError(error, t, 'settings.resetPasswordFailed'));
+          } finally {
+            setSending(false);
+          }
+        },
+      },
+    ]);
+  };
 
   return (
     <ThemedView style={styles.container}>
@@ -39,6 +73,14 @@ export default function SettingsScreen() {
           <ThemePicker />
           <ThemedView style={styles.separator} />
           <LanguagePicker />
+          <ThemedView style={styles.separator} />
+          <Button
+            label={t('settings.resetPassword')}
+            variant="secondary"
+            onPress={resetPassword}
+            loading={sending}
+            disabled={!email}
+          />
           <ThemedText type="small" themeColor="textSecondary" style={styles.footer}>
             {t('settings.storedOnDevice', 'These preferences are saved on this device. Your language also syncs to your account.')}
           </ThemedText>

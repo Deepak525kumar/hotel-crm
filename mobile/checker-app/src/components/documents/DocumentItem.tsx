@@ -8,13 +8,14 @@ import type { WorkerDocument, DocumentCategory } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  PASSPORT: 'documents.categoryPASSPORT',
-  ID_CARD: 'documents.categoryID_CARD',
-  RESIDENCE_PERMIT: 'documents.categoryRESIDENCE_PERMIT',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
-  DRIVERS_LICENSE: 'documents.categoryDRIVERS_LICENSE',
+  TAX_NUMBER: 'documents.categoryTAX_NUMBER',
+  SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
+  HEALTH_INSURANCE: 'documents.categoryHEALTH_INSURANCE',
+  ID_CARD: 'documents.categoryID_CARD',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ADDRESS: 'documents.categoryADDRESS',
   CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
-  GENERAL: 'documents.categoryGENERAL',
 };
 
 export function DocumentItem({ document }: { document: WorkerDocument }) {
@@ -36,7 +37,9 @@ export function DocumentItem({ document }: { document: WorkerDocument }) {
             <ThemedText type="linkPrimary">{t("documents.view")}</ThemedText>
           </Pressable>
         ) : (
-          <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('documents.previewUnavailable')}
+          </ThemedText>
         )}
       </ThemedView>
     </ThemedView>

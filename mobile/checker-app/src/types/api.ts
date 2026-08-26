@@ -240,7 +240,11 @@ export interface WorkerDocument {
   updated_at: string;
 }
 
-export type DocumentCategory = 'GENERAL' | 'PASSPORT' | 'ID_CARD' | 'RESIDENCE_PERMIT' | 'WORK_PERMIT' | 'DRIVERS_LICENSE' | 'CONTRACT_SCAN';
+// Must equal the server's Prisma enum -- guarded by
+// __tests__/document-categories-match-server.test.ts. This union carried
+// GENERAL, RESIDENCE_PERMIT and DRIVERS_LICENSE, none of which the server
+// accepts, and was missing the four it requires.
+export type DocumentCategory = 'WORK_PERMIT' | 'TAX_NUMBER' | 'SOCIAL_SECURITY_NUMBER' | 'HEALTH_INSURANCE' | 'ID_CARD' | 'PASSPORT' | 'ADDRESS' | 'CONTRACT_SCAN';
 
 export interface ContractDto {
   id: string;

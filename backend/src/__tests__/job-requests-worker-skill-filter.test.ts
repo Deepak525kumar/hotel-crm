@@ -81,16 +81,34 @@ describe('JobRequestService.list — worker skill scoping', () => {
     );
   });
 
-  it('shows a worker with NO skills the marketplace rows only, not every broadcast', async () => {
+  // 2026-08-26: a broadcast slot with skill: null ("no specific skill
+  // required") must be visible to every worker in scope, unconditionally --
+  // not gated on the worker holding any particular skill (or any skill at
+  // all). See computeBroadcastEligibility()/acceptBroadcast() for the same
+  // null-means-everyone treatment on the read/accept side.
+  it('always includes the "no specific skill required" branch, regardless of the worker\'s own skills', async () => {
+    await service.list(QUERY, WORKER);
+    expect(whereUsed().OR).toEqual(
+      expect.arrayContaining([{ skill_slots: { some: { skill: null } } }])
+    );
+  });
+
+  it('shows a worker with NO skills the marketplace rows and no-skill-required broadcasts, not every broadcast', async () => {
     mockEmploymentRecord.findUnique.mockResolvedValue({ skills: [] });
     await service.list(QUERY, WORKER);
-    expect(whereUsed().OR).toEqual([{ skill_slots: { none: {} } }]);
+    expect(whereUsed().OR).toEqual([
+      { skill_slots: { none: {} } },
+      { skill_slots: { some: { skill: null } } },
+    ]);
   });
 
   it('treats a worker with no employment record the same as one with no skills', async () => {
     mockEmploymentRecord.findUnique.mockResolvedValue(null);
     await service.list(QUERY, WORKER);
-    expect(whereUsed().OR).toEqual([{ skill_slots: { none: {} } }]);
+    expect(whereUsed().OR).toEqual([
+      { skill_slots: { none: {} } },
+      { skill_slots: { some: { skill: null } } },
+    ]);
   });
 
   it('still applies the existing roster hotel scoping alongside the skill filter', async () => {

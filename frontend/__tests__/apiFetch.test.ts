@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from "@/lib/api";
+import { apiFetch, ApiError, employeesApi } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth";
 
 /**
@@ -93,5 +93,31 @@ describe("apiFetch", () => {
     const err = await apiFetch("/x").catch((e) => e as ApiError);
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).code).toBe("RATE_LIMITED");
+  });
+});
+
+// 2026-08-26 (reported live: "The edit skills function is still not working
+// after clicking submit it says malformed body"). employeesApi.update()
+// pre-stringified its own body with JSON.stringify(data), and apiFetch
+// unconditionally JSON.stringify()s whatever `body` it's handed — so the
+// request went out DOUBLE-encoded (a JSON string containing an escaped JSON
+// string, e.g. '"{\\"skills\\":[\\"CLEANER\\"]}"'). Express's body-parser
+// happily parses that as valid JSON... whose value is a plain string, not
+// an object, which is exactly what the backend's zod object schema then
+// rejected. Every other apiFetch caller in this codebase passes the raw
+// object and lets apiFetch do the one-and-only stringify; this pins that
+// employeesApi.update does the same, so the regression can't come back.
+describe("employeesApi.update — body must be single-encoded JSON", () => {
+  it("sends the raw object as the fetch body, not a pre-stringified string", async () => {
+    mockFetch.mockResolvedValueOnce(jsonRes(200, { status: "success", data: {} }));
+
+    await employeesApi.update("emp-1", { skills: ["CLEANER"] });
+
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    // The body itself must be a JSON string of the OBJECT -- parsing it once
+    // must yield the object back, not another JSON string.
+    const parsedOnce = JSON.parse(init.body as string);
+    expect(parsedOnce).toEqual({ skills: ["CLEANER"] });
+    expect(typeof parsedOnce).toBe("object");
   });
 });

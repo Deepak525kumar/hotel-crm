@@ -26,9 +26,13 @@ import type { RaiseBroadcastInput, SkillTag } from "@/lib/types";
 import { useTranslation } from "react-i18next";
 
 interface SkillLine {
-  skill: SkillTag;
+  /** `null` means "no specific skill required" for this line. */
+  skill: SkillTag | null;
   headcount: string;
 }
+
+/** Sentinel `<select>` value for the "no specific skill required" option — HTML select values must be strings, so `null` is represented as "" and converted back at submit time. */
+const NO_SKILL_VALUE = "";
 
 interface FormState {
   hotel_id: string;
@@ -249,11 +253,16 @@ function NewBroadcastForm() {
                   <div className="flex-1">
                     <Select
                       label={index === 0 ? "Skill" : undefined}
-                      value={line.skill}
+                      value={line.skill ?? NO_SKILL_VALUE}
                       onChange={(e) =>
-                        setSkillLine(index, { skill: e.target.value as SkillTag })
+                        setSkillLine(index, {
+                          skill: e.target.value === NO_SKILL_VALUE ? null : (e.target.value as SkillTag),
+                        })
                       }
-                      options={SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) }))}
+                      options={[
+                        ...SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+                        { value: NO_SKILL_VALUE, label: t("requests.noSkillOption") },
+                      ]}
                     />
                   </div>
                   <div className="w-28">

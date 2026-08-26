@@ -81,7 +81,8 @@
     "loadFailed": "Laden fehlgeschlagen",
     "tomorrow": "Morgen",
     "getDirections": "Route anzeigen",
-    "success": "Erfolgreich"
+    "success": "Erfolgreich",
+    "send": "Senden"
   },
   "fields": {
     "name": "Name",
@@ -321,7 +322,14 @@
     "localDevBuild": "Lokaler Entwicklungs-Build",
     "pageDescription": "Ihre Konto-, Sitzungs- und App-Einstellungen.",
     "signedInAs": "Angemeldet als",
-    "notAvailableYet": "Noch nicht verfügbar"
+    "notAvailableYet": "Noch nicht verfügbar",
+    "resetPassword": "Passwort zurücksetzen",
+    "resetPasswordBody": "Wir senden einen Link zum Zurücksetzen an {{email}}.",
+    "resetPasswordSent": "Falls diese E-Mail existiert, ist ein Link unterwegs.",
+    "resetPasswordFailed": "Zurücksetzen konnte nicht gestartet werden. Bitte erneut versuchen.",
+    "title": "Einstellungen",
+    "appearanceHint": "Wählen Sie das Erscheinungsbild der App. „Gerät folgen“ übernimmt Ihre Telefoneinstellungen.",
+    "storedOnDevice": "Diese Einstellungen werden auf diesem Gerät gespeichert. Ihre Sprache wird zusätzlich mit Ihrem Konto synchronisiert."
   },
   "auth": {
     "login": "Anmelden",
@@ -349,7 +357,8 @@
     "resetLinkSentHint": "Falls diese E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts an sie gesendet.",
     "enterNewPasswordHint": "Geben Sie ein neues Passwort für Ihr Konto ein.",
     "resetPasswordTitle": "Passwort zurücksetzen",
-    "invalidResetTokenMissing": "Ungültiges oder fehlendes Zurücksetzungs-Token."
+    "invalidResetTokenMissing": "Ungültiges oder fehlendes Zurücksetzungs-Token.",
+    "enterEmailForReset": "Geben Sie zuerst Ihre E-Mail-Adresse ein und tippen Sie dann auf Passwort vergessen."
   },
   "search": {
     "byNameOrEmail": "Nach Name oder E-Mail suchen…",
@@ -398,7 +407,14 @@
     "detailsTitle": "Schichtdetails",
     "upcomingTitle": "Kommende Schichten",
     "offerNoLongerOpen": "Dieses Angebot ist nicht mehr offen.",
-    "alreadyFilledByAnother": "Diese Schicht wurde bereits von einem anderen Mitarbeiter besetzt."
+    "alreadyFilledByAnother": "Diese Schicht wurde bereits von einem anderen Mitarbeiter besetzt.",
+    "assignedBy": "Zugewiesen von",
+    "exactLocation": "Genauer Ort",
+    "addressSearch": "Nach Adresse",
+    "openInMaps": "In Karten öffnen",
+    "mapsUnavailable": "Auf diesem Gerät ist keine Karten-App verfügbar.",
+    "callHotel": "Hotel anrufen",
+    "emailHotel": "Hotel per E-Mail"
   },
   "jobs": {
     "none": "Keine offenen Jobs gefunden.",
@@ -414,7 +430,10 @@
     "position": "Position",
     "pay": "Vergütung",
     "offerBadge": "ANGEBOT",
-    "noLongerOpen": "Diese Stelle ist nicht mehr offen."
+    "noLongerOpen": "Diese Stelle ist nicht mehr offen.",
+    "hotel": "Hotel",
+    "location": "Ort",
+    "description": "Beschreibung"
   },
   "documents": {
     "title": "Dokumente",
@@ -423,6 +442,7 @@
     "expiryPlaceholder": "Ablaufdatum (optional, JJJJ-MM-TT)",
     "expiryFormat": "Ablaufdatum muss das Format JJJJ-MM-TT haben.",
     "view": "Ansehen",
+    "viewAll": "Dokumente ansehen",
     "categoryGENERAL": "Allgemein",
     "categoryWORK_PERMIT": "Arbeitserlaubnis",
     "upload": "Hochladen",
@@ -449,6 +469,17 @@
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
     "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "Foto aufnehmen",
+    "choosePhoto": "Foto auswählen",
+    "cameraPermissionDenied": "Für Fotoaufnahmen wird Kamerazugriff benötigt. Sie können ihn in den Einstellungen aktivieren.",
+    "libraryPermissionDenied": "Für die Fotoauswahl wird Zugriff auf Fotos benötigt. Sie können ihn in den Einstellungen aktivieren.",
+    "replace": "Ersetzen",
+    "uploaded": "Hochgeladen",
+    "required": "Erforderlich",
+    "previewUnavailable": "Vorschau nicht verfügbar",
+    "deleteConfirm": "Möchten Sie dieses Dokument wirklich entfernen?",
+    "missingRequired": "Fehlende erforderliche Dokumente",
+    "missingRequiredDesc": "Bitte laden Sie die folgenden fehlenden Dokumente hoch:",
     "uploadFailedReason": "Upload fehlgeschlagen: {{reason}}"
   },
   "hr": {
@@ -558,7 +589,18 @@
     "sendResetLink": "Zurücksetzungslink senden",
     "firstNameLastNameRequired": "Vor- und Nachname sind erforderlich.",
     "phoneInvalid": "Die Telefonnummer muss eine gültige internationale Nummer sein, z. B. +49301234567.",
-    "viewProfile": "Profil ansehen"
+    "viewProfile": "Profil ansehen",
+    "myDetails": "Meine Daten",
+    "identity": "Identität",
+    "name": "Name",
+    "email": "E-Mail",
+    "role": "Rolle",
+    "employment": "Beschäftigung",
+    "employeeId": "Mitarbeiter-ID",
+    "jobTitle": "Stellenbezeichnung",
+    "startDate": "Eintrittsdatum",
+    "employmentStatus": "Status",
+    "reportingLine": "Berichtslinie"
   },
   "skills": {
     "CLEANER": "Reinigungskraft",
@@ -598,7 +640,10 @@
     "viewWeek": "Woche",
     "viewMonth": "Monat",
     "sickOrVacation": "Krank / Urlaub",
-    "yourMarkedDays": "Ihre markierten Tage"
+    "yourMarkedDays": "Ihre markierten Tage",
+    "viewmonth": "Monat",
+    "viewweek": "Woche",
+    "viewday": "Tag"
   },
   "hotels": {
     "inThisGroup": "Hotels in dieser Gruppe",
@@ -700,6 +745,8 @@
     "broadcastsLoadFailed": "Rundmeldungen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
     "skillsNeeded": "Benötigte Fähigkeiten",
     "addSkill": "Fähigkeit hinzufügen",
+    "noSkillOption": "Keine bestimmte Fähigkeit erforderlich",
+    "anySkill": "Beliebige Fähigkeit",
     "raiseBroadcastAction": "Rundmeldung senden",
     "slotClaimedByOther": "Jemand anderes hat diesen Platz kurz vor Ihnen belegt — es wurde keine Schicht zugewiesen."
   },
@@ -776,7 +823,11 @@
     "submitForReview": "Zur Prüfung einreichen",
     "submitDisabledHint": "Laden Sie alle erforderlichen Dokumente hoch, bevor Sie einreichen.",
     "noEmploymentRecord": "Ihr Beschäftigungsdatensatz ist noch nicht bereit. Bitte wenden Sie sich an Ihre Führungskraft.",
-    "submittedForReview": "Ihre Bewerbung wurde zur Prüfung eingereicht."
+    "submittedForReview": "Ihre Bewerbung wurde zur Prüfung eingereicht.",
+    "idOrPassport": "Ausweis oder Reisepass",
+    "checklistTitle": "Ihre Dokumente",
+    "remainingCount": "Noch {{count}} erforderlich",
+    "allUploaded": "Alle Dokumente hochgeladen"
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
@@ -851,7 +902,15 @@
     "verificationNotesPlaceholder": "Verifizierungsnotizen (optional)…",
     "verifiedMark": "Verifiziert ✓",
     "verifiedBody": "Die Anwesenheit wurde bestätigt.",
-    "verifyFailed": "Bestätigung fehlgeschlagen"
+    "verifyFailed": "Bestätigung fehlgeschlagen",
+    "checkedInAt": "Eingecheckt: {{time}}",
+    "statusPRESENT": "Anwesend",
+    "statusABSENT": "Abwesend",
+    "statusLATE": "Verspätet",
+    "statusPARTIAL": "Teilweise",
+    "statusEXCUSED": "Entschuldigt",
+    "statusEXPECTED": "Erwartet",
+    "unknownWorker": "Unbekannter Mitarbeiter"
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",
@@ -942,7 +1001,9 @@
     "reworkNotesRequired": "Beschreiben Sie, was nachgearbeitet werden muss.",
     "reworkAssigned": "Nacharbeit zugewiesen. Der Mitarbeiter wurde benachrichtigt.",
     "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
-    "reworkCompleted": "Nacharbeit abgeschlossen"
+    "reworkCompleted": "Nacharbeit abgeschlossen",
+    "reworkDone": "Nacharbeit eingereicht {{when}}",
+    "inspectedBy": "Geprüft von"
   },
   "ratings": {
     "comment": "Kommentar",
@@ -965,7 +1026,14 @@
     "withdrawBody": "{{day}} wird nicht mehr als {{kind}} markiert. Eine für diesen Tag abgesagte Schicht wird nicht automatisch wiederhergestellt.",
     "withdrawA11y": "{{kind}} am {{day}} zurückziehen",
     "markFailed": "Abwesenheit konnte nicht eingetragen werden.",
-    "withdrawFailed": "Abwesenheit konnte nicht zurückgezogen werden."
+    "withdrawFailed": "Abwesenheit konnte nicht zurückgezogen werden.",
+    "daysSelected": "{{count}} Tage ausgewählt",
+    "tapAgainForRange": "Tippen Sie auf einen späteren Tag, um einen Zeitraum zu wählen",
+    "reasonTitle": "Grund für den Urlaub",
+    "reasonHint": "Für Urlaub erforderlich. Geben Sie keine medizinischen Angaben ein.",
+    "reasonPlaceholder": "z. B. Familienreise, private Tage",
+    "reasonRequired": "Für Urlaub ist ein Grund erforderlich.",
+    "reasonTooLong": "Bitte halten Sie den Grund unter 500 Zeichen."
   },
   "checklist": {
     "dust": "Staub",
@@ -998,5 +1066,9 @@
     "yourWeek": "Ihre Woche",
     "viewAll": "Alle ansehen",
     "documentsNeedAttention": "Dokumente benötigen Aufmerksamkeit"
+  },
+  "marketplace": {
+    "description": "Schichten, auf die Sie sich bewerben können.",
+    "noneOpen": "Derzeit keine offenen Stellen."
   }
 }

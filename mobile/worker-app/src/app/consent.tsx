@@ -13,6 +13,7 @@ import type { ConsentNotice, ConsentStatus } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../lib/api-error-i18n';
+import { useConsentRevisionStore } from '@/stores/consent-store';
 
 /**
  * Self-service record/decision surface, not an access-blocking wall — no
@@ -49,7 +50,7 @@ export default function ConsentScreen() {
     } finally {
       setStatusLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadStatus();
@@ -66,7 +67,7 @@ export default function ConsentScreen() {
     } finally {
       setFetchingNotice(false);
     }
-  }, []);
+  }, [t]);
 
   const onDecide = useCallback(
     async (decision: 'GRANTED' | 'DECLINED') => {
@@ -91,7 +92,7 @@ export default function ConsentScreen() {
         setDeciding(null);
       }
     },
-    [notice]
+    [notice, t]
   );
 
   const onWithdraw = useCallback(async () => {
@@ -107,12 +108,21 @@ export default function ConsentScreen() {
       // of the server actually confirming the withdrawal.
       await api.consent.withdraw(DAILY_ACCESS_GATE_INSTANCE);
       setStatus({ status: 'absent' });
+      // Tell ConsentGate to re-read. Setting local state above only updates
+      // THIS screen -- the gate keeps its own copy, and none of its three
+      // re-check triggers (CONSENT_REQUIRED response, AppState -> active,
+      // midnight rollover) fire for a withdrawal the worker just performed
+      // here. Without this the app stayed fully usable until it was
+      // force-quit, while the server was already refusing every gated call.
+      useConsentRevisionStore.getState().invalidate();
     } catch (error) {
       setActionError(translateApiError(error, t, 'consent.couldNotWithdraw'));
     } finally {
       setWithdrawing(false);
     }
-  }, []);
+    // `t` was missing from these deps, so the failure message was captured
+    // from the render at mount and would not follow a language change.
+  }, [t]);
 
   return (
     <ThemedView style={styles.container}>

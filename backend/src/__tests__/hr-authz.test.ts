@@ -63,6 +63,7 @@ jest.mock('../modules/hr/controller.js', () => ({
     requestPayslip: ok,
     fulfilPayslipRequest: ok,
     uploadDocument: ok,
+    downloadDefaultContract: ok,
   },
 }));
 
@@ -325,6 +326,44 @@ describe('HR route authorization (ADR-030 C-10)', () => {
       testAuth = { userId: 'x1', role: 'checker', permissions: [], scope: null };
       const res = await request(makeApp()).get('/hr/workers/w1/contract-status');
       expect(res.status).toBe(403);
+    });
+  });
+
+  // 2026-08-26 (reported live: "download pdf ... throwing FORBIDDEN error").
+  // This route used to be gated by scopeWorkerRoute() (checkWorkerScope()'s
+  // strict, non-reviewer group-scope), unlike contract-status immediately
+  // above (which already moved to scopeWorkerReadRoute() on 2026-08-24 for
+  // this exact reason). A manager/RM downloading the contract for an
+  // applicant they themselves just created -- hotel_group_id still null,
+  // target_hotel_group_id set -- was denied every time. Now shares
+  // contract-status's read gate.
+  describe('GET /hr/workers/:worker_id/contract-download (same read gate as contract-status)', () => {
+    it('allows a manager whose scope matches a not-yet-approved applicant\'s target group', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: null, target_hotel_group_id: 'g1', target_primary_hotel_id: null });
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-download');
+      expect(res.status).toBe(200);
+    });
+
+    it('denies a manager whose scope does not match the applicant\'s target group', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: null, target_hotel_group_id: 'g2', target_primary_hotel_id: null });
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-download');
+      expect(res.status).toBe(403);
+    });
+
+    it('allows a manager in scope of an already-approved worker (group-grain, unchanged behavior)', async () => {
+      testAuth = { userId: 'm1', role: 'manager', permissions: ['hr:read'], scope: { type: 'hotel_group', hotel_group_id: 'g1' } };
+      mockEmploymentRecordFindUnique.mockResolvedValue({ hotel_group_id: 'g1', target_hotel_group_id: null, target_primary_hotel_id: null });
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-download');
+      expect(res.status).toBe(200);
+    });
+
+    it('allows the worker downloading their own contract', async () => {
+      testAuth = { userId: 'w1', role: 'worker', permissions: ['hr:contract:read-own'], scope: null };
+      const res = await request(makeApp()).get('/hr/workers/w1/contract-download');
+      expect(res.status).toBe(200);
+      expect(mockEmploymentRecordFindUnique).not.toHaveBeenCalled();
     });
   });
 

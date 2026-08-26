@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Badge, Button, Card, SectionHeader } from '@/components/ui';
-import { UploadDocumentCard } from '@/components/documents/UploadDocumentCard';
-import { DocumentsList } from '@/components/documents/DocumentsList';
+import { DocumentChecklistRow } from '@/components/documents/DocumentChecklistRow';
+import { buildChecklist, canSubmitForReview } from '@/lib/onboarding-checklist';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { translateApiError } from '@/lib/api-error-i18n';
@@ -96,8 +96,9 @@ export default function OnboardingScreen() {
     }
   }, [user, t, load]);
 
-  const missing = completeness?.missing_categories ?? [];
-  const isComplete = completeness?.is_complete ?? false;
+  const checklist = buildChecklist(documents, completeness);
+  const isComplete = canSubmitForReview(checklist, completeness);
+  const remaining = checklist.filter((e) => e.document === null).length;
 
   // Only PENDING can act. The other gated statuses are terminal from the
   // worker's side -- telling a REJECTED worker to upload more documents would
@@ -139,37 +140,26 @@ export default function OnboardingScreen() {
 
           {canSubmit ? (
             <>
-              <SectionHeader title={t('onboarding.whatWeNeed')} />
+              <SectionHeader
+                title={t('onboarding.checklistTitle')}
+                subtitle={remaining === 0 ? t('onboarding.allUploaded') : t('onboarding.remainingCount', { count: remaining })}
+              />
               {loading ? (
                 <ActivityIndicator />
               ) : (
                 <Card>
-                  {isComplete ? (
-                    <ThemedText type="small">{t('onboarding.allDocumentsUploaded')}</ThemedText>
-                  ) : (
-                    <>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {t('onboarding.stillMissing')}
-                      </ThemedText>
-                      <View style={styles.chips}>
-                        {missing.map((c) => (
-                          <Badge key={c} label={t(`documents.category${c}`)} tone="warning" />
-                        ))}
-                      </View>
-                    </>
+                  {checklist.map((entry) =>
+                    user ? (
+                      <DocumentChecklistRow
+                        key={entry.key}
+                        entry={entry}
+                        workerId={user.id}
+                        onUploaded={onUploaded}
+                      />
+                    ) : null,
                   )}
                 </Card>
               )}
-
-              <SectionHeader title={t('onboarding.uploadDocuments')} />
-              {user ? <UploadDocumentCard workerId={user.id} onUploaded={onUploaded} /> : null}
-
-              {documents.length > 0 ? (
-                <>
-                  <SectionHeader title={t('onboarding.uploaded')} />
-                  <DocumentsList documents={documents} loading={false} refreshing={false} onRefresh={() => void load()} />
-                </>
-              ) : null}
 
               <Button
                 label={t('onboarding.submitForReview')}

@@ -1,5 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
+import { api, setAccessToken } from '@/lib/api';
+
 /**
  * Onboarding submission (api.employee).
  *
@@ -26,8 +28,6 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 
 const fetchMock = jest.fn() as jest.MockedFunction<(...a: any[]) => any>;
 (globalThis as any).fetch = fetchMock;
-
-import { api, setAccessToken } from '@/lib/api';
 
 function ok(body: unknown) {
   return {

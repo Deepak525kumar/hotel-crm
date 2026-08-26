@@ -39,6 +39,17 @@ let _accessToken: string | null = null;
 let _refreshToken: string | null = null;
 let _onTokenRefreshed: ((access: string, refresh: string) => Promise<void>) | null = null;
 let _onAuthFailure: (() => Promise<void>) | null = null;
+/**
+ * Fired whenever the API refuses a call with CONSENT_REQUIRED.
+ *
+ * The server revokes consent immediately, but this client only ever found out
+ * on a fresh mount: ConsentGate read /consent/status once in a useEffect, so a
+ * checker whose consent was withdrawn (from the web, by an admin, or on
+ * another device) kept a fully usable UI until the app was force-quit, while
+ * every gated request was already 403-ing underneath. This turns that 403 into
+ * the signal that re-runs the gate.
+ */
+let _onConsentRequired: (() => void) | null = null;
 // Shared promise to serialize concurrent refresh attempts
 let _refreshPromise: Promise<{ access_token: string; refresh_token: string }> | null = null;
 
@@ -56,6 +67,21 @@ export function setOnTokenRefreshed(cb: (access: string, refresh: string) => Pro
 
 export function setOnAuthFailure(cb: () => Promise<void>): void {
   _onAuthFailure = cb;
+}
+
+export function setOnConsentRequired(cb: (() => void) | null): void {
+  _onConsentRequired = cb;
+}
+
+/** The server's error code for a call refused by the daily consent gate. */
+export const CONSENT_REQUIRED_CODE = 'CONSENT_REQUIRED';
+
+/**
+ * Notifies the consent gate without altering control flow: the caller still
+ * gets its ApiError, so per-screen error handling is unchanged.
+ */
+function notifyIfConsentRequired(code: string | undefined): void {
+  if (code === CONSENT_REQUIRED_CODE) _onConsentRequired?.();
 }
 
 export function getAccessToken(): string | null {
@@ -269,6 +295,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
             retryBody.error?.message == null,
           );
         }
+        notifyIfConsentRequired(retryBody.error?.code);
         throw new ApiError(
           retryBody.error?.code ?? 'UNKNOWN',
           retryBody.error?.message ?? 'Request failed',
@@ -280,6 +307,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
       return retryBody.data as T;
     }
 
+    notifyIfConsentRequired(body.error?.code);
     throw new ApiError(
       body.error?.code ?? 'UNKNOWN',
       body.error?.message ?? 'Request failed',
@@ -294,6 +322,13 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   auth: {
+    // Anti-enumeration by design: the server answers 200 whether or not the
+    // address exists, so callers must not infer anything from success.
+    requestPasswordReset: (email: string) =>
+      request<{ message: string }>('/auth/password-reset', {
+        method: 'POST',
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      }),
     login: (email: string, password: string) =>
       request<AuthResponse>('/auth/login', {
         method: 'POST',

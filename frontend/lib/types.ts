@@ -675,7 +675,8 @@ export type SkillTag = "CLEANER" | "PUBLIC_SERVICE" | "KITCHEN_DISHWASHER" | "WA
 /** Matches backend `JobRequestSkillSlotDto` (job-requests/types.ts) exactly. */
 export interface JobRequestSkillSlotDto {
   id: string;
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — open to every eligible worker. */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
 }
@@ -689,7 +690,8 @@ export interface RaiseBroadcastInput {
   hourly_rate?: number;
   currency?: string;
   description?: string;
-  skills: { skill: SkillTag; headcount: number }[];
+  /** `skill: null` means "no specific skill required" for that line. */
+  skills: { skill: SkillTag | null; headcount: number }[];
 }
 
 /**
@@ -702,7 +704,8 @@ export interface RaiseBroadcastInput {
  * own `eligible` inclusion.
  */
 export interface SkillSlotEligibilityDto {
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — open to every eligible worker. */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
   eligible_count: number;
@@ -719,7 +722,8 @@ export interface BroadcastEligibilityDto {
 
 /** Body of `POST /work-requests/broadcasts/:id/accept` (any authenticated role — worker-initiated). */
 export interface AcceptBroadcastInput {
-  skill: SkillTag;
+  /** `null` claims the "no specific skill required" slot, if the broadcast has one. */
+  skill: SkillTag | null;
 }
 
 /**
@@ -728,8 +732,8 @@ export interface AcceptBroadcastInput {
  * is a lost first-accept race (TREQ-005) — not an error, no assignment created.
  */
 export type AcceptBroadcastResultDto =
-  | { status: "accepted"; assignment_id: string; job_request_id: string; skill: SkillTag }
-  | { status: "requirement_fulfilled"; job_request_id: string; skill: SkillTag };
+  | { status: "accepted"; assignment_id: string; job_request_id: string; skill: SkillTag | null }
+  | { status: "requirement_fulfilled"; job_request_id: string; skill: SkillTag | null };
 
 /* -------------------------------------------------------------------------- */
 /*  Assignments                                                               */

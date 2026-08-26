@@ -63,7 +63,8 @@
           "cameraPermission": "Used only when you take a photo to show that rework is done."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      "./plugins/withDisableUserScriptSandboxing.js"
     ],
     "experiments": {
       "typedRoutes": true,
