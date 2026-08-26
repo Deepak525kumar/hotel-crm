@@ -480,7 +480,8 @@
     "previewUnavailable": "پیش نظارہ دستیاب نہیں",
     "deleteConfirm": "کیا آپ واقعی یہ دستاویز ہٹانا چاہتے ہیں؟",
     "missingRequired": "لازمی دستاویزات غائب ہیں",
-    "missingRequiredDesc": "براہ کرم درج ذیل غائب دستاویزات اپ لوڈ کریں:"
+    "missingRequiredDesc": "براہ کرم درج ذیل غائب دستاویزات اپ لوڈ کریں:",
+    "uploadFailedReason": "اپ لوڈ ناکام: {{reason}}"
   },
   "hr": {
     "title": "ایچ آر اور پے رول",

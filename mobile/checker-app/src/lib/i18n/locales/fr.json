@@ -479,7 +479,8 @@
     "previewUnavailable": "Aperçu indisponible",
     "deleteConfirm": "Voulez-vous vraiment supprimer ce document ?",
     "missingRequired": "Documents requis manquants",
-    "missingRequiredDesc": "Veuillez téléverser les documents manquants suivants :"
+    "missingRequiredDesc": "Veuillez téléverser les documents manquants suivants :",
+    "uploadFailedReason": "Échec du téléversement : {{reason}}"
   },
   "hr": {
     "title": "RH et paie",

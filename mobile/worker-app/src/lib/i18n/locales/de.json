@@ -479,7 +479,8 @@
     "previewUnavailable": "Vorschau nicht verfügbar",
     "deleteConfirm": "Möchten Sie dieses Dokument wirklich entfernen?",
     "missingRequired": "Fehlende erforderliche Dokumente",
-    "missingRequiredDesc": "Bitte laden Sie die folgenden fehlenden Dokumente hoch:"
+    "missingRequiredDesc": "Bitte laden Sie die folgenden fehlenden Dokumente hoch:",
+    "uploadFailedReason": "Upload fehlgeschlagen: {{reason}}"
   },
   "hr": {
     "title": "Personal & Lohn",

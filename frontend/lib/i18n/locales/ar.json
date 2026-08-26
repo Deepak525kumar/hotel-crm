@@ -480,7 +480,8 @@
     "previewUnavailable": "المعاينة غير متاحة",
     "deleteConfirm": "هل تريد بالتأكيد إزالة هذا المستند؟",
     "missingRequired": "مستندات مطلوبة ناقصة",
-    "missingRequiredDesc": "يرجى رفع المستندات الناقصة التالية:"
+    "missingRequiredDesc": "يرجى رفع المستندات الناقصة التالية:",
+    "uploadFailedReason": "فشل الرفع: {{reason}}"
   },
   "hr": {
     "title": "الموارد البشرية والرواتب",
