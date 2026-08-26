@@ -706,7 +706,10 @@
     "revokeSessionsAction": "إلغاء الجلسات",
     "deactivateAction": "إلغاء التفعيل",
     "employeeManagement": "إدارة الموظفين",
-    "revokeAccessFor": "يؤدي هذا إلى إلغاء وصول <name>{{name}}</name>. يمكنك إعادة تفعيل الحساب من شاشة التعديل."
+    "revokeAccessFor": "يؤدي هذا إلى إلغاء وصول <name>{{name}}</name>. يمكنك إعادة تفعيل الحساب من شاشة التعديل.",
+    "reactivateAccountTitle": "إعادة تنشيط الحساب",
+    "reactivateAccountBody": "يستعيد إمكانية تسجيل الدخول. يحتفظ الحساب بدوره ونطاقه.",
+    "reactivateAction": "إعادة تنشيط"
   },
   "requests": {
     "title": "طلب عمل",

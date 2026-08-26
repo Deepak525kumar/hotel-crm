@@ -58,6 +58,7 @@ function UserDetail() {
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const deactivate = useAsyncAction();
+  const reactivate = useAsyncAction();
 
   const [passwordResetSentAt, setPasswordResetSentAt] = useState<Date | null>(null);
   const passwordReset = useAsyncAction();
@@ -86,6 +87,19 @@ function UserDetail() {
         setSessionsRevokedAt(new Date());
         setRevokeConfirmOpen(false);
       },
+    });
+
+  // The deactivate card was rendered only while `is_active` was true, so the
+  // moment an account was deactivated the whole card vanished and nothing
+  // anywhere offered the inverse -- despite the card's own copy promising
+  // "The account can be reactivated later."
+  const onReactivate = () =>
+    reactivate.run(async () => {
+      await usersApi.update(id, { is_active: true });
+      await Promise.all([
+        globalMutate(["user", id]),
+        globalMutate((key) => Array.isArray(key) && key[0] === "users"),
+      ]);
     });
 
   const onDeactivate = () =>
@@ -301,6 +315,30 @@ function UserDetail() {
           </RoleGate>
 
           <UserDeactivateGate>
+            {!user.is_active && (
+              <Card>
+                <CardContent className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {t("users.reactivateAccountTitle")}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {t("users.reactivateAccountBody")}
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    disabled={reactivate.pending}
+                    onClick={onReactivate}
+                  >
+                    {reactivate.pending
+                      ? t("common.saving")
+                      : t("users.reactivateAction")}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {user.is_active && (
               <Card className="border-red-100 dark:border-red-900/50">
                 <CardContent className="flex items-center justify-between gap-4">

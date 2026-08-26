@@ -705,7 +705,10 @@
     "revokeSessionsAction": "Скасувати сеанси",
     "deactivateAction": "Деактивувати",
     "employeeManagement": "Управління працівниками",
-    "revokeAccessFor": "Це скасовує доступ для <name>{{name}}</name>. Ви можете повторно активувати обліковий запис на екрані редагування."
+    "revokeAccessFor": "Це скасовує доступ для <name>{{name}}</name>. Ви можете повторно активувати обліковий запис на екрані редагування.",
+    "reactivateAccountTitle": "Активувати обліковий запис",
+    "reactivateAccountBody": "Відновлює доступ до входу. Роль і область доступу зберігаються.",
+    "reactivateAction": "Активувати"
   },
   "requests": {
     "title": "Запит на роботу",

@@ -705,7 +705,10 @@
     "revokeSessionsAction": "Revoke sessions",
     "deactivateAction": "Deactivate",
     "employeeManagement": "Employee Management",
-    "revokeAccessFor": "This revokes access for <name>{{name}}</name>. You can reactivate the account from the edit screen."
+    "revokeAccessFor": "This revokes access for <name>{{name}}</name>. You can reactivate the account from the edit screen.",
+    "reactivateAccountTitle": "Reactivate account",
+    "reactivateAccountBody": "Restores sign-in access. The account keeps its role and scope.",
+    "reactivateAction": "Reactivate"
   },
   "requests": {
     "title": "Work request",

@@ -705,7 +705,10 @@
     "revokeSessionsAction": "Révoquer les sessions",
     "deactivateAction": "Désactiver",
     "employeeManagement": "Gestion des employés",
-    "revokeAccessFor": "Cela révoque l'accès de <name>{{name}}</name>. Vous pouvez réactiver le compte depuis l'écran de modification."
+    "revokeAccessFor": "Cela révoque l'accès de <name>{{name}}</name>. Vous pouvez réactiver le compte depuis l'écran de modification.",
+    "reactivateAccountTitle": "Réactiver le compte",
+    "reactivateAccountBody": "Rétablit l’accès à la connexion. Le rôle et la portée sont conservés.",
+    "reactivateAction": "Réactiver"
   },
   "requests": {
     "title": "Demande de travail",

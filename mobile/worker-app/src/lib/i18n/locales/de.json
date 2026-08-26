@@ -705,7 +705,10 @@
     "revokeSessionsAction": "Sitzungen widerrufen",
     "deactivateAction": "Deaktivieren",
     "employeeManagement": "Mitarbeiterverwaltung",
-    "revokeAccessFor": "Dies entzieht <name>{{name}}</name> den Zugriff. Sie können das Konto über den Bearbeitungsbildschirm wieder aktivieren."
+    "revokeAccessFor": "Dies entzieht <name>{{name}}</name> den Zugriff. Sie können das Konto über den Bearbeitungsbildschirm wieder aktivieren.",
+    "reactivateAccountTitle": "Konto reaktivieren",
+    "reactivateAccountBody": "Stellt den Anmeldezugang wieder her. Rolle und Geltungsbereich bleiben erhalten.",
+    "reactivateAction": "Reaktivieren"
   },
   "requests": {
     "title": "Arbeitsanfrage",

@@ -706,7 +706,10 @@
     "revokeSessionsAction": "سیشن منسوخ کریں",
     "deactivateAction": "غیر فعال کریں",
     "employeeManagement": "ملازم مینجمنٹ",
-    "revokeAccessFor": "یہ <name>{{name}}</name> کی رسائی منسوخ کر دیتا ہے۔ آپ ترمیمی سکرین سے اکاؤنٹ دوبارہ فعال کر سکتے ہیں۔"
+    "revokeAccessFor": "یہ <name>{{name}}</name> کی رسائی منسوخ کر دیتا ہے۔ آپ ترمیمی سکرین سے اکاؤنٹ دوبارہ فعال کر سکتے ہیں۔",
+    "reactivateAccountTitle": "اکاؤنٹ دوبارہ فعال کریں",
+    "reactivateAccountBody": "سائن ان رسائی بحال کرتا ہے۔ اکاؤنٹ اپنا کردار اور دائرہ برقرار رکھتا ہے۔",
+    "reactivateAction": "دوبارہ فعال کریں"
   },
   "requests": {
     "title": "کام کی درخواست",
