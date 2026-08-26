@@ -419,8 +419,8 @@ describe('request — FormData body', () => {
     mockFetch.mockResolvedValueOnce(res(201, { data: { id: 'doc1' } }));
 
     const form = new FormData();
-    form.append('category', 'GENERAL');
-    await api.documents.upload('worker1', { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' }, { category: 'GENERAL' });
+    form.append('category', 'ID_CARD');
+    await api.documents.upload('worker1', { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' }, { category: 'ID_CARD' });
 
     const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
@@ -448,7 +448,7 @@ describe('documents.upload', () => {
     await api.documents.upload(
       'worker1',
       { uri: 'file:///doc.pdf', name: 'passport.pdf', mimeType: 'application/pdf' },
-      { category: 'GENERAL' },
+      { category: 'ID_CARD' },
     );
 
     // The field key that carries the actual file must be named "file" (the
@@ -474,7 +474,7 @@ describe('documents.upload', () => {
     await api.documents.upload(
       'worker1',
       { uri: 'file:///doc', name: 'doc' },
-      { category: 'GENERAL' },
+      { category: 'ID_CARD' },
     );
 
     const fileCall = appendSpy.mock.calls.find(([field]) => field === 'file');
@@ -506,7 +506,7 @@ describe('documents.upload', () => {
     await api.documents.upload(
       'worker1',
       { uri: 'file:///doc.pdf', name: 'doc.pdf', mimeType: 'application/pdf' },
-      { category: 'GENERAL' },
+      { category: 'ID_CARD' },
     );
 
     const [url, init] = mockFetch.mock.calls[0] as [string, RequestInit];

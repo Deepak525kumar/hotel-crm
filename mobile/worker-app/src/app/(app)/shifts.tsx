@@ -1,92 +1,134 @@
-import { StyleSheet, FlatList, Pressable, ActivityIndicator, RefreshControl, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
+import { useTranslation } from 'react-i18next';
+
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { Badge, BadgeTone, Card, EmptyState, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
-import type { WorkerAssignment, AssignmentStatus } from '@/types/api';
-import { useTranslation } from 'react-i18next';
+import type { AssignmentStatus, WorkerAssignment } from '@/types/api';
 
-const STATUS_COLOR: Record<AssignmentStatus, string> = {
-  CONFIRMED: '#3182CE',
-  IN_PROGRESS: '#38A169',
-  COMPLETED: '#718096',
-  NO_SHOW: '#E53E3E',
-  CANCELLED: '#A0AEC0',
-  REASSIGNED: '#DD6B20',
+/**
+ * Schedule — the merge of the old "My Shifts" and "Calendar" tabs.
+ *
+ * Those were two tabs, side by side, behind near-identical calendar icons,
+ * showing the same assignments in two shapes. This is the list; the month grid
+ * is one tap away at the top rather than a second tab competing for the same
+ * space.
+ *
+ * Status colour now comes from theme tokens. It used to be a module-scope map
+ * of six raw hexes (`#3182CE`, `#38A169`, ...) applied as badge fills with
+ * white text, which ignored the colour scheme entirely.
+ */
+const STATUS_TONE: Record<AssignmentStatus, BadgeTone> = {
+  CONFIRMED: 'primary',
+  IN_PROGRESS: 'success',
+  COMPLETED: 'neutral',
+  NO_SHOW: 'danger',
+  CANCELLED: 'neutral',
+  REASSIGNED: 'warning',
 };
 
 function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => void }) {
   const { t } = useTranslation();
-  const color = STATUS_COLOR[item.status] ?? '#718096';
   const isRework = Boolean(item.rework_of_assignment_id);
+  // Reads the assignment's own fields. Gating this on work_request meant every
+  // calendar-placed shift (i.e. all of them in production) showed no date at
+  // all — just a title and a status badge.
+  const day = item.day ?? item.work_request?.shift_date;
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
-      <ThemedView type="backgroundElement" style={styles.card}>
-        <ThemedView style={styles.cardRow} type="backgroundElement">
-          <ThemedText type="smallBold" style={styles.flex}>
-            {isRework
-              ? t('quality.reworkTitle')
-              : (item.work_request?.position ?? t('common.shift'))}
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+    >
+      <Card>
+        <View style={styles.cardRow}>
+          <ThemedText type="smallBold" style={styles.flex} numberOfLines={1}>
+            {isRework ? t('quality.reworkTitle') : (item.work_request?.position ?? t('common.shift'))}
           </ThemedText>
-          <View style={[styles.badge, { backgroundColor: color }]}>
-            <ThemedText type="small" style={styles.badgeText}>
-              {item.status.replace(/_/g, ' ')}
-            </ThemedText>
-          </View>
-        </ThemedView>
-        {/* Reads the assignment's own fields. Gating this on work_request meant
-            every calendar-placed shift (i.e. all of them in production) showed
-            no date at all — just a title and a status badge. */}
-        {item.hotel?.name && (
-          <ThemedText type="small" themeColor="textSecondary">{item.hotel.name}</ThemedText>
-        )}
-        {(item.day ?? item.work_request?.shift_date) && (
+          <Badge
+            label={item.status.replace(/_/g, ' ')}
+            tone={STATUS_TONE[item.status] ?? 'neutral'}
+          />
+        </View>
+
+        {item.hotel?.name ? (
           <ThemedText type="small" themeColor="textSecondary">
-            {new Date((item.day ?? item.work_request!.shift_date) as string).toLocaleDateString(undefined, {
-              weekday: 'short', month: 'short', day: 'numeric',
+            {item.hotel.name}
+          </ThemedText>
+        ) : null}
+
+        {day ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {new Date(day as string).toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+            {item.shift_start_time && item.shift_end_time
+              ? `  ·  ${item.shift_start_time} – ${item.shift_end_time}`
+              : ''}
+          </ThemedText>
+        ) : null}
+
+        {item.attendance?.check_in_at ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('attendance.checkedInAt', {
+              time: new Date(item.attendance.check_in_at).toLocaleTimeString(),
+              defaultValue: `Checked in: ${new Date(item.attendance.check_in_at).toLocaleTimeString()}`,
             })}
           </ThemedText>
-        )}
-        {item.shift_start_time && item.shift_end_time && (
-          <ThemedText type="small" themeColor="textSecondary">
-            {item.shift_start_time} – {item.shift_end_time}
-          </ThemedText>
-        )}
-        {item.attendance?.check_in_at && (
-          <ThemedText type="small" themeColor="textSecondary">
-            Checked in: {new Date(item.attendance.check_in_at).toLocaleTimeString()}
-          </ThemedText>
-        )}
-      </ThemedView>
+        ) : null}
+      </Card>
     </Pressable>
   );
 }
 
-export default function ShiftsScreen() {
+export default function ScheduleScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
-  
-  const { data: assignments, isLoading: loading, isValidating: refreshing, mutate } = useSWR(
-    user ? `/assignments/list_all/${user.id}` : null,
-    () => api.assignments.list({ limit: 50 })
-  );
-  
-  const items = Array.isArray(assignments) ? assignments : [];
 
-  const onRefresh = async () => {
-    await mutate();
-  };
+  const {
+    data: assignments,
+    isLoading: loading,
+    isValidating: refreshing,
+    mutate,
+  } = useSWR(user ? `/assignments/list_all/${user.id}` : null, () =>
+    api.assignments.list({ limit: 50 }),
+  );
+
+  const items = Array.isArray(assignments) ? assignments : [];
 
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>{t('nav.myShifts')}</ThemedText>
+        <View style={styles.header}>
+          <ThemedText type="title">{t('nav.schedule')}</ThemedText>
+        </View>
+
+        <SectionHeader
+          title={t('shifts.upcomingTitle')}
+          action={
+            <Pressable
+              onPress={() => router.push('/(app)/calendar')}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.calendar')}
+              hitSlop={8}
+            >
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('nav.calendar')} ›
+              </ThemedText>
+            </Pressable>
+          }
+        />
+
         {loading && !items.length ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
@@ -96,7 +138,7 @@ export default function ShiftsScreen() {
             initialNumToRender={10}
             maxToRenderPerBatch={10}
             windowSize={5}
-            removeClippedSubviews={true}
+            removeClippedSubviews
             renderItem={({ item }) => (
               <ShiftCard
                 item={item}
@@ -110,11 +152,11 @@ export default function ShiftsScreen() {
               />
             )}
             ListEmptyComponent={
-              <ThemedView type="backgroundElement" style={styles.empty}>
-                <ThemedText type="small" themeColor="textSecondary">{t('shifts.none')}</ThemedText>
-              </ThemedView>
+              <EmptyState title={t('shifts.none')} body={t('home.noUpcomingShiftsBody')} />
             }
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => void mutate()} />
+            }
             contentContainerStyle={styles.list}
             showsVerticalScrollIndicator={false}
           />
@@ -126,14 +168,10 @@ export default function ShiftsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.three, paddingTop: Spacing.three },
   header: { marginBottom: Spacing.three },
   loader: { marginTop: Spacing.six },
   list: { gap: Spacing.two, paddingBottom: Spacing.six },
-  card: { borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
-  badge: { borderRadius: Spacing.one, paddingHorizontal: Spacing.two, paddingVertical: 2 },
-  badgeText: { color: '#fff', fontSize: 11 },
-  empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center', marginTop: Spacing.four },
 });

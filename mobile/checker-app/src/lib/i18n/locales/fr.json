@@ -80,7 +80,8 @@
     "shift": "Service",
     "loadFailed": "Échec du chargement",
     "tomorrow": "Demain",
-    "getDirections": "Obtenir l'itinéraire"
+    "getDirections": "Obtenir l'itinéraire",
+    "success": "Succès"
   },
   "fields": {
     "name": "Nom",
@@ -200,7 +201,8 @@
     "queue": "File d'attente",
     "attendanceDetail": "Détail de présence",
     "qualityCheck": "Contrôle qualité",
-    "rateWorker": "Évaluer l'employé"
+    "rateWorker": "Évaluer l'employé",
+    "schedule": "Planning"
   },
   "roles": {
     "admin": "Administrateur",
@@ -752,7 +754,25 @@
     "downloadContract": "Télécharger le contrat",
     "completeOnboardingAction": "Terminez votre intégration",
     "contractExpiredNotice": "Votre contrat a expiré. Veuillez démarrer le processus de réintégration pour recevoir et téléverser un nouveau contrat.",
-    "rejectionReasonPlaceholder": "p. ex. Document non valide téléversé"
+    "rejectionReasonPlaceholder": "p. ex. Document non valide téléversé",
+    "title": "Finalisez votre inscription",
+    "statusPENDING": "En cours",
+    "statusREJECTED": "Non approuvé",
+    "statusDEACTIVATED": "En pause",
+    "statusDELETED": "Fermé",
+    "statusPendingBody": "Téléversez les documents ci-dessous, puis soumettez-les pour examen. Votre responsable approuve votre compte avant que vous puissiez prendre des services.",
+    "statusRejectedBody": "Votre candidature n'a pas été approuvée. Veuillez contacter votre responsable : il pourra vous indiquer ce qui manque et relancer votre inscription.",
+    "statusDeactivatedBody": "Votre compte est en pause, aucun service n’est donc disponible. Veuillez contacter votre responsable pour le réactiver.",
+    "statusDeletedBody": "Ce compte est fermé. Veuillez contacter votre responsable si vous pensez qu’il s’agit d’une erreur.",
+    "whatWeNeed": "Ce qu’il nous manque",
+    "stillMissing": "Encore à téléverser :",
+    "allDocumentsUploaded": "Tous les documents requis sont téléversés. Vous pouvez soumettre pour examen.",
+    "uploadDocuments": "Téléverser un document",
+    "uploaded": "Vos documents",
+    "submitForReview": "Soumettre pour examen",
+    "submitDisabledHint": "Téléversez tous les documents requis avant de soumettre.",
+    "noEmploymentRecord": "Votre dossier d’emploi n’est pas encore prêt. Veuillez contacter votre responsable.",
+    "submittedForReview": "Votre candidature a été soumise pour examen."
   },
   "analytics": {
     "myPerformance": "Mes performances",
@@ -960,5 +980,19 @@
     "LOW": "Faible",
     "PROBATION": "Probation",
     "unrated": "Pas encore évalué"
+  },
+  "home": {
+    "greetingMorning": "Bonjour",
+    "greetingAfternoon": "Bon après-midi",
+    "greetingEvening": "Bonsoir",
+    "greetingNoName": "Bon retour",
+    "nextShift": "Prochain service",
+    "noUpcomingShifts": "Aucun service à venir",
+    "noUpcomingShiftsBody": "Dès qu’un service vous sera attribué, il apparaîtra ici.",
+    "browseJobs": "Voir les offres",
+    "openJobs": "Offres disponibles",
+    "yourWeek": "Votre semaine",
+    "viewAll": "Tout voir",
+    "documentsNeedAttention": "Documents à compléter"
   }
 }

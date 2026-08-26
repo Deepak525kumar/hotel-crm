@@ -1,6 +1,11 @@
 import { useEffect } from 'react';
 import { useRouter, useSegments, usePathname, useGlobalSearchParams } from 'expo-router';
 import { useAuthStore } from '@/stores/auth-store';
+import {
+  shouldGateOnboarding,
+  isRouteAllowedWhileGated,
+  ONBOARDING_ROUTE,
+} from '@/lib/onboarding-gate-decision';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, isInitialized } = useAuthStore();
@@ -29,8 +34,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       });
     } else if (user && inAuthGroup) {
       router.replace('/(app)');
+    } else if (
+      // ADR-065: a worker who is not ACTIVE is redirected to onboarding rather
+      // than dropped into tabs that can only render empty states. Before this,
+      // the app let them all the way in and relied on a dismissible card on the
+      // dashboard to tell them onboarding was incomplete.
+      user &&
+      shouldGateOnboarding({ status: user.employment_status, role: user.role }) &&
+      !isRouteAllowedWhileGated(pathname)
+    ) {
+      router.replace(ONBOARDING_ROUTE);
     }
-  }, [user, isInitialized, segments, pathname, params]);
+  }, [user, isInitialized, segments, pathname, params, router]);
 
   return <>{children}</>;
 }

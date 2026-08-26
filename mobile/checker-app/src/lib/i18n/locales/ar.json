@@ -81,7 +81,8 @@
     "shift": "وردية",
     "loadFailed": "فشل التحميل",
     "tomorrow": "غدًا",
-    "getDirections": "الحصول على الاتجاهات"
+    "getDirections": "الحصول على الاتجاهات",
+    "success": "تم بنجاح"
   },
   "fields": {
     "name": "الاسم",
@@ -201,7 +202,8 @@
     "queue": "قائمة الانتظار",
     "attendanceDetail": "تفاصيل الحضور",
     "qualityCheck": "فحص الجودة",
-    "rateWorker": "تقييم العامل"
+    "rateWorker": "تقييم العامل",
+    "schedule": "الجدول"
   },
   "roles": {
     "admin": "مدير النظام",
@@ -753,7 +755,25 @@
     "downloadContract": "تنزيل العقد",
     "completeOnboardingAction": "أكمل انضمامك",
     "contractExpiredNotice": "انتهت صلاحية عقدك. يرجى بدء عملية إعادة الانضمام لاستلام عقد جديد ورفعه.",
-    "rejectionReasonPlaceholder": "مثال: تم رفع مستند غير صالح"
+    "rejectionReasonPlaceholder": "مثال: تم رفع مستند غير صالح",
+    "title": "أكمل إعداد حسابك",
+    "statusPENDING": "قيد الإعداد",
+    "statusREJECTED": "غير معتمد",
+    "statusDEACTIVATED": "موقوف مؤقتًا",
+    "statusDELETED": "مغلق",
+    "statusPendingBody": "ارفع المستندات أدناه ثم أرسلها للمراجعة. يعتمد مديرك حسابك قبل أن تتمكن من العمل في المناوبات.",
+    "statusRejectedBody": "لم تتم الموافقة على طلبك. يرجى التحدث إلى مديرك، فهو يستطيع إخبارك بما هو مطلوب وإعادة بدء الإعداد.",
+    "statusDeactivatedBody": "حسابك موقوف مؤقتًا، لذا لا تتوفر مناوبات. يرجى التحدث إلى مديرك لإعادة تفعيله.",
+    "statusDeletedBody": "هذا الحساب مغلق. يرجى التحدث إلى مديرك إذا كنت تعتقد أن هذا خطأ.",
+    "whatWeNeed": "ما زلنا بحاجة إلى",
+    "stillMissing": "ما زال يلزم رفعه:",
+    "allDocumentsUploaded": "تم رفع جميع المستندات المطلوبة. يمكنك الإرسال للمراجعة.",
+    "uploadDocuments": "رفع مستند",
+    "uploaded": "مستنداتك",
+    "submitForReview": "إرسال للمراجعة",
+    "submitDisabledHint": "ارفع كل مستند مطلوب قبل الإرسال.",
+    "noEmploymentRecord": "سجل التوظيف الخاص بك غير جاهز بعد. يرجى التواصل مع مديرك.",
+    "submittedForReview": "تم إرسال طلبك للمراجعة."
   },
   "analytics": {
     "myPerformance": "أدائي",
@@ -961,5 +981,19 @@
     "LOW": "منخفض",
     "PROBATION": "تحت المراقبة",
     "unrated": "لم يتم التقييم بعد"
+  },
+  "home": {
+    "greetingMorning": "صباح الخير",
+    "greetingAfternoon": "مساء الخير",
+    "greetingEvening": "مساء الخير",
+    "greetingNoName": "مرحبًا بعودتك",
+    "nextShift": "المناوبة القادمة",
+    "noUpcomingShifts": "لا توجد مناوبات قادمة",
+    "noUpcomingShiftsBody": "عند إسناد مناوبة إليك ستظهر هنا.",
+    "browseJobs": "تصفح الوظائف المتاحة",
+    "openJobs": "الوظائف المتاحة",
+    "yourWeek": "أسبوعك",
+    "viewAll": "عرض الكل",
+    "documentsNeedAttention": "المستندات تحتاج إلى انتباه"
   }
 }

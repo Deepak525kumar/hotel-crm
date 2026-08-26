@@ -1,14 +1,29 @@
-import { StyleSheet, Pressable, ActivityIndicator, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { useAuthStore } from '@/stores/auth-store';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Badge, Button, Card, ListRow, SectionHeader } from '@/components/ui';
+import { useAuthStore } from '@/stores/auth-store';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { workerDisplayName } from '@/lib/greeting';
+
+/**
+ * Profile.
+ *
+ * Was a details card followed by five identical full-width grey slabs, so
+ * "View documents", "Sign out" and everything between them had exactly the
+ * same visual weight and nothing could be found at a glance. Now: an identity
+ * header, then grouped navigation rows, then the destructive action on its
+ * own, styled as destructive.
+ *
+ * It also carries the entry points the three-tab bar no longer has room for
+ * (notifications, jobs), which is why the list is longer than it looks.
+ */
 export default function ProfileScreen() {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
@@ -28,121 +43,118 @@ export default function ProfileScreen() {
 
   if (!user) return null;
 
+  const displayName = workerDisplayName(user.first_name);
+  const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+  // Initials for the avatar, falling back to the email so the circle is never
+  // empty (and never shows a cuid fragment).
+  const initials =
+    (displayName?.[0] ?? user.email?.[0] ?? '?').toUpperCase() +
+    (user.last_name?.[0]?.toUpperCase() ?? '');
+
+  const employmentTone =
+    user.employment_status === 'ACTIVE'
+      ? 'success'
+      : user.employment_status === 'PENDING'
+        ? 'warning'
+        : 'neutral';
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        {/* Scrollable: the language picker adds six rows plus two lines of
-            explanatory copy to a screen that already carried a details card
-            and five buttons. Without this the sign-out button sits below the
-            fold on a small phone with no way to reach it. */}
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Settings lives here, top-right, rather than as a fifth bottom tab:
-            the tab bar is for what a worker touches during a shift. */}
-        <ThemedView style={styles.headerRow}>
-          <ThemedText type="subtitle" style={styles.header}>{t("profile.title")}</ThemedText>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('settings.title', 'Settings')}
-            onPress={() => router.push('/settings')}
-            hitSlop={12}
-            style={({ pressed }) => [styles.settingsButton, { opacity: pressed ? 0.7 : 1 }]}
-          >
-            <ThemedText type="subtitle">⚙</ThemedText>
-          </Pressable>
-        </ThemedView>
+          <View style={styles.headerRow}>
+            <ThemedText type="title">{t('profile.title')}</ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.settings')}
+              onPress={() => router.push('/settings')}
+              hitSlop={12}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            >
+              <ThemedText type="subtitle">⚙</ThemedText>
+            </Pressable>
+          </View>
 
-        <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">{t("fields.name")}</ThemedText>
-            <ThemedText type="small">
-              {user.first_name} {user.last_name}
-            </ThemedText>
-          </ThemedView>
-          <ThemedView style={styles.divider} type="backgroundSelected" />
-          <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">{t("auth.email")}</ThemedText>
-            <ThemedText type="small">{user.email}</ThemedText>
-          </ThemedView>
-          <ThemedView style={styles.divider} type="backgroundSelected" />
-          <ThemedView style={styles.row} type="backgroundElement">
-            <ThemedText type="small" themeColor="textSecondary">{t("fields.role")}</ThemedText>
-            <ThemedText type="small" style={styles.roleText}>
-              {user.role}
-            </ThemedText>
-          </ThemedView>
-          
-          {user.creator_name && (
-            <>
-              <ThemedView style={styles.divider} type="backgroundSelected" />
-              <ThemedView style={styles.row} type="backgroundElement">
-                <ThemedText type="small" themeColor="textSecondary">{t("requests.createdBy")}</ThemedText>
-                <ThemedText type="small">{user.creator_name}</ThemedText>
-              </ThemedView>
-            </>
-          )}
-
-          {user.manager_name && (
-            <>
-              <ThemedView style={styles.divider} type="backgroundSelected" />
-              <ThemedView style={styles.row} type="backgroundElement">
-                <ThemedText type="small" themeColor="textSecondary">{t("profile.directManager")}</ThemedText>
-                <ThemedText type="small">{user.manager_name}</ThemedText>
-              </ThemedView>
-            </>
-          )}
-        </ThemedView>
-
-        <Pressable
-          onPress={() => router.push('/ratings')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        >
-          <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">{t('leaderboard.view')}</ThemedText>
-          </ThemedView>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/documents')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        >
-          <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">{t('documents.view')}</ThemedText>
-          </ThemedView>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/consent')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        >
-          <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">{t('consent.view')}</ThemedText>
-          </ThemedView>
-        </Pressable>
-
-        <Pressable
-          onPress={() => router.push('/hr')}
-          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        >
-          <ThemedView type="backgroundElement" style={styles.actionButton}>
-            <ThemedText type="smallBold">{t('hr.view')}</ThemedText>
-          </ThemedView>
-        </Pressable>
-
-        <Pressable
-          onPress={handleLogout}
-          disabled={isLoggingOut}
-          style={({ pressed }) => [{ opacity: pressed || isLoggingOut ? 0.7 : 1 }]}
-        >
-          <ThemedView type="backgroundElement" style={styles.actionButton}>
-            {isLoggingOut ? (
-              <ActivityIndicator color={theme.text} />
-            ) : (
-              <ThemedText type="smallBold" style={styles.logoutText}>
-                {t('profile.signOut')}
+          <Card style={styles.identity}>
+            <View style={[styles.avatar, { backgroundColor: theme.primarySubtle }]}>
+              <ThemedText type="subtitle" style={{ color: theme.primary }}>
+                {initials}
               </ThemedText>
-            )}
-          </ThemedView>
-        </Pressable>
+            </View>
+            <View style={styles.identityText}>
+              <ThemedText type="smallBold" numberOfLines={1}>
+                {fullName || user.email}
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                {user.email}
+              </ThemedText>
+              <View style={styles.badges}>
+                <Badge label={user.role} tone="primary" />
+                {user.employment_status ? (
+                  <Badge label={user.employment_status} tone={employmentTone} />
+                ) : null}
+              </View>
+            </View>
+          </Card>
+
+          {user.manager_name || user.creator_name ? (
+            <>
+              <SectionHeader title={t('profile.overview')} />
+              <Card>
+                {user.manager_name ? (
+                  <ListRow title={t('profile.directManager')} subtitle={user.manager_name} />
+                ) : null}
+                {user.creator_name ? (
+                  <ListRow title={t('requests.createdBy')} subtitle={user.creator_name} />
+                ) : null}
+              </Card>
+            </>
+          ) : null}
+
+          <SectionHeader title={t('common.quickLinks')} />
+          <Card style={styles.linkCard}>
+            <ListRow
+              title={t('documents.view')}
+              onPress={() => router.push('/documents')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('hr.view')}
+              onPress={() => router.push('/hr')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('leaderboard.view')}
+              onPress={() => router.push('/ratings')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            {/* Notifications and Jobs lost their tabs when the bar went to
+                three; they still need a way in. */}
+            <ListRow
+              title={t('nav.alerts')}
+              onPress={() => router.push('/(app)/notifications')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('nav.jobs')}
+              onPress={() => router.push('/(app)/marketplace')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('consent.view')}
+              onPress={() => router.push('/consent')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+          </Card>
+
+          <Button
+            label={t('profile.signOut')}
+            variant="ghost"
+            onPress={() => void handleLogout()}
+            loading={isLoggingOut}
+            style={styles.signOut}
+          />
+          {isLoggingOut ? <ActivityIndicator color={theme.text} /> : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -150,55 +162,31 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  safeArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  safeArea: { flex: 1 },
   content: {
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.four,
-    gap: Spacing.three,
+    paddingHorizontal: Spacing.three,
+    paddingTop: Spacing.three,
+    paddingBottom: Spacing.six,
+    gap: Spacing.two,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: Spacing.two,
   },
-  header: {
-    paddingBottom: Spacing.two,
-  },
-  settingsButton: {
-    paddingBottom: Spacing.two,
-    paddingHorizontal: Spacing.one,
-  },
-  card: {
-    borderRadius: Spacing.three,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  identity: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.full,
     alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-  },
-  divider: {
-    height: 1,
-    marginHorizontal: Spacing.three,
-  },
-  roleText: {
-    textTransform: 'capitalize',
-  },
-  actionButton: {
-    height: 48,
-    borderRadius: Spacing.two,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  logoutText: {
-    color: '#E53E3E',
-  },
+  identityText: { flex: 1, gap: Spacing.half },
+  badges: { flexDirection: 'row', gap: Spacing.one, marginTop: Spacing.half },
+  // The rows draw their own dividers, so the card supplies no extra gap.
+  linkCard: { gap: 0, paddingVertical: 0 },
+  signOut: { marginTop: Spacing.three },
 });

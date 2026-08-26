@@ -80,7 +80,8 @@
     "shift": "Schicht",
     "loadFailed": "Laden fehlgeschlagen",
     "tomorrow": "Morgen",
-    "getDirections": "Route anzeigen"
+    "getDirections": "Route anzeigen",
+    "success": "Erfolgreich"
   },
   "fields": {
     "name": "Name",
@@ -200,7 +201,8 @@
     "queue": "Warteschlange",
     "attendanceDetail": "Anwesenheitsdetails",
     "qualityCheck": "Qualitätsprüfung",
-    "rateWorker": "Mitarbeiter bewerten"
+    "rateWorker": "Mitarbeiter bewerten",
+    "schedule": "Dienstplan"
   },
   "roles": {
     "admin": "Administrator",
@@ -752,7 +754,25 @@
     "downloadContract": "Vertrag herunterladen",
     "completeOnboardingAction": "Schließen Sie Ihre Einarbeitung ab",
     "contractExpiredNotice": "Ihr Vertrag ist abgelaufen. Bitte starten Sie den erneuten Onboarding-Prozess, um einen neuen Vertrag zu erhalten und hochzuladen.",
-    "rejectionReasonPlaceholder": "z. B. Ungültiges Dokument hochgeladen"
+    "rejectionReasonPlaceholder": "z. B. Ungültiges Dokument hochgeladen",
+    "title": "Registrierung abschließen",
+    "statusPENDING": "In Bearbeitung",
+    "statusREJECTED": "Nicht genehmigt",
+    "statusDEACTIVATED": "Pausiert",
+    "statusDELETED": "Geschlossen",
+    "statusPendingBody": "Laden Sie die unten aufgeführten Dokumente hoch und reichen Sie sie zur Prüfung ein. Ihre Führungskraft genehmigt Ihr Konto, bevor Sie Schichten übernehmen können.",
+    "statusRejectedBody": "Ihre Bewerbung wurde nicht genehmigt. Bitte sprechen Sie mit Ihrer Führungskraft – sie kann Ihnen sagen, was fehlt, und Ihre Registrierung neu starten.",
+    "statusDeactivatedBody": "Ihr Konto ist pausiert, daher sind keine Schichten verfügbar. Bitte wenden Sie sich an Ihre Führungskraft, um es reaktivieren zu lassen.",
+    "statusDeletedBody": "Dieses Konto ist geschlossen. Bitte wenden Sie sich an Ihre Führungskraft, wenn dies ein Fehler ist.",
+    "whatWeNeed": "Was noch fehlt",
+    "stillMissing": "Noch hochzuladen:",
+    "allDocumentsUploaded": "Alle erforderlichen Dokumente sind hochgeladen. Sie können zur Prüfung einreichen.",
+    "uploadDocuments": "Dokument hochladen",
+    "uploaded": "Ihre Dokumente",
+    "submitForReview": "Zur Prüfung einreichen",
+    "submitDisabledHint": "Laden Sie alle erforderlichen Dokumente hoch, bevor Sie einreichen.",
+    "noEmploymentRecord": "Ihr Beschäftigungsdatensatz ist noch nicht bereit. Bitte wenden Sie sich an Ihre Führungskraft.",
+    "submittedForReview": "Ihre Bewerbung wurde zur Prüfung eingereicht."
   },
   "analytics": {
     "myPerformance": "Meine Leistung",
@@ -960,5 +980,19 @@
     "LOW": "Niedrig",
     "PROBATION": "Bewährung",
     "unrated": "Noch nicht bewertet"
+  },
+  "home": {
+    "greetingMorning": "Guten Morgen",
+    "greetingAfternoon": "Guten Tag",
+    "greetingEvening": "Guten Abend",
+    "greetingNoName": "Willkommen zurück",
+    "nextShift": "Nächste Schicht",
+    "noUpcomingShifts": "Keine bevorstehenden Schichten",
+    "noUpcomingShiftsBody": "Sobald Ihnen eine Schicht zugewiesen wird, erscheint sie hier.",
+    "browseJobs": "Offene Stellen ansehen",
+    "openJobs": "Offene Stellen",
+    "yourWeek": "Ihre Woche",
+    "viewAll": "Alle ansehen",
+    "documentsNeedAttention": "Dokumente benötigen Aufmerksamkeit"
   }
 }

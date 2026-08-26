@@ -11,8 +11,14 @@ import { useTranslation } from 'react-i18next';
 // Translation KEYS, not display strings: this map is module-scope, where
 // t() cannot be called. Each value is resolved at render time instead, so
 // the label follows the active language rather than being frozen at import.
+/**
+ * What the dropdown starts on. Must be a category the SERVER accepts — the
+ * previous default was a client-only `GENERAL`, which 422'd every upload made
+ * without changing the dropdown.
+ */
+const DEFAULT_CATEGORY: DocumentCategory = 'ID_CARD';
+
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  GENERAL: 'documents.categoryGENERAL',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
   TAX_NUMBER: 'documents.categoryTAX_NUMBER',
   SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
@@ -32,14 +38,14 @@ export function UploadDocumentCard({
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const [category, setCategory] = useState<DocumentCategory>('GENERAL');
+  const [category, setCategory] = useState<DocumentCategory>(DEFAULT_CATEGORY);
   const [isWorkPermit, setIsWorkPermit] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
   const { pending, uploading, error, pickFile, clearPending, upload } = useDocumentUpload(
     workerId,
     (doc) => {
       onUploaded(doc);
-      setCategory('GENERAL');
+      setCategory(DEFAULT_CATEGORY);
       setIsWorkPermit(false);
       setExpiresAt('');
     }
@@ -79,7 +85,7 @@ export function UploadDocumentCard({
           </ThemedView>
 
           <ThemedView style={styles.row} type="backgroundElement">
-            {(['GENERAL', 'WORK_PERMIT', 'TAX_NUMBER', 'SOCIAL_SECURITY_NUMBER', 'HEALTH_INSURANCE', 'ID_CARD', 'PASSPORT', 'ADDRESS', 'CONTRACT_SCAN'] as const).map((c) => (
+            {(['WORK_PERMIT', 'TAX_NUMBER', 'SOCIAL_SECURITY_NUMBER', 'HEALTH_INSURANCE', 'ID_CARD', 'PASSPORT', 'ADDRESS', 'CONTRACT_SCAN'] as const).map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}

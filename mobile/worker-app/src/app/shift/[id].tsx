@@ -2,7 +2,7 @@ import { StyleSheet, ScrollView, Pressable, ActivityIndicator, Alert, View, Link
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import * as Location from 'expo-location';
+import { getCoordinatesIfAvailable } from '@/lib/optional-location';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { api } from '@/lib/api';
@@ -71,17 +71,9 @@ export default function ShiftDetailScreen() {
     if (!shift) return;
     setActing(true);
     try {
-      let location: { latitude: number; longitude: number } | undefined;
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const position = await Location.getCurrentPositionAsync({});
-          location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-        }
-      } catch {
-        // Location sampling failed -- fall through; backend decides whether
-        // this hotel requires it.
-      }
+      // Undefined when the module, the permission or the fix is unavailable;
+      // the backend decides whether this hotel requires coordinates.
+      const location = await getCoordinatesIfAvailable();
 
       await api.attendance.checkIn(shift.id, location);
       await reload();
@@ -97,17 +89,9 @@ export default function ShiftDetailScreen() {
     if (!att?.id) return;
     setActing(true);
     try {
-      let location: { latitude: number; longitude: number } | undefined;
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === 'granted') {
-          const position = await Location.getCurrentPositionAsync({});
-          location = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-        }
-      } catch {
-        // Location sampling failed -- fall through; backend decides whether
-        // this hotel requires it.
-      }
+      // Undefined when the module, the permission or the fix is unavailable;
+      // the backend decides whether this hotel requires coordinates.
+      const location = await getCoordinatesIfAvailable();
 
       await api.attendance.checkOut(att.id, location);
       await reload();
