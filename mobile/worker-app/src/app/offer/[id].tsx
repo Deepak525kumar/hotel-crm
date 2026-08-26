@@ -39,9 +39,12 @@ export default function OfferDetailScreen() {
   const [offer, setOffer] = useState<Broadcast | null>(null);
   const [eligibility, setEligibility] = useState<BroadcastEligibility | null>(null);
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState<SkillTag | null>(null);
+  // Keyed by slot id, not skill: a `null` skill (no specific skill
+  // required, 2026-08-26) would otherwise be indistinguishable from "not
+  // accepting anything" -- slot ids are always unique and non-null.
+  const [acceptingSlotId, setAcceptingSlotId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [fulfilledSkill, setFulfilledSkill] = useState<SkillTag | null>(null);
+  const [fulfilledSlotId, setFulfilledSlotId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -62,10 +65,10 @@ export default function OfferDetailScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const onAccept = async (skill: SkillTag) => {
+  const onAccept = async (skill: SkillTag | null, slotId: string) => {
     if (!id) return;
     setError(null);
-    setAccepting(skill);
+    setAcceptingSlotId(slotId);
     try {
       const result = await api.workRequests.acceptBroadcast(id, skill);
       if (result.status === 'accepted') {
@@ -74,12 +77,12 @@ export default function OfferDetailScreen() {
       }
       // Lost the first-accept race — not an error, no assignment created.
       // Show a non-error state and let the worker re-check the offer.
-      setFulfilledSkill(skill);
+      setFulfilledSlotId(slotId);
       await load();
     } catch (err) {
       setError(translateApiError(err, t, 'errors.generic'));
     } finally {
-      setAccepting(null);
+      setAcceptingSlotId(null);
     }
   };
 
@@ -143,22 +146,30 @@ export default function OfferDetailScreen() {
           <ThemedText type="small" themeColor="textSecondary" style={styles.sectionLabel}>{t("requests.skillsNeeded")}</ThemedText>
           {offer.skill_slots.map((slot) => {
             const filled = slot.confirmed_count >= slot.headcount;
-            const canAccept = !closed && mySlots.some((s) => s.skill === slot.skill);
+            // Compared by id, not skill: mySlots is already the eligible
+            // subset of offer.skill_slots (resolveMySlots), and multiple
+            // slots can share the same skill value -- including `null`
+            // ("no specific skill required", 2026-08-26) -- so an id
+            // comparison is the only one that can't cross-match the wrong
+            // slot.
+            const canAccept = !closed && mySlots.some((s) => s.id === slot.id);
             return (
               <ThemedView key={slot.id} type="backgroundElement" style={styles.slotRow}>
                 <View style={styles.flex}>
-                  <ThemedText type="smallBold">{SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}</ThemedText>
+                  <ThemedText type="smallBold">
+                    {slot.skill === null ? t('requests.anySkill') : SKILL_LABEL_KEY[slot.skill] ? t(SKILL_LABEL_KEY[slot.skill]) : slot.skill}
+                  </ThemedText>
                   <ThemedText type="small" themeColor="textSecondary">
                     {slot.confirmed_count}/{slot.headcount} confirmed
                   </ThemedText>
                 </View>
                 {canAccept && (
                   <Pressable
-                    onPress={() => onAccept(slot.skill)}
-                    disabled={accepting !== null}
+                    onPress={() => onAccept(slot.skill, slot.id)}
+                    disabled={acceptingSlotId !== null}
                     style={styles.acceptButton}
                   >
-                    {accepting === slot.skill ? (
+                    {acceptingSlotId === slot.id ? (
                       <ActivityIndicator size="small" color="#ffffff" />
                     ) : (
                       <ThemedText type="smallBold" style={styles.acceptButtonText}>{t('jobs.accept')}</ThemedText>
@@ -170,7 +181,7 @@ export default function OfferDetailScreen() {
             );
           })}
 
-          {fulfilledSkill && (
+          {fulfilledSlotId && (
             <ThemedView type="backgroundElement" style={styles.noticeCard}>
               <ThemedText type="small" themeColor="textSecondary">{t("shifts.alreadyFilledByAnother")}</ThemedText>
             </ThemedView>

@@ -28,3 +28,21 @@ export const SKILL_LABEL_KEY: Record<SkillTag, string> = SKILL_OPTIONS.reduce(
   (acc, opt) => ({ ...acc, [opt.value]: opt.labelKey }),
   {} as Record<SkillTag, string>,
 );
+
+/**
+ * `null` on a `JobRequestSkillSlot` means "no specific skill required" — the
+ * slot is open to every roster-eligible, free worker regardless of which (if
+ * any) skills they hold (2026-08-26). Distinct from `SKILL_OPTIONS`
+ * deliberately: that list enumerates a WORKER's actual assignable skill
+ * tags (WorkerOnboardingCard's edit modal, UserForm) and must never gain a
+ * "None" entry there — a worker cannot have "no skill" as one of their own
+ * skills. This key exists only for a broadcast SKILL SLOT, where "no skill
+ * required" is a real, selectable option.
+ */
+export const NO_SKILL_LABEL_KEY = "requests.anySkill";
+
+/** Renders a skill-slot's `skill` for display, including the `null` ("no specific skill required") case. `t` is react-i18next's translate function. */
+export function skillSlotLabel(t: (key: string) => string, skill: SkillTag | null): string {
+  if (skill === null) return t(NO_SKILL_LABEL_KEY);
+  return t(SKILL_LABEL_KEY[skill]) || skill;
+}

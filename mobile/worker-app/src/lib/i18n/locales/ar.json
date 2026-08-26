@@ -700,6 +700,8 @@
     "broadcastsLoadFailed": "تعذر تحميل البث. يرجى المحاولة مرة أخرى.",
     "skillsNeeded": "المهارات المطلوبة",
     "addSkill": "إضافة مهارة",
+    "noSkillOption": "لا حاجة لمهارة محددة",
+    "anySkill": "أي مهارة",
     "raiseBroadcastAction": "إطلاق البث",
     "slotClaimedByOther": "حجز شخص آخر هذا المكان قبلك مباشرة — لم يتم إسناد أي وردية."
   },

@@ -309,6 +309,83 @@ describe('JobRequestService.acceptBroadcast', () => {
     );
   });
 
+  // 2026-08-26 (reported live: "when no skill is selected the request
+  // should go to all the workers that are in scope"). A null-skill slot
+  // requires no EmploymentRecord.skills check at all -- a worker holding no
+  // skills whatsoever can still claim it, as long as they're otherwise
+  // roster-eligible/free/not-absent.
+  it('allows a worker with NO skills to accept a "no specific skill required" (null) slot', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 1 })] })
+    );
+    mockEmploymentRecord.findUnique.mockResolvedValue({
+      status: 'ACTIVE',
+      hotel_group_id: 'g1',
+      skills: [], // holds no skill tags at all
+    });
+    mockWorkerAssignment.findFirst.mockResolvedValue(null); // free that day
+    mockJobRequestSkillSlot.updateMany.mockResolvedValue({ count: 1 });
+    mockWorkerAssignment.create.mockResolvedValue({ id: 'a1' });
+    mockCalendarEntry.create.mockResolvedValue({ id: 'ce1' });
+
+    const result = await service.acceptBroadcast('jr1', null, { userId: 'w1', role: 'worker' });
+
+    expect(result).toEqual({
+      status: 'accepted',
+      assignment_id: 'a1',
+      job_request_id: 'jr1',
+      skill: null,
+    });
+    expect(mockWorkerAssignment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ skill_slot_id: 'slot1', worker_id: 'w1' }),
+    });
+  });
+
+  it('does not look up EmploymentRecord.skills at all for a null-skill accept (roster eligibility is the only gate)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 1 })] })
+    );
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockJobRequestSkillSlot.updateMany.mockResolvedValue({ count: 1 });
+    mockWorkerAssignment.create.mockResolvedValue({ id: 'a1' });
+    mockCalendarEntry.create.mockResolvedValue({ id: 'ce1' });
+
+    await service.acceptBroadcast('jr1', null, { userId: 'w1', role: 'worker' });
+
+    // isWorkerEligibleForHotel() itself calls employmentRecord.findUnique
+    // twice (resolveWorkerGroupScope()'s status/hotel_group_id read, then
+    // its own record.id read for the blocklist check) -- the assertion is
+    // that the service's OWN third, skills-specific lookup never fires for
+    // skill: null. A real-skill accept ('CLEANER', tested above) makes that
+    // third call; this one must not.
+    expect(mockEmploymentRecord.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns "requirement fulfilled" (not an error) when a null-skill claim affects zero rows', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(
+      makeJobRequestRow({ skill_slots: [makeSkillSlotRow({ skill: null, headcount: 1 })] })
+    );
+    mockWorkerAssignment.findFirst.mockResolvedValue(null);
+    mockJobRequestSkillSlot.updateMany.mockResolvedValue({ count: 0 }); // slot already filled
+
+    const result = await service.acceptBroadcast('jr1', null, { userId: 'w1', role: 'worker' });
+
+    expect(result).toEqual({
+      status: 'requirement_fulfilled',
+      job_request_id: 'jr1',
+      skill: null,
+    });
+    expect(mockWorkerAssignment.create).not.toHaveBeenCalled();
+  });
+
+  it('throws NotFoundError when the worker claims null but the broadcast has no null-skill slot', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow()); // only a CLEANER slot
+    await expect(
+      service.acceptBroadcast('jr1', null, { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'NotFoundError' });
+    expect(mockJobRequestSkillSlot.updateMany).not.toHaveBeenCalled();
+  });
+
   it('returns "requirement fulfilled" (not an error) when the claim affects zero rows', async () => {
     mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
     mockEmploymentRecord.findUnique.mockResolvedValue({

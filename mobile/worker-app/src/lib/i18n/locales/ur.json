@@ -700,6 +700,8 @@
     "broadcastsLoadFailed": "اعلانات لوڈ نہیں ہو سکے۔ دوبارہ کوشش کریں۔",
     "skillsNeeded": "درکار مہارتیں",
     "addSkill": "مہارت شامل کریں",
+    "noSkillOption": "کسی مخصوص مہارت کی ضرورت نہیں",
+    "anySkill": "کوئی بھی مہارت",
     "raiseBroadcastAction": "اعلان بھیجیں",
     "slotClaimedByOther": "کسی اور نے یہ جگہ آپ سے ذرا پہلے لے لی — کوئی شفٹ تفویض نہیں ہوئی۔"
   },

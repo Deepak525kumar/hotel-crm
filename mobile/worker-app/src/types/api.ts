@@ -251,7 +251,8 @@ export type SkillTag = 'CLEANER' | 'PUBLIC_SERVICE' | 'KITCHEN_DISHWASHER' | 'WA
 
 export interface JobRequestSkillSlot {
   id: string;
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — open to every eligible worker (2026-08-26). */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
 }
@@ -269,7 +270,8 @@ export interface Broadcast extends WorkRequest {
 // exists on the wire at all — a worker/checker caller instead gets
 // `eligible`, their own inclusion for this slot only.
 export interface SkillSlotEligibility {
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — open to every eligible worker (2026-08-26). */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
   eligible_count: number;
@@ -288,8 +290,8 @@ export interface BroadcastEligibility {
 // race returns `requirement_fulfilled`, not an error — no assignment is
 // created, and the caller must not treat this as a failure.
 export type AcceptBroadcastResult =
-  | { status: 'accepted'; assignment_id: string; job_request_id: string; skill: SkillTag }
-  | { status: 'requirement_fulfilled'; job_request_id: string; skill: SkillTag };
+  | { status: 'accepted'; assignment_id: string; job_request_id: string; skill: SkillTag | null }
+  | { status: 'requirement_fulfilled'; job_request_id: string; skill: SkillTag | null };
 
 // Backend list endpoints return the array directly in body.data.
 // Pagination metadata (page, per_page, total) is in body.pagination but

@@ -390,7 +390,9 @@ export const api = {
       request<BroadcastEligibility>(`/work-requests/broadcasts/${id}/eligibility`),
     // Worker accepts one skill slot on a broadcast. First-accept wins; a
     // lost race returns {status: 'requirement_fulfilled'}, not an error.
-    acceptBroadcast: (id: string, skill: SkillTag) =>
+    // `skill: null` (2026-08-26) claims the "no specific skill required"
+    // slot, if the broadcast has one.
+    acceptBroadcast: (id: string, skill: SkillTag | null) =>
       request<AcceptBroadcastResult>(`/work-requests/broadcasts/${id}/accept`, {
         method: 'POST',
         body: JSON.stringify({ skill }),
