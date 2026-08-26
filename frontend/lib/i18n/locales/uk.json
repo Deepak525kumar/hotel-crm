@@ -81,7 +81,8 @@
     "loadFailed": "Не вдалося завантажити",
     "tomorrow": "Завтра",
     "getDirections": "Маршрут проїзду",
-    "success": "Успішно"
+    "success": "Успішно",
+    "send": "Надіслати"
   },
   "fields": {
     "name": "Ім'я",
@@ -321,7 +322,14 @@
     "localDevBuild": "Локальна збірка розробки",
     "pageDescription": "Налаштування вашого облікового запису, сеансу та застосунку.",
     "signedInAs": "Увійшли як",
-    "notAvailableYet": "Ще недоступно"
+    "notAvailableYet": "Ще недоступно",
+    "resetPassword": "Скинути пароль",
+    "resetPasswordBody": "Ми надішлемо посилання для скидання на {{email}}.",
+    "resetPasswordSent": "Якщо така адреса існує, посилання вже надіслано.",
+    "resetPasswordFailed": "Не вдалося розпочати скидання. Спробуйте ще раз.",
+    "title": "Налаштування",
+    "appearanceHint": "Виберіть вигляд застосунку. «Як на пристрої» слідує налаштуванням телефона.",
+    "storedOnDevice": "Ці налаштування зберігаються на цьому пристрої. Мова також синхронізується з вашим обліковим записом."
   },
   "auth": {
     "login": "Увійти",
@@ -349,7 +357,8 @@
     "resetLinkSentHint": "Якщо ця електронна адреса існує, на неї надіслано посилання для скидання пароля.",
     "enterNewPasswordHint": "Введіть новий пароль для свого облікового запису.",
     "resetPasswordTitle": "Скинути пароль",
-    "invalidResetTokenMissing": "Недійсний або відсутній токен скидання."
+    "invalidResetTokenMissing": "Недійсний або відсутній токен скидання.",
+    "enterEmailForReset": "Спочатку введіть свою електронну адресу, потім натисніть «Забули пароль»."
   },
   "search": {
     "byNameOrEmail": "Пошук за іменем або поштою…",
@@ -398,7 +407,14 @@
     "detailsTitle": "Деталі зміни",
     "upcomingTitle": "Майбутні зміни",
     "offerNoLongerOpen": "Ця пропозиція більше не відкрита.",
-    "alreadyFilledByAnother": "Цю зміну вже зайняв інший працівник."
+    "alreadyFilledByAnother": "Цю зміну вже зайняв інший працівник.",
+    "assignedBy": "Призначив",
+    "exactLocation": "Точне місце",
+    "addressSearch": "За адресою",
+    "openInMaps": "Відкрити в Картах",
+    "mapsUnavailable": "На цьому пристрої немає застосунку карт.",
+    "callHotel": "Зателефонувати в готель",
+    "emailHotel": "Написати готелю"
   },
   "jobs": {
     "none": "Відкритих вакансій не знайдено.",
@@ -414,7 +430,10 @@
     "position": "Посада",
     "pay": "Оплата",
     "offerBadge": "ПРОПОЗИЦІЯ",
-    "noLongerOpen": "Ця вакансія більше не відкрита."
+    "noLongerOpen": "Ця вакансія більше не відкрита.",
+    "hotel": "Готель",
+    "location": "Місце",
+    "description": "Опис"
   },
   "documents": {
     "title": "Документи",
@@ -423,6 +442,7 @@
     "expiryPlaceholder": "Термін дії (необов'язково, РРРР-ММ-ДД)",
     "expiryFormat": "Термін дії має бути у форматі РРРР-ММ-ДД.",
     "view": "Переглянути",
+    "viewAll": "Переглянути документи",
     "categoryGENERAL": "Загальне",
     "categoryWORK_PERMIT": "Дозвіл на роботу",
     "upload": "Завантажити",
@@ -448,7 +468,18 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "Зробити фото",
+    "choosePhoto": "Вибрати фото",
+    "cameraPermissionDenied": "Для зйомки потрібен доступ до камери. Увімкніть його в Налаштуваннях.",
+    "libraryPermissionDenied": "Для вибору фото потрібен доступ до фотографій. Увімкніть його в Налаштуваннях.",
+    "replace": "Замінити",
+    "uploaded": "Завантажено",
+    "required": "Обов’язково",
+    "previewUnavailable": "Попередній перегляд недоступний",
+    "deleteConfirm": "Ви впевнені, що хочете видалити цей документ?",
+    "missingRequired": "Бракує обов’язкових документів",
+    "missingRequiredDesc": "Будь ласка, завантажте такі відсутні документи:"
   },
   "hr": {
     "title": "Кадри та зарплата",
@@ -557,7 +588,17 @@
     "sendResetLink": "Надіслати посилання для скидання",
     "firstNameLastNameRequired": "Ім'я та прізвище є обов'язковими.",
     "phoneInvalid": "Телефон має бути дійсним міжнародним номером, напр. +49301234567.",
-    "viewProfile": "Переглянути профіль"
+    "viewProfile": "Переглянути профіль",
+    "myDetails": "Мої дані",
+    "identity": "Особисті дані",
+    "name": "Ім’я",
+    "email": "Електронна пошта",
+    "role": "Роль",
+    "employment": "Працевлаштування",
+    "employeeId": "ID працівника",
+    "jobTitle": "Посада",
+    "startDate": "Дата початку",
+    "employmentStatus": "Статус"
   },
   "skills": {
     "CLEANER": "Прибиральник",
@@ -597,7 +638,10 @@
     "viewWeek": "Тиждень",
     "viewMonth": "Місяць",
     "sickOrVacation": "Хвороба / Відпустка",
-    "yourMarkedDays": "Ваші позначені дні"
+    "yourMarkedDays": "Ваші позначені дні",
+    "viewmonth": "Місяць",
+    "viewweek": "Тиждень",
+    "viewday": "День"
   },
   "hotels": {
     "inThisGroup": "Готелі цієї групи",
@@ -775,7 +819,11 @@
     "submitForReview": "Надіслати на перевірку",
     "submitDisabledHint": "Завантажте всі потрібні документи перед надсиланням.",
     "noEmploymentRecord": "Ваш запис про працевлаштування ще не готовий. Зверніться до свого керівника.",
-    "submittedForReview": "Вашу заявку надіслано на перевірку."
+    "submittedForReview": "Вашу заявку надіслано на перевірку.",
+    "idOrPassport": "Посвідчення особи або паспорт",
+    "checklistTitle": "Ваші документи",
+    "remainingCount": "Ще потрібно: {{count}}",
+    "allUploaded": "Усі документи завантажено"
   },
   "analytics": {
     "myPerformance": "Моя результативність",
@@ -850,7 +898,14 @@
     "verificationNotesPlaceholder": "Нотатки перевірки (необов’язково)…",
     "verifiedMark": "Перевірено ✓",
     "verifiedBody": "Відвідування підтверджено.",
-    "verifyFailed": "Не вдалося підтвердити"
+    "verifyFailed": "Не вдалося підтвердити",
+    "checkedInAt": "Реєстрація: {{time}}",
+    "statusPRESENT": "Присутній",
+    "statusABSENT": "Відсутній",
+    "statusLATE": "Запізнення",
+    "statusPARTIAL": "Частково",
+    "statusEXCUSED": "Виправдано",
+    "statusEXPECTED": "Очікується"
   },
   "employees": {
     "noBlocked": "Немає заблокованих працівників",
@@ -941,7 +996,8 @@
     "reworkNotesRequired": "Опишіть, що потрібно переробити.",
     "reworkAssigned": "Переробку призначено. Працівника сповіщено.",
     "reworkPending": "Переробку призначено — очікується працівник",
-    "reworkCompleted": "Переробку завершено"
+    "reworkCompleted": "Переробку завершено",
+    "reworkDone": "Переробку надіслано {{when}}"
   },
   "ratings": {
     "comment": "Коментар",
@@ -964,7 +1020,14 @@
     "withdrawBody": "{{day}} більше не буде позначено як {{kind}}. Скасовану на цей день зміну не буде відновлено автоматично.",
     "withdrawA11y": "Скасувати {{kind}} на {{day}}",
     "markFailed": "Не вдалося зафіксувати відсутність.",
-    "withdrawFailed": "Не вдалося скасувати відсутність."
+    "withdrawFailed": "Не вдалося скасувати відсутність.",
+    "daysSelected": "Вибрано днів: {{count}}",
+    "tapAgainForRange": "Торкніться пізнішого дня, щоб вибрати період",
+    "reasonTitle": "Причина відпустки",
+    "reasonHint": "Обов’язково для відпустки. Не вказуйте медичні дані.",
+    "reasonPlaceholder": "напр. сімейна поїздка, особисті дні",
+    "reasonRequired": "Для відпустки потрібна причина.",
+    "reasonTooLong": "Будь ласка, вкладіться у 500 символів."
   },
   "checklist": {
     "dust": "Пил",
@@ -997,5 +1060,8 @@
     "yourWeek": "Ваш тиждень",
     "viewAll": "Переглянути все",
     "documentsNeedAttention": "Документи потребують уваги"
+  },
+  "marketplace": {
+    "description": "Зміни, на які ви можете подати заявку."
   }
 }

@@ -58,3 +58,22 @@ export function isRouteAllowedWhileGated(pathname: string): boolean {
   const allowed = [ONBOARDING_ROUTE, '/documents', '/settings'];
   return allowed.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
+
+/**
+ * Routes a gate sent the user to, rather than routes the user chose.
+ *
+ * `returnTo` exists to restore where someone was heading when their session
+ * lapsed. A gate destination is the opposite of that: nobody navigates to
+ * /onboarding on purpose, they are put there. Capturing one produced a
+ * cross-account bug -- a PENDING worker was redirected to /onboarding, logged
+ * out from that screen (which is where the sign-out button lives), and
+ * AuthGuard recorded returnTo=/onboarding. The next worker to sign in on that
+ * device, ACTIVE and fully onboarded, was then sent straight to the onboarding
+ * screen and had no way off it, because the gate only ever redirects gated
+ * users TO onboarding and never non-gated users away. It survived until the
+ * app was reloaded and router state was discarded.
+ */
+export function isGateOwnedRoute(pathname: string): boolean {
+  const gateRoutes = [ONBOARDING_ROUTE, '/consent'];
+  return gateRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}

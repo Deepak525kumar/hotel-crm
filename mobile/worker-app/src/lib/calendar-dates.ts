@@ -24,3 +24,32 @@ export function formatDay(day: string): string {
     timeZone: 'UTC',
   });
 }
+
+/** Every ISO day from `start` to `end` inclusive, in order. Empty if reversed. */
+export function datesInRange(start: string, end: string): string[] {
+  if (end < start) return [];
+  const days: string[] = [];
+  const cursor = new Date(`${start}T00:00:00.000Z`);
+  const last = new Date(`${end}T00:00:00.000Z`);
+  while (cursor <= last) {
+    days.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+/** Monday-based week containing `day`, as seven ISO dates. */
+export function weekOf(day: string): string[] {
+  const d = new Date(`${day}T00:00:00.000Z`);
+  const offset = (d.getUTCDay() + 6) % 7;
+  d.setUTCDate(d.getUTCDate() - offset);
+  const monday = d.toISOString().slice(0, 10);
+  return datesInRange(monday, addDays(monday, 6));
+}
+
+/** `day` shifted by `n` days, staying date-only. */
+export function addDays(day: string, n: number): string {
+  const d = new Date(`${day}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}

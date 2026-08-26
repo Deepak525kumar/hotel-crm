@@ -1,4 +1,4 @@
-import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
+import { isoDateInCalendarTimezone, formatDay, datesInRange, weekOf, addDays } from '@/lib/calendar-dates';
 
 /**
  * GD-18 narrow slice (OD-CAL-04): the mobile "today"/"tomorrow" quick-mark
@@ -41,5 +41,50 @@ describe('isoDateInCalendarTimezone', () => {
 describe('formatDay', () => {
   it('formats a YYYY-MM-DD string for display without a local-timezone off-by-one', () => {
     expect(formatDay('2026-07-28')).toBe('Tue, Jul 28');
+  });
+});
+
+describe('datesInRange', () => {
+  it('includes both ends', () => {
+    expect(datesInRange('2026-08-24', '2026-08-26')).toEqual(['2026-08-24', '2026-08-25', '2026-08-26']);
+  });
+
+  it('returns a single day when start equals end', () => {
+    expect(datesInRange('2026-08-24', '2026-08-24')).toEqual(['2026-08-24']);
+  });
+
+  it('returns nothing when the range is reversed', () => {
+    expect(datesInRange('2026-08-26', '2026-08-24')).toEqual([]);
+  });
+
+  it('crosses a month boundary', () => {
+    expect(datesInRange('2026-08-30', '2026-09-01')).toEqual(['2026-08-30', '2026-08-31', '2026-09-01']);
+  });
+
+  // 2028 is a leap year; a naive +1 day over Feb 28 loses the 29th.
+  it('crosses a leap day', () => {
+    expect(datesInRange('2028-02-28', '2028-03-01')).toEqual(['2028-02-28', '2028-02-29', '2028-03-01']);
+  });
+});
+
+describe('weekOf', () => {
+  it('starts the week on Monday', () => {
+    // 2026-08-26 is a Wednesday.
+    const week = weekOf('2026-08-26');
+    expect(week).toHaveLength(7);
+    expect(week[0]).toBe('2026-08-24');
+    expect(week[6]).toBe('2026-08-30');
+  });
+
+  // Sunday is the end of a Monday-based week, not the start of the next one.
+  it('treats Sunday as the last day of the same week', () => {
+    expect(weekOf('2026-08-30')[0]).toBe('2026-08-24');
+  });
+});
+
+describe('addDays', () => {
+  it('moves forward and backward across a month boundary', () => {
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-09-01', -1)).toBe('2026-08-31');
   });
 });

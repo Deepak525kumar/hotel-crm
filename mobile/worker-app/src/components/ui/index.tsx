@@ -115,12 +115,50 @@ export function Button({
 
 // ------------------------------------------------------- SectionHeader
 
-export function SectionHeader({ title, action }: { title: string; action?: ReactNode }) {
+/**
+ * A screen's title row, with the notification bell on the right.
+ *
+ * Four screens had grown their own copy of this with slightly different
+ * spacing and alignment, which is what made the app feel assembled rather
+ * than designed.
+ */
+export function ScreenHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+  return (
+    <View style={styles.screenHeader}>
+      <View style={styles.sectionText}>
+        {subtitle ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {subtitle}
+          </ThemedText>
+        ) : null}
+        <ThemedText type="title">{title}</ThemedText>
+      </View>
+      {action}
+    </View>
+  );
+}
+
+export function SectionHeader({
+  title,
+  subtitle,
+  action,
+}: {
+  title: string;
+  subtitle?: string;
+  action?: ReactNode;
+}) {
   return (
     <View style={styles.sectionHeader}>
-      <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-        {title.toUpperCase()}
-      </ThemedText>
+      <View style={styles.sectionText}>
+        <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
+          {title.toUpperCase()}
+        </ThemedText>
+        {subtitle ? (
+          <ThemedText type="small" themeColor="textSecondary">
+            {subtitle}
+          </ThemedText>
+        ) : null}
+      </View>
       {action}
     </View>
   );
@@ -258,6 +296,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.three,
+  },
+  sectionText: { flex: 1, gap: 2 },
+  screenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+    marginBottom: Spacing.three,
   },
   sectionHeader: {
     flexDirection: 'row',

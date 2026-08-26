@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { NotificationBell } from '@/components/NotificationBell';
 import { Badge, Button, Card, ListRow, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { Radius, Spacing } from '@/constants/theme';
@@ -64,18 +65,29 @@ export default function ProfileScreen() {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.headerRow}>
             <ThemedText type="title">{t('profile.title')}</ThemedText>
-            <Pressable
+            <View style={styles.headerActions}>
+              <NotificationBell />
+              <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('nav.settings')}
               onPress={() => router.push('/settings')}
               hitSlop={12}
               style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
             >
-              <ThemedText type="subtitle">⚙</ThemedText>
-            </Pressable>
+                <ThemedText type="subtitle">⚙</ThemedText>
+              </Pressable>
+            </View>
           </View>
 
-          <Card style={styles.identity}>
+          {/* The identity block is the natural place to tap for "my details",
+              and it was inert until now. */}
+          <Pressable
+            onPress={() => router.push('/profile-details')}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.myDetails')}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Card style={styles.identity}>
             <View style={[styles.avatar, { backgroundColor: theme.primarySubtle }]}>
               <ThemedText type="subtitle" style={{ color: theme.primary }}>
                 {initials}
@@ -95,7 +107,8 @@ export default function ProfileScreen() {
                 ) : null}
               </View>
             </View>
-          </Card>
+            </Card>
+          </Pressable>
 
           {user.manager_name || user.creator_name ? (
             <>
@@ -114,7 +127,7 @@ export default function ProfileScreen() {
           <SectionHeader title={t('common.quickLinks')} />
           <Card style={styles.linkCard}>
             <ListRow
-              title={t('documents.view')}
+              title={t('documents.viewAll')}
               onPress={() => router.push('/documents')}
               right={<ThemedText themeColor="textSecondary">›</ThemedText>}
             />
@@ -128,13 +141,9 @@ export default function ProfileScreen() {
               onPress={() => router.push('/ratings')}
               right={<ThemedText themeColor="textSecondary">›</ThemedText>}
             />
-            {/* Notifications and Jobs lost their tabs when the bar went to
-                three; they still need a way in. */}
-            <ListRow
-              title={t('nav.alerts')}
-              onPress={() => router.push('/(app)/notifications')}
-              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
-            />
+            {/* Alerts are reached from the bell in every screen header now,
+                so this row would be a second, staler way in. Jobs still needs
+                one -- it lost its tab when the bar went to three. */}
             <ListRow
               title={t('nav.jobs')}
               onPress={() => router.push('/(app)/marketplace')}
@@ -170,6 +179,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.six,
     gap: Spacing.two,
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

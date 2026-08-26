@@ -81,7 +81,8 @@
     "loadFailed": "Échec du chargement",
     "tomorrow": "Demain",
     "getDirections": "Obtenir l'itinéraire",
-    "success": "Succès"
+    "success": "Succès",
+    "send": "Envoyer"
   },
   "fields": {
     "name": "Nom",
@@ -321,7 +322,14 @@
     "localDevBuild": "Build de développement local",
     "pageDescription": "Vos préférences de compte, de session et d'application.",
     "signedInAs": "Connecté en tant que",
-    "notAvailableYet": "Pas encore disponible"
+    "notAvailableYet": "Pas encore disponible",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "resetPasswordBody": "Nous enverrons un lien de réinitialisation à {{email}}.",
+    "resetPasswordSent": "Si cet e-mail existe, un lien est en route.",
+    "resetPasswordFailed": "Impossible de lancer la réinitialisation. Veuillez réessayer.",
+    "title": "Réglages",
+    "appearanceHint": "Choisissez l’apparence de l’app. « Suivre l’appareil » suit les réglages de votre téléphone.",
+    "storedOnDevice": "Ces préférences sont enregistrées sur cet appareil. Votre langue est aussi synchronisée avec votre compte."
   },
   "auth": {
     "login": "Se connecter",
@@ -349,7 +357,8 @@
     "resetLinkSentHint": "Si cet e-mail existe, un lien de réinitialisation du mot de passe lui a été envoyé.",
     "enterNewPasswordHint": "Saisissez un nouveau mot de passe pour votre compte.",
     "resetPasswordTitle": "Réinitialiser le mot de passe",
-    "invalidResetTokenMissing": "Jeton de réinitialisation invalide ou manquant."
+    "invalidResetTokenMissing": "Jeton de réinitialisation invalide ou manquant.",
+    "enterEmailForReset": "Saisissez d'abord votre e-mail, puis touchez Mot de passe oublié."
   },
   "search": {
     "byNameOrEmail": "Rechercher par nom ou e-mail…",
@@ -398,7 +407,14 @@
     "detailsTitle": "Détails du service",
     "upcomingTitle": "Services à venir",
     "offerNoLongerOpen": "Cette offre n'est plus ouverte.",
-    "alreadyFilledByAnother": "Ce service a déjà été pourvu par un autre employé."
+    "alreadyFilledByAnother": "Ce service a déjà été pourvu par un autre employé.",
+    "assignedBy": "Assigné par",
+    "exactLocation": "Emplacement exact",
+    "addressSearch": "Par adresse",
+    "openInMaps": "Ouvrir dans Plans",
+    "mapsUnavailable": "Aucune application de cartes n’est disponible sur cet appareil.",
+    "callHotel": "Appeler l’hôtel",
+    "emailHotel": "Envoyer un e-mail à l’hôtel"
   },
   "jobs": {
     "none": "Aucune offre disponible.",
@@ -414,7 +430,10 @@
     "position": "Poste",
     "pay": "Rémunération",
     "offerBadge": "OFFRE",
-    "noLongerOpen": "Cette offre n'est plus ouverte."
+    "noLongerOpen": "Cette offre n'est plus ouverte.",
+    "hotel": "Hôtel",
+    "location": "Lieu",
+    "description": "Description"
   },
   "documents": {
     "title": "Documents",
@@ -423,6 +442,7 @@
     "expiryPlaceholder": "Date d'expiration (facultatif, AAAA-MM-JJ)",
     "expiryFormat": "La date d'expiration doit être au format AAAA-MM-JJ.",
     "view": "Voir",
+    "viewAll": "Voir les documents",
     "categoryGENERAL": "Général",
     "categoryWORK_PERMIT": "Permis de travail",
     "upload": "Téléverser",
@@ -448,7 +468,18 @@
     "categoryID_CARD": "ID Card",
     "categoryPASSPORT": "Passport",
     "categoryADDRESS": "Proof of Address",
-    "categoryCONTRACT_SCAN": "Signed Contract"
+    "categoryCONTRACT_SCAN": "Signed Contract",
+    "takePhoto": "Prendre une photo",
+    "choosePhoto": "Choisir une photo",
+    "cameraPermissionDenied": "L'accès à l'appareil photo est nécessaire. Vous pouvez l'activer dans les Réglages.",
+    "libraryPermissionDenied": "L'accès aux photos est nécessaire. Vous pouvez l'activer dans les Réglages.",
+    "replace": "Remplacer",
+    "uploaded": "Téléversé",
+    "required": "Requis",
+    "previewUnavailable": "Aperçu indisponible",
+    "deleteConfirm": "Voulez-vous vraiment supprimer ce document ?",
+    "missingRequired": "Documents requis manquants",
+    "missingRequiredDesc": "Veuillez téléverser les documents manquants suivants :"
   },
   "hr": {
     "title": "RH et paie",
@@ -557,7 +588,17 @@
     "sendResetLink": "Envoyer le lien de réinitialisation",
     "firstNameLastNameRequired": "Le prénom et le nom sont requis.",
     "phoneInvalid": "Le téléphone doit être un numéro international valide, par ex. +49301234567.",
-    "viewProfile": "Voir le profil"
+    "viewProfile": "Voir le profil",
+    "myDetails": "Mes informations",
+    "identity": "Identité",
+    "name": "Nom",
+    "email": "E-mail",
+    "role": "Rôle",
+    "employment": "Emploi",
+    "employeeId": "Identifiant employé",
+    "jobTitle": "Intitulé du poste",
+    "startDate": "Date de début",
+    "employmentStatus": "Statut"
   },
   "skills": {
     "CLEANER": "Agent d'entretien",
@@ -597,7 +638,10 @@
     "viewWeek": "Semaine",
     "viewMonth": "Mois",
     "sickOrVacation": "Maladie / Congé",
-    "yourMarkedDays": "Vos jours signalés"
+    "yourMarkedDays": "Vos jours signalés",
+    "viewmonth": "Mois",
+    "viewweek": "Semaine",
+    "viewday": "Jour"
   },
   "hotels": {
     "inThisGroup": "Hôtels de ce groupe",
@@ -775,7 +819,11 @@
     "submitForReview": "Soumettre pour examen",
     "submitDisabledHint": "Téléversez tous les documents requis avant de soumettre.",
     "noEmploymentRecord": "Votre dossier d’emploi n’est pas encore prêt. Veuillez contacter votre responsable.",
-    "submittedForReview": "Votre candidature a été soumise pour examen."
+    "submittedForReview": "Votre candidature a été soumise pour examen.",
+    "idOrPassport": "Carte d'identité ou passeport",
+    "checklistTitle": "Vos documents",
+    "remainingCount": "{{count}} encore requis",
+    "allUploaded": "Tous les documents téléversés"
   },
   "analytics": {
     "myPerformance": "Mes performances",
@@ -850,7 +898,14 @@
     "verificationNotesPlaceholder": "Notes de vérification (facultatif)…",
     "verifiedMark": "Vérifié ✓",
     "verifiedBody": "La présence a été vérifiée.",
-    "verifyFailed": "Échec de la vérification"
+    "verifyFailed": "Échec de la vérification",
+    "checkedInAt": "Pointage : {{time}}",
+    "statusPRESENT": "Présent",
+    "statusABSENT": "Absent",
+    "statusLATE": "En retard",
+    "statusPARTIAL": "Partiel",
+    "statusEXCUSED": "Excusé",
+    "statusEXPECTED": "Attendu"
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
@@ -941,7 +996,8 @@
     "reworkNotesRequired": "Décrivez ce qui doit être refait.",
     "reworkAssigned": "Reprise attribuée. L'employé a été notifié.",
     "reworkPending": "Reprise attribuée — en attente de l'employé",
-    "reworkCompleted": "Reprise terminée"
+    "reworkCompleted": "Reprise terminée",
+    "reworkDone": "Reprise envoyée {{when}}"
   },
   "ratings": {
     "comment": "Commentaire",
@@ -964,7 +1020,14 @@
     "withdrawBody": "{{day}} ne sera plus marqué {{kind}}. Un service annulé pour ce jour n’est pas rétabli automatiquement.",
     "withdrawA11y": "Retirer {{kind}} le {{day}}",
     "markFailed": "Impossible d’enregistrer l’absence.",
-    "withdrawFailed": "Impossible de retirer l’absence."
+    "withdrawFailed": "Impossible de retirer l’absence.",
+    "daysSelected": "{{count}} jours sélectionnés",
+    "tapAgainForRange": "Touchez un jour ultérieur pour sélectionner une période",
+    "reasonTitle": "Motif des congés",
+    "reasonHint": "Requis pour les congés. N’indiquez pas de détails médicaux.",
+    "reasonPlaceholder": "p. ex. voyage en famille, jours personnels",
+    "reasonRequired": "Un motif est requis pour les congés.",
+    "reasonTooLong": "Veuillez limiter le motif à 500 caractères."
   },
   "checklist": {
     "dust": "Poussière",
@@ -997,5 +1060,8 @@
     "yourWeek": "Votre semaine",
     "viewAll": "Tout voir",
     "documentsNeedAttention": "Documents à compléter"
+  },
+  "marketplace": {
+    "description": "Créneaux auxquels vous pouvez postuler."
   }
 }

@@ -1,6 +1,7 @@
 import {
   shouldGateOnboarding,
   isRouteAllowedWhileGated,
+  isGateOwnedRoute,
   ONBOARDING_ROUTE,
 } from '@/lib/onboarding-gate-decision';
 
@@ -42,4 +43,33 @@ describe('isRouteAllowedWhileGated', () => {
       expect(isRouteAllowedWhileGated(route)).toBe(false);
     },
   );
+});
+
+describe('isGateOwnedRoute', () => {
+  // Regression: a PENDING worker was redirected to /onboarding, signed out
+  // from there (the sign-out button lives on that screen), and AuthGuard
+  // captured returnTo=/onboarding. The next worker to sign in on the same
+  // device -- ACTIVE, fully onboarded -- was sent to the onboarding screen
+  // and could not leave it until the app was reloaded.
+  it('treats gate destinations as not-returnable', () => {
+    expect(isGateOwnedRoute('/onboarding')).toBe(true);
+    expect(isGateOwnedRoute('/consent')).toBe(true);
+  });
+
+  it('treats routes the worker chose as returnable', () => {
+    expect(isGateOwnedRoute('/shifts')).toBe(false);
+    expect(isGateOwnedRoute('/documents')).toBe(false);
+    expect(isGateOwnedRoute('/settings')).toBe(false);
+    expect(isGateOwnedRoute('/shift/abc-123')).toBe(false);
+  });
+
+  // `/onboarding-summary` must not match on a bare prefix compare.
+  it('does not match a route that merely starts with the same characters', () => {
+    expect(isGateOwnedRoute('/onboarding-summary')).toBe(false);
+    expect(isGateOwnedRoute('/consent-history')).toBe(false);
+  });
+
+  it('matches nested routes under a gate destination', () => {
+    expect(isGateOwnedRoute('/onboarding/step-2')).toBe(true);
+  });
 });

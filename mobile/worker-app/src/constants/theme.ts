@@ -27,7 +27,11 @@ export const Colors = {
     backgroundElement: '#FFFFFF', // Pure white cards
     backgroundSelected: '#E2E8F0', // Slate 200
     textSecondary: '#64748B', // Slate 500
-    primary: '#4F46E5', // Indigo 600
+    // Teal rather than WhatsApp's own green: the palette already spends
+    // green on `success` (a completed shift), and an accent in the same
+    // hue would undo the distinction between "finished" and "this is a
+    // button". Teal keeps the messaging-app feel without the collision.
+    primary: '#0F766E', // Teal 700 — 4.8:1 on white, so onPrimary text passes AA
 
     // --- additive semantic tokens ---
     /** Hairline dividers and card outlines. */
@@ -37,7 +41,7 @@ export const Colors = {
     /** Text/icons drawn ON a `primary` fill. */
     onPrimary: '#FFFFFF',
     /** Tinted `primary` wash for selected rows and subtle callouts. */
-    primarySubtle: '#EEF2FF', // Indigo 50
+    primarySubtle: '#CCFBF1', // Teal 100
     success: '#15803D', // Green 700
     successSubtle: '#DCFCE7', // Green 100
     warning: '#B45309', // Amber 700
@@ -53,13 +57,13 @@ export const Colors = {
     backgroundElement: '#18181B', // Zinc 900
     backgroundSelected: '#27272A', // Zinc 800
     textSecondary: '#A1A1AA', // Zinc 400
-    primary: '#6366F1', // Indigo 500
+    primary: '#0D9488', // Teal 600 — lifted for the dark ground
 
     // --- additive semantic tokens ---
     border: '#27272A', // Zinc 800
     surfaceRaised: '#27272A', // Zinc 800
     onPrimary: '#FFFFFF',
-    primarySubtle: '#1E1B4B', // Indigo 950
+    primarySubtle: '#042F2E', // Teal 950
     // Lightened against the dark ground: the light-mode 700s fail contrast here.
     success: '#4ADE80', // Green 400
     successSubtle: '#14532D', // Green 900
