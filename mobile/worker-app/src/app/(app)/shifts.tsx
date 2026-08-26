@@ -3,10 +3,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
+import { NotificationBell } from '@/components/NotificationBell';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Badge, BadgeTone, Card, EmptyState, SectionHeader } from '@/components/ui';
+import { Badge, BadgeTone, Card, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
@@ -26,10 +27,15 @@ import type { AssignmentStatus, WorkerAssignment } from '@/types/api';
  */
 const STATUS_TONE: Record<AssignmentStatus, BadgeTone> = {
   CONFIRMED: 'primary',
-  IN_PROGRESS: 'success',
-  COMPLETED: 'neutral',
+  IN_PROGRESS: 'primary',
+  // The three terminal states carry the outcome, so they are the ones that
+  // must read at a glance: work done is green, work missed or called off is
+  // red. COMPLETED and CANCELLED were both 'neutral', which made a finished
+  // shift and a cancelled one look identical in a list -- the single most
+  // useful distinction on the screen.
+  COMPLETED: 'success',
   NO_SHOW: 'danger',
-  CANCELLED: 'neutral',
+  CANCELLED: 'danger',
   REASSIGNED: 'warning',
 };
 
@@ -110,7 +116,7 @@ export default function ScheduleScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <ThemedText type="title">{t('nav.schedule')}</ThemedText>
+          <ScreenHeader title={t('nav.schedule')} action={<NotificationBell />} />
         </View>
 
         <SectionHeader

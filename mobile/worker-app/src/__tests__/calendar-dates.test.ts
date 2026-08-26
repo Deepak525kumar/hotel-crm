@@ -1,4 +1,4 @@
-import { isoDateInCalendarTimezone, formatDay } from '@/lib/calendar-dates';
+import { isoDateInCalendarTimezone, formatDay, datesInRange, weekOf, addDays, calendarDateOf } from '@/lib/calendar-dates';
 
 /**
  * GD-18 narrow slice (OD-CAL-04): the mobile "today"/"tomorrow" quick-mark
@@ -41,5 +41,70 @@ describe('isoDateInCalendarTimezone', () => {
 describe('formatDay', () => {
   it('formats a YYYY-MM-DD string for display without a local-timezone off-by-one', () => {
     expect(formatDay('2026-07-28')).toBe('Tue, Jul 28');
+  });
+});
+
+describe('datesInRange', () => {
+  it('includes both ends', () => {
+    expect(datesInRange('2026-08-24', '2026-08-26')).toEqual(['2026-08-24', '2026-08-25', '2026-08-26']);
+  });
+
+  it('returns a single day when start equals end', () => {
+    expect(datesInRange('2026-08-24', '2026-08-24')).toEqual(['2026-08-24']);
+  });
+
+  it('returns nothing when the range is reversed', () => {
+    expect(datesInRange('2026-08-26', '2026-08-24')).toEqual([]);
+  });
+
+  it('crosses a month boundary', () => {
+    expect(datesInRange('2026-08-30', '2026-09-01')).toEqual(['2026-08-30', '2026-08-31', '2026-09-01']);
+  });
+
+  // 2028 is a leap year; a naive +1 day over Feb 28 loses the 29th.
+  it('crosses a leap day', () => {
+    expect(datesInRange('2028-02-28', '2028-03-01')).toEqual(['2028-02-28', '2028-02-29', '2028-03-01']);
+  });
+});
+
+describe('weekOf', () => {
+  it('starts the week on Monday', () => {
+    // 2026-08-26 is a Wednesday.
+    const week = weekOf('2026-08-26');
+    expect(week).toHaveLength(7);
+    expect(week[0]).toBe('2026-08-24');
+    expect(week[6]).toBe('2026-08-30');
+  });
+
+  // Sunday is the end of a Monday-based week, not the start of the next one.
+  it('treats Sunday as the last day of the same week', () => {
+    expect(weekOf('2026-08-30')[0]).toBe('2026-08-24');
+  });
+});
+
+describe('addDays', () => {
+  it('moves forward and backward across a month boundary', () => {
+    expect(addDays('2026-08-31', 1)).toBe('2026-09-01');
+    expect(addDays('2026-09-01', -1)).toBe('2026-08-31');
+  });
+});
+
+describe('calendarDateOf', () => {
+  // Regression: attendance took `check_in_at.slice(0, 10)`, i.e. the UTC date.
+  // From ~22:00 Berlin onward that is the previous day, so a shift checked
+  // into just after midnight local displayed as yesterday.
+  it('uses the Berlin day, not the UTC day, late in the evening', () => {
+    // 2026-08-26T22:30Z is 2026-08-27 00:30 in Berlin (CEST, UTC+2).
+    expect(calendarDateOf('2026-08-26T22:30:00.000Z')).toBe('2026-08-27');
+  });
+
+  it('agrees with the UTC date during the middle of the day', () => {
+    expect(calendarDateOf('2026-08-26T09:00:00.000Z')).toBe('2026-08-26');
+  });
+
+  // Winter is UTC+1, so the boundary moves by an hour.
+  it('handles the winter offset', () => {
+    expect(calendarDateOf('2026-01-15T23:30:00.000Z')).toBe('2026-01-16');
+    expect(calendarDateOf('2026-01-15T22:30:00.000Z')).toBe('2026-01-15');
   });
 });

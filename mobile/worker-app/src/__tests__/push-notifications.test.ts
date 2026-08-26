@@ -11,6 +11,7 @@ jest.mock('expo-notifications', () => ({
   getDevicePushTokenAsync: jest.fn(),
   setNotificationHandler: jest.fn(),
   addNotificationResponseReceivedListener: jest.fn(),
+  addNotificationReceivedListener: jest.fn(),
 }));
 jest.mock('@/lib/api', () => ({
   api: { notifications: { registerPushToken: jest.fn() } },
@@ -22,6 +23,7 @@ const mockNotifications = Notifications as unknown as {
   getDevicePushTokenAsync: jest.Mock;
   setNotificationHandler: jest.Mock;
   addNotificationResponseReceivedListener: jest.Mock;
+  addNotificationReceivedListener: jest.Mock;
 };
 
 const mockRegister = (api as unknown as {
@@ -173,6 +175,7 @@ describe('subscribeToPushNotifications', () => {
     mockRemove.mockReset();
     (mockRouter.push as jest.Mock).mockReset();
     mockNotifications.addNotificationResponseReceivedListener.mockReturnValue({ remove: mockRemove });
+    mockNotifications.addNotificationReceivedListener.mockReturnValue({ remove: jest.fn() });
   });
 
   // Web guard. expo-notifications has no working foreground handler on web,

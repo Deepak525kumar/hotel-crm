@@ -58,3 +58,41 @@ export function isRouteAllowedWhileGated(pathname: string): boolean {
   const allowed = [ONBOARDING_ROUTE, '/documents', '/settings'];
   return allowed.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
+
+/**
+ * Routes a gate sent the user to, rather than routes the user chose.
+ *
+ * `returnTo` exists to restore where someone was heading when their session
+ * lapsed. A gate destination is the opposite of that: nobody navigates to
+ * /onboarding on purpose, they are put there. Capturing one produced a
+ * cross-account bug -- a PENDING worker was redirected to /onboarding, logged
+ * out from that screen (which is where the sign-out button lives), and
+ * AuthGuard recorded returnTo=/onboarding. The next worker to sign in on that
+ * device, ACTIVE and fully onboarded, was then sent straight to the onboarding
+ * screen and had no way off it, because the gate only ever redirects gated
+ * users TO onboarding and never non-gated users away. It survived until the
+ * app was reloaded and router state was discarded.
+ */
+export function isGateOwnedRoute(pathname: string): boolean {
+  const gateRoutes = [ONBOARDING_ROUTE, '/consent'];
+  return gateRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
+/**
+ * Whether a user sitting on the onboarding screen should be sent into the app.
+ *
+ * The mirror of `shouldGateOnboarding`, and the half that was missing: the gate
+ * only ever pushed gated users TOWARD onboarding, so anyone who arrived there
+ * without being gated had no way off it. That is what made the cross-account
+ * `returnTo` bug survive until the app was reloaded.
+ *
+ * Also covers a worker whose record turns ACTIVE while they sit on the screen.
+ */
+export function shouldLeaveOnboarding(args: {
+  status: string | null | undefined;
+  role: string | null | undefined;
+  pathname: string;
+}): boolean {
+  if (args.pathname !== ONBOARDING_ROUTE) return false;
+  return !shouldGateOnboarding({ status: args.status, role: args.role });
+}

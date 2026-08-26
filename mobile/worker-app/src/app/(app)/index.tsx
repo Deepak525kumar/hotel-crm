@@ -7,7 +7,8 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Badge, Button, Card, EmptyState, SectionHeader, StatTile } from '@/components/ui';
+import { Badge, Button, Card, EmptyState, ScreenHeader, SectionHeader, StatTile } from '@/components/ui';
+import { NotificationBell } from '@/components/NotificationBell';
 import { useAuthStore } from '@/stores/auth-store';
 import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
@@ -83,12 +84,11 @@ export default function HomeScreen() {
           contentContainerStyle={styles.content}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
-          <View style={styles.header}>
-            <ThemedText type="small" themeColor="textSecondary">
-              {t(greetingKeyForHour(new Date().getHours()))}
-            </ThemedText>
-            <ThemedText type="title">{name ? name : t('home.greetingNoName')}</ThemedText>
-          </View>
+          <ScreenHeader
+            subtitle={t(greetingKeyForHour(new Date().getHours()))}
+            title={name ? name : t('home.greetingNoName')}
+            action={<NotificationBell />}
+          />
 
           {loading ? (
             <ActivityIndicator style={styles.loader} />
