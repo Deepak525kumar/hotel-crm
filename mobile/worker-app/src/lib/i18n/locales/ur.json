@@ -907,7 +907,8 @@
     "statusLATE": "دیر سے",
     "statusPARTIAL": "جزوی",
     "statusEXCUSED": "معذور",
-    "statusEXPECTED": "متوقع"
+    "statusEXPECTED": "متوقع",
+    "unknownWorker": "نامعلوم ورکر"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
@@ -999,7 +1000,8 @@
     "reworkAssigned": "دوبارہ کام تفویض کر دیا گیا۔ کارکن کو مطلع کر دیا گیا۔",
     "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
     "reworkCompleted": "دوبارہ کام مکمل",
-    "reworkDone": "دوبارہ کام جمع کرایا گیا {{when}}"
+    "reworkDone": "دوبارہ کام جمع کرایا گیا {{when}}",
+    "inspectedBy": "معائنہ کیا گیا از"
   },
   "ratings": {
     "comment": "تبصرہ",

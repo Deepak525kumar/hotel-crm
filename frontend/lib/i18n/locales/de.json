@@ -906,7 +906,8 @@
     "statusLATE": "Verspätet",
     "statusPARTIAL": "Teilweise",
     "statusEXCUSED": "Entschuldigt",
-    "statusEXPECTED": "Erwartet"
+    "statusEXPECTED": "Erwartet",
+    "unknownWorker": "Unbekannter Mitarbeiter"
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",
@@ -998,7 +999,8 @@
     "reworkAssigned": "Nacharbeit zugewiesen. Der Mitarbeiter wurde benachrichtigt.",
     "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
     "reworkCompleted": "Nacharbeit abgeschlossen",
-    "reworkDone": "Nacharbeit eingereicht {{when}}"
+    "reworkDone": "Nacharbeit eingereicht {{when}}",
+    "inspectedBy": "Geprüft von"
   },
   "ratings": {
     "comment": "Kommentar",

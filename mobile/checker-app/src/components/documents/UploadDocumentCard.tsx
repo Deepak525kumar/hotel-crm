@@ -11,13 +11,21 @@ import { useTranslation } from 'react-i18next';
 // Translation KEYS, not display strings: this map is module-scope, where
 // t() cannot be called. Each value is resolved at render time instead, so
 // the label follows the active language rather than being frozen at import.
+/**
+ * What the dropdown starts on. Must be a category the SERVER accepts — the
+ * previous default was a client-only `GENERAL`, so every upload made without
+ * touching the dropdown came back 422.
+ */
+const DEFAULT_CATEGORY: DocumentCategory = 'ID_CARD';
+
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
-  GENERAL: 'documents.categoryGENERAL',
-  PASSPORT: 'documents.categoryPASSPORT',
-  ID_CARD: 'documents.categoryID_CARD',
-  RESIDENCE_PERMIT: 'documents.categoryRESIDENCE_PERMIT',
   WORK_PERMIT: 'documents.categoryWORK_PERMIT',
-  DRIVERS_LICENSE: 'documents.categoryDRIVERS_LICENSE',
+  TAX_NUMBER: 'documents.categoryTAX_NUMBER',
+  SOCIAL_SECURITY_NUMBER: 'documents.categorySOCIAL_SECURITY_NUMBER',
+  HEALTH_INSURANCE: 'documents.categoryHEALTH_INSURANCE',
+  ID_CARD: 'documents.categoryID_CARD',
+  PASSPORT: 'documents.categoryPASSPORT',
+  ADDRESS: 'documents.categoryADDRESS',
   CONTRACT_SCAN: 'documents.categoryCONTRACT_SCAN',
 };
 
@@ -30,14 +38,14 @@ export function UploadDocumentCard({
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
-  const [category, setCategory] = useState<DocumentCategory>('GENERAL');
+  const [category, setCategory] = useState<DocumentCategory>(DEFAULT_CATEGORY);
   const [isWorkPermit, setIsWorkPermit] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
-  const { pending, uploading, error, pickFile, clearPending, upload } = useDocumentUpload(
+  const { pending, uploading, error, pickFile, pickPhoto, clearPending, upload } = useDocumentUpload(
     workerId,
     (doc) => {
       onUploaded(doc);
-      setCategory('GENERAL');
+      setCategory(DEFAULT_CATEGORY);
       setIsWorkPermit(false);
       setExpiresAt('');
     }
@@ -62,9 +70,20 @@ export function UploadDocumentCard({
       <ThemedText type="smallBold" style={styles.header}>{t("documents.uploadTitle")}</ThemedText>
 
       {!pending ? (
-        <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, { opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText type="small" style={styles.pickButtonText}>{t("documents.chooseFile")}</ThemedText>
-        </Pressable>
+        /* Photo first: identity documents are photographed far more often than
+           they are scanned, and an iPhone's HEIC cannot go through the file
+           picker at all (the frozen upload policy has no image/heic). */
+        <ThemedView style={styles.pickRow} type="backgroundElement">
+          <Pressable onPress={() => void pickPhoto('camera')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.takePhoto')}</ThemedText>
+          </Pressable>
+          <Pressable onPress={() => void pickPhoto('library')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.choosePhoto')}</ThemedText>
+          </Pressable>
+          <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.chooseFile')}</ThemedText>
+          </Pressable>
+        </ThemedView>
       ) : (
         <>
           <ThemedView style={styles.row} type="backgroundElement">
@@ -77,7 +96,7 @@ export function UploadDocumentCard({
           </ThemedView>
 
           <ThemedView style={styles.row} type="backgroundElement">
-            {(['GENERAL', 'PASSPORT', 'ID_CARD', 'RESIDENCE_PERMIT', 'WORK_PERMIT', 'DRIVERS_LICENSE', 'CONTRACT_SCAN'] as const).map((c) => (
+            {(Object.keys(CATEGORY_LABEL_KEY) as DocumentCategory[]).map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setCategory(c)}
@@ -160,6 +179,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: Spacing.one },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, flexWrap: 'wrap' },
   flex: { flex: 1 },
+  pickRow: { flexDirection: 'row', gap: 8 },
   pickButton: {
     height: 44,
     borderRadius: Spacing.two,

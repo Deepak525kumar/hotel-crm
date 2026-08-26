@@ -906,7 +906,8 @@
     "statusLATE": "Запізнення",
     "statusPARTIAL": "Частково",
     "statusEXCUSED": "Виправдано",
-    "statusEXPECTED": "Очікується"
+    "statusEXPECTED": "Очікується",
+    "unknownWorker": "Невідомий працівник"
   },
   "employees": {
     "noBlocked": "Немає заблокованих працівників",
@@ -998,7 +999,8 @@
     "reworkAssigned": "Переробку призначено. Працівника сповіщено.",
     "reworkPending": "Переробку призначено — очікується працівник",
     "reworkCompleted": "Переробку завершено",
-    "reworkDone": "Переробку надіслано {{when}}"
+    "reworkDone": "Переробку надіслано {{when}}",
+    "inspectedBy": "Перевірив"
   },
   "ratings": {
     "comment": "Коментар",

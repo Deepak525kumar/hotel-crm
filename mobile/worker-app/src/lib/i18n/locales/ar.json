@@ -907,7 +907,8 @@
     "statusLATE": "متأخر",
     "statusPARTIAL": "جزئي",
     "statusEXCUSED": "بعذر",
-    "statusEXPECTED": "متوقع"
+    "statusEXPECTED": "متوقع",
+    "unknownWorker": "عامل غير معروف"
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",
@@ -999,7 +1000,8 @@
     "reworkAssigned": "تم تعيين إعادة العمل. تم إخطار العامل.",
     "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
     "reworkCompleted": "اكتملت إعادة العمل",
-    "reworkDone": "تم إرسال إعادة العمل {{when}}"
+    "reworkDone": "تم إرسال إعادة العمل {{when}}",
+    "inspectedBy": "تم التفتيش بواسطة"
   },
   "ratings": {
     "comment": "تعليق",
