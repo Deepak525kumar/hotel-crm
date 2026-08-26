@@ -104,6 +104,14 @@ role came back on every launch unchecked. The gate now lives in the store. The l
 a client-side check that runs *after* state is set is not a gate, because the navigation guard
 watches that same state.
 
+A second build-level trap, found from a real iOS build on 2026-08-26: both mobile apps defaulted to
+Expo's dev-server port 8081, and when worker-app's server holds it, `expo run:ios` in `checker-app`
+can skip starting a server and bake 8081 into the build — so a checker build serves worker-app's
+JavaScript. The apps look alike enough that this reads as a checker-app bug. `checker-app` now pins
+`--port 8082` in its `start`/`ios`/`android`/`web` scripts (`src/__tests__/dev-server-port.test.ts`
+guards it). **Before believing any mobile finding, confirm which app's bundle you are actually
+running.**
+
 One caution from that run, about diagnosis rather than coverage: a jest-expo preset error blamed on
 a missing dependency turned out to be a locally-broken `node_modules` (`--legacy-peer-deps`
 suppresses the peer install `react-native` relies on), not a repository defect. Reproduce a
