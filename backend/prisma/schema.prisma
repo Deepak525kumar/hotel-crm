@@ -928,7 +928,13 @@ model JobRequestSkillSlot {
   id              String     @id @default(cuid())
   job_request_id  String
   job_request     JobRequest @relation(fields: [job_request_id], references: [id], onDelete: Cascade)
-  skill           SkillTag
+  // Nullable (2026-08-26): null means "no specific skill required" -- the
+  // slot is open to every roster-eligible, free worker at the hotel
+  // regardless of which (if any) skill tags they hold, rather than
+  // requiring a broadcast to always name one of the 4 fixed SkillTag
+  // values. See job-requests/service.ts computeBroadcastEligibility() and
+  // acceptBroadcast() for how a null slot is matched.
+  skill           SkillTag?
   headcount       Int
   confirmed_count Int        @default(0)
   created_at      DateTime   @default(now())

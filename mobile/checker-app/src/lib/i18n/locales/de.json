@@ -744,6 +744,8 @@
     "broadcastsLoadFailed": "Rundmeldungen konnten nicht geladen werden. Bitte versuchen Sie es erneut.",
     "skillsNeeded": "Benötigte Fähigkeiten",
     "addSkill": "Fähigkeit hinzufügen",
+    "noSkillOption": "Keine bestimmte Fähigkeit erforderlich",
+    "anySkill": "Beliebige Fähigkeit",
     "raiseBroadcastAction": "Rundmeldung senden",
     "slotClaimedByOther": "Jemand anderes hat diesen Platz kurz vor Ihnen belegt — es wurde keine Schicht zugewiesen."
   },

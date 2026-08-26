@@ -98,10 +98,15 @@ export const RaiseBroadcastSchema = z.object({
   hourly_rate: z.number().positive().optional(),
   currency: z.string().length(3).optional(),
   description: z.string().optional(),
+  // `skill: null` (2026-08-26) means "no specific skill required" -- the
+  // line is open to every roster-eligible, free worker at the hotel
+  // regardless of which (if any) skill tags they hold. Explicit `.nullable()`
+  // rather than `.optional()`: the caller must say "no skill" on purpose, not
+  // merely omit the field.
   skills: z
     .array(
       z.object({
-        skill: z.nativeEnum(SkillTag),
+        skill: z.nativeEnum(SkillTag).nullable(),
         headcount: z.number().int().positive(),
       })
     )
@@ -112,7 +117,8 @@ export type RaiseBroadcastInput = z.infer<typeof RaiseBroadcastSchema>;
 
 export interface JobRequestSkillSlotDto {
   id: string;
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — see RaiseBroadcastSchema. */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
 }
@@ -134,7 +140,8 @@ export interface JobRequestSkillSlotDto {
 // a worker/checker caller only, computed server-side from the same set
 // this DTO used to expose wholesale.
 export interface SkillSlotEligibilityDto {
-  skill: SkillTag;
+  /** `null` means "no specific skill required" — see RaiseBroadcastSchema. */
+  skill: SkillTag | null;
   headcount: number;
   confirmed_count: number;
   eligible_count: number;
@@ -152,9 +159,11 @@ export interface BroadcastEligibilityDto {
 // Epic 9 PR 9.9 (TREQ-004/TREQ-005, MIG-GAP-06): a worker accepts one skill
 // slot on a broadcast JobRequest. `skill` disambiguates which slot on a
 // multi-skill broadcast the worker is claiming (e.g. a worker holding both
-// CLEANER and WAITER must say which opening they're accepting).
+// CLEANER and WAITER must say which opening they're accepting). `null`
+// (2026-08-26) claims the "no specific skill required" slot, if the
+// broadcast has one — see RaiseBroadcastSchema.
 export const AcceptBroadcastSchema = z.object({
-  skill: z.nativeEnum(SkillTag),
+  skill: z.nativeEnum(SkillTag).nullable(),
 });
 
 export type AcceptBroadcastInput = z.infer<typeof AcceptBroadcastSchema>;
@@ -166,13 +175,13 @@ export interface AcceptBroadcastAssignmentDto {
   status: 'accepted';
   assignment_id: string;
   job_request_id: string;
-  skill: SkillTag;
+  skill: SkillTag | null;
 }
 
 export interface AcceptBroadcastFulfilledDto {
   status: 'requirement_fulfilled';
   job_request_id: string;
-  skill: SkillTag;
+  skill: SkillTag | null;
 }
 
 export type AcceptBroadcastResultDto = AcceptBroadcastAssignmentDto | AcceptBroadcastFulfilledDto;

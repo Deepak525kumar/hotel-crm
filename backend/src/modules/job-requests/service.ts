@@ -265,6 +265,13 @@ export class JobRequestService extends BaseService {
         const skills = record?.skills ?? [];
         where.OR = [
           { skill_slots: { none: {} } },
+          // 2026-08-26: a broadcast carrying a "no specific skill required"
+          // slot (skill: null) must be visible to every worker in scope,
+          // same as a marketplace request -- it is not gated by the
+          // worker's own skills at all. Unconditional (not skills.length >
+          // 0 gated like the branch below): a worker with zero skill tags
+          // can still see and accept a no-skill-required slot.
+          { skill_slots: { some: { skill: null } } },
           ...(skills.length > 0 ? [{ skill_slots: { some: { skill: { in: skills } } } }] : []),
         ];
       }
@@ -577,7 +584,9 @@ export class JobRequestService extends BaseService {
     // derivative, never read back for behavior. Superseded once TREQ-011
     // retires the marketplace fields entirely.
     const totalWorkersNeeded = input.skills.reduce((sum, s) => sum + s.headcount, 0);
-    const positionSummary = input.skills.map((s) => `${s.headcount}x ${s.skill}`).join(', ');
+    const positionSummary = input.skills
+      .map((s) => `${s.headcount}x ${s.skill ?? 'Any skill'}`)
+      .join(', ');
 
     const { wr, slots } = await this.prisma.$transaction(async (tx) => {
       const created = await tx.jobRequest.create({
@@ -767,9 +776,13 @@ export class JobRequestService extends BaseService {
     );
 
     const slots = skillSlots.map((slot) => {
+      // null (2026-08-26) means "no specific skill required" -- every free,
+      // roster-eligible worker qualifies, regardless of which skills (if
+      // any) their EmploymentRecord lists.
       const eligibleWorkerIds = rosterWorkerIds.filter(
         (workerId) =>
-          freeWorkerIds.has(workerId) && (skillsByWorker.get(workerId) ?? []).includes(slot.skill)
+          freeWorkerIds.has(workerId) &&
+          (slot.skill === null || (skillsByWorker.get(workerId) ?? []).includes(slot.skill))
       );
       return {
         skill: slot.skill,
@@ -817,7 +830,10 @@ export class JobRequestService extends BaseService {
             recipientId: workerId,
             type: 'JOB_REQUEST_BROADCAST',
             title: 'New Job Available',
-            message: `A ${slot.skill} shift needs coverage on ${eligibility.shift_date}.`,
+            message:
+              slot.skill === null
+                ? `A shift needs coverage on ${eligibility.shift_date}.`
+                : `A ${slot.skill} shift needs coverage on ${eligibility.shift_date}.`,
             data: { work_request_id: wr.id, hotel_id: wr.hotel_id, skill: slot.skill },
             hotelId: wr.hotel_id,
             transports: [OutboxTransport.PUSH],
@@ -889,12 +905,17 @@ export class JobRequestService extends BaseService {
     if (!eligible) {
       throw new ForbiddenError('Cannot accept this broadcast');
     }
-    const record = await this.prisma.employmentRecord.findUnique({
-      where: { user_id: actor.userId },
-      select: { skills: true },
-    });
-    if (!record || !record.skills.includes(skill)) {
-      throw new ForbiddenError('Cannot accept this broadcast');
+    // A null slot (2026-08-26) requires no specific skill -- isWorkerEligibleForHotel()
+    // already confirmed roster/group/blocklist membership above, so there is
+    // nothing further to check against EmploymentRecord.skills here.
+    if (skill !== null) {
+      const record = await this.prisma.employmentRecord.findUnique({
+        where: { user_id: actor.userId },
+        select: { skills: true },
+      });
+      if (!record || !record.skills.includes(skill)) {
+        throw new ForbiddenError('Cannot accept this broadcast');
+      }
     }
     const free = await isWorkerFreeOnDay(actor.userId, wr.shift_date);
     if (!free) {

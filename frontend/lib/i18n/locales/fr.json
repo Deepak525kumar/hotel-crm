@@ -744,6 +744,8 @@
     "broadcastsLoadFailed": "Impossible de charger les diffusions. Veuillez réessayer.",
     "skillsNeeded": "Compétences requises",
     "addSkill": "Ajouter une compétence",
+    "noSkillOption": "Aucune compétence spécifique requise",
+    "anySkill": "Toute compétence",
     "raiseBroadcastAction": "Lancer la diffusion",
     "slotClaimedByOther": "Quelqu’un d’autre a pris cette place juste avant vous — aucun service n’a été attribué."
   },

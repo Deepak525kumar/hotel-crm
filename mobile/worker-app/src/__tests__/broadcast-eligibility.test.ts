@@ -71,6 +71,32 @@ describe('resolveMySlots', () => {
     expect(resolveMySlots(makeBroadcast(), eligibility)).toEqual([]);
   });
 
+  // 2026-08-26: a null skill means "no specific skill required" — the
+  // broadcast slot is open to every roster-eligible, free worker regardless
+  // of which (if any) skills they hold. Every downstream consumer must
+  // treat `skill: null` as a real, matchable value, not a missing one.
+  it('returns a "no specific skill required" slot the user is eligible for', () => {
+    const broadcast = makeBroadcast({
+      skill_slots: [{ id: 'slot3', skill: null, headcount: 1, confirmed_count: 0 }],
+    });
+    const eligibility = makeEligibility({
+      slots: [{ skill: null, headcount: 1, confirmed_count: 0, eligible_count: 5, eligible: true }],
+    });
+    const result = resolveMySlots(broadcast, eligibility);
+    expect(result).toEqual([{ id: 'slot3', skill: null, headcount: 1, confirmed_count: 0 }]);
+  });
+
+  it('excludes a "no specific skill required" slot that is already filled', () => {
+    const broadcast = makeBroadcast({
+      skill_slots: [{ id: 'slot3', skill: null, headcount: 1, confirmed_count: 1 }],
+    });
+    const eligibility = makeEligibility({
+      slots: [{ skill: null, headcount: 1, confirmed_count: 1, eligible_count: 5, eligible: true }],
+    });
+    const result = resolveMySlots(broadcast, eligibility);
+    expect(result).toEqual([]);
+  });
+
   it('returns multiple slots when eligible for more than one skill', () => {
     const broadcast = makeBroadcast({
       skill_slots: [

@@ -44,33 +44,17 @@ const upload = multer({
 // IF-HR-GetContractStatus (ADR-042/OD-HR-10) requires worker self-access,
 // which checkWorkerScope() cannot express. Worker self-access is instead
 // self-scoped in the service layer (HrService.getContractStatus checks
-// actorId === workerId for the 'worker' role) — the identical
-// requireRole(['admin','manager','regional_manager','worker']) +
-// scopeWorkerRoute() shape documents/routes.ts's four routes already establish.
-function scopeWorkerRoute() {
-  return (req: Request, res: Response, next: NextFunction) => {
-    // Self-access is role-independent (2026-08-13). Previously this was
-    // `role === 'worker'` only, from when a worker was the only applicant;
-    // under ADR-065 a Manager/RM onboards too and has no scope of their own
-    // until approval, so a role-keyed check would deny them their own
-    // contract status. This currently also passes via checkWorkerScope()'s
-    // own self-record branch, but relying on that leaves the correctness of
-    // this route dependent on an unrelated guard's internals -- state the
-    // self-exemption here, where the route's own intent lives.
-    if (req.auth && req.auth.userId === req.params.worker_id) {
-      next();
-      return;
-    }
-    if (req.auth?.role === 'worker') {
-      next();
-      return;
-    }
-    checkWorkerScope()(req, res, next);
-  };
-}
+// actorId === workerId for the 'worker' role).
+//
+// 2026-08-26: the strict, non-reviewer-scoped variant that used to live here
+// (scopeWorkerRoute()) is gone — its last caller (contract-download) was
+// migrated to scopeWorkerReadRoute() below, which was already every other
+// read route's gate. Keeping an unused, narrower duplicate around risked a
+// future read route being wired to the one that reintroduces the
+// pending-applicant 403 this file has already fixed twice.
 
 /**
- * Read-only variant of `scopeWorkerRoute()` that also admits a reviewer whose
+ * Variant of the worker-scope read gate that also admits a reviewer whose
  * scope matches a **not-yet-approved** applicant's `target_*` fields.
  *
  * 2026-08-24: `checkWorkerScope()` resolves through `isWorkerInGroupScope()`,
@@ -246,7 +230,7 @@ router.post(
 // is additionally scoped via checkWorkerScope() (group-grain); worker is
 // self-scoped inside HrService.getContractStatus — worker_id is never
 // trusted from the path for a worker-role caller beyond that self-check.
-// scopeWorkerRoute() lets a worker through to the service's own check
+// scopeWorkerReadRoute() lets a worker through to the service's own check
 // rather than being denied by checkWorkerScope().
 router.get(
   '/workers/:worker_id/contract-status',
@@ -258,14 +242,21 @@ router.get(
 
 // 2026-08-13 contract feature: serves the single static default contract
 // PDF. Same read gate as IF-HR-GetContractStatus immediately above --
-// worker self-download (scopeWorkerRoute lets a worker through to no
-// further check, matching getContractStatus's own worker-self-read shape),
-// manager/RM via checkWorkerScope() group-scope, admin unscoped.
+// worker self-download, manager/RM via group-scope (or the reviewer's
+// target_* scope for a not-yet-approved applicant), admin unscoped.
+//
+// 2026-08-26: was scopeWorkerRoute() (checkWorkerScope()'s strict
+// group-scope only), which denies whenever hotel_group_id is still null --
+// true for every applicant pending approval, i.e. exactly the population a
+// manager/RM's review flow needs to download a contract for. Same bug class
+// as the 2026-08-24 contract-status fix above; this route was missed then.
+// Read-only route, so scopeWorkerReadRoute() (reviewer-scope fallback) is
+// safe here per its own doc comment.
 router.get(
   '/workers/:worker_id/contract-download',
   requireRole(['admin', 'manager', 'regional_manager', 'worker', 'checker']),
   requireContractReadAccess(),
-  scopeWorkerRoute(),
+  scopeWorkerReadRoute(),
   (req, res, next) => hrController.downloadDefaultContract(req, res, next)
 );
 

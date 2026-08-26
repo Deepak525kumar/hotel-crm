@@ -408,6 +408,20 @@ describe('workRequests.acceptBroadcast', () => {
       status: 409,
     });
   });
+
+  // 2026-08-26: `skill: null` claims the "no specific skill required" slot
+  // on a broadcast. Must be sent as a real JSON `null`, not omitted or
+  // coerced to a string -- the backend schema is `.nativeEnum(SkillTag).nullable()`.
+  it('sends skill: null to claim a "no specific skill required" slot', async () => {
+    const result = { status: 'accepted', assignment_id: 'a1', job_request_id: 'jr1', skill: null };
+    mockFetch.mockResolvedValueOnce(res(201, { data: result }));
+
+    const accepted = await api.workRequests.acceptBroadcast('jr1', null);
+
+    expect(accepted).toEqual(result);
+    const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toEqual({ skill: null });
+  });
 });
 
 // ---------------------------------------------------------------------------
