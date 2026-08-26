@@ -77,6 +77,11 @@ export interface StorageClient {
   upload(key: string, body: Buffer, mimeType: string): Promise<void>;
 
   /**
+   * Download a file from S3 (EU) and return it as a Buffer.
+   */
+  download(key: string): Promise<Buffer>;
+
+  /**
    * Generate a short-lived presigned GET URL for a stored object.
    * OD-DOC-018: presigned-URL retrieval mechanism (implementation-time default).
    * Returns null when no bucket is configured (test/CI environments).
@@ -129,6 +134,14 @@ async function buildS3Client(bucket: string, region: string): Promise<StorageCli
       );
     },
 
+    async download(key: string): Promise<Buffer> {
+      const response = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      if (!response.Body) {
+        throw new Error('S3 object body is empty');
+      }
+      return Buffer.from(await response.Body.transformToByteArray());
+    },
+
     async getPresignedUrl(key: string): Promise<string | null> {
       const command = new GetObjectCommand({ Bucket: bucket, Key: key });
       return getSignedUrl(client, command, { expiresIn: PRESIGNED_URL_TTL_SECONDS });
@@ -146,7 +159,11 @@ const stubStorageClient: StorageClient = {
   async upload(_key, _body, _mimeType): Promise<void> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; upload is a no-op', { _key });
   },
-  async getPresignedUrl(_key): Promise<string | null> {
+  async download(_key: string): Promise<Buffer> {
+    logger.warn('documents_storage_stub: S3_BUCKET not configured; download returns empty buffer', { _key });
+    return Buffer.alloc(0);
+  },
+  async getPresignedUrl(_key: string): Promise<string | null> {
     logger.warn('documents_storage_stub: S3_BUCKET not configured; presigned URL unavailable');
     return null;
   },
