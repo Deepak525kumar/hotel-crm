@@ -31,7 +31,7 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [t]);
+  }, []);
 
   useEffect(() => { load(); }, [load]);
 

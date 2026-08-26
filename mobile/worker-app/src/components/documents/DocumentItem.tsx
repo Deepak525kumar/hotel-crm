@@ -41,7 +41,9 @@ export function DocumentItem({ document, onDelete, isDeleting }: { document: Wor
               <ThemedText type="linkPrimary">{t('documents.view')}</ThemedText>
             </Pressable>
           ) : (
-            <ThemedText type="small" themeColor="textSecondary">{t("assignments.unavailable")}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+            {t('documents.previewUnavailable')}
+          </ThemedText>
           )}
           {onDelete && (
             <Pressable onPress={() => onDelete(document.id)} disabled={isDeleting} style={styles.deleteButton}>

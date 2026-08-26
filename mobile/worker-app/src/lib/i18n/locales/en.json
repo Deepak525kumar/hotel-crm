@@ -906,7 +906,8 @@
     "statusLATE": "Late",
     "statusPARTIAL": "Partial",
     "statusEXCUSED": "Excused",
-    "statusEXPECTED": "Expected"
+    "statusEXPECTED": "Expected",
+    "unknownWorker": "Unknown worker"
   },
   "employees": {
     "noBlocked": "No blocked employees",
@@ -998,7 +999,8 @@
     "reworkAssigned": "Rework assigned. The worker has been notified.",
     "reworkPending": "Rework assigned — awaiting the worker",
     "reworkCompleted": "Rework completed",
-    "reworkDone": "Rework submitted {{when}}"
+    "reworkDone": "Rework submitted {{when}}",
+    "inspectedBy": "Inspected by"
   },
   "ratings": {
     "comment": "Comment",

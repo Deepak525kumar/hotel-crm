@@ -41,7 +41,7 @@ export function UploadDocumentCard({
   const [category, setCategory] = useState<DocumentCategory>(DEFAULT_CATEGORY);
   const [isWorkPermit, setIsWorkPermit] = useState(false);
   const [expiresAt, setExpiresAt] = useState('');
-  const { pending, uploading, error, pickFile, clearPending, upload } = useDocumentUpload(
+  const { pending, uploading, error, pickFile, pickPhoto, clearPending, upload } = useDocumentUpload(
     workerId,
     (doc) => {
       onUploaded(doc);
@@ -70,9 +70,20 @@ export function UploadDocumentCard({
       <ThemedText type="smallBold" style={styles.header}>{t("documents.uploadTitle")}</ThemedText>
 
       {!pending ? (
-        <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, { opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText type="small" style={styles.pickButtonText}>{t("documents.chooseFile")}</ThemedText>
-        </Pressable>
+        /* Photo first: identity documents are photographed far more often than
+           they are scanned, and an iPhone's HEIC cannot go through the file
+           picker at all (the frozen upload policy has no image/heic). */
+        <ThemedView style={styles.pickRow} type="backgroundElement">
+          <Pressable onPress={() => void pickPhoto('camera')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.takePhoto')}</ThemedText>
+          </Pressable>
+          <Pressable onPress={() => void pickPhoto('library')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.choosePhoto')}</ThemedText>
+          </Pressable>
+          <Pressable onPress={pickFile} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+            <ThemedText type="small" style={styles.pickButtonText}>{t('documents.chooseFile')}</ThemedText>
+          </Pressable>
+        </ThemedView>
       ) : (
         <>
           <ThemedView style={styles.row} type="backgroundElement">
@@ -168,6 +179,7 @@ const styles = StyleSheet.create({
   header: { marginBottom: Spacing.one },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two, flexWrap: 'wrap' },
   flex: { flex: 1 },
+  pickRow: { flexDirection: 'row', gap: 8 },
   pickButton: {
     height: 44,
     borderRadius: Spacing.two,

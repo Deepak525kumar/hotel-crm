@@ -906,7 +906,8 @@
     "statusLATE": "En retard",
     "statusPARTIAL": "Partiel",
     "statusEXCUSED": "Excusé",
-    "statusEXPECTED": "Attendu"
+    "statusEXPECTED": "Attendu",
+    "unknownWorker": "Employé inconnu"
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
@@ -998,7 +999,8 @@
     "reworkAssigned": "Reprise attribuée. L'employé a été notifié.",
     "reworkPending": "Reprise attribuée — en attente de l'employé",
     "reworkCompleted": "Reprise terminée",
-    "reworkDone": "Reprise envoyée {{when}}"
+    "reworkDone": "Reprise envoyée {{when}}",
+    "inspectedBy": "Inspecté par"
   },
   "ratings": {
     "comment": "Commentaire",
