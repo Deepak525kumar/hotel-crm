@@ -11,7 +11,7 @@ async function main() {
   const buffer = await readFile(filePath);
   
   const storage = await getStorageClient();
-  const key = 'templates/Personalfragebogen_NEU.pdf';
+  const key = 'documents/templates/Personalfragebogen_NEU.pdf';
   
   console.log(`Uploading to S3 with key: ${key}...`);
   await storage.upload(key, buffer, 'application/pdf');

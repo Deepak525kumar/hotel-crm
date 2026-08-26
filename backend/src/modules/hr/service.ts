@@ -415,7 +415,7 @@ export class HrService extends BaseService {
     try {
       const storage = await getStorageClient();
       try {
-        const s3Pdf = await storage.download('templates/Personalfragebogen_NEU.pdf');
+        const s3Pdf = await storage.download('documents/templates/Personalfragebogen_NEU.pdf');
         if (s3Pdf.length > 0) {
           return s3Pdf;
         }
