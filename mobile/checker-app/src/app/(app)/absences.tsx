@@ -17,6 +17,8 @@ import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { translateApiError } from '../../lib/api-error-i18n';
+import { ScreenHeader } from '@/components/ui';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // Keys, not nouns: the label is resolved with t() at the point of render so a
 // language change repaints it. Both the badge and the confirm dialog read from
@@ -264,7 +266,7 @@ export default function AbsencesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>{t("calendar.sickOrVacation")}</ThemedText>
+        <ScreenHeader title={t('calendar.sickOrVacation')} action={<NotificationBell />} />
 
         <Calendar
           current={selected[0]}

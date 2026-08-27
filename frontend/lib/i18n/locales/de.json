@@ -570,7 +570,8 @@
     "markReadHint": "Markieren Sie diese Benachrichtigung als gelesen, sobald Sie sie gesehen haben.",
     "allCaughtUp": "Sie sind auf dem neuesten Stand.",
     "tapToMarkRead": "Zum Markieren als gelesen tippen",
-    "noneYet": "Noch keine Benachrichtigungen."
+    "noneYet": "Noch keine Benachrichtigungen.",
+    "empty": "Noch keine Benachrichtigungen"
   },
   "leaderboard": {
     "none": "Noch keine Ranglistendaten.",
@@ -917,7 +918,10 @@
     "statusPARTIAL": "Teilweise",
     "statusEXCUSED": "Entschuldigt",
     "statusEXPECTED": "Erwartet",
-    "unknownWorker": "Unbekannter Mitarbeiter"
+    "unknownWorker": "Unbekannter Mitarbeiter",
+    "allCaughtUp": "Alles erledigt",
+    "pendingCount": "{{count}} zur Überprüfung offen",
+    "inOutTimes": "Ein: {{in}} · Aus: {{out}}"
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",

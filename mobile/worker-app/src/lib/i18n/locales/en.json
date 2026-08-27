@@ -570,7 +570,8 @@
     "markReadHint": "Mark this notification as read once you’ve seen it.",
     "allCaughtUp": "You’re all caught up.",
     "tapToMarkRead": "Tap to mark as read",
-    "noneYet": "No notifications yet."
+    "noneYet": "No notifications yet.",
+    "empty": "No notifications yet"
   },
   "leaderboard": {
     "none": "No leaderboard data yet.",
@@ -917,7 +918,10 @@
     "statusPARTIAL": "Partial",
     "statusEXCUSED": "Excused",
     "statusEXPECTED": "Expected",
-    "unknownWorker": "Unknown worker"
+    "unknownWorker": "Unknown worker",
+    "allCaughtUp": "All caught up",
+    "pendingCount": "{{count}} pending verification",
+    "inOutTimes": "In: {{in}} · Out: {{out}}"
   },
   "employees": {
     "noBlocked": "No blocked employees",

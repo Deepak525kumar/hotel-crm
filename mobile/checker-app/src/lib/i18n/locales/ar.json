@@ -571,7 +571,8 @@
     "markReadHint": "ضع علامة مقروء على هذا الإشعار بمجرد اطلاعك عليه.",
     "allCaughtUp": "لقد اطلعت على كل شيء.",
     "tapToMarkRead": "اضغط للوضع كمقروء",
-    "noneYet": "لا توجد إشعارات بعد."
+    "noneYet": "لا توجد إشعارات بعد.",
+    "empty": "لا توجد إشعارات بعد"
   },
   "leaderboard": {
     "none": "لا توجد بيانات لوحة الصدارة بعد.",
@@ -918,7 +919,10 @@
     "statusPARTIAL": "جزئي",
     "statusEXCUSED": "بعذر",
     "statusEXPECTED": "متوقع",
-    "unknownWorker": "عامل غير معروف"
+    "unknownWorker": "عامل غير معروف",
+    "allCaughtUp": "كل شيء مكتمل",
+    "pendingCount": "{{count}} في انتظار التحقق",
+    "inOutTimes": "دخول: {{in}} · خروج: {{out}}"
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",

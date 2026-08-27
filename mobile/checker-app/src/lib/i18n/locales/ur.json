@@ -571,7 +571,8 @@
     "markReadHint": "اس اطلاع کو دیکھنے کے بعد پڑھا گیا نشان زد کریں۔",
     "allCaughtUp": "آپ سب کچھ دیکھ چکے ہیں۔",
     "tapToMarkRead": "پڑھا ہوا نشان زد کرنے کے لیے تھپتھپائیں",
-    "noneYet": "ابھی کوئی اطلاع نہیں۔"
+    "noneYet": "ابھی کوئی اطلاع نہیں۔",
+    "empty": "ابھی تک کوئی اطلاعات نہیں"
   },
   "leaderboard": {
     "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
@@ -918,7 +919,10 @@
     "statusPARTIAL": "جزوی",
     "statusEXCUSED": "معذور",
     "statusEXPECTED": "متوقع",
-    "unknownWorker": "نامعلوم ورکر"
+    "unknownWorker": "نامعلوم ورکر",
+    "allCaughtUp": "سب مکمل",
+    "pendingCount": "{{count}} تصدیق کے منتظر",
+    "inOutTimes": "اِن: {{in}} · آؤٹ: {{out}}"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",

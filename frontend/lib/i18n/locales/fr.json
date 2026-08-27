@@ -570,7 +570,8 @@
     "markReadHint": "Marquez cette notification comme lue une fois que vous l’avez vue.",
     "allCaughtUp": "Vous êtes à jour.",
     "tapToMarkRead": "Appuyez pour marquer comme lu",
-    "noneYet": "Aucune notification pour le moment."
+    "noneYet": "Aucune notification pour le moment.",
+    "empty": "Aucune notification pour le moment"
   },
   "leaderboard": {
     "none": "Aucune donnée de classement.",
@@ -917,7 +918,10 @@
     "statusPARTIAL": "Partiel",
     "statusEXCUSED": "Excusé",
     "statusEXPECTED": "Attendu",
-    "unknownWorker": "Employé inconnu"
+    "unknownWorker": "Employé inconnu",
+    "allCaughtUp": "Tout est à jour",
+    "pendingCount": "{{count}} en attente de vérification",
+    "inOutTimes": "Entrée : {{in}} · Sortie : {{out}}"
   },
   "employees": {
     "noBlocked": "Aucun employé bloqué",
