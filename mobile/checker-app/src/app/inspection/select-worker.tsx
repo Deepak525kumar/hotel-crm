@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BackLink } from '@/components/BackLink';
 import { Badge, Card, EmptyState, ScreenHeader } from '@/components/ui';
 import { assignmentStatusTone } from '@/lib/assignment-status-tone';
 import { api } from '@/lib/api';
@@ -38,12 +39,12 @@ export default function SelectWorkerScreen() {
   const renderItem = ({ item }: { item: InspectableWorker }) => (
     <Pressable
       accessibilityRole="button"
-      onPress={() => router.push(`/rating/${item.assignment_id}`)}
+      onPress={() => router.push({ pathname: '/rating/[id]', params: { id: item.assignment_id, worker_id: item.worker_id } })}
       style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
     >
       <Card style={styles.card}>
         <View style={styles.row}>
-          <ThemedText type="smallBold">
+          <ThemedText type="smallBold" style={{ flex: 1 }} numberOfLines={1}>
             {item.worker_name ?? t('quality.workerUnavailable')}
           </ThemedText>
           <Badge tone={assignmentStatusTone(item.status)} label={item.status.replace('_', ' ')} />
@@ -60,10 +61,13 @@ export default function SelectWorkerScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ScreenHeader
-          title={t('quality.selectWorkerTitle')}
-          subtitle={t('quality.selectWorkerSubtitle')}
-        />
+        <View style={{ paddingHorizontal: Spacing.four, paddingTop: Spacing.two }}>
+          <BackLink />
+          <ScreenHeader
+            title={t('quality.selectWorkerTitle')}
+            subtitle={t('quality.selectWorkerSubtitle')}
+          />
+        </View>
         {isLoading ? (
           <ActivityIndicator style={styles.loader} />
         ) : (

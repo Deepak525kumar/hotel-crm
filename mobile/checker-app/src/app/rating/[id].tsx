@@ -13,7 +13,6 @@ import { translateApiError } from '@/lib/api-error-i18n';
 import {
   INSPECTION_CHECKLIST_ITEMS,
   checklistItemLabelKey,
-  deriveOverallScore,
   invalidChecklistItems,
   type InspectionChecklistItem,
 } from '@/lib/inspection-checklist';
@@ -46,28 +45,24 @@ export default function RatingScreen() {
   const [error, setError] = useState<string | null>(null);
   const picker = usePhotoPicker();
 
-  const overall = deriveOverallScore(scores);
-
-  const setItem = (item: InspectionChecklistItem, raw: string) => {
-    const trimmed = raw.trim();
-    setScores((prev) => ({
-      ...prev,
-      [item]: trimmed === '' ? undefined : Number(trimmed),
-    }));
-  };
+  const [overallRaw, setOverallRaw] = useState('');
+  const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
   const submit = async () => {
     setError(null);
 
-    // Named here rather than left to the server, which 400s citing a field the
-    // checker cannot see after the whole form is filled in.
+    const missingChecks = INSPECTION_CHECKLIST_ITEMS.filter((item) => scores[item] === undefined);
+    if (missingChecks.length > 0) {
+      setError(t('quality.checklistEmpty', 'All checklist items must be marked.'));
+      return;
+    }
     const invalid = invalidChecklistItems(scores);
     if (invalid.length > 0) {
       setError(t('quality.checklistItemRange'));
       return;
     }
-    if (overall === null) {
-      setError(t('quality.checklistEmpty'));
+    if (overall === null || Number.isNaN(overall) || overall < 0 || overall > 100) {
+      setError(t('quality.checklistEmpty', 'Overall score is required and must be 0-100.'));
       return;
     }
     // CRR §15: the photo accompanies the rating. The server enforces it too
@@ -116,7 +111,7 @@ export default function RatingScreen() {
             title={t('quality.rateWorker')}
             subtitle={
               overall === null
-                ? t('quality.checklistEmpty')
+                ? t('quality.checklistEmpty', 'Fill in the checklist and rating')
                 : t('quality.overallScore', { score: overall })
             }
           />
@@ -128,18 +123,45 @@ export default function RatingScreen() {
                 <ThemedText type="small" style={styles.itemLabel}>
                   {t(checklistItemLabelKey(item))}
                 </ThemedText>
-                <TextInput
-                  value={scores[item] === undefined ? '' : String(scores[item])}
-                  onChangeText={(v) => setItem(item, v)}
-                  keyboardType="number-pad"
-                  maxLength={3}
-                  placeholder="—"
-                  placeholderTextColor={theme.textSecondary}
-                  accessibilityLabel={t(checklistItemLabelKey(item))}
-                  style={[styles.itemInput, { color: theme.text, borderColor: theme.border }]}
-                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => setScores((prev) => ({ ...prev, [item]: 100 }))}
+                    style={[
+                      styles.toggleButton,
+                      scores[item] === 100 ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.border }
+                    ]}
+                  >
+                    <ThemedText type="smallBold" style={{ color: scores[item] === 100 ? theme.background : theme.text }}>
+                      {t('common.pass', 'Pass')}
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setScores((prev) => ({ ...prev, [item]: 0 }))}
+                    style={[
+                      styles.toggleButton,
+                      scores[item] === 0 ? { backgroundColor: theme.danger, borderColor: theme.danger } : { borderColor: theme.border }
+                    ]}
+                  >
+                    <ThemedText type="smallBold" style={{ color: scores[item] === 0 ? '#fff' : theme.text }}>
+                      {t('common.fail', 'Fail')}
+                    </ThemedText>
+                  </Pressable>
+                </View>
               </View>
             ))}
+          </Card>
+
+          <SectionHeader title={t('quality.overallScoreTitle', 'Overall Score (0-100)')} />
+          <Card>
+            <TextInput
+              value={overallRaw}
+              onChangeText={setOverallRaw}
+              keyboardType="number-pad"
+              maxLength={3}
+              placeholder="e.g. 85"
+              placeholderTextColor={theme.textSecondary}
+              style={[styles.scoreInput, { color: theme.text, borderColor: theme.border }]}
+            />
           </Card>
 
           <SectionHeader title={t('quality.photoEvidence')} />
@@ -215,12 +237,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   itemLabel: { flex: 1 },
-  itemInput: {
-    width: 64,
+  toggleButton: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: Spacing.one,
-    paddingVertical: Spacing.one,
-    textAlign: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  scoreInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Spacing.one,
+    padding: Spacing.two,
+    fontSize: 16,
   },
   photoButtons: { flexDirection: 'row', gap: Spacing.two },
   photoButton: { paddingVertical: Spacing.one },

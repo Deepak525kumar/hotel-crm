@@ -126,12 +126,12 @@ export function ScreenHeader({ title, subtitle, action }: { title: string; subti
   return (
     <View style={styles.screenHeader}>
       <View style={styles.sectionText}>
+        <ThemedText type="title">{title}</ThemedText>
         {subtitle ? (
           <ThemedText type="small" themeColor="textSecondary">
             {subtitle}
           </ThemedText>
         ) : null}
-        <ThemedText type="title">{title}</ThemedText>
       </View>
       {action}
     </View>

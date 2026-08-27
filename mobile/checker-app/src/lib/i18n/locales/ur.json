@@ -85,7 +85,9 @@
     "success": "کامیاب",
     "send": "بھیجیں",
     "change": "تبدیل کریں",
-    "submit": "جمع کریں"
+    "submit": "جمع کریں",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "نام",
@@ -1049,7 +1051,8 @@
     "selectWorkerSubtitle": "آج آپ کے ہوٹلوں میں شفٹ پر موجود ورکرز",
     "noInspectableWorkers": "جانچنے کے لیے کوئی ورکر نہیں",
     "noInspectableWorkersBody": "جن ہوٹلوں میں آپ کام کر رہے ہیں وہاں آج کوئی شفٹ پر نہیں ہے۔",
-    "workerUnavailable": "ورکر دستیاب نہیں"
+    "workerUnavailable": "ورکر دستیاب نہیں",
+    "overallScoreTitle": "Overall Score (0-100)"
   },
   "ratings": {
     "comment": "تبصرہ",

@@ -84,7 +84,9 @@
     "success": "Успішно",
     "send": "Надіслати",
     "change": "Змінити",
-    "submit": "Надіслати"
+    "submit": "Надіслати",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "Ім'я",
@@ -1048,7 +1050,8 @@
     "selectWorkerSubtitle": "Сьогодні на зміні у ваших готелях",
     "noInspectableWorkers": "Немає працівників для перевірки",
     "noInspectableWorkersBody": "Сьогодні ніхто не на зміні в готелях, де ви працюєте.",
-    "workerUnavailable": "Працівник недоступний"
+    "workerUnavailable": "Працівник недоступний",
+    "overallScoreTitle": "Overall Score (0-100)"
   },
   "ratings": {
     "comment": "Коментар",

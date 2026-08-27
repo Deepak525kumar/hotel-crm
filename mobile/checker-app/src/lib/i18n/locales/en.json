@@ -84,7 +84,9 @@
     "success": "Success",
     "send": "Send",
     "change": "Change",
-    "submit": "Submit"
+    "submit": "Submit",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "Name",
@@ -1027,6 +1029,7 @@
     "checklistEmpty": "Score at least one item",
     "checklistItemRange": "Each item must be a whole number from 0 to 100",
     "overallScore": "Overall score {{score}}",
+    "overallScoreTitle": "Overall Score (0-100)",
     "photoEvidence": "Photo evidence",
     "comment": "Comment",
     "commentPlaceholder": "Anything the worker should know",
