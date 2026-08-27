@@ -61,11 +61,13 @@ export default function SelectWorkerScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <BackLink />
-        <ScreenHeader
-          title={t('quality.selectWorkerTitle')}
-          subtitle={t('quality.selectWorkerSubtitle')}
-        />
+        <View style={{ paddingHorizontal: Spacing.four, paddingTop: Spacing.two }}>
+          <BackLink />
+          <ScreenHeader
+            title={t('quality.selectWorkerTitle')}
+            subtitle={t('quality.selectWorkerSubtitle')}
+          />
+        </View>
         {isLoading ? (
           <ActivityIndicator style={styles.loader} />
         ) : (
