@@ -36,8 +36,8 @@ The only PR that touches the database. Everything else depends on it.
    compare-and-swap pattern both existing rework mutations use.
 4. **New**: auto-close job for unconfirmed reworks (ADR-072 §2.3). Model it on
    `ReworkEscalationJob` — marker column written in the same transaction as the state change and
-   part of the query predicate, or it will re-fire every tick. The delay is not fixed by the ADR;
-   make it a named constant with the reasoning at the definition.
+   part of the query predicate, or it will re-fire every tick. The delay is **one hour**
+   (ADR-072 §4.1) — a named constant, with the reasoning at the definition.
 5. **Escalation recipients** (ADR-072 §2.2): confirm the escalation targets
    `verification.verified_by_id` — the checker who actually inspected — and the worker's manager.
    Extend the notification payload so a client can route to the evidence: verification id, worker,
@@ -76,10 +76,11 @@ Depends on PR 1's endpoints.
 - Rework state and evidence on the manager surfaces, so an escalation the manager receives is
   actionable from the web rather than only from a phone.
 
-## Open, deliberately
+## Settled since this plan was written
 
-Carried from `ADR-072` §4 — do not silently settle these in code:
+`ADR-072` §4 now decides all three: auto-close at one hour (§4.1); send-back creates a second rework
+assignment rather than reopening the first (§4.2); rework carries no payroll or time-tracking
+treatment (§4.3).
 
-- The auto-close delay constant.
-- Whether "send back" creates a second rework assignment or reopens the first.
-- Payroll treatment of rework time (open since `ADR-069`).
+One consequence is worth repeating where an implementer will hit it: `rework_completed_at` means
+*the current cycle is complete*, not *rework is finished*. Closure is `rework_confirmed_at` alone.

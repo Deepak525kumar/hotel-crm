@@ -126,11 +126,43 @@ see.
 - Existing reworks in flight at deploy time have no confirmation timestamp. They are already
   `COMPLETED`; the migration must not retroactively reopen them.
 
-## 4. What this does not decide
+## 4. The three follow-on decisions
 
-- The auto-close delay itself is not fixed here. It is an operational constant, and setting it
-  requires knowing how quickly checkers actually review — which nothing currently measures.
-- Whether a checker sending a rework back creates a second rework assignment or reopens the first.
-  `ADR-069`'s reasoning (never mutate a closed unit of work) points at a new linked assignment, but
-  the loop-count implications are not worked through here.
-- Payroll treatment of rework time. `ADR-069` flagged it as a possible effect and it remains open.
+Taken 2026-08-27, after the section above recorded them as open. Kept in this ADR rather than a
+new one: they settle this ADR's own gaps and are meaningless apart from it.
+
+### 4.1 Unconfirmed rework auto-closes after one hour
+
+The delay left open in §2.3 is **one hour** from the worker marking the rework done.
+
+An hour is long enough that a checker mid-inspection is not racing a timer, and short enough that a
+rework does not sit unreviewed past the shift it belongs to. Nothing currently measures how quickly
+checkers actually review, so this is a judgement, not a derivation — if review latency is ever
+measured, this is the number to revisit first.
+
+### 4.2 Sending a rework back creates a second rework assignment
+
+A checker who rejects the evidence creates **another** rework assignment linked to the same
+verification, rather than reopening the one just completed.
+
+This follows `ADR-069`'s reasoning rather than diverging from it: a unit of work that the worker
+finished and submitted is not retroactively unfinished. Each cycle is therefore its own
+`WorkerAssignment` row, and the cycle history is the set of rework assignments hanging off the
+verification — which is where a reviewer would look for "how many times did this come back".
+
+The consequence to hold onto: the verification's `rework_completed_at` means *the current cycle is
+complete*, not *rework is finished*. Closure is `rework_confirmed_at`, and only that. Anything
+reading `rework_completed_at` as "done" is reading it wrong.
+
+Nothing here bounds the number of cycles. An unbounded send-back loop is possible and is accepted
+for now; if it happens in practice the cap belongs in a later decision, with a number that came
+from real data.
+
+### 4.3 Rework time is not tracked for payroll
+
+Rework carries **no payroll or time-tracking treatment**. It produces no attendance (§2.4), no
+worked-time record, and no payroll line.
+
+This closes the question `ADR-069` left open. Rework is corrective work on a shift already paid
+through its original assignment. If that changes commercially, it is a new decision — not something
+to be inferred from the absence of a column.
