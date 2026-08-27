@@ -126,4 +126,60 @@ describe('listInspectableWorkers', () => {
     expect(findMany).toHaveBeenCalledTimes(1);
     expect(findMany.mock.calls[0][0].where.hotel_id).toBeUndefined();
   });
+
+  describe('scope', () => {
+    it('narrows a hotel_group manager through the hotel relation, not to everything', async () => {
+      // Regression: an earlier revision left the group case unfiltered behind a
+      // comment claiming it was narrowed. A group-scoped manager would have
+      // seen every hotel's workers.
+      findMany.mockResolvedValueOnce([]);
+
+      await service.listInspectableWorkers(
+        { userId: 'm1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } as any },
+        '2026-08-27',
+      );
+
+      const where = findMany.mock.calls[0][0].where;
+      expect(where.hotel).toEqual({ hotel_group_id: 'g1' });
+      expect(where.hotel_id).toBeUndefined();
+    });
+
+    it('pins a hotel-scoped manager to their hotel', async () => {
+      findMany.mockResolvedValueOnce([]);
+      await service.listInspectableWorkers(
+        { userId: 'm1', role: 'manager', scope: { type: 'hotel', hotel_id: 'h7' } as any },
+        '2026-08-27',
+      );
+      expect(findMany.mock.calls[0][0].where.hotel_id).toBe('h7');
+    });
+
+    it('denies a scoped manager with no scope claim rather than showing everything', async () => {
+      const r = await service.listInspectableWorkers(
+        { userId: 'm1', role: 'manager', scope: null },
+        '2026-08-27',
+      );
+      expect(r.workers).toEqual([]);
+      expect(findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('the day argument', () => {
+    it.each(['2026-13-45', '0000-00-00', '2026-02-30'])(
+      'rejects %s rather than querying a date nobody asked for',
+      async (day) => {
+        // '2026-02-30' is the subtle one: JS rolls it to March 2, so before this
+        // guard the endpoint answered 200 for March 2 while echoing 2026-02-30.
+        await expect(
+          service.listInspectableWorkers(checker, day),
+        ).rejects.toMatchObject({ message: expect.stringContaining('real calendar date') });
+        expect(findMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('accepts a real leap day', async () => {
+      findMany.mockResolvedValueOnce([]);
+      const r = await service.listInspectableWorkers(checker, '2028-02-29');
+      expect(r.day).toBe('2028-02-29');
+    });
+  });
 });

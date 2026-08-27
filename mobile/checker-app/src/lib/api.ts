@@ -384,15 +384,13 @@ export const api = {
       if (params?.page) qs.set('page', String(params.page));
       if (params?.per_page) qs.set('per_page', String(params.per_page));
       const q = qs.toString();
-      return request<{ data: AttendanceRecord[]; total: number }>(`/attendance${q ? `?${q}` : ''}`);
+      return request<AttendanceRecord[]>(`/attendance${q ? `?${q}` : ''}`);
     },
     // The backend does not embed attendance on AssignmentDto, so a shift is
     // resolved to its attendance row by assignment_id to obtain the id needed
     // for check-out.
     listByAssignment: (assignmentId: string) =>
-      request<{ data: AttendanceRecord[]; total: number }>(
-        `/attendance?assignment_id=${encodeURIComponent(assignmentId)}`
-      ),
+      request<AttendanceRecord[]>(`/attendance?assignment_id=${encodeURIComponent(assignmentId)}`),
     list: (params?: {
       is_verified?: boolean;
       status?: string;
@@ -406,7 +404,7 @@ export const api = {
       if (params?.hotel_id) qs.set('hotel_id', params.hotel_id);
       if (params?.page) qs.set('page', String(params.page));
       if (params?.per_page) qs.set('per_page', String(params.per_page));
-      return request<{ data: AttendanceRecord[]; total: number }>(`/attendance?${qs}`);
+      return request<AttendanceRecord[]>(`/attendance?${qs}`);
     },
     get: (id: string) => request<AttendanceRecord>(`/attendance/${id}`),
     verify: (id: string, notes?: string) =>

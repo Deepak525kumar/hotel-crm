@@ -75,7 +75,7 @@ export default function QueueScreen() {
 
   // EXPECTED means nobody has checked in yet -- there is nothing to verify, so
   // it does not belong in a verification queue.
-  const records = (data?.data ?? []).filter((r) => r.status !== 'EXPECTED');
+  const records = (data ?? []).filter((r) => r.status !== 'EXPECTED');
   const countOf = (status: string) => records.filter((r) => r.status === status).length;
 
   return (

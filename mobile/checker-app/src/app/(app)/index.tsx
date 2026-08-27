@@ -85,7 +85,7 @@ export default function HomeScreen() {
   // rows to a checker (it backs the verification queue), so the gate must pick
   // out the checker's own — see checking-eligibility.ts.
   const eligibility = resolveCheckingEligibility(
-    attendance?.data ?? [],
+    attendance ?? [],
     localToday(),
     user?.id ?? ''
   );

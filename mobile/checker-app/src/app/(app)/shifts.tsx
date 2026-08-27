@@ -111,19 +111,11 @@ export default function ScheduleScreen() {
             title={t('nav.schedule')}
             action={
               <View style={styles.headerActions}>
-                {/* Was a "Calendar ›" text link buried in a section header. */}
-                <Pressable
-                  onPress={() => router.push('/(app)/calendar')}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('nav.calendar')}
-                  hitSlop={8}
-                >
-                  <SymbolView
-                    name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
-                    tintColor={theme.text}
-                    size={24}
-                  />
-                </Pressable>
+{/* worker-app has a calendar-view toggle here, routing to
+                    /(app)/calendar. That screen was not ported to this app, so
+                    the button is not either — a header icon that navigates
+                    nowhere is worse than no icon. Port the calendar screen
+                    first if this is wanted. */}
                 <NotificationBell />
               </View>
             }
@@ -147,13 +139,12 @@ export default function ScheduleScreen() {
             renderItem={({ item }) => (
               <ShiftCard
                 item={item}
-                onPress={() => {
-                  if (item.rework_of_assignment_id) {
-                    router.push(`/rework/${item.id}`);
-                    return;
-                  }
-                  router.push(`/shift/${item.id}`);
-                }}
+                // worker-app branches to /rework/[id] here; this app has no
+                // such route and a checker is never assigned rework — rework is
+                // corrective work for the worker who did the room. Left as the
+                // plain shift route rather than copied across to a screen that
+                // does not exist.
+                onPress={() => router.push(`/shift/${item.id}`)}
               />
             )}
             ListEmptyComponent={

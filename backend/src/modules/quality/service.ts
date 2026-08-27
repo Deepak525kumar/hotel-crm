@@ -971,17 +971,37 @@ export class QualityService extends BaseService {
   async listInspectableWorkers(actor: Actor, day?: string) {
     const targetDay = day ?? todayInCalendarTimezone();
     const dayStart = new Date(`${targetDay}T00:00:00.000Z`);
+    // A YYYY-MM-DD shape is not a real date: '2026-13-45' reached Prisma as an
+    // Invalid Date and surfaced as a generic "Invalid database request", and
+    // '2026-02-30' silently rolled over to March 2 while the response still
+    // echoed back '2026-02-30' — a result for a day nobody asked about.
+    // Round-tripping the parsed date rejects both.
+    if (Number.isNaN(dayStart.getTime()) || dayStart.toISOString().slice(0, 10) !== targetDay) {
+      throw new ValidationError('day must be a real calendar date in YYYY-MM-DD form');
+    }
 
-    let hotelFilter: { hotel_id?: string | { in: string[] } } = {};
+    let hotelFilter: Prisma.WorkerAssignmentWhereInput = {};
 
     if (actor.role.toLowerCase() === 'admin') {
       // Unscoped by design, as everywhere else in this service.
     } else if (isScopedManagerRole(actor.role)) {
       const scope = actor.scope ?? null;
+      // No scope claim denies, matching assignments/service.ts list(): an
+      // absent scope is not "see everything".
       if (!scope) return { day: targetDay, workers: [] };
-      if (scope.type === 'hotel') hotelFilter = { hotel_id: scope.hotel_id };
-      // hotel_group and global fall through to no hotel restriction here; the
-      // group case is narrowed below via the hotel relation.
+      if (scope.type === 'hotel') {
+        hotelFilter = { hotel_id: scope.hotel_id };
+      } else if (scope.type === 'hotel_group') {
+        // Narrowed through the hotel relation, the same shape
+        // assignments/service.ts list() uses. An earlier revision of this
+        // method left the group case unfiltered with a comment claiming it was
+        // narrowed here — it was not, so a group-scoped manager would have seen
+        // every hotel's workers. Unreachable in practice (this route needs
+        // quality:write, which manager/RM do not hold) but wrong, and one
+        // permission grant away from being a disclosure.
+        hotelFilter = { hotel: { hotel_group_id: scope.hotel_group_id } };
+      }
+      // scope.type === 'global' -> no added restriction, deliberately.
     } else {
       const own = await this.prisma.workerAssignment.findMany({
         where: {

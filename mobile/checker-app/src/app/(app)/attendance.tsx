@@ -12,7 +12,7 @@ import { Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
 import { calendarDateOf, calendarTimeOf, formatDay } from '@/lib/calendar-dates';
 import { formatDuration, workedMinutes } from '@/lib/attendance-format';
-import type { Attendance, AttendanceStatus } from '@/types/api';
+import type { AttendanceRecord, AttendanceStatus } from '@/types/api';
 
 // Mirrors the tone language used on the shifts list: present/excused read as
 // settled, absent as a problem, late/partial as needing a look.
@@ -39,7 +39,7 @@ function time(iso?: string | null): string {
 export default function AttendanceScreen() {
   const { t } = useTranslation();
   const router = useRouter();
-  const [items, setItems] = useState<Attendance[]>([]);
+  const [items, setItems] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 

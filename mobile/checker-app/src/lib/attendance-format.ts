@@ -1,7 +1,7 @@
-import type { Attendance } from '@/types/api';
+import type { AttendanceRecord } from '@/types/api';
 
 /** Worked duration in whole minutes, or null while a shift is still open. */
-export function workedMinutes(a: Attendance): number | null {
+export function workedMinutes(a: AttendanceRecord): number | null {
   if (!a.check_in_at || !a.check_out_at) return null;
   const ms = new Date(a.check_out_at).getTime() - new Date(a.check_in_at).getTime();
   return ms > 0 ? Math.round(ms / 60_000) : null;

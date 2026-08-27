@@ -349,6 +349,10 @@ export interface DocumentCompleteness {
 // Kept identical to worker-app's copies deliberately — the two apps read the
 // same endpoints, and a divergent local shape here would be a silent decoding
 // bug rather than a compile error.
+//
+// worker-app's `Attendance` is deliberately NOT ported: this app already had
+// `AttendanceRecord` for the same payload, and the two disagreed (`notes` is
+// nullable in one and optional in the other). One shape per endpoint.
 export type WorkRequestStatus = 'DRAFT' | 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'EXPIRED';
 
 export interface AssignmentHotel {
@@ -376,7 +380,8 @@ export interface WorkerAssignment {
   status: AssignmentStatus;
   created_at: string;
   work_request?: WorkRequest;
-  attendance?: Attendance | null;
+  /** AttendanceRecord, not a second local shape — see the note above. */
+  attendance?: AttendanceRecord | null;
   /**
    * Fields the API now nests on every assignment (list and detail).
    *
@@ -394,16 +399,6 @@ export interface WorkerAssignment {
   assigned_by_name?: string | null;
 }
 
-export interface Attendance {
-  id: string;
-  assignment_id: string;
-  worker_id: string;
-  check_in_at?: string | null;
-  check_out_at?: string | null;
-  status: AttendanceStatus;
-  notes?: string;
-  created_at: string;
-}
 
 export interface WorkerStats {
   completed_assignments: number;

@@ -45,6 +45,12 @@
         }
       ],
       "expo-notifications",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Used only when you check in or out of your shift, to confirm you are at the hotel."
+        }
+      ],
       "expo-font",
       "expo-image",
       "expo-localization",

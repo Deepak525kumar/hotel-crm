@@ -88,6 +88,10 @@ export default function RootLayout() {
                 <ScreenHeader>, and expo-router's bar on top of it is the
                 double-title this app just removed from the tab layout. */}
             <Stack.Screen name="inspection/select-worker" options={{ headerShown: false }} />
+            {/* Where check-in and check-out live. Home, Schedule and Attendance
+                all route here; without it the Start-checking gate could tell a
+                checker to check in with nowhere to do it. */}
+            <Stack.Screen name="shift/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="documents" options={{ headerShown: false }} />
             <Stack.Screen name="consent" options={{ headerShown: false }} />
             <Stack.Screen name="hr" options={{ headerShown: false }} />
