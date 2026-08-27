@@ -74,10 +74,14 @@ export function isScopedManagerRole(role: string): boolean {
  * neither an admin (unrestricted) nor a scope-bound manager.
  *
  * Replaces the `role !== 'admin' && role !== 'manager'` shape, which
- * misclassified a Regional Manager as a worker. `checker` is NOT included: it
- * is cross-hotel by present behaviour at several call sites, so callers that
- * treat checker as non-self must say so explicitly (see
- * `isSelfScopedRole(role, { checkerIsSelfScoped: false })`).
+ * misclassified a Regional Manager as a worker. `checker` defaults to
+ * self-scoped, same as `worker` — attendance/service.ts previously opted a
+ * checker out of that (`checkerIsSelfScoped: false`) to back a cross-hotel
+ * attendance-verification queue; that feature was removed 2026-08-27
+ * (checkers do not verify attendance), and with it the last caller of the
+ * override. The parameter stays available for a future call site that
+ * genuinely needs a checker treated as cross-hotel — say so explicitly with
+ * `isSelfScopedRole(role, { checkerIsSelfScoped: false })`.
  */
 export function isSelfScopedRole(
   role: string,

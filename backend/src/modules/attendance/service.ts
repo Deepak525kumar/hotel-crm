@@ -305,15 +305,20 @@ export class AttendanceService extends BaseService {
       ...(query.is_verified !== undefined ? { is_verified: query.is_verified } : {}),
     };
 
-    // `checkerIsSelfScoped: false` preserves this module's existing behaviour —
-    // checker is cross-hotel here, unchanged. The change is that
-    // regional_manager no longer matches the self-scoped branch: the previous
+    // Regional_manager no longer matches the self-scoped branch: the previous
     // `role !== 'admin' && role !== 'manager' && role !== 'checker'` test
     // narrowed an RM to its own attendance rows, while the
     // `role === 'manager'` filter below skipped its hotel_group narrowing —
     // a 200 with the wrong rows in both directions. ADR-030 §3 C-26 grants RM
     // `✓ᶜ` on attendance.
-    if (isSelfScopedRole(actor.role, { checkerIsSelfScoped: false })) {
+    //
+    // checker is self-scoped here (default, no override) as of 2026-08-27:
+    // checkers do not verify attendance, so the cross-hotel "verification
+    // queue" shape this module used to carry for them (`checkerIsSelfScoped:
+    // false`) no longer has a feature to serve, and left unscoped it meant a
+    // checker calling this endpoint with no `worker_id` saw every worker's
+    // attendance platform-wide. See update()'s matching note.
+    if (isSelfScopedRole(actor.role)) {
       where.worker_id = actor.userId;
     } else if (query.worker_id) {
       where.worker_id = query.worker_id;
@@ -321,8 +326,8 @@ export class AttendanceService extends BaseService {
 
     // Epic 5 PR 5.5 (ADR-024, retired M-4): a scope-bound manager's list is
     // constrained to the hotels in their PR 5.4 `scope` claim — hotel scope for
-    // a Hotel Manager, hotel_group for a Regional Manager. Admin and checker
-    // remain cross-hotel (unchanged); worker is already own-worker-scoped above.
+    // a Hotel Manager, hotel_group for a Regional Manager. Admin remains
+    // cross-hotel (unchanged); worker/checker are already own-scoped above.
     if (isScopedManagerRole(actor.role)) {
       const scope = actor.scope ?? null;
       if (!scope) {
@@ -388,7 +393,7 @@ export class AttendanceService extends BaseService {
     const record = await this.prisma.attendance.findUnique({ where: { id } });
     if (!record) throw new NotFoundError('Attendance record not found');
 
-    if (isSelfScopedRole(actor.role, { checkerIsSelfScoped: false })) {
+    if (isSelfScopedRole(actor.role)) {
       if (record.worker_id !== actor.userId) {
         throw new ForbiddenError('Cannot access this attendance record');
       }
@@ -427,26 +432,24 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    // Nobody verifies their own attendance (2026-08-27).
-    //
-    // `checkerIsSelfScoped: false` puts a checker on the management branch,
-    // which may set is_verified, status, minutes_late and check_in_at. That was
-    // unreachable for one's OWN record while checkers could not check in at
-    // all — POST /attendance was worker-only, so a checker had no attendance
-    // row. Admitting 'checker' there created one, and with it the ability to
-    // mark oneself verified and PRESENT: observed live, a checker 644 minutes
-    // late rewrote their own row to PRESENT / 0 minutes late / verified, with
-    // verified_by_id equal to worker_id.
-    //
-    // Ownership therefore beats role here: a record belonging to the caller is
-    // always handled by the self branch (check_out_at and notes only),
-    // whatever the caller's role. This restricts nothing that worked before —
-    // admins and managers do not work shifts, so they hold no attendance rows
-    // of their own — and a checker's authority over OTHER people's attendance
-    // is untouched.
+    // Nobody verifies their own attendance (2026-08-27), and — as of the same
+    // date — a checker does not verify anyone's attendance: the
+    // cross-hotel/management-branch access this module used to grant a
+    // checker over OTHER workers' records (`checkerIsSelfScoped: false`) is
+    // gone. isSelfScopedRole() now runs with no override, so a checker lands
+    // on the self branch below exactly like a worker: check_out_at and notes
+    // on their OWN record only, `Cannot modify another worker's attendance`
+    // on anyone else's. (History: admitting 'checker' to the management
+    // branch for records it did NOT own was the original 2026-08-27 fix here
+    // — a checker checking in created its own row, and the pre-existing
+    // management-branch fallthrough for a role isSelfScopedRole didn't
+    // recognize let a checker mark ITS OWN row verified/PRESENT, observed
+    // live as a 644-minutes-late self-rewrite with verified_by_id ==
+    // worker_id. That specific hole is closed by isOwnRecord below either
+    // way; the broader "checker manages other workers' attendance" capability
+    // it rode in on is what this second pass removes.)
     const isOwnRecord = record.worker_id === actorId;
-    const isWorker =
-      isOwnRecord || isSelfScopedRole(actorRole, { checkerIsSelfScoped: false });
+    const isWorker = isOwnRecord || isSelfScopedRole(actorRole);
 
     if (isWorker) {
       if (record.worker_id !== actorId) {

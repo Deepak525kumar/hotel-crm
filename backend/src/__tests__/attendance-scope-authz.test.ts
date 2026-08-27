@@ -179,8 +179,19 @@ describe('Attendance scope authorization (ATT OQ-02 / SIR-ATT-002)', () => {
       expect(res.status).toBe(200);
     });
 
-    it('allows a checker to update any record (cross-hotel preserved, 200)', async () => {
+    // 2026-08-27: checkers do not verify attendance, so the cross-hotel
+    // management-branch access this endpoint used to grant a checker over
+    // OTHER workers' records is gone — a checker is self-scoped now, exactly
+    // like a worker (see attendance/service.ts's update() note).
+    it("denies a checker updating another worker's record (403)", async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: [], scope: null };
+      const res = await request(makeApp()).patch('/attendance/att_h2').send({ notes: 'ok' });
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('allows a checker to update their OWN record (200)', async () => {
+      testAuth = { userId: 'w1', role: 'checker', permissions: [], scope: null };
       const res = await request(makeApp()).patch('/attendance/att_h2').send({ notes: 'ok' });
       expect(res.status).toBe(200);
     });
@@ -301,8 +312,17 @@ describe('Attendance scope authorization (ATT OQ-02 / SIR-ATT-002)', () => {
       expect(res.status).toBe(200);
     });
 
-    it('allows a checker to read any record (cross-hotel preserved, 200)', async () => {
+    // 2026-08-27: checkers do not verify attendance, so this endpoint's
+    // cross-hotel access for a checker is gone — self-scoped, like a worker.
+    it("denies a checker reading another worker's record (403)", async () => {
       testAuth = { userId: 'chk_1', role: 'checker', permissions: [], scope: null };
+      const res = await request(makeApp()).get('/attendance/att_h2');
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('ForbiddenError');
+    });
+
+    it('allows a checker to read their OWN record (200)', async () => {
+      testAuth = { userId: 'w1', role: 'checker', permissions: [], scope: null };
       const res = await request(makeApp()).get('/attendance/att_h2');
       expect(res.status).toBe(200);
     });

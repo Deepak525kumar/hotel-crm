@@ -24,18 +24,16 @@ jest.mock('../lib/db.js', () => ({ getPrisma: () => prismaStub }));
 import { AttendanceService } from '../modules/attendance/service.js';
 
 /**
- * Nobody verifies their own attendance.
+ * Nobody verifies their own attendance, and a checker does not verify anyone
+ * else's either (2026-08-27: checkers do not verify attendance; the
+ * cross-hotel management-branch access this module used to grant a checker
+ * over OTHER workers' records was removed with the verification-queue
+ * feature it existed to serve). isSelfScopedRole() now runs with no
+ * override, so a checker lands on the self branch exactly like a worker.
  *
- * `update()` puts a checker on the management branch
- * (`checkerIsSelfScoped: false`), which may set is_verified, status,
- * minutes_late and check_in_at. That was unreachable for one's own record
- * while POST /attendance was worker-only — a checker had no attendance row at
- * all. Admitting 'checker' to check-in created the row, and with it the
- * ability to mark oneself present and verified.
- *
- * Observed against a live database before the fix: a checker 644 minutes late
- * PATCHed their own row to PRESENT, minutes_late 0, is_verified true, with
- * verified_by_id equal to worker_id.
+ * The original hole this file guards against, still true: before the first
+ * fix here, a checker 644 minutes late PATCHed their OWN row to PRESENT,
+ * minutes_late 0, is_verified true, with verified_by_id equal to worker_id.
  */
 describe('attendance update: ownership beats role', () => {
   const service = new AttendanceService();
@@ -72,19 +70,12 @@ describe('attendance update: ownership beats role', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  it("leaves a checker's authority over ANOTHER worker's attendance intact", async () => {
-    // The regression risk of the fix: over-restricting and breaking the
-    // verification queue, which is the checker's actual job.
+  it("denies a checker acting on ANOTHER worker's attendance (self-scoped, not management)", async () => {
     findUnique.mockResolvedValue({ ...own, id: 'att-worker', worker_id: 'worker-9' });
-    update.mockResolvedValue({
-      ...own, id: 'att-worker', worker_id: 'worker-9', is_verified: true,
-      created_at: new Date(), updated_at: new Date(), verified_at: new Date(),
-      verified_by_id: CHECKER, minutes_worked: null, notes: null, expected_end: null,
-    });
 
-    await service.update('att-worker', { is_verified: true } as any, CHECKER, 'checker', null);
-
-    expect(update).toHaveBeenCalled();
-    expect(update.mock.calls[0][0].data.is_verified).toBe(true);
+    await expect(
+      service.update('att-worker', { is_verified: true } as any, CHECKER, 'checker', null)
+    ).rejects.toMatchObject({ message: expect.stringContaining("another worker's attendance") });
+    expect(update).not.toHaveBeenCalled();
   });
 });
