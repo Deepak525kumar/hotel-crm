@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { SkillTag } from '@prisma/client';
 
+// A JobRequest/broadcast is for exactly one account role -- WORKER or
+// CHECKER. The wider UserRole Prisma enum backs the column (see schema.prisma
+// on JobRequest.target_role); this is the API-boundary restriction of it,
+// since MANAGER/ADMIN/REGIONAL_MANAGER are never a valid target and must
+// never be accepted from a request body. Defaults to WORKER so every
+// pre-checker-role creation path keeps behaving exactly as before.
+const TargetRoleEnum = z.enum(['WORKER', 'CHECKER']);
+
 // Schema is the frozen authority for enums (PRISMA_SCHEMA_V2_FREEZE). The
 // API_SPEC_V1_PATCH_V2 OPEN/CLOSED enum was written before the freeze and is
 // superseded — see the audit. DTO field names follow the spec where they are
@@ -20,6 +28,7 @@ const timeString = z
 
 export const CreateWorkRequestSchema = z.object({
   hotel_id: z.string().min(1),
+  target_role: TargetRoleEnum.default('WORKER'),
   position: z.string().min(1),
   workers_needed: z.number().int().positive().max(1000).default(1),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
@@ -38,6 +47,7 @@ export type CreateWorkRequestInput = z.infer<typeof CreateWorkRequestSchema>;
 
 export const UpdateWorkRequestSchema = z
   .object({
+    target_role: TargetRoleEnum.optional(),
     position: z.string().min(1).optional(),
     workers_needed: z.number().int().positive().max(1000).optional(),
     shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -58,6 +68,9 @@ export type UpdateWorkRequestInput = z.infer<typeof UpdateWorkRequestSchema>;
 
 export const ListWorkRequestsQuerySchema = z.object({
   hotel_id: z.string().optional(),
+  // Manager/admin-only filter (service.ts overrides this for worker/checker
+  // callers to their own role regardless of what's passed here).
+  target_role: TargetRoleEnum.optional(),
   status: z.union([WorkRequestStatusEnum, z.array(WorkRequestStatusEnum)]).optional(),
   position: z.string().optional(),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -88,6 +101,7 @@ export type ListWorkRequestsQuery = z.infer<typeof ListWorkRequestsQuerySchema>;
 // and no single `workers_needed`.
 export const RaiseBroadcastSchema = z.object({
   hotel_id: z.string().min(1),
+  target_role: TargetRoleEnum.default('WORKER'),
   shift_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD'),
   shift_start_time: z
     .string()
@@ -190,6 +204,7 @@ export interface WorkRequestDto {
   id: string;
   hotel_id: string;
   created_by_id: string;
+  target_role: 'WORKER' | 'CHECKER';
   position: string;
   workers_needed: number;
   workers_confirmed: number;

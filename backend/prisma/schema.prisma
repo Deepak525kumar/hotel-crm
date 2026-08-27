@@ -863,6 +863,14 @@ model JobRequest {
   hotel               Hotel             @relation(fields: [hotel_id], references: [id], onDelete: Cascade)
   created_by_id       String
   created_by          User              @relation("request_creator", fields: [created_by_id], references: [id], onDelete: Restrict)
+  // Which account role this request/broadcast is for -- WORKER or CHECKER
+  // only (validated at the API boundary; the wider UserRole enum is reused
+  // rather than a new 2-value one so no separate type exists to keep in
+  // sync). Defaults to WORKER so every pre-existing row keeps its current
+  // (pre-checker-role) meaning with no backfill. A checker must never see
+  // or accept a WORKER-targeted request and vice versa -- see
+  // job-requests/service.ts's list()/getById()/acceptBroadcast().
+  target_role         UserRole          @default(WORKER)
   position            String // required role for this shift
   workers_needed      Int               @default(1)
   workers_confirmed   Int               @default(0)
@@ -910,6 +918,7 @@ model JobRequest {
   @@index([shift_date])
   @@index([position])
   @@index([hotel_id, status, shift_date]) // hot path: "open shifts at hotel on date"
+  @@index([target_role])
   @@map("WorkRequest")
 }
 

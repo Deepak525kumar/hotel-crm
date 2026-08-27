@@ -139,6 +139,7 @@ const makeJobRequestRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'jr1',
   hotel_id: 'h1',
   created_by_id: 'mgr1',
+  target_role: 'WORKER' as const,
   position: '1x CLEANER',
   workers_needed: 1,
   workers_confirmed: 0,
@@ -201,6 +202,24 @@ describe('JobRequestService.acceptBroadcast', () => {
     await expect(
       service.acceptBroadcast('jr1', 'WAITER', { userId: 'w1', role: 'worker' })
     ).rejects.toMatchObject({ name: 'NotFoundError' });
+  });
+
+  // 2026-08-27 (target_role): a worker cannot accept a checker-targeted
+  // broadcast slot, checked before roster/skill eligibility.
+  it('rejects a worker accepting a CHECKER-targeted broadcast (ForbiddenError)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow({ target_role: 'CHECKER' }));
+    await expect(
+      service.acceptBroadcast('jr1', 'CLEANER', { userId: 'w1', role: 'worker' })
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    expect(mockJobRequestSkillSlot.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a checker accepting a WORKER-targeted broadcast (ForbiddenError)', async () => {
+    mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow());
+    await expect(
+      service.acceptBroadcast('jr1', 'CLEANER', { userId: 'c1', role: 'checker' })
+    ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    expect(mockJobRequestSkillSlot.updateMany).not.toHaveBeenCalled();
   });
 
   it('rejects a worker not eligible at this hotel (ForbiddenError)', async () => {

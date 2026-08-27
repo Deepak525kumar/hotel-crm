@@ -5,6 +5,7 @@ import {
   Prisma,
   JobRequest,
   JobRequestSkillSlot,
+  UserRole,
   WorkRequestStatus,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
@@ -60,6 +61,13 @@ const ALLOWED_TRANSITIONS: Partial<Record<WorkRequestStatus, WorkRequestStatus[]
   [WorkRequestStatus.PARTIALLY_FILLED]: [WorkRequestStatus.CANCELLED],
 };
 
+// A JobRequest's target_role (UserRole) <-> the lowercase account role
+// string every actor/JWT carries. Kept to these two values -- see
+// TargetRoleEnum's own comment in types.ts.
+function actorRoleToTargetRole(role: string): UserRole {
+  return role === 'checker' ? UserRole.CHECKER : UserRole.WORKER;
+}
+
 export class JobRequestService extends BaseService {
   /**
    * Fill state, derived at read time (2026-08-07).
@@ -111,6 +119,10 @@ export class JobRequestService extends BaseService {
       id: wr.id,
       hotel_id: wr.hotel_id,
       created_by_id: wr.created_by_id,
+      // The column is typed against the full UserRole enum for reuse, but
+      // every write site (create()/update()/raiseBroadcast(), all validated
+      // by TargetRoleEnum) only ever stores WORKER or CHECKER.
+      target_role: wr.target_role as 'WORKER' | 'CHECKER',
       position: wr.position,
       workers_needed: wr.workers_needed,
       // Same dead-column problem as the analytics dashboard fix: the stored
@@ -183,6 +195,7 @@ export class JobRequestService extends BaseService {
         data: {
           hotel_id: input.hotel_id,
           created_by_id: actor.userId,
+          target_role: input.target_role,
           position: input.position,
           workers_needed: input.workers_needed,
           shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
@@ -225,6 +238,10 @@ export class JobRequestService extends BaseService {
       // Same discriminator closeExpiredBroadcasts() uses below.
       ...(query.is_broadcast === true ? { skill_slots: { some: {} } } : {}),
       ...(query.is_broadcast === false ? { skill_slots: { none: {} } } : {}),
+      // Manager/admin-only filter; overridden below for a worker/checker
+      // caller regardless of what they pass, since their own role is the
+      // only value they're ever allowed to see.
+      ...(query.target_role ? { target_role: query.target_role as UserRole } : {}),
     };
 
     // PATCH-04: non-management roles only see requests for hotels where they
@@ -241,6 +258,12 @@ export class JobRequestService extends BaseService {
           : '__none__'
         : { in: hotelIds };
 
+      // 2026-08-27 (target_role): a worker must never see a checker-targeted
+      // request and vice versa -- overrides whatever `query.target_role`
+      // above may have set, since a self-scoped caller does not get to ask
+      // for the other role's rows.
+      where.target_role = actorRoleToTargetRole(actor.role);
+
       // 2026-08-13 fix: this scoped a worker by hotel but never by SKILL,
       // while acceptBroadcast() hard-rejects a worker who does not hold the
       // slot's skill ("Cannot accept this broadcast", ForbiddenError). So a
@@ -254,9 +277,13 @@ export class JobRequestService extends BaseService {
       // than a bare `some` filter, which would have hidden every marketplace
       // request from every worker.
       //
-      // Deliberately scoped to `worker`, not all self-scoped roles: a checker
-      // is self-scoped too but does not accept broadcasts, and its
-      // EmploymentRecord skills (if any) describe something else entirely.
+      // Deliberately scoped to `worker`, not all self-scoped roles: a
+      // checker's EmploymentRecord skills (if any) describe something other
+      // than the WORKER-domain SkillTag enum entirely, so a checker-targeted
+      // broadcast is expected to use a `skill: null` ("no specific skill
+      // required") slot rather than a SkillTag match — the target_role guard
+      // above already keeps a checker off any worker-targeted (SkillTag'd)
+      // broadcast, so no separate skill filter is needed for checker here.
       if (actor.role === 'worker') {
         const record = await this.prisma.employmentRecord.findUnique({
           where: { user_id: actor.userId },
@@ -321,6 +348,11 @@ export class JobRequestService extends BaseService {
     if (!wr) throw new NotFoundError('Work request not found');
 
     if (isSelfScopedRole(actor.role)) {
+      // A worker/checker must never read the other role's request by id,
+      // same guard list() applies via where.target_role.
+      if (wr.target_role !== actorRoleToTargetRole(actor.role)) {
+        throw new ForbiddenError('Cannot access this work request');
+      }
       const eligible = await isWorkerEligibleForHotel(actor.userId, wr.hotel_id);
       if (!eligible) throw new ForbiddenError('Cannot access this work request');
     } else if (isScopedManagerRole(actor.role)) {
@@ -393,6 +425,7 @@ export class JobRequestService extends BaseService {
     // published — once OPEN, terms are locked except for status changes.
     const editable = wr.status === WorkRequestStatus.DRAFT;
     if (editable) {
+      if (input.target_role !== undefined) data.target_role = input.target_role as UserRole;
       if (input.position !== undefined) data.position = input.position;
       if (input.workers_needed !== undefined) data.workers_needed = input.workers_needed;
       if (input.shift_date !== undefined)
@@ -417,7 +450,11 @@ export class JobRequestService extends BaseService {
     // Worker.
     let updated: JobRequest;
     if (isPublishing) {
-      const workerIds = await listEligibleWorkerIds(wr.hotel_id);
+      // Roster fan-out must match whichever target_role this publish is
+      // actually taking effect with, in the rare case a caller changes
+      // target_role and publishes in the same PATCH.
+      const effectiveTargetRole = (data.target_role as UserRole | undefined) ?? wr.target_role;
+      const workerIds = await listEligibleWorkerIds(wr.hotel_id, effectiveTargetRole);
       updated = await this.prisma.$transaction(async (tx) => {
         const wrUpdated = await tx.jobRequest.update({ where: { id }, data });
         await this.enqueueRosterPublished(tx, wrUpdated, workerIds);
@@ -593,6 +630,7 @@ export class JobRequestService extends BaseService {
         data: {
           hotel_id: input.hotel_id,
           created_by_id: actor.userId,
+          target_role: input.target_role,
           position: positionSummary,
           workers_needed: totalWorkersNeeded,
           shift_date: new Date(`${input.shift_date}T00:00:00.000Z`),
@@ -668,6 +706,10 @@ export class JobRequestService extends BaseService {
       if (!inScope) {
         throw new ForbiddenError('Cannot view eligibility for this work request');
       }
+    } else if (isSelfScopedRole(actor.role) && wr.target_role !== actorRoleToTargetRole(actor.role)) {
+      // Same guard as getById() -- a worker/checker must never see
+      // eligibility for the other role's broadcast.
+      throw new ForbiddenError('Cannot view eligibility for this work request');
     }
 
     const internal = await this.computeBroadcastEligibility(wr, wr.skill_slots);
@@ -710,7 +752,13 @@ export class JobRequestService extends BaseService {
     shift_date: string;
     slots: { skill: JobRequestSkillSlot['skill']; headcount: number; confirmed_count: number; eligible_worker_ids: string[] }[];
   }> {
-    const rosterWorkerIds = await listEligibleWorkerIds(wr.hotel_id);
+    // 2026-08-27 (target_role): narrowed to the broadcast's own target role
+    // -- without this, a checker (or a worker) was eligible for the OTHER
+    // role's `skill: null` ("no specific skill required") slot, since
+    // listEligibleWorkerIds() with no role filter returns every active
+    // EmploymentRecord regardless of account role and the null-skill branch
+    // below does not check EmploymentRecord.skills at all.
+    const rosterWorkerIds = await listEligibleWorkerIds(wr.hotel_id, wr.target_role);
     if (rosterWorkerIds.length === 0) {
       return {
         job_request_id: wr.id,
@@ -893,6 +941,14 @@ export class JobRequestService extends BaseService {
     const slot = wr.skill_slots.find((s) => s.skill === skill);
     if (!slot) {
       throw new NotFoundError('No matching skill slot on this broadcast');
+    }
+
+    // 2026-08-27 (target_role): a worker cannot accept a checker-targeted
+    // broadcast and vice versa, whatever slot they name -- checked before
+    // the roster/skill checks below so this reads as a plain "not for you",
+    // not a roster-membership failure.
+    if (actorRoleToTargetRole(actor.role) !== wr.target_role) {
+      throw new ForbiddenError('Cannot accept this broadcast');
     }
 
     // Worker-side eligibility: roster membership (hotel-group scope, same

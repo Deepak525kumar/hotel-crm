@@ -129,6 +129,7 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'wr1',
   hotel_id: 'h1',
   created_by_id: 'mgr1',
+  target_role: 'WORKER' as const,
   position: 'cleaner',
   workers_needed: 2,
   workers_confirmed: 0,
@@ -153,6 +154,7 @@ const makeRow = (overrides: Record<string, unknown> = {}) => ({
 
 const baseInput = {
   hotel_id: 'h1',
+  target_role: 'WORKER' as const,
   position: 'cleaner',
   workers_needed: 2,
   shift_date: '2026-07-01',
@@ -393,8 +395,13 @@ describe('WorkRequestService', () => {
 
         await service.update('wr1', { status: 'OPEN' }, { userId: 'mgr1', role: 'admin' });
 
+        // 2026-08-27 (target_role): the fan-out is narrowed to the
+        // publishing row's own target_role (WORKER, makeRow()'s default) so
+        // a checker never gets a WORKER-targeted publish notification.
         expect(mockEmploymentRecord.findMany).toHaveBeenCalledWith(
-          expect.objectContaining({ where: { hotel_group_id: 'g1', status: 'ACTIVE' } })
+          expect.objectContaining({
+            where: { hotel_group_id: 'g1', status: 'ACTIVE', user: { role: 'WORKER' } },
+          })
         );
         expect(mockNotification.create).toHaveBeenCalledTimes(2);
         const types = mockNotification.create.mock.calls.map((c) => c[0].data.type);
@@ -564,6 +571,49 @@ describe('WorkRequestService', () => {
         expect(where.hotel_id).toEqual({ in: ['h1', 'h2'] });
       });
     });
+
+    // 2026-08-27: a worker/checker must only ever see their own role's
+    // requests, even if a WORKER-only checker somehow submitted the other
+    // role's value on the query string.
+    describe('target_role scoping', () => {
+      beforeEach(() => {
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findMany.mockResolvedValue([{ id: 'h1' }]);
+        mockWorkRequest.findMany.mockResolvedValue([]);
+        mockWorkRequest.count.mockResolvedValue(0);
+      });
+
+      it('scopes a worker caller to target_role WORKER', async () => {
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'w1', role: 'worker' });
+        expect(mockWorkRequest.findMany.mock.calls[0][0].where.target_role).toBe('WORKER');
+      });
+
+      it('scopes a checker caller to target_role CHECKER', async () => {
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'c1', role: 'checker' });
+        expect(mockWorkRequest.findMany.mock.calls[0][0].where.target_role).toBe('CHECKER');
+      });
+
+      it("a worker cannot override its own scoping via query.target_role=CHECKER", async () => {
+        await service.list(
+          { page: 1, per_page: 20, target_role: 'CHECKER' } as any,
+          { userId: 'w1', role: 'worker' }
+        );
+        expect(mockWorkRequest.findMany.mock.calls[0][0].where.target_role).toBe('WORKER');
+      });
+
+      it('lets an admin filter by target_role via the query param', async () => {
+        await service.list(
+          { page: 1, per_page: 20, target_role: 'CHECKER' } as any,
+          { userId: 'a1', role: 'admin' }
+        );
+        expect(mockWorkRequest.findMany.mock.calls[0][0].where.target_role).toBe('CHECKER');
+      });
+
+      it('does not filter by target_role for an admin with no query param', async () => {
+        await service.list({ page: 1, per_page: 20 } as any, { userId: 'a1', role: 'admin' });
+        expect(mockWorkRequest.findMany.mock.calls[0][0].where.target_role).toBeUndefined();
+      });
+    });
   });
 
   describe('getById', () => {
@@ -591,6 +641,34 @@ describe('WorkRequestService', () => {
         await expect(service.getById('wr1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
           name: 'ForbiddenError',
         });
+      });
+    });
+
+    describe('target_role access', () => {
+      it('denies a worker reading a CHECKER-targeted request', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ hotel_id: 'h1', target_role: 'CHECKER' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        await expect(service.getById('wr1', { userId: 'w1', role: 'worker' })).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
+
+      it('denies a checker reading a WORKER-targeted request', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ hotel_id: 'h1' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        await expect(service.getById('wr1', { userId: 'c1', role: 'checker' })).rejects.toMatchObject({
+          name: 'ForbiddenError',
+        });
+      });
+
+      it('allows a checker reading a CHECKER-targeted request', async () => {
+        mockWorkRequest.findUnique.mockResolvedValue(makeRow({ hotel_id: 'h1', target_role: 'CHECKER' }));
+        mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g1' });
+        mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+        const dto = await service.getById('wr1', { userId: 'c1', role: 'checker' });
+        expect(dto.id).toBe('wr1');
       });
     });
   });
