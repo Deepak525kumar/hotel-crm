@@ -111,11 +111,19 @@ export default function ScheduleScreen() {
             title={t('nav.schedule')}
             action={
               <View style={styles.headerActions}>
-{/* worker-app has a calendar-view toggle here, routing to
-                    /(app)/calendar. That screen was not ported to this app, so
-                    the button is not either — a header icon that navigates
-                    nowhere is worse than no icon. Port the calendar screen
-                    first if this is wanted. */}
+                {/* Was a "Calendar ›" text link buried in a section header. */}
+                <Pressable
+                  onPress={() => router.push('/(app)/calendar')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('nav.calendar')}
+                  hitSlop={8}
+                >
+                  <SymbolView
+                    name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
+                    tintColor={theme.text}
+                    size={24}
+                  />
+                </Pressable>
                 <NotificationBell />
               </View>
             }

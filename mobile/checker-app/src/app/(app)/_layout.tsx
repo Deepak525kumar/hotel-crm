@@ -21,9 +21,16 @@ import { PushRegistration } from '@/components/PushRegistration';
  *
  * Moved off the bar, still reachable:
  *
- *   - `leaderboard` and `absences` are rows on Profile. The old Queue
- *     screen (attendance verification) was dropped entirely -- checkers do
- *     not verify attendance.
+ *   - `leaderboard` is a row on Profile.
+ *   - `calendar` is a view mode inside Schedule, exactly as in worker-app --
+ *     see its own header comment. It replaces the standalone Sick/Vacation
+ *     screen this app used to have: worker-app has never had two separate
+ *     absence-marking surfaces, and keeping this app's old one alongside a
+ *     ported calendar.tsx would have meant two screens independently
+ *     calling markAbsence/deleteAbsence against the same record, with no
+ *     shared state between them.
+ *   - The old Queue screen (attendance verification) was dropped entirely --
+ *     checkers do not verify attendance.
  *   - `notifications` is the header bell, as in worker-app.
  *
  * `href: null` keeps a route navigable while hiding its tab, which is why they
@@ -108,7 +115,7 @@ export default function AppLayout() {
 
         {/* Reachable by navigation, not by tab. See the comment above. */}
         <Tabs.Screen name="leaderboard" options={{ href: null }} />
-        <Tabs.Screen name="absences" options={{ href: null }} />
+        <Tabs.Screen name="calendar" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </>

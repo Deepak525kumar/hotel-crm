@@ -38,10 +38,9 @@ const BLOCK_MESSAGE: Record<CheckingBlockReason, string> = {
 /**
  * Home — the checker's landing screen, and the only route to Start checking.
  *
- * It replaces the attendance queue that used to be the first tab. The queue
- * still exists (`/(app)/queue`); it is simply no longer what the app opens on,
- * because a list of unverified attendance rows is not where a checker's day
- * starts.
+ * There used to be an attendance-verification queue as the first tab.
+ * Checkers do not verify attendance, so that screen was dropped entirely
+ * (see `(app)/_layout.tsx`'s header comment).
  *
  * Start checking is gated on being checked in (`resolveCheckingEligibility`,
  * which carries the rule and its tests). The gate is deliberately visible
