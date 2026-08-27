@@ -110,6 +110,7 @@ S3_BUCKET_BACKUPS=hotelcrm-backups
 
 SENDGRID_API_KEY=SG.xxxxx
 EMAIL_SERVICE=sendgrid
+EMAIL_FROM_ADDRESS=noreply@deepcleaninghub.de
 
 APNS_PRIVATE_KEY_BASE64=base64-encoded-p8-key
 APNS_KEY_ID=XXXXXXXXXX
