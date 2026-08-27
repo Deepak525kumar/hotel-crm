@@ -1039,7 +1039,12 @@
       "minibar_restocking": "منی بار کی بھرائی",
       "fragrance_amenities": "خوشبو اور سہولیات",
       "other": "دیگر"
-    }
+    },
+    "selectWorkerTitle": "ورکر منتخب کریں",
+    "selectWorkerSubtitle": "آج آپ کے ہوٹلوں میں شفٹ پر موجود ورکرز",
+    "noInspectableWorkers": "جانچنے کے لیے کوئی ورکر نہیں",
+    "noInspectableWorkersBody": "جن ہوٹلوں میں آپ کام کر رہے ہیں وہاں آج کوئی شفٹ پر نہیں ہے۔",
+    "workerUnavailable": "ورکر دستیاب نہیں"
   },
   "ratings": {
     "comment": "تبصرہ",
@@ -1101,7 +1106,13 @@
     "openJobs": "دستیاب ملازمتیں",
     "yourWeek": "آپ کا ہفتہ",
     "viewAll": "سب دیکھیں",
-    "documentsNeedAttention": "دستاویزات پر توجہ درکار ہے"
+    "documentsNeedAttention": "دستاویزات پر توجہ درکار ہے",
+    "startCheckingTitle": "کمروں کی جانچ",
+    "startChecking": "جانچ شروع کریں",
+    "goToSchedule": "میرا شیڈول دیکھیں",
+    "checkingBlockedNoShift": "آج آپ کی کوئی شفٹ نہیں ہے، اس لیے جانچنے کے لیے کچھ نہیں۔",
+    "checkingBlockedNotCheckedIn": "کمروں کی جانچ شروع کرنے سے پہلے اپنی شفٹ میں چیک اِن کریں۔",
+    "checkingBlockedCheckedOut": "آپ اپنی شفٹ سے چیک آؤٹ کر چکے ہیں۔ آج کے لیے جانچ بند ہے۔"
   },
   "marketplace": {
     "description": "شفٹس جن کے لیے آپ درخواست دے سکتے ہیں۔",

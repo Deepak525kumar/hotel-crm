@@ -175,6 +175,32 @@ export class QualityController {
     }
   }
 
+  /**
+   * GET /quality/inspectable-workers — who this checker may inspect today.
+   * `day` is optional and defaults to today in the calendar timezone.
+   */
+  async listInspectableWorkers(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const rawDay = req.query.day;
+      const day = typeof rawDay === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDay) ? rawDay : undefined;
+      if (typeof rawDay === 'string' && day === undefined) {
+        throw new ValidationError('day must be YYYY-MM-DD');
+      }
+      const result = await qualityService.listInspectableWorkers(
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
+        day
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getLeaderboard(req: Request, res: Response, next: NextFunction) {
     try {
       if (!req.auth) throw new UnauthorizedError('Not authenticated');

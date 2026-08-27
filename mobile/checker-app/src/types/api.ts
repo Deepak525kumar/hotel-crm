@@ -40,7 +40,19 @@ export interface ApiResponse<T> {
   meta: { timestamp: string; request_id: string };
 }
 
-export type AttendanceStatus = 'EXPECTED' | 'PRESENT' | 'ABSENT' | 'LATE' | 'PARTIAL';
+// Kept in step with the backend's own enums (schema.prisma). Both of these
+// were short of a value the API can actually return: AttendanceStatus was
+// missing EXCUSED and AssignmentStatus was missing NO_SHOW and REASSIGNED.
+// A missing member is not a compile error at the call site — it is a status
+// arriving at runtime that every exhaustive map and badge silently has no
+// case for. worker-app's copies already carried the full sets.
+export type AttendanceStatus =
+  | 'EXPECTED'
+  | 'PRESENT'
+  | 'ABSENT'
+  | 'LATE'
+  | 'PARTIAL'
+  | 'EXCUSED';
 
 export interface AttendanceRecord {
   id: string;
@@ -72,7 +84,13 @@ export interface AttendanceRecord {
   verified_by_name?: string | null;
 }
 
-export type AssignmentStatus = 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type AssignmentStatus =
+  | 'CONFIRMED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'NO_SHOW'
+  | 'CANCELLED'
+  | 'REASSIGNED';
 
 export interface Assignment {
   id: string;
@@ -322,4 +340,106 @@ export interface DocumentCompleteness {
   missing_categories: DocumentCategory[];
   categories: Record<DocumentCategory, boolean>;
   document_count: number;
+}
+
+// --- Ported from worker-app (2026-08-27) ---
+// A checker works a shift exactly as a worker does: the same assignments, the
+// same attendance, the same stats. These types were worker-app-only because
+// the checker app had no Home, Schedule or Attendance screen to need them.
+// Kept identical to worker-app's copies deliberately — the two apps read the
+// same endpoints, and a divergent local shape here would be a silent decoding
+// bug rather than a compile error.
+export type WorkRequestStatus = 'DRAFT' | 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'EXPIRED';
+
+export interface AssignmentHotel {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  country: string;
+  timezone: string;
+  latitude: number | null;
+  longitude: number | null;
+  contact_phone: string | null;
+  contact_email: string | null;
+}
+
+export interface WorkerAssignment {
+  id: string;
+  work_request_id: string;
+  // ADR-069: set when this assignment is corrective rework for another one.
+  // Both request FKs are null on a rework row, so without this the shift list
+  // renders it as a generic "Shift" -- indistinguishable from real work, with
+  // a 20-minute escalation clock the worker cannot see running.
+  rework_of_assignment_id?: string | null;
+  worker_id: string;
+  status: AssignmentStatus;
+  created_at: string;
+  work_request?: WorkRequest;
+  attendance?: Attendance | null;
+  /**
+   * Fields the API now nests on every assignment (list and detail).
+   *
+   * Before this, the DTO carried only ids and a status, so the shift screen
+   * could show neither where nor when the shift was — it rendered hotel, date
+   * and time only inside a `work_request` block, and every assignment in the
+   * database is calendar-placed with work_request null. A worker opening a
+   * shift saw a status and nothing else.
+   */
+  day?: string; // YYYY-MM-DD
+  hotel?: AssignmentHotel | null;
+  /** Null for calendar-placed shifts: times live on a JobRequest, and there is none. */
+  shift_start_time?: string | null; // HH:mm
+  shift_end_time?: string | null; // HH:mm
+  assigned_by_name?: string | null;
+}
+
+export interface Attendance {
+  id: string;
+  assignment_id: string;
+  worker_id: string;
+  check_in_at?: string | null;
+  check_out_at?: string | null;
+  status: AttendanceStatus;
+  notes?: string;
+  created_at: string;
+}
+
+export interface WorkerStats {
+  completed_assignments: number;
+  rooms_completed: number;
+  average_rating: number | null;
+  attendance: {
+    total: number;
+    present: number;
+    late: number;
+    absent: number;
+  };
+}
+
+export interface WorkRequest {
+  id: string;
+  hotel_id: string;
+  hotel?: { id: string; name: string; address?: string };
+  position: string;
+  description?: string;
+  workers_needed: number;
+  workers_confirmed: number;
+  shift_date: string; // ISO date string
+  shift_start_time: string; // HH:mm
+  shift_end_time: string; // HH:mm
+  hourly_rate?: number;
+  status: WorkRequestStatus;
+  created_at: string;
+}
+
+/** A row in the Start-checking worker picker (ADR-072 §2.5). */
+export interface InspectableWorker {
+  assignment_id: string;
+  worker_id: string;
+  /** Null when the user record no longer resolves — render a label, never an id fragment. */
+  worker_name: string | null;
+  hotel_id: string;
+  hotel_name: string | null;
+  status: AssignmentStatus;
 }

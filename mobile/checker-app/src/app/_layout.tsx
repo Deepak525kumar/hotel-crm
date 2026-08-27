@@ -84,6 +84,10 @@ export default function RootLayout() {
                 AuthGuard redirects a non-ACTIVE checker here. */}
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="rating/[id]" options={{ headerShown: false }} />
+            {/* headerShown false like its siblings: the screen draws its own
+                <ScreenHeader>, and expo-router's bar on top of it is the
+                double-title this app just removed from the tab layout. */}
+            <Stack.Screen name="inspection/select-worker" options={{ headerShown: false }} />
             <Stack.Screen name="documents" options={{ headerShown: false }} />
             <Stack.Screen name="consent" options={{ headerShown: false }} />
             <Stack.Screen name="hr" options={{ headerShown: false }} />

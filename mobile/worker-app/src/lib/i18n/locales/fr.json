@@ -1038,7 +1038,12 @@
       "minibar_restocking": "Réapprovisionnement du minibar",
       "fragrance_amenities": "Parfum et articles",
       "other": "Autre"
-    }
+    },
+    "selectWorkerTitle": "Sélectionner un employé",
+    "selectWorkerSubtitle": "En service aujourd'hui dans vos hôtels",
+    "noInspectableWorkers": "Aucun employé à contrôler",
+    "noInspectableWorkersBody": "Personne n'est en service aujourd'hui dans les hôtels où vous travaillez.",
+    "workerUnavailable": "Employé indisponible"
   },
   "ratings": {
     "comment": "Commentaire",
@@ -1100,7 +1105,13 @@
     "openJobs": "Offres disponibles",
     "yourWeek": "Votre semaine",
     "viewAll": "Tout voir",
-    "documentsNeedAttention": "Documents à compléter"
+    "documentsNeedAttention": "Documents à compléter",
+    "startCheckingTitle": "Contrôles des chambres",
+    "startChecking": "Commencer le contrôle",
+    "goToSchedule": "Voir mon planning",
+    "checkingBlockedNoShift": "Vous n'avez aucun service prévu aujourd'hui, il n'y a donc rien à contrôler.",
+    "checkingBlockedNotCheckedIn": "Pointez votre arrivée avant de commencer à contrôler les chambres.",
+    "checkingBlockedCheckedOut": "Vous avez pointé votre départ. Les contrôles sont terminés pour aujourd’hui."
   },
   "marketplace": {
     "description": "Créneaux auxquels vous pouvez postuler.",

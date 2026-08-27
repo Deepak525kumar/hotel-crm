@@ -1,4 +1,7 @@
 import type {
+  InspectableWorker,
+  WorkerAssignment,
+  WorkerStats,
   AttendanceRecord,
   AuthResponse,
   CalendarAbsence,
@@ -354,6 +357,42 @@ export const api = {
   },
 
   attendance: {
+    // --- Ported from worker-app (2026-08-27) ---
+    // A checker checks in to their own shift exactly as a worker does, and
+    // must be checked in before inspecting a room. POST /attendance admits
+    // 'checker' as of the same date.
+    //
+    // GD-14: when coordinates are available they're sent with the check-in
+    // itself so backend-attendance can run its geofence verification as part
+    // of the same request — optional here only because location
+    // permission/signal can fail on-device, not because Attendance treats
+    // them as informational.
+    checkIn: (assignmentId: string, location?: { latitude: number; longitude: number }) =>
+      request<AttendanceRecord>('/attendance', {
+        method: 'POST',
+        body: JSON.stringify({ assignment_id: assignmentId, ...location }),
+      }),
+    checkOut: (attendanceId: string, location?: { latitude: number; longitude: number }) =>
+      request<AttendanceRecord>(`/attendance/${attendanceId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ check_out_at: new Date().toISOString(), ...location }),
+      }),
+    // GET /attendance is scoped by req.auth server-side, so the caller receives
+    // only their own records -- no worker_id is sent from the client.
+    listMine: (params?: { page?: number; per_page?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.per_page) qs.set('per_page', String(params.per_page));
+      const q = qs.toString();
+      return request<{ data: AttendanceRecord[]; total: number }>(`/attendance${q ? `?${q}` : ''}`);
+    },
+    // The backend does not embed attendance on AssignmentDto, so a shift is
+    // resolved to its attendance row by assignment_id to obtain the id needed
+    // for check-out.
+    listByAssignment: (assignmentId: string) =>
+      request<{ data: AttendanceRecord[]; total: number }>(
+        `/attendance?assignment_id=${encodeURIComponent(assignmentId)}`
+      ),
     list: (params?: {
       is_verified?: boolean;
       status?: string;
@@ -377,7 +416,37 @@ export const api = {
       }),
   },
 
+  assignments: {
+    list: (params?: { page?: number; limit?: number }) => {
+      const qs = new URLSearchParams();
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      const q = qs.toString();
+      return request<WorkerAssignment[]>(`/assignments${q ? `?${q}` : ''}`);
+    },
+    get: (id: string) => request<WorkerAssignment>(`/assignments/${id}`),
+    updateStatus: (id: string, status: string) =>
+      request<WorkerAssignment>(`/assignments/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status }),
+      }),
+  },
+  analytics: {
+    // Only the self-scoped one is ported: /analytics/stats is admin/manager
+    // only, so a checker calling it takes a 403 (GD-06 fixed exactly that
+    // silent failure in worker-app).
+    myStats: () => request<WorkerStats>('/analytics/my-stats'),
+  },
   quality: {
+    /**
+     * ADR-072 §2.5: the workers this checker may inspect on `day` (defaults to
+     * today server-side). Scope is resolved on the server from the checker's
+     * own shifts — the client sends no hotel, and could not be trusted to.
+     */
+    inspectableWorkers: (day?: string) =>
+      request<{ day: string; workers: InspectableWorker[] }>(
+        `/quality/inspectable-workers${day ? `?day=${encodeURIComponent(day)}` : ''}`
+      ),
     /**
      * CRR §15: the checker uploads a photo WITH the rating.
      *
