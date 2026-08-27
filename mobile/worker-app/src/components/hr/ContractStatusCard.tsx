@@ -125,10 +125,10 @@ export function ContractStatusCard({
               disabled={downloading || uploading}
               style={({ pressed }) => [
                 styles.actionButton,
-                { backgroundColor: '#3182CE', opacity: pressed ? 0.7 : 1 }
+                { backgroundColor: theme.primary, opacity: pressed ? 0.7 : 1 }
               ]}
             >
-              <ThemedText type="smallBold" style={{ color: '#fff' }}>Upload Signed Scan</ThemedText>
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>{t('hr.uploadSignedScan')}</ThemedText>
             </Pressable>
           ) : (
             <ThemedView style={styles.uploadPendingRow}>
@@ -141,12 +141,12 @@ export function ContractStatusCard({
                 disabled={uploading}
                 style={[styles.confirmButton, { opacity: uploading ? 0.7 : 1 }]}
               >
-                {uploading ? <ActivityIndicator size="small" color="#fff" /> : <ThemedText type="smallBold" style={{ color: '#fff' }}>Submit</ThemedText>}
+                {uploading ? <ActivityIndicator size="small" color={theme.onPrimary} /> : <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>{t('common.submit')}</ThemedText>}
               </Pressable>
             </ThemedView>
           )}
 
-          {error && <ThemedText type="small" style={{ color: '#E53E3E', marginTop: Spacing.two }}>{error}</ThemedText>}
+          {error && <ThemedText type="small" style={{ color: theme.danger, marginTop: Spacing.two }}>{error}</ThemedText>}
         </ThemedView>
       )}
     </ThemedView>
@@ -200,7 +200,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   confirmButton: {
-    backgroundColor: '#38A169',
+
     paddingHorizontal: Spacing.three,
     height: 36,
     borderRadius: Spacing.two,

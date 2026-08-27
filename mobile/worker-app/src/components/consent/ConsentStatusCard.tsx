@@ -5,6 +5,7 @@ import { Spacing } from '@/constants/theme';
 import { statusAction, statusDescription, statusLabelKey } from '@/lib/consent-status';
 import type { ConsentStatus } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/hooks/use-theme';
 
 // Colocated with the component that renders it, matching this app's existing
 // convention for status-color maps (e.g. shifts.tsx's STATUS_COLOR,
@@ -13,10 +14,12 @@ import { useTranslation } from 'react-i18next';
 // semantic success/error/warning tokens exist yet, so every status color in
 // this app is a local, colocated hex map like this one, not a shared lib
 // function.
-const STATUS_COLOR: Record<ConsentStatus['status'], string> = {
-  granted: '#38A169',
-  declined: '#E53E3E',
-  absent: '#DD6B20',
+const STATUS_TONE: Record<ConsentStatus['status'], 'success' | 'danger' | 'warning'> = {
+  // Theme tokens, resolved at render: the previous trio was light-mode only
+  // and matched neither the badges elsewhere nor the accent.
+  granted: 'success',
+  declined: 'danger',
+  absent: 'warning',
 };
 
 /**
@@ -40,6 +43,7 @@ export function ConsentStatusCard({
   onWithdraw: () => void;
   withdrawing: boolean;
 }) {
+  const theme = useTheme();
   const { t } = useTranslation();
   if (loading) {
     return <ActivityIndicator style={styles.loader} />;
@@ -47,7 +51,7 @@ export function ConsentStatusCard({
 
   if (error || !status) {
     return (
-      <ThemedText type="small" style={styles.errorText}>
+      <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
         {error ?? t('consent.loadFailed')}
       </ThemedText>
     );
@@ -60,7 +64,7 @@ export function ConsentStatusCard({
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.row} type="backgroundElement">
         <ThemedView style={styles.info} type="backgroundElement">
-          <ThemedText type="smallBold" style={{ color: STATUS_COLOR[status.status] }}>
+          <ThemedText type="smallBold" style={{ color: theme[STATUS_TONE[status.status]] }}>
             {t(statusLabelKey(status))}
           </ThemedText>
           {description && (
@@ -95,5 +99,5 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.two, padding: Spacing.three, marginBottom: Spacing.three },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.two },
   info: { flex: 1, gap: 2 },
-  errorText: { color: '#E53E3E' },
+  errorText: {},
 });

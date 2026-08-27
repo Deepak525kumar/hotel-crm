@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import type { RatingTier } from '@/types/api';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * TREQ-003 / TRULE-003: the tier label shown next to a worker's 0-100 score.
@@ -14,22 +15,41 @@ import type { RatingTier } from '@/types/api';
  * Renders nothing for null: an unrated worker is a new starter, and a badge
  * in a standings column invites being read as a standing.
  */
-const TIER_COLORS: Record<RatingTier, { bg: string; fg: string }> = {
-  ELITE: { bg: '#D1FAE5', fg: '#065F46' },
-  HIGH: { bg: '#DCFCE7', fg: '#166534' },
-  STANDARD: { bg: '#F3F4F6', fg: '#374151' },
-  LOW: { bg: '#FEF3C7', fg: '#92400E' },
-  PROBATION: { bg: '#FEE2E2', fg: '#991B1B' },
+/**
+ * Paired theme tokens rather than ten hex literals. The previous palette was
+ * light-mode only: every `bg` was a pale wash that turned the label
+ * unreadable against a dark card, and none of it tracked the accent.
+ */
+const TIER_TONE: Record<RatingTier, 'success' | 'neutral' | 'warning' | 'danger'> = {
+  ELITE: 'success',
+  HIGH: 'success',
+  STANDARD: 'neutral',
+  LOW: 'warning',
+  PROBATION: 'danger',
 };
 
 export function RatingTierBadge({ tier }: { tier: RatingTier | null }) {
   const { t } = useTranslation();
+  // Both hooks before the early return: hooks must run in the same order on
+  // every render, and `tier` is nullable.
+  const theme = useTheme();
   if (!tier) return null;
 
-  const c = TIER_COLORS[tier];
+  const tone = TIER_TONE[tier];
   return (
-    <View style={[styles.badge, { backgroundColor: c.bg }]}>
-      <Text style={[styles.text, { color: c.fg }]}>{t(`ratingTier.${tier}`)}</Text>
+    <View
+      style={[
+        styles.badge,
+        {
+          backgroundColor: tone === 'neutral' ? theme.backgroundSelected : theme[`${tone}Subtle`],
+        },
+      ]}
+    >
+      <Text
+        style={[styles.text, { color: tone === 'neutral' ? theme.textSecondary : theme[tone] }]}
+      >
+        {t(`ratingTier.${tier}`)}
+      </Text>
     </View>
   );
 }

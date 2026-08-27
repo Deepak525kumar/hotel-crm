@@ -230,7 +230,7 @@ export function ConsentGate({ children }: { children: React.ReactNode }) {
 
         {error ? (
           <ThemedView type="backgroundElement" style={styles.card}>
-            <ThemedText type="small" style={{ color: '#E53E3E' }}>
+            <ThemedText type="small" style={{ color: theme.danger }}>
               {error}
             </ThemedText>
             <Pressable onPress={() => void load()} style={styles.retry}>

@@ -145,7 +145,7 @@ export default function LoginScreen() {
           />
 
           {error && (
-            <ThemedText type="small" style={styles.errorText}>
+            <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
               {error}
             </ThemedText>
           )}
@@ -206,7 +206,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   errorText: {
-    color: '#E53E3E',
     textAlign: 'center',
   },
   button: {

@@ -74,7 +74,7 @@ export function UploadDocumentCard({
            they are scanned, and an iPhone's HEIC cannot go through the file
            picker at all (the frozen upload policy has no image/heic). */
         <ThemedView style={styles.pickRow} type="backgroundElement">
-          <Pressable onPress={() => void pickPhoto('camera')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
+          <Pressable onPress={() => void pickPhoto('camera')} style={({ pressed }) => [styles.pickButton, styles.flex, { backgroundColor: theme.primary, opacity: pressed ? 0.7 : 1 }]}>
             <ThemedText type="small" style={styles.pickButtonText}>{t('documents.takePhoto')}</ThemedText>
           </Pressable>
           <Pressable onPress={() => void pickPhoto('library')} style={({ pressed }) => [styles.pickButton, styles.flex, { opacity: pressed ? 0.7 : 1 }]}>
@@ -141,7 +141,7 @@ export function UploadDocumentCard({
             style={[styles.input, { color: theme.text, borderColor: theme.backgroundSelected }]}
           />
           {!expiresAtIsValid && (
-            <ThemedText type="small" style={styles.errorText}>
+            <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
               Expiry date must use YYYY-MM-DD.
             </ThemedText>
           )}
@@ -185,9 +185,9 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#3182CE',
+
   },
-  pickButtonText: { color: '#fff' },
+  pickButtonText: {},
   categoryButton: {
     width: '48%',
     height: 36,
@@ -208,5 +208,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: { color: '#E53E3E' },
+  errorText: {},
 });

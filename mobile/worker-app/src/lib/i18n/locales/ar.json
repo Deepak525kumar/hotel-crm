@@ -84,7 +84,8 @@
     "getDirections": "الحصول على الاتجاهات",
     "success": "تم بنجاح",
     "send": "إرسال",
-    "change": "تغيير"
+    "change": "تغيير",
+    "submit": "إرسال"
   },
   "fields": {
     "name": "الاسم",
@@ -526,7 +527,8 @@
     "payslipConfirm": "هل ترغب في طلب قسيمة راتبك لـ {{period}}؟",
     "contractSavedTo": "تم حفظ العقد في {{uri}}",
     "contractDownloadFailed": "تعذّر تنزيل العقد.",
-    "contractModuleMissing": "إصدار التطبيق هذا ينقصه مكوّن مطلوب ({{module}}). يرجى تحديث التطبيق أو إعادة تثبيته ثم المحاولة مرة أخرى."
+    "contractModuleMissing": "إصدار التطبيق هذا ينقصه مكوّن مطلوب ({{module}}). يرجى تحديث التطبيق أو إعادة تثبيته ثم المحاولة مرة أخرى.",
+    "uploadSignedScan": "رفع النسخة الموقعة"
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",

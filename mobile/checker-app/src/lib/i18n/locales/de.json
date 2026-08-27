@@ -83,7 +83,8 @@
     "getDirections": "Route anzeigen",
     "success": "Erfolgreich",
     "send": "Senden",
-    "change": "Ändern"
+    "change": "Ändern",
+    "submit": "Absenden"
   },
   "fields": {
     "name": "Name",
@@ -525,7 +526,8 @@
     "payslipConfirm": "Möchten Sie Ihre Lohnabrechnung für {{period}} anfordern?",
     "contractSavedTo": "Vertrag gespeichert unter {{uri}}",
     "contractDownloadFailed": "Der Vertrag konnte nicht heruntergeladen werden.",
-    "contractModuleMissing": "Dieser App-Build enthält eine erforderliche Komponente nicht ({{module}}). Bitte aktualisieren oder installieren Sie die App neu und versuchen Sie es erneut."
+    "contractModuleMissing": "Dieser App-Build enthält eine erforderliche Komponente nicht ({{module}}). Bitte aktualisieren oder installieren Sie die App neu und versuchen Sie es erneut.",
+    "uploadSignedScan": "Unterschriebenen Scan hochladen"
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",

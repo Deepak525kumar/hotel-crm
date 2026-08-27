@@ -17,11 +17,17 @@ import { usePhotoPicker } from '@/hooks/usePhotoPicker';
 
 type VerificationStatus = 'PASSED' | 'NEEDS_REWORK' | 'FAILED';
 
-const STATUS_COLORS: Record<VerificationStatus, string> = {
-  PASSED: '#22c55e',
-  NEEDS_REWORK: '#f59e0b',
-  FAILED: '#ef4444',
+/**
+ * Semantic tones, not raw hexes: the fills ignored the colour scheme, and
+ * white-on-amber fails contrast in either. Same shape as the attendance and
+ * assignment tone maps.
+ */
+const STATUS_TONE: Record<VerificationStatus, 'success' | 'warning' | 'danger'> = {
+  PASSED: 'success',
+  NEEDS_REWORK: 'warning',
+  FAILED: 'danger',
 };
+
 
 // Keys rather than nouns, resolved at render. The uppercase presentation is
 // part of each translation rather than a .toUpperCase() call: casing rules are
@@ -129,7 +135,7 @@ export default function QualityVerificationScreen() {
       alignItems: 'center',
     },
     photoButtonText: { color: theme.text, fontWeight: '600', fontSize: 13 },
-    photoError: { color: '#E53E3E', fontSize: 12, marginTop: 8 },
+    photoError: { color: theme.danger, fontSize: 12, marginTop: 8 },
     photoRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -138,7 +144,7 @@ export default function QualityVerificationScreen() {
       marginTop: 10,
     },
     photoName: { color: theme.textSecondary, fontSize: 12, flexShrink: 1 },
-    photoRemove: { color: '#E53E3E', fontSize: 12, fontWeight: '600' },
+    photoRemove: { color: theme.danger, fontSize: 12, fontWeight: '600' },
     notesInput: {
       backgroundColor: theme.background,
       borderRadius: 10,
@@ -149,12 +155,12 @@ export default function QualityVerificationScreen() {
       textAlignVertical: 'top',
     },
     button: {
-      backgroundColor: '#7c3aed',
+      backgroundColor: theme.primary,
       borderRadius: 12,
       padding: 16,
       alignItems: 'center',
     },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    buttonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '700' },
   });
 
   const adj = (delta: number) => setScore((s) => Math.min(100, Math.max(0, s + delta)));
@@ -191,16 +197,21 @@ export default function QualityVerificationScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t("quality.outcome")}</Text>
           <View style={styles.outcomeRow}>
+            {/* Paired solid/subtle tokens rather than a hex plus an alpha
+                suffix: `${hex}22` produced a wash that only worked on a light
+                ground, so in dark mode the badge sat invisibly on the card. */}
             <View
               style={[
                 styles.outcomeBadge,
                 {
-                  borderColor: STATUS_COLORS[derivedStatus],
-                  backgroundColor: `${STATUS_COLORS[derivedStatus]}22`,
+                  borderColor: theme[STATUS_TONE[derivedStatus]],
+                  backgroundColor: theme[`${STATUS_TONE[derivedStatus]}Subtle`],
                 },
               ]}
             >
-              <Text style={[styles.outcomeBadgeText, { color: STATUS_COLORS[derivedStatus] }]}>
+              <Text
+                style={[styles.outcomeBadgeText, { color: theme[STATUS_TONE[derivedStatus]] }]}
+              >
                 {t(STATUS_LABEL_KEY[derivedStatus])}
               </Text>
             </View>
@@ -253,7 +264,7 @@ export default function QualityVerificationScreen() {
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.onPrimary} />
           ) : (
             <Text style={styles.buttonText}>{t("quality.submitVerification")}</Text>
           )}

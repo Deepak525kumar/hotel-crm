@@ -83,7 +83,8 @@
     "getDirections": "Obtenir l'itinéraire",
     "success": "Succès",
     "send": "Envoyer",
-    "change": "Modifier"
+    "change": "Modifier",
+    "submit": "Envoyer"
   },
   "fields": {
     "name": "Nom",
@@ -525,7 +526,8 @@
     "payslipConfirm": "Souhaitez-vous demander votre bulletin de paie pour {{period}} ?",
     "contractSavedTo": "Contrat enregistré dans {{uri}}",
     "contractDownloadFailed": "Le contrat n’a pas pu être téléchargé.",
-    "contractModuleMissing": "Cette version de l’application ne contient pas un composant requis ({{module}}). Veuillez mettre à jour ou réinstaller l’application, puis réessayer."
+    "contractModuleMissing": "Cette version de l’application ne contient pas un composant requis ({{module}}). Veuillez mettre à jour ou réinstaller l’application, puis réessayer.",
+    "uploadSignedScan": "Téléverser le scan signé"
   },
   "consent": {
     "title": "Consentement à la protection des données",

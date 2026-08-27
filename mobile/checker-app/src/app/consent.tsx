@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../lib/api-error-i18n';
 import { useConsentRevisionStore } from '@/stores/consent-store';
+import { useTheme } from '@/hooks/use-theme';
 
 /**
  * Self-service record/decision surface, not an access-blocking wall — no
@@ -27,6 +28,7 @@ import { useConsentRevisionStore } from '@/stores/consent-store';
  * drift from what the server actually recorded.
  */
 export default function ConsentScreen() {
+  const theme = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const [status, setStatus] = useState<ConsentStatus | null>(null);
@@ -145,7 +147,7 @@ export default function ConsentScreen() {
         )}
 
         {actionError && (
-          <ThemedText type="small" style={styles.errorText}>
+          <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
             {actionError}
           </ThemedText>
         )}
@@ -160,5 +162,5 @@ const styles = StyleSheet.create({
   back: { marginBottom: Spacing.two },
   header: { marginBottom: Spacing.three },
   loadingNotice: { marginBottom: Spacing.two },
-  errorText: { color: '#E53E3E', marginTop: Spacing.two },
+  errorText: { marginTop: Spacing.two },
 });

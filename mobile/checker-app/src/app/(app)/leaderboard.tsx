@@ -61,11 +61,11 @@ export default function LeaderboardScreen() {
     sub: { fontSize: 12, color: theme.textSecondary, marginTop: 2 },
     scoreCol: { alignItems: 'flex-end' },
     scoreNum: { fontSize: 20, fontWeight: '800', color: theme.text },
-    stars: { fontSize: 11, color: '#f59e0b', marginTop: 2 },
+    stars: { fontSize: 11, color: theme.warning, marginTop: 2 },
     empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
     emptyText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center' },
     loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    error: { color: '#ef4444', textAlign: 'center', padding: 16 },
+    error: { color: theme.danger, textAlign: 'center', padding: 16 },
   });
 
   const renderItem = ({ item, index }: { item: LeaderboardEntry; index: number }) => {

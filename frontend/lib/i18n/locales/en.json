@@ -83,7 +83,8 @@
     "getDirections": "Get Directions",
     "success": "Success",
     "send": "Send",
-    "change": "Change"
+    "change": "Change",
+    "submit": "Submit"
   },
   "fields": {
     "name": "Name",
@@ -525,7 +526,8 @@
     "payslipConfirm": "Would you like to request your payslip for {{period}}?",
     "contractSavedTo": "Contract saved to {{uri}}",
     "contractDownloadFailed": "The contract could not be downloaded.",
-    "contractModuleMissing": "This app build is missing a required component ({{module}}). Please update or reinstall the app, then try again."
+    "contractModuleMissing": "This app build is missing a required component ({{module}}). Please update or reinstall the app, then try again.",
+    "uploadSignedScan": "Upload signed scan"
   },
   "consent": {
     "title": "Data-protection consent",

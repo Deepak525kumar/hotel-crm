@@ -14,7 +14,8 @@ import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
-import { Button } from '@/components/ui';
+import { Badge, Button } from '@/components/ui';
+import { attendanceStatusTone } from '@/lib/attendance-status-tone';
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '--';
@@ -22,7 +23,6 @@ function formatDateTime(iso: string | null): string {
 }
 
 function InfoRow({ label, value, color }: { label: string; value: string; color?: string }) {
-  const { t } = useTranslation();
   const theme = useTheme();
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8 }}>
@@ -32,13 +32,6 @@ function InfoRow({ label, value, color }: { label: string; value: string; color?
   );
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  PRESENT: '#22c55e',
-  LATE: '#f59e0b',
-  ABSENT: '#ef4444',
-  EXPECTED: '#94a3b8',
-  PARTIAL: '#a78bfa',
-};
 
 export default function AttendanceDetailScreen() {
   const { t } = useTranslation();
@@ -87,9 +80,9 @@ export default function AttendanceDetailScreen() {
     },
     divider: { height: 1, backgroundColor: theme.background, marginVertical: 2 },
     badge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
     verifiedBanner: {
-      backgroundColor: '#dcfce7',
+      backgroundColor: theme.successSubtle,
       borderRadius: 10,
       padding: 12,
       alignItems: 'center',
@@ -97,7 +90,7 @@ export default function AttendanceDetailScreen() {
       justifyContent: 'center',
       gap: 6,
     },
-    verifiedText: { color: '#166534', fontWeight: '700', fontSize: 15 },
+    verifiedText: { color: theme.success, fontWeight: '700', fontSize: 15 },
     notesInput: {
       backgroundColor: theme.background,
       borderRadius: 10,
@@ -109,13 +102,13 @@ export default function AttendanceDetailScreen() {
       marginTop: 8,
     },
     button: {
-      backgroundColor: '#3b82f6',
+      backgroundColor: theme.primary,
       borderRadius: 12,
       padding: 16,
       alignItems: 'center',
       marginTop: 12,
     },
-    buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    buttonText: { color: theme.onPrimary, fontSize: 16, fontWeight: '700' },
     action: { marginTop: 8 },
     outlineButton: {
       borderRadius: 12,
@@ -140,9 +133,10 @@ export default function AttendanceDetailScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t("fields.status")}</Text>
-          <View style={[styles.badge, { backgroundColor: STATUS_COLORS[record.status] ?? '#94a3b8' }]}>
-            <Text style={styles.badgeText}>{record.status}</Text>
-          </View>
+          <Badge
+            label={t(`attendance.status${record.status}`, record.status)}
+            tone={attendanceStatusTone(record.status)}
+          />
           <View style={styles.divider} />
           {/* Who and where. The DTO used to carry only ids, so this screen
               showed times and a status with no indication of whose shift it
@@ -170,7 +164,7 @@ export default function AttendanceDetailScreen() {
             <InfoRow
               label={t("attendance.minutesLate")}
               value={`${record.minutes_late}m`}
-              color={record.minutes_late > 0 ? '#f59e0b' : '#22c55e'}
+              color={record.minutes_late > 0 ? theme.warning : theme.success}
             />
           )}
           {record.minutes_worked !== null && (
@@ -199,7 +193,7 @@ export default function AttendanceDetailScreen() {
               disabled={verifying}
             >
               {verifying ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.onPrimary} />
               ) : (
                 <Text style={styles.buttonText}>{t("attendance.verifyTitleAction")}</Text>
               )}
