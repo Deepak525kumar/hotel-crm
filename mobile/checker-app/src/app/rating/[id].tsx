@@ -61,8 +61,8 @@ export default function RatingScreen() {
       setError(t('quality.checklistItemRange'));
       return;
     }
-    if (overall === null || Number.isNaN(overall) || overall < 0 || overall > 100) {
-      setError(t('quality.checklistEmpty', 'Overall score is required and must be 0-100.'));
+    if (overall === null || !Number.isInteger(overall) || overall < 0 || overall > 100) {
+      setError(t('quality.scoreWholeNumber', 'Score must be a whole number from 0 to 100.'));
       return;
     }
     // CRR §15: the photo accompanies the rating. The server enforces it too
