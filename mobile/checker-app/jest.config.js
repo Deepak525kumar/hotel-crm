@@ -40,6 +40,7 @@ const unit = {
   },
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
+    '^expo-file-system$': '<rootDir>/src/__mocks__/expo-file-system.ts',
     '^@/(.*)$': '<rootDir>/src/$1',
     '^expo-secure-store$': '<rootDir>/src/__mocks__/expo-secure-store.ts',
     '^react-native$': '<rootDir>/src/__mocks__/react-native.ts',
