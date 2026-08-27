@@ -13,6 +13,7 @@ import type { WorkerDocument, DocumentCompleteness, DocumentCategory } from '@/t
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../lib/api-error-i18n';
+import { useTheme } from '@/hooks/use-theme';
 
 // For the completeness banner translation
 const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
@@ -27,6 +28,7 @@ const CATEGORY_LABEL_KEY: Record<DocumentCategory, string> = {
 };
 
 export default function DocumentsScreen() {
+  const theme = useTheme();
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -125,7 +127,7 @@ export default function DocumentsScreen() {
         <UploadDocumentCard workerId={user.id} onUploaded={onUploaded} />
 
         {loadError && (
-          <ThemedText type="small" style={styles.errorText}>
+          <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
             {loadError}
           </ThemedText>
         )}
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, paddingHorizontal: Spacing.four, paddingTop: Spacing.four },
   back: { marginBottom: Spacing.two },
   header: { marginBottom: Spacing.three },
-  errorText: { color: '#E53E3E', marginBottom: Spacing.two },
+  errorText: { marginBottom: Spacing.two },
   warningBanner: {
     padding: Spacing.three,
     borderRadius: Spacing.two,

@@ -6,9 +6,10 @@ import { Spacing } from '@/constants/theme';
 import type { PayslipRequestDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 
-const STATUS_COLOR: Record<PayslipRequestDto['status'], string> = {
-  REQUESTED: '#D69E2E',
-  FULFILLED: '#38A169',
+const STATUS_TONE: Record<PayslipRequestDto['status'], 'warning' | 'success'> = {
+  // Tokens rather than hexes, resolved against the theme at render.
+  REQUESTED: 'warning',
+  FULFILLED: 'success',
 };
 
 export function PayslipRequestsList({
@@ -36,7 +37,7 @@ export function PayslipRequestsList({
       <ThemedView style={styles.headerRow}>
         <ThemedText type="smallBold">{t("hr.payslipRequests")}</ThemedText>
         <Pressable onPress={onRequestPayslip} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-          <ThemedText type="smallBold" style={{ color: '#3182CE' }}>+ Request</ThemedText>
+          <ThemedText type="smallBold" style={{ color: theme.primary }}>{t('hr.requestPayslip')}</ThemedText>
         </Pressable>
       </ThemedView>
 
@@ -52,7 +53,7 @@ export function PayslipRequestsList({
               <ThemedText 
                 type="smallBold" 
                 style={{ 
-                  color: STATUS_COLOR[item.status],
+                  color: theme[STATUS_TONE[item.status]],
                   textTransform: 'capitalize'
                 }}
               >

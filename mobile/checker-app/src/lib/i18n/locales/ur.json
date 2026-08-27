@@ -84,7 +84,8 @@
     "getDirections": "راستہ حاصل کریں",
     "success": "کامیاب",
     "send": "بھیجیں",
-    "change": "تبدیل کریں"
+    "change": "تبدیل کریں",
+    "submit": "جمع کریں"
   },
   "fields": {
     "name": "نام",
@@ -526,7 +527,8 @@
     "payslipConfirm": "کیا آپ {{period}} کے لیے اپنی تنخواہ کی پرچی طلب کرنا چاہتے ہیں؟",
     "contractSavedTo": "معاہدہ {{uri}} میں محفوظ ہو گیا",
     "contractDownloadFailed": "معاہدہ ڈاؤن لوڈ نہیں ہو سکا۔",
-    "contractModuleMissing": "ایپ کے اس بلڈ میں ایک مطلوبہ جزو ({{module}}) موجود نہیں۔ براہِ کرم ایپ کو اپ ڈیٹ یا دوبارہ انسٹال کریں اور پھر کوشش کریں۔"
+    "contractModuleMissing": "ایپ کے اس بلڈ میں ایک مطلوبہ جزو ({{module}}) موجود نہیں۔ براہِ کرم ایپ کو اپ ڈیٹ یا دوبارہ انسٹال کریں اور پھر کوشش کریں۔",
+    "uploadSignedScan": "دستخط شدہ اسکین اپ لوڈ کریں"
   },
   "consent": {
     "title": "ڈیٹا تحفظ کی رضامندی",
@@ -571,7 +573,8 @@
     "markReadHint": "اس اطلاع کو دیکھنے کے بعد پڑھا گیا نشان زد کریں۔",
     "allCaughtUp": "آپ سب کچھ دیکھ چکے ہیں۔",
     "tapToMarkRead": "پڑھا ہوا نشان زد کرنے کے لیے تھپتھپائیں",
-    "noneYet": "ابھی کوئی اطلاع نہیں۔"
+    "noneYet": "ابھی کوئی اطلاع نہیں۔",
+    "empty": "ابھی تک کوئی اطلاعات نہیں"
   },
   "leaderboard": {
     "none": "ابھی لیڈر بورڈ کا ڈیٹا نہیں۔",
@@ -918,7 +921,10 @@
     "statusPARTIAL": "جزوی",
     "statusEXCUSED": "معذور",
     "statusEXPECTED": "متوقع",
-    "unknownWorker": "نامعلوم ورکر"
+    "unknownWorker": "نامعلوم ورکر",
+    "allCaughtUp": "سب مکمل",
+    "pendingCount": "{{count}} تصدیق کے منتظر",
+    "inOutTimes": "اِن: {{in}} · آؤٹ: {{out}}"
   },
   "employees": {
     "noBlocked": "کوئی بلاک شدہ ملازم نہیں",
@@ -1011,7 +1017,29 @@
     "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
     "reworkCompleted": "دوبارہ کام مکمل",
     "reworkDone": "دوبارہ کام جمع کرایا گیا {{when}}",
-    "inspectedBy": "معائنہ کیا گیا از"
+    "inspectedBy": "معائنہ کیا گیا از",
+    "rateWorker": "ورکر کی درجہ بندی",
+    "checklistTitle": "معائنہ چیک لسٹ",
+    "checklistEmpty": "کم از کم ایک آئٹم اسکور کریں",
+    "checklistItemRange": "ہر آئٹم 0 سے 100 تک مکمل نمبر ہونا چاہیے",
+    "overallScore": "مجموعی اسکور {{score}}",
+    "photoEvidence": "تصویری ثبوت",
+    "comment": "تبصرہ",
+    "commentPlaceholder": "کوئی بھی بات جو ورکر کو معلوم ہونی چاہیے",
+    "submitRating": "درجہ بندی جمع کریں",
+    "ratingRecorded": "درجہ بندی محفوظ ہو گئی",
+    "ratingFailed": "درجہ بندی محفوظ نہ ہو سکی۔ دوبارہ کوشش کریں۔",
+    "workerUnknown": "اس ریکارڈ سے کوئی ورکر منسلک نہیں، اس لیے درجہ بندی ممکن نہیں۔",
+    "checklist": {
+      "dust": "گرد",
+      "bathroom": "باتھ روم",
+      "bed_linen": "بستر کی چادریں",
+      "mirror": "آئینہ",
+      "floor": "فرش",
+      "minibar_restocking": "منی بار کی بھرائی",
+      "fragrance_amenities": "خوشبو اور سہولیات",
+      "other": "دیگر"
+    }
   },
   "ratings": {
     "comment": "تبصرہ",

@@ -84,7 +84,8 @@
     "getDirections": "الحصول على الاتجاهات",
     "success": "تم بنجاح",
     "send": "إرسال",
-    "change": "تغيير"
+    "change": "تغيير",
+    "submit": "إرسال"
   },
   "fields": {
     "name": "الاسم",
@@ -526,7 +527,8 @@
     "payslipConfirm": "هل ترغب في طلب قسيمة راتبك لـ {{period}}؟",
     "contractSavedTo": "تم حفظ العقد في {{uri}}",
     "contractDownloadFailed": "تعذّر تنزيل العقد.",
-    "contractModuleMissing": "إصدار التطبيق هذا ينقصه مكوّن مطلوب ({{module}}). يرجى تحديث التطبيق أو إعادة تثبيته ثم المحاولة مرة أخرى."
+    "contractModuleMissing": "إصدار التطبيق هذا ينقصه مكوّن مطلوب ({{module}}). يرجى تحديث التطبيق أو إعادة تثبيته ثم المحاولة مرة أخرى.",
+    "uploadSignedScan": "رفع النسخة الموقعة"
   },
   "consent": {
     "title": "الموافقة على حماية البيانات",
@@ -571,7 +573,8 @@
     "markReadHint": "ضع علامة مقروء على هذا الإشعار بمجرد اطلاعك عليه.",
     "allCaughtUp": "لقد اطلعت على كل شيء.",
     "tapToMarkRead": "اضغط للوضع كمقروء",
-    "noneYet": "لا توجد إشعارات بعد."
+    "noneYet": "لا توجد إشعارات بعد.",
+    "empty": "لا توجد إشعارات بعد"
   },
   "leaderboard": {
     "none": "لا توجد بيانات لوحة الصدارة بعد.",
@@ -918,7 +921,10 @@
     "statusPARTIAL": "جزئي",
     "statusEXCUSED": "بعذر",
     "statusEXPECTED": "متوقع",
-    "unknownWorker": "عامل غير معروف"
+    "unknownWorker": "عامل غير معروف",
+    "allCaughtUp": "كل شيء مكتمل",
+    "pendingCount": "{{count}} في انتظار التحقق",
+    "inOutTimes": "دخول: {{in}} · خروج: {{out}}"
   },
   "employees": {
     "noBlocked": "لا يوجد موظفون محظورون",
@@ -1011,7 +1017,29 @@
     "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
     "reworkCompleted": "اكتملت إعادة العمل",
     "reworkDone": "تم إرسال إعادة العمل {{when}}",
-    "inspectedBy": "تم التفتيش بواسطة"
+    "inspectedBy": "تم التفتيش بواسطة",
+    "rateWorker": "تقييم العامل",
+    "checklistTitle": "قائمة التفتيش",
+    "checklistEmpty": "قيّم عنصراً واحداً على الأقل",
+    "checklistItemRange": "يجب أن يكون كل عنصر رقماً صحيحاً من 0 إلى 100",
+    "overallScore": "النتيجة الإجمالية {{score}}",
+    "photoEvidence": "إثبات بالصور",
+    "comment": "تعليق",
+    "commentPlaceholder": "أي شيء ينبغي أن يعرفه العامل",
+    "submitRating": "إرسال التقييم",
+    "ratingRecorded": "تم تسجيل التقييم",
+    "ratingFailed": "تعذر حفظ التقييم. حاول مرة أخرى.",
+    "workerUnknown": "لا يوجد عامل مرتبط بهذا السجل، لذا لا يمكن تقييمه.",
+    "checklist": {
+      "dust": "الغبار",
+      "bathroom": "الحمام",
+      "bed_linen": "مفارش السرير",
+      "mirror": "المرآة",
+      "floor": "الأرضية",
+      "minibar_restocking": "إعادة تعبئة الميني بار",
+      "fragrance_amenities": "العطور والمستلزمات",
+      "other": "أخرى"
+    }
   },
   "ratings": {
     "comment": "تعليق",

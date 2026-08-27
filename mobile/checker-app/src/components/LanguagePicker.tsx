@@ -79,7 +79,7 @@ export function LanguagePicker() {
       </ThemedView>
 
       {failed ? (
-        <ThemedText type="small" style={styles.error}>
+        <ThemedText type="small" style={[styles.error, { color: theme.danger }]}>
           {t('settings.language.changeFailed')}
         </ThemedText>
       ) : null}
@@ -114,9 +114,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
   },
   error: {
-    color: '#E53E3E',
+    // colour applied at the usage site, where theme is in scope
   },
   notice: {
-    color: '#B7791F',
+    // colour applied at the usage site, where theme is in scope
   },
 });

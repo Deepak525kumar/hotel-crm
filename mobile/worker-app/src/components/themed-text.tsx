@@ -21,6 +21,9 @@ export function ThemedText({ style, type = 'default', themeColor, ...rest }: The
         type === 'smallBold' && styles.smallBold,
         type === 'subtitle' && styles.subtitle,
         type === 'link' && styles.link,
+        // linkPrimary is the accent, so it must follow the theme rather than a
+        // fixed blue that stopped matching the accent entirely.
+        type === 'linkPrimary' && { color: theme.primary },
         type === 'linkPrimary' && styles.linkPrimary,
         type === 'code' && styles.code,
         style,
@@ -63,7 +66,7 @@ const styles = StyleSheet.create({
   linkPrimary: {
     lineHeight: 30,
     fontSize: 14,
-    color: '#3c87f7',
+    // linkPrimary takes its colour from the theme at render time
   },
   code: {
     fontFamily: Fonts.mono,

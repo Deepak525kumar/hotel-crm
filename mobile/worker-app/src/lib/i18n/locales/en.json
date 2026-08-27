@@ -83,7 +83,8 @@
     "getDirections": "Get Directions",
     "success": "Success",
     "send": "Send",
-    "change": "Change"
+    "change": "Change",
+    "submit": "Submit"
   },
   "fields": {
     "name": "Name",
@@ -525,7 +526,8 @@
     "payslipConfirm": "Would you like to request your payslip for {{period}}?",
     "contractSavedTo": "Contract saved to {{uri}}",
     "contractDownloadFailed": "The contract could not be downloaded.",
-    "contractModuleMissing": "This app build is missing a required component ({{module}}). Please update or reinstall the app, then try again."
+    "contractModuleMissing": "This app build is missing a required component ({{module}}). Please update or reinstall the app, then try again.",
+    "uploadSignedScan": "Upload signed scan"
   },
   "consent": {
     "title": "Data-protection consent",
@@ -570,7 +572,8 @@
     "markReadHint": "Mark this notification as read once you’ve seen it.",
     "allCaughtUp": "You’re all caught up.",
     "tapToMarkRead": "Tap to mark as read",
-    "noneYet": "No notifications yet."
+    "noneYet": "No notifications yet.",
+    "empty": "No notifications yet"
   },
   "leaderboard": {
     "none": "No leaderboard data yet.",
@@ -917,7 +920,10 @@
     "statusPARTIAL": "Partial",
     "statusEXCUSED": "Excused",
     "statusEXPECTED": "Expected",
-    "unknownWorker": "Unknown worker"
+    "unknownWorker": "Unknown worker",
+    "allCaughtUp": "All caught up",
+    "pendingCount": "{{count}} pending verification",
+    "inOutTimes": "In: {{in}} · Out: {{out}}"
   },
   "employees": {
     "noBlocked": "No blocked employees",
@@ -1010,7 +1016,29 @@
     "reworkPending": "Rework assigned — awaiting the worker",
     "reworkCompleted": "Rework completed",
     "reworkDone": "Rework submitted {{when}}",
-    "inspectedBy": "Inspected by"
+    "inspectedBy": "Inspected by",
+    "rateWorker": "Rate worker",
+    "checklistTitle": "Inspection checklist",
+    "checklistEmpty": "Score at least one item",
+    "checklistItemRange": "Each item must be a whole number from 0 to 100",
+    "overallScore": "Overall score {{score}}",
+    "photoEvidence": "Photo evidence",
+    "comment": "Comment",
+    "commentPlaceholder": "Anything the worker should know",
+    "submitRating": "Submit rating",
+    "ratingRecorded": "Rating recorded",
+    "ratingFailed": "The rating could not be saved. Please try again.",
+    "workerUnknown": "This record has no worker attached, so it cannot be rated.",
+    "checklist": {
+      "dust": "Dust",
+      "bathroom": "Bathroom",
+      "bed_linen": "Bed linen",
+      "mirror": "Mirror",
+      "floor": "Floor",
+      "minibar_restocking": "Minibar restocking",
+      "fragrance_amenities": "Fragrance & amenities",
+      "other": "Other"
+    }
   },
   "ratings": {
     "comment": "Comment",

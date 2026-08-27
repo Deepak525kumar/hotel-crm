@@ -105,7 +105,7 @@ export default function VerificationEvidenceScreen() {
     label: { color: theme.textSecondary, fontSize: 13 },
     score: { fontSize: 34, fontWeight: '800', color: theme.text },
     badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-    badgeText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+    badgeText: { color: theme.onPrimary, fontWeight: '700', fontSize: 12 },
     meta: { color: theme.text, fontSize: 15, fontWeight: '600', marginTop: 8 },
     metaSecondary: { color: theme.textSecondary, fontSize: 13, marginTop: 2 },
     notes: { color: theme.text, fontSize: 14 },
@@ -132,25 +132,27 @@ export default function VerificationEvidenceScreen() {
       minHeight: 70,
       textAlignVertical: 'top',
     },
-    button: { backgroundColor: '#f59e0b', borderRadius: 12, padding: 15, alignItems: 'center' },
-    buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-    error: { color: '#E53E3E', fontSize: 13 },
+    button: { backgroundColor: theme.warning, borderRadius: 12, padding: 15, alignItems: 'center' },
+    buttonText: { color: theme.onPrimary, fontWeight: '700', fontSize: 15 },
+    error: { color: theme.danger, fontSize: 13 },
     pill: {
       alignSelf: 'flex-start',
       borderRadius: 8,
       paddingHorizontal: 10,
       paddingVertical: 5,
-      backgroundColor: '#f59e0b22',
+      backgroundColor: theme.warningSubtle,
     },
-    pillText: { color: '#b45309', fontSize: 12, fontWeight: '600' },
+    pillText: { color: theme.warning, fontSize: 12, fontWeight: '600' },
   });
 
+  // Tokens, not hexes: the previous trio ignored the colour scheme entirely
+  // and matched neither the queue's badges nor the quality screen's outcome.
   const statusColor =
     verification?.status === 'PASSED'
-      ? '#22c55e'
+      ? theme.success
       : verification?.status === 'NEEDS_REWORK'
-        ? '#f59e0b'
-        : '#ef4444';
+        ? theme.warning
+        : theme.danger;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -253,7 +255,7 @@ export default function VerificationEvidenceScreen() {
               disabled={assigning}
             >
               {assigning ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.onPrimary} />
               ) : (
                 <Text style={styles.buttonText}>{t('quality.assignRework')}</Text>
               )}

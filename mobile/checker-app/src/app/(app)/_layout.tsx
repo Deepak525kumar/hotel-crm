@@ -61,19 +61,10 @@ export default function AppLayout() {
             ),
           }}
         />
-        <Tabs.Screen
-          name="notifications"
-          options={{
-            title: t('nav.alerts'),
-            tabBarIcon: ({ color, size }) => (
-              <SymbolView
-                name={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
-                tintColor={color}
-                size={size}
-              />
-            ),
-          }}
-        />
+        {/* Reached from the bell in every screen header, not a tab -- the bar
+            is for what a checker touches while working a queue. Mirrors
+            worker-app. */}
+        <Tabs.Screen name="notifications" options={{ href: null }} />
         <Tabs.Screen
           name="profile"
           options={{

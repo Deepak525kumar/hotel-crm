@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Spacing } from '@/constants/theme';
 import type { ContractDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
-import { downloadContract } from '@/lib/contract-download';
+import { ContractDownloadError, downloadContract } from '@/lib/contract-download';
 import { useDocumentUpload } from '@/hooks/useDocumentUpload';
 import { useState } from 'react';
 
@@ -13,10 +13,12 @@ export function ContractStatusCard({
   contract,
   loading,
   workerId,
+  onUploadSuccess,
 }: {
   contract: ContractDto | null;
   loading: boolean;
   workerId: string;
+  onUploadSuccess?: () => void;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -27,18 +29,31 @@ export function ContractStatusCard({
     try {
       const { uri, outcome } = await downloadContract(workerId);
       if (outcome === 'saved') {
-        Alert.alert('Success', `Contract downloaded to ${uri}`);
+        // Sharing was unavailable, so the share sheet never opened. Say where
+        // the file actually is rather than leaving the tap looking like a no-op.
+        Alert.alert(t('common.done'), t('hr.contractSavedTo', { uri }));
       }
     } catch (e) {
-      Alert.alert(t('errors.title'), t('hr.dataLoadFailed'));
+      // Was `t('hr.dataLoadFailed')` for every failure, which is why this was
+      // impossible to diagnose from the device: a missing native module, an
+      // expired session and a server error all produced the same sentence.
+      if (e instanceof ContractDownloadError && e.code === 'NATIVE_MODULE_MISSING') {
+        Alert.alert(t('errors.title'), t('hr.contractModuleMissing', { module: e.detail ?? '' }));
+      } else {
+        const detail = e instanceof ContractDownloadError ? e.detail : undefined;
+        Alert.alert(
+          t('errors.title'),
+          detail ? `${t('hr.contractDownloadFailed')}\n\n${detail}` : t('hr.contractDownloadFailed'),
+        );
+      }
     } finally {
       setDownloading(false);
     }
   };
 
   const { pending, uploading, pickFile, upload, error, clearPending } = useDocumentUpload(workerId, () => {
-    Alert.alert('Success', 'Contract uploaded successfully.');
-    // In a real app we'd reload the contract status here
+    Alert.alert(t('common.success'), t('documents.uploadSuccess', 'Contract uploaded successfully.'));
+    onUploadSuccess?.();
   });
 
   if (loading) {
@@ -110,10 +125,10 @@ export function ContractStatusCard({
               disabled={downloading || uploading}
               style={({ pressed }) => [
                 styles.actionButton,
-                { backgroundColor: '#3182CE', opacity: pressed ? 0.7 : 1 }
+                { backgroundColor: theme.primary, opacity: pressed ? 0.7 : 1 }
               ]}
             >
-              <ThemedText type="smallBold" style={{ color: '#fff' }}>Upload Signed Scan</ThemedText>
+              <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>{t('hr.uploadSignedScan')}</ThemedText>
             </Pressable>
           ) : (
             <ThemedView style={styles.uploadPendingRow}>
@@ -126,12 +141,12 @@ export function ContractStatusCard({
                 disabled={uploading}
                 style={[styles.confirmButton, { opacity: uploading ? 0.7 : 1 }]}
               >
-                {uploading ? <ActivityIndicator size="small" color="#fff" /> : <ThemedText type="smallBold" style={{ color: '#fff' }}>Submit</ThemedText>}
+                {uploading ? <ActivityIndicator size="small" color={theme.onPrimary} /> : <ThemedText type="smallBold" style={{ color: theme.onPrimary }}>{t('common.submit')}</ThemedText>}
               </Pressable>
             </ThemedView>
           )}
 
-          {error && <ThemedText type="small" style={{ color: '#E53E3E', marginTop: Spacing.two }}>{error}</ThemedText>}
+          {error && <ThemedText type="small" style={{ color: theme.danger, marginTop: Spacing.two }}>{error}</ThemedText>}
         </ThemedView>
       )}
     </ThemedView>
@@ -185,7 +200,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   confirmButton: {
-    backgroundColor: '#38A169',
+
     paddingHorizontal: Spacing.three,
     height: 36,
     borderRadius: Spacing.two,

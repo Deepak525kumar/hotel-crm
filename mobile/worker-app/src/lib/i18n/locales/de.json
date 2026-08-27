@@ -83,7 +83,8 @@
     "getDirections": "Route anzeigen",
     "success": "Erfolgreich",
     "send": "Senden",
-    "change": "Ändern"
+    "change": "Ändern",
+    "submit": "Absenden"
   },
   "fields": {
     "name": "Name",
@@ -525,7 +526,8 @@
     "payslipConfirm": "Möchten Sie Ihre Lohnabrechnung für {{period}} anfordern?",
     "contractSavedTo": "Vertrag gespeichert unter {{uri}}",
     "contractDownloadFailed": "Der Vertrag konnte nicht heruntergeladen werden.",
-    "contractModuleMissing": "Dieser App-Build enthält eine erforderliche Komponente nicht ({{module}}). Bitte aktualisieren oder installieren Sie die App neu und versuchen Sie es erneut."
+    "contractModuleMissing": "Dieser App-Build enthält eine erforderliche Komponente nicht ({{module}}). Bitte aktualisieren oder installieren Sie die App neu und versuchen Sie es erneut.",
+    "uploadSignedScan": "Unterschriebenen Scan hochladen"
   },
   "consent": {
     "title": "Datenschutz-Einwilligung",
@@ -570,7 +572,8 @@
     "markReadHint": "Markieren Sie diese Benachrichtigung als gelesen, sobald Sie sie gesehen haben.",
     "allCaughtUp": "Sie sind auf dem neuesten Stand.",
     "tapToMarkRead": "Zum Markieren als gelesen tippen",
-    "noneYet": "Noch keine Benachrichtigungen."
+    "noneYet": "Noch keine Benachrichtigungen.",
+    "empty": "Noch keine Benachrichtigungen"
   },
   "leaderboard": {
     "none": "Noch keine Ranglistendaten.",
@@ -917,7 +920,10 @@
     "statusPARTIAL": "Teilweise",
     "statusEXCUSED": "Entschuldigt",
     "statusEXPECTED": "Erwartet",
-    "unknownWorker": "Unbekannter Mitarbeiter"
+    "unknownWorker": "Unbekannter Mitarbeiter",
+    "allCaughtUp": "Alles erledigt",
+    "pendingCount": "{{count}} zur Überprüfung offen",
+    "inOutTimes": "Ein: {{in}} · Aus: {{out}}"
   },
   "employees": {
     "noBlocked": "Keine gesperrten Mitarbeiter",
@@ -1010,7 +1016,29 @@
     "reworkPending": "Nacharbeit zugewiesen — warten auf den Mitarbeiter",
     "reworkCompleted": "Nacharbeit abgeschlossen",
     "reworkDone": "Nacharbeit eingereicht {{when}}",
-    "inspectedBy": "Geprüft von"
+    "inspectedBy": "Geprüft von",
+    "rateWorker": "Mitarbeiter bewerten",
+    "checklistTitle": "Prüf-Checkliste",
+    "checklistEmpty": "Bewerten Sie mindestens einen Punkt",
+    "checklistItemRange": "Jeder Punkt muss eine ganze Zahl von 0 bis 100 sein",
+    "overallScore": "Gesamtwertung {{score}}",
+    "photoEvidence": "Fotonachweis",
+    "comment": "Kommentar",
+    "commentPlaceholder": "Was der Mitarbeiter wissen sollte",
+    "submitRating": "Bewertung senden",
+    "ratingRecorded": "Bewertung gespeichert",
+    "ratingFailed": "Die Bewertung konnte nicht gespeichert werden. Bitte erneut versuchen.",
+    "workerUnknown": "Diesem Datensatz ist kein Mitarbeiter zugeordnet, daher ist keine Bewertung möglich.",
+    "checklist": {
+      "dust": "Staub",
+      "bathroom": "Badezimmer",
+      "bed_linen": "Bettwäsche",
+      "mirror": "Spiegel",
+      "floor": "Boden",
+      "minibar_restocking": "Minibar auffüllen",
+      "fragrance_amenities": "Duft & Ausstattung",
+      "other": "Sonstiges"
+    }
   },
   "ratings": {
     "comment": "Kommentar",

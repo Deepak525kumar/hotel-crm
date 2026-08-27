@@ -8,15 +8,17 @@ import { api } from '@/lib/api';
 import { Spacing } from '@/constants/theme';
 import type { Notification } from '@/types/api';
 import { useTranslation } from 'react-i18next';
+import { useTheme } from '@/hooks/use-theme';
 
 function NotifCard({ item, onPress }: { item: Notification; onPress: () => void }) {
+  const theme = useTheme();
   const unread = !item.read_at;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
       <ThemedView type={unread ? 'backgroundSelected' : 'backgroundElement'} style={styles.card}>
         <View style={styles.cardRow}>
           <ThemedText type="smallBold" style={styles.flex}>{item.title}</ThemedText>
-          {unread && <View style={styles.dot} />}
+          {unread && <View style={[styles.dot, { backgroundColor: theme.primary }]} />}
         </View>
         <ThemedText type="small" themeColor="textSecondary">{item.message}</ThemedText>
         <ThemedText type="small" themeColor="textSecondary" style={styles.time}>
@@ -99,7 +101,9 @@ const styles = StyleSheet.create({
   card: { borderRadius: Spacing.two, padding: Spacing.three, gap: Spacing.one },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   flex: { flex: 1 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3182CE' },
+  // Accent token, not a hex: the hardcoded blue ignored the colour scheme
+  // and no longer matched the app's accent at all.
+  dot: { width: 8, height: 8, borderRadius: 4 },
   time: { fontSize: 11 },
   empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center', marginTop: Spacing.four },
 });

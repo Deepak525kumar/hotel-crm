@@ -1,24 +1,60 @@
-import { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
-import { api } from '@/lib/api';
-import type { Notification } from '@/types/api';
-import { useTheme } from '@/hooks/use-theme';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
+
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { BackLink } from '@/components/BackLink';
+import { Card, EmptyState, ScreenHeader } from '@/components/ui';
+import { api } from '@/lib/api';
+import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useNotificationStore } from '@/stores/notification-store';
+import type { Notification } from '@/types/api';
+
+/**
+ * Alerts.
+ *
+ * Rebuilt on the shared UI primitives to match worker-app's list. Reached from
+ * the bell in every screen header rather than a bottom tab -- the tab bar is
+ * for what a checker touches while working a queue.
+ */
+function NotifCard({ item, onPress }: { item: Notification; onPress: () => void }) {
+  const theme = useTheme();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+      <Card>
+        <View style={styles.row}>
+          {/* Unread marker takes the accent token. Both apps previously
+              hardcoded a blue hex here, which ignored the colour scheme and no
+              longer matched the accent at all. */}
+          {!item.is_read ? (
+            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+          ) : (
+            <View style={styles.dotSpacer} />
+          )}
+          <View style={styles.body}>
+            <ThemedText type="smallBold">{item.title}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {item.message}
+            </ThemedText>
+            <ThemedText type="small" themeColor="textSecondary">
+              {new Date(item.created_at).toLocaleString()}
+            </ThemedText>
+          </View>
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
 
 export default function NotificationsScreen() {
   const { t } = useTranslation();
-  const theme = useTheme();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const refreshUnread = useNotificationStore((s) => s.refresh);
 
   const load = useCallback(async (isRefresh = false) => {
     if (!isRefresh) setLoading(true);
@@ -26,100 +62,69 @@ export default function NotificationsScreen() {
       const data = await api.notifications.list();
       setNotifications(Array.isArray(data) ? data : []);
     } catch {
-      // show empty state on error
+      // Leaves the previous list in place; the empty state covers a first load.
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const handleMarkRead = async (id: string) => {
+  const handlePress = async (item: Notification) => {
+    if (item.is_read) return;
     try {
-      await api.notifications.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
+      await api.notifications.markAsRead(item.id);
+      setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, is_read: true } : n)));
+      // Keeps the header badge honest: without this it keeps counting a
+      // notification the checker is looking at.
+      void refreshUnread();
     } catch {
-      // ignore
+      // The row stays unread and can be tapped again.
     }
   };
 
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: theme.background },
-    header: { paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
-    headerSub: { fontSize: 13, color: theme.textSecondary },
-    card: {
-      backgroundColor: theme.backgroundElement,
-      borderRadius: 12,
-      padding: 14,
-      marginHorizontal: 16,
-      marginBottom: 8,
-      borderLeftWidth: 3,
-    },
-    cardRow: { flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-    dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#3b82f6', marginTop: 5 },
-    cardContent: { flex: 1 },
-    title: { fontSize: 14, fontWeight: '700', color: theme.text },
-    message: { fontSize: 13, color: theme.textSecondary, marginTop: 3 },
-    time: { fontSize: 11, color: theme.textSecondary, marginTop: 6 },
-    empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
-    emptyText: { fontSize: 16, color: theme.textSecondary, textAlign: 'center' },
-    loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  });
-
-  const renderItem = ({ item }: { item: Notification }) => (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        { borderLeftColor: item.is_read ? theme.backgroundElement : '#3b82f6' },
-      ]}
-      onPress={() => { if (!item.is_read) handleMarkRead(item.id); }}
-      activeOpacity={0.7}
-    >
-      <View style={styles.cardRow}>
-        {!item.is_read && <View style={styles.dot} />}
-        <View style={styles.cardContent}>
-          <Text style={styles.title}>{item.title}</Text>
-          <Text style={styles.message}>{item.message}</Text>
-          <Text style={styles.time}>{new Date(item.created_at).toLocaleString()}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.loading]}>
-        <ActivityIndicator size="large" color={theme.text} />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerSub}>{t("notifications.tapToMarkRead")}</Text>
-      </View>
-      <FlatList
-        data={notifications}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={notifications.length === 0 ? { flex: 1 } : undefined}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => { setRefreshing(true); load(true); }}
-            tintColor={theme.text}
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <BackLink />
+        <ScreenHeader title={t('nav.alerts')} />
+
+        {loading ? (
+          <ActivityIndicator style={styles.loader} />
+        ) : (
+          <FlatList
+            data={notifications}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={() => {
+                  setRefreshing(true);
+                  void load(true);
+                }}
+              />
+            }
+            renderItem={({ item }) => <NotifCard item={item} onPress={() => void handlePress(item)} />}
+            ListEmptyComponent={<EmptyState title={t('notifications.empty')} />}
           />
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyText}>{t("notifications.noneYet")}</Text>
-          </View>
-        }
-      />
-    </View>
+        )}
+      </SafeAreaView>
+    </ThemedView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  safeArea: { flex: 1, paddingHorizontal: Spacing.three },
+  loader: { marginTop: Spacing.five },
+  list: { gap: Spacing.two, paddingBottom: Spacing.six },
+  row: { flexDirection: 'row', gap: Spacing.two },
+  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
+  dotSpacer: { width: 8 },
+  body: { flex: 1, gap: 2 },
+});

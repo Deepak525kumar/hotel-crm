@@ -17,6 +17,8 @@ import { Spacing } from '@/constants/theme';
 import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { translateApiError } from '../../lib/api-error-i18n';
+import { Badge, BadgeTone, ScreenHeader } from '@/components/ui';
+import { NotificationBell } from '@/components/NotificationBell';
 
 // Keys, not nouns: the label is resolved with t() at the point of render so a
 // language change repaints it. Both the badge and the confirm dialog read from
@@ -27,9 +29,15 @@ const KIND_LABEL_KEY: Record<CalendarAbsenceKind, string> = {
   VACATION: 'absences.kindVACATION',
 };
 
-const KIND_COLOR: Record<CalendarAbsenceKind, string> = {
-  SICK: '#E53E3E',
-  VACATION: '#3182CE',
+/**
+ * Semantic tones, not raw hexes. These were `#E53E3E` / `#3182CE` painted as
+ * badge fills with white text, which ignored the colour scheme: the same two
+ * colours in dark mode against a near-black ground. Mirrors worker-app's
+ * calendar screen.
+ */
+const KIND_TONE: Record<CalendarAbsenceKind, BadgeTone> = {
+  SICK: 'danger',
+  VACATION: 'primary',
 };
 
 function AbsenceCard({
@@ -42,7 +50,7 @@ function AbsenceCard({
   withdrawing: boolean;
 }) {
   const { t } = useTranslation();
-  const color = KIND_COLOR[item.kind];
+
   // The backend refuses to delete a past absence, so offering the action on
   // one would only ever produce an error. Same rule the web app applies.
   const isPast = item.day < isoDateInCalendarTimezone(0);
@@ -51,11 +59,7 @@ function AbsenceCard({
     <ThemedView type="backgroundElement" style={styles.card}>
       <ThemedView style={styles.cardRow} type="backgroundElement">
         <ThemedText type="smallBold">{formatDay(item.day)}</ThemedText>
-        <ThemedView style={[styles.badge, { backgroundColor: color }]} type="backgroundElement">
-          <ThemedText type="small" style={styles.badgeText}>
-            {t(KIND_LABEL_KEY[item.kind])}
-          </ThemedText>
-        </ThemedView>
+        <Badge label={t(KIND_LABEL_KEY[item.kind])} tone={KIND_TONE[item.kind]} />
       </ThemedView>
       {!isPast && (
         <Pressable
@@ -228,7 +232,7 @@ export default function AbsencesScreen() {
   const markedDates = useMemo(() => {
     const marks: Record<string, Record<string, unknown>> = {};
     for (const a of items) {
-      marks[a.day] = { marked: true, dotColor: a.kind === 'SICK' ? '#E53E3E' : theme.primary };
+      marks[a.day] = { marked: true, dotColor: a.kind === 'SICK' ? theme.danger : theme.primary };
     }
     for (const day of selected) {
       marks[day] = {
@@ -264,7 +268,7 @@ export default function AbsencesScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="subtitle" style={styles.header}>{t("calendar.sickOrVacation")}</ThemedText>
+        <ScreenHeader title={t('calendar.sickOrVacation')} action={<NotificationBell />} />
 
         <Calendar
           current={selected[0]}
@@ -303,7 +307,7 @@ export default function AbsencesScreen() {
                 style={({ pressed }) => [
                   styles.actionButton,
                   {
-                    backgroundColor: kind === 'SICK' ? '#E53E3E' : theme.primary,
+                    backgroundColor: kind === 'SICK' ? theme.danger : theme.primary,
                     opacity: pressed || marking !== null ? 0.6 : 1,
                   },
                 ]}
@@ -429,7 +433,7 @@ const styles = StyleSheet.create({
     padding: Spacing.two,
     textAlignVertical: 'top',
   },
-  modalError: { color: '#E53E3E' },
+  modalError: {},
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -455,8 +459,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.two,
   },
-  actionButtonText: { color: '#fff' },
-  errorText: { color: '#E53E3E', marginBottom: Spacing.two },
+
+  errorText: { marginBottom: Spacing.two },
   listHeader: { marginBottom: Spacing.two },
   loader: { marginTop: Spacing.six },
   list: { gap: Spacing.two, paddingBottom: Spacing.six },
@@ -472,6 +476,6 @@ const styles = StyleSheet.create({
   withdrawText: {
     textDecorationLine: 'underline',
   },
-  badgeText: { color: '#fff', fontSize: 11 },
+
   empty: { borderRadius: Spacing.two, padding: Spacing.four, alignItems: 'center' },
 });

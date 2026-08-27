@@ -13,8 +13,10 @@ import type { ContractDto, PayslipRequestDto } from '@/types/api';
 import { useTranslation } from 'react-i18next';
 import { BackLink } from '@/components/BackLink';
 import { translateApiError } from '../lib/api-error-i18n';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function HRScreen() {
+  const theme = useTheme();
   const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user } = useAuthStore();
@@ -102,7 +104,7 @@ export default function HRScreen() {
         <ThemedText type="subtitle" style={styles.header}>{t("hr.title")}</ThemedText>
 
         {loadError && (
-          <ThemedText type="small" style={styles.errorText}>
+          <ThemedText type="small" style={[styles.errorText, { color: theme.danger }]}>
             {loadError}
           </ThemedText>
         )}
@@ -128,5 +130,5 @@ const styles = StyleSheet.create({
   back: { marginBottom: Spacing.two },
   header: { marginBottom: Spacing.three },
   sectionTitle: { marginBottom: Spacing.two },
-  errorText: { color: '#E53E3E', marginBottom: Spacing.two },
+  errorText: { marginBottom: Spacing.two },
 });
