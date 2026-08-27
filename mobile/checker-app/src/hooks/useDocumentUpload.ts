@@ -2,8 +2,13 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { api } from '@/lib/api';
-import { ALLOWED_MIME_TYPES, validatePickedAsset } from '@/lib/document-validation';
+import { api, ApiError } from '@/lib/api';
+import {
+  ALLOWED_MIME_TYPES,
+  resolveMimeType,
+  validateFileSize,
+  validatePickedAsset,
+} from '@/lib/document-validation';
 import { resolvePickedPhoto } from '@/lib/picked-photo';
 import type { DocumentCategory, WorkerDocument } from '@/types/api';
 import { translateApiError } from '../lib/api-error-i18n';
@@ -13,6 +18,8 @@ export interface PendingUpload {
   name: string;
   mimeType?: string;
   size?: number;
+  /** Web only — the real File object, preferred over `uri` when present. */
+  file?: unknown;
 }
 
 /**
@@ -45,7 +52,15 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
       return;
     }
 
-    setPending({ uri: asset.uri, name: asset.name, mimeType: asset.mimeType, size: asset.size });
+    // Resolved, not raw: the picker can report no MIME type at all, and the
+    // server only accepts a known one.
+    setPending({
+      uri: asset.uri,
+      name: asset.name,
+      mimeType: resolveMimeType(asset),
+      size: asset.size,
+      file: (asset as { file?: unknown }).file,
+    });
   }, [t]);
 
   /**
@@ -111,7 +126,7 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         return;
       }
 
-      const sizeError = validatePickedAsset({ size: asset.fileSize });
+      const sizeError = validateFileSize(asset.fileSize);
       if (sizeError) {
         setError(t(sizeError));
         return;
@@ -142,7 +157,20 @@ export function useDocumentUpload(workerId: string, onUploaded: (doc: WorkerDocu
         onUploaded(doc);
         setPending(null);
       } catch (err) {
-        setError(translateApiError(err, t, 'documents.uploadFailed'));
+        // A server rejection (4xx/5xx) arrives as an ApiError carrying the
+        // server's own message, and translateApiError shows it verbatim.
+        // Anything else means `fetch` itself threw -- the request never got a
+        // response at all, which for a multipart upload almost always means
+        // the native layer could not read the picked file. That case used to
+        // collapse into a bare "Upload failed. Please try again.", which named
+        // nothing and made the failure undiagnosable from a device. Keep the
+        // underlying reason.
+        if (err instanceof ApiError) {
+          setError(translateApiError(err, t, 'documents.uploadFailed'));
+        } else {
+          const reason = err instanceof Error ? err.message : String(err);
+          setError(t('documents.uploadFailedReason', { reason }));
+        }
       } finally {
         setUploading(false);
       }
