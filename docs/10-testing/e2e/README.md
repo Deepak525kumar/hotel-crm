@@ -116,6 +116,13 @@ port is compiled into `RCTBundleURLProvider.mm` and no Expo CLI runs at all).
 the failure came straight back. **Before believing any mobile finding, confirm which app's bundle you are actually
 running.**
 
+The 2026-08-27 checker check-in run (`runs/2026-08-27-checker-checkin-and-worker-picker.md`) is the
+clearest case yet for testing against a live API rather than fixtures. A client-side gate had been
+written on the assumption that `GET /attendance` is self-scoped — it is not for a checker, which
+backs the verification queue and returns other workers' rows. The unit tests shared the assumption
+and passed; the first real response disproved it. **A fixture written from the same belief as the
+code under test proves only that the belief is self-consistent.**
+
 One caution from that run, about diagnosis rather than coverage: a jest-expo preset error blamed on
 a missing dependency turned out to be a locally-broken `node_modules` (`--legacy-peer-deps`
 suppresses the peer install `react-native` relies on), not a repository defect. Reproduce a

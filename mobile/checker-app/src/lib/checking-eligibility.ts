@@ -35,25 +35,35 @@ function localDay(iso: string): string {
 }
 
 /**
- * @param records the checker's own attendance rows (GET /attendance is scoped
- *   to the caller server-side, so these are never anyone else's)
- * @param today   YYYY-MM-DD in the device's local timezone
+ * @param records rows from GET /attendance
+ * @param today    YYYY-MM-DD in the device's local timezone
+ * @param selfId   the signed-in checker's user id
+ *
+ * `selfId` is not optional, and the filtering it drives is the point.
+ * GET /attendance is NOT self-scoped for a checker: the endpoint backs the
+ * attendance-verification queue, so it returns other workers' rows too —
+ * confirmed live, where a checker's own list came back holding a worker's row
+ * alongside their own. Without this filter the gate reads someone else's
+ * check-in as the checker's own and unlocks Start checking for a checker who
+ * never checked in.
  */
 export function resolveCheckingEligibility(
   records: readonly AttendanceRecord[],
-  today: string
+  today: string,
+  selfId: string
 ): CheckingEligibility {
+  const own = records.filter((r) => r.worker_id === selfId);
   // Checked in *today*, not merely at some point: a check_in_at from a
   // previous shift that was never checked out would otherwise keep the
   // button live indefinitely.
-  const todays = records.filter(
+  const todays = own.filter(
     (r) => r.check_in_at !== null && localDay(r.check_in_at) === today
   );
 
   if (todays.length === 0) {
     // Distinguish "no shift at all today" from "scheduled but not yet checked
     // in": an EXPECTED row exists for a scheduled shift before check-in.
-    const scheduledToday = records.some(
+    const scheduledToday = own.some(
       (r) => r.expected_start !== null && localDay(r.expected_start) === today
     );
     return {

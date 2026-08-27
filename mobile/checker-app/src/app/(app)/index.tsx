@@ -81,7 +81,14 @@ export default function HomeScreen() {
     ? assignments.filter((s) => ['CONFIRMED', 'IN_PROGRESS'].includes(s.status))
     : [];
 
-  const eligibility = resolveCheckingEligibility(attendance?.data ?? [], localToday());
+  // user!.id, not an unfiltered list: GET /attendance returns other workers'
+  // rows to a checker (it backs the verification queue), so the gate must pick
+  // out the checker's own — see checking-eligibility.ts.
+  const eligibility = resolveCheckingEligibility(
+    attendance?.data ?? [],
+    localToday(),
+    user?.id ?? ''
+  );
 
   const loading = statsLoading || assignmentsLoading;
   const refreshing = statsValidating || assignmentsValidating || attendanceValidating;
