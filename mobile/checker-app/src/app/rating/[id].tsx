@@ -51,9 +51,9 @@ export default function RatingScreen() {
   const submit = async () => {
     setError(null);
 
-    const missingChecks = INSPECTION_CHECKLIST_ITEMS.filter((item) => scores[item] === undefined);
-    if (missingChecks.length > 0) {
-      setError(t('quality.checklistEmpty', 'All checklist items must be marked.'));
+    const scoredItems = INSPECTION_CHECKLIST_ITEMS.filter((item) => typeof scores[item] === 'number');
+    if (scoredItems.length === 0) {
+      setError(t('quality.checklistEmpty', 'Score at least one item.'));
       return;
     }
     const invalid = invalidChecklistItems(scores);
@@ -193,7 +193,7 @@ export default function RatingScreen() {
             ))}
           </Card>
 
-          <SectionHeader title={t('quality.comment')} />
+          <SectionHeader title={t('quality.commentOptional', 'Comment (optional)')} />
           <Card>
             <TextInput
               value={comment}
