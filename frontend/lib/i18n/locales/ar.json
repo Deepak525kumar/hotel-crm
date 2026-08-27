@@ -1015,7 +1015,29 @@
     "reworkPending": "تم تعيين إعادة العمل — في انتظار العامل",
     "reworkCompleted": "اكتملت إعادة العمل",
     "reworkDone": "تم إرسال إعادة العمل {{when}}",
-    "inspectedBy": "تم التفتيش بواسطة"
+    "inspectedBy": "تم التفتيش بواسطة",
+    "rateWorker": "تقييم العامل",
+    "checklistTitle": "قائمة التفتيش",
+    "checklistEmpty": "قيّم عنصراً واحداً على الأقل",
+    "checklistItemRange": "يجب أن يكون كل عنصر رقماً صحيحاً من 0 إلى 100",
+    "overallScore": "النتيجة الإجمالية {{score}}",
+    "photoEvidence": "إثبات بالصور",
+    "comment": "تعليق",
+    "commentPlaceholder": "أي شيء ينبغي أن يعرفه العامل",
+    "submitRating": "إرسال التقييم",
+    "ratingRecorded": "تم تسجيل التقييم",
+    "ratingFailed": "تعذر حفظ التقييم. حاول مرة أخرى.",
+    "workerUnknown": "لا يوجد عامل مرتبط بهذا السجل، لذا لا يمكن تقييمه.",
+    "checklist": {
+      "dust": "الغبار",
+      "bathroom": "الحمام",
+      "bed_linen": "مفارش السرير",
+      "mirror": "المرآة",
+      "floor": "الأرضية",
+      "minibar_restocking": "إعادة تعبئة الميني بار",
+      "fragrance_amenities": "العطور والمستلزمات",
+      "other": "أخرى"
+    }
   },
   "ratings": {
     "comment": "تعليق",

@@ -14,6 +14,7 @@ import { api } from '@/lib/api';
 import type { AttendanceRecord } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui';
 
 function formatDateTime(iso: string | null): string {
   if (!iso) return '--';
@@ -115,6 +116,7 @@ export default function AttendanceDetailScreen() {
       marginTop: 12,
     },
     buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+    action: { marginTop: 8 },
     outlineButton: {
       borderRadius: 12,
       padding: 16,
@@ -205,14 +207,27 @@ export default function AttendanceDetailScreen() {
           </View>
         )}
 
-        <TouchableOpacity
-          style={[styles.outlineButton, { borderColor: '#7c3aed' }]}
+        {/* Two distinct records, as on the web: the verification is the
+            pass/fail decision, the rating is the TREQ-005 checklist score that
+            feeds WorkerOverallRating. The app previously offered only the
+            first, so the checklist was unreachable. */}
+        <Button
+          label={t('nav.qualityCheck')}
+          variant="secondary"
           onPress={() => router.push(`/quality/${record.assignment_id}`)}
-        >
-          <Text style={{ color: '#7c3aed', fontSize: 15, fontWeight: '600' }}>
-            Quality Verification →
-          </Text>
-        </TouchableOpacity>
+          style={styles.action}
+        />
+        <Button
+          label={t('quality.rateWorker')}
+          variant="secondary"
+          onPress={() =>
+            router.push({
+              pathname: '/rating/[id]',
+              params: { id: record.assignment_id, worker_id: record.worker_id },
+            })
+          }
+          style={styles.action}
+        />
 
         {/* The separate "Rate Worker" screen was retired on 2026-08-24. It
             was a 1-5 star picker (score x 20) writing to the Rating model,

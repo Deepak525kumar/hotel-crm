@@ -1014,7 +1014,29 @@
     "reworkPending": "Rework assigned — awaiting the worker",
     "reworkCompleted": "Rework completed",
     "reworkDone": "Rework submitted {{when}}",
-    "inspectedBy": "Inspected by"
+    "inspectedBy": "Inspected by",
+    "rateWorker": "Rate worker",
+    "checklistTitle": "Inspection checklist",
+    "checklistEmpty": "Score at least one item",
+    "checklistItemRange": "Each item must be a whole number from 0 to 100",
+    "overallScore": "Overall score {{score}}",
+    "photoEvidence": "Photo evidence",
+    "comment": "Comment",
+    "commentPlaceholder": "Anything the worker should know",
+    "submitRating": "Submit rating",
+    "ratingRecorded": "Rating recorded",
+    "ratingFailed": "The rating could not be saved. Please try again.",
+    "workerUnknown": "This record has no worker attached, so it cannot be rated.",
+    "checklist": {
+      "dust": "Dust",
+      "bathroom": "Bathroom",
+      "bed_linen": "Bed linen",
+      "mirror": "Mirror",
+      "floor": "Floor",
+      "minibar_restocking": "Minibar restocking",
+      "fragrance_amenities": "Fragrance & amenities",
+      "other": "Other"
+    }
   },
   "ratings": {
     "comment": "Comment",

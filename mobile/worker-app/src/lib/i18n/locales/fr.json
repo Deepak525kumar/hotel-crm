@@ -1014,7 +1014,29 @@
     "reworkPending": "Reprise attribuée — en attente de l'employé",
     "reworkCompleted": "Reprise terminée",
     "reworkDone": "Reprise envoyée {{when}}",
-    "inspectedBy": "Inspecté par"
+    "inspectedBy": "Inspecté par",
+    "rateWorker": "Évaluer l’employé",
+    "checklistTitle": "Liste de contrôle",
+    "checklistEmpty": "Notez au moins un élément",
+    "checklistItemRange": "Chaque élément doit être un entier de 0 à 100",
+    "overallScore": "Score global {{score}}",
+    "photoEvidence": "Preuve photo",
+    "comment": "Commentaire",
+    "commentPlaceholder": "Ce que l’employé doit savoir",
+    "submitRating": "Envoyer l’évaluation",
+    "ratingRecorded": "Évaluation enregistrée",
+    "ratingFailed": "L’évaluation n’a pas pu être enregistrée. Veuillez réessayer.",
+    "workerUnknown": "Aucun employé n’est associé à cet enregistrement ; impossible de l’évaluer.",
+    "checklist": {
+      "dust": "Poussière",
+      "bathroom": "Salle de bain",
+      "bed_linen": "Linge de lit",
+      "mirror": "Miroir",
+      "floor": "Sol",
+      "minibar_restocking": "Réapprovisionnement du minibar",
+      "fragrance_amenities": "Parfum et articles",
+      "other": "Autre"
+    }
   },
   "ratings": {
     "comment": "Commentaire",

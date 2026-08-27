@@ -83,6 +83,7 @@ export default function RootLayout() {
             {/* ADR-065: the onboarding gate is universal for non-Admin roles.
                 AuthGuard redirects a non-ACTIVE checker here. */}
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+            <Stack.Screen name="rating/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="documents" options={{ headerShown: false }} />
             <Stack.Screen name="consent" options={{ headerShown: false }} />
             <Stack.Screen name="hr" options={{ headerShown: false }} />

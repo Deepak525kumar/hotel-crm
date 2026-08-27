@@ -1015,7 +1015,29 @@
     "reworkPending": "دوبارہ کام تفویض — کارکن کا انتظار",
     "reworkCompleted": "دوبارہ کام مکمل",
     "reworkDone": "دوبارہ کام جمع کرایا گیا {{when}}",
-    "inspectedBy": "معائنہ کیا گیا از"
+    "inspectedBy": "معائنہ کیا گیا از",
+    "rateWorker": "ورکر کی درجہ بندی",
+    "checklistTitle": "معائنہ چیک لسٹ",
+    "checklistEmpty": "کم از کم ایک آئٹم اسکور کریں",
+    "checklistItemRange": "ہر آئٹم 0 سے 100 تک مکمل نمبر ہونا چاہیے",
+    "overallScore": "مجموعی اسکور {{score}}",
+    "photoEvidence": "تصویری ثبوت",
+    "comment": "تبصرہ",
+    "commentPlaceholder": "کوئی بھی بات جو ورکر کو معلوم ہونی چاہیے",
+    "submitRating": "درجہ بندی جمع کریں",
+    "ratingRecorded": "درجہ بندی محفوظ ہو گئی",
+    "ratingFailed": "درجہ بندی محفوظ نہ ہو سکی۔ دوبارہ کوشش کریں۔",
+    "workerUnknown": "اس ریکارڈ سے کوئی ورکر منسلک نہیں، اس لیے درجہ بندی ممکن نہیں۔",
+    "checklist": {
+      "dust": "گرد",
+      "bathroom": "باتھ روم",
+      "bed_linen": "بستر کی چادریں",
+      "mirror": "آئینہ",
+      "floor": "فرش",
+      "minibar_restocking": "منی بار کی بھرائی",
+      "fragrance_amenities": "خوشبو اور سہولیات",
+      "other": "دیگر"
+    }
   },
   "ratings": {
     "comment": "تبصرہ",

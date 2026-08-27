@@ -1014,7 +1014,29 @@
     "reworkPending": "Переробку призначено — очікується працівник",
     "reworkCompleted": "Переробку завершено",
     "reworkDone": "Переробку надіслано {{when}}",
-    "inspectedBy": "Перевірив"
+    "inspectedBy": "Перевірив",
+    "rateWorker": "Оцінити працівника",
+    "checklistTitle": "Контрольний список",
+    "checklistEmpty": "Оцініть хоча б один пункт",
+    "checklistItemRange": "Кожен пункт має бути цілим числом від 0 до 100",
+    "overallScore": "Загальна оцінка {{score}}",
+    "photoEvidence": "Фотодоказ",
+    "comment": "Коментар",
+    "commentPlaceholder": "Що варто знати працівнику",
+    "submitRating": "Надіслати оцінку",
+    "ratingRecorded": "Оцінку збережено",
+    "ratingFailed": "Не вдалося зберегти оцінку. Спробуйте ще раз.",
+    "workerUnknown": "До цього запису не прикріплено працівника, тож оцінити його неможливо.",
+    "checklist": {
+      "dust": "Пил",
+      "bathroom": "Ванна кімната",
+      "bed_linen": "Постільна білизна",
+      "mirror": "Дзеркало",
+      "floor": "Підлога",
+      "minibar_restocking": "Поповнення мінібару",
+      "fragrance_amenities": "Аромат і приладдя",
+      "other": "Інше"
+    }
   },
   "ratings": {
     "comment": "Коментар",
