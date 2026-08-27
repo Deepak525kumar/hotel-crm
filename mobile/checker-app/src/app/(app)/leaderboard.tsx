@@ -13,6 +13,8 @@ import { api } from '@/lib/api';
 import type { LeaderboardEntry } from '@/types/api';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from 'react-i18next';
+import { ScreenHeader } from '@/components/ui';
+import { NotificationBell } from '@/components/NotificationBell';
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
@@ -101,7 +103,11 @@ export default function LeaderboardScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerSub}>{t("leaderboard.topPerformers")}</Text>
+        <ScreenHeader
+          title={t('nav.leaderboard')}
+          subtitle={t('leaderboard.topPerformers')}
+          action={<NotificationBell />}
+        />
       </View>
       {error && <Text style={styles.error}>{error}</Text>}
       <FlatList
