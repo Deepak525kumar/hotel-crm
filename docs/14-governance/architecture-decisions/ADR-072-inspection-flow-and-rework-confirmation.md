@@ -166,3 +166,69 @@ worked-time record, and no payroll line.
 This closes the question `ADR-069` left open. Rework is corrective work on a shift already paid
 through its original assignment. If that changes commercially, it is a new decision — not something
 to be inferred from the absence of a column.
+
+---
+
+## 5. Structural findings from a second, closer audit (2026-08-27)
+
+The first pass through this ADR treated the requested flow as mostly wiring over what `ADR-069`
+shipped. A closer audit of the schema and the checker app says otherwise. Four findings below block
+the flow as described; none can be settled by implementation choice.
+
+### 5.1 There is no room-level unit of work anywhere
+
+The requested flow is phrased per room — "he has to do **that room** in 15 minutes". The data model
+has no room-level work unit at all. `schema.prisma:421` states it outright: *"full-day
+WorkerAssignment — no room-level task layer implied."*
+
+Rooms exist only as `RoomsCompletedEntry`, a **manager-entered count** against the whole assignment
+(`schema.prisma:1278`), not as individually assignable, inspectable things. So "that room" has
+nothing to point at: an inspection cannot name a room, a rework cannot be scoped to one, and a
+worker cannot be told which room to redo except in free text in the notes.
+
+Either the flow is per-assignment (the notes carry the room, informally), or a room-level task layer
+is introduced — which is a substantially larger change than this ADR anticipated, touching
+assignment, inspection, rework and the roster.
+
+### 5.2 One inspection per assignment, ever
+
+`QualityVerification.assignment_id` and `Rating.assignment_id` are both `@unique`
+(`schema.prisma:1152`, `:1188`) — 1-to-1 with `WorkerAssignment`.
+
+A checker therefore cannot inspect the same worker's shift twice. Picking a worker who has already
+been inspected today cannot produce a second inspection; it collides. The requested flow — start an
+inspection, pick any worker on shift — assumes inspections are repeatable, and today they are not.
+
+This is independent of §4.2's send-back decision: reworks are assignments and multiply freely; it is
+*inspections* that are capped at one.
+
+### 5.3 The checklist and the score live on two unconnected records
+
+The checker app's inspection screen calls `createVerification({ assignment_id, score, notes })`
+(`mobile/checker-app/src/app/quality/[id].tsx:64`) — score and notes, **no checklist**.
+
+The checklist (`criteria_scores`, keyed to `INSPECTION_CHECKLIST_ITEMS`) lives on **`Rating`**, via a
+separate `createRating` call. Rework hangs off **`QualityVerification`**. Both are 1-to-1 with the
+assignment, and nothing in the client links them.
+
+So the requested sequence — photos → checklist → score → approve/rework — spans two records that are
+created by different endpoints, and the rework decision attaches to only one of them. Whether these
+become one record, or one flow writing both in a transaction, is a decision, not a detail.
+
+### 5.4 Approve versus rework is currently derived from the score, not chosen
+
+`deriveStatus()` (`quality/[id].tsx:35`) maps score to outcome: ≥70 `PASSED`, 40–69 `NEEDS_REWORK`,
+below that failing. The service then refuses rework on a `PASSED` verification
+(`quality/service.ts:380`).
+
+The requested flow gives the checker two explicit buttons after the checklist. That conflicts
+directly: a checker who scores work 85 but wants it redone cannot currently ask for rework, because
+85 derives `PASSED`. Either the score stops deciding the outcome, or the buttons are constrained by
+it. Both are defensible; they are not the same product.
+
+### 5.5 Status
+
+**These four are open and block PR 1's shape.** They are recorded here rather than resolved in code,
+per this repository's rule that no implementation begins from an unfrozen specification. §§1–4 of
+this ADR stand and are unaffected.
+

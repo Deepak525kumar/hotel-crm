@@ -21,6 +21,12 @@ changes a shipped state machine, and the client PRs depend on its shape.
 | Worker's rework screen: "rework done" + photos only, no check-in/out | `worker-app/src/app/rework/[id].tsx` | Built |
 | Worker may read the checker's photos for their own work (authorization) | `quality/service.ts:892` | Built — no client surface |
 
+> **Blocked as written.** The 2026-08-27 audit (`ADR-072` §5) found four structural facts that this
+> plan assumed away: there is no room-level unit of work; inspections are 1-to-1 with an assignment
+> so a worker can be inspected only once; the checklist and the score live on two unconnected
+> records; and approve-versus-rework is derived from the score rather than chosen. PR 1's shape
+> depends on how those are settled — do not start it against this section as written.
+
 ## PR 1 — Backend: confirmation state, auto-close, attendance exclusion
 
 The only PR that touches the database. Everything else depends on it.
