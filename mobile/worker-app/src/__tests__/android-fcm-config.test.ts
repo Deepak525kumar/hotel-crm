@@ -58,7 +58,7 @@ describe('Android FCM configuration (worker-app)', () => {
         c.client_info.android_client_info.package_name
     );
     expect(packages).toContain(app.android.package);
-    expect(app.android.package).toBe('com.hotelcrm.workerapp');
+    expect(app.android.package).toBe('com.fhmhotelservices.workerapp');
   });
 
   it('registers device tokens under the WORKER app', () => {

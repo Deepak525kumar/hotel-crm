@@ -84,7 +84,9 @@
     "success": "Erfolgreich",
     "send": "Senden",
     "change": "Ändern",
-    "submit": "Absenden"
+    "submit": "Absenden",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "Name",
@@ -1048,7 +1050,8 @@
     "selectWorkerSubtitle": "Heute im Dienst in Ihren Hotels",
     "noInspectableWorkers": "Keine Mitarbeiter zu kontrollieren",
     "noInspectableWorkersBody": "In den Hotels, in denen Sie arbeiten, ist heute niemand im Dienst.",
-    "workerUnavailable": "Mitarbeiter nicht verfügbar"
+    "workerUnavailable": "Mitarbeiter nicht verfügbar",
+    "overallScoreTitle": "Overall Score (0-100)"
   },
   "ratings": {
     "comment": "Kommentar",

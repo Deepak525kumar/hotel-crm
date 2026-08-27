@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:14495829635:android:29d52ee5fd05f10bf095b6",
         "android_client_info": {
-          "package_name": "com.hotelcrm.checkerapp"
+          "package_name": "com.fhmhotelservices.checkerapp"
         }
       },
       "oauth_client": [],
@@ -28,7 +28,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:14495829635:android:814b079ac798b9f5f095b6",
         "android_client_info": {
-          "package_name": "com.hotelcrm.workerapp"
+          "package_name": "com.fhmhotelservices.workerapp"
         }
       },
       "oauth_client": [],

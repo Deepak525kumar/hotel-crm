@@ -85,7 +85,9 @@
     "success": "تم بنجاح",
     "send": "إرسال",
     "change": "تغيير",
-    "submit": "إرسال"
+    "submit": "إرسال",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "الاسم",
@@ -1049,7 +1051,8 @@
     "selectWorkerSubtitle": "الموظفون في الوردية اليوم في فنادقك",
     "noInspectableWorkers": "لا يوجد موظفون للفحص",
     "noInspectableWorkersBody": "لا أحد في الوردية اليوم في الفنادق التي تعمل بها.",
-    "workerUnavailable": "الموظف غير متاح"
+    "workerUnavailable": "الموظف غير متاح",
+    "overallScoreTitle": "Overall Score (0-100)"
   },
   "ratings": {
     "comment": "تعليق",

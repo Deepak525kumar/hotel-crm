@@ -84,7 +84,9 @@
     "success": "Success",
     "send": "Send",
     "change": "Change",
-    "submit": "Submit"
+    "submit": "Submit",
+    "pass": "Pass",
+    "fail": "Fail"
   },
   "fields": {
     "name": "Name",
@@ -1048,7 +1050,8 @@
     "selectWorkerSubtitle": "Workers on shift today at your hotels",
     "noInspectableWorkers": "No workers to check",
     "noInspectableWorkersBody": "Nobody is on shift today at the hotels you are working.",
-    "workerUnavailable": "Worker unavailable"
+    "workerUnavailable": "Worker unavailable",
+    "overallScoreTitle": "Overall Score (0-100)"
   },
   "ratings": {
     "comment": "Comment",
