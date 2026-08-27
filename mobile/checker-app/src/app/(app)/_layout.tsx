@@ -31,6 +31,10 @@ import { PushRegistration } from '@/components/PushRegistration';
  *     shared state between them.
  *   - The old Queue screen (attendance verification) was dropped entirely --
  *     checkers do not verify attendance.
+ *   - `jobs` (worker-app calls its equivalent "marketplace") is a section on
+ *     Home, and a full screen from there, exactly as in worker-app -- see its
+ *     own header comment. Every row it shows is CHECKER-targeted, enforced
+ *     server-side (job-requests/service.ts), not by anything in this app.
  *   - `notifications` is the header bell, as in worker-app.
  *
  * `href: null` keeps a route navigable while hiding its tab, which is why they
@@ -116,6 +120,7 @@ export default function AppLayout() {
         {/* Reachable by navigation, not by tab. See the comment above. */}
         <Tabs.Screen name="leaderboard" options={{ href: null }} />
         <Tabs.Screen name="calendar" options={{ href: null }} />
+        <Tabs.Screen name="jobs" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </>

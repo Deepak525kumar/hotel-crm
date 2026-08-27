@@ -170,7 +170,10 @@
     "score0to100": "Punktzahl (0–100)",
     "hotelNamePlaceholder": "z. B. Grand Central Hotel",
     "groupNamePlaceholder": "z. B. Region Nord",
-    "jobTitlePlaceholder": "z. B. Zimmermädchen"
+    "jobTitlePlaceholder": "z. B. Zimmermädchen",
+    "targetRole": "Schicht für",
+    "targetRoleWorker": "Mitarbeiter",
+    "targetRoleChecker": "Prüfer"
   },
   "nav": {
     "dashboard": "Übersicht",
@@ -435,7 +438,8 @@
     "noLongerOpen": "Diese Stelle ist nicht mehr offen.",
     "hotel": "Hotel",
     "location": "Ort",
-    "description": "Beschreibung"
+    "description": "Beschreibung",
+    "slotsFilled": "{{confirmed}}/{{headcount}} gefüllt"
   },
   "documents": {
     "title": "Dokumente",
@@ -758,7 +762,8 @@
     "noSkillOption": "Keine bestimmte Fähigkeit erforderlich",
     "anySkill": "Beliebige Fähigkeit",
     "raiseBroadcastAction": "Rundmeldung senden",
-    "slotClaimedByOther": "Jemand anderes hat diesen Platz kurz vor Ihnen belegt — es wurde keine Schicht zugewiesen."
+    "slotClaimedByOther": "Jemand anderes hat diesen Platz kurz vor Ihnen belegt — es wurde keine Schicht zugewiesen.",
+    "checkersNeeded": "Benötigte Prüfer"
   },
   "onboarding": {
     "managerReview": "Manager-Prüfung",

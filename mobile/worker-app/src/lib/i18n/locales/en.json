@@ -170,7 +170,10 @@
     "score0to100": "Score (0–100)",
     "hotelNamePlaceholder": "e.g. Grand Central Hotel",
     "groupNamePlaceholder": "e.g. Northern Region",
-    "jobTitlePlaceholder": "e.g. Housekeeper"
+    "jobTitlePlaceholder": "e.g. Housekeeper",
+    "targetRole": "Shift for",
+    "targetRoleWorker": "Worker",
+    "targetRoleChecker": "Checker"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -435,7 +438,8 @@
     "noLongerOpen": "This job is no longer open.",
     "hotel": "Hotel",
     "location": "Location",
-    "description": "Description"
+    "description": "Description",
+    "slotsFilled": "{{confirmed}}/{{headcount}} filled"
   },
   "documents": {
     "title": "Documents",
@@ -758,7 +762,8 @@
     "noSkillOption": "No specific skill required",
     "anySkill": "Any skill",
     "raiseBroadcastAction": "Raise broadcast",
-    "slotClaimedByOther": "Someone else claimed this slot just before you — no shift was assigned."
+    "slotClaimedByOther": "Someone else claimed this slot just before you — no shift was assigned.",
+    "checkersNeeded": "Checkers needed"
   },
   "onboarding": {
     "managerReview": "Manager Review",

@@ -42,6 +42,8 @@ export interface WorkRequest {
   id: string;
   hotel_id: string;
   hotel?: { id: string; name: string; address?: string };
+  /** Which account role this request/broadcast is for (2026-08-27). */
+  target_role: 'WORKER' | 'CHECKER';
   position: string;
   description?: string;
   workers_needed: number;

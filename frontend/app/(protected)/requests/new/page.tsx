@@ -25,6 +25,7 @@ import { useTranslation } from "react-i18next";
 
 interface FormState {
   hotel_id: string;
+  target_role: "WORKER" | "CHECKER";
   position: string;
   workers_needed: string;
   shift_date: string;
@@ -38,6 +39,7 @@ interface FormState {
 
 const INITIAL: FormState = {
   hotel_id: "",
+  target_role: "WORKER",
   position: "",
   workers_needed: "1",
   shift_date: "",
@@ -67,6 +69,7 @@ function NewWorkRequestForm() {
     const rate = form.hourly_rate.trim();
     return {
       hotel_id: form.hotel_id,
+      target_role: form.target_role,
       position: form.position.trim(),
       workers_needed: Number(form.workers_needed),
       shift_date: form.shift_date,
@@ -163,6 +166,18 @@ function NewWorkRequestForm() {
                   {h.name} — {h.city}, {h.country}
                 </option>
               ))}
+            </Select>
+
+            <Select
+              label={t("fields.targetRole")}
+              required
+              value={form.target_role}
+              onChange={(e) =>
+                set("target_role", e.target.value as "WORKER" | "CHECKER")
+              }
+            >
+              <option value="WORKER">{t("fields.targetRoleWorker")}</option>
+              <option value="CHECKER">{t("fields.targetRoleChecker")}</option>
             </Select>
 
             <Input

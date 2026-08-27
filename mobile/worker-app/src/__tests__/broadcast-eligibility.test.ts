@@ -4,6 +4,7 @@ import type { Broadcast, BroadcastEligibility } from '@/types/api';
 const makeBroadcast = (overrides: Partial<Broadcast> = {}): Broadcast => ({
   id: 'jr1',
   hotel_id: 'h1',
+  target_role: 'WORKER',
   position: '2x CLEANER',
   workers_needed: 2,
   workers_confirmed: 0,

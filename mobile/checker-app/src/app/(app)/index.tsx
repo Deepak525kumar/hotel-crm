@@ -76,6 +76,17 @@ export default function HomeScreen() {
     api.attendance.listMine(user!.id, { per_page: 20 })
   );
 
+  // Open jobs, CHECKER-targeted only (enforced server-side, see jobs.tsx's
+  // own note) -- mirrors worker-app's Home section, kept to 3 rows here with
+  // "Browse jobs" the way through to the full list.
+  const {
+    data: openJobs,
+    isValidating: jobsValidating,
+    mutate: mutateJobs,
+  } = useSWR(user ? `/work-requests/open/${user.id}` : null, () =>
+    api.workRequests.list({ status: 'OPEN', limit: 3 })
+  );
+
   const upcoming = Array.isArray(assignments)
     ? assignments.filter((s) => ['CONFIRMED', 'IN_PROGRESS'].includes(s.status))
     : [];
@@ -90,10 +101,10 @@ export default function HomeScreen() {
   );
 
   const loading = statsLoading || assignmentsLoading;
-  const refreshing = statsValidating || assignmentsValidating || attendanceValidating;
+  const refreshing = statsValidating || assignmentsValidating || attendanceValidating || jobsValidating;
 
   const onRefresh = async () => {
-    await Promise.all([mutateStats(), mutateAssignments(), mutateAttendance()]);
+    await Promise.all([mutateStats(), mutateAssignments(), mutateAttendance(), mutateJobs()]);
   };
 
   const name = workerDisplayName(user?.first_name);
@@ -201,6 +212,40 @@ export default function HomeScreen() {
                   </Pressable>
                 ))
               )}
+
+              <SectionHeader title={t('home.openJobs')} />
+              {Array.isArray(openJobs) && openJobs.length > 0 ? (
+                openJobs.map((job) => (
+                  <Pressable
+                    key={job.id}
+                    accessibilityRole="button"
+                    onPress={() => router.push(`/job/${job.id}`)}
+                  >
+                    <Card>
+                      <ThemedText type="smallBold">{job.position ?? t('common.shift')}</ThemedText>
+                      {job.hotel?.name ? (
+                        <ThemedText type="small" themeColor="textSecondary">
+                          {job.hotel.name}
+                        </ThemedText>
+                      ) : null}
+                      <ThemedText type="small" themeColor="textSecondary">
+                        {job.shift_date ? new Date(job.shift_date).toLocaleDateString() : ''}
+                      </ThemedText>
+                    </Card>
+                  </Pressable>
+                ))
+              ) : (
+                <Card>
+                  <ThemedText type="small" themeColor="textSecondary">
+                    {t('marketplace.noneOpen')}
+                  </ThemedText>
+                </Card>
+              )}
+              <Button
+                label={t('home.browseJobs')}
+                variant="secondary"
+                onPress={() => router.push('/(app)/jobs')}
+              />
             </>
           )}
         </ScrollView>

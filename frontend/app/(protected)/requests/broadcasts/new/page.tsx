@@ -36,6 +36,7 @@ const NO_SKILL_VALUE = "";
 
 interface FormState {
   hotel_id: string;
+  target_role: "WORKER" | "CHECKER";
   shift_date: string;
   shift_start_time: string;
   shift_end_time: string;
@@ -47,6 +48,7 @@ interface FormState {
 
 const INITIAL: FormState = {
   hotel_id: "",
+  target_role: "WORKER",
   shift_date: "",
   shift_start_time: "",
   shift_end_time: "",
@@ -72,6 +74,24 @@ function NewBroadcastForm() {
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  // CHECKER has no SkillTag values of its own (CLEANER/WAITER/... are
+  // WORKER-domain) -- a checker-targeted broadcast is always a plain
+  // headcount, using the "no specific skill required" (null) slot the
+  // schema already supports rather than a fabricated CHECKER skill tag.
+  // Switching target_role collapses/restores the skill-line editor so the
+  // form can't submit a SkillTag alongside target_role: CHECKER.
+  const setTargetRole = (role: "WORKER" | "CHECKER") =>
+    setForm((prev) => ({
+      ...prev,
+      target_role: role,
+      skills:
+        role === "CHECKER"
+          ? [{ skill: null, headcount: prev.skills[0]?.headcount ?? "1" }]
+          : prev.skills.some((line) => line.skill !== null)
+            ? prev.skills
+            : [{ skill: "CLEANER", headcount: prev.skills[0]?.headcount ?? "1" }],
+    }));
 
   const setSkillLine = (index: number, patch: Partial<SkillLine>) =>
     setForm((prev) => ({
@@ -131,6 +151,7 @@ function NewBroadcastForm() {
     const rate = form.hourly_rate.trim();
     const input: RaiseBroadcastInput = {
       hotel_id: form.hotel_id,
+      target_role: form.target_role,
       shift_date: form.shift_date,
       shift_start_time: form.shift_start_time,
       shift_end_time: form.shift_end_time,
@@ -187,6 +208,16 @@ function NewBroadcastForm() {
               ))}
             </Select>
 
+            <Select
+              label={t("fields.targetRole")}
+              required
+              value={form.target_role}
+              onChange={(e) => setTargetRole(e.target.value as "WORKER" | "CHECKER")}
+            >
+              <option value="WORKER">{t("fields.targetRoleWorker")}</option>
+              <option value="CHECKER">{t("fields.targetRoleChecker")}</option>
+            </Select>
+
             <div className="grid gap-4 sm:grid-cols-3">
               <Input
                 label={t("assignments.shiftDate")}
@@ -238,56 +269,71 @@ function NewBroadcastForm() {
               onChange={(e) => set("description", e.target.value)}
             />
 
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                  {t("requests.skillsNeeded")}
-                </span>
-                <Button type="button" variant="outline" size="sm" onClick={addSkillLine}>
-                  {t("requests.addSkill")}
-                </Button>
+            {form.target_role === "CHECKER" ? (
+              // No skill picker: a checker-targeted broadcast is a plain
+              // headcount on the single null-skill slot (see setTargetRole).
+              <div className="w-28">
+                <Input
+                  label={t("requests.checkersNeeded")}
+                  type="number"
+                  min={1}
+                  required
+                  value={form.skills[0]?.headcount ?? "1"}
+                  onChange={(e) => setSkillLine(0, { headcount: e.target.value })}
+                />
               </div>
-
-              {form.skills.map((line, index) => (
-                <div key={index} className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <Select
-                      label={index === 0 ? "Skill" : undefined}
-                      value={line.skill ?? NO_SKILL_VALUE}
-                      onChange={(e) =>
-                        setSkillLine(index, {
-                          skill: e.target.value === NO_SKILL_VALUE ? null : (e.target.value as SkillTag),
-                        })
-                      }
-                      options={[
-                        ...SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
-                        { value: NO_SKILL_VALUE, label: t("requests.noSkillOption") },
-                      ]}
-                    />
-                  </div>
-                  <div className="w-28">
-                    <Input
-                      label={index === 0 ? "Headcount" : undefined}
-                      type="number"
-                      min={1}
-                      required
-                      value={line.headcount}
-                      onChange={(e) => setSkillLine(index, { headcount: e.target.value })}
-                    />
-                  </div>
-                  {form.skills.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => removeSkillLine(index)}
-                    >
-                      {t("common.remove")}
-                    </Button>
-                  )}
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {t("requests.skillsNeeded")}
+                  </span>
+                  <Button type="button" variant="outline" size="sm" onClick={addSkillLine}>
+                    {t("requests.addSkill")}
+                  </Button>
                 </div>
-              ))}
-            </div>
+
+                {form.skills.map((line, index) => (
+                  <div key={index} className="flex items-end gap-3">
+                    <div className="flex-1">
+                      <Select
+                        label={index === 0 ? "Skill" : undefined}
+                        value={line.skill ?? NO_SKILL_VALUE}
+                        onChange={(e) =>
+                          setSkillLine(index, {
+                            skill: e.target.value === NO_SKILL_VALUE ? null : (e.target.value as SkillTag),
+                          })
+                        }
+                        options={[
+                          ...SKILL_OPTIONS.map((o) => ({ value: o.value, label: t(o.labelKey) })),
+                          { value: NO_SKILL_VALUE, label: t("requests.noSkillOption") },
+                        ]}
+                      />
+                    </div>
+                    <div className="w-28">
+                      <Input
+                        label={index === 0 ? "Headcount" : undefined}
+                        type="number"
+                        min={1}
+                        required
+                        value={line.headcount}
+                        onChange={(e) => setSkillLine(index, { headcount: e.target.value })}
+                      />
+                    </div>
+                    {form.skills.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => removeSkillLine(index)}
+                      >
+                        {t("common.remove")}
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <FormError>{dateTimeError ?? error}</FormError>
 

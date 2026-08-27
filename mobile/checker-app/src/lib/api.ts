@@ -1,5 +1,10 @@
 import type {
+  AcceptBroadcastResult,
+  Broadcast,
+  BroadcastEligibility,
   InspectableWorker,
+  SkillTag,
+  WorkRequest,
   WorkerAssignment,
   WorkerStats,
   AttendanceRecord,
@@ -423,6 +428,35 @@ export const api = {
       }),
   },
 
+  workRequests: {
+    // Server-side, GET /work-requests is already narrowed to the caller's
+    // own target_role for a self-scoped role (job-requests/service.ts
+    // list()), so a checker only ever receives CHECKER-targeted rows and
+    // cannot widen that by passing a target_role of its own. This client
+    // does not send one -- there is nothing useful it could ask for.
+    list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set('status', params.status);
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      // The backend accepts only the literal strings "true"/"false".
+      if (params?.is_broadcast !== undefined) qs.set('is_broadcast', params.is_broadcast ? 'true' : 'false');
+      const q = qs.toString();
+      return request<WorkRequest[]>(`/work-requests${q ? `?${q}` : ''}`);
+    },
+    get: (id: string) => request<WorkRequest>(`/work-requests/${id}`),
+    getBroadcastEligibility: (id: string) =>
+      request<BroadcastEligibility>(`/work-requests/broadcasts/${id}/eligibility`),
+    // First-accept wins; a lost race returns {status: 'requirement_fulfilled'},
+    // not an error. `skill: null` claims the "no specific skill required"
+    // slot -- the only shape a CHECKER-targeted broadcast uses, since the
+    // SkillTag values are all WORKER-domain.
+    acceptBroadcast: (id: string, skill: SkillTag | null) =>
+      request<AcceptBroadcastResult>(`/work-requests/broadcasts/${id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ skill }),
+      }),
+  },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
       const qs = new URLSearchParams();
