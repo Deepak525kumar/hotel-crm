@@ -21,12 +21,6 @@ changes a shipped state machine, and the client PRs depend on its shape.
 | Worker's rework screen: "rework done" + photos only, no check-in/out | `worker-app/src/app/rework/[id].tsx` | Built |
 | Worker may read the checker's photos for their own work (authorization) | `quality/service.ts:892` | Built — no client surface |
 
-> **Blocked as written.** The 2026-08-27 audit (`ADR-072` §5) found four structural facts that this
-> plan assumed away: there is no room-level unit of work; inspections are 1-to-1 with an assignment
-> so a worker can be inspected only once; the checklist and the score live on two unconnected
-> records; and approve-versus-rework is derived from the score rather than chosen. PR 1's shape
-> depends on how those are settled — do not start it against this section as written.
-
 ## PR 1 — Backend: confirmation state, auto-close, attendance exclusion
 
 The only PR that touches the database. Everything else depends on it.
@@ -35,6 +29,19 @@ The only PR that touches the database. Everything else depends on it.
    `QualityVerification`, plus the idempotence marker the auto-close job needs. `rework_completed_at`
    keeps its meaning (the worker finished); closure is a new, later fact. Migration must not
    retroactively reopen reworks already `COMPLETED` (ADR-072 §3).
+   Also in this migration, from `ADR-072` §6: a **room label** field, separate from the notes
+   (§6.1); and **drop the `@unique`** on `QualityVerification.assignment_id` and
+   `Rating.assignment_id` so a shift can be inspected repeatedly (§6.2). Dropping those uniques
+   turns two 1-to-1 relations into one-to-many — every reader of "the verification for this
+   assignment" must be found and given an explicit latest-or-all rule. That sweep is in PR 1's
+   scope, not a follow-up.
+1b. **Inspection write path** (§6.3): one endpoint writing `QualityVerification` and `Rating` in a
+   single transaction — score, checklist, photos, room label. No supported path creates one without
+   the other.
+1c. **Outcome stops being derived** (§6.4): remove the service check refusing rework on a `PASSED`
+   verification (`quality/service.ts:380`), and record the checker's chosen outcome rather than
+   computing it from the score. Anything that inferred an outcome from a score must read the
+   recorded outcome instead.
 2. **`completeRework`**: stop setting the rework assignment to `COMPLETED`. Move it to awaiting
    review and notify the checker as it does today.
 3. **New**: checker confirmation endpoint — closes the rework assignment. Same authorization surface

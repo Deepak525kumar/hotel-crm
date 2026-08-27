@@ -228,7 +228,73 @@ it. Both are defensible; they are not the same product.
 
 ### 5.5 Status
 
-**These four are open and block PR 1's shape.** They are recorded here rather than resolved in code,
-per this repository's rule that no implementation begins from an unfrozen specification. §§1–4 of
-this ADR stand and are unaffected.
+Resolved the same day in §6 below. §§1–4 of this ADR stand and are unaffected.
+
+---
+
+## 6. Resolutions to §5, and their costs
+
+Taken 2026-08-27, each answering one finding above.
+
+### 6.1 A room field that names the room and does nothing else
+
+The inspection gains a **dedicated room field**, separate from the notes. It is a label: it names
+which room the inspection and any resulting rework are about, and **no logic reads it**. No room-level
+task layer is built (§5.1's third option is explicitly declined).
+
+Kept separate from `rework_notes` deliberately — the notes say *what was wrong*, the room field says
+*where*. Merging them would make the room unreadable to any future screen that wants to show it.
+
+The cost, stated so it is not discovered later: the room is **not validated against the hotel's
+actual rooms**, not queryable as a relation, and two checkers may write the same room differently
+("204", "Room 204"). That is accepted for now. Making it real data later means adding the relation
+and backfilling free text — which is why it is a distinct field rather than prose, so the backfill
+has something to parse.
+
+### 6.2 Inspections become repeatable per shift
+
+The `@unique` on `QualityVerification.assignment_id` (and on `Rating.assignment_id`, which the same
+flow writes) is **dropped**. A checker may inspect the same worker's shift as often as needed —
+including re-inspecting after a rework, which §2.3's confirmation step effectively requires.
+
+Consequences: the 1-to-1 relations become one-to-many, and anything reading "the verification for
+this assignment" must now choose — latest, or all. Every such reader is part of PR 1's scope, not a
+follow-up.
+
+### 6.3 One flow writes both records in one transaction
+
+Rating and `QualityVerification` **stay separate records**; the inspection flow writes both in a
+single transaction. No migration merging them, and `Rating` keeps feeding `WorkerOverallRating`
+exactly as it does now.
+
+This was chosen over merging them because the merge touches the leaderboards, the rating tiers and
+the rework loop at once, for an end state that is tidier but not more capable. The two records stay
+consistent by construction because nothing writes one without the other.
+
+The rule that follows: **there is no supported path that creates a verification without its
+rating, or the reverse.** If a second caller ever needs one alone, that is a decision to revisit
+this, not a reason to add a partial write.
+
+### 6.4 The checker decides the outcome; the score is a record, not a gate
+
+Approve and Rework are both always available, whatever the score. `deriveStatus()`'s thresholds stop
+deciding the outcome, and the service check that refuses rework on a `PASSED` verification
+(`quality/service.ts:380`) is removed.
+
+A checker may rework work they scored 85, or approve work they scored 55. The score remains the
+quality record and still feeds the rating; it no longer constrains the checker's judgement about
+whether the work must be redone.
+
+The cost: outcome and score can disagree, and reporting that assumed "passed means score ≥ 70" will
+be wrong. Anything deriving an outcome from a score must read the recorded outcome instead.
+
+### 6.5 Every inspection counts toward the rating
+
+With §6.2 allowing many inspections per shift, **all of them feed the rating** — the existing
+aggregation is unchanged.
+
+The cost was put explicitly and accepted: **a worker inspected three times in a day carries three
+times the weight of a worker inspected once.** Inspection frequency therefore influences a worker's
+rating independently of their work. If that distorts the leaderboard in practice, the fix is a
+per-shift weighting decision, and it should be made from real data rather than pre-empted here.
 
