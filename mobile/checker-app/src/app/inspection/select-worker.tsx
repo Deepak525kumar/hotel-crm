@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { BackLink } from '@/components/BackLink';
 import { Badge, Card, EmptyState, ScreenHeader } from '@/components/ui';
 import { assignmentStatusTone } from '@/lib/assignment-status-tone';
 import { api } from '@/lib/api';
@@ -60,6 +61,7 @@ export default function SelectWorkerScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
+        <BackLink />
         <ScreenHeader
           title={t('quality.selectWorkerTitle')}
           subtitle={t('quality.selectWorkerSubtitle')}
