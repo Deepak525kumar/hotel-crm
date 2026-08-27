@@ -1,5 +1,10 @@
 import type {
+  AcceptBroadcastResult,
+  Broadcast,
+  BroadcastEligibility,
   InspectableWorker,
+  SkillTag,
+  WorkRequest,
   WorkerAssignment,
   WorkerStats,
   AttendanceRecord,
@@ -377,14 +382,23 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ check_out_at: new Date().toISOString(), ...location }),
       }),
-    // GET /attendance is scoped by req.auth server-side, so the caller receives
-    // only their own records -- no worker_id is sent from the client.
-    listMine: (params?: { page?: number; per_page?: number }) => {
+    // GET /attendance is self-scoped server-side for a WORKER, but
+    // deliberately NOT for a CHECKER -- checker is cross-hotel there by
+    // design, because the same endpoint backs the attendance-verification
+    // queue (list every worker's rows to verify them). A checker calling
+    // this with no worker_id therefore got back every worker's attendance,
+    // not their own: their Attendance tab showed other people's shifts, and
+    // tapping one 403'd with "Cannot access this assignment" (assignments
+    // stay self-scoped for a checker, so a foreign assignment id is refused)
+    // -- found live, traced to this one unscoped call.
+    // worker_id is required here (not optional) so this cannot regress back
+    // to the unscoped call by a param being left off.
+    listMine: (workerId: string, params?: { page?: number; per_page?: number }) => {
       const qs = new URLSearchParams();
+      qs.set('worker_id', workerId);
       if (params?.page) qs.set('page', String(params.page));
       if (params?.per_page) qs.set('per_page', String(params.per_page));
-      const q = qs.toString();
-      return request<AttendanceRecord[]>(`/attendance${q ? `?${q}` : ''}`);
+      return request<AttendanceRecord[]>(`/attendance?${qs}`);
     },
     // The backend does not embed attendance on AssignmentDto, so a shift is
     // resolved to its attendance row by assignment_id to obtain the id needed
@@ -414,6 +428,35 @@ export const api = {
       }),
   },
 
+  workRequests: {
+    // Server-side, GET /work-requests is already narrowed to the caller's
+    // own target_role for a self-scoped role (job-requests/service.ts
+    // list()), so a checker only ever receives CHECKER-targeted rows and
+    // cannot widen that by passing a target_role of its own. This client
+    // does not send one -- there is nothing useful it could ask for.
+    list: (params?: { status?: string; page?: number; limit?: number; is_broadcast?: boolean }) => {
+      const qs = new URLSearchParams();
+      if (params?.status) qs.set('status', params.status);
+      if (params?.page) qs.set('page', String(params.page));
+      if (params?.limit) qs.set('limit', String(params.limit));
+      // The backend accepts only the literal strings "true"/"false".
+      if (params?.is_broadcast !== undefined) qs.set('is_broadcast', params.is_broadcast ? 'true' : 'false');
+      const q = qs.toString();
+      return request<WorkRequest[]>(`/work-requests${q ? `?${q}` : ''}`);
+    },
+    get: (id: string) => request<WorkRequest>(`/work-requests/${id}`),
+    getBroadcastEligibility: (id: string) =>
+      request<BroadcastEligibility>(`/work-requests/broadcasts/${id}/eligibility`),
+    // First-accept wins; a lost race returns {status: 'requirement_fulfilled'},
+    // not an error. `skill: null` claims the "no specific skill required"
+    // slot -- the only shape a CHECKER-targeted broadcast uses, since the
+    // SkillTag values are all WORKER-domain.
+    acceptBroadcast: (id: string, skill: SkillTag | null) =>
+      request<AcceptBroadcastResult>(`/work-requests/broadcasts/${id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ skill }),
+      }),
+  },
   assignments: {
     list: (params?: { page?: number; limit?: number }) => {
       const qs = new URLSearchParams();

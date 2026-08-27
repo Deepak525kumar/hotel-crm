@@ -170,7 +170,10 @@
     "score0to100": "Оцінка (0–100)",
     "hotelNamePlaceholder": "напр. Grand Central Hotel",
     "groupNamePlaceholder": "напр. Північний регіон",
-    "jobTitlePlaceholder": "напр. Покоївка"
+    "jobTitlePlaceholder": "напр. Покоївка",
+    "targetRole": "Зміна для",
+    "targetRoleWorker": "Працівник",
+    "targetRoleChecker": "Перевіряючий"
   },
   "nav": {
     "dashboard": "Панель",
@@ -435,7 +438,8 @@
     "noLongerOpen": "Ця вакансія більше не відкрита.",
     "hotel": "Готель",
     "location": "Місце",
-    "description": "Опис"
+    "description": "Опис",
+    "slotsFilled": "{{confirmed}}/{{headcount}} заповнено"
   },
   "documents": {
     "title": "Документи",
@@ -758,7 +762,8 @@
     "noSkillOption": "Без конкретної навички",
     "anySkill": "Будь-яка навичка",
     "raiseBroadcastAction": "Надіслати розсилку",
-    "slotClaimedByOther": "Хтось інший зайняв це місце безпосередньо перед вами — зміну не призначено."
+    "slotClaimedByOther": "Хтось інший зайняв це місце безпосередньо перед вами — зміну не призначено.",
+    "checkersNeeded": "Потрібно перевіряючих"
   },
   "onboarding": {
     "managerReview": "Перевірка менеджером",

@@ -103,6 +103,7 @@ const makeJobRequestRow = (overrides: Record<string, unknown> = {}) => ({
   id: 'jr1',
   hotel_id: 'h1',
   created_by_id: 'mgr1',
+  target_role: 'WORKER' as const,
   position: '2x CLEANER, 1x WAITER',
   workers_needed: 3,
   workers_confirmed: 0,
@@ -128,6 +129,7 @@ const makeJobRequestRow = (overrides: Record<string, unknown> = {}) => ({
 
 const baseBroadcastInput = {
   hotel_id: 'h1',
+  target_role: 'WORKER' as const,
   shift_date: '2026-08-01',
   shift_start_time: '08:00',
   shift_end_time: '16:00',
@@ -878,8 +880,26 @@ describe('JobRequestService.getBroadcastEligibility', () => {
       expect(dto.slots[0].eligible).toBe(false);
     });
 
-    it('a checker gets the same self-scoped shape as a worker', async () => {
+    // 2026-08-27 (target_role): a checker may never view eligibility for a
+    // WORKER-targeted broadcast, same guard getById() applies.
+    it('a checker is denied eligibility on a WORKER-targeted broadcast', async () => {
       twoEligibleWorkersSetup();
+      await expect(
+        service.getBroadcastEligibility('jr1', { userId: 'w2', role: 'checker' })
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('a checker gets the same self-scoped shape as a worker, on a CHECKER-targeted broadcast', async () => {
+      mockJobRequest.findUnique.mockResolvedValue(makeJobRequestRow({ target_role: 'CHECKER' }));
+      mockHotel.findUnique.mockResolvedValue({ hotel_group_id: 'g1' });
+      mockEmploymentRecord.findMany
+        .mockResolvedValueOnce([{ user_id: 'w1' }, { user_id: 'w2' }])
+        .mockResolvedValueOnce([
+          { user_id: 'w1', skills: ['CLEANER'] },
+          { user_id: 'w2', skills: ['CLEANER'] },
+        ]);
+      mockWorkerAssignment.findMany.mockResolvedValue([]);
+
       const dto = await service.getBroadcastEligibility('jr1', { userId: 'w2', role: 'checker' });
 
       expect(dto.slots[0]).not.toHaveProperty('eligible_worker_ids');

@@ -28,7 +28,7 @@
  * null-scope precedent in `auth/service.ts` — an ungrouped or non-ACTIVE
  * employee has no scope at all, exactly like a user with no JWT scope claim.
  */
-import { EmploymentStatus } from '@prisma/client';
+import { EmploymentStatus, UserRole } from '@prisma/client';
 import { getPrisma } from './db.js';
 import { isHotelInScope } from './scope.js';
 import type { UserScope } from './jwt.js';
@@ -103,8 +103,17 @@ export async function listEligibleHotelIds(userId: string): Promise<string[]> {
  * Reverse case (#7): given a hotel, which workers are eligible there (fan-out
  * roster)? Resolves the hotel's group first; an ungrouped hotel has no
  * eligible workers under the cutover.
+ *
+ * `role` (2026-08-27, job-requests target_role): narrows the roster to one
+ * account role — a JobRequest's `target_role` means "workers" here can mean
+ * WORKER or CHECKER, and the two must never be mixed into the same
+ * eligible/notified set. `EmploymentRecord` carries no role of its own (a
+ * checker has one exactly like a worker does), so this joins through to the
+ * linked `User` row. Omitted entirely by every pre-existing caller, so this
+ * is additive — the unfiltered (both-roles) shape stays available for any
+ * future caller that genuinely wants it.
  */
-export async function listEligibleWorkerIds(hotelId: string): Promise<string[]> {
+export async function listEligibleWorkerIds(hotelId: string, role?: UserRole): Promise<string[]> {
   const prisma = getPrisma();
   const hotel = await prisma.hotel.findUnique({
     where: { id: hotelId },
@@ -112,7 +121,11 @@ export async function listEligibleWorkerIds(hotelId: string): Promise<string[]> 
   });
   if (!hotel?.hotel_group_id) return [];
   const records = await prisma.employmentRecord.findMany({
-    where: { hotel_group_id: hotel.hotel_group_id, status: EmploymentStatus.ACTIVE },
+    where: {
+      hotel_group_id: hotel.hotel_group_id,
+      status: EmploymentStatus.ACTIVE,
+      ...(role ? { user: { role } } : {}),
+    },
     select: { user_id: true },
   });
   return records.map((r) => r.user_id);

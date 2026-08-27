@@ -171,7 +171,10 @@
     "score0to100": "النتيجة (0–100)",
     "hotelNamePlaceholder": "مثال: Grand Central Hotel",
     "groupNamePlaceholder": "مثال: المنطقة الشمالية",
-    "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف"
+    "jobTitlePlaceholder": "مثال: عاملة تنظيف غرف",
+    "targetRole": "الوردية لـ",
+    "targetRoleWorker": "عامل",
+    "targetRoleChecker": "مُدقِّق"
   },
   "nav": {
     "dashboard": "لوحة التحكم",
@@ -436,7 +439,8 @@
     "noLongerOpen": "لم تعد هذه الوظيفة متاحة.",
     "hotel": "الفندق",
     "location": "الموقع",
-    "description": "الوصف"
+    "description": "الوصف",
+    "slotsFilled": "{{confirmed}}/{{headcount}} مكتمل"
   },
   "documents": {
     "title": "المستندات",
@@ -759,7 +763,8 @@
     "noSkillOption": "لا حاجة لمهارة محددة",
     "anySkill": "أي مهارة",
     "raiseBroadcastAction": "إطلاق البث",
-    "slotClaimedByOther": "حجز شخص آخر هذا المكان قبلك مباشرة — لم يتم إسناد أي وردية."
+    "slotClaimedByOther": "حجز شخص آخر هذا المكان قبلك مباشرة — لم يتم إسناد أي وردية.",
+    "checkersNeeded": "المدققون المطلوبون"
   },
   "onboarding": {
     "managerReview": "مراجعة المدير",

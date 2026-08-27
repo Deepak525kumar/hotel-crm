@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { mutate } from "swr";
 import { useHotelOptions, useHotelOptionsInGroup } from "@/hooks/useWorkRequests";
 import { useHotelGroups } from "@/hooks/useHotels";
-import { useUserOptions, useUsersByIds } from "@/hooks/useHotels";
+import { useUsersByIds, useShiftWorkerOptions } from "@/hooks/useHotels";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useAssignment, useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange, useOwnAbsences } from "@/hooks/useCalendar";
@@ -889,8 +889,7 @@ function WorkerPicker({
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const { users: workers, isLoading } = useUserOptions({
-    role: "worker",
+  const { users: workers, isLoading } = useShiftWorkerOptions({
     hotel_id: hotelId || undefined,
     search: debouncedSearch || undefined,
     limit: 20,
@@ -1202,8 +1201,7 @@ function MarkAbsenceForWorkerModal({
   const { t } = useTranslation();
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const { users: workers, isLoading: workersLoading } = useUserOptions({
-    role: "worker",
+  const { users: workers, isLoading: workersLoading } = useShiftWorkerOptions({
     search: debouncedSearch || undefined,
     limit: 20,
   });

@@ -416,6 +416,8 @@ export interface WorkRequest {
   id: string;
   hotel_id: string;
   hotel?: { id: string; name: string; address?: string };
+  /** Which account role this request/broadcast is for (2026-08-27). */
+  target_role: 'WORKER' | 'CHECKER';
   position: string;
   description?: string;
   workers_needed: number;
@@ -427,6 +429,52 @@ export interface WorkRequest {
   status: WorkRequestStatus;
   created_at: string;
 }
+
+export type SkillTag = 'CLEANER' | 'PUBLIC_SERVICE' | 'KITCHEN_DISHWASHER' | 'WAITER';
+
+export interface JobRequestSkillSlot {
+  id: string;
+  /** `null` means "no specific skill required" — open to every eligible worker (2026-08-26). */
+  skill: SkillTag | null;
+  headcount: number;
+  confirmed_count: number;
+}
+
+// A broadcast row as returned by GET /work-requests (list/get) — same
+// WorkRequest shape, plus skill_slots when the row is a broadcast (absent
+// on a marketplace row).
+export interface Broadcast extends WorkRequest {
+  skill_slots?: JobRequestSkillSlot[];
+}
+
+// Matches backend SkillSlotEligibilityDto exactly — the response of
+// GET /work-requests/broadcasts/:id/eligibility. Role-scoped server-side:
+// the route has no requireRole gate, so no eligible_worker_ids field
+// exists on the wire at all — a worker/checker caller instead gets
+// `eligible`, their own inclusion for this slot only.
+export interface SkillSlotEligibility {
+  /** `null` means "no specific skill required" — open to every eligible worker (2026-08-26). */
+  skill: SkillTag | null;
+  headcount: number;
+  confirmed_count: number;
+  eligible_count: number;
+  eligible?: boolean;
+}
+
+export interface BroadcastEligibility {
+  job_request_id: string;
+  hotel_id: string;
+  shift_date: string; // YYYY-MM-DD
+  slots: SkillSlotEligibility[];
+}
+
+// Matches backend AcceptBroadcastResultDto exactly — the discriminated
+// response of POST /work-requests/broadcasts/:id/accept. A lost first-accept
+// race returns `requirement_fulfilled`, not an error — no assignment is
+// created, and the caller must not treat this as a failure.
+export type AcceptBroadcastResult =
+  | { status: 'accepted'; assignment_id: string; job_request_id: string; skill: SkillTag | null }
+  | { status: 'requirement_fulfilled'; job_request_id: string; skill: SkillTag | null };
 
 /** A row in the Start-checking worker picker (ADR-072 §2.5). */
 export interface InspectableWorker {

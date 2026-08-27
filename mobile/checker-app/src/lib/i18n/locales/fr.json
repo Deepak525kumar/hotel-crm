@@ -170,7 +170,10 @@
     "score0to100": "Score (0–100)",
     "hotelNamePlaceholder": "p. ex. Grand Central Hotel",
     "groupNamePlaceholder": "p. ex. Région Nord",
-    "jobTitlePlaceholder": "p. ex. Femme de chambre"
+    "jobTitlePlaceholder": "p. ex. Femme de chambre",
+    "targetRole": "Poste pour",
+    "targetRoleWorker": "Employé",
+    "targetRoleChecker": "Contrôleur"
   },
   "nav": {
     "dashboard": "Tableau de bord",
@@ -435,7 +438,8 @@
     "noLongerOpen": "Cette offre n'est plus ouverte.",
     "hotel": "Hôtel",
     "location": "Lieu",
-    "description": "Description"
+    "description": "Description",
+    "slotsFilled": "{{confirmed}}/{{headcount}} pourvu"
   },
   "documents": {
     "title": "Documents",
@@ -758,7 +762,8 @@
     "noSkillOption": "Aucune compétence spécifique requise",
     "anySkill": "Toute compétence",
     "raiseBroadcastAction": "Lancer la diffusion",
-    "slotClaimedByOther": "Quelqu’un d’autre a pris cette place juste avant vous — aucun service n’a été attribué."
+    "slotClaimedByOther": "Quelqu’un d’autre a pris cette place juste avant vous — aucun service n’a été attribué.",
+    "checkersNeeded": "Contrôleurs requis"
   },
   "onboarding": {
     "managerReview": "Validation par le responsable",

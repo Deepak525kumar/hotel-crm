@@ -5,7 +5,7 @@ import { useCalendarEntriesInRange } from "@/hooks/useAssignments";
 import { useAbsencesInRange, useOwnAbsences } from "@/hooks/useCalendar";
 import { useAuth } from "@/hooks/useAuth";
 import { useHotelOptions, useHotelOptionsInGroup } from "@/hooks/useWorkRequests";
-import { useHotelGroups, useUserOptions, useUsersByIds } from "@/hooks/useHotels";
+import { useHotelGroups, useUserOptions, useShiftWorkerOptions, useUsersByIds } from "@/hooks/useHotels";
 import { useAuthStore } from "@/stores/auth";
 // Side-effect import: initialises i18next so `t()` resolves real copy rather
 // than echoing key paths. Relying on a transitive import chain for this is
@@ -41,6 +41,12 @@ jest.mock("@/hooks/useWorkRequests", () => ({
 jest.mock("@/hooks/useHotels", () => ({
   useHotelGroups: jest.fn(() => ({ groups: [] })),
   useUserOptions: jest.fn(),
+  // The picker now sources candidates from useShiftWorkerOptions (worker +
+  // checker, merged) rather than calling useUserOptions({role:"worker"})
+  // directly -- kept a separate mock, driven identically to useUserOptions
+  // below, so this test does not silently assert against a hook the
+  // component no longer calls.
+  useShiftWorkerOptions: jest.fn(),
   useUsersByIds: jest.fn(() => new Map()),
 }));
 jest.mock("swr", () => ({ mutate: jest.fn() }));
@@ -50,6 +56,7 @@ const mockAbsences = useAbsencesInRange as jest.Mock;
 const mockAuth = useAuth as jest.Mock;
 const mockHotels = useHotelOptions as jest.Mock;
 const mockUsers = useUserOptions as jest.Mock;
+const mockShiftWorkers = useShiftWorkerOptions as jest.Mock;
 const mockUsersByIds = useUsersByIds as jest.Mock;
 const mockGroupHotels = useHotelOptionsInGroup as jest.Mock;
 
@@ -100,6 +107,7 @@ beforeEach(() => {
   mockHotels.mockReturnValue({ hotels: [{ id: "h1", name: "Grand Hotel" }], isLoading: false });
   mockGroupHotels.mockReturnValue({ hotels: [{ id: "h1", name: "Grand Hotel" }] });
   mockUsers.mockReturnValue({ users: [], isLoading: false });
+  mockShiftWorkers.mockReturnValue({ users: [], isLoading: false });
   mockUsersByIds.mockReturnValue(
     new Map([["w1", { id: "w1", first_name: "Wanda", last_name: "Worker" }]]),
   );
@@ -167,6 +175,7 @@ describe("unavailable workers in the placement picker", () => {
     absences: CalendarAbsence[] = [],
   ) {
     mockUsers.mockReturnValue({ users: workers, isLoading: false });
+    mockShiftWorkers.mockReturnValue({ users: workers, isLoading: false });
     mockEntries.mockReturnValue({ data: entries, isLoading: false, error: null });
     mockAbsences.mockReturnValue({ data: absences, isLoading: false });
 

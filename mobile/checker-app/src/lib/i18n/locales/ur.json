@@ -171,7 +171,10 @@
     "score0to100": "سکور (0–100)",
     "hotelNamePlaceholder": "مثلاً Grand Central Hotel",
     "groupNamePlaceholder": "مثلاً شمالی علاقہ",
-    "jobTitlePlaceholder": "مثلاً ہاؤس کیپر"
+    "jobTitlePlaceholder": "مثلاً ہاؤس کیپر",
+    "targetRole": "شفٹ برائے",
+    "targetRoleWorker": "ورکر",
+    "targetRoleChecker": "چیکر"
   },
   "nav": {
     "dashboard": "ڈیش بورڈ",
@@ -436,7 +439,8 @@
     "noLongerOpen": "یہ نوکری اب کھلی نہیں ہے۔",
     "hotel": "ہوٹل",
     "location": "مقام",
-    "description": "تفصیل"
+    "description": "تفصیل",
+    "slotsFilled": "{{confirmed}}/{{headcount}} مکمل"
   },
   "documents": {
     "title": "دستاویزات",
@@ -759,7 +763,8 @@
     "noSkillOption": "کسی مخصوص مہارت کی ضرورت نہیں",
     "anySkill": "کوئی بھی مہارت",
     "raiseBroadcastAction": "اعلان بھیجیں",
-    "slotClaimedByOther": "کسی اور نے یہ جگہ آپ سے ذرا پہلے لے لی — کوئی شفٹ تفویض نہیں ہوئی۔"
+    "slotClaimedByOther": "کسی اور نے یہ جگہ آپ سے ذرا پہلے لے لی — کوئی شفٹ تفویض نہیں ہوئی۔",
+    "checkersNeeded": "مطلوبہ چیکرز"
   },
   "onboarding": {
     "managerReview": "مینیجر کا جائزہ",

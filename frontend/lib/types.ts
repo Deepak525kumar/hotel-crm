@@ -601,6 +601,8 @@ export interface WorkRequest {
   id: string;
   hotel_id: string;
   created_by_id: string;
+  /** Which account role this request/broadcast is for. Defaults to WORKER server-side. */
+  target_role: "WORKER" | "CHECKER";
   position: string;
   workers_needed: number;
   workers_confirmed: number;
@@ -632,6 +634,8 @@ export interface WorkRequest {
 /** Body of `POST /work-requests`. */
 export interface CreateWorkRequestInput {
   hotel_id: string;
+  /** Defaults to WORKER server-side if omitted. */
+  target_role?: "WORKER" | "CHECKER";
   position: string;
   workers_needed: number;
   shift_date: string;
@@ -655,6 +659,8 @@ export interface UpdateWorkRequestInput {
 /** Query params accepted by `GET /work-requests`. */
 export interface ListWorkRequestsQuery {
   hotel_id?: string;
+  /** Manager/admin-only filter; ignored (overridden server-side) for a worker/checker caller. */
+  target_role?: "WORKER" | "CHECKER";
   status?: WorkRequestStatus | WorkRequestStatus[];
   position?: string;
   shift_date?: string;
@@ -684,6 +690,8 @@ export interface JobRequestSkillSlotDto {
 /** Body of `POST /work-requests/broadcasts` (admin/manager only). */
 export interface RaiseBroadcastInput {
   hotel_id: string;
+  /** Defaults to WORKER server-side if omitted. */
+  target_role?: "WORKER" | "CHECKER";
   shift_date: string; // YYYY-MM-DD
   shift_start_time: string; // HH:MM
   shift_end_time: string; // HH:MM
