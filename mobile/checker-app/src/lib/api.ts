@@ -1,25 +1,27 @@
 import type {
-  User,
-  AuthResponse,
   AttendanceRecord,
-  QualityVerification,
-  Rating,
-  LeaderboardEntry,
-  Notification,
-  PushToken,
-  PushPlatform,
+  AuthResponse,
   CalendarAbsence,
   CalendarAbsenceKind,
-  PushApp,
-  WorkerDocument,
-  DocumentCategory,
-  ConsentStatus,
   ConsentNotice,
   ConsentRecord,
-  RecordConsentDecisionInput,
+  ConsentStatus,
   ContractDto,
-  PayslipRequestDto,
   CreatePayslipRequestRequest,
+  DocumentCategory,
+  DocumentCompleteness,
+  EmploymentRecordDto,
+  LeaderboardEntry,
+  Notification,
+  PayslipRequestDto,
+  PushApp,
+  PushPlatform,
+  PushToken,
+  QualityVerification,
+  Rating,
+  RecordConsentDecisionInput,
+  User,
+  WorkerDocument,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
 
@@ -498,7 +500,7 @@ export const api = {
     // worker_id is always the authenticated caller — self-scope is the
     // authorization, enforced server-side (documents/routes.ts
     // scopeWorkerRoute()). Only list/upload are ported here — this worker-app
-    // screen has no use for completeness()/get()/export() (all exist on
+    // screen has no use for get()/export() (both exist on
     // frontend/lib/api.ts's documentsApi); add whichever is needed when a
     // screen actually consumes it, rather than porting the full contract
     // speculatively.
@@ -506,6 +508,11 @@ export const api = {
       request<WorkerDocument[]>(
         `/documents/workers/${workerId}/documents${category ? `?category=${category}` : ''}`
       ),
+    // Added with the onboarding flow (ADR-065 is universal for non-Admin
+    // roles): the checklist needs the server's own completeness verdict,
+    // which owns the ID_CARD-or-PASSPORT and work-permit rules.
+    getCompleteness: (workerId: string) =>
+      request<DocumentCompleteness>(`/documents/workers/${workerId}/documents/completeness`),
     // Takes the raw picker-asset shape (uri/name/mimeType, as returned by
     // expo-document-picker; `size` deliberately not accepted here — the
     // backend derives file_size_bytes server-side from the parsed file,
@@ -550,6 +557,23 @@ export const api = {
         body: form,
       });
     },
+  },
+  employee: {
+    /**
+     * Resolves this user's EmploymentRecord, or null when none exists yet
+     * (null, not a 404). ADR-065 makes onboarding universal for non-Admin
+     * roles, so a checker reads their own record exactly as a worker does.
+     *
+     * Required before submitForReview: the lifecycle endpoints are keyed by
+     * the human-facing `employee_id` (e.g. "EMP-C-001"), which is NOT the user
+     * id and is not returned by /auth/me.
+     */
+    getByUserId: (userId: string) =>
+      request<EmploymentRecordDto | null>(`/employees/by-user/${encodeURIComponent(userId)}`),
+
+    /** `employeeId` is the EmploymentRecord's `employee_id`, never the user id. */
+    submitForReview: (employeeId: string) =>
+      request<unknown>(`/employees/${encodeURIComponent(employeeId)}/submit-for-review`, { method: 'POST' }),
   },
   consent: {
     // SPEC-CONSENT-001@0.2.0 FROZEN (ADR-015/ADR-037, GD-17): every route is

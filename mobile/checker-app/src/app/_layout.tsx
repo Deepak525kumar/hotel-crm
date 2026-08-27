@@ -80,6 +80,9 @@ export default function RootLayout() {
               options={{ title: t('nav.qualityCheck'), headerShown: true }}
             />
             <Stack.Screen name="verification/[id]" options={{ headerShown: false }} />
+            {/* ADR-065: the onboarding gate is universal for non-Admin roles.
+                AuthGuard redirects a non-ACTIVE checker here. */}
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
             <Stack.Screen name="documents" options={{ headerShown: false }} />
             <Stack.Screen name="consent" options={{ headerShown: false }} />
             <Stack.Screen name="hr" options={{ headerShown: false }} />

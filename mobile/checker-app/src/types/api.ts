@@ -19,6 +19,11 @@ export interface User {
    * app's identical field and the backend's `User.preferred_language`.
    */
   preferred_language?: string | null;
+  /**
+   * ADR-065: the onboarding gate is universal for non-Admin roles, checkers
+   * included. Absent for admins, who hold no EmploymentRecord by design.
+   */
+  employment_status?: string | null;
 }
 
 export interface AuthResponse {
@@ -298,4 +303,23 @@ export interface RecordConsentDecisionInput {
 export interface CreatePayslipRequestRequest {
   period_start: string;
   period_end: string;
+}
+
+export interface EmploymentRecordDto {
+  id: string;
+  user_id: string;
+  employee_id: string;
+  job_title: string;
+  start_date: string;
+  status: string;
+  submitted_for_review_at?: string | null;
+}
+
+export interface DocumentCompleteness {
+  worker_id: string;
+  work_permit_required: boolean;
+  is_complete: boolean;
+  missing_categories: DocumentCategory[];
+  categories: Record<DocumentCategory, boolean>;
+  document_count: number;
 }
