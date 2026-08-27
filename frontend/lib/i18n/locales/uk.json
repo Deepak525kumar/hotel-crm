@@ -1038,7 +1038,12 @@
       "minibar_restocking": "Поповнення мінібару",
       "fragrance_amenities": "Аромат і приладдя",
       "other": "Інше"
-    }
+    },
+    "selectWorkerTitle": "Оберіть працівника",
+    "selectWorkerSubtitle": "Сьогодні на зміні у ваших готелях",
+    "noInspectableWorkers": "Немає працівників для перевірки",
+    "noInspectableWorkersBody": "Сьогодні ніхто не на зміні в готелях, де ви працюєте.",
+    "workerUnavailable": "Працівник недоступний"
   },
   "ratings": {
     "comment": "Коментар",
@@ -1100,7 +1105,13 @@
     "openJobs": "Відкриті вакансії",
     "yourWeek": "Ваш тиждень",
     "viewAll": "Переглянути все",
-    "documentsNeedAttention": "Документи потребують уваги"
+    "documentsNeedAttention": "Документи потребують уваги",
+    "startCheckingTitle": "Перевірки номерів",
+    "startChecking": "Почати перевірку",
+    "goToSchedule": "До мого графіка",
+    "checkingBlockedNoShift": "Сьогодні у вас немає зміни, тож немає чого перевіряти.",
+    "checkingBlockedNotCheckedIn": "Відмітьтеся на зміні, перш ніж починати перевіряти номери.",
+    "checkingBlockedCheckedOut": "Ви завершили зміну. Перевірки на сьогодні закрито."
   },
   "marketplace": {
     "description": "Зміни, на які ви можете подати заявку.",

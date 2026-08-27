@@ -108,6 +108,24 @@ export default function ProfileScreen() {
 
           <SectionHeader title={t('common.quickLinks')} />
           <Card style={styles.linkCard}>
+            {/* Leaderboard and Sick/Vacation used to be tabs. They moved here
+                when the tab bar was aligned with worker-app's four; both are
+                things a checker opens occasionally, not daily. */}
+            <ListRow
+              title={t('nav.leaderboard')}
+              onPress={() => router.push('/(app)/leaderboard')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('calendar.sickOrVacation')}
+              onPress={() => router.push('/(app)/absences')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
+            <ListRow
+              title={t('nav.queue')}
+              onPress={() => router.push('/(app)/queue')}
+              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
+            />
             <ListRow
               title={t('documents.viewAll')}
               onPress={() => router.push('/documents')}

@@ -1038,7 +1038,12 @@
       "minibar_restocking": "Minibar restocking",
       "fragrance_amenities": "Fragrance & amenities",
       "other": "Other"
-    }
+    },
+    "selectWorkerTitle": "Select a worker",
+    "selectWorkerSubtitle": "Workers on shift today at your hotels",
+    "noInspectableWorkers": "No workers to check",
+    "noInspectableWorkersBody": "Nobody is on shift today at the hotels you are working.",
+    "workerUnavailable": "Worker unavailable"
   },
   "ratings": {
     "comment": "Comment",
@@ -1100,7 +1105,13 @@
     "openJobs": "Open jobs",
     "yourWeek": "Your week",
     "viewAll": "View all",
-    "documentsNeedAttention": "Documents need attention"
+    "documentsNeedAttention": "Documents need attention",
+    "startCheckingTitle": "Room checks",
+    "startChecking": "Start checking",
+    "goToSchedule": "Go to my schedule",
+    "checkingBlockedNoShift": "You have no shift scheduled today, so there is nothing to check.",
+    "checkingBlockedNotCheckedIn": "Check in to your shift before you start checking rooms.",
+    "checkingBlockedCheckedOut": "You have checked out of your shift. Checking is closed for today."
   },
   "marketplace": {
     "description": "Shifts you can apply for.",

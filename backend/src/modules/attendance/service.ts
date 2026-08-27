@@ -427,7 +427,26 @@ export class AttendanceService extends BaseService {
       }
     }
 
-    const isWorker = isSelfScopedRole(actorRole, { checkerIsSelfScoped: false });
+    // Nobody verifies their own attendance (2026-08-27).
+    //
+    // `checkerIsSelfScoped: false` puts a checker on the management branch,
+    // which may set is_verified, status, minutes_late and check_in_at. That was
+    // unreachable for one's OWN record while checkers could not check in at
+    // all — POST /attendance was worker-only, so a checker had no attendance
+    // row. Admitting 'checker' there created one, and with it the ability to
+    // mark oneself verified and PRESENT: observed live, a checker 644 minutes
+    // late rewrote their own row to PRESENT / 0 minutes late / verified, with
+    // verified_by_id equal to worker_id.
+    //
+    // Ownership therefore beats role here: a record belonging to the caller is
+    // always handled by the self branch (check_out_at and notes only),
+    // whatever the caller's role. This restricts nothing that worked before —
+    // admins and managers do not work shifts, so they hold no attendance rows
+    // of their own — and a checker's authority over OTHER people's attendance
+    // is untouched.
+    const isOwnRecord = record.worker_id === actorId;
+    const isWorker =
+      isOwnRecord || isSelfScopedRole(actorRole, { checkerIsSelfScoped: false });
 
     if (isWorker) {
       if (record.worker_id !== actorId) {

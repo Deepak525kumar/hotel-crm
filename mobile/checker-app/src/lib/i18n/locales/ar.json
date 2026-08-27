@@ -1039,7 +1039,12 @@
       "minibar_restocking": "إعادة تعبئة الميني بار",
       "fragrance_amenities": "العطور والمستلزمات",
       "other": "أخرى"
-    }
+    },
+    "selectWorkerTitle": "اختر موظفًا",
+    "selectWorkerSubtitle": "الموظفون في الوردية اليوم في فنادقك",
+    "noInspectableWorkers": "لا يوجد موظفون للفحص",
+    "noInspectableWorkersBody": "لا أحد في الوردية اليوم في الفنادق التي تعمل بها.",
+    "workerUnavailable": "الموظف غير متاح"
   },
   "ratings": {
     "comment": "تعليق",
@@ -1101,7 +1106,13 @@
     "openJobs": "الوظائف المتاحة",
     "yourWeek": "أسبوعك",
     "viewAll": "عرض الكل",
-    "documentsNeedAttention": "المستندات تحتاج إلى انتباه"
+    "documentsNeedAttention": "المستندات تحتاج إلى انتباه",
+    "startCheckingTitle": "فحوصات الغرف",
+    "startChecking": "ابدأ الفحص",
+    "goToSchedule": "الذهاب إلى جدولي",
+    "checkingBlockedNoShift": "ليس لديك وردية اليوم، لذا لا يوجد ما يمكن فحصه.",
+    "checkingBlockedNotCheckedIn": "سجّل حضورك في ورديتك قبل بدء فحص الغرف.",
+    "checkingBlockedCheckedOut": "لقد سجّلت انصرافك من ورديتك. انتهى الفحص لهذا اليوم."
   },
   "marketplace": {
     "description": "المناوبات التي يمكنك التقدم لها.",

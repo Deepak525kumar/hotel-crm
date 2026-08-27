@@ -86,6 +86,14 @@ router.post(
 router.get('/ratings/:rating_id/photos', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getRatingPhotos(req, res, next)
 );
+// ADR-072 §2.5: the worker picker that starts an inspection. quality:write,
+// not quality:read — this is the entry point to inspecting, and a manager (who
+// holds read but not write) does not run inspections. Scope is resolved in the
+// service, which is the layer that knows a checker's JWT carries no scope claim.
+router.get('/inspectable-workers', requirePermission('quality:write'), (req, res, next) =>
+  qualityController.listInspectableWorkers(req, res, next)
+);
+
 router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getLeaderboard(req, res, next)
 );

@@ -1038,7 +1038,12 @@
       "minibar_restocking": "Minibar auffüllen",
       "fragrance_amenities": "Duft & Ausstattung",
       "other": "Sonstiges"
-    }
+    },
+    "selectWorkerTitle": "Mitarbeiter auswählen",
+    "selectWorkerSubtitle": "Heute im Dienst in Ihren Hotels",
+    "noInspectableWorkers": "Keine Mitarbeiter zu kontrollieren",
+    "noInspectableWorkersBody": "In den Hotels, in denen Sie arbeiten, ist heute niemand im Dienst.",
+    "workerUnavailable": "Mitarbeiter nicht verfügbar"
   },
   "ratings": {
     "comment": "Kommentar",
@@ -1100,7 +1105,13 @@
     "openJobs": "Offene Stellen",
     "yourWeek": "Ihre Woche",
     "viewAll": "Alle ansehen",
-    "documentsNeedAttention": "Dokumente benötigen Aufmerksamkeit"
+    "documentsNeedAttention": "Dokumente benötigen Aufmerksamkeit",
+    "startCheckingTitle": "Zimmerkontrollen",
+    "startChecking": "Kontrolle starten",
+    "goToSchedule": "Zu meinem Dienstplan",
+    "checkingBlockedNoShift": "Sie haben heute keine Schicht, daher gibt es nichts zu kontrollieren.",
+    "checkingBlockedNotCheckedIn": "Melden Sie sich zu Ihrer Schicht an, bevor Sie mit der Kontrolle beginnen.",
+    "checkingBlockedCheckedOut": "Sie haben sich von Ihrer Schicht abgemeldet. Die Kontrolle ist für heute beendet."
   },
   "marketplace": {
     "description": "Schichten, auf die Sie sich bewerben können.",

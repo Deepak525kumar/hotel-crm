@@ -950,6 +950,107 @@ export class QualityService extends BaseService {
     return { verification_id: verification.id, photos };
   }
 
+  /**
+   * The workers a checker may inspect today (ADR-072 §2.5, owner decision
+   * 2026-08-27: "workers with a shift today, any hotel in the checker's scope").
+   *
+   * A checker's JWT carries no `scope` claim — resolveScope mints one only for
+   * admin/RM/manager — so "in scope" for a checker is resolved the way
+   * assertCanViewVerification already resolves it: the hotels where the checker
+   * themselves holds an active assignment. That keeps one definition of a
+   * checker's reach rather than inventing a second.
+   *
+   * Check-in state is deliberately NOT a filter (ADR-072 §2.5): a checker may
+   * need to inspect, or record the absence of, work by someone whose attendance
+   * is missing, and filtering on check-in would hide exactly that case.
+   *
+   * Rework assignments are excluded: they are corrective work on a shift that
+   * was already inspected, not a shift to inspect. Listing them would offer the
+   * checker the same worker twice for one day's work.
+   */
+  async listInspectableWorkers(actor: Actor, day?: string) {
+    const targetDay = day ?? todayInCalendarTimezone();
+    const dayStart = new Date(`${targetDay}T00:00:00.000Z`);
+    // A YYYY-MM-DD shape is not a real date: '2026-13-45' reached Prisma as an
+    // Invalid Date and surfaced as a generic "Invalid database request", and
+    // '2026-02-30' silently rolled over to March 2 while the response still
+    // echoed back '2026-02-30' — a result for a day nobody asked about.
+    // Round-tripping the parsed date rejects both.
+    if (Number.isNaN(dayStart.getTime()) || dayStart.toISOString().slice(0, 10) !== targetDay) {
+      throw new ValidationError('day must be a real calendar date in YYYY-MM-DD form');
+    }
+
+    let hotelFilter: Prisma.WorkerAssignmentWhereInput = {};
+
+    if (actor.role.toLowerCase() === 'admin') {
+      // Unscoped by design, as everywhere else in this service.
+    } else if (isScopedManagerRole(actor.role)) {
+      const scope = actor.scope ?? null;
+      // No scope claim denies, matching assignments/service.ts list(): an
+      // absent scope is not "see everything".
+      if (!scope) return { day: targetDay, workers: [] };
+      if (scope.type === 'hotel') {
+        hotelFilter = { hotel_id: scope.hotel_id };
+      } else if (scope.type === 'hotel_group') {
+        // Narrowed through the hotel relation, the same shape
+        // assignments/service.ts list() uses. An earlier revision of this
+        // method left the group case unfiltered with a comment claiming it was
+        // narrowed here — it was not, so a group-scoped manager would have seen
+        // every hotel's workers. Unreachable in practice (this route needs
+        // quality:write, which manager/RM do not hold) but wrong, and one
+        // permission grant away from being a disclosure.
+        hotelFilter = { hotel: { hotel_group_id: scope.hotel_group_id } };
+      }
+      // scope.type === 'global' -> no added restriction, deliberately.
+    } else {
+      const own = await this.prisma.workerAssignment.findMany({
+        where: {
+          worker_id: actor.userId,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+          day: dayStart,
+        },
+        select: { hotel_id: true },
+      });
+      const hotelIds = [...new Set(own.map((a) => a.hotel_id))];
+      // No shift today means no hotel in reach, which is a legitimately empty
+      // list rather than an error: the client turns it into "you have no shift
+      // today", the same thing the Start-checking gate says.
+      if (hotelIds.length === 0) return { day: targetDay, workers: [] };
+      hotelFilter = { hotel_id: { in: hotelIds } };
+    }
+
+    const assignments = await this.prisma.workerAssignment.findMany({
+      where: {
+        ...hotelFilter,
+        day: dayStart,
+        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        rework_of_assignment_id: null,
+        worker_id: { not: actor.userId },
+      },
+      select: {
+        id: true,
+        worker_id: true,
+        hotel_id: true,
+        status: true,
+        worker: { select: { first_name: true, last_name: true, role: true } },
+        hotel: { select: { name: true } },
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return {
+      day: targetDay,
+      workers: assignments.map((a) => ({
+        assignment_id: a.id,
+        worker_id: a.worker_id,
+        worker_name: [a.worker?.first_name, a.worker?.last_name].filter(Boolean).join(' ') || null,
+        hotel_id: a.hotel_id,
+        hotel_name: a.hotel?.name ?? null,
+        status: a.status,
+      })),
+    };
+  }
+
   async getLeaderboard(
     hotelId: string,
     page = 1,
