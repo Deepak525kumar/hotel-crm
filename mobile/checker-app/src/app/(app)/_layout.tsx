@@ -21,7 +21,9 @@ import { PushRegistration } from '@/components/PushRegistration';
  *
  * Moved off the bar, still reachable:
  *
- *   - `leaderboard` and `absences` are rows on Profile.
+ *   - `leaderboard` and `absences` are rows on Profile. The old Queue
+ *     screen (attendance verification) was dropped entirely -- checkers do
+ *     not verify attendance.
  *   - `notifications` is the header bell, as in worker-app.
  *
  * `href: null` keeps a route navigable while hiding its tab, which is why they
@@ -107,7 +109,6 @@ export default function AppLayout() {
         {/* Reachable by navigation, not by tab. See the comment above. */}
         <Tabs.Screen name="leaderboard" options={{ href: null }} />
         <Tabs.Screen name="absences" options={{ href: null }} />
-        <Tabs.Screen name="queue" options={{ href: null }} />
         <Tabs.Screen name="notifications" options={{ href: null }} />
       </Tabs>
     </>

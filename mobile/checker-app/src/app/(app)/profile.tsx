@@ -122,11 +122,6 @@ export default function ProfileScreen() {
               right={<ThemedText themeColor="textSecondary">›</ThemedText>}
             />
             <ListRow
-              title={t('nav.queue')}
-              onPress={() => router.push('/(app)/queue')}
-              right={<ThemedText themeColor="textSecondary">›</ThemedText>}
-            />
-            <ListRow
               title={t('documents.viewAll')}
               onPress={() => router.push('/documents')}
               right={<ThemedText themeColor="textSecondary">›</ThemedText>}

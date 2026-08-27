@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useHotelOptions } from "@/hooks/useWorkRequests";
-import { useUserOptions, useHotel } from "@/hooks/useHotels";
+import { useShiftWorkerOptions, useHotel } from "@/hooks/useHotels";
 import { localToday } from "@/lib/format";
 import { assignmentsApi, ApiError } from "@/lib/api";
 import { StaffingWriteGate } from "@/components/auth/RoleGate";
@@ -44,8 +44,7 @@ function NewCalendarEntryForm() {
   const [submitting, setSubmitting] = useState(false);
 
   const { data: selectedHotel } = useHotel(form.hotel_id);
-  const { users: workers, isLoading: workersLoading } = useUserOptions({
-    role: "worker",
+  const { users: workers, isLoading: workersLoading } = useShiftWorkerOptions({
     hotel_id: form.hotel_id || undefined,
   });
 

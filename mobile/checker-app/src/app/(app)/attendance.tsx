@@ -10,6 +10,7 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { Badge, Card, EmptyState, ScreenHeader } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { calendarDateOf, calendarTimeOf, formatDay } from '@/lib/calendar-dates';
 import { formatDuration, workedMinutes } from '@/lib/attendance-format';
 import type { AttendanceRecord, AttendanceStatus } from '@/types/api';
@@ -39,19 +40,24 @@ function time(iso?: string | null): string {
 export default function AttendanceScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const { user } = useAuthStore();
   const [items, setItems] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    if (!user) return;
     try {
-      const res = await api.attendance.listMine({ per_page: 50 });
+      // Own records only -- GET /attendance is cross-hotel for a checker by
+      // design (it backs the verification queue elsewhere in the app), so
+      // this screen must scope to self explicitly. See listMine's own note.
+      const res = await api.attendance.listMine(user.id, { per_page: 50 });
       setItems(Array.isArray(res) ? res : []);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     void load();

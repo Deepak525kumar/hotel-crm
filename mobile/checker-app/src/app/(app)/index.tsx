@@ -74,7 +74,7 @@ export default function HomeScreen() {
     isValidating: attendanceValidating,
     mutate: mutateAttendance,
   } = useSWR(user ? `/attendance/mine/${user.id}` : null, () =>
-    api.attendance.listMine({ per_page: 20 })
+    api.attendance.listMine(user!.id, { per_page: 20 })
   );
 
   const upcoming = Array.isArray(assignments)

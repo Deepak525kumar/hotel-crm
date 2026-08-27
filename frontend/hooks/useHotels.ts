@@ -111,6 +111,34 @@ export function useUsersByIds(ids: string[]) {
  * fetch — once M-3 promotes users, they appear here with no further code
  * change needed at any of this hook's four call sites.
  */
+/**
+ * Candidates for calendar/roster placement -- WORKER and CHECKER, merged the
+ * same way `useRegionalManagerCandidates` merges manager/RM above. A checker
+ * works a shift exactly as a worker does (checks in, is placed on the
+ * calendar) as of 2026-08-27, but every placement dropdown here had
+ * `role: "worker"` hardcoded from before that role existed. The backend gate
+ * (`isWorkerEligibleForHotel`) was already role-agnostic -- an employment
+ * record plus group scope, nothing checking `role === 'worker'` -- so a
+ * checker COULD already be placed via the API; only these dropdowns could
+ * never offer one as an option.
+ */
+export function useShiftWorkerOptions(query: Omit<ListUsersQuery, "role"> = {}) {
+  const workers = useUserOptions({ role: "worker", ...query });
+  const checkers = useUserOptions({ role: "checker", ...query });
+
+  const byId = new Map<string, (typeof workers.users)[number]>();
+  for (const user of [...workers.users, ...checkers.users]) {
+    byId.set(user.id, user);
+  }
+  const users = Array.from(byId.values());
+
+  return {
+    users,
+    isLoading: workers.isLoading || checkers.isLoading,
+    error: workers.error ?? checkers.error,
+  };
+}
+
 export function useRegionalManagerCandidates() {
   const managers = useUserOptions({ role: "manager" });
   const regionalManagers = useUserOptions({ role: "regional_manager" });

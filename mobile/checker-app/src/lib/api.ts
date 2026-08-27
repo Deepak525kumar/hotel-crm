@@ -377,14 +377,23 @@ export const api = {
         method: 'PATCH',
         body: JSON.stringify({ check_out_at: new Date().toISOString(), ...location }),
       }),
-    // GET /attendance is scoped by req.auth server-side, so the caller receives
-    // only their own records -- no worker_id is sent from the client.
-    listMine: (params?: { page?: number; per_page?: number }) => {
+    // GET /attendance is self-scoped server-side for a WORKER, but
+    // deliberately NOT for a CHECKER -- checker is cross-hotel there by
+    // design, because the same endpoint backs the attendance-verification
+    // queue (list every worker's rows to verify them). A checker calling
+    // this with no worker_id therefore got back every worker's attendance,
+    // not their own: their Attendance tab showed other people's shifts, and
+    // tapping one 403'd with "Cannot access this assignment" (assignments
+    // stay self-scoped for a checker, so a foreign assignment id is refused)
+    // -- found live, traced to this one unscoped call.
+    // worker_id is required here (not optional) so this cannot regress back
+    // to the unscoped call by a param being left off.
+    listMine: (workerId: string, params?: { page?: number; per_page?: number }) => {
       const qs = new URLSearchParams();
+      qs.set('worker_id', workerId);
       if (params?.page) qs.set('page', String(params.page));
       if (params?.per_page) qs.set('per_page', String(params.per_page));
-      const q = qs.toString();
-      return request<AttendanceRecord[]>(`/attendance${q ? `?${q}` : ''}`);
+      return request<AttendanceRecord[]>(`/attendance?${qs}`);
     },
     // The backend does not embed attendance on AssignmentDto, so a shift is
     // resolved to its attendance row by assignment_id to obtain the id needed
