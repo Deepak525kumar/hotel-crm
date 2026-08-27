@@ -38,12 +38,12 @@ export default function SelectWorkerScreen() {
   const renderItem = ({ item }: { item: InspectableWorker }) => (
     <Pressable
       accessibilityRole="button"
-      onPress={() => router.push(`/rating/${item.assignment_id}`)}
+      onPress={() => router.push({ pathname: '/rating/[id]', params: { id: item.assignment_id, worker_id: item.worker_id } })}
       style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
     >
       <Card style={styles.card}>
         <View style={styles.row}>
-          <ThemedText type="smallBold">
+          <ThemedText type="smallBold" style={{ flex: 1 }} numberOfLines={1}>
             {item.worker_name ?? t('quality.workerUnavailable')}
           </ThemedText>
           <Badge tone={assignmentStatusTone(item.status)} label={item.status.replace('_', ' ')} />

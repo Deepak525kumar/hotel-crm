@@ -1023,7 +1023,7 @@ export class QualityService extends BaseService {
       where: {
         ...hotelFilter,
         day: dayStart,
-        status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        status: { in: [...ACTIVE_ASSIGNMENT_STATUSES, AssignmentStatus.COMPLETED] },
         rework_of_assignment_id: null,
         worker_id: { not: actor.userId },
       },
