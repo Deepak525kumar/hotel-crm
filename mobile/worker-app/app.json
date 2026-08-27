@@ -12,11 +12,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.hotelcrm.workerapp",
+      "bundleIdentifier": "com.fhmhotelservices.workerapp",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.hotelcrm.workerapp",
+      "package": "com.fhmhotelservices.workerapp",
       "googleServicesFile": "./google-services.json",
       "versionCode": 1,
       "adaptiveIcon": {
