@@ -620,6 +620,8 @@
     "WAITER": "Serveur"
   },
   "calendar": {
+    "agendaTitle": "Vos services et jours d’absence",
+    "agendaEmpty": "Rien de prévu",
     "absences": "Absences",
     "dailySummary": "Résumé quotidien des services",
     "editDailySummary": "Modifier le résumé quotidien",

@@ -620,6 +620,8 @@
     "WAITER": "Kellner"
   },
   "calendar": {
+    "agendaTitle": "Ihre Schichten und freien Tage",
+    "agendaEmpty": "Nichts geplant",
     "absences": "Abwesenheiten",
     "dailySummary": "Tägliche Schichtübersicht",
     "editDailySummary": "Tägliche Schichtübersicht bearbeiten",

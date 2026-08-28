@@ -620,6 +620,8 @@
     "WAITER": "Waiter"
   },
   "calendar": {
+    "agendaTitle": "Your shifts and days off",
+    "agendaEmpty": "Nothing scheduled",
     "absences": "Absences",
     "dailySummary": "Daily Shift Summary",
     "editDailySummary": "Edit Daily Shift Summary",

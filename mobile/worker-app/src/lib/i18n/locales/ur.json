@@ -621,6 +621,8 @@
     "WAITER": "ویٹر"
   },
   "calendar": {
+    "agendaTitle": "آپ کی شفٹیں اور چھٹیاں",
+    "agendaEmpty": "کچھ بھی طے شدہ نہیں",
     "absences": "غیر حاضریاں",
     "dailySummary": "روزانہ شفٹ خلاصہ",
     "editDailySummary": "روزانہ شفٹ خلاصہ ترمیم کریں",
