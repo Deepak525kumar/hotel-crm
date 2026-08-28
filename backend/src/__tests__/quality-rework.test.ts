@@ -146,6 +146,45 @@ describe('ReworkEscalationJob', () => {
 // guards them happens outside the transaction, so two concurrent callers can
 // both observe the "not yet" state. Both are now compare-and-swap claims, the
 // same pattern the password-reset fix uses.
+// Owner decision, 2026-08-29: rework is the CHECKER's call, not the score's.
+// assignRework used to refuse a PASSED verification, which made the action a
+// function of the number typed on the previous screen -- a checker who scored
+// a room 75 and then saw something that had to be redone could not say so.
+describe('rework is the checker’s decision, not an inference from the score', () => {
+  const body = () => {
+    const src = readFileSync('src/modules/quality/service.ts', 'utf8');
+    return src.slice(src.indexOf('async assignRework('), src.indexOf('async completeRework('));
+  };
+
+  it('does not refuse a PASSED verification', () => {
+    // The specific guard that was removed. Asserted on its message rather than
+    // on the absence of the word PASSED, because the method legitimately still
+    // references VerificationStatus when it writes NEEDS_REWORK below.
+    expect(body()).not.toContain('Cannot assign rework for a passed inspection');
+  });
+
+  it('gates on nothing derived from score at all', () => {
+    // A re-introduced gate would most likely come back as a threshold
+    // comparison or a status equality check on the way in.
+    expect(body()).not.toMatch(/status === VerificationStatus\.PASSED/);
+    expect(body()).not.toMatch(/score\s*>=\s*\d+/);
+  });
+
+  it('writes NEEDS_REWORK so the record cannot contradict the decision', () => {
+    // Otherwise a row says PASSED while carrying a rework assignment: a green
+    // badge next to "awaiting the worker" on both evidence screens, and
+    // analytics (which filters on `status: PASSED`) still counting it as a
+    // pass after the checker said it is not one.
+    expect(body()).toContain('status: VerificationStatus.NEEDS_REWORK');
+  });
+
+  it('leaves the score itself untouched', () => {
+    // The number the checker gave is still the number they gave, and it feeds
+    // WorkerOverallRating. Only the OUTCOME is overridden by the decision.
+    expect(body()).not.toMatch(/data:\s*\{[^}]*\bscore:/s);
+  });
+});
+
 describe('rework claims are compare-and-swap, not check-then-act', () => {
   it('assignRework claims on rework_required === false', () => {
     const src = readFileSync('src/modules/quality/service.ts', 'utf8');
