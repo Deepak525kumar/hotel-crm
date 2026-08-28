@@ -80,6 +80,17 @@ export const ListLeaderboardQuerySchema = z.object({
 
 export type ListLeaderboardQuery = z.infer<typeof ListLeaderboardQuerySchema>;
 
+// The checker's own inspection history. Same page/per_page shape as the
+// leaderboard above so the two read routes paginate identically; a lower
+// per_page cap because each row carries two nested records rather than one
+// scalar score.
+export const ListOwnInspectionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  per_page: z.coerce.number().int().min(1).max(50).default(20),
+});
+
+export type ListOwnInspectionsQuery = z.infer<typeof ListOwnInspectionsQuerySchema>;
+
 // ADR-069 / CRR §14: a checker assigns rework to a specific worker. Photo
 // evidence arrives as multipart, not in this body -- these are the non-file
 // fields.

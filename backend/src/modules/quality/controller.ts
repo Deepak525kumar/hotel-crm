@@ -7,6 +7,7 @@ import {
   CreateQualityVerificationSchema,
   CreateRatingSchema,
   ListLeaderboardQuerySchema,
+  ListOwnInspectionsQuerySchema,
 } from './types.js';
 import type { UploadedPhoto } from './types.js';
 
@@ -190,6 +191,29 @@ export class QualityController {
       const result = await qualityService.listInspectableWorkers(
         { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
         day
+      );
+      res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // CRR §14/§15: the checker's own inspection history. Self-scoped in the
+  // service off req.auth.userId -- there is deliberately no `checker_id` or
+  // `user_id` query parameter to spoof.
+  async listOwnInspections(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const parsed = ListOwnInspectionsQuerySchema.safeParse(req.query);
+      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
+      const result = await qualityService.listOwnInspections(
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
+        parsed.data.page,
+        parsed.data.per_page
       );
       res.status(200).json({
         status: 'success',

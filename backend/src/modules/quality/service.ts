@@ -1051,6 +1051,166 @@ export class QualityService extends BaseService {
     };
   }
 
+  /**
+   * The caller's own inspection history — every shift they scored, newest
+   * first (CRR §14/§15).
+   *
+   * The quality module had no list read path at all: `/verifications/:id` and
+   * `/ratings/:id/photos` can only be reached by someone who already knows the
+   * id. That made an inspection effectively write-only the moment the screen
+   * that created it was dismissed. Two concrete consequences, both reported
+   * from the field:
+   *
+   *   - A checker could not see what they had scored, or the photos they had
+   *     uploaded, once they left the submit screen.
+   *   - "Assign rework" (CRR §14) lives on the verification evidence screen,
+   *     which was reachable ONLY by the redirect immediately after submitting
+   *     a verification, or by tapping a REWORK_COMPLETED push. Miss both and
+   *     the one action the requirement names a checker for was unreachable.
+   *     The web app has the same gap for the same reason — see the "no GET
+   *     endpoint exists for either" comment on its assignment detail page,
+   *     which keeps both records in React state only and loses them on reload.
+   *
+   * Rooted at WorkerAssignment rather than queried per model because a
+   * checker's mental unit is the shift they inspected, not the two rows it
+   * produced. `Rating` and `QualityVerification` are each 1:1 with an
+   * assignment (`assignment_id @unique`) and are written by SEPARATE actions —
+   * the checklist score and the pass/fail verification — so one shift may
+   * legitimately have either, or both. Listing the two models separately would
+   * show the same inspection twice with no way for a client to tell that it
+   * was one visit.
+   *
+   * Self-scoped by construction: the filter is the caller's own id on
+   * `rated_by_id`/`verified_by_id`, never a client-supplied parameter. That is
+   * the whole authorization — the caller is being shown records they authored,
+   * and therefore already saw in full at authoring time. A role that cannot
+   * author (WORKER holds `quality:read` but not `quality:write`) gets an empty
+   * list, which is correct rather than a denial.
+   *
+   * Photo KEYS are deliberately not returned, only counts. A key is useless
+   * without a presigned URL, and the two existing photo endpoints already mint
+   * those per record on their own authorization check. Returning keys here
+   * would widen this response into a listing of private storage paths for no
+   * gain.
+   */
+  async listOwnInspections(actor: Actor, page = 1, perPage = 20) {
+    const where: Prisma.WorkerAssignmentWhereInput = {
+      OR: [
+        { rating: { rated_by_id: actor.userId } },
+        { quality_verification: { verified_by_id: actor.userId } },
+      ],
+    };
+
+    const [total, assignments] = await Promise.all([
+      this.prisma.workerAssignment.count({ where }),
+      this.prisma.workerAssignment.findMany({
+        where,
+        select: {
+          id: true,
+          day: true,
+          worker: { select: { id: true, first_name: true, last_name: true } },
+          hotel: { select: { id: true, name: true, city: true } },
+          rating: {
+            select: {
+              id: true,
+              // Selected only so the mapping below can drop a record this
+              // caller did not write — see the authorship note there.
+              rated_by_id: true,
+              score: true,
+              comment: true,
+              criteria_scores: true,
+              photo_urls: true,
+              created_at: true,
+            },
+          },
+          quality_verification: {
+            select: {
+              id: true,
+              verified_by_id: true,
+              score: true,
+              status: true,
+              notes: true,
+              photo_urls: true,
+              rework_required: true,
+              rework_notes: true,
+              rework_completed_at: true,
+              created_at: true,
+            },
+          },
+        },
+        // `day` is the shift being inspected, which is what a checker
+        // recognizes a row by. `id` breaks ties deterministically: without a
+        // second key Postgres may return two same-day rows in a different
+        // order between two requests, which under pagination silently drops or
+        // duplicates a row across a page boundary rather than merely
+        // reshuffling the page.
+        orderBy: [{ day: 'desc' }, { id: 'desc' }],
+        skip: (page - 1) * perPage,
+        take: perPage,
+      }),
+    ]);
+
+    return {
+      inspections: assignments.map((a) => {
+        // Authorship is re-applied per record, not just per assignment. The
+        // `where` above matches an assignment when EITHER relation is the
+        // caller's, so a shift this checker only RATED still arrives carrying
+        // whatever verification a colleague wrote for the same shift — both
+        // models hang off the same assignment, and the two actions have
+        // different authors as often as not.
+        //
+        // Caught against the dev database, where exactly that happened: a
+        // checker who had authored two ratings and no verifications got back a
+        // row presenting another checker's NEEDS_REWORK verification as their
+        // own. Not a disclosure — anyone who may rate an assignment already
+        // passes assertCanViewVerification for it — but wrong for a screen
+        // that answers "what did I score, and what did I upload", and actively
+        // misleading where it drives the rework decision.
+        const rating = a.rating?.rated_by_id === actor.userId ? a.rating : null;
+        const verification =
+          a.quality_verification?.verified_by_id === actor.userId ? a.quality_verification : null;
+
+        return {
+          assignment_id: a.id,
+          day: a.day,
+          worker: a.worker
+            ? { id: a.worker.id, first_name: a.worker.first_name, last_name: a.worker.last_name }
+            : null,
+          hotel: a.hotel ? { id: a.hotel.id, name: a.hotel.name, city: a.hotel.city } : null,
+          rating: rating
+            ? {
+                id: rating.id,
+                score: rating.score,
+                comment: rating.comment,
+                criteria_scores: rating.criteria_scores,
+                photo_count: rating.photo_urls.length,
+                created_at: rating.created_at,
+              }
+            : null,
+          verification: verification
+            ? {
+                id: verification.id,
+                score: verification.score,
+                status: verification.status,
+                notes: verification.notes,
+                photo_count: verification.photo_urls.length,
+                rework_required: verification.rework_required,
+                rework_notes: verification.rework_notes,
+                rework_completed_at: verification.rework_completed_at,
+                created_at: verification.created_at,
+              }
+            : null,
+        };
+      }),
+      pagination: {
+        page,
+        per_page: perPage,
+        total,
+        total_pages: Math.ceil(total / perPage),
+      },
+    };
+  }
+
   async getLeaderboard(
     hotelId: string,
     page = 1,
