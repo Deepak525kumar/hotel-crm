@@ -1,3 +1,4 @@
+import { todayKeyInCalendarTimezone } from "@/lib/calendar";
 /**
  * Presentation-layer formatting helpers. Centralised so date/number rendering
  * stays consistent across detail views and tables.
@@ -18,24 +19,34 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 /**
- * Today's date in the browser's LOCAL timezone, as YYYY-MM-DD -- for
- * comparing against/setting the `min` of a `type="date"` input, whose own
- * `.value` is always local, never UTC.
+ * Today's date in the platform CALENDAR timezone (Europe/Berlin), as
+ * YYYY-MM-DD -- for comparing against, and setting the `min` of, a
+ * `type="date"` input.
  *
- * `new Date().toISOString().slice(0, 10)` is a common but incorrect
- * shortcut: `toISOString()` always returns the UTC date, which disagrees
- * with the local date for roughly a third of the day in any timezone west
- * of UTC (e.g. in New York, from 8pm to midnight local time, the UTC date
- * has already rolled over to tomorrow) -- a "cannot be in the past" check
- * built on it incorrectly rejects TODAY's date during exactly that window.
- * `toLocaleDateString("en-CA")` is used instead purely for its YYYY-MM-DD
- * output format (en-CA is the one common locale with that ISO-like default,
- * not because this only makes sense for Canadian users) -- it operates on
- * the Date's local representation, matching what a date input actually
- * produces.
+ * It used to return the BROWSER's local date, and the name still says so.
+ * That was wrong in a way no timezone-agnostic reasoning catches: every
+ * date-only field these inputs feed (`CalendarEntry.day`, absence days,
+ * shift dates) is resolved server-side in Europe/Berlin, so a manager east
+ * of Frankfurt saw a `min` of their own tomorrow and could submit a day the
+ * backend then treated as the future. Reported from the field on 2026-08-29
+ * at 03:12 IST, when Frankfurt was still on 2026-08-28: a shift placed on
+ * "today" could not be checked into, because the server called it a future
+ * day. See `todayKeyInCalendarTimezone()` in `lib/calendar.ts`.
+ *
+ * No timezone conversion happens at the input itself, which is why this is
+ * the right fix rather than a papering-over: a date input's `.value` is a
+ * bare calendar date with no instant behind it, and `min` is compared as
+ * one. Handing it the Frankfurt day simply makes the floor agree with the
+ * rule the server will apply.
+ *
+ * `new Date().toISOString().slice(0, 10)` remains the wrong shortcut for the
+ * same underlying reason it always was -- it answers with the UTC date,
+ * which is a third zone that matches neither the browser nor Frankfurt.
  */
 export function localToday(): string {
-  return new Date().toLocaleDateString("en-CA");
+  // Name kept only to avoid churning five call sites in a fix that needs to
+  // ship; it is wrong and should follow.
+  return todayKeyInCalendarTimezone();
 }
 
 /**

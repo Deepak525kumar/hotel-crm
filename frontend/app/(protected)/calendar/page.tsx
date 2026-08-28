@@ -39,6 +39,8 @@ import {
   startOfMonthGrid,
   startOfWeek,
   toDateKey,
+  todayInCalendarTimezone,
+  todayKeyInCalendarTimezone,
   type CalendarView,
 } from "@/lib/calendar";
 import { CalendarFilters } from "@/components/calendar/CalendarFilters";
@@ -51,7 +53,11 @@ export default function CalendarGridPage() {
   const backArrow = useDirectionalArrow("back");
   const { user } = useAuth();
   const [view, setView] = useState<CalendarView>("week");
-  const [anchor, setAnchor] = useState(() => new Date());
+  // Anchored to Frankfurt, not the browser. A manager east of Frankfurt
+  // opening this page just after their local midnight was shown a grid whose
+  // "today" was the server's tomorrow, and placing a shift on it produced a
+  // check-in the worker could not perform.
+  const [anchor, setAnchor] = useState(todayInCalendarTimezone);
   const [addDay, setAddDay] = useState<string | null>(null);
   const [markAbsenceDay, setMarkAbsenceDay] = useState<string | null>(null);
   const [editingEntry, setEditingEntry] = useState<CalendarEntryDto | null>(null);
@@ -81,7 +87,7 @@ export default function CalendarGridPage() {
   // Today control's toggle state (highlighted + inert when already there,
   // rather than a plain nav button that looks the same regardless of where
   // you're currently looking).
-  const todayKey = toDateKey(new Date());
+  const todayKey = todayKeyInCalendarTimezone();
   const isOnToday = todayKey >= from && todayKey <= to;
 
   const { data: entries, isLoading: entriesLoading, error: entriesError } =
@@ -299,7 +305,7 @@ export default function CalendarGridPage() {
           ? new Date(a.getTime() + DAY_MS)
           : new Date(a.getFullYear(), a.getMonth() + 1, 1),
     );
-  const goToday = () => setAnchor(new Date());
+  const goToday = () => setAnchor(todayInCalendarTimezone());
 
   return (
     <div className="space-y-6">
@@ -559,7 +565,7 @@ function DayCell({
   onSelectEntry: (entry: CalendarEntryDto) => void;
 }) {
   const { t } = useTranslation();
-  const isToday = dayKey === toDateKey(new Date());
+  const isToday = dayKey === todayKeyInCalendarTimezone();
   const isMonth = view === "month";
   const [dragOver, setDragOver] = useState(false);
 
