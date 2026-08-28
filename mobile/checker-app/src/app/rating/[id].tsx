@@ -51,9 +51,9 @@ export default function RatingScreen() {
   const submit = async () => {
     setError(null);
 
-    const missingChecks = INSPECTION_CHECKLIST_ITEMS.filter((item) => scores[item] === undefined);
-    if (missingChecks.length > 0) {
-      setError(t('quality.checklistEmpty', 'All checklist items must be marked.'));
+    const scoredItems = INSPECTION_CHECKLIST_ITEMS.filter((item) => typeof scores[item] === 'number');
+    if (scoredItems.length === 0) {
+      setError(t('quality.checklistEmpty', 'Score at least one item.'));
       return;
     }
     const invalid = invalidChecklistItems(scores);
@@ -61,8 +61,8 @@ export default function RatingScreen() {
       setError(t('quality.checklistItemRange'));
       return;
     }
-    if (overall === null || Number.isNaN(overall) || overall < 0 || overall > 100) {
-      setError(t('quality.checklistEmpty', 'Overall score is required and must be 0-100.'));
+    if (overall === null || !Number.isInteger(overall) || overall < 0 || overall > 100) {
+      setError(t('assignments.scoreWholeNumber', 'Score must be a whole number from 0 to 100.'));
       return;
     }
     // CRR §15: the photo accompanies the rating. The server enforces it too
@@ -193,7 +193,7 @@ export default function RatingScreen() {
             ))}
           </Card>
 
-          <SectionHeader title={t('quality.comment')} />
+          <SectionHeader title={t('fields.commentOptional', 'Comment (optional)')} />
           <Card>
             <TextInput
               value={comment}
