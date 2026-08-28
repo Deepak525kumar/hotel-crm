@@ -88,6 +88,9 @@ const mockPrisma = {
   // aggregate counts all of a worker's rows regardless of status, so creating
   // one changes it. These mocks back that recompute; the suites below are not
   // about rating maths, so the values are inert.
+  // refreshWorkerOverallRating() reads QualityVerification for the quality
+  // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+  qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
   rating: { aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({ _avg: { score: null }, _count: 0 }) },
   attendance: { count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue(0) },
   workerOverallRating: { upsert: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({}) },

@@ -52,7 +52,14 @@ jest.mock('../lib/logger.js', () => ({
 const mockQualityVerification = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   create: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  // refreshWorkerOverallRating() reads checks for the quality half of the
+  // rating (2026-08-29). Defaults below say "no checks yet"; the rating suites
+  // override them where the score under test matters.
+  aggregate: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
+  findMany: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
 };
+mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+mockQualityVerification.findMany.mockResolvedValue([]);
 const mockWorkerAssignment = {
   findUnique: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
   count: jest.fn() as jest.MockedFunction<(...args: any[]) => any>,
@@ -564,7 +571,11 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
   });
 
   it('upserts all five aggregate fields from a fresh computation, not just average_score/total_ratings', async () => {
-    mockRating.aggregate.mockResolvedValue({ _avg: { score: 72 }, _count: 4 });
+    // The quality half comes from checks now (2026-08-29). An empty recent
+    // window makes blendRecencyWeightedScore fall back to the lifetime
+    // average, so quality is exactly 72 here.
+    mockQualityVerification.aggregate.mockResolvedValue({ _avg: { score: 72 }, _count: 4 });
+    mockQualityVerification.findMany.mockResolvedValue([]);
     mockWorkerAssignment.count
       .mockResolvedValueOnce(10) // total_assignments
       .mockResolvedValueOnce(6); // completed (status: COMPLETED)
@@ -581,7 +592,11 @@ describe('Quality createRating — WorkerOverallRating single-writer aggregate (
     expect(mockWorkerOverallRating.upsert).toHaveBeenCalledTimes(1);
     const { create, update } = mockWorkerOverallRating.upsert.mock.calls[0][0];
     const expected = {
-      average_score: 72,
+      // 0.7 x quality + 0.3 x attendance, where attendance is
+      // completed / due x 100 = 6/10 x 100 = 60.
+      //   0.7 * 72 + 0.3 * 60 = 50.4 + 18 = 68.4
+      average_score: 68.4,
+      // Now the count of CHECKS, not of Rating rows.
       total_ratings: 4,
       total_assignments: 10,
       completion_rate: 0.6,
@@ -816,17 +831,24 @@ describe('Quality getLeaderboard — pagination (ADR-035)', () => {
 // outcomes that were not (yet, or ever) their doing. This exercises
 // refreshWorkerOverallRating() directly against a minimal fake `tx`,
 // independent of QualityService's own request-handling tests above.
-describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-13 fix)', () => {
+describe('refreshWorkerOverallRating — total_assignments denominator', () => {
   const makeTx = () => ({
     $executeRawUnsafe: jest.fn(),
-    rating: { aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any> },
+    // The quality half now reads checks, not the Rating model (2026-08-29).
+    qualityVerification: {
+      aggregate: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
+      findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
+    },
     workerAssignment: {
       count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
         async (args: any) => {
-          // The completedAssignments count (status: COMPLETED only) is a
-          // second, distinct call -- only the FIRST call (the denominator)
-          // is asserted against assignmentCountWhere by the caller.
-          return args.where && 'OR' in args.where ? 3 : 1;
+          // The denominator used to be identifiable by an `OR`; since
+          // 2026-08-29 it is a flat COMPLETED+NO_SHOW status filter, so it is
+          // matched on that. The completedAssignments count (COMPLETED only)
+          // is a second, distinct call.
+          return Array.isArray(args.where?.status?.in) && args.where.status.in.length === 2
+            ? 3
+            : 1;
         }
       ),
       findFirst: jest.fn() as jest.MockedFunction<(...a: any[]) => any>,
@@ -841,14 +863,14 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
 
   it('excludes CANCELLED and REASSIGNED from the denominator, at any day', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
     tx.attendance.count.mockResolvedValue(1);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
     expect(denominatorCall[0].where).toEqual({
       worker_id: 'w1',
@@ -859,10 +881,9 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
       // on top of the 0-100 quality score, which is the mechanism the platform
       // actually uses to record poor work.
       rework_of_assignment_id: null,
-      OR: [
-        { status: { in: ['COMPLETED', 'NO_SHOW'] } },
-        { status: { in: ['CONFIRMED', 'IN_PROGRESS'] }, day: { lte: new Date('2026-08-13T00:00:00.000Z') } },
-      ],
+      // Owner decision 2026-08-29: only settled shifts. The CONFIRMED/
+      // IN_PROGRESS-with-a-past-day arm is gone -- those have no outcome yet.
+      status: { in: ['COMPLETED', 'NO_SHOW'] },
     });
   });
 
@@ -871,7 +892,7 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
   // ratio, where it would be indistinguishable from a no-show.
   it('counts worker-initiated cancellations separately, without touching the denominator', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: 4 }, _count: 5 });
     tx.attendance.count.mockResolvedValue(1);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
@@ -895,33 +916,38 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
     expect(upsert.create.worker_cancellations).toBe(1);
   });
 
-  it('includes a future-dated CONFIRMED/IN_PROGRESS shift once its day is <= today, excludes it before', async () => {
+  it('excludes CONFIRMED/IN_PROGRESS entirely, even once their day has passed', async () => {
+    // Retargeted 2026-08-29. This previously asserted the opposite -- that a
+    // past-dated active shift COUNTED -- which scored shifts that had not
+    // finished. A stale one is resolved to NO_SHOW by AssignmentNoShowJob and
+    // counts from that point.
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     tx.attendance.count.mockResolvedValue(0);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
-    const dayFilter = denominatorCall[0].where.OR[1].day;
-    expect(dayFilter).toEqual({ lte: new Date('2026-08-13T00:00:00.000Z') });
+    expect(denominatorCall[0].where.status.in).toEqual(['COMPLETED', 'NO_SHOW']);
+    expect(denominatorCall[0].where).not.toHaveProperty('OR');
+    expect(denominatorCall[0].where).not.toHaveProperty('day');
   });
 
   it('always includes COMPLETED/NO_SHOW regardless of day (a terminal outcome already happened)', async () => {
     const tx = makeTx();
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 });
     tx.attendance.count.mockResolvedValue(0);
     tx.workerAssignment.findFirst.mockResolvedValue(null);
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 
     const denominatorCall = (tx.workerAssignment.count.mock.calls as any[]).find(
-      (c) => c[0]?.where && 'OR' in c[0].where
+      (c) => Array.isArray(c[0]?.where?.status?.in) && c[0].where.status.in.length === 2
     );
-    expect(denominatorCall[0].where.OR[0]).toEqual({ status: { in: ['COMPLETED', 'NO_SHOW'] } });
+    expect(denominatorCall[0].where.status).toEqual({ in: ['COMPLETED', 'NO_SHOW'] });
   });
 });
 
@@ -930,16 +956,20 @@ describe('refreshWorkerOverallRating — total_assignments denominator (2026-08-
 describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agreement', () => {
   const makeTx = (dueCount: number, presentCount: number) => ({
     $executeRawUnsafe: jest.fn(),
-    rating: {
+    qualityVerification: {
       aggregate: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue({
         _avg: { score: 80 },
         _count: 1,
       }),
+      findMany: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockResolvedValue([]),
     },
     workerAssignment: {
       count: (jest.fn() as jest.MockedFunction<(...a: any[]) => any>).mockImplementation(
         async (args: any) => {
-          if (args.where && 'OR' in args.where) return dueCount; // denominator
+          // Denominator: the flat COMPLETED+NO_SHOW status filter.
+          if (Array.isArray(args.where?.status?.in) && args.where.status.in.length === 2) {
+            return dueCount;
+          }
           if (args.where?.cancellation_reason !== undefined) return 0;
           return 0; // completedAssignments
         }
@@ -987,9 +1017,9 @@ describe('refreshWorkerOverallRating — on_time_rate numerator/denominator agre
     expect(attendanceWhere).toHaveProperty('assignment');
   });
 
-  it('does not trigger a warning if the worker has 0 ratings, avoiding a default 0 score from firing alerts', async () => {
+  it('does not trigger a warning if the worker has no checks, avoiding a default 0 score from firing alerts', async () => {
     const tx = makeTx(1, 1);
-    tx.rating.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 }); // 0 ratings
+    tx.qualityVerification.aggregate.mockResolvedValue({ _avg: { score: null }, _count: 0 }); // 0 ratings
 
     await refreshWorkerOverallRating(tx as any, 'w1');
 

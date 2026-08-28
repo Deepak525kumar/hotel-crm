@@ -161,6 +161,9 @@ jest.mock('../lib/db.js', () => ({
     // service previously touched prisma.user only when a rooms-completed entry
     // existed, so this fixture never needed the model.
     user: { findMany: async () => [], findUnique: async () => null },
+    // refreshWorkerOverallRating() reads QualityVerification for the quality
+    // half of the rating (2026-08-29). Neutral fixture: no checks recorded.
+    qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
     rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
     attendance: { count: async () => 0, updateMany: async () => ({ count: 0 }) },
     workerOverallRating: { upsert: async () => ({}) },
@@ -215,6 +218,7 @@ jest.mock('../lib/db.js', () => ({
           updateMany: async () => ({ count: 0 }),
         },
         rating: { aggregate: async () => ({ _avg: { score: 0 }, _count: 0 }) },
+        qualityVerification: { aggregate: async () => ({ _avg: { score: null }, _count: 0 }), findMany: async () => [] },
         workerOverallRating: { upsert: async () => ({}) },
         jobRequestSkillSlot: { update: async () => ({}) },
         notification: { create: async () => ({ id: 'notif_new' }) },

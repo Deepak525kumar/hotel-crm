@@ -79,6 +79,9 @@ const txStub = {
   // + notification enqueue in $transaction too.
   qualityVerification: {
     create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
+    // Quality half of the rating now reads checks (2026-08-29).
+    aggregate: async () => ({ _avg: { score: null }, _count: 0 }),
+    findMany: async () => [],
   },
 };
 
@@ -91,6 +94,9 @@ jest.mock('../lib/db.js', () => ({
     qualityVerification: {
       findUnique: async () => null,
       create: async ({ data }: any) => ({ id: 'ver_1', ...data }),
+    // Quality half of the rating now reads checks (2026-08-29).
+    aggregate: async () => ({ _avg: { score: null }, _count: 0 }),
+    findMany: async () => [],
     },
     workerOverallRating: { findMany: async () => [], count: async () => 0 },
     hotel: {

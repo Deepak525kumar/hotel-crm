@@ -84,9 +84,23 @@ export default function LeaderboardScreen() {
           </Text>
         </View>
         <View style={styles.scoreCol}>
-          <Text style={styles.scoreNum}>{item.average_score.toFixed(1)}</Text>
-          <RatingTierBadge tier={item.rating_tier} />
-          <Text style={styles.stars}>{starString(item.average_score)}</Text>
+          {/* An unrated worker has average_score 0 and total_ratings 0, and
+              printing "0.0" next to real scores reads as the worst performer
+              on the board rather than as "nobody has checked them yet". The
+              web leaderboard has always shown "—" here; this did not, so the
+              same worker looked bottom-ranked on mobile and unrated on the
+              web. RatingTierBadge already handles the null tier the server
+              sends for them, and starString would draw zero stars, so both
+              are suppressed too rather than left to render an empty verdict. */}
+          {item.total_ratings > 0 ? (
+            <>
+              <Text style={styles.scoreNum}>{item.average_score.toFixed(1)}</Text>
+              <RatingTierBadge tier={item.rating_tier} />
+              <Text style={styles.stars}>{starString(item.average_score)}</Text>
+            </>
+          ) : (
+            <Text style={styles.scoreNum}>—</Text>
+          )}
         </View>
       </View>
     );

@@ -15,6 +15,7 @@ import {
   RECENCY_WINDOW,
   blendRecencyWeightedScore,
 } from './recency-weighting.js';
+import { attendanceScore, blendQualityAndAttendance } from './overall-rating.js';
 import { notificationService } from '../notifications/service.js';
 import { isHotelInScope } from '../../middleware/permissions.js';
 // From lib/scope.js, not the middleware re-export — see geo/service.ts's note:
@@ -86,7 +87,6 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
   // re-run by refreshWorkerOverallRating's every caller on the next status
   // change, so it is never permanently stuck counting a now-past CONFIRMED
   // row that should have transitioned).
-  const today = new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`);
   const dueAssignmentWhere: Prisma.WorkerAssignmentWhereInput = {
     worker_id,
     // ADR-069 §3: rework assignments are excluded from every ratio here. A
@@ -96,19 +96,20 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
     // compounding a penalty on top of the 0-100 quality score, which is the
     // mechanism the platform already uses to record poor work.
     rework_of_assignment_id: null,
-    OR: [
-      { status: { in: [AssignmentStatus.COMPLETED, AssignmentStatus.NO_SHOW] } },
-      {
-        status: { in: [AssignmentStatus.CONFIRMED, AssignmentStatus.IN_PROGRESS] },
-        day: { lte: today },
-      },
-      // Worker-initiated cancellations are deliberately NOT here. Declaring
-      // sick/vacation is not a failure to complete a shift, so it must not
-      // move completion_rate -- the 2026-08-13 rule above stands. It is still
-      // worth seeing, so it is surfaced as its own count
-      // (worker_cancellations) rather than folded into a ratio where it would
-      // be indistinguishable from a no-show.
-    ],
+    // Owner decision 2026-08-29: "only completed and no show. nor should sick
+    // leave count nor vacations." Every other status is excluded:
+    //
+    //   - CANCELLED, which is what a sick or vacation mark auto-creates.
+    //     Declaring an absence in advance is not a failure to turn up, and
+    //     counting it would make using the absence feature lower your score.
+    //     (Still visible on its own as `worker_cancellations`, never folded
+    //     into a ratio where it would be indistinguishable from a no-show.)
+    //   - CONFIRMED / IN_PROGRESS, even once their day has passed. This arm
+    //     previously counted them via `day: { lte: today }`, which scored
+    //     shifts that had not finished. A stale one is resolved to NO_SHOW by
+    //     AssignmentNoShowJob, and counts from that point.
+    //   - REASSIGNED, which describes a shift somebody else ended up owning.
+    status: { in: [AssignmentStatus.COMPLETED, AssignmentStatus.NO_SHOW] },
   };
 
   const [
@@ -121,8 +122,18 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
     workerCancellations,
   ] =
     await Promise.all([
-      tx.rating.aggregate({
-        where: { worker_id },
+      // Owner decision 2026-08-29: "the rating should be fed by the rating
+      // checker submits in checks". The quality figure now comes from
+      // QualityVerification -- the score recorded during a check -- rather
+      // than the separate Rating model, which asked the checker for a second
+      // number about the same visit.
+      //
+      // `verified_by_id` is not filtered: the score belongs to the WORKER
+      // being inspected regardless of which checker recorded it. The join to
+      // the worker is through the assignment, since QualityVerification has no
+      // worker_id column of its own.
+      tx.qualityVerification.aggregate({
+        where: { assignment: { worker_id } },
         _avg: { score: true },
         _count: true,
       }),
@@ -133,9 +144,9 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       // cost grow O(n) with a worker's cumulative rating count, uncapped, and
       // asks whoever implements this to prefer a bounded design. The lifetime
       // half of the blend stays an aggregate, computed DB-side above.
-      typeof tx.rating?.findMany === 'function'
-        ? tx.rating.findMany({
-            where: { worker_id },
+      typeof tx.qualityVerification?.findMany === 'function'
+        ? tx.qualityVerification.findMany({
+            where: { assignment: { worker_id } },
             // id is a tiebreak, not decoration. created_at ties are
             // possible (several ratings written in one transaction share a
             // now()), and with a tie straddling the 10th position the window
@@ -207,13 +218,30 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
       }),
     ]);
 
-  const averageScore = blendRecencyWeightedScore(
-    recentRatings.map((r) => r.score),
-    agg._avg.score,
-    agg._count
-  );
+  // Two 70/30 splits on two different axes, composed. First recency
+  // (TREQ-004): recent-10 against lifetime, WITHIN the quality figure.
+  const qualityScore =
+    agg._count > 0
+      ? blendRecencyWeightedScore(recentRatings.map((r) => r.score), agg._avg.score, agg._count)
+      : null;
+
   const completionRate = totalAssignments > 0 ? completedAssignments / totalAssignments : 0;
   const onTimeRate = totalAssignments > 0 ? onTimeAttendance / totalAssignments : 0;
+
+  // Then quality against attendance (owner decision 2026-08-29). Attendance is
+  // completionRate on the new denominator -- COMPLETED / (COMPLETED+NO_SHOW) --
+  // expressed 0-100 so it shares the quality scale. Derived from the same
+  // number rather than recomputed, so the stored rate and the rating it feeds
+  // can never disagree.
+  const attendance = attendanceScore(completedAssignments, totalAssignments);
+  const blended = blendQualityAndAttendance(qualityScore, attendance);
+
+  // Null means "never inspected" and is stored as 0 alongside total_ratings 0,
+  // which is this codebase's existing unrated convention -- deriveRatingTier()
+  // returns null on it and the web leaderboard prints "—". Kept rather than
+  // migrating average_score to nullable, so there is one way to express
+  // "unrated" instead of two that can disagree.
+  const averageScore = blended ?? 0;
 
   const existingRating = typeof tx.workerOverallRating?.findUnique === 'function'
     ? await tx.workerOverallRating.findUnique({ where: { worker_id } })
@@ -221,7 +249,11 @@ export async function refreshWorkerOverallRating(tx: RatingAggregateTx, worker_i
   let warning_70_sent_at = existingRating?.warning_70_sent_at ?? null;
   let warning_50_sent_at = existingRating?.warning_50_sent_at ?? null;
 
-  if (totalAssignments > 0 && agg._count > 0) { // Only evaluate warnings if they have actually done shifts AND have at least one rating
+  // Warnings need BOTH a due shift and at least one check. The check
+  // requirement is what keeps an unrated worker silent: averageScore is 0 for
+  // them, which would otherwise read as "below 50" and alert the worker and
+  // their regional manager before anyone had inspected anything.
+  if (totalAssignments > 0 && agg._count > 0) {
     if (averageScore < 50) {
       if (!warning_50_sent_at) {
         warning_50_sent_at = new Date();
