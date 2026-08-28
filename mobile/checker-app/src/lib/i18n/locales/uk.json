@@ -621,6 +621,8 @@
     "WAITER": "Офіціант"
   },
   "calendar": {
+    "agendaTitle": "Ваші зміни та вихідні",
+    "agendaEmpty": "Нічого не заплановано",
     "absences": "Відсутності",
     "dailySummary": "Щоденний підсумок змін",
     "editDailySummary": "Редагувати щоденний підсумок",

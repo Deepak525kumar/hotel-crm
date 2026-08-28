@@ -15,7 +15,10 @@ import { isoDateInCalendarTimezone, formatDay, weekOf } from '@/lib/calendar-dat
 import { resolveDaySelection, selectedDays as daysOf } from '@/lib/absence-selection';
 import { Radius, Spacing } from '@/constants/theme';
 import { Badge, BadgeTone, Button, Card, EmptyState, ScreenHeader, SectionHeader } from '@/components/ui';
-import type { CalendarAbsence, CalendarAbsenceKind } from '@/types/api';
+import type { CalendarAbsence, CalendarAbsenceKind, WorkerAssignment } from '@/types/api';
+import { buildAgenda, shiftDays, type AgendaEntry } from '@/lib/calendar-agenda';
+import { assignmentStatusTone } from '@/lib/assignment-status-tone';
+import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { NotificationBell } from '@/components/NotificationBell';
 import { translateApiError } from '../../lib/api-error-i18n';
@@ -39,6 +42,39 @@ const KIND_TONE: Record<CalendarAbsenceKind, BadgeTone> = {
   SICK: 'danger',
   VACATION: 'primary',
 };
+
+/**
+ * A shift on the calendar, beside the absences.
+ *
+ * The screen listed absences only, so someone looking at their own calendar
+ * saw the days they had booked off and no sign of the shifts those days were
+ * booked against. Tapping opens the shift, which is where check-in lives.
+ */
+function ShiftCard({ item, onPress }: { item: WorkerAssignment; onPress: () => void }) {
+  const { t } = useTranslation();
+  const isRework = Boolean(item.rework_of_assignment_id);
+
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}>
+      <Card>
+        <ThemedView style={styles.cardRow} type="backgroundElement">
+          <ThemedText type="smallBold" style={styles.cardTitle} numberOfLines={1}>
+            {isRework ? t('quality.reworkTitle') : (item.work_request?.position ?? t('common.shift'))}
+          </ThemedText>
+          <Badge
+            label={item.status.replace(/_/g, ' ')}
+            tone={assignmentStatusTone(item.status) ?? 'neutral'}
+          />
+        </ThemedView>
+        {item.hotel?.name ? (
+          <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+            {item.hotel.name}
+          </ThemedText>
+        ) : null}
+      </Card>
+    </Pressable>
+  );
+}
 
 function AbsenceCard({
   item,
@@ -80,7 +116,9 @@ function AbsenceCard({
 export default function CalendarScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const router = useRouter();
   const [items, setItems] = useState<CalendarAbsence[]>([]);
+  const [shifts, setShifts] = useState<WorkerAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [marking, setMarking] = useState<{ day: string; kind: CalendarAbsenceKind } | null>(null);
@@ -126,8 +164,21 @@ export default function CalendarScreen() {
 
   const byDay = new Map(items.map((a) => [a.day, a]));
 
+  const shiftDaySet = useMemo(() => shiftDays(shifts), [shifts]);
+
+  const agenda = useMemo(
+    // From today onward: the list is what is still ahead, not a history.
+    () => buildAgenda(items, shifts, { from: isoDateInCalendarTimezone(0) }),
+    [items, shifts],
+  );
+
   const markedDates = useMemo(() => {
     const marks: Record<string, Record<string, unknown>> = {};
+    // Shifts first, so a day carrying both keeps the absence's colour below --
+    // the absence is why the shift is cancelled, and it is the stronger signal.
+    for (const day of shiftDaySet) {
+      marks[day] = { marked: true, dotColor: theme.success };
+    }
     for (const a of items) {
       marks[a.day] = { marked: true, dotColor: a.kind === 'SICK' ? theme.danger : theme.primary };
     }
@@ -160,8 +211,23 @@ export default function CalendarScreen() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.calendar.myAbsences();
-      setItems(Array.isArray(res) ? res : []);
+      // Both halves of "what is on my calendar", fetched together. Settled
+      // rather than awaited as a pair: the absence list is this screen's
+      // primary function and must still render if the assignments call fails,
+      // which is what a worker marking themselves sick on a bad connection
+      // depends on.
+      const [absencesResult, shiftsResult] = await Promise.allSettled([
+        api.calendar.myAbsences(),
+        api.assignments.list({ limit: 100 }),
+      ]);
+      if (absencesResult.status === 'fulfilled') {
+        setItems(Array.isArray(absencesResult.value) ? absencesResult.value : []);
+      }
+      setShifts(
+        shiftsResult.status === 'fulfilled' && Array.isArray(shiftsResult.value)
+          ? shiftsResult.value
+          : [],
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -287,15 +353,21 @@ export default function CalendarScreen() {
             marked-days list could only be scrolled inside whatever narrow strip
             was left below the calendar. */}
         <FlatList
-          data={loading ? [] : items}
-          keyExtractor={(i) => i.id}
-          renderItem={({ item }) => (
-            <AbsenceCard
-              item={item}
-              onWithdraw={handleWithdraw}
-              withdrawing={withdrawingId === item.id}
-            />
-          )}
+          data={loading ? [] : agenda}
+          keyExtractor={(e: AgendaEntry) =>
+            e.kind === 'absence' ? `a-${e.absence.id}` : `s-${e.shift.id}`
+          }
+          renderItem={({ item }: { item: AgendaEntry }) =>
+            item.kind === 'absence' ? (
+              <AbsenceCard
+                item={item.absence}
+                onWithdraw={handleWithdraw}
+                withdrawing={withdrawingId === item.absence.id}
+              />
+            ) : (
+              <ShiftCard item={item.shift} onPress={() => router.push(`/shift/${item.shift.id}`)} />
+            )
+          }
           ListHeaderComponent={
             <>
           <ScreenHeader title={t('calendar.sickOrVacation')} action={<NotificationBell />} />
@@ -386,11 +458,11 @@ export default function CalendarScreen() {
             </ThemedText>
           )}
 
-              <SectionHeader title={t('calendar.yourMarkedDays')} />
+              <SectionHeader title={t('calendar.agendaTitle')} />
               {loading ? <ActivityIndicator style={styles.loader} color={theme.text} /> : null}
             </>
           }
-          ListEmptyComponent={loading ? null : <EmptyState title={t('profile.noAbsences')} />}
+          ListEmptyComponent={loading ? null : <EmptyState title={t('calendar.agendaEmpty')} />}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
@@ -493,6 +565,9 @@ const styles = StyleSheet.create({
   list: { gap: Spacing.two, paddingBottom: Spacing.six },
   card: { borderRadius: Spacing.two, padding: Spacing.three },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Lets a long position/hotel name truncate instead of shoving the status
+  // badge off the card.
+  cardTitle: { flex: 1, marginRight: Spacing.two },
   // `Spacing.xs` / `Spacing.sm` do not exist on this app's scale (it is
   // half/one/two/three/...), so these three values were `undefined` and the
   // button rendered with no spacing at all. The syntax error above masked the

@@ -622,6 +622,8 @@
     "WAITER": "نادل"
   },
   "calendar": {
+    "agendaTitle": "مناوباتك وأيام غيابك",
+    "agendaEmpty": "لا يوجد شيء مجدول",
     "absences": "حالات الغياب",
     "dailySummary": "ملخص الورديات اليومي",
     "editDailySummary": "تعديل ملخص الورديات اليومي",
