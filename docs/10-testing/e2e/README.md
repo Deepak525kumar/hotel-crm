@@ -58,8 +58,9 @@ replace them.
 | 11 | `scenarios/11-daily-consent-gate.md` | Daily consent gate: enforcement, escape hatches, day rollover |
 | 12 | `scenarios/12-checker-photo-evidence-and-rework.md` | Checker photo evidence, rework loop, escalation, ADR-069 metric exclusion |
 | 16 | `scenarios/16-push-notification-delivery.md` | Push delivery end to end: token registration, APNs topic/environment, outbox fan-out, invalid-token pruning |
+| 17 | `scenarios/17-email-delivery.md` | Email delivery end to end: handler resolution, sending-domain authentication, recipient/body shapes, bounce blindness |
 
-**Start with 00. Then 01-07, 09-12 and 16 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07, 09-12, 16 and 17 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
 ### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28)

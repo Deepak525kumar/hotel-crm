@@ -154,6 +154,35 @@ curl -v -d '{"aps":{"alert":"probe"}}' \
 
 **PASS:** `200`.
 
+**You do not need a real device token for this to be useful.** Send to a
+syntactically valid but non-existent token (64 hex characters for APNs) and read
+what comes back. The provider must authenticate you and validate the topic
+*before* it can decide the token is unknown, so its rejection reports the state
+of everything upstream of the device:
+
+| Response to a fake token | What it proves |
+|---|---|
+| `400 BadDeviceToken` | key, team **and topic** all accepted — configuration is correct |
+| `400 BadTopic` / `TopicDisallowed` | the `apns-topic` is not a bundle ID this key's team owns |
+| `403 InvalidProviderToken` | key id / team id / `.p8` mismatch |
+
+The same works for FCM: `404 UNREGISTERED` or `400 INVALID_ARGUMENT` means the
+service-account OAuth2 exchange succeeded and only the token was rejected,
+whereas `403 SENDER_ID_MISMATCH` means the wrong Firebase project and `401` a
+bad key.
+
+Run on 2026-08-29 against the deployed credentials this returned
+`BadDeviceToken` for both `com.fhmhotelservices.workerapp` and
+`com.fhmhotelservices.checkerapp`, and `UNREGISTERED` for FCM — the first
+positive confirmation that the topic fix took, and the check that would have
+caught the original outage in seconds rather than however long it stood.
+
+It does **not** replace Step 5, and must never be written up as one. A correct
+topic and a real delivery are different claims: this cannot see a
+sandbox-versus-production token mismatch (which also answers `BadDeviceToken`,
+indistinguishable from a fake token), a worker that is not running, or a
+notification the device receives and suppresses.
+
 **FAIL, and what each reason means:**
 
 | Reason | Cause | Fix |
@@ -199,8 +228,9 @@ happened to be testing on Android.
 
 ## Known gaps in this scenario
 
-- **Steps 5 and 6 need real credentials and a real device**; there is no local emulation of
-  APNs or FCM in this repository. A run without them is a partial pass and must say so.
+- **Step 5 needs a real device.** Step 6 does not — the fake-token probe above needs only the
+  credentials — but the two prove different things, and a green Step 6 is not a delivery
+  confirmation. There is no local emulation of APNs or FCM in this repository.
 - The **JWT refresh path** (`ApnsProviderClient` caches for 20 minutes of a 60-minute life) is
   not exercised — a token-expiry regression would need a run longer than the cache window.
 - **Payload size** (the 4KB APNs cap) is asserted in the unit suite, not here.
