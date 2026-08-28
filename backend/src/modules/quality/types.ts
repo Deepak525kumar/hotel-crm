@@ -91,6 +91,52 @@ export const ListOwnInspectionsQuerySchema = z.object({
 
 export type ListOwnInspectionsQuery = z.infer<typeof ListOwnInspectionsQuerySchema>;
 
+/**
+ * One inspection, one request (2026-08-29). Everything the checker captured,
+ * plus the decision they made about it.
+ *
+ * Multipart, so every scalar arrives as a string: `score` needs
+ * z.coerce.number() for the same reason CreateQualityVerificationSchema does
+ * (a `z.number()` there rejected every photo-bearing rating while the
+ * JSON-bodied unit tests passed), and `criteria_scores` arrives as a JSON
+ * string rather than an object.
+ *
+ * `outcome` is the checker's decision and is NOT derived from `score` --
+ * see QualityService.recordInspection and assignRework.
+ */
+export const RecordInspectionSchema = z.object({
+  assignment_id: z.string().min(1),
+  worker_id: z.string().min(1),
+  score: z.coerce.number().int().min(0).max(100),
+  comment: z.string().optional(),
+  criteria_scores: z
+    .string()
+    .transform((raw, ctx) => {
+      try {
+        return JSON.parse(raw) as unknown;
+      } catch {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'criteria_scores must be valid JSON' });
+        return z.NEVER;
+      }
+    })
+    .pipe(z.record(z.string(), z.coerce.number().int().min(0).max(100)))
+    .optional(),
+  outcome: z.enum(['complete', 'rework']),
+  // Defaults to `comment` in the service: the checker app asks the question
+  // once, and the answer is what the worker is sent.
+  rework_notes: z.string().optional(),
+});
+
+export interface RecordInspectionRequest {
+  assignment_id: string;
+  worker_id: string;
+  score: number;
+  comment?: string;
+  criteria_scores?: Record<string, number>;
+  outcome: 'complete' | 'rework';
+  rework_notes?: string;
+}
+
 // ADR-069 / CRR §14: a checker assigns rework to a specific worker. Photo
 // evidence arrives as multipart, not in this body -- these are the non-file
 // fields.

@@ -8,6 +8,7 @@ import {
   VerificationStatus,
 } from '@prisma/client';
 import { BaseService } from '../../lib/base-service.js';
+import type { DatabaseTransaction } from '../../lib/db.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../lib/errors.js';
 import { deriveRatingTier } from './rating-tiers.js';
 import {
@@ -22,6 +23,7 @@ import { isScopedManagerRole } from '../../lib/scope.js';
 import type { UserScope } from '../../lib/jwt.js';
 import type {
   AssignReworkRequest,
+  RecordInspectionRequest,
   CreateQualityVerificationRequest,
   CreateRatingRequest,
   UploadedPhoto,
@@ -418,47 +420,80 @@ export class QualityService extends BaseService {
         throw new ConflictError('Rework has already been assigned for this verification');
       }
 
-      const reworkAssignment = await tx.workerAssignment.create({
-        data: {
-          worker_id: original.worker_id,
-          hotel_id: original.hotel_id,
-          assigned_by_id: actor.userId,
-          // Dated today, not the original's day: CRR §14 expects rework to be
-          // actionable now, and the 20-minute clock starts here.
-          day: new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`),
-          status: AssignmentStatus.CONFIRMED,
-          rework_of_assignment_id: original.id,
-          rework_verification_id: verification.id,
-        },
+      return this.createReworkAssignment(tx, {
+        original,
+        verificationId: verification.id,
+        notes: input.notes,
+        actorId: actor.userId,
       });
-
-      // CRR §14 requires BOTH a stored, readable inbox entry AND a push --
-      // "not one instead of the other". enqueue() writes the Notification row
-      // (the inbox) and dispatches PUSH, so one call satisfies both. CRR §18's
-      // push-only rule is about external channels (no SMS), not about
-      // skipping the in-app record.
-      await notificationService.enqueue(
-        {
-          recipientId: original.worker_id,
-          type: 'REWORK_REQUIRED',
-          title: 'Rework required',
-          message: input.notes,
-          data: {
-            verification_id: verification.id,
-            original_assignment_id: original.id,
-            rework_assignment_id: reworkAssignment.id,
-            notes: input.notes,
-          },
-          hotelId: original.hotel_id,
-          transports: [OutboxTransport.PUSH],
-          sourceModule: OutboxSourceModule.QUALITY,
-          producerService: 'QualityService',
-        },
-        tx
-      );
-
-      return reworkAssignment;
     });
+  }
+
+  /**
+   * The rework assignment and the notification that goes with it (CRR §14).
+   *
+   * Shared by assignRework() -- which acts on an inspection recorded earlier --
+   * and recordInspection(), which decides at capture time. Extracted rather
+   * than duplicated because the two must not drift: the worker app deep-links
+   * a REWORK_REQUIRED push on `data.rework_assignment_id`
+   * (worker-app/src/lib/push-notifications.ts), so a payload that differs
+   * between the two producers means a push that opens the wrong screen -- or
+   * nothing -- depending on which path created it.
+   *
+   * Runs inside the caller's transaction. The caller owns the claim on
+   * `rework_required`; this helper assumes it has already been won.
+   */
+  private async createReworkAssignment(
+    tx: DatabaseTransaction,
+    params: {
+      original: { id: string; worker_id: string; hotel_id: string };
+      verificationId: string;
+      notes: string;
+      actorId: string;
+    }
+  ) {
+    const { original, verificationId, notes, actorId } = params;
+
+    const reworkAssignment = await tx.workerAssignment.create({
+      data: {
+        worker_id: original.worker_id,
+        hotel_id: original.hotel_id,
+        assigned_by_id: actorId,
+        // Dated today, not the original's day: CRR §14 expects rework to be
+        // actionable now, and the 20-minute clock starts here.
+        day: new Date(`${todayInCalendarTimezone()}T00:00:00.000Z`),
+        status: AssignmentStatus.CONFIRMED,
+        rework_of_assignment_id: original.id,
+        rework_verification_id: verificationId,
+      },
+    });
+
+    // CRR §14 requires BOTH a stored, readable inbox entry AND a push --
+    // "not one instead of the other". enqueue() writes the Notification row
+    // (the inbox) and dispatches PUSH, so one call satisfies both. CRR §18's
+    // push-only rule is about external channels (no SMS), not about
+    // skipping the in-app record.
+    await notificationService.enqueue(
+      {
+        recipientId: original.worker_id,
+        type: 'REWORK_REQUIRED',
+        title: 'Rework required',
+        message: notes,
+        data: {
+          verification_id: verificationId,
+          original_assignment_id: original.id,
+          rework_assignment_id: reworkAssignment.id,
+          notes,
+        },
+        hotelId: original.hotel_id,
+        transports: [OutboxTransport.PUSH],
+        sourceModule: OutboxSourceModule.QUALITY,
+        producerService: 'QualityService',
+      },
+      tx
+    );
+
+    return reworkAssignment;
   }
 
   /**
@@ -535,6 +570,244 @@ export class QualityService extends BaseService {
     });
   }
 
+
+  /**
+   * May this actor record an inspection against this assignment?
+   *
+   * The identical branch was written out three times -- createVerification,
+   * createRating, and now recordInspection -- which is three places for one
+   * security rule to drift. Extracted verbatim; the comments below are the
+   * ones that were already there and are the reason it is written this way.
+   *
+   * isScopedManagerRole() covers regional_manager as defense-in-depth, not as
+   * a live grant: ADR-030 §3 C-27 denies RM `quality:write`, so an RM cannot
+   * currently reach these methods at all. Written this way because a bare
+   * `role === 'manager'` test would SILENTLY no-op the scope check if C-27
+   * were ever widened -- failing open on a security boundary.
+   *
+   * The checker branch is assignment-based, NOT JWT scope: a checker's token
+   * never carries a scope claim (resolveScope mints one only for
+   * admin/RM/manager), so a scope gate here would deny every checker
+   * unconditionally.
+   */
+  private async assertCanInspect(
+    assignment: { hotel_id: string; day: Date },
+    actor: Actor,
+    forbiddenMessage: string
+  ): Promise<void> {
+    if (isScopedManagerRole(actor.role)) {
+      const inScope = await isHotelInScope(actor.scope ?? null, assignment.hotel_id);
+      if (!inScope) {
+        throw new ForbiddenError(forbiddenMessage);
+      }
+    } else if (actor.role === 'checker') {
+      const checkerAssignment = await this.prisma.workerAssignment.findFirst({
+        where: {
+          worker_id: actor.userId,
+          hotel_id: assignment.hotel_id,
+          day: assignment.day,
+          status: { in: ACTIVE_ASSIGNMENT_STATUSES },
+        },
+      });
+      if (!checkerAssignment) {
+        throw new ForbiddenError(
+          'Checker must have an active assignment at the same hotel on the same day'
+        );
+      }
+    }
+  }
+
+  /**
+   * One inspection, one request (2026-08-29).
+   *
+   * The checker app used to make three sequential calls to end an inspection
+   * -- createRating, then createVerification, then assignRework -- because the
+   * two records live in two tables written by two endpoints. That was wrong in
+   * three concrete ways, all of them invisible from the server side:
+   *
+   *   1. The photos were uploaded TWICE, once per record, over hotel wifi.
+   *   2. Nothing was atomic. A failure between calls left a rating with no
+   *      verification, or a verification with no rework, and the client had to
+   *      reason about which.
+   *   3. The worker received up to THREE notifications for one inspection:
+   *      RATING_RECEIVED, then a score-derived REWORK_REQUIRED from
+   *      createVerification, then the real REWORK_REQUIRED from assignRework.
+   *      Two of those were duplicates of a decision the checker made once.
+   *
+   * This writes both records, the aggregate refresh, the rework assignment and
+   * exactly ONE notification in a single transaction, from a single upload.
+   * The two-endpoint path is untouched -- the web still uses it, and it
+   * remains the way to add a verification to an inspection recorded earlier.
+   *
+   * The outcome is the CHECKER's, not the score's: `outcome: 'rework'` writes
+   * NEEDS_REWORK whatever the number says. See assignRework() for why the
+   * score gate was removed.
+   */
+  async recordInspection(
+    data: RecordInspectionRequest,
+    actor: Actor,
+    photos: UploadedPhoto[] = []
+  ) {
+    const { assignment_id, worker_id, score, comment, criteria_scores, outcome } = data;
+    const reworkNotes = (data.rework_notes ?? comment ?? '').trim();
+
+    const assignment = await this.prisma.workerAssignment.findUnique({
+      where: { id: assignment_id },
+    });
+    if (!assignment) throw new NotFoundError('Assignment not found');
+    if (assignment.worker_id !== worker_id) {
+      throw new ForbiddenError('worker_id does not match the assignment worker');
+    }
+
+    await this.assertCanInspect(assignment, actor, 'Cannot inspect for this hotel');
+
+    // CRR §15: the photo accompanies the rating. After authorization, so an
+    // actor who may not inspect gets that answer rather than a validation hint.
+    if (photos.length === 0) {
+      throw new ValidationError('A photo is required to submit an inspection');
+    }
+    // The notes ARE what the worker is sent and the only instruction they get,
+    // with a 20-minute escalation clock running. An empty one is not a
+    // rework request, it is a shift they cannot act on.
+    if (outcome === 'rework' && reworkNotes === '') {
+      throw new ValidationError('Rework notes are required to assign rework');
+    }
+
+    // Both tables carry `assignment_id @unique`. Pre-checked together so a
+    // half-recorded inspection reports which half already exists, rather than
+    // failing on the second write after the first has committed.
+    const [existingVerification, existingRating] = await Promise.all([
+      this.prisma.qualityVerification.findUnique({ where: { assignment_id } }),
+      this.prisma.rating.findUnique({ where: { assignment_id } }),
+    ]);
+    if (existingVerification) {
+      throw new ConflictError('Verification already exists for this assignment');
+    }
+    if (existingRating) {
+      throw new ConflictError('Rating already exists for this assignment');
+    }
+
+    // ONE upload, shared by both records. They are the same photographs of the
+    // same room on the same visit; storing two copies under two key prefixes
+    // was an artifact of two endpoints, not a property of the evidence.
+    //
+    // Uploaded BEFORE the transaction opens: an S3 round-trip per file inside
+    // it would hold row locks for the duration of a network upload. The cost
+    // is orphaned objects if the commit then fails -- cheap and invisible --
+    // against lock contention on a hot table.
+    const photoKeys = await this.uploadPhotos(photos, assignment_id, 'inspection');
+
+    const derivedStatus: VerificationStatus =
+      score >= 70
+        ? VerificationStatus.PASSED
+        : score >= 40
+          ? VerificationStatus.NEEDS_REWORK
+          : VerificationStatus.FAILED;
+
+    // The decision wins over the derivation. A row that says PASSED while
+    // carrying a rework assignment contradicts itself, renders as a green
+    // badge beside "awaiting the worker", and keeps counting as a pass in
+    // analytics (which filters on `status: PASSED`). Same rule assignRework
+    // applies when it is used on its own.
+    const status = outcome === 'rework' ? VerificationStatus.NEEDS_REWORK : derivedStatus;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let verification;
+      let rating;
+      try {
+        verification = await tx.qualityVerification.create({
+          data: {
+            assignment_id,
+            hotel_id: assignment.hotel_id,
+            verified_by_id: actor.userId,
+            score,
+            status,
+            notes: comment ?? null,
+            photo_urls: photoKeys,
+            ...(outcome === 'rework'
+              ? { rework_required: true, rework_notes: reworkNotes }
+              : {}),
+          },
+        });
+        rating = await tx.rating.create({
+          data: {
+            assignment_id,
+            hotel_id: assignment.hotel_id,
+            worker_id,
+            rated_by_id: actor.userId,
+            score,
+            comment: comment ?? null,
+            criteria_scores: criteria_scores
+              ? (criteria_scores as Prisma.InputJsonValue)
+              : Prisma.JsonNull,
+            photo_urls: photoKeys,
+          },
+        });
+      } catch (error) {
+        // Concurrent duplicates pass the pre-check above and collide here.
+        // Translated to the same 409 rather than surfacing as a 500.
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+          throw new ConflictError('This assignment has already been inspected');
+        }
+        throw error;
+      }
+
+      // GD-04 single-writer rule: every path that writes a Rating must refresh
+      // the aggregate inside the same transaction, or WorkerOverallRating goes
+      // silently stale.
+      await refreshWorkerOverallRating(tx, worker_id);
+
+      if (outcome === 'rework') {
+        // No compare-and-swap here, unlike assignRework: the verification row
+        // was created microseconds ago inside this same transaction, so there
+        // is no concurrent claimant to lose to. The duplicate this guards
+        // against upstream -- two rework rows and two escalation timers for
+        // one failure -- is prevented by `assignment_id @unique` instead.
+        const reworkAssignment = await this.createReworkAssignment(tx, {
+          original: assignment,
+          verificationId: verification.id,
+          notes: reworkNotes,
+          actorId: actor.userId,
+        });
+        return { verification, rating, reworkAssignment };
+      }
+
+      // Exactly one notification for the "complete" outcome. The old
+      // three-call path sent RATING_RECEIVED as well; two pushes for one
+      // inspection is noise, and the score is in this one.
+      await notificationService.enqueue(
+        {
+          recipientId: worker_id,
+          type: 'QUALITY_VERIFICATION_SUBMITTED',
+          title: 'Quality check recorded',
+          message: `Your work was inspected and scored ${score} out of 100.`,
+          data: { verification_id: verification.id, rating_id: rating.id, assignment_id, score, status },
+          hotelId: assignment.hotel_id,
+          transports: [OutboxTransport.PUSH],
+          sourceModule: OutboxSourceModule.QUALITY,
+          producerService: 'QualityService',
+        },
+        tx
+      );
+
+      return { verification, rating, reworkAssignment: null };
+    });
+
+    await this.logAudit(
+      actor.userId,
+      actor.role,
+      'RECORD_INSPECTION',
+      'QUALITY_VERIFICATION',
+      result.verification.id,
+      { assignment_id, worker_id, score, outcome },
+    );
+
+    return {
+      verification: result.verification,
+      rating: result.rating,
+      rework_assignment: result.reworkAssignment,
+    };
+  }
 
   async createVerification(
     data: CreateQualityVerificationRequest,

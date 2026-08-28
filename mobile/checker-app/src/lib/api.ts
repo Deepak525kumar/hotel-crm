@@ -22,6 +22,7 @@ import type {
   LeaderboardEntry,
   Notification,
   OwnInspectionsPage,
+  RecordedInspection,
   PayslipRequestDto,
   PushApp,
   PushPlatform,
@@ -33,6 +34,7 @@ import type {
   WorkerDocument,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
+import type { InspectionOutcome } from '@/lib/inspection-outcome';
 
 // KNOWN GAP -- the user-facing error strings in this module (rate limit,
 // session revoked, session expired, token-refresh failure, generic request
@@ -539,6 +541,48 @@ export const api = {
         body: form,
       });
     },
+    /**
+     * One inspection, one request (2026-08-29).
+     *
+     * Replaces the three-call sequence this app used to run at the end of an
+     * inspection -- createRating, then createVerification, then assignRework.
+     * That uploaded the photos TWICE (once per record, over hotel wifi), had
+     * no atomicity, and produced up to three notifications for one decision.
+     * The server now writes both records, the aggregate refresh, any rework
+     * assignment and exactly one notification in a single transaction.
+     *
+     * `outcome` is the checker's decision and is NOT inferred from `score`:
+     * rework is assignable at any score.
+     */
+    recordInspection: (
+      data: {
+        assignment_id: string;
+        worker_id: string;
+        score: number;
+        comment?: string;
+        criteria_scores?: Record<string, number>;
+        outcome: InspectionOutcome;
+        rework_notes?: string;
+      },
+      photos: { uri: string; name: string; type: string }[] = []
+    ) => {
+      const form = new FormData();
+      form.append('assignment_id', data.assignment_id);
+      form.append('worker_id', data.worker_id);
+      form.append('score', String(data.score));
+      form.append('outcome', data.outcome);
+      if (data.comment) form.append('comment', data.comment);
+      if (data.rework_notes) form.append('rework_notes', data.rework_notes);
+      if (data.criteria_scores) {
+        form.append('criteria_scores', JSON.stringify(data.criteria_scores));
+      }
+      for (const photo of photos) appendNativeFile(form, 'photos', photo);
+      return request<RecordedInspection>('/quality/inspections', {
+        method: 'POST',
+        body: form,
+      });
+    },
+
     createRating: (
       data: {
         assignment_id: string;
