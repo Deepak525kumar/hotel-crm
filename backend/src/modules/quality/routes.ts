@@ -79,6 +79,20 @@ router.post(
   (req, res, next) => qualityController.createRating(req, res, next)
 );
 
+// One inspection, one request (2026-08-29). Writes the Rating AND the
+// QualityVerification -- plus the rework assignment when the checker asks for
+// one -- in a single transaction from a single photo upload.
+//
+// The two single-record routes above are deliberately kept: the web still uses
+// them, and POST /verifications remains the way to add a pass/fail check to an
+// inspection that was only rated.
+router.post(
+  '/inspections',
+  requirePermission('quality:write'),
+  photoUpload.array('photos', MAX_PHOTOS_PER_VERIFICATION),
+  (req, res, next) => qualityController.recordInspection(req, res, next)
+);
+
 // Presigned URLs for one rating's evidence — same shape as
 // /verifications/:id/photos above, quality:read rather than quality:write for
 // the identical reason (managers/RMs hold read and must be able to see what

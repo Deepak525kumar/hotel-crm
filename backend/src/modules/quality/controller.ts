@@ -8,6 +8,7 @@ import {
   CreateRatingSchema,
   ListLeaderboardQuerySchema,
   ListOwnInspectionsQuerySchema,
+  RecordInspectionSchema,
 } from './types.js';
 import type { UploadedPhoto } from './types.js';
 
@@ -123,6 +124,37 @@ export class QualityController {
         scope: req.auth.scope ?? null,
       });
       res.status(200).json({
+        status: 'success',
+        data: result,
+        meta: { timestamp: new Date().toISOString(), request_id: req.requestId },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // One inspection, one request: both records, the aggregate refresh, any
+  // rework assignment and exactly one notification, in a single transaction
+  // from a single photo upload.
+  async recordInspection(req: Request, res: Response, next: NextFunction) {
+    try {
+      if (!req.auth) throw new UnauthorizedError('Not authenticated');
+      const parsed = RecordInspectionSchema.safeParse(req.body);
+      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message);
+
+      const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+      const photos: UploadedPhoto[] = files.map((f) => ({
+        buffer: f.buffer,
+        mimeType: f.mimetype,
+        originalName: f.originalname,
+      }));
+
+      const result = await qualityService.recordInspection(
+        parsed.data as never,
+        { userId: req.auth.userId, role: req.auth.role, scope: req.auth.scope ?? null },
+        photos
+      );
+      res.status(201).json({
         status: 'success',
         data: result,
         meta: { timestamp: new Date().toISOString(), request_id: req.requestId },

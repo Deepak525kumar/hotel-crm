@@ -997,7 +997,6 @@
   "quality": {
     "markComplete": "Mark complete",
     "reworkNeedsComment": "Add a comment first — the worker is sent it as the rework instructions.",
-    "outcomeFailed": "The inspection could not be saved in full. Check your history before submitting it again.",
     "historySubtitle": "Shifts you have scored",
     "historyEmpty": "No inspections yet",
     "historyEmptyBody": "Shifts you score will appear here, with the photos you uploaded.",
