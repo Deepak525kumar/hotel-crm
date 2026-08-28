@@ -997,7 +997,6 @@
   "quality": {
     "markComplete": "Als erledigt markieren",
     "reworkNeedsComment": "Fügen Sie zuerst einen Kommentar hinzu – er wird der Mitarbeiterin bzw. dem Mitarbeiter als Nacharbeitsanweisung gesendet.",
-    "outcomeFailed": "Die Kontrolle konnte nicht vollständig gespeichert werden. Prüfen Sie Ihren Verlauf, bevor Sie sie erneut senden.",
     "historySubtitle": "Von Ihnen bewertete Schichten",
     "historyEmpty": "Noch keine Kontrollen",
     "historyEmptyBody": "Von Ihnen bewertete Schichten erscheinen hier, zusammen mit Ihren hochgeladenen Fotos.",

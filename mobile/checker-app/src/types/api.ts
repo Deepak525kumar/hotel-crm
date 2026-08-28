@@ -153,6 +153,21 @@ export interface Rating {
 }
 
 /**
+ * What POST /quality/inspections returns: both records written for one visit,
+ * plus the rework assignment when the checker asked for one.
+ *
+ * `rework_assignment` is null on the "complete" outcome. It is the WHOLE
+ * assignment row rather than an id because the worker app deep-links a
+ * REWORK_REQUIRED push on it, and returning it here keeps the shape honest
+ * about what the request actually created.
+ */
+export interface RecordedInspection {
+  verification: QualityVerification;
+  rating: Rating;
+  rework_assignment: { id: string } | null;
+}
+
+/**
  * One row of the checker's own inspection history
  * (GET /quality/my-inspections).
  *

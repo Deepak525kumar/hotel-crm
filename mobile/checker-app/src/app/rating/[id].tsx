@@ -93,44 +93,22 @@ export default function RatingScreen() {
         Object.entries(scores).filter(([, v]) => typeof v === 'number'),
       ) as Record<string, number>;
 
-      // The Rating goes first, deliberately. It is this screen's primary
-      // record -- the checklist is what feeds WorkerOverallRating -- and it is
-      // what the screen wrote before this change. Leading with it means the
-      // worst case of a partial failure below is exactly the old behaviour
-      // (a saved rating, no verification), which History can then finish via
-      // its "record a pass/fail check" row. The reverse order would let a
-      // verification failure discard a completed checklist.
-      await api.quality.createRating(
+      // ONE request. This was three -- createRating, createVerification,
+      // assignRework -- which uploaded the photos twice, could not be atomic,
+      // and sent the worker up to three notifications for one decision. The
+      // server now writes both records, the aggregate refresh, any rework
+      // assignment and exactly one notification in a single transaction.
+      const { verification } = await api.quality.recordInspection(
         {
           assignment_id: id,
           worker_id: workerId,
           score: overall,
           comment: comment || undefined,
           criteria_scores,
+          outcome,
         },
         picker.photos,
       );
-
-      // The decision itself. Status is derived server-side from the score, so
-      // this records PASSED/NEEDS_REWORK/FAILED without the client asserting
-      // one -- the outcome the checker chose and the score they gave cannot
-      // disagree.
-      //
-      // The photos are sent a second time rather than shared. The two records
-      // hold independent evidence (`Rating.photo_urls` and
-      // `QualityVerification.photo_urls`) and there is no endpoint that writes
-      // both, so this costs one extra upload per inspection. Worth it for now:
-      // the alternative is a verification with no evidence behind a decision
-      // that can send someone back to redo a room. A combined
-      // create-inspection endpoint is the real fix.
-      const verification = await api.quality.createVerification(
-        { assignment_id: id, score: overall, notes: comment || undefined },
-        picker.photos,
-      );
-
-      if (outcome === 'rework') {
-        await api.quality.assignRework(verification.id, comment.trim());
-      }
 
       Alert.alert(
         t('common.submitted'),
@@ -147,11 +125,11 @@ export default function RatingScreen() {
         ],
       );
     } catch (e) {
-      // A failure here may be partial -- the rating can be saved while the
-      // verification or the rework call is not. Saying only "the rating could
-      // not be saved" would be wrong in that case and would invite a duplicate
-      // submission, which the server answers with a 409 on assignment_id.
-      setError(translateApiError(e, t, 'quality.outcomeFailed'));
+      // Nothing partial to explain any more: the request either recorded the
+      // whole inspection or recorded none of it. A retry is safe, and a
+      // genuine duplicate is answered with a 409 that translateApiError
+      // surfaces as its own message.
+      setError(translateApiError(e, t, 'quality.ratingFailed'));
     } finally {
       setSubmitting(false);
     }
