@@ -17,6 +17,11 @@ import {
   type InspectionChecklistItem,
 } from '@/lib/inspection-checklist';
 import { usePhotoPicker } from '@/hooks/usePhotoPicker';
+import {
+  PASSING_SCORE,
+  resolveOutcomeAvailability,
+  type InspectionOutcome,
+} from '@/lib/inspection-outcome';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -48,7 +53,10 @@ export default function RatingScreen() {
   const [overallRaw, setOverallRaw] = useState('');
   const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
-  const submit = async () => {
+  // Drives both the button's disabled state and the reason shown under it.
+  const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(overall, comment);
+
+  const submit = async (outcome: InspectionOutcome) => {
     setError(null);
 
     const scoredItems = INSPECTION_CHECKLIST_ITEMS.filter((item) => typeof scores[item] === 'number');
@@ -75,6 +83,22 @@ export default function RatingScreen() {
       setError(t('quality.workerUnknown'));
       return;
     }
+    // The rework gate, re-checked at submit rather than trusted from the
+    // disabled button: `overall` and `comment` are free-text state and the
+    // button's disabled prop is a render-time snapshot.
+    if (outcome === 'rework') {
+      const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(overall, comment);
+      if (!reworkAllowed) {
+        setError(
+          reworkBlockedReason === 'PASSING_SCORE'
+            ? t('quality.reworkNeedsFailingScore', { score: PASSING_SCORE })
+            : reworkBlockedReason === 'NO_COMMENT'
+              ? t('quality.reworkNeedsComment')
+              : t('quality.checklistEmpty'),
+        );
+        return;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -82,6 +106,13 @@ export default function RatingScreen() {
         Object.entries(scores).filter(([, v]) => typeof v === 'number'),
       ) as Record<string, number>;
 
+      // The Rating goes first, deliberately. It is this screen's primary
+      // record -- the checklist is what feeds WorkerOverallRating -- and it is
+      // what the screen wrote before this change. Leading with it means the
+      // worst case of a partial failure below is exactly the old behaviour
+      // (a saved rating, no verification), which History can then finish via
+      // its "record a pass/fail check" row. The reverse order would let a
+      // verification failure discard a completed checklist.
       await api.quality.createRating(
         {
           assignment_id: id,
@@ -92,11 +123,48 @@ export default function RatingScreen() {
         },
         picker.photos,
       );
-      Alert.alert(t('common.submitted'), t('quality.ratingRecorded'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ]);
+
+      // The decision itself. Status is derived server-side from the score, so
+      // this records PASSED/NEEDS_REWORK/FAILED without the client asserting
+      // one -- the outcome the checker chose and the score they gave cannot
+      // disagree.
+      //
+      // The photos are sent a second time rather than shared. The two records
+      // hold independent evidence (`Rating.photo_urls` and
+      // `QualityVerification.photo_urls`) and there is no endpoint that writes
+      // both, so this costs one extra upload per inspection. Worth it for now:
+      // the alternative is a verification with no evidence behind a decision
+      // that can send someone back to redo a room. A combined
+      // create-inspection endpoint is the real fix.
+      const verification = await api.quality.createVerification(
+        { assignment_id: id, score: overall, notes: comment || undefined },
+        picker.photos,
+      );
+
+      if (outcome === 'rework') {
+        await api.quality.assignRework(verification.id, comment.trim());
+      }
+
+      Alert.alert(
+        t('common.submitted'),
+        outcome === 'rework' ? t('quality.reworkAssigned') : t('quality.ratingRecorded'),
+        [
+          {
+            text: t('common.ok'),
+            // Land on the evidence screen rather than dismissing: it shows the
+            // recorded outcome, the photos, and the rework state -- and it is
+            // where rework can still be assigned if the checker completed now
+            // and changed their mind.
+            onPress: () => router.replace(`/verification/${verification.id}`),
+          },
+        ],
+      );
     } catch (e) {
-      setError(translateApiError(e, t, 'quality.ratingFailed'));
+      // A failure here may be partial -- the rating can be saved while the
+      // verification or the rework call is not. Saying only "the rating could
+      // not be saved" would be wrong in that case and would invite a duplicate
+      // submission, which the server answers with a 409 on assignment_id.
+      setError(translateApiError(e, t, 'quality.outcomeFailed'));
     } finally {
       setSubmitting(false);
     }
@@ -211,12 +279,34 @@ export default function RatingScreen() {
             </ThemedText>
           ) : null}
 
+          {/* Two outcomes, not one submit. An inspection ends in a decision --
+              the room is acceptable, or it has to be redone -- and the screen
+              used to record a score without ever recording which.
+
+              "Assign rework" stays visible when it is unavailable, with the
+              reason underneath, rather than disappearing: a button that comes
+              and goes as a number is typed reads as a glitch, and the rule
+              (a passing score has nothing to redo) is worth stating once
+              where the checker meets it. */}
           <Button
-            label={t('quality.submitRating')}
-            onPress={() => void submit()}
+            label={t('quality.markComplete')}
+            onPress={() => void submit('complete')}
             loading={submitting}
             style={styles.submit}
           />
+          <Button
+            label={t('quality.assignRework')}
+            variant="secondary"
+            disabled={!reworkAllowed || submitting}
+            onPress={() => void submit('rework')}
+          />
+          {reworkBlockedReason && reworkBlockedReason !== 'NO_SCORE' ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {reworkBlockedReason === 'PASSING_SCORE'
+                ? t('quality.reworkNeedsFailingScore', { score: PASSING_SCORE })
+                : t('quality.reworkNeedsComment')}
+            </ThemedText>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
