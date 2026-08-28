@@ -90,12 +90,16 @@ export default function VerificationEvidenceScreen() {
       .finally(() => setAssigning(false));
   };
 
-  // A passed inspection has nothing to rework, and rework can only be assigned
-  // once (the server enforces this with a compare-and-swap and answers 409).
-  const canAssignRework =
-    verification !== null &&
-    verification.status !== 'PASSED' &&
-    verification.rework_required !== true;
+  // Offered at any status. Rework is the checker's decision, not an inference
+  // from the score (owner decision, 2026-08-29) -- this used to exclude PASSED,
+  // which meant a checker who scored a room 75 and then found something that
+  // had to be redone had no way to say so from the evidence screen either.
+  //
+  // The one remaining condition is that rework has not already been assigned:
+  // the server enforces that with a compare-and-swap and answers 409, and a
+  // second rework row would start a second 20-minute escalation timer for one
+  // failure.
+  const canAssignRework = verification !== null && verification.rework_required !== true;
 
   const styles = StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },

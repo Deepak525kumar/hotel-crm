@@ -178,6 +178,7 @@
     "targetRoleChecker": "Prüfer"
   },
   "nav": {
+    "history": "Verlauf",
     "dashboard": "Übersicht",
     "assignments": "Einsätze",
     "attendance": "Anwesenheit",
@@ -994,6 +995,18 @@
     "nothingErased": "Nichts wird gelöscht. Der Verlauf bleibt erhalten und ein Administrator kann den Eintrag aus der Archivansicht wiederherstellen."
   },
   "quality": {
+    "markComplete": "Als erledigt markieren",
+    "reworkNeedsComment": "Fügen Sie zuerst einen Kommentar hinzu – er wird der Mitarbeiterin bzw. dem Mitarbeiter als Nacharbeitsanweisung gesendet.",
+    "historySubtitle": "Von Ihnen bewertete Schichten",
+    "historyEmpty": "Noch keine Kontrollen",
+    "historyEmptyBody": "Von Ihnen bewertete Schichten erscheinen hier, zusammen mit Ihren hochgeladenen Fotos.",
+    "ratingLabel": "Bewertung",
+    "verificationLabel": "Prüfung",
+    "notChecked": "Keine Bestanden-/Nicht-bestanden-Prüfung erfasst",
+    "recordVerification": "Bestanden-/Nicht-bestanden-Prüfung erfassen",
+    "photoCount": "{{count}} Fotos",
+    "ratingEvidence": "Nachweise zur Bewertung",
+    "noPhotos": "Zu dieser Bewertung wurden keine Fotos hochgeladen.",
     "outcome": "Ergebnis",
     "determinedByScore": "Anhand der Punktzahl bestimmt",
     "submitVerification": "Verifizierung absenden",

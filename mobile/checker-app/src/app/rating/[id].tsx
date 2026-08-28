@@ -17,6 +17,7 @@ import {
   type InspectionChecklistItem,
 } from '@/lib/inspection-checklist';
 import { usePhotoPicker } from '@/hooks/usePhotoPicker';
+import { resolveOutcomeAvailability, type InspectionOutcome } from '@/lib/inspection-outcome';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -48,7 +49,10 @@ export default function RatingScreen() {
   const [overallRaw, setOverallRaw] = useState('');
   const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
-  const submit = async () => {
+  // Drives both the button's disabled state and the reason shown under it.
+  const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(comment);
+
+  const submit = async (outcome: InspectionOutcome) => {
     setError(null);
 
     const scoredItems = INSPECTION_CHECKLIST_ITEMS.filter((item) => typeof scores[item] === 'number');
@@ -75,6 +79,13 @@ export default function RatingScreen() {
       setError(t('quality.workerUnknown'));
       return;
     }
+    // The rework gate, re-checked at submit rather than trusted from the
+    // disabled button: `overall` and `comment` are free-text state and the
+    // button's disabled prop is a render-time snapshot.
+    if (outcome === 'rework' && !resolveOutcomeAvailability(comment).reworkAllowed) {
+      setError(t('quality.reworkNeedsComment'));
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -82,20 +93,42 @@ export default function RatingScreen() {
         Object.entries(scores).filter(([, v]) => typeof v === 'number'),
       ) as Record<string, number>;
 
-      await api.quality.createRating(
+      // ONE request. This was three -- createRating, createVerification,
+      // assignRework -- which uploaded the photos twice, could not be atomic,
+      // and sent the worker up to three notifications for one decision. The
+      // server now writes both records, the aggregate refresh, any rework
+      // assignment and exactly one notification in a single transaction.
+      const { verification } = await api.quality.recordInspection(
         {
           assignment_id: id,
           worker_id: workerId,
           score: overall,
           comment: comment || undefined,
           criteria_scores,
+          outcome,
         },
         picker.photos,
       );
-      Alert.alert(t('common.submitted'), t('quality.ratingRecorded'), [
-        { text: t('common.ok'), onPress: () => router.back() },
-      ]);
+
+      Alert.alert(
+        t('common.submitted'),
+        outcome === 'rework' ? t('quality.reworkAssigned') : t('quality.ratingRecorded'),
+        [
+          {
+            text: t('common.ok'),
+            // Land on the evidence screen rather than dismissing: it shows the
+            // recorded outcome, the photos, and the rework state -- and it is
+            // where rework can still be assigned if the checker completed now
+            // and changed their mind.
+            onPress: () => router.replace(`/verification/${verification.id}`),
+          },
+        ],
+      );
     } catch (e) {
+      // Nothing partial to explain any more: the request either recorded the
+      // whole inspection or recorded none of it. A retry is safe, and a
+      // genuine duplicate is answered with a 409 that translateApiError
+      // surfaces as its own message.
       setError(translateApiError(e, t, 'quality.ratingFailed'));
     } finally {
       setSubmitting(false);
@@ -211,12 +244,30 @@ export default function RatingScreen() {
             </ThemedText>
           ) : null}
 
+          {/* Two outcomes, not one submit. An inspection ends in a decision --
+              the room is acceptable, or it has to be redone -- and the screen
+              used to record a score without ever recording which.
+
+              Neither button depends on the score. Rework is the checker's
+              call at any score (owner decision, 2026-08-29); the only thing
+              it needs is the note the worker will be sent. */}
           <Button
-            label={t('quality.submitRating')}
-            onPress={() => void submit()}
+            label={t('quality.markComplete')}
+            onPress={() => void submit('complete')}
             loading={submitting}
             style={styles.submit}
           />
+          <Button
+            label={t('quality.assignRework')}
+            variant="secondary"
+            disabled={!reworkAllowed || submitting}
+            onPress={() => void submit('rework')}
+          />
+          {reworkBlockedReason ? (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('quality.reworkNeedsComment')}
+            </ThemedText>
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>

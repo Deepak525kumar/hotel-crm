@@ -21,6 +21,8 @@ import type {
   EmploymentRecordDto,
   LeaderboardEntry,
   Notification,
+  OwnInspectionsPage,
+  RecordedInspection,
   PayslipRequestDto,
   PushApp,
   PushPlatform,
@@ -32,6 +34,7 @@ import type {
   WorkerDocument,
 } from '@/types/api';
 import type { UiLocale } from '@/lib/locales';
+import type { InspectionOutcome } from '@/lib/inspection-outcome';
 
 // KNOWN GAP -- the user-facing error strings in this module (rate limit,
 // session revoked, session expired, token-refresh failure, generic request
@@ -538,6 +541,48 @@ export const api = {
         body: form,
       });
     },
+    /**
+     * One inspection, one request (2026-08-29).
+     *
+     * Replaces the three-call sequence this app used to run at the end of an
+     * inspection -- createRating, then createVerification, then assignRework.
+     * That uploaded the photos TWICE (once per record, over hotel wifi), had
+     * no atomicity, and produced up to three notifications for one decision.
+     * The server now writes both records, the aggregate refresh, any rework
+     * assignment and exactly one notification in a single transaction.
+     *
+     * `outcome` is the checker's decision and is NOT inferred from `score`:
+     * rework is assignable at any score.
+     */
+    recordInspection: (
+      data: {
+        assignment_id: string;
+        worker_id: string;
+        score: number;
+        comment?: string;
+        criteria_scores?: Record<string, number>;
+        outcome: InspectionOutcome;
+        rework_notes?: string;
+      },
+      photos: { uri: string; name: string; type: string }[] = []
+    ) => {
+      const form = new FormData();
+      form.append('assignment_id', data.assignment_id);
+      form.append('worker_id', data.worker_id);
+      form.append('score', String(data.score));
+      form.append('outcome', data.outcome);
+      if (data.comment) form.append('comment', data.comment);
+      if (data.rework_notes) form.append('rework_notes', data.rework_notes);
+      if (data.criteria_scores) {
+        form.append('criteria_scores', JSON.stringify(data.criteria_scores));
+      }
+      for (const photo of photos) appendNativeFile(form, 'photos', photo);
+      return request<RecordedInspection>('/quality/inspections', {
+        method: 'POST',
+        body: form,
+      });
+    },
+
     createRating: (
       data: {
         assignment_id: string;
@@ -587,6 +632,33 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ verification_id: verificationId, notes }),
       }),
+
+    /**
+     * The checker's own inspection history — the shifts they scored, newest
+     * first. Self-scoped server-side off the auth token; there is no actor
+     * parameter to pass and none to spoof.
+     *
+     * This is the app's only route back to a past inspection. Before it, both
+     * evidence screens were reachable only from the redirect immediately after
+     * submitting, or from a push notification — so a checker who dismissed the
+     * confirmation could not see their own scores or photos again, and
+     * "Assign rework" (CRR §14) had no entry point at all.
+     */
+    myInspections: (page = 1, perPage = 20) =>
+      request<OwnInspectionsPage>(
+        `/quality/my-inspections?page=${page}&per_page=${perPage}`
+      ),
+
+    /**
+     * Presigned URLs for one RATING's evidence — the checklist score's photos,
+     * the counterpart of verificationPhotos below. The endpoint has existed
+     * since CRR §15 gave Rating a photo column; nothing in this app called it,
+     * so photos uploaded with a rating could never be looked at again.
+     */
+    ratingPhotos: (ratingId: string) =>
+      request<{ rating_id: string; photos: { key: string; url: string | null }[] }>(
+        `/quality/ratings/${encodeURIComponent(ratingId)}/photos`
+      ),
 
     verificationPhotos: (verificationId: string) =>
       request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(

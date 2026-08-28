@@ -179,6 +179,7 @@
     "targetRoleChecker": "چیکر"
   },
   "nav": {
+    "history": "تاریخ",
     "dashboard": "ڈیش بورڈ",
     "assignments": "تفویضات",
     "attendance": "حاضری",
@@ -995,6 +996,18 @@
     "nothingErased": "کچھ بھی مٹایا نہیں جاتا۔ تاریخ محفوظ رہتی ہے اور ایڈمن اسے آرکائیو ویو سے بحال کر سکتا ہے۔"
   },
   "quality": {
+    "markComplete": "مکمل کے طور پر نشان زد کریں",
+    "reworkNeedsComment": "پہلے تبصرہ شامل کریں — یہ کارکن کو دوبارہ کام کی ہدایات کے طور پر بھیجا جاتا ہے۔",
+    "historySubtitle": "وہ شفٹیں جن کو آپ نے اسکور کیا",
+    "historyEmpty": "ابھی تک کوئی معائنہ نہیں",
+    "historyEmptyBody": "جن شفٹوں کو آپ اسکور کریں گے وہ آپ کی اپ لوڈ کردہ تصاویر کے ساتھ یہاں دکھائی دیں گی۔",
+    "ratingLabel": "درجہ بندی",
+    "verificationLabel": "جانچ",
+    "notChecked": "کوئی پاس/فیل جانچ درج نہیں",
+    "recordVerification": "پاس/فیل جانچ درج کریں",
+    "photoCount": "{{count}} تصاویر",
+    "ratingEvidence": "درجہ بندی کے شواہد",
+    "noPhotos": "اس درجہ بندی کے ساتھ کوئی تصویر اپ لوڈ نہیں کی گئی۔",
     "outcome": "نتیجہ",
     "determinedByScore": "اسکور سے طے شدہ",
     "submitVerification": "تصدیق جمع کریں",

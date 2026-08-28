@@ -178,6 +178,7 @@
     "targetRoleChecker": "Checker"
   },
   "nav": {
+    "history": "History",
     "dashboard": "Dashboard",
     "assignments": "Assignments",
     "attendance": "Attendance",
@@ -994,6 +995,18 @@
     "nothingErased": "Nothing is erased. History is preserved and an admin can restore it from the archived view."
   },
   "quality": {
+    "markComplete": "Mark complete",
+    "reworkNeedsComment": "Add a comment first — the worker is sent it as the rework instructions.",
+    "historySubtitle": "Shifts you have scored",
+    "historyEmpty": "No inspections yet",
+    "historyEmptyBody": "Shifts you score will appear here, with the photos you uploaded.",
+    "ratingLabel": "Rating",
+    "verificationLabel": "Check",
+    "notChecked": "No pass/fail check recorded",
+    "recordVerification": "Record a pass/fail check",
+    "photoCount": "{{count}} photos",
+    "ratingEvidence": "Rating evidence",
+    "noPhotos": "No photos were uploaded with this rating.",
     "outcome": "Outcome",
     "determinedByScore": "Determined by score",
     "submitVerification": "Submit Verification",
