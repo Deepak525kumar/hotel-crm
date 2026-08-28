@@ -6,8 +6,16 @@ import { useTranslation } from 'react-i18next';
 import { PushRegistration } from '@/components/PushRegistration';
 
 /**
- * Four tabs: Home, Schedule, Attendance, Profile — the same bar the worker app
- * has, in the same order.
+ * Five tabs: Home, Schedule, Attendance, History, Profile. The first three and
+ * the last are the same bar the worker app has, in the same order.
+ *
+ * `history` is the one tab this app has that worker-app does not, and it is
+ * role-specific rather than a copy: it lists the shifts THIS checker scored.
+ * Before it, the app had no route back to a past inspection at all — both
+ * evidence screens are keyed by a record id and nothing handed one out after
+ * the fact, so a checker could not review their own scores or photos, and
+ * "Assign rework" (CRR §14) was reachable only in the seconds after
+ * submitting a verification or by tapping a REWORK_COMPLETED push.
  *
  * It used to be Queue, Leaderboard, Sick/Vacation, Profile, which shared no
  * shape with the worker app and opened onto an attendance queue rather than a
@@ -97,6 +105,19 @@ export default function AppLayout() {
             tabBarIcon: ({ color, size }) => (
               <SymbolView
                 name={{ ios: 'clock', android: 'schedule', web: 'schedule' }}
+                tintColor={color}
+                size={size}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="history"
+          options={{
+            title: t('nav.history'),
+            tabBarIcon: ({ color, size }) => (
+              <SymbolView
+                name={{ ios: 'checklist', android: 'fact_check', web: 'fact_check' }}
                 tintColor={color}
                 size={size}
               />
