@@ -17,11 +17,7 @@ import {
   type InspectionChecklistItem,
 } from '@/lib/inspection-checklist';
 import { usePhotoPicker } from '@/hooks/usePhotoPicker';
-import {
-  PASSING_SCORE,
-  resolveOutcomeAvailability,
-  type InspectionOutcome,
-} from '@/lib/inspection-outcome';
+import { resolveOutcomeAvailability, type InspectionOutcome } from '@/lib/inspection-outcome';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -54,7 +50,7 @@ export default function RatingScreen() {
   const overall = overallRaw.trim() === '' ? null : Number(overallRaw);
 
   // Drives both the button's disabled state and the reason shown under it.
-  const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(overall, comment);
+  const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(comment);
 
   const submit = async (outcome: InspectionOutcome) => {
     setError(null);
@@ -86,18 +82,9 @@ export default function RatingScreen() {
     // The rework gate, re-checked at submit rather than trusted from the
     // disabled button: `overall` and `comment` are free-text state and the
     // button's disabled prop is a render-time snapshot.
-    if (outcome === 'rework') {
-      const { reworkAllowed, reworkBlockedReason } = resolveOutcomeAvailability(overall, comment);
-      if (!reworkAllowed) {
-        setError(
-          reworkBlockedReason === 'PASSING_SCORE'
-            ? t('quality.reworkNeedsFailingScore', { score: PASSING_SCORE })
-            : reworkBlockedReason === 'NO_COMMENT'
-              ? t('quality.reworkNeedsComment')
-              : t('quality.checklistEmpty'),
-        );
-        return;
-      }
+    if (outcome === 'rework' && !resolveOutcomeAvailability(comment).reworkAllowed) {
+      setError(t('quality.reworkNeedsComment'));
+      return;
     }
 
     setSubmitting(true);
@@ -283,11 +270,9 @@ export default function RatingScreen() {
               the room is acceptable, or it has to be redone -- and the screen
               used to record a score without ever recording which.
 
-              "Assign rework" stays visible when it is unavailable, with the
-              reason underneath, rather than disappearing: a button that comes
-              and goes as a number is typed reads as a glitch, and the rule
-              (a passing score has nothing to redo) is worth stating once
-              where the checker meets it. */}
+              Neither button depends on the score. Rework is the checker's
+              call at any score (owner decision, 2026-08-29); the only thing
+              it needs is the note the worker will be sent. */}
           <Button
             label={t('quality.markComplete')}
             onPress={() => void submit('complete')}
@@ -300,11 +285,9 @@ export default function RatingScreen() {
             disabled={!reworkAllowed || submitting}
             onPress={() => void submit('rework')}
           />
-          {reworkBlockedReason && reworkBlockedReason !== 'NO_SCORE' ? (
+          {reworkBlockedReason ? (
             <ThemedText type="small" themeColor="textSecondary">
-              {reworkBlockedReason === 'PASSING_SCORE'
-                ? t('quality.reworkNeedsFailingScore', { score: PASSING_SCORE })
-                : t('quality.reworkNeedsComment')}
+              {t('quality.reworkNeedsComment')}
             </ThemedText>
           ) : null}
         </ScrollView>

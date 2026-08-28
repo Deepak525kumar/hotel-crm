@@ -996,7 +996,6 @@
   },
   "quality": {
     "markComplete": "Als erledigt markieren",
-    "reworkNeedsFailingScore": "Nacharbeit ist nur unter {{score}} möglich – bei einer bestandenen Bewertung gibt es nichts nachzuarbeiten.",
     "reworkNeedsComment": "Fügen Sie zuerst einen Kommentar hinzu – er wird der Mitarbeiterin bzw. dem Mitarbeiter als Nacharbeitsanweisung gesendet.",
     "outcomeFailed": "Die Kontrolle konnte nicht vollständig gespeichert werden. Prüfen Sie Ihren Verlauf, bevor Sie sie erneut senden.",
     "historySubtitle": "Von Ihnen bewertete Schichten",
