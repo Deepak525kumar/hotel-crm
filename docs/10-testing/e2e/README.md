@@ -57,13 +57,14 @@ replace them.
 | 10 | `scenarios/10-calendar-shift-summary.md` | Calendar / daily shift summary |
 | 11 | `scenarios/11-daily-consent-gate.md` | Daily consent gate: enforcement, escape hatches, day rollover |
 | 12 | `scenarios/12-checker-photo-evidence-and-rework.md` | Checker photo evidence, rework loop, escalation, ADR-069 metric exclusion |
+| 16 | `scenarios/16-push-notification-delivery.md` | Push delivery end to end: token registration, APNs topic/environment, outbox fan-out, invalid-token pruning |
 
-**Start with 00. Then 01-07 and 09-12 in order.** 08 is not a test — it is the backlog and the
+**Start with 00. Then 01-07, 09-12 and 16 in order.** 08 is not a test — it is the backlog and the
 "what we still haven't checked" list. Read it at the end of a run and update it.
 
-### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25)
+### Known coverage gaps (recorded 2026-08-22, extended 2026-08-25, one closed 2026-08-28)
 
-Four shipped features have no scenario. Listed here rather than left to be rediscovered, per this
+Three shipped features have no scenario. Listed here rather than left to be rediscovered, per this
 suite's own rule that a gap found but not written down gets found again from scratch. **These are
 outstanding work, not passed checks.**
 
@@ -72,9 +73,13 @@ outstanding work, not passed checks.**
 | `13-language-and-rtl.md` | Six UI locales (`de en fr ar uk ur`), two right-to-left, persisted on `User.preferred_language`, across web and both mobile apps | PRs #471–#484 | **none — undocumented, no specification** |
 | `14-payslip-requests.md` | Payslip request intake, manager fulfilment, date validation | PRs #487–#491 | `ADR-014`, `SPEC-HR-001` |
 | `15-re-onboarding.md` | Re-onboarding of inactive/deactivated workers, nav lockout, capability pin | PRs #468, #469 | `ADR-065` (partially) |
-| `16-push-notification-delivery.md` | Device push: token registration through the consent gate, `PushToken` ownership reassignment, PUSH outbox fan-out, APNs/FCM send, invalid-token pruning | Epic 7 PRs 7.5–7.8 | `ADR-029` §4, `SPEC-NOTIF-001` |
 
-The language one matters most and is the least testable as things stand: there is no specification
+**`16-push-notification-delivery.md` was written on 2026-08-28** and is no longer a gap — see
+the scenario index above. It was written the expensive way: the missing scenario is exactly
+what let a placeholder APNs bundle ID take out 100% of iOS push, for both apps, undetected for
+as long as it stood. Every observable inside the system stayed green.
+
+The language one matters most of the remaining three, and is the least testable as things stand: there is no specification
 saying which language any surface should render in, so a scenario would have to invent its own pass
 criteria. Writing the specification comes first.
 
