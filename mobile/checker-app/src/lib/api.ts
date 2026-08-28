@@ -21,6 +21,7 @@ import type {
   EmploymentRecordDto,
   LeaderboardEntry,
   Notification,
+  OwnInspectionsPage,
   PayslipRequestDto,
   PushApp,
   PushPlatform,
@@ -587,6 +588,33 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ verification_id: verificationId, notes }),
       }),
+
+    /**
+     * The checker's own inspection history — the shifts they scored, newest
+     * first. Self-scoped server-side off the auth token; there is no actor
+     * parameter to pass and none to spoof.
+     *
+     * This is the app's only route back to a past inspection. Before it, both
+     * evidence screens were reachable only from the redirect immediately after
+     * submitting, or from a push notification — so a checker who dismissed the
+     * confirmation could not see their own scores or photos again, and
+     * "Assign rework" (CRR §14) had no entry point at all.
+     */
+    myInspections: (page = 1, perPage = 20) =>
+      request<OwnInspectionsPage>(
+        `/quality/my-inspections?page=${page}&per_page=${perPage}`
+      ),
+
+    /**
+     * Presigned URLs for one RATING's evidence — the checklist score's photos,
+     * the counterpart of verificationPhotos below. The endpoint has existed
+     * since CRR §15 gave Rating a photo column; nothing in this app called it,
+     * so photos uploaded with a rating could never be looked at again.
+     */
+    ratingPhotos: (ratingId: string) =>
+      request<{ rating_id: string; photos: { key: string; url: string | null }[] }>(
+        `/quality/ratings/${encodeURIComponent(ratingId)}/photos`
+      ),
 
     verificationPhotos: (verificationId: string) =>
       request<{ verification_id: string; photos: { key: string; url: string | null }[] }>(
