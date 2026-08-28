@@ -74,6 +74,59 @@ export class CalendarService extends BaseService {
   // manager-on-a-worker's-behalf write in this codebase is
   // (isWorkerInGroupScope, e.g. users/service.ts#updateUserProfile,
   // documents/service.ts#getDocument) -- admin unrestricted.
+  /**
+   * A sick or vacation day the person marked themselves belongs to them.
+   *
+   * Owner decision, 2026-08-29: "manager should not be able to move or
+   * change worker's or checker's sick leave when the worker or checker has
+   * marked the leave himself."
+   *
+   * The register already had the mirror of this rule -- deleteAbsence()
+   * refuses to let a WORKER remove an absence a manager marked on their
+   * behalf -- but nothing in the other direction. A manager could silently
+   * move, re-kind or delete a worker's own declaration of their own sick
+   * day, and the only trace was an AuditLog entry nobody reads until there
+   * is a dispute. That is precisely the record it matters most not to be
+   * able to rewrite quietly.
+   *
+   * `marked_by_id == null` counts as self-marked. That is not a guess: the
+   * column was added on 2026-08-08
+   * (20260808000000_calendar_absence_reason_and_marked_by) with **no
+   * backfill**, and until that same change landed there was no
+   * manager-on-behalf path at all -- POST /calendar/my-absences was the only
+   * writer. So every NULL row was self-service by construction. Going
+   * forward NULL can also mean "the manager who marked it has since been
+   * deleted" (onDelete: SetNull), which is rare and, for a protection rule,
+   * the safe way to be wrong.
+   *
+   * Note this reads the opposite way from deleteAbsence()'s existing
+   * worker-side branch, which treats NULL as "not manager-marked" so a
+   * worker is never locked out of their own absence. Both choices resolve
+   * the same ambiguity in favour of the WORKER, which is the point.
+   *
+   * Admin is exempt, matching every other rule in this service ("unscoped by
+   * design"): admin is the break-glass role, and a genuinely wrong absence
+   * still has to be fixable by someone.
+   */
+  private assertSelfMarkedAbsenceIsUntouched(
+    existing: { worker_id: string; marked_by_id: string | null },
+    actor: { userId: string; role: string },
+    action: 'move' | 'change' | 'delete'
+  ): void {
+    const role = actor.role.toLowerCase();
+    if (role === 'admin') return;
+    // The owner acting on their own absence is the whole point of protecting it.
+    if (existing.worker_id === actor.userId) return;
+
+    const selfMarked =
+      existing.marked_by_id === null || existing.marked_by_id === existing.worker_id;
+    if (!selfMarked) return;
+
+    throw new ForbiddenError(
+      `Cannot ${action} an absence the worker marked themselves. Ask them to change it.`
+    );
+  }
+
   async markAbsenceForWorker(
     input: MarkAbsenceForWorkerInput,
     actor: { userId: string; role: string; scope?: UserScope | null }
@@ -84,6 +137,23 @@ export class CalendarService extends BaseService {
         throw new ForbiddenError("Cannot mark this worker's absence");
       }
     }
+    // The upsert below overwrites kind, reason and marked_by_id on an
+    // existing row, so "mark on behalf of" is also the CHANGE path -- a
+    // manager re-marking a day the worker already claimed as sick would
+    // silently replace their declaration. Read before writing.
+    const existing = await this.prisma.calendarAbsence.findUnique({
+      where: {
+        worker_id_day: {
+          worker_id: input.worker_id,
+          day: new Date(`${input.day}T00:00:00.000Z`),
+        },
+      },
+      select: { worker_id: true, marked_by_id: true },
+    });
+    if (existing) {
+      this.assertSelfMarkedAbsenceIsUntouched(existing, actor, 'change');
+    }
+
     const { worker_id, ...rest } = input;
     return this.markAbsenceInternal(worker_id, rest, actor);
   }
@@ -171,6 +241,10 @@ export class CalendarService extends BaseService {
       }
     }
 
+    // Scope says WHICH workers a manager may act on; this says whether this
+    // particular absence is theirs to touch at all.
+    this.assertSelfMarkedAbsenceIsUntouched(existing, actor, 'move');
+
     const today = todayInCalendarTimezone();
     if (input.day < today) {
       throw new ConflictError('Cannot move an absence to a past day');
@@ -248,6 +322,12 @@ export class CalendarService extends BaseService {
       const inScope = await isWorkerInGroupScope(actor.scope ?? null, existing.worker_id);
       if (!inScope) throw new ForbiddenError('Cannot delete this absence');
     }
+
+    // The mirror of the worker-side rule above: that one stops a worker
+    // removing a manager's mark, this one stops a manager removing the
+    // worker's own. Placed after the scope checks so an out-of-scope manager
+    // still gets the scope answer rather than being told what the absence is.
+    this.assertSelfMarkedAbsenceIsUntouched(existing, actor, 'delete');
 
     const today = todayInCalendarTimezone();
     const absenceDay = existing.day.toISOString().slice(0, 10);

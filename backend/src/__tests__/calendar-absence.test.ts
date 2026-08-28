@@ -757,7 +757,15 @@ describe('CalendarService.moveAbsence (drag-to-move, 2026-08-08 feature)', () =>
     expect(result.day).toBe('2026-07-29');
   });
 
-  it("allows a manager in scope to move a worker's absence on their behalf", async () => {
+  it("allows a manager in scope to move an absence THEY marked", async () => {
+    // Retargeted 2026-08-29. This used to run against the shared fixture,
+    // which is self-marked (marked_by_id: 'w1') -- so it was asserting that a
+    // manager may move a worker's own declaration, which is now refused.
+    // Manager-on-behalf remains fully supported for marks a manager made.
+    mockCalendarAbsence.findUnique.mockResolvedValue({
+      ...existingAbsence,
+      marked_by_id: 'mgr1',
+    });
     await expect(
       service.moveAbsence(
         'abs1',
@@ -765,6 +773,69 @@ describe('CalendarService.moveAbsence (drag-to-move, 2026-08-08 feature)', () =>
         { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
       )
     ).resolves.toBeDefined();
+  });
+
+  // Owner decision, 2026-08-29: a sick or vacation day the person marked
+  // themselves is theirs. The register already refused to let a WORKER delete
+  // a manager's mark; nothing stopped the reverse, so a manager could quietly
+  // move or rewrite a worker's own declaration of their own sick day.
+  describe("a self-marked absence is the worker's", () => {
+    it('refuses a manager moving an absence the worker marked themselves', async () => {
+      // The shared fixture is self-marked (marked_by_id === worker_id).
+      await expect(
+        service.moveAbsence(
+          'abs1',
+          { day: '2026-07-29' },
+          { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('treats marked_by_id === null as self-marked', async () => {
+      // Not a guess: the column was added on 2026-08-08 with no backfill, and
+      // until that change there was no manager-on-behalf path at all -- every
+      // NULL row was self-service by construction.
+      mockCalendarAbsence.findUnique.mockResolvedValue({
+        ...existingAbsence,
+        marked_by_id: null,
+      });
+      await expect(
+        service.moveAbsence(
+          'abs1',
+          { day: '2026-07-29' },
+          { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        )
+      ).rejects.toMatchObject({ name: 'ForbiddenError' });
+    });
+
+    it('still lets the worker move their OWN self-marked absence', async () => {
+      // The rule protects the owner; it must not lock them out of their own
+      // record, which would make it unusable rather than protected.
+      await expect(
+        service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'w1', role: 'worker' })
+      ).resolves.toBeDefined();
+    });
+
+    it('exempts admin, the break-glass role', async () => {
+      // Consistent with every other rule in this service, and necessary: a
+      // genuinely wrong absence still has to be fixable by someone.
+      await expect(
+        service.moveAbsence('abs1', { day: '2026-07-29' }, { userId: 'admin1', role: 'admin' })
+      ).resolves.toBeDefined();
+    });
+
+    it('reports scope before ownership for an out-of-scope manager', async () => {
+      // An out-of-scope manager must not learn who marked an absence they may
+      // not see at all.
+      mockEmploymentRecord.findUnique.mockResolvedValue({ status: 'ACTIVE', hotel_group_id: 'g_other' });
+      await expect(
+        service.moveAbsence(
+          'abs1',
+          { day: '2026-07-29' },
+          { userId: 'mgr1', role: 'manager', scope: { type: 'hotel_group', hotel_group_id: 'g1' } }
+        )
+      ).rejects.toMatchObject({ message: 'Cannot move this absence' });
+    });
   });
 
   it("denies a manager out of scope (ForbiddenError)", async () => {
@@ -813,6 +884,7 @@ describe('CalendarService.moveAbsence (drag-to-move, 2026-08-08 feature)', () =>
   });
 
   it('notifies the worker when a manager moves the absence on their behalf', async () => {
+    mockCalendarAbsence.findUnique.mockResolvedValue({ ...existingAbsence, marked_by_id: 'mgr1' });
     await service.moveAbsence(
       'abs1',
       { day: '2026-07-29' },
