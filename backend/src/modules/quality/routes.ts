@@ -94,6 +94,20 @@ router.get('/inspectable-workers', requirePermission('quality:write'), (req, res
   qualityController.listInspectableWorkers(req, res, next)
 );
 
+// CRR §14/§15: the checker's own inspection history — the shifts they scored,
+// newest first. `/my-` prefix and no role gate beyond the permission token,
+// matching calendar's /my-absences and analytics' /my-stats: self-scope IS the
+// authorization here, because the service filters on the caller's own id and
+// accepts no actor parameter from the client.
+//
+// quality:read rather than quality:write, even though only a quality:write
+// holder can have authored anything: the token gates a READ, and a role that
+// never inspected simply gets an empty list. Gating a read behind a write
+// token would be the wrong shape to copy the next time this file grows.
+router.get('/my-inspections', requirePermission('quality:read'), (req, res, next) =>
+  qualityController.listOwnInspections(req, res, next)
+);
+
 router.get('/leaderboard', requirePermission('quality:read'), (req, res, next) =>
   qualityController.getLeaderboard(req, res, next)
 );
