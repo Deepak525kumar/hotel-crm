@@ -5,7 +5,13 @@ import {
   ResendProviderClient,
   SendgridProviderClient,
 } from './email-provider.js';
-import { ApnsProviderClient, FcmProviderClient, InvalidTokenError, PushProviderClient } from './push-provider.js';
+import {
+  ApnsProviderClient,
+  FcmProviderClient,
+  InvalidTokenError,
+  PushConfigurationError,
+  PushProviderClient,
+} from './push-provider.js';
 
 /**
  * Compile-time exhaustiveness check: a call site only type-checks if `value`
@@ -395,6 +401,29 @@ export class PushTransportHandler implements TransportHandler {
         });
         successCount += 1;
       } catch (error) {
+        if (error instanceof PushConfigurationError) {
+          // Deployment misconfiguration (today: a wrong APNs topic). Not
+          // transient and not the token's fault, so this neither retries nor
+          // deletes the row -- it is skipped exactly like the "no topic
+          // configured for this app" branch above, and for the same reason:
+          // no number of retries can change the outcome, and burning the
+          // backoff schedule only hides the cause behind a dead-letter count.
+          //
+          // ERROR rather than WARN because this is the one push failure a
+          // human must act on, and it is otherwise invisible: every
+          // individual send looks like an ordinary provider rejection.
+          logger.error('PushTransportHandler: push provider rejected this deployment’s configuration', {
+            event_id: event.event_id,
+            push_token_id: pushToken.id,
+            user_id: notification.user_id,
+            platform: pushToken.platform,
+            app: pushToken.app,
+            topic: error.topic ?? null,
+            error: error.message,
+          });
+          continue;
+        }
+
         if (error instanceof InvalidTokenError) {
           logger.info('PushTransportHandler: device token permanently invalid, deleting', {
             event_id: event.event_id,

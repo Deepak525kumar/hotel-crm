@@ -83,6 +83,44 @@ export class InvalidTokenError extends Error {
   }
 }
 
+/**
+ * Thrown when the provider rejects the send because THIS DEPLOYMENT is
+ * misconfigured, not because anything about the device or the network is
+ * wrong. Today that means the APNs topic: `BadTopic` (the `apns-topic`
+ * header is not a bundle ID this auth key's team owns), `TopicDisallowed`,
+ * and `DeviceTokenNotForTopic` (the token was minted by a different app than
+ * the topic names).
+ *
+ * Separated from the plain `Error` transient path because retrying cannot
+ * possibly help: every attempt re-sends the same wrong header and fails
+ * identically until a human edits the environment and redeploys. Treating it
+ * as transient is not merely wasteful, it is actively misleading -- it was
+ * how a one-character-class config mistake (`com.hotelcrm.checkerapp` in the
+ * deployed .env versus the real `com.fhmhotelservices.checkerapp`) produced
+ * a 100% iOS push outage across BOTH apps that read, from the outside, as a
+ * healthy worker steadily dead-lettering events: the boot log said "APNs
+ * configured", each row exhausted its backoff schedule normally, and no
+ * single log line named the topic as the cause.
+ *
+ * `PushTransportHandler` catches this specifically to log at ERROR with the
+ * offending topic, and to NOT count it as a transient failure. It also never
+ * deletes the PushToken row: the token is perfectly valid and will deliver
+ * the moment the topic is corrected. Deleting it would force every device to
+ * re-register before push worked again, turning a config fix into a
+ * fix-plus-reinstall.
+ */
+export class PushConfigurationError extends Error {
+  constructor(
+    message: string,
+    /** The rejected `apns-topic`, so the log line names what to fix. */
+    readonly topic?: string
+  ) {
+    super(message);
+    this.name = 'PushConfigurationError';
+    Object.setPrototypeOf(this, PushConfigurationError.prototype);
+  }
+}
+
 function base64url(input: string | Buffer): string {
   return Buffer.from(input).toString('base64url');
 }
@@ -181,6 +219,20 @@ export class ApnsProviderClient implements PushProviderClient {
           }
           if (status === 410 || (status === 400 && reason === 'BadDeviceToken')) {
             reject(new InvalidTokenError(`APNs reported the token invalid: ${status} ${reason}`));
+            return;
+          }
+          // Topic rejections are a deployment-config fault, not a delivery
+          // fault -- see PushConfigurationError. `DeviceTokenNotForTopic`
+          // sits here rather than with the invalid-token cases above for the
+          // same reason: the token is fine, it just belongs to the OTHER
+          // app, which means this deployment paired the wrong topic with it.
+          if (reason === 'BadTopic' || reason === 'TopicDisallowed' || reason === 'DeviceTokenNotForTopic') {
+            reject(
+              new PushConfigurationError(
+                `APNs rejected the topic: ${status} ${reason}. apns-topic must equal the app's iOS bundle identifier (expo.ios.bundleIdentifier in mobile/<app>/app.json); check APNS_BUNDLE_ID_WORKER / APNS_BUNDLE_ID_CHECKER.`,
+                input.topic
+              )
+            );
             return;
           }
           reject(new Error(`APNs send failed: ${status} ${reason}`));
