@@ -179,6 +179,7 @@
     "targetRoleChecker": "مُدقِّق"
   },
   "nav": {
+    "history": "السجل",
     "dashboard": "لوحة التحكم",
     "assignments": "المهام",
     "attendance": "الحضور",
@@ -995,6 +996,16 @@
     "nothingErased": "لا يتم محو أي شيء. يتم الحفاظ على السجل ويمكن للمسؤول استعادته من عرض الأرشيف."
   },
   "quality": {
+    "historySubtitle": "المناوبات التي قمت بتقييمها",
+    "historyEmpty": "لا توجد عمليات تفتيش بعد",
+    "historyEmptyBody": "ستظهر هنا المناوبات التي تقيّمها، مع الصور التي رفعتها.",
+    "ratingLabel": "التقييم",
+    "verificationLabel": "الفحص",
+    "notChecked": "لم يُسجَّل فحص النجاح/الرسوب",
+    "recordVerification": "سجِّل فحص النجاح/الرسوب",
+    "photoCount": "{{count}} صور",
+    "ratingEvidence": "أدلة التقييم",
+    "noPhotos": "لم تُرفع أي صور مع هذا التقييم.",
     "outcome": "النتيجة",
     "determinedByScore": "يُحدَّد بناءً على الدرجة",
     "submitVerification": "إرسال التحقق",

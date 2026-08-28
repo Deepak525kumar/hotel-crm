@@ -178,6 +178,7 @@
     "targetRoleChecker": "Contrôleur"
   },
   "nav": {
+    "history": "Historique",
     "dashboard": "Tableau de bord",
     "assignments": "Affectations",
     "attendance": "Présence",
@@ -994,6 +995,16 @@
     "nothingErased": "Rien n'est effacé. L'historique est conservé et un administrateur peut le restaurer depuis la vue archivée."
   },
   "quality": {
+    "historySubtitle": "Services que vous avez notés",
+    "historyEmpty": "Aucune inspection pour le moment",
+    "historyEmptyBody": "Les services que vous notez apparaîtront ici, avec les photos que vous avez envoyées.",
+    "ratingLabel": "Évaluation",
+    "verificationLabel": "Contrôle",
+    "notChecked": "Aucun contrôle réussite/échec enregistré",
+    "recordVerification": "Enregistrer un contrôle réussite/échec",
+    "photoCount": "{{count}} photos",
+    "ratingEvidence": "Preuves de l’évaluation",
+    "noPhotos": "Aucune photo n’a été envoyée avec cette évaluation.",
     "outcome": "Résultat",
     "determinedByScore": "Déterminé par le score",
     "submitVerification": "Envoyer la vérification",

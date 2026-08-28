@@ -152,6 +152,52 @@ export interface Rating {
   created_at: string;
 }
 
+/**
+ * One row of the checker's own inspection history
+ * (GET /quality/my-inspections).
+ *
+ * Keyed by the SHIFT, not by either record: `Rating` and `QualityVerification`
+ * are separate 1:1 records on the same assignment, written by two different
+ * actions (the checklist score and the pass/fail check), so a shift may carry
+ * either or both. Either field being null means "this checker did not record
+ * that kind of inspection for this shift" — the server filters both by the
+ * caller's own authorship, so a colleague's record on the same shift arrives
+ * as null rather than as the caller's own.
+ *
+ * Photo COUNTS, not keys: the presigned URLs live 15 minutes, so they are
+ * fetched per record by the evidence screens rather than carried in a list.
+ */
+export interface OwnInspection {
+  assignment_id: string;
+  day: string;
+  worker: { id: string; first_name: string; last_name: string } | null;
+  hotel: { id: string; name: string; city: string } | null;
+  rating: {
+    id: string;
+    score: number;
+    comment: string | null;
+    criteria_scores: Record<string, number> | null;
+    photo_count: number;
+    created_at: string;
+  } | null;
+  verification: {
+    id: string;
+    score: number;
+    status: VerificationStatus;
+    notes: string | null;
+    photo_count: number;
+    rework_required: boolean;
+    rework_notes: string | null;
+    rework_completed_at: string | null;
+    created_at: string;
+  } | null;
+}
+
+export interface OwnInspectionsPage {
+  inspections: OwnInspection[];
+  pagination: { page: number; per_page: number; total: number; total_pages: number };
+}
+
 // Epic 7 PR 7.7: device push-token registration. Mirrors the backend's
 // PushPlatform/PushApp enums (backend/prisma/schema.prisma). `app` identifies
 // which mobile application minted the token — the Platform Worker needs it to
