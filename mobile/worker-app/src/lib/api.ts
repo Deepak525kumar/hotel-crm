@@ -157,6 +157,34 @@ interface ErrorBody {
   error?: { code?: string; message?: string };
 }
 
+/**
+ * Appends a file to a FormData object in a way that is compatible with React Native's
+ * legacy `fetch` and Expo's WinterCG `fetch`.
+ */
+function appendNativeFile(form: FormData, field: string, asset: { uri: string; name: string; type?: string; file?: unknown }) {
+  if (typeof Blob !== 'undefined' && asset.file instanceof Blob) {
+    // Web: a real File/Blob, which FormData encodes directly.
+    form.append(field, asset.file, asset.name);
+  } else {
+    let FileCtor: (new (uri: string) => unknown) | undefined;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      FileCtor = (require('expo-file-system') as { File: new (uri: string) => unknown }).File;
+    } catch {
+      FileCtor = undefined;
+    }
+    if (!FileCtor) {
+      throw new ApiError(
+        'NATIVE_MODULE_MISSING',
+        'This app build is missing a required component (expo-file-system). Please update or reinstall the app.',
+        0,
+        true,
+      );
+    }
+    form.append(field, new FileCtor(asset.uri) as unknown as Blob, asset.name);
+  }
+}
+
 async function safeJson(res: Response): Promise<ErrorBody> {
   try {
     return await res.json();
@@ -491,7 +519,7 @@ export const api = {
     completeRework: (assignmentId: string, photos: { uri: string; name: string; type: string }[]) => {
       const form = new FormData();
       for (const photo of photos) {
-        form.append('photos', photo as unknown as Blob);
+        appendNativeFile(form, 'photos', photo);
       }
       return request<unknown>(
         `/quality/rework/${encodeURIComponent(assignmentId)}/complete`,
@@ -598,27 +626,7 @@ export const api = {
       // of an Expo module whose native half is absent throws during module
       // evaluation and takes down every importer (the same failure that once
       // presented as "Route is missing the required default export").
-      if (typeof Blob !== 'undefined' && asset.file instanceof Blob) {
-        // Web: a real File/Blob, which FormData encodes directly.
-        form.append('file', asset.file, asset.name);
-      } else {
-        let FileCtor: (new (uri: string) => unknown) | undefined;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          FileCtor = (require('expo-file-system') as { File: new (uri: string) => unknown }).File;
-        } catch {
-          FileCtor = undefined;
-        }
-        if (!FileCtor) {
-          throw new ApiError(
-            'NATIVE_MODULE_MISSING',
-            'This app build is missing a required component (expo-file-system). Please update or reinstall the app.',
-            0,
-            true,
-          );
-        }
-        form.append('file', new FileCtor(asset.uri) as unknown as Blob, asset.name);
-      }
+      appendNativeFile(form, 'file', asset);
       form.append('category', input.category);
       form.append('original_filename', asset.name);
       form.append('mime_type', asset.mimeType ?? 'application/octet-stream');
