@@ -996,7 +996,6 @@
   },
   "quality": {
     "markComplete": "Marquer comme terminé",
-    "reworkNeedsFailingScore": "La reprise n’est possible qu’en dessous de {{score}} — une note réussie n’a rien à refaire.",
     "reworkNeedsComment": "Ajoutez d’abord un commentaire — il est envoyé à la personne comme consigne de reprise.",
     "outcomeFailed": "L’inspection n’a pas pu être enregistrée entièrement. Vérifiez votre historique avant de la renvoyer.",
     "historySubtitle": "Services que vous avez notés",

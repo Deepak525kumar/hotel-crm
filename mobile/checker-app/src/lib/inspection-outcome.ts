@@ -7,39 +7,26 @@
  * outcomes are now the two buttons, which is how a checker actually thinks
  * about the end of an inspection.
  *
- * The constraint that makes this non-trivial is the server's, not this
- * screen's. `QualityVerification.status` is DERIVED from the score
- * (backend/src/modules/quality/service.ts createVerification) — a client
- * cannot choose it — and `assignRework` rejects a PASSED verification with
- * `Cannot assign rework for a passed inspection`. So "assign rework" is only
- * possible below the passing threshold, and offering it above that would be a
- * button whose only possible outcome is a 400 after the checker has filled in
- * the entire form.
+ * **The score does not gate the decision** (owner decision, 2026-08-29).
+ * An earlier revision of this file only offered "assign rework" below the
+ * server's passing threshold, because `assignRework` refused a PASSED
+ * verification. That made the action a function of the number typed a moment
+ * earlier: a checker who scored a room 75 and then saw something that had to
+ * be redone could not say so. The score is a summary; the person standing in
+ * the room is the authority. The server gate is gone, so this one is too.
+ *
+ * What remains is the one requirement the action genuinely has: rework notes.
  *
  * Pure and separate from the screen so it is testable: this project's jest
  * config collects logic from `.test.ts`, so a rule left inside a component is
  * untested by construction.
  */
 
-/**
- * Mirrors the server's threshold in
- * `backend/src/modules/quality/service.ts` (`numScore >= 70 -> PASSED`).
- * Pinned by inspection-outcome-match-server.test.ts, which reads that file —
- * the same guard the checklist keys already carry, and for the same reason:
- * a silently drifted constant here produces a 400 naming a rule the checker
- * cannot see.
- */
-export const PASSING_SCORE = 70;
-
 export type InspectionOutcome = 'complete' | 'rework';
 
 export type ReworkBlockedReason =
-  /** No valid overall score yet — nothing to decide about. */
-  | 'NO_SCORE'
-  /** The score passes, so by definition there is nothing to redo. */
-  | 'PASSING_SCORE'
   /** Rework notes are what the worker is actually sent; an empty one is useless. */
-  | 'NO_COMMENT';
+  'NO_COMMENT';
 
 export interface OutcomeAvailability {
   reworkAllowed: boolean;
@@ -48,26 +35,19 @@ export interface OutcomeAvailability {
 }
 
 /**
- * @param overall the overall score as entered, or null when absent/unparsed
  * @param comment the comment field, which doubles as the rework notes
  *
  * The comment is deliberately reused rather than asking for rework notes in a
  * second box. `assignRework` requires non-empty notes and sends them to the
- * worker as the push body and the notification message — which is exactly
+ * worker as the push body and the notification message -- which is exactly
  * what "anything the worker should know" already asks for. Two fields would
  * ask the same question twice and leave the checker guessing which one the
  * worker actually reads.
+ *
+ * Note there is deliberately no `score` parameter. Adding one back is the
+ * shape the removed gate had, so its absence is the guard.
  */
-export function resolveOutcomeAvailability(
-  overall: number | null,
-  comment: string
-): OutcomeAvailability {
-  if (overall === null || !Number.isInteger(overall) || overall < 0 || overall > 100) {
-    return { reworkAllowed: false, reworkBlockedReason: 'NO_SCORE' };
-  }
-  if (overall >= PASSING_SCORE) {
-    return { reworkAllowed: false, reworkBlockedReason: 'PASSING_SCORE' };
-  }
+export function resolveOutcomeAvailability(comment: string): OutcomeAvailability {
   if (comment.trim() === '') {
     return { reworkAllowed: false, reworkBlockedReason: 'NO_COMMENT' };
   }

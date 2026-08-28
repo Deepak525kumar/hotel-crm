@@ -376,9 +376,17 @@ export class QualityService extends BaseService {
       const inScope = await isHotelInScope(actor.scope ?? null, original.hotel_id);
       if (!inScope) throw new ForbiddenError('Cannot assign rework for this hotel');
     }
-    if (verification.status === VerificationStatus.PASSED) {
-      throw new ValidationError('Cannot assign rework for a passed inspection');
-    }
+    // No score gate. Rework is the CHECKER's decision, not an inference from
+    // the number they typed (owner decision, 2026-08-29).
+    //
+    // This used to refuse a PASSED verification outright, which made the
+    // action a function of the score: `status` is derived from it
+    // (>= 70 PASSED), so a checker who scored a room 75 and then saw
+    // something that had to be redone could not say so. The score is a
+    // summary; the person standing in the room is the authority. The reverse
+    // case was already allowed and uncontroversial -- a NEEDS_REWORK score
+    // with no rework assigned -- so the gate was only ever enforced in one
+    // direction anyway.
 
     return this.prisma.$transaction(async (tx) => {
       // CLAIM FIRST, then act. The read above is a check-then-act window: two
@@ -389,7 +397,22 @@ export class QualityService extends BaseService {
       // zero rows and gets the same 409 a sequential duplicate would.
       const claimed = await tx.qualityVerification.updateMany({
         where: { id: verification.id, rework_required: false },
-        data: { rework_required: true, rework_notes: input.notes },
+        data: {
+          rework_required: true,
+          rework_notes: input.notes,
+          // The decision overrides the score-derived status. Without this a
+          // row can say PASSED while carrying a rework assignment -- which is
+          // self-contradictory in the record, renders as a green PASSED badge
+          // next to "awaiting the worker" on both evidence screens, and lets
+          // analytics keep counting it as a pass (analytics/service.ts filters
+          // on `status: PASSED`) after the checker has said it is not one.
+          //
+          // Deliberately NOT FAILED: the checker asked for a correction, which
+          // is what NEEDS_REWORK means. The `score` column is untouched -- the
+          // number they gave is still the number they gave, and overwriting it
+          // would destroy the input to WorkerOverallRating.
+          status: VerificationStatus.NEEDS_REWORK,
+        },
       });
       if (claimed.count === 0) {
         throw new ConflictError('Rework has already been assigned for this verification');
