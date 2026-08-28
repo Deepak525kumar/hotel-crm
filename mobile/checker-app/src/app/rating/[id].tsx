@@ -62,7 +62,7 @@ export default function RatingScreen() {
       return;
     }
     if (overall === null || !Number.isInteger(overall) || overall < 0 || overall > 100) {
-      setError(t('quality.scoreWholeNumber', 'Score must be a whole number from 0 to 100.'));
+      setError(t('assignments.scoreWholeNumber', 'Score must be a whole number from 0 to 100.'));
       return;
     }
     // CRR §15: the photo accompanies the rating. The server enforces it too
@@ -193,7 +193,7 @@ export default function RatingScreen() {
             ))}
           </Card>
 
-          <SectionHeader title={t('quality.commentOptional', 'Comment (optional)')} />
+          <SectionHeader title={t('fields.commentOptional', 'Comment (optional)')} />
           <Card>
             <TextInput
               value={comment}
