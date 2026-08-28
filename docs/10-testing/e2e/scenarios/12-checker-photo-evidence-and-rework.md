@@ -168,6 +168,62 @@ Platform-wide tiles are deliberately *not* filtered — rework is real work the 
 A stat above 1.0 is the visible symptom; the invisible one is a denominator fixed on one side
 only, so assert the ratio rather than eyeballing the counts.
 
+## Step 10 — The checker can find the inspection again afterwards
+
+```bash
+curl -s -H "Authorization: Bearer $CT" \
+  "http://localhost:3001/api/v1/quality/my-inspections" | jq
+```
+
+**PASS:** the inspection just recorded is in `inspections`, carrying `verification.id`,
+`verification.status`, `verification.rework_required`, and `rating.photo_count` /
+`verification.photo_count`.
+
+**This step encodes a defect every earlier step in this file walked straight past.** Steps 1–9
+drive the rework loop with `curl`, holding ids in shell variables — so they proved the loop
+works while saying nothing about whether a checker could ever *start* it from the app. They
+could not:
+
+- The quality module had **no list endpoint**. `/verifications/:id` and `/ratings/:id/photos`
+  are reachable only by someone who already holds the id, and nothing handed one out.
+- "Assign rework" lives on checker-app's `verification/[id]`. Its only in-app link was the
+  redirect fired immediately after submitting a verification, from `quality/[id]` — which was
+  itself linked only from `attendance/[id]`, a screen **nothing in the app navigates to** (the
+  attendance queue it belonged to was deleted; the Attendance tab shows the checker's own
+  record and routes to `shift/[id]`).
+- The one remaining door was a `REWORK_COMPLETED` push — and push was simultaneously dead, see
+  Scenario 16 Step 0.
+
+So `POST /quality/rework` was fully working, fully tested here, and unreachable in the shipped
+app. **A scenario driven entirely by `curl` cannot catch that class of defect**, because `curl`
+supplies by hand exactly the ids the UI had no way to obtain. Where an HTTP step stands in for
+something a person does in an app, say which screen leads there — and check that it does.
+
+## Step 11 — The history is the caller's own work, not their colleagues'
+
+Have a *second* checker record a verification on an assignment the first checker rated, then
+re-run Step 10 as the **first** checker.
+
+**PASS:** the row appears (it is their rating), but `verification` is `null`.
+
+Both `Rating` and `QualityVerification` hang off the same assignment and the two actions
+routinely have different authors, so the `OR` that finds the assignment will happily carry the
+other person's record along with it. Not a disclosure — anyone who may rate an assignment
+already passes `assertCanViewVerification` for it — but wrong on a screen answering "what did
+I score", and actively misleading where it drives the rework decision. Found against a real
+database; the mocked unit tests were structurally incapable of seeing it, since they asserted
+the query arguments rather than what Postgres returned.
+
+Also confirm the scoping cannot be steered from the client:
+
+```bash
+curl -s -H "Authorization: Bearer $CT" \
+  "http://localhost:3001/api/v1/quality/my-inspections?user_id=$OTHER_CHECKER_ID&checker_id=$OTHER_CHECKER_ID" | jq '.data.pagination.total'
+```
+
+**PASS:** unchanged from Step 10. There is no actor parameter; the filter is the caller's own
+id from `req.auth`.
+
 ---
 
 ## Known gaps in this scenario
@@ -175,6 +231,7 @@ only, so assert the ratio rather than eyeballing the counts.
 - Presigned-URL **expiry** (15-min TTL) is not exercised; a clock-skew or TTL regression
   would pass here.
 - The mobile capture path (`usePhotoPicker`) is not driven; these steps use `curl`, so an
-  Expo-side picker regression is not covered.
+  Expo-side picker regression is not covered. Steps 10-11 narrow this but do not close it:
+  they check that the ids the UI needs are *obtainable*, not that a tap obtains them.
 - Escalation timing is verified by backdating, not by waiting — a wrong *interval constant*
   would still pass. Assert the constant in the unit suite instead.
