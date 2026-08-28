@@ -1,7 +1,12 @@
 import { describe, it, expect, jest, afterEach, beforeAll, afterAll } from '@jest/globals';
 import http2 from 'node:http2';
 import crypto from 'node:crypto';
-import { ApnsProviderClient, FcmProviderClient, InvalidTokenError } from '../modules/notifications/push-provider.js';
+import {
+  ApnsProviderClient,
+  FcmProviderClient,
+  InvalidTokenError,
+  PushConfigurationError,
+} from '../modules/notifications/push-provider.js';
 
 // Epic 7 PR 7.5 (ADR-029 §4). APNs uses Node's raw http2 module (not `fetch`),
 // so its happy/error paths are verified against a real local plaintext (h2c)
@@ -124,6 +129,47 @@ describe('ApnsProviderClient (Epic 7 PR 7.5, ADR-029 §4)', () => {
     const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
 
     await expect(client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.hotelcrm.workerapp' })).rejects.toThrow(InvalidTokenError);
+  });
+
+  // The topic-rejection family. These are DEPLOYMENT faults, not delivery
+  // faults: a wrong `apns-topic` fails identically on every retry until an
+  // operator edits the environment. Classifying them as transient is what let
+  // a placeholder bundle ID (`com.hotelcrm.checkerapp` instead of the real
+  // `com.fhmhotelservices.checkerapp`) take out 100% of iOS push for both
+  // apps while looking like ordinary dead-lettering.
+  it.each(['BadTopic', 'TopicDisallowed', 'DeviceTokenNotForTopic'])(
+    'throws PushConfigurationError on a %s rejection',
+    async (reason) => {
+      nextResponse = { status: 400, body: JSON.stringify({ reason }) };
+      const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+      await expect(
+        client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.wrong.bundle' })
+      ).rejects.toThrow(PushConfigurationError);
+    }
+  );
+
+  it('names the rejected topic on the error, so the log line says what to fix', async () => {
+    nextResponse = { status: 400, body: JSON.stringify({ reason: 'BadTopic' }) };
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await expect(
+      client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.wrong.bundle' })
+    ).rejects.toMatchObject({ topic: 'com.wrong.bundle' });
+  });
+
+  it('does NOT treat a topic rejection as an invalid token', async () => {
+    // The distinction has a real consequence: InvalidTokenError makes
+    // PushTransportHandler DELETE the PushToken row. The token is valid here
+    // — only the header is wrong — so deleting it would force every device to
+    // re-register before push worked again, turning a one-line config fix
+    // into a fix-plus-reinstall.
+    nextResponse = { status: 400, body: JSON.stringify({ reason: 'BadTopic' }) };
+    const client = new ApnsProviderClient(privateKeyBase64, 'KEY123', 'TEAM456', baseUrl);
+
+    await expect(
+      client.send({ token: 't', title: 'Hi', body: 'B', topic: 'com.wrong.bundle' })
+    ).rejects.not.toThrow(InvalidTokenError);
   });
 
   it('throws a plain Error (not InvalidTokenError) on other non-200 responses', async () => {

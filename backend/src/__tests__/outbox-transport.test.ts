@@ -12,7 +12,7 @@ import {
   resolvePushTransportHandler,
   TransportRegistry,
 } from '../modules/notifications/outbox-transport.js';
-import { InvalidTokenError } from '../modules/notifications/push-provider.js';
+import { InvalidTokenError, PushConfigurationError } from '../modules/notifications/push-provider.js';
 
 const makeEvent = (transport: OutboxTransport) =>
   ({
@@ -482,6 +482,42 @@ describe('PushTransportHandler (Epic 7 PR 7.5, ADR-029 §4)', () => {
     // No successes, but the only failure was permanent invalidity — nothing to retry.
     await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
     expect(mockPushTokenDelete).toHaveBeenCalledWith({ where: { id: 'pt1' } });
+  });
+
+  it('does not retry, and does not delete the token, on a PushConfigurationError', async () => {
+    // A wrong `apns-topic` is a deployment fault: it fails identically on
+    // every retry until someone edits the environment, so riding the backoff
+    // schedule into DEAD_LETTER buys nothing and hides the cause. And the
+    // token itself is valid — deleting it would force a re-registration on
+    // every device before push worked again, turning a config fix into a
+    // fix-plus-reinstall.
+    mockPushTokenFindMany.mockResolvedValue([{ id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'CHECKER', user_id: 'user1' }]);
+    mockApnsClient.send.mockRejectedValue(
+      new PushConfigurationError('APNs rejected the topic: 400 BadTopic', 'com.wrong.bundle')
+    );
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+    await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
+    expect(mockPushTokenDelete).not.toHaveBeenCalled();
+  });
+
+  it('still delivers to a healthy device when another device hits a config error', async () => {
+    // The misconfiguration is per-platform (an APNs topic), so Android must
+    // keep working. During the real outage this was the actual production
+    // shape: FCM was correctly configured while every APNs send failed.
+    mockPushTokenFindMany.mockResolvedValue([
+      { id: 'pt1', token: 'ios-token', platform: 'IOS', app: 'CHECKER', user_id: 'user1' },
+      { id: 'pt2', token: 'android-token', platform: 'ANDROID', app: 'CHECKER', user_id: 'user1' },
+    ]);
+    mockApnsClient.send.mockRejectedValue(
+      new PushConfigurationError('APNs rejected the topic: 400 BadTopic', 'com.wrong.bundle')
+    );
+    mockFcmClient.send.mockResolvedValue(undefined);
+    const handler = new PushTransportHandler(mockPrisma, mockApnsClient, mockFcmClient, BOTH_TOPICS as any);
+
+    await expect(handler.deliver(makeEvent(OutboxTransport.PUSH))).resolves.toBeUndefined();
+    expect(mockFcmClient.send).toHaveBeenCalledTimes(1);
+    expect(mockPushTokenDelete).not.toHaveBeenCalled();
   });
 
   it('does not let a failed token-delete block delivery or bubble up', async () => {
